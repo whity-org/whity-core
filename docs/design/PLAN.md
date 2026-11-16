@@ -76,7 +76,7 @@ Done when: EditorArabic and EditorType match; an axe check passes on the editor;
 Live collaboration (cursors, presence, version history) comes after M8 (E.3).
 
 
-# App screens: build plan (2.3–2.9)
+# App screens: build plan (2.3–3.5)
 
 Every screen in the inventory now has cards (`13-app-map.md`). Build them after the foundation (editor M1) is in, one milestone per branch and pull request, comparing with `screenshots/` in both themes and in Arabic where there's an Arabic card.
 
@@ -100,3 +100,75 @@ Done when: store, plugin page, install dialog and Installed tab match; `plugins:
 
 ## A6 · Workspace, billing and settings (section 25)
 Done when: the Settings sub-nav and its pages, your account with text size, billing, the audit log in sentences, and the Platform pages for operators match; money in normal units; Promotions default to JOD.
+
+## A7 · Quick wins on built pages
+The Approvals list with bulk approval for tier-1 items only (AQ.1, `TplApprovalsList`); approval gating with request dates, identity checks, Face ID or passkey, and a second admin for two-step resets (AG.1, `TplGatingTwoStep`); Delegations in names, with I'm away (OR.1, `TplAway`); the 80 mm thermal receipt (N8, `TplReceipt80`). Done when: those cards match, the receipt prints at 72 mm with the JoFotara QR in English and Arabic; a two-step reset can't be completed by one admin or by the requester.
+
+## A8 · Contacts and import
+Customers and suppliers as one record type with tags and a record page; spreadsheet import (CSV, Excel) with column matching for contacts, items, opening stock and opening balances, reusing the label-sheet matcher. Done when: `TplContacts`, `TplImport` and the contact screens in `TmOpsMobile` and `TmFinanceMobile` match (N1, N3); an import shows what will be created, updated or skipped before anything changes, and can be undone for 24 hours.
+
+## A9 · Custom fields
+Fields added to existing records (items, contacts, tasks), using the form builder's kinds, shown in lists, filters, document merge fields and flow conditions. Done when: `TplCustomFields` and "Add a field" in `TmFinanceMobile` match (N2); a new field is usable at once in lists, filters, a document template and a flow condition, without code.
+
+## A10 · Tasks and boards on Taskaat
+Tasks and Boards read and write Taskaat (T.1–T.4), worked out with Taskaat's team: done-when checks, evidence, the review gate, decisions. Done when: `TplTasks`, `TplBoard`, `TmTasks` and `TmBoards` match against a live Taskaat project, and "Open in Taskaat" opens the same task.
+
+## A11 · Receiving, waste and bank (N4–N6)
+Receiving against a purchase order with the phone's scanner and the three-way match (`TplReceiving`); waste and stock adjustments with approval above a value (`TplAdjustments`); bank reconciliation with the Bookkeeping assistant's dashed suggestions (`TplBankRec`). Done when: those cards and their phone screens match; a mismatched bill can't be paid until someone resolves it; the month closes only at a zero difference.
+
+## A12 · Reports and agent notifications (N7, N9)
+Profit and loss, balance sheet, ageing, stock value and sales tax (`TplReports`), as read-only views of the accounts; agent notifications by email and WhatsApp (`TplAgentNotify`). Done when: the cards match; a notification only opens Whity (no actions in the message) and an agent sends at most one an hour, except sign-in approvals.
+
+## A13 · Lottie in the app and the Animations setting (LT.4)
+The player (`handoff/motion/whity-lottie.js` pattern, or `lottie` in Flutter) with colours from the tokens; the moments in `TplMoments` and `TmMoments`; single approvals play `approve-set-down`, bulk stays in code; the Animations setting (Full, Calm, Off) in Account › Preferences and on the phone. Done when: each moment plays once as specified, never blocks a button, follows the workspace's colour and dark mode, and shows its last frame for Calm, Off and reduce motion.
+
+## A14 · The web app on a phone (PW.1–PW.11)
+Under 640px: the tab bar with More and Create, lists with sort, select and bulk, the library, the editor's phone toolbar and modes, calendar, settings, read-only builders, the short-screen sidebar and the account menu (WHIT-827), installing as the workspace's own app and asking for notifications once. Done when: every `Pw*` card is matched at 390 wide in light, dark and Arabic; no page scrolls sideways at 360; the install offer appears once and only in the browser.
+
+## A15 · Screens and surfaces with no card before 3.4 (SC.1–SC.18, SU.1–SU.10)
+Messages (inbox, chat box, settings), Approvals › Decided, impact plans, agent credentials and whity-agent, saved blocks, welcome and joining, sign-up and public-form settings, plan limits, document themes, issuing a document, the two-column sign-in, Whity ID; then the verify page, payment return, the calendar on a computer, the persona editor, the customer's booking page, WhatsApp and SMS templates and link previews. Order them inside the milestones they belong to (calendar with ADR 0017, persona with agents) where that's simpler. Done when: each card in `13-app-map.md`'s 3.4 rows is matched in light, dark and Arabic, and every route in the app map names a built screen.
+
+## P1 · Form printouts (FP.1–FP.12)
+The print engine work in `handoff/print/FORM-PRINTOUTS.md`: the automatic layout from a form's sections, the blocks in `DocFormBlocks`, the decision and approvals, signatures confirmed in Whity (drawn on touch screens), the footer with reference, page x of y and the client's marks, and the Form printouts tab of a document theme (`TplFormPrintStyle`, paid plans and trials; free = standard). Done when: the ethics application in `DocFormPrintout` prints page for page from a real form, in English and Arabic; a trial ending changes only new printouts; the QR opens the verify page.
+
+## A16 · The calendar, like Google Calendar (CV.1–CV.11)
+The sidebar as a rail on calendar screens; the left panel (mini month, search, people and rooms as coloured checkboxes, Also show); Colour by person, service or room per person; Day, 4 days, Week, Month, Year with keys; details beside a booking; click or drag to create with the quick booking; drag to move and pull to resize in 15-minute steps, the customer asked first, Undo for 10 seconds; conflicts (busy, room taken, closed, 409); the phone's Day, 3 days and Month with the drawer, sheets and press and hold. Builds on A15's calendar (`TplCalendarStaff` stays the booking sheet and setup). Done when: `TplCalendarWeek`, `TplCalendarViews`, `TplCalendarEditing` and `TplCalendarPhone` are matched in light, dark and Arabic; every drag can be done with the keyboard; a moved customer booking sends one updated `.ics` with the same UID.
+
+## A17 · One chat (UC.1–UC.13)
+Chat replaces Messages (`/admin/messages` redirects to `/chat`): one list for people, groups, customers on every channel, agents and bots, with tabs; three panes with details or a thread on the right; bubbles or compact rows (Preferences › Chat); replies, threads, reactions, mentions, pins, search in a chat; photos as albums, files, voice with its text; sending, not sent, ticks and Seen by; edit and delete for everyone within 2 days; blocks in messages (records, payment links, booking times, forms, polls, approvals); bots in Settings › Chat; new chat and new group; blocking customers; the phone screens. Customer chats keep notes, assigning and the channel. Done when: `TplChatHub`, `TplChatCompact`, `TplChatParts` and `TplChatPhone` are matched in light, dark and Arabic; a WhatsApp reply and an email reply land in the same conversation; agents never send to a customer without a person.
+
+Everything after A17 and P1 is in the long-term roadmap (section 28): the 3.1 modules (L8) and Whity mobile (L9) are designed and wait there.
+
+
+# Websites (3.3)
+
+The public sites (section 29, WS.1–WS.3). Build-ready static pages are in `sites/`, in English and Arabic. Each site lives where it lives today (whity.dev as a static site, id.whity.dev as the identity provider's templates, the status page apart from Whity); port the pages into that stack and keep the class names and structure. One milestone per site, in this order.
+
+## W1 · whity.dev
+Done when: the page matches `SiteHome` and `SiteHomeAr` at 1440 wide and has no sideways scroll at 390; every feature claim on it is checked against what has shipped (anything not shipped is removed or marked "coming"); plans come from `GET /api/public/plans` (WS.5, contract in section 29) and the page falls back to the saved, then the built-in plans when it doesn't answer; prices stay `[price]` until the owner sets them in Whity.
+
+## W2 · health.whity.dev
+Done when: it matches `SiteStatus`, reads the real status JSON, says in one sentence what isn't working, and stays up when Whity is down.
+
+## W3 · id.whity.dev
+Done when: sign in, approve on the phone and the account page match `SiteId` in both languages; passkeys, Apple and Google sign-in work.
+
+## W4 · brand.whity.dev and W5 · docs.whity.dev
+Done when: they match `SiteBrand` and `SiteDocs`; the brand kit download links to the current files in `handoff/logos/`; docs search works and every article has an Arabic version or says it's coming.
+
+## W6 · The company pages and the footer
+Security, Partners, About, Contact, Privacy, Licence and 404, and the mega footer on every page (WS.13–WS.23). Done when: each matches its `Site*` card in both languages at 1440 and 390; the footer's colour choice is remembered; the contact form posts to `POST /api/public/contact` (contract in section 29) and keeps the message if sending fails; the privacy page shows the lawyer's text once it exists.
+
+## W7 · The one-line installer
+`https://whity.dev/install.sh` as specified in section 29 (WS.20). Done when: on a clean Mac, Linux and Windows-with-WSL machine the line gets to a signed-in Whity at localhost:3000; with Docker or Node.js missing it stops with one plain line and changes nothing; the terminal on `SiteInstall` shows exactly what it prints.
+
+## W8 · Launch check
+Done when: every feature claim on every page is checked against what has shipped; no link on the sites is broken; `llms.txt`, `security.txt` and the brand kit are served.
+
+# Emails (3.3, 3.4)
+
+## E1 · The fifteen emails (EM.1)
+Build from `handoff/emails/` (English and Arabic, placeholders listed in its README). Done when: each email renders as its card (`EmailAccount`, `EmailMoney`, `EmailAgents`, `EmailWorkspace`, `EmailArabic`, `EmailDark`) in Gmail, Outlook and Apple Mail, light and dark; white-label removes "Sent with Whity" and sends from the workspace's own domain; security emails can't be turned off; approval emails only open the app.
+
+## E2 · The ten 3.4 emails (SU.8)
+Bookings (confirmed and moved with an `.ics`, one UID for the booking's life; cancelled with METHOD:CANCEL; the reminder), form received, form decision with the printout PDF, sign request, join approved and declined, message reply (threading back into Messages). Done when: each renders as `EmailBookings`, `EmailForms`, `EmailJoining` in Gmail, Outlook and Apple Mail, light and dark, English and Arabic; a moved booking updates the same calendar entry; a reply to `message-reply` lands in the same conversation.

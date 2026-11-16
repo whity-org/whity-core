@@ -1,17 +1,22 @@
 import type { Block, DocumentKind, PublishBlocker, ResolvedDocumentTheme, WhityDocument } from '@whity/ui/editor/contract';
 import type { FieldGroup } from '@whity/ui/editor/fields';
 import type { BrandLogos } from '@whity/ui/editor/page-view';
-import type { EditorServices, FieldPreview, RecordView, UploadedFile } from '@whity/ui/editor/services';
+import { createElement } from 'react';
+import type { EditorServices, FieldPreview, PluginBlocks, RecordView, UploadedFile } from '@whity/ui/editor/services';
 import type {
   DocumentEditorAdapter,
   IssueResult,
   LoadedDocument,
   SaveResult,
   TemplateSetup,
+  ThemeChoice,
   VersionContent,
 } from '@whity/features/document-editor';
+import { BlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
+import { agentsAdapter } from './agents';
+import { savedBlocksAdapter } from './saved-blocks';
 import { collabAdapter } from './collab';
 
 /**
@@ -39,6 +44,29 @@ function pageOf(page: Row['page']): Pick<WhityDocument, 'page' | 'labels'> {
 /** Who edited last, for the status bar. No name (a seeded starter) shows the time alone. */
 function lastEditor(row: Row): WhityDocument['updatedBy'] {
   return { kind: 'person', id: String(row.updated_by ?? ''), name: row.updated_by_name ?? '' };
+}
+
+/**
+ * The picker's themes from `GET /api/document-themes`: not archived, the
+ * workspace default first, then Whity standard, then the workspace's own.
+ */
+export function themeChoices(rows: unknown): ThemeChoice[] {
+  if (!Array.isArray(rows)) return [];
+  const out: ThemeChoice[] = [];
+  for (const row of rows as Record<string, unknown>[]) {
+    if (typeof row?.ref !== 'string' || row.archived === true) continue;
+    const tokens = (row.tokens ?? {}) as { accent?: unknown };
+    out.push({
+      ref: row.ref,
+      scope: row.scope === 'system' ? 'system' : 'tenant',
+      name: typeof row.name === 'string' ? row.name : row.ref,
+      nameAr: typeof row.name_ar === 'string' ? row.name_ar : '',
+      accent: typeof tokens.accent === 'string' ? tokens.accent : undefined,
+      isDefault: Array.isArray(row.default_for) && row.default_for.includes('workspace'),
+    });
+  }
+  // A stable sort: the default first, everything else as the server listed it.
+  return out.sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
 }
 
 export function toDocument(row: Row): WhityDocument {
@@ -132,11 +160,22 @@ function toRecordView(row: RecordResponse): RecordView {
  * the block shows as hidden rather than as an error.
  */
 async function loadServices(id: string): Promise<EditorServices> {
-  const { data } = await api.GET('/api/v1/document-embeds');
+  // Plugin blocks (editor M7, E.17-E.20): a workspace without any still edits.
+  const [{ data }, pluginBlocks] = await Promise.all([
+    api.GET('/api/v1/document-embeds'),
+    api.GET('/api/v1/document-blocks').then((r) => r.data?.data).catch(() => undefined),
+  ]);
   const fileUrl = (fileId: string) => `/api/v1/document-sources/${Number(id)}/files/${encodeURIComponent(fileId)}/content`;
 
   return {
     recordTypes: data?.data.record_types ?? [],
+    ...(pluginBlocks ? { pluginBlocks: pluginBlocks as unknown as PluginBlocks } : {}),
+    // Whity's own renderer draws a plugin block's declared view; no plugin code runs.
+    renderPluginView: (view) => createElement(BlockRenderer, { blocks: view as Parameters<typeof BlockRenderer>[0]['blocks'] }),
+    async enablePlugin(plugin) {
+      const { response } = await api.POST('/api/v1/workspace-plugins/{plugin}/enable', { params: { path: { plugin } } });
+      if (!response.ok) throw new Error(`Failed to switch the plugin on (${response.status})`);
+    },
     chartSources: data?.data.chart_sources ?? [],
     fileUrl,
     async resolveRecord(ref) {
@@ -189,6 +228,10 @@ export const documentSourcesAdapter: DocumentEditorAdapter = {
   loadServices,
   // M5: comments and suggestions.
   ...collabAdapter,
+  // M6: Ask an agent.
+  ...agentsAdapter,
+  // M7: saved blocks.
+  ...savedBlocksAdapter,
 
   async loadTemplate(recordType): Promise<TemplateSetup> {
     const [{ data, response }, logos] = await Promise.all([
@@ -316,6 +359,12 @@ export const documentSourcesAdapter: DocumentEditorAdapter = {
     throw new Error(typeof body?.error === 'string' ? body.error : `Failed to issue the document (${response.status})`);
   },
 
+  /** WHIT-785: the themes a document may pick, the workspace default first. */
+  async listThemes(): Promise<ThemeChoice[]> {
+    const { data } = await api.GET('/api/v1/document-themes', {});
+    return themeChoices(data?.data);
+  },
+
   async load(id: string): Promise<LoadedDocument> {
     const { data, response } = await api.GET('/api/v1/document-sources/{id}', { params: { path: { id: Number(id) } } });
     if (data === undefined) throw new Error(`Failed to load the document (${response.status})`);
@@ -335,6 +384,8 @@ export const documentSourcesAdapter: DocumentEditorAdapter = {
         blocks: patch.blocks as unknown as Row['blocks'],
         ...(patch.page || patch.labels ? { page: { ...patch.page, ...(patch.labels ? { labels: patch.labels } : {}) } as Row['page'] } : {}),
         ...(patch.ownFields ? { own_fields: patch.ownFields } : {}),
+        // E.44 (WHIT-785): sent only when the picker set it; null follows the workspace default.
+        ...(patch.theme !== undefined ? { theme: patch.theme as Row['theme'] } : {}),
       },
     });
     if (response.status === 409) {

@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "currency": "JOD",
+  "decimals": 3,
+  "updatedAt": "2026-11-09",
+  "plans": [
+    {
+      "id": "free",
+      "highlight": false,
+      "name": {
+        "en": "Free",
+        "ar": "مجاني"
+      },
+      "tagline": {
+        "en": "For a shop or a small team",
+        "ar": "لمتجر أو فريق صغير"
+      },
+      "price": {
+        "monthly": "0"
+      },
+      "limits": {
+        "staff": 5,
+        "customersPerMonth": 500
+      },
+      "features": [
+        {
+          "en": "Your logo and colour",
+          "ar": "شعارك ولونك"
+        },
+        {
+          "en": "Whity’s own apps and agents",
+          "ar": "تطبيقات Whity ووكلاؤه"
+        }
+      ],
+      "cta": {
+        "label": {
+          "en": "Start free",
+          "ar": "ابدأ مجاناً"
+        },
+        "href": "https://app.whity.dev/register?plan=free"
+      }
+    },
+    {
+      "id": "team",
+      "highlight": true,
+      "name": {
+        "en": "Team",
+        "ar": "الفريق"
+      },
+      "tagline": {
+        "en": "For growing teams",
+        "ar": "للفرق المتنامية"
+      },
+      "price": {
+        "monthly": null
+      },
+      "limits": {
+        "staff": 25,
+        "customersPerMonth": 5000
+      },
+      "features": [
+        {
+          "en": "Your own web address and sign-in",
+          "ar": "عنوانك وصفحة دخولك الخاصة"
+        },
+        {
+          "en": "No “Built on Whity”",
+          "ar": "دون «Built on Whity»"
+        }
+      ],
+      "cta": {
+        "label": {
+          "en": "Start free",
+          "ar": "ابدأ مجاناً"
+        },
+        "href": "https://app.whity.dev/register?plan=team"
+      }
+    },
+    {
+      "id": "business",
+      "highlight": false,
+      "name": {
+        "en": "Business",
+        "ar": "الأعمال"
+      },
+      "tagline": {
+        "en": "For branches and bigger teams",
+        "ar": "للفروع والفرق الأكبر"
+      },
+      "price": {
+        "monthly": null
+      },
+      "limits": {
+        "staff": 100,
+        "customersPerMonth": 25000
+      },
+      "features": [
+        {
+          "en": "Your own app in the stores",
+          "ar": "تطبيقك الخاص في المتاجر"
+        },
+        {
+          "en": "Everything in Team",
+          "ar": "كل ما في الفريق"
+        }
+      ],
+      "cta": {
+        "label": {
+          "en": "Start free",
+          "ar": "ابدأ مجاناً"
+        },
+        "href": "https://app.whity.dev/register?plan=business"
+      }
+    }
+  ],
+  "dedicatedHosting": {
+    "fromMonthly": null
+  }
+}

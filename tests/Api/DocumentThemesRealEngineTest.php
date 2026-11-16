@@ -20,6 +20,9 @@ use Whity\Core\Document\Fields\DocumentFieldRegistry;
 use Whity\Core\Document\Print\SourceDocumentPrinter;
 use Whity\Core\Document\Theme\DocumentThemeRepository;
 use Whity\Core\Document\Theme\DocumentThemeResolver;
+use Whity\Core\Entitlement\EntitlementRegistry;
+use Whity\Core\Entitlement\EntitlementService;
+use Whity\Core\Entitlement\TenantEntitlementRepository;
 use Whity\Core\Ou\OuReachResolver;
 use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\RBAC\ResourceRoleAssignmentRepository;
@@ -176,6 +179,49 @@ final class DocumentThemesRealEngineTest extends TestCase
         self::assertSame('document', $theme['sources']['letterhead.lines']);
     }
 
+    /** Design 3.4: the letterhead layout and the form printout options ride on the theme. */
+    public function testFormPrintoutOptionsAndTheLetterheadLayoutAreThemeOptions(): void
+    {
+        $this->themes->create(self::TENANT, 'irb', 'IRB', 'لجنة', 'whity.standard', ['accent' => '#7a1f3d'], self::OWNER);
+        $before = $this->resolver->resolve(self::TENANT, ['ref' => 'tenant.irb']);
+        self::assertArrayNotHasKey('form', $before['tokens'], 'only when a theme sets it');
+        self::assertArrayNotHasKey('layout', $before['tokens']['letterhead'], 'the start layout is the default and adds nothing');
+
+        $this->themes->update(self::TENANT, 'irb', 1, ['tokens' => [
+            'accent' => '#7a1f3d',
+            'letterhead' => ['layout' => 'centred'],
+            'form' => ['sectionStyle' => 'number', 'marks' => [['src' => 'data:image/png;base64,iVBORw0KGgo=', 'alt' => 'ISO 9001:2015']]],
+        ]], self::OWNER);
+        $theme = $this->resolver->resolve(self::TENANT, ['ref' => 'tenant.irb', 'overrides' => ['letterhead' => ['layout' => 'bilingual']]]);
+
+        self::assertSame('bilingual', $theme['tokens']['letterhead']['layout'], 'a document may override the layout');
+        self::assertSame('number', $theme['tokens']['form']['sectionStyle']);
+        self::assertSame('tenant.irb', $theme['sources']['form']);
+        self::assertNotSame($before['hash'], $theme['hash']);
+    }
+
+    public function testTheTitleFaceAndLargePrintAreThemeOptions(): void
+    {
+        $standard = $this->resolver->resolve(self::TENANT);
+        self::assertSame('readex', $standard['tokens']['titleFace'], 'E.46: Readex Pro by default');
+        self::assertFalse($standard['tokens']['largePrint'], 'E.47: off by default');
+        self::assertSame('whity.standard', $standard['sources']['titleFace']);
+
+        $this->themes->create(self::TENANT, 'plain', 'Plain', 'بسيط', 'whity.standard', [
+            'titleFace' => 'noto',
+            'largePrint' => true,
+        ], self::OWNER);
+        $theme = $this->resolver->resolve(self::TENANT, ['ref' => 'tenant.plain']);
+        self::assertSame('noto', $theme['tokens']['titleFace']);
+        self::assertTrue($theme['tokens']['largePrint']);
+        self::assertSame('tenant.plain', $theme['sources']['largePrint']);
+        self::assertNotSame($standard['hash'], $theme['hash']);
+
+        self::assertSame(['titleFace' => 'titleFace must be one of readex, noto.'], \Whity\Core\Document\Theme\DocumentThemeTokens::errors(['titleFace' => 'comic']));
+        self::assertSame(['largePrint' => 'largePrint must be true or false.'], \Whity\Core\Document\Theme\DocumentThemeTokens::errors(['largePrint' => 'yes']));
+        self::assertArrayHasKey('largePrint', \Whity\Core\Document\Theme\DocumentThemeTokens::errors(['largePrint' => true], overridesOnly: true), 'a theme option, not a document override');
+    }
+
     public function testADocumentsOwnPrintColourGetsAMatchingTitleOnDark(): void
     {
         $this->themes->create(self::TENANT, 'house', 'House', 'الدار', null, [
@@ -248,6 +294,24 @@ final class DocumentThemesRealEngineTest extends TestCase
         self::assertSame(409, $this->call('create', 'POST', '/api/document-themes', [
             'key' => 'bakery', 'name' => 'Again', 'name_ar' => 'مرة أخرى',
         ])->getStatusCode(), 'a key is unique in its workspace');
+    }
+
+    /**
+     * WHIT-1024: the schema says whether this workspace may customise its form
+     * printouts, so the Form printouts tab shows a free plan's options locked.
+     */
+    public function testTheSchemaSaysWhetherFormPrintoutsMayBeCustomised(): void
+    {
+        $entitlements = new EntitlementService(new TenantEntitlementRepository($this->pdo));
+        $this->handler = new DocumentThemesApiHandler($this->themes, $this->resolver, $this->settings, $entitlements);
+
+        $paid = $this->data($this->call('schema', 'GET', '/api/document-themes/schema'));
+        self::assertTrue($paid['form']['allowed']);
+        self::assertSame('documents.form_printouts', $paid['form']['entitlement']);
+
+        $entitlements->set(self::TENANT, EntitlementRegistry::DOCUMENTS_FORM_PRINTOUTS, 'false');
+        $free = $this->data($this->call('schema', 'GET', '/api/document-themes/schema'));
+        self::assertFalse($free['form']['allowed']);
     }
 
     public function testAThemeNeedsBothNamesAndOnlyTheClosedTokens(): void

@@ -1,6 +1,7 @@
 import * as React from "react"
 import { IconLock } from "@tabler/icons-react"
 
+import { Lottie } from "./lottie"
 import { cn } from "./utils"
 
 /**
@@ -37,13 +38,26 @@ function LockedScreen({
       )}
       {...props}
     >
-      <div
-        data-slot="locked-screen-icon"
-        aria-hidden="true"
-        className="mb-4 rounded-full bg-muted p-4 text-muted-foreground [&>svg]:size-12"
-      >
-        {icon ?? <IconLock />}
-      </div>
+      {icon ? (
+        <div
+          data-slot="locked-screen-icon"
+          aria-hidden="true"
+          className="mb-4 rounded-full bg-muted p-4 text-muted-foreground [&>svg]:size-12"
+        >
+          {icon}
+        </div>
+      ) : (
+        // The security-lock scene (LT.4); the lock icon shows until it is ready.
+        <Lottie
+          name="security-lock"
+          className="mb-4 h-[120px] w-[160px]"
+          fallback={
+            <span data-slot="locked-screen-icon" className="rounded-full bg-muted p-4 text-muted-foreground [&>svg]:size-12">
+              <IconLock />
+            </span>
+          }
+        />
+      )}
       <h2 data-slot="locked-screen-title" className="mb-2 text-xl font-semibold text-foreground">
         {title}
       </h2>

@@ -35,6 +35,7 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 const mockApiClient = jest.fn();
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient: mockApiClient, user: { id: 7 } }),
 }));
@@ -193,6 +194,47 @@ describe('a decision step offers a verdict', () => {
     expect(JSON.parse(String((mockApiClient.mock.calls[0][1] as RequestInit).body))).toEqual({
       action: 'acknowledged',
       note: 'The budget line is wrong',
+      verdict: 'rejected',
+    });
+  });
+
+  it('asks for the values the step needs and sends them only with an approval (WHIT-1016)', async () => {
+    mockApiClient.mockImplementation(() =>
+      jsonResponse(201, { data: {}, resolved: 0, delivered: 0, decided: 'approved' })
+    );
+    const asking = decisionRoute({
+      steps: [
+        step({ id: 11, position: 1 }),
+        step({ id: 12, position: 2 }),
+        step({
+          id: 13,
+          position: 3,
+          decision: true,
+          inputs: [{ key: 'meeting_no', label: 'Committee meeting number', label_ar: null, required: true, max_length: 20 }],
+        }),
+      ],
+    });
+
+    const { unmount } = renderPanel(asking, SOLE_APPROVER);
+    expect(screen.getByText('Fill in before you approve')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Committee meeting number'), { target: { value: '14' } });
+    fireEvent.click(screen.getByRole('button', { name: /approve/i }));
+
+    await waitFor(() => expect(mockApiClient).toHaveBeenCalled());
+    expect(JSON.parse(String((mockApiClient.mock.calls[0][1] as RequestInit).body))).toEqual({
+      action: 'acknowledged',
+      verdict: 'approved',
+      values: { meeting_no: '14' },
+    });
+    unmount();
+
+    mockApiClient.mockClear();
+    renderPanel(asking, SOLE_APPROVER);
+    fireEvent.change(screen.getByLabelText('Committee meeting number'), { target: { value: '14' } });
+    fireEvent.click(screen.getByRole('button', { name: /reject/i }));
+    await waitFor(() => expect(mockApiClient).toHaveBeenCalled());
+    expect(JSON.parse(String((mockApiClient.mock.calls[0][1] as RequestInit).body))).toEqual({
+      action: 'acknowledged',
       verdict: 'rejected',
     });
   });

@@ -25,6 +25,16 @@ final readonly class Branding
          * instance setting, not a workspace one: the same on every host.
          */
         public bool $installable = true,
+        /**
+         * Whether the workspace's public pages show "Built on Whity" (WHIT-932):
+         * false when its plan holds `brand.remove_badge`.
+         */
+        public bool $builtOnWhity = true,
+        /**
+         * The workspace's currency (CU.4): what Money shows and new amounts
+         * start in when a screen has no row of its own. USD by default.
+         */
+        public string $currency = 'USD',
     ) {
     }
 
@@ -32,7 +42,7 @@ final readonly class Branding
      * The main colour (2.8) and the light and dark token sets derived from it
      * are null until the workspace sets one; clients then keep Whity Blue.
      *
-     * @return array{siteName: string, logoWideUrl: ?string, logoSquareUrl: ?string, faviconUrl: ?string, mainColor: ?string, theme: array{light: array<string, string>, dark: array<string, string>}|null, installable: bool}
+     * @return array{siteName: string, logoWideUrl: ?string, logoSquareUrl: ?string, faviconUrl: ?string, mainColor: ?string, theme: array{light: array<string, string>, dark: array<string, string>}|null, installable: bool, builtOnWhity: bool, currency: string}
      */
     public function toArray(): array
     {
@@ -44,6 +54,8 @@ final readonly class Branding
             'mainColor' => $this->mainColor,
             'theme' => $this->theme,
             'installable' => $this->installable,
+            'builtOnWhity' => $this->builtOnWhity,
+            'currency' => $this->currency,
         ];
     }
 }

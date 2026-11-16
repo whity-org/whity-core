@@ -68,10 +68,10 @@ export const Arabic: Story = {
       title: "تذكير بالدفع",
       blocks: [
         { id: "a1", type: "paragraph", content: [t("السادة عيادة المثال المحترمين،")] },
-        { id: "a2", type: "paragraph", content: [t("استحقت الفاتورة INV-1042 بقيمة JOD 301.600 بتاريخ 14 Oct 2026.")] },
+        { id: "a2", type: "paragraph", content: [t("استحقت الفاتورة INV-1042 بقيمة $301.60 بتاريخ 14 Oct 2026.")] },
         { id: "a3", type: "heading", level: 1, content: [t("الفواتير المفتوحة")] },
-        { id: "a4", type: "number", level: 0, content: [t("INV-1042، بقيمة JOD 301.600")] },
-        { id: "a5", type: "number", level: 0, content: [t("INV-1051، بقيمة JOD 96.000")] },
+        { id: "a4", type: "number", level: 0, content: [t("INV-1042، بقيمة $301.60")] },
+        { id: "a5", type: "number", level: 0, content: [t("INV-1051، بقيمة $96.00")] },
         { id: "a6", type: "paragraph", content: [t("Payment can also be made online by card.")] },
         { id: "a7", type: "checklist", level: 0, checked: false, content: [t("مراجعة المبالغ")] },
       ],

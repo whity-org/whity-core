@@ -58,6 +58,7 @@ final class TenantOwnedTables
         'resource_role_assignments' => '088_create_resource_role_assignments.php',
         'permission_delegations' => '014_create_permission_delegations.php',
         'audit_log' => '016_create_audit_log.php',
+        'away_periods' => '251_add_two_admin_resets_and_away.php',
         'persons' => '018_create_persons.php',
         'relations' => '020_create_relations.php',
         'tenant_settings' => '025_create_tenant_settings.php',
@@ -111,6 +112,63 @@ final class TenantOwnedTables
         // (plans / plan_entitlements are global catalogs with no tenant_id,
         // unregistered like `permissions`.)
         'tenant_plan' => '055_create_plans.php',
+
+        // WHIT-932 — add-on packs a workspace holds beside its tier, and the
+        // distinct customers it served each month. Every query binds tenant_id.
+        'tenant_plan_addons' => '241_create_tenant_plan_addons.php',
+        'tenant_monthly_customers' => '242_create_tenant_monthly_customers.php',
+
+        // WHIT-941 — calendar and bookings (ADR 0017). Every query binds
+        // tenant_id; the two token lookups (feed, manage link) are reasoned
+        // ignores that read the tenant from the row they find.
+        'calendar_staff' => '247_create_calendar.php',
+        'calendar_working_hours' => '247_create_calendar.php',
+        'calendar_events' => '247_create_calendar.php',
+        'calendar_services' => '248_create_calendar_bookings.php',
+        'calendar_service_staff' => '248_create_calendar_bookings.php',
+        'calendar_bookings' => '248_create_calendar_bookings.php',
+        // Design 3.3: rooms a service needs, filtered by branch.
+        'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
+        // Design 3.5: each person's own calendar view choices (CV.2, CV.4).
+        'calendar_view_preferences' => '278_create_calendar_view_preferences.php',
+        'calendar_event_people' => '284_extend_calendar_events.php',
+
+        // WHIT-953 — contacts and their spreadsheet imports (design 3.3 A8).
+        // Every query binds tenant_id.
+        'contacts' => '261_create_contacts.php',
+        'contact_imports' => '261_create_contacts.php',
+        'contact_import_changes' => '261_create_contacts.php',
+
+        // WHIT-954 — the workspace's own fields and their values (A9).
+        'custom_field_definitions' => '263_create_custom_fields.php',
+        'custom_field_values' => '263_create_custom_fields.php',
+        // Messages (ADR 0016, WHIT-938): conversations with customers, their
+        // messages, web chat visitors and the per-workspace settings. Every
+        // query binds tenant_id. The public chat and inbound webhook routes find
+        // the workspace from its slug first, then bind it like any other read.
+        'conversations' => '243_create_conversations_and_messages.php',
+        'messages' => '243_create_conversations_and_messages.php',
+        'conversation_contacts' => '289_one_conversation_per_customer.php',
+        'webchat_visitors' => '245_create_webchat_and_messaging_settings.php',
+        // Team chat (CH.1, CH.2): a team chat and its people and agents.
+        'chats' => '253_create_team_chat.php',
+        'chat_members' => '253_create_team_chat.php',
+        // One chat (UC.1): each person's pins and read marks on any conversation.
+        'chat_person_state' => '281_create_chat_person_state.php',
+        // Reactions on chat messages (UC.9).
+        'chat_message_reactions' => '282_add_chat_message_parts.php',
+        // Files, photos and voice sent in Chat (UC.10).
+        'chat_attachments' => '279_create_chat_attachments.php',
+        'stored_files' => '298_create_stored_files.php',
+        // Votes in chat polls (UC.5).
+        'chat_poll_votes' => '280_create_chat_poll_votes.php',
+        // Bots and blocked senders (UC.4, UC.12).
+        'chat_bots' => '283_create_chat_bots_and_blocking.php',
+        'chat_blocked_senders' => '283_create_chat_bots_and_blocking.php',
+        // Code plugins switched on per workspace (WHIT-1122).
+        'tenant_code_plugins' => '287_create_tenant_code_plugins.php',
+        // Cash payments for paid plugin plans (WHIT-1153).
+        'plugin_cash_payments' => '296_create_plugin_cash_payments.php',
 
         // WC-affiliates — which workspace an affiliate referred (migration 154).
         // The referral is the only affiliate table carrying a tenant: it says
@@ -185,6 +243,12 @@ final class TenantOwnedTables
         'document_suggestions' => '183_create_document_suggestions.php',
         'document_comment_threads' => '184_create_document_comment_threads.php',
         'document_comments' => '185_create_document_comments.php',
+        'document_agent_requests' => '252_create_document_agent_requests.php',
+        // Editor M7: saved blocks, their insert-only versions, and which
+        // documents use them (migrations 260 and 265, E.21-E.24, E.38).
+        'saved_blocks' => '260_create_saved_blocks.php',
+        'saved_block_versions' => '260_create_saved_blocks.php',
+        'saved_block_uses' => '265_create_saved_block_uses.php',
         // Whity Builder (WHIT-760): a workspace's own plugins as published
         // manifest versions, the live pointer, and the permission slugs they
         // declare (migration 164).
@@ -257,6 +321,8 @@ final class TenantOwnedTables
         'document_route_recipients'  => '112_create_document_routing.php',
         // WHIT-919: the versions of whatever a route travels on.
         'route_subject_versions'     => '226_add_route_send_back_and_versions.php',
+        // WHIT-1016: values a person entered at a route step (migration 267).
+        'route_step_values'          => '267_add_route_step_inputs.php',
         // WHIT-922: signatures, saved drawn signatures and signing confirmations.
         'route_signatures'           => '232_add_route_signatures.php',
         'saved_signatures'           => '232_add_route_signatures.php',
@@ -534,10 +600,6 @@ final class TenantOwnedTables
         // each document. Every statement binds `tenant_id` and the plugin slug,
         // so one plugin's tracking never answers for another plugin's document.
         'plugin_document_links' => '214_create_plugin_document_links.php',
-        // `form_submission_reviews` (migration 194) — the office's record on a
-        // submission. Every statement binds `tenant_id`, so a submission id from
-        // another tenant reads as not found.
-        'form_submission_reviews' => '194_add_form_staff_fields_and_reviews.php',
         // Convening (migrations 130/131/134) — deliberative bodies, who sits on
         // them, their meetings, the agenda each meeting carries, the decisions
         // taken, who was invited, and who actually turned up. All seven are
@@ -562,6 +624,8 @@ final class TenantOwnedTables
         // profile-only join condition would be satisfiable by another tenant's
         // invitation row.
         'meeting_attendees' => '134_create_meeting_attendance.php',
+        // Web push: one browser per person per workspace (WHIT-1073).
+        'push_subscriptions' => '276_create_push_subscriptions.php',
     ];
 
     /**

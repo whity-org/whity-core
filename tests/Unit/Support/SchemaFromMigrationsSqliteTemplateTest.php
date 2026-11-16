@@ -152,6 +152,149 @@ final class SchemaFromMigrationsSqliteTemplateTest extends TestCase
         self::assertGreaterThan(0, (int) $this->one($pdo, 'SELECT COUNT(*) FROM permissions'));
     }
 
+    /**
+     * NOW() holds still for a whole statement, as PostgreSQL's does (WHIT-949).
+     *
+     * Migration 121 writes `NOW(), NOW()` as created_at and updated_at, and
+     * migration 124 claims only rows where updated_at <= created_at. A NOW()
+     * that read the clock on every call gave a row two different seconds
+     * whenever the clock ticked between the calls, and that row came out of the
+     * migrations unclaimed. Here the clock is made to tick between the calls on
+     * purpose, through both exec() and prepare().
+     */
+    public function testNowHoldsStillForAWholeStatement(): void
+    {
+        $pdo = SchemaFromMigrations::make();
+        $pdo->sqliteCreateFunction('whity_wait_for_next_second', static function (): int {
+            $start = time();
+            while (time() === $start) {
+                usleep(20_000);
+            }
+
+            return 1;
+        }, 0);
+
+        $pdo->exec('CREATE TABLE clock_probe (created_at TEXT, waited INTEGER, updated_at TEXT)');
+        $pdo->exec('INSERT INTO clock_probe VALUES (NOW(), whity_wait_for_next_second(), NOW())');
+        $pdo->prepare('INSERT INTO clock_probe SELECT NOW(), whity_wait_for_next_second(), NOW() WHERE :seed = \'catalogue\'')
+            ->execute([':seed' => 'catalogue']);
+
+        $rows = $this->all($pdo, 'SELECT created_at, updated_at FROM clock_probe');
+        self::assertCount(2, $rows);
+        foreach ($rows as $row) {
+            self::assertSame($row['created_at'], $row['updated_at']);
+        }
+
+        // Text that says NOW() is not a call.
+        self::assertSame('NOW()', $this->one($pdo, "SELECT 'NOW()'"));
+    }
+
+    /**
+     * A template built after a test changed the process is still exactly what a
+     * process nothing has touched gets from running the migrations (WHIT-949).
+     *
+     * The template is built the first time any test in a process asks for a
+     * database, so whatever the tests before it changed is there when it is
+     * built. This test changes what tests commonly change (the timezone and an
+     * environment variable the migrations do not read), forces a rebuild, and
+     * compares the copy with a migration run in a separate, clean PHP process.
+     */
+    public function testATemplateBuiltAfterTheProcessChangedMatchesACleanProcess(): void
+    {
+        $timezone = date_default_timezone_get();
+        $env = [];
+        foreach (SchemaFromMigrations::PG_TEMPLATE_ENV_INPUTS as $name) {
+            $value = $_ENV[$name] ?? getenv($name);
+            if (is_string($value)) {
+                $env[] = $name . '=' . $value;
+            }
+        }
+
+        try {
+            date_default_timezone_set('Pacific/Kiritimati');
+            $_ENV['WHITY_TEMPLATE_PROBE'] = 'changed';
+            putenv('WHITY_TEMPLATE_PROBE=changed');
+
+            // Lose this process's template files so the next make() builds anew.
+            foreach (glob(sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'whity-phpunit-sqlite-' . getmypid() . '-*.db') ?: [] as $file) {
+                unlink($file);
+            }
+            SchemaFromMigrations::make();
+            $copy = SchemaFromMigrations::make();
+        } finally {
+            date_default_timezone_set($timezone);
+            unset($_ENV['WHITY_TEMPLATE_PROBE']);
+            putenv('WHITY_TEMPLATE_PROBE');
+        }
+
+        $clean = $this->cleanProcessMigrationRun($env);
+
+        self::assertSame(
+            array_column($clean['objects'], null, 'name'),
+            array_column($this->all($copy, 'SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY name'), null, 'name')
+        );
+        self::assertNotEmpty($clean['tables']);
+        foreach ($clean['tables'] as $table => $rows) {
+            self::assertSame(
+                $this->mask($rows),
+                $this->rows($copy, (string) $table),
+                "Table {$table} differs from a migration run in a clean process."
+            );
+        }
+    }
+
+    /**
+     * Every file a migration run reads is part of the template's key, so an
+     * edit to a catalogue or to a class a migration calls builds a new one.
+     */
+    public function testTheTemplateKeyCoversEveryFileTheMigrationsRead(): void
+    {
+        $files = SchemaFromMigrations::fingerprintFiles();
+
+        foreach ([
+            'database/migrations/124_add_translation_source_provenance.php',
+            'database/migrations/135_sync_permission_descriptions.php',
+            'database/i18n/admin.json',
+            'src/Core/i18n/TranslationSync.php',
+            'src/Core/i18n/TranslationCatalog.php',
+            'src/Core/RBAC/CorePermissionDescriptions.php',
+            'src/Core/RBAC/CorePermissions.php',
+        ] as $expected) {
+            self::assertContains($expected, $files);
+        }
+        self::assertNotEmpty(preg_grep('#^database/i18n/[^/]+/[^/]+\.json$#', $files), 'Locale catalogues are part of the key.');
+
+        foreach (['RENDER_SERVICE_URL', 'RENDER_SHARED_SECRET', 'COMPOSE_PROFILES', 'INITIAL_SYSTEM_ADMIN_EMAIL'] as $name) {
+            self::assertContains($name, SchemaFromMigrations::PG_TEMPLATE_ENV_INPUTS);
+        }
+    }
+
+    /**
+     * @param list<string> $env NAME=value pairs the migrations read
+     * @return array{objects: list<array<string, mixed>>, tables: array<string, list<array<string, mixed>>>}
+     */
+    private function cleanProcessMigrationRun(array $env): array
+    {
+        $command = array_merge(
+            [PHP_BINARY, dirname(__DIR__, 2) . '/Support/sqlite-clean-migration-dump.php'],
+            $env
+        );
+        $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        self::assertIsResource($process);
+
+        $output = (string) stream_get_contents($pipes[1]);
+        $errors = (string) stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        self::assertSame(0, proc_close($process), $errors);
+
+        $result = unserialize($output, ['allowed_classes' => false]);
+        self::assertIsArray($result, $errors);
+
+        /** @var array{objects: list<array<string, mixed>>, tables: array<string, list<array<string, mixed>>>} */
+        return $result;
+    }
+
     /** @return array<string, array<string, mixed>> */
     private function objects(PDO $pdo): array
     {
@@ -191,6 +334,15 @@ final class SchemaFromMigrationsSqliteTemplateTest extends TestCase
             ? 'SELECT name, seq FROM sqlite_sequence ORDER BY name'
             : 'SELECT rowid AS whity_rowid, * FROM "' . $table . '" ORDER BY rowid';
 
+        return $this->mask($this->all($pdo, $query));
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function mask(array $rows): array
+    {
         return array_map(static fn(array $row): array => array_map(
             static function (mixed $value): mixed {
                 if (is_string($value) && preg_match('/^\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d/', $value) === 1) {
@@ -203,7 +355,7 @@ final class SchemaFromMigrationsSqliteTemplateTest extends TestCase
                 return $value;
             },
             $row
-        ), $this->all($pdo, $query));
+        ), $rows);
     }
 
     /** @return list<array<string, mixed>> */

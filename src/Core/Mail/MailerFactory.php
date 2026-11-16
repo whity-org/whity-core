@@ -18,12 +18,9 @@ use Whity\Core\Settings\SettingsService;
 /**
  * Selects the {@see Mailer} transport (WC-235 / WC-email).
  *
- * Two sources:
- *   - {@see fromEnv()} — the boot-time fallback driven by MAIL_TRANSPORT
- *     ('' / 'null' → Null, 'log' → Log). SMTP is NOT built from env: it needs
- *     the settings-backed config below.
- *   - {@see fromSettings()} — the real, operator-configured transport read from
- *     the GLOBAL instance settings (`mail.*`). This is what the app uses.
+ * {@see fromSettings()} builds the operator-configured transport from the
+ * GLOBAL instance settings (`mail.*`). (The old boot-time MAIL_TRANSPORT
+ * environment fallback had no caller left and went with WHIT-1053.)
  *
  * Fail-safe throughout: an unknown/misconfigured transport degrades to
  * {@see NullMailer} with a warning rather than crashing the worker on boot —
@@ -31,9 +28,6 @@ use Whity\Core\Settings\SettingsService;
  */
 final class MailerFactory
 {
-    /** Environment variable naming the transport (legacy/boot fallback). */
-    public const ENV_TRANSPORT = 'MAIL_TRANSPORT';
-
     /**
      * The app_settings key holding the SMTP password, encrypted at rest. It is
      * deliberately NOT a {@see SettingsRegistry} key: it lives in `app_settings`
@@ -46,20 +40,6 @@ final class MailerFactory
     public const AUTH_MODE_OAUTH2 = 'oauth2';
 
     private const TOKEN_REQUEST_TIMEOUT_SECONDS = 10;
-
-    /**
-     * @param array<string, mixed> $env Environment map (e.g. $_ENV).
-     */
-    public static function fromEnv(array $env, LoggerInterface $logger): Mailer
-    {
-        $transport = strtolower(trim((string) ($env[self::ENV_TRANSPORT] ?? '')));
-
-        return match ($transport) {
-            '', 'null' => new NullMailer(),
-            'log'      => new LogMailer($logger),
-            default    => self::unknown($transport, $logger),
-        };
-    }
 
     /**
      * Build the transport from GLOBAL instance settings (`mail.*`).

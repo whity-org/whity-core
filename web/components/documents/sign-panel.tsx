@@ -22,7 +22,7 @@ import { Checkbox } from '@whity/ui/checkbox';
 import { Input } from '@whity/ui/input';
 import { Textarea } from '@whity/ui/textarea';
 import { useTranslation } from '@whity/features/i18n';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import type { DocumentRoute } from './routing-wire';
 import {
@@ -60,17 +60,17 @@ export interface SignPanelProps {
   documentId: number;
   route: DocumentRoute;
   onActed: () => void;
+  /** Called once the signature is recorded, before `onActed` refetches. */
+  onSigned?: () => void;
 }
 
-async function errorOf(response: Response, fallback: string): Promise<string> {
-  const body: unknown = await response.json().catch(() => null);
+function errorOf(body: unknown, fallback: string): string {
   const error = typeof body === 'object' && body !== null ? (body as { error?: unknown }).error : undefined;
   return typeof error === 'string' && error !== '' ? error : fallback;
 }
 
-export function SignPanel({ documentId, route, onActed }: SignPanelProps) {
+export function SignPanel({ documentId, route, onActed, onSigned }: SignPanelProps) {
   const t = useTranslation('documents');
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
 
   const [context, setContext] = useState<SigningContext | null>(null);
@@ -87,22 +87,22 @@ export function SignPanel({ documentId, route, onActed }: SignPanelProps) {
   const [reason, setReason] = useState('');
   const [returnOutcome, setReturnOutcome] = useState<string | null>(null);
 
-  const base = `/api/v1/documents/${documentId}/routes/${route.id}`;
-
   const load = useCallback(async () => {
     try {
-      const response = await apiClient(`${base}/signing`);
+      const { data, response } = await api.GET('/api/v1/documents/{id}/routes/{routeId}/signing', {
+        params: { path: { id: documentId, routeId: route.id } },
+      });
       if (!response.ok) {
         setLoadError(true);
         return;
       }
-      const body = (await response.json()) as { data: SigningContext };
+      const body = data as unknown as { data: SigningContext };
       setContext(body.data);
       setUseSaved(body.data.saved_signature !== null);
     } catch {
       setLoadError(true);
     }
-  }, [apiClient, base]);
+  }, [documentId, route.id]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- loads once per route
@@ -135,12 +135,14 @@ export function SignPanel({ documentId, route, onActed }: SignPanelProps) {
     setBusy('code');
     setRefusal(null);
     try {
-      const response = await apiClient(`${base}/signing/code`, { method: 'POST' });
+      const { data, error, response } = await api.POST('/api/v1/documents/{id}/routes/{routeId}/signing/code', {
+        params: { path: { id: documentId, routeId: route.id } },
+      });
       if (!response.ok) {
-        setRefusal(await errorOf(response, t('signing.code.error', 'The code could not be sent.')));
+        setRefusal(errorOf(error, t('signing.code.error', 'The code could not be sent.')));
         return;
       }
-      const body = (await response.json()) as { data: { email_hint: string | null } };
+      const body = data as unknown as { data: { email_hint: string | null } };
       setCodeHint(body.data.email_hint);
     } catch {
       setRefusal(t('signing.code.error', 'The code could not be sent.'));
@@ -162,10 +164,9 @@ export function SignPanel({ documentId, route, onActed }: SignPanelProps) {
     setBusy('sign');
     setRefusal(null);
     try {
-      const response = await apiClient(`${base}/sign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { error, response } = await api.POST('/api/v1/documents/{id}/routes/{routeId}/sign', {
+        params: { path: { id: documentId, routeId: route.id } },
+        body: {
           content_hash: context.subject.content_hash,
           consent,
           consent_version: context.consent_version,
@@ -175,16 +176,17 @@ export function SignPanel({ documentId, route, onActed }: SignPanelProps) {
             factor.method === 'fresh_sign_in'
               ? { method: factor.method }
               : { method: factor.method, code: code.replace(/\s+/g, '') },
-        }),
+        } as never,
       });
       if (!response.ok) {
-        const message = await errorOf(response, t('signing.error', 'The signature could not be recorded.'));
+        const message = errorOf(error, t('signing.error', 'The signature could not be recorded.'));
         setRefusal(message);
         addToast(message, 'error');
         if (response.status === 409) void load();
         return;
       }
       addToast(t('signing.done', 'Signed. Your electronic signature is recorded with the audit trail.'), 'success');
+      onSigned?.();
       onActed();
     } catch {
       setRefusal(t('signing.error', 'The signature could not be recorded.'));
@@ -197,13 +199,12 @@ export function SignPanel({ documentId, route, onActed }: SignPanelProps) {
     setBusy('decline');
     setRefusal(null);
     try {
-      const response = await apiClient(`${base}/actions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'declined', note: reason.trim() }),
+      const { error, response } = await api.POST('/api/v1/documents/{id}/routes/{routeId}/actions', {
+        params: { path: { id: documentId, routeId: route.id } },
+        body: { action: 'declined', note: reason.trim() } as never,
       });
       if (!response.ok) {
-        setRefusal(await errorOf(response, t('signing.decline.error', 'Your decline could not be recorded.')));
+        setRefusal(errorOf(error, t('signing.decline.error', 'Your decline could not be recorded.')));
         return;
       }
       addToast(t('signing.decline.done', 'You declined to sign. Your reason is in the trail.'), 'info');

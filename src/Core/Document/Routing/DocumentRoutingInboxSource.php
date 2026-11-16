@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Document\Routing;
 
 use Whity\Core\Identity\PersonName;
-use Whity\Core\Inbox\InboxItem;
+use Whity\Sdk\Inbox\InboxItem;
 use Whity\Core\Inbox\InboxSourceInterface;
 use Whity\Core\RBAC\ResourceTypeRegistry;
 use Whity\Core\Settings\SettingsRegistry;
@@ -81,10 +81,32 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
      */
     public function list(int $tenantId, int $profileId, bool $openOnly, int $limit, int $offset): array
     {
-        $rows = $this->recipients->listForProfile($tenantId, $profileId, $openOnly, $limit, $offset);
         $showReviewers = $this->showsReviewerNames($tenantId);
+        $covered = $this->recipients->coveredBy($tenantId, $profileId);
+        if ($covered === []) {
+            $rows = $this->recipients->listForProfile($tenantId, $profileId, $openOnly, $limit, $offset);
 
-        return array_map(static fn (array $row): InboxItem => self::toItem($row, $showReviewers), $rows);
+            return array_map(static fn (array $row): InboxItem => self::toItem($row, $showReviewers), $rows);
+        }
+
+        // Merge map A2: while people who named this person are away, their open
+        // items wait here too, each saying whom it is for. Merged newest first.
+        $rows = $this->recipients->listForProfile($tenantId, $profileId, $openOnly, $limit + $offset, 0);
+        $for = [];
+        foreach ($covered as $awayId) {
+            $for[$awayId] = ['profile_id' => $awayId, 'name' => $this->recipients->memberName($tenantId, $awayId)];
+            foreach ($this->recipients->listForProfile($tenantId, $awayId, true, $limit + $offset, 0) as $row) {
+                if (($row['role'] ?? RouteRecipientRepository::ROLE_STEP) === RouteRecipientRepository::ROLE_STEP) {
+                    $rows[] = $row;
+                }
+            }
+        }
+        usort($rows, static fn (array $a, array $b): int => (int) $b['id'] <=> (int) $a['id']);
+
+        return array_map(
+            static fn (array $row): InboxItem => self::toItem($row, $showReviewers, $for[(int) $row['profile_id']] ?? null),
+            array_slice($rows, $offset, $limit),
+        );
     }
 
     /** WHIT-920: `forms.show_reviewer_names`, off unless the workspace turned it on. */
@@ -100,15 +122,22 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
 
     public function count(int $tenantId, int $profileId, bool $openOnly): int
     {
-        return $this->recipients->countForProfile($tenantId, $profileId, $openOnly);
+        $count = $this->recipients->countForProfile($tenantId, $profileId, $openOnly);
+        foreach ($this->recipients->coveredBy($tenantId, $profileId) as $awayId) {
+            $count += $this->recipients->countOpenStepItems($tenantId, $awayId);
+        }
+
+        return $count;
     }
 
     /**
      * One recipient row as an inbox item.
      *
      * @param array<string, mixed> $row A row from {@see RouteRecipientRepository::listForProfile()}.
+     * @param array{profile_id: int, name: string}|null $for Merge map A2: the
+     *        person who is away, when the reader decides this item for them.
      */
-    private static function toItem(array $row, bool $showReviewers = false): InboxItem
+    private static function toItem(array $row, bool $showReviewers = false, ?array $for = null): InboxItem
     {
         // WHIT-920 (A9): an item sent back to the person who SENT a form, on a
         // route with no document, comes from a reviewer the applicant does not
@@ -195,6 +224,9 @@ final class DocumentRoutingInboxSource implements InboxSourceInterface
                 // was created. Offering Forward / Acknowledge / Return on one is
                 // offering three buttons that cannot work.
                 'satisfied_by' => $delivery ? RouteSatisfaction::DELIVERY : RouteSatisfaction::ACT,
+                // Merge map A2: set when the reader decides this for someone
+                // who is away ("For Amro Saleh"); null on their own items.
+                'on_behalf_of' => $for,
             ],
             sender: $sender,
         );

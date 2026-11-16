@@ -1,0 +1,95 @@
+{
+  "plans": [
+    {
+      "plan_key": "starter",
+      "name": "Starter",
+      "description": "For a small team finding its feet.",
+      "sort_order": 10,
+      "is_addon": false,
+      "prices": [
+        {
+          "currency": "USD",
+          "amount": 0,
+          "period": "month",
+          "per_seat": false
+        }
+      ],
+      "limits": {
+        "members.max": 3,
+        "documents.render.per_month": 20,
+        "documents.form_printouts": false,
+        "sso.tenant_idp": false,
+        "customers.per_month": 100,
+        "agents.runs.per_month": 200,
+        "brand.custom_domain": false,
+        "brand.remove_badge": false,
+        "brand.own_email_sender": false,
+        "brand.own_app": false
+      }
+    },
+    {
+      "plan_key": "professional",
+      "name": "Professional",
+      "description": "Per seat, for a growing organisation.",
+      "sort_order": 20,
+      "prices": [
+        {
+          "currency": "USD",
+          "amount": 800,
+          "period": "month",
+          "per_seat": true
+        },
+        {
+          "currency": "USD",
+          "amount": 8000,
+          "period": "year",
+          "per_seat": true
+        }
+      ],
+      "limits": {
+        "members.max": 40,
+        "documents.render.per_month": 500,
+        "documents.form_printouts": true,
+        "storage.quota_bytes": 21474836480,
+        "sso.tenant_idp": true,
+        "customers.per_month": 2000,
+        "agents.runs.per_month": 2000,
+        "brand.custom_domain": true,
+        "brand.remove_badge": true,
+        "brand.own_email_sender": true,
+        "brand.own_app": false
+      }
+    },
+    {
+      "plan_key": "enterprise",
+      "name": "Enterprise",
+      "description": "Negotiated. A plan with no prices cannot be bought, only quoted.",
+      "sort_order": 30,
+      "prices": [],
+      "limits": {
+        "members.max": -1,
+        "documents.render.per_month": -1,
+        "documents.form_printouts": true,
+        "storage.quota_bytes": -1,
+        "sso.tenant_idp": true,
+        "customers.per_month": -1,
+        "agents.runs.per_month": -1,
+        "brand.custom_domain": true,
+        "brand.remove_badge": true,
+        "brand.own_email_sender": true,
+        "brand.own_app": true
+      }
+    },
+    {
+      "plan_key": "extra-staff",
+      "name": "Extra staff",
+      "description": "An add-on pack. Each pack adds its numbers to the plan's; a workspace may hold several.",
+      "sort_order": 100,
+      "is_addon": true,
+      "prices": [],
+      "limits": {
+        "members.max": 10
+      }
+    }
+  ]
+}

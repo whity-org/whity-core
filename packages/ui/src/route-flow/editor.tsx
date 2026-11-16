@@ -219,6 +219,8 @@ export interface RouteFlowEditorLabels {
   quorumAll: string;
   quorumAny: string;
   quorumMajority: string;
+  /** Optional so older callers keep working; falls back to the English. */
+  quorumFirst?: string;
   /** Shown when the graph is larger than the ceiling and has been cut. */
   tooManyNodes: string;
 }
@@ -624,9 +626,9 @@ interface RouteFlowEdgeData extends Record<string, unknown> {
  * Bigger than a label's own line box, so the two clear rather than touch.
  */
 const LABEL_NUDGE: Record<RouteFlowVerdict | 'continue', number> = {
-  approved: -18,
+  approved: -22,
   continue: 0,
-  rejected: 18,
+  rejected: 22,
 };
 
 /**
@@ -670,7 +672,8 @@ function RouteFlowTransitionEdge({
       // SVG text defaults to black and `@xyflow/react` sets no fill of its own,
       // so an edge label was black on a near-black canvas in dark mode. Both
       // colours come from the theme, so the chip and its text move together.
-      labelStyle={{ fontSize: 10, fill: 'var(--color-muted-foreground, #64748b)' }}
+      // `--text-xs` (13px, the floor, A.1), and it grows with Larger text.
+      labelStyle={{ fontSize: 'var(--text-xs)', fill: 'var(--color-muted-foreground, #64748b)' }}
       labelShowBg
       labelBgPadding={[4, 2]}
       labelBgBorderRadius={3}
@@ -736,6 +739,8 @@ export function RouteFlowEditor({
           return labels.quorumAny;
         case 'majority':
           return labels.quorumMajority;
+        case 'first':
+          return labels.quorumFirst ?? 'the first answer decides';
         default:
           return labels.quorumAll;
       }

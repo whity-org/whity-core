@@ -14,6 +14,11 @@ import { cn } from "./utils"
  * margin is physical (`ml`) rather than logical.
  */
 const buttonVariants = cva(
+  // On a touch screen every button gets a hit area of at least 44 × 44
+  // (04-layout, touch targets) without changing how it looks: an invisible
+  // ::after reaches out to 44px around the smaller sizes. `relative` anchors
+  // it; a caller's `absolute`/`fixed` still wins through tailwind-merge.
+  "relative pointer-coarse:after:absolute pointer-coarse:after:inset-x-[min(0px,calc((100%-2.75rem)/2))] pointer-coarse:after:inset-y-[min(0px,calc((100%-2.75rem)/2))] pointer-coarse:after:content-[''] " +
   "group/button inline-flex shrink-0 items-center justify-center gap-1.5 rounded-control border border-transparent bg-clip-padding text-sm leading-none font-medium whitespace-nowrap outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive [&_svg]:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {

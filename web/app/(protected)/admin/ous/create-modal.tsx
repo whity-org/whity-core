@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api, type components } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   Dialog,
@@ -21,9 +21,9 @@ import {
 import { Textarea } from '@whity/ui/textarea';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import { LocalizedNameField } from '@/components/localized-name-field';
-import { cleanNames, type NameLanguage } from '@/lib/localized-name';
 import type { BilingualValue } from '@whity/ui/bilingual-input';
 import type { OU } from './types';
+import { type BilingualLanguage, cleanLocalizedText } from '@whity/ui/localized-text';
 
 interface CreateOuModalProps {
   isOpen: boolean;
@@ -41,7 +41,6 @@ export function CreateOuModal({
   ous,
   defaultParentId = null,
 }: CreateOuModalProps) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const [isLoading, setIsLoading] = useState(false);
@@ -50,10 +49,10 @@ export function CreateOuModal({
   // language they are reading in.
   const readerLanguage = useLanguageCode();
   const [names, setNames] = useState<BilingualValue>({});
-  const [chosenLanguage, setChosenLanguage] = useState<NameLanguage | null>(null);
+  const [chosenLanguage, setChosenLanguage] = useState<BilingualLanguage | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
-  const filled = Object.keys(cleanNames(names));
-  const nameLanguage: NameLanguage =
+  const filled = Object.keys(cleanLocalizedText(names));
+  const nameLanguage: BilingualLanguage =
     chosenLanguage ??
     (filled.length === 1 && (filled[0] === 'ar' || filled[0] === 'en')
       ? filled[0]
@@ -69,7 +68,7 @@ export function CreateOuModal({
   );
 
   const handleCreate = async () => {
-    const cleaned = cleanNames(names);
+    const cleaned = cleanLocalizedText(names);
     const original = cleaned[nameLanguage] ?? '';
     if (original === '') {
       setNameError(
@@ -83,7 +82,7 @@ export function CreateOuModal({
 
     try {
       setIsLoading(true);
-      const payload: Record<string, unknown> = {
+      const payload: components['schemas']['OuCreateRequest'] = {
         name: original,
         names: cleaned,
         name_language: nameLanguage,
@@ -94,15 +93,11 @@ export function CreateOuModal({
         payload.parent_id = parseInt(parentId, 10);
       }
 
-      const response = await apiClient('/api/v1/ous', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
+      const { response, error } = await api.POST('/api/v1/ous', { body: payload });
 
       if (!response.ok) {
-        const error = await response.json();
         throw new Error(
-          error.error || t('ous.create.error', 'Failed to create organizational unit')
+          (error as { error?: string } | undefined)?.error || t('ous.create.error', 'Failed to create organizational unit')
         );
       }
 

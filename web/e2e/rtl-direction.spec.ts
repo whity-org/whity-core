@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { AppShell } from './support/pages';
 
 /**
  * App-wide RTL support: interface direction is a PROPERTY OF THE CHOSEN
@@ -21,13 +22,13 @@ test.describe('Interface direction follows the language', () => {
   test('choosing Arabic flips <html dir>, and the choice survives a reload', async ({ page }) => {
     await page.goto('/dashboard');
     const html = page.locator('html');
-    const switcher = page.getByTestId('language-switcher').locator('select');
+    const shell = new AppShell(page);
 
     // Defaults to LTR once the provider resolves English.
     await expect(html).toHaveAttribute('dir', 'ltr');
 
     // Choosing Arabic mirrors the whole document — no separate control.
-    await switcher.selectOption('ar');
+    await shell.chooseLanguage('العربية');
     await expect(html).toHaveAttribute('dir', 'rtl');
     await expect(html).toHaveAttribute('lang', 'ar');
 
@@ -36,7 +37,7 @@ test.describe('Interface direction follows the language', () => {
     await expect(html).toHaveAttribute('dir', 'rtl');
 
     // And switching back to English un-mirrors it.
-    await switcher.selectOption('en');
+    await shell.chooseLanguage('English');
     await expect(html).toHaveAttribute('dir', 'ltr');
   });
 

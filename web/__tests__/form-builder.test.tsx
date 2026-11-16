@@ -12,6 +12,9 @@ import { FormBuilderScreen, FormsListScreen } from '@whity/features/forms';
 import { ResponsesTab } from '../../packages/features/src/forms/responses-tab';
 import type { FormsScreenEnv } from '@whity/features/forms';
 import {
+  canControl,
+  conditionOperator,
+  controllersFor,
   reorder,
   problemsOf,
   snapshot,
@@ -123,6 +126,21 @@ describe('builder model', () => {
     const copy = duplicateField(fields, 0);
     expect(copy[1].id).toBeUndefined();
     expect(copy[1].field_key).toBe('imports_copy');
+  });
+
+  it('offers every earlier question to a rule, and compares values only on choice questions', () => {
+    const fields = [
+      draft('imports', { field_type: 'checkbox' }),
+      draft('staff', { field_type: 'repeating' }),
+      draft('notes'),
+      draft('customs'),
+    ];
+    expect(controllersFor(fields, 3).map((f) => f.field_key)).toEqual(['imports', 'staff', 'notes']);
+    expect(controllersFor(fields, 3).filter(canControl).map((f) => f.field_key)).toEqual(['imports']);
+    expect(conditionOperator({ field: 'imports', equals: true })).toBe('equals');
+    expect(conditionOperator({ field: 'kind', in: ['a'] })).toBe('equals');
+    expect(conditionOperator({ field: 'imports', notEquals: true })).toBe('notEquals');
+    expect(conditionOperator({ field: 'staff', answered: true })).toBe('answered');
   });
 
   it('compares objects by their contents, because the server returns labels in another order', () => {
@@ -320,6 +338,23 @@ describe('FormBuilderScreen', () => {
     await userEvent.click(await screen.findByRole('switch', { name: 'Not open to members' }));
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/forms/7/member-access')).toBe(true));
     expect(await screen.findByRole('switch', { name: 'Open to members' })).toBeChecked();
+  });
+
+  it('says when the reference is given, and keeps the choice on a save (WHIT-1017)', async () => {
+    const calls: Array<{ method: string; path: string; body?: unknown }> = [];
+    const env = fakeEnv(calls, { ...FORM, reference_format: 'IRB {SEQ}/{STEP:meeting_no}', reference_assign: 'approval' });
+    render(<FormBuilderScreen env={env} formId={7} canManage />);
+    await screen.findByText(/Supplier name/);
+    await userEvent.click(screen.getByRole('tab', { name: 'Settings' }));
+
+    expect(await screen.findByText('When it is approved')).toBeInTheDocument();
+    expect(screen.getByText(/finishes approved, before the final document is made/)).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText('Reference number'), '-X');
+    await userEvent.click(await screen.findByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'PATCH')).toBe(true));
+    const patch = calls.find((c) => c.method === 'PATCH');
+    expect(patch?.body).toMatchObject({ reference_format: 'IRB {SEQ}/{STEP:meeting_no}-X', reference_assign: 'approval' });
   });
 
   it('does not show the switch while the server does not offer it', async () => {

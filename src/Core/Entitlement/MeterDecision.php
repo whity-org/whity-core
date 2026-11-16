@@ -12,17 +12,24 @@ namespace Whity\Core\Entitlement;
  * the daily one they will get back tonight, or the monthly one that means they
  * should upgrade — and WHEN it returns. Those two answers lead to completely
  * different actions, and a boolean can express neither.
+ *
+ * A WARNING IS ALLOWED AND STILL NAMES THE LIMIT. With `meters.enforcement` on
+ * `warn` an action past its limit goes ahead, and {@see self::$warned} is what
+ * separates it from an ordinary allowed action, the same split
+ * {@see \Whity\Core\Seat\SeatDecision} makes for seats.
  */
 final class MeterDecision
 {
     private function __construct(
         public readonly bool $allowed,
-        /** The limit that refused, or null when allowed. */
+        /** The limit that refused or was passed, or null when neither. */
         public readonly ?string $key = null,
         public readonly int $limit = 0,
         public readonly int $remaining = 0,
         /** ISO-8601 instant when the refusing window reopens. */
         public readonly ?string $resetsAt = null,
+        /** Past the limit, on an instance that warns instead of refusing. */
+        public readonly bool $warned = false,
     ) {
     }
 
@@ -36,10 +43,15 @@ final class MeterDecision
         return new self(false, $key, $limit, max(0, $remaining), $resetsAt);
     }
 
+    public static function warned(string $key, int $limit, string $resetsAt): self
+    {
+        return new self(true, $key, $limit, 0, $resetsAt, true);
+    }
+
     /**
-     * The period the refusing limit runs on, for wording the message.
+     * The period the named limit runs on, for wording the message.
      *
-     * @throws \InvalidArgumentException When called on an allowed decision.
+     * @throws \InvalidArgumentException When no limit was refused or passed.
      */
     public function period(): ?string
     {

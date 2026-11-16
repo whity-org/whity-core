@@ -69,7 +69,7 @@ test.describe('Delegations (role matrix)', () => {
       page.getByRole('heading', { name: 'Delegations' })
     ).toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Delegate' })
+      page.getByRole('button', { name: 'New delegation' })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: 'Access denied' })
@@ -111,7 +111,7 @@ test.describe('Delegations (role matrix)', () => {
 
     // Open the create modal; its pickers load from /api/permissions,
     // /api/roles, /api/users and /api/ous before the form renders.
-    await page.getByRole('button', { name: 'Delegate' }).click();
+    await page.getByRole('button', { name: 'New delegation' }).click();
     const dialog = page.getByRole('dialog');
     await expect(
       dialog.getByText('Grant a subset of your own permissions')

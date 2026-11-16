@@ -85,7 +85,7 @@ test.describe('Website Settings — admin (settings:read/write/manage)', () => {
 
     // …and must be denied when navigating directly to the (also system-tenant-only) Sign-up page.
     await page.goto('/admin/settings/signup');
-    await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
     await expect(page.getByTestId('settings-section-signup')).toHaveCount(0);
   });
 });

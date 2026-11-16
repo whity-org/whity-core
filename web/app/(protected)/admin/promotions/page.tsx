@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api, type components } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
+import { useWorkspaceCurrency } from '@/lib/branding-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { PLANS_MANAGE } from '@/lib/capabilities';
@@ -63,22 +64,21 @@ interface Promotion {
 const FORBIDDEN = 'forbidden';
 
 export default function PromotionsPage() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
   const canManage = hasPermission(PLANS_MANAGE);
 
   const { data, loading, error, refetch } = useFetch(async () => {
-    const res = await apiClient('/api/v1/promotions');
+    const { data: body, response: res } = await api.GET('/api/v1/promotions');
     if (res.status === 403) {
       throw new Error(FORBIDDEN);
     }
     if (!res.ok) {
       throw new Error(t('promotions.error.load', 'Failed to load promotions'));
     }
-    return ((await res.json()).data ?? []) as Promotion[];
-  }, [apiClient]);
+    return (((body as { data?: unknown[] } | undefined)?.data ?? []) as Promotion[]);
+  }, []);
 
   const [creating, setCreating] = useState(false);
 
@@ -144,9 +144,11 @@ export default function PromotionsPage() {
         size="sm"
         data-testid={`retire-${promotion.id}`}
         onClick={async () => {
-          const res = await apiClient(`/api/v1/promotions/${promotion.id}`, { method: 'DELETE' });
+          const { response: res, error } = await api.DELETE('/api/v1/promotions/{id}', {
+            params: { path: { id: promotion.id } },
+          });
           if (!res.ok) {
-            const body = (await res.json().catch(() => null)) as { error?: string } | null;
+            const body = (error ?? null) as { error?: string } | null;
             addToast(body?.error ?? t('promotions.retireFailed', 'Could not retire this promotion.'), 'error');
             return;
           }
@@ -231,7 +233,6 @@ export default function PromotionsPage() {
  * discover from a revenue report.
  */
 function CreatePromotionDialog({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
 
@@ -240,13 +241,14 @@ function CreatePromotionDialog({ onClose, onSaved }: { onClose: () => void; onSa
   const [kind, setKind] = useState<'percent' | 'amount'>('percent');
   const [percent, setPercent] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('JOD');
+  const workspaceCurrency = useWorkspaceCurrency();
+  const [currency, setCurrency] = useState(workspaceCurrency);
   const [endsAt, setEndsAt] = useState('');
   const [maxRedemptions, setMaxRedemptions] = useState('');
   const [saving, setSaving] = useState(false);
 
   const percentValue = Number(percent);
-  // Typed in normal units ("5.000"); the API takes minor units.
+  // Typed in normal units ("5.00"); the API takes minor units.
   let amountValue = 0;
   if (amount.trim() !== '' && /^[A-Z]{3}$/.test(currency)) {
     try {
@@ -388,7 +390,7 @@ function CreatePromotionDialog({ onClose, onSaved }: { onClose: () => void; onSa
             data-testid="promo-save"
             onClick={async () => {
               setSaving(true);
-              const payload: Record<string, unknown> = { name: name.trim() };
+              const payload: components['schemas']['PromotionCreateRequest'] = { name: name.trim() };
               if (code.trim() !== '') payload.code = code.trim();
               if (kind === 'percent') {
                 payload.percent_off = percentValue;
@@ -402,14 +404,11 @@ function CreatePromotionDialog({ onClose, onSaved }: { onClose: () => void; onSa
               if (endsAt !== '') payload.ends_at = `${endsAt} 00:00:00`;
               if (maxRedemptions.trim() !== '') payload.max_redemptions = Number(maxRedemptions);
 
-              const res = await apiClient('/api/v1/promotions', {
-                method: 'POST',
-                body: JSON.stringify(payload),
-              });
+              const { response: res, error } = await api.POST('/api/v1/promotions', { body: payload });
               setSaving(false);
 
               if (!res.ok) {
-                const body = (await res.json().catch(() => null)) as
+                const body = (error ?? null) as
                   | { error?: string; details?: Record<string, string> }
                   | null;
                 // The server's own words. A 409 explains that the code is taken

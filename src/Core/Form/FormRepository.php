@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 use PDOException;
 use Whity\Core\Db\DbBool;
@@ -50,7 +51,7 @@ final class FormRepository
      * Written once and shared by every read, so a column added to the table
      * cannot reach one caller and not another.
      */
-    private const COLUMNS = 'id, tenant_id, form_key, name, title, description, submit_label, sections, banner, reference_format, status, version,
+    private const COLUMNS = 'id, tenant_id, form_key, name, title, description, submit_label, sections, banner, reference_format, reference_assign, status, version,
                              route_template_id,
                              (SELECT t.name FROM document_route_templates t
                                WHERE t.id = forms.route_template_id AND t.tenant_id = forms.tenant_id) AS route_template_name,
@@ -469,7 +470,7 @@ final class FormRepository
             $stmt->execute([
                 ':tenant_id' => $tenantId,
                 ':form_key' => $formKey,
-                ':name' => LocalizedLabel::encode($name),
+                ':name' => LocalizedText::encode($name),
                 ':description' => $description,
                 ':status' => FormStatus::DRAFT,
                 ':route_template_id' => $routeTemplateId,
@@ -502,7 +503,7 @@ final class FormRepository
      * Returns false when the form does not exist in this tenant.
      *
      * @param array<string, mixed> $changes Any of: name, title, description, route_template_id,
-     *                                     submit_label, sections, reference_format, banner.
+     *                                     submit_label, sections, reference_format, reference_assign, banner.
      */
     public function update(int $tenantId, int $id, array $changes): bool
     {
@@ -513,7 +514,7 @@ final class FormRepository
             /** @var array<string, string> $name */
             $name = $changes['name'];
             $sets[] = 'name = :name';
-            $params[':name'] = LocalizedLabel::encode($name);
+            $params[':name'] = LocalizedText::encode($name);
         }
         if (array_key_exists('title', $changes)) {
             $sets[] = 'title = :title';
@@ -553,6 +554,11 @@ final class FormRepository
         if (array_key_exists('reference_format', $changes)) {
             $sets[] = 'reference_format = :reference_format';
             $params[':reference_format'] = $changes['reference_format'];
+        }
+        // WHIT-1017: `submit` or `approval`, checked by the caller and the column's CHECK.
+        if (array_key_exists('reference_assign', $changes)) {
+            $sets[] = 'reference_assign = :reference_assign';
+            $params[':reference_assign'] = $changes['reference_assign'];
         }
         if (array_key_exists('submit_label', $changes)) {
             $sets[] = 'submit_label = :submit_label';
@@ -654,7 +660,7 @@ final class FormRepository
         if ($stored === null) {
             return null;
         }
-        $text = LocalizedLabel::preferred(LocalizedLabel::decode((string) $stored));
+        $text = LocalizedText::resolve(LocalizedText::decode((string) $stored, languages: LocalizedText::BILINGUAL));
         if ($text !== '') {
             return $text;
         }
@@ -704,7 +710,7 @@ final class FormRepository
     {
         $encoded = is_array($value) ? json_encode($value) : false;
 
-        return LocalizedLabel::decode($encoded === false ? null : $encoded);
+        return LocalizedText::decode($encoded === false ? null : $encoded, languages: LocalizedText::BILINGUAL);
     }
 
     /**
@@ -725,19 +731,24 @@ final class FormRepository
             'id' => (int) $row['id'],
             'tenant_id' => (int) $row['tenant_id'],
             'form_key' => (string) $row['form_key'],
-            'name' => LocalizedLabel::decode(isset($row['name']) ? (string) $row['name'] : null),
+            'name' => LocalizedText::decode(isset($row['name']) ? (string) $row['name'] : null, languages: LocalizedText::BILINGUAL),
             // What the person filling it in reads as its heading (migration 223);
             // null means the name.
-            'title' => isset($row['title']) ? (LocalizedLabel::decode((string) $row['title']) ?: null) : null,
+            'title' => isset($row['title']) ? (LocalizedText::decode((string) $row['title'], languages: LocalizedText::BILINGUAL) ?: null) : null,
             'banner' => FormBanner::present(FormBanner::fromStorage($row['banner'] ?? null), (int) $row['tenant_id']),
             // The string stays the one existing clients read, and the map is the
-            // whole text: see {@see LocalizedLabel::preferred()}.
+            // whole text: see {@see LocalizedText::resolve()}.
             'description' => self::preferredOrNull($row['description'] ?? null),
-            'description_i18n' => LocalizedLabel::decode(
-                isset($row['description']) ? (string) $row['description'] : null
+            'description_i18n' => LocalizedText::decode(
+                isset($row['description']) ? (string) $row['description'] : null,
+                languages: LocalizedText::BILINGUAL,
             ) ?: new \stdClass(),
-            'submit_label' => isset($row['submit_label']) ? LocalizedLabel::decode((string) $row['submit_label']) : null,
+            'submit_label' => isset($row['submit_label']) ? LocalizedText::decode((string) $row['submit_label'], languages: LocalizedText::BILINGUAL) : null,
             'reference_format' => isset($row['reference_format']) ? (string) $row['reference_format'] : null,
+            // WHIT-1017: when the reference is given: on submit, or when the route finishes approved.
+            'reference_assign' => ($row['reference_assign'] ?? null) === FormReferenceAssign::APPROVAL
+                ? FormReferenceAssign::APPROVAL
+                : FormReferenceAssign::SUBMIT,
             'sections' => self::decodeSections($row['sections'] ?? null),
             'status' => $status,
             'version' => (int) $row['version'],

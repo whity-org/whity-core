@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { continueSignupPlugin } from '@/lib/signup-plugin';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useBranding } from '@/lib/branding-context';
 import { Button } from '@whity/ui/button';
@@ -15,8 +17,9 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { SsoLoginButtons } from '@/components/sso-login-buttons';
 import { TwoFactorSetupWizard } from '@/components/TwoFactorSettings';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
-import { localizedName } from '@/lib/localized-name';
+import { oneEntryPerWorkspace, rolesLabel } from '@/lib/workspace-memberships';
 import { SSO_ERROR_KEYS } from './sso-error-keys';
+import { localizedText } from '@whity/ui/localized-text';
 
 /**
  * THIS SCREEN IS THE TRANSLATION TEMPLATE — the first one converted from
@@ -135,6 +138,7 @@ export default function LoginPage() {
       tenant_name_language?: string;
       tenant_names?: Record<string, string>;
       role: string;
+      roles?: string[];
     }> | null
   >(null);
   const [selectingTenant, setSelectingTenant] = useState(false);
@@ -185,12 +189,12 @@ export default function LoginPage() {
           t('sso.multipleWorkspaces', 'Your account has multiple workspaces — sign in to choose one.'),
           'info'
         );
-      fetch('/api/v1/auth/select-tenant', { credentials: 'include' })
-        .then(async (response) => {
-          const body = response.ok ? await response.json().catch(() => null) : null;
+      api.GET('/api/v1/auth/select-tenant')
+        .then(({ data, response }) => {
+          const body = (response.ok ? data ?? null : null) as { data?: { memberships?: unknown } } | null;
           const memberships = body?.data?.memberships;
           if (Array.isArray(memberships) && memberships.length > 0) {
-            setPendingMemberships(memberships);
+            setPendingMemberships(oneEntryPerWorkspace(memberships as never));
           } else {
             showBounce();
           }
@@ -228,28 +232,14 @@ export default function LoginPage() {
     setLoginError(null);
     try {
       // Check for 2FA requirement first
-      const response = await fetch('/api/v1/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // CSRF defense (WC-160): required on the auth POSTs.
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ email, password }),
-        credentials: 'include',
+      // The client sends the CSRF header (WC-160) the auth POSTs need.
+      const { data: loginBody, error: loginError_, response } = await api.POST('/api/v1/login', {
+        body: { email, password } as never,
       });
 
       if (response.status === 202) {
-        // try/catch, NOT `.json().catch()`: some 202 mocks in tests (and a
-        // body-less real 202) have no `.json` method at all, which throws
-        // SYNCHRONOUSLY when called — a `.catch()` chained onto that call
-        // never runs since the call itself never returns a promise.
-        let data: { requires_2fa_enrollment?: boolean; enrollment_token?: string } = {};
-        try {
-          data = await response.json();
-        } catch {
-          data = {};
-        }
+        // A body-less 202 has no data at all.
+        const data = ((loginBody ?? {}) as unknown) as { requires_2fa_enrollment?: boolean; enrollment_token?: string };
         if (data.requires_2fa_enrollment) {
           // Mandatory 2FA, never enrolled, grace period expired: there is no
           // code to enter — the user must set up an authenticator now.
@@ -266,20 +256,20 @@ export default function LoginPage() {
           setFieldErrors({});
         }
       } else if (response.ok) {
-        const data = await response.json().catch(() => ({}));
+        const data = ((loginBody ?? {}) as unknown) as { requires_tenant_selection?: boolean; memberships?: unknown[] };
         if (data.requires_tenant_selection && Array.isArray(data.memberships)) {
           // Multi-membership profile: no session minted yet — prompt the user
           // to choose which tenant to sign in to before completing login.
-          setPendingMemberships(data.memberships);
+          setPendingMemberships(oneEntryPerWorkspace(data.memberships as never));
           setPassword('');
           setFieldErrors({});
         } else {
           // Single-membership: session cookie already set — redirect in.
           await refreshAuth();
-          router.push('/dashboard');
+          router.push((await continueSignupPlugin()) ?? '/dashboard');
         }
       } else {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = ((loginError_ ?? {}) as unknown) as { message?: string };
         const message =
           response.status === 401
             ? t('login.error.invalidCredentials', 'Invalid credentials')
@@ -309,23 +299,16 @@ export default function LoginPage() {
     setSelectingTenant(true);
     setLoginError(null);
     try {
-      const response = await fetch('/api/v1/auth/select-tenant', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // CSRF defense (WC-160): required on the auth POSTs.
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ tenant_id: tenantId }),
-        credentials: 'include',
+      const { error: selectError, response } = await api.POST('/api/v1/auth/select-tenant', {
+        body: { tenant_id: tenantId } as never,
       });
 
       if (response.ok) {
         // Session issued for the chosen tenant — redirect in.
         await refreshAuth();
-        router.push('/dashboard');
+        router.push((await continueSignupPlugin()) ?? '/dashboard');
       } else {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = ((selectError ?? {}) as unknown) as { message?: string };
         const message =
           response.status === 403
             ? t('workspace.error.notMember', 'You are not a member of that workspace.')
@@ -376,21 +359,14 @@ export default function LoginPage() {
     setTwoFactorError(null);
 
     try {
-      const response = await fetch('/api/v1/login/2fa', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // CSRF defense (WC-160): required on the auth POSTs.
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ code: twoFactorCode }),
-        credentials: 'include',
+      const { error: twoFactorFailure, response } = await api.POST('/api/v1/login/2fa', {
+        body: { code: twoFactorCode } as never,
       });
 
       if (response.ok) {
         // 2FA successful - refresh auth state and redirect
         await refreshAuth();
-        router.push('/dashboard');
+        router.push((await continueSignupPlugin()) ?? '/dashboard');
       } else if (response.status === 401) {
         const errorMsg = backupCodeMode
           ? t('recovery.error.invalid', 'Invalid recovery code. Please try again.')
@@ -405,7 +381,7 @@ export default function LoginPage() {
         );
         setTwoFactorCode('');
       } else {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = ((twoFactorFailure ?? {}) as unknown) as { message?: string };
         const errorMsg =
           errorData.message || t('twoFactor.error.generic', 'Verification failed. Please try again.');
         setTwoFactorError(errorMsg);
@@ -531,15 +507,9 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="text-sm font-medium">
-                  {t('login.password.label', 'Password')}
-                </label>
-                {/* WC-password-reset-2fa-recovery: self-service reset entry point. */}
-                <Link href="/forgot-password" className="text-sm font-medium text-primary hover:underline">
-                  {t('login.password.forgot', 'Forgot password?')}
-                </Link>
-              </div>
+              <label htmlFor="password" className="text-sm font-medium">
+                {t('login.password.label', 'Password')}
+              </label>
               <Input
                 id="password"
                 type="password"
@@ -563,6 +533,14 @@ export default function LoginPage() {
             <Button type="submit" className="w-full" disabled={isFormDisabled}>
               {buttonText}
             </Button>
+
+            {/* WC-password-reset-2fa-recovery: self-service reset entry point,
+                under the button as TplSignInTwoColumn draws it (WHIT-1044). */}
+            <p className="text-center">
+              <Link href="/forgot-password" className="text-sm text-muted-foreground hover:text-foreground hover:underline">
+                {t('login.password.forgotYour', 'Forgot your password?')}
+              </Link>
+            </p>
 
             {/* WC-235: self-service registration entry point. The prompt and
                 the link text are SEPARATE keys because they are separate
@@ -609,9 +587,9 @@ export default function LoginPage() {
                 onClick={() => handleSelectTenant(m.tenant_id)}
               >
                 <span>
-                  {localizedName(m.tenant_names, readerLanguage, m.tenant_name_language, m.tenant_name)}
+                  {localizedText(m.tenant_names, readerLanguage, m.tenant_name_language, m.tenant_name)}
                 </span>
-                <span className="text-xs capitalize text-muted-foreground">{m.role}</span>
+                <span className="text-xs capitalize text-muted-foreground">{rolesLabel(m)}</span>
               </Button>
             ))}
           </div>

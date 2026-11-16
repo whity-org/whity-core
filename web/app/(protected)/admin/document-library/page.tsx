@@ -7,12 +7,21 @@ import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
-import { fetchAllPages } from '@/lib/api/fetch-all-pages';
+import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
+import { api, apiFetch } from '@/lib/api/client';
 import { labelRequestKey, resolveLabels } from '@/lib/api/resolve-labels';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
-import { IconFilePlus } from '@tabler/icons-react';
+import { IconChevronDown, IconFilePlus, IconFolder, IconStar } from '@tabler/icons-react';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@whity/ui/sheet';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@whity/ui/select';
 import { useTranslation } from '@whity/features/i18n';
 import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
 import { formNameFrom } from '@/lib/documents/template-name';
@@ -50,6 +59,7 @@ import type {
   LibraryLayout,
   SortDirection,
 } from './types';
+import { useNewIntent } from '@/lib/commands/new-intent';
 
 /**
  * The document library (#947 item 5) — a Drive-shaped browser over documents
@@ -167,8 +177,39 @@ function storedLayout(): LibraryLayout {
   }
 }
 
+/** A collection as a chip under the Folder button (phone, PwLibrary). */
+function CollectionChip({
+  selected,
+  disabled,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={selected}
+      className={[
+        'flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-full border px-4 text-sm transition-colors',
+        selected
+          ? 'border-primary bg-primary-tint text-primary'
+          : 'border-border bg-background text-foreground hover:bg-muted',
+        disabled ? 'cursor-not-allowed opacity-50' : '',
+      ].join(' ')}
+    >
+      {children}
+    </button>
+  );
+}
+
 export default function DocumentLibraryPage() {
-  const { apiClient, user } = useAuth();
+  const { user } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('documents');
   const dates = useDateDisplay();
@@ -179,6 +220,10 @@ export default function DocumentLibraryPage() {
   const { has: hasCapability } = useCapabilities();
 
   const [viewKey, setViewKey] = useState(DEFAULT_VIEW);
+  // On a phone the folder rail is a bottom sheet behind the Folder button above
+  // the list (PwLibrary), so the documents come first; choosing a folder closes
+  // it.
+  const [railOpen, setRailOpen] = useState(false);
   const [collectionId, setCollectionId] = useState<number | null>(null);
   const [anchorOuId, setAnchorOuId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
@@ -200,6 +245,8 @@ export default function DocumentLibraryPage() {
   const [layout, setLayout] = useState<LibraryLayout>(storedLayout);
 
   const [creatingDocument, setCreatingDocument] = useState(false);
+  // ⌘K `/new document` (WHIT-1069) opens the same dialog as New document.
+  useNewIntent('document', () => setCreatingDocument(true));
   const [creatingCollection, setCreatingCollection] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
   const [renamingCollection, setRenamingCollection] = useState<DocumentCollection | null>(null);
@@ -211,19 +258,19 @@ export default function DocumentLibraryPage() {
   // ── the rail ────────────────────────────────────────────────────────────
 
   const views = useFetch<DocumentViewsResponse>(async () => {
-    const response = await apiClient('/api/v1/documents/views');
+    const { data, response } = await api.GET('/api/v1/documents/views');
     throwUnlessOk(response, t('organizer.error.views', 'Failed to load the document folders'));
-    return (await response.json()) as DocumentViewsResponse;
-  }, [apiClient]);
+    return data as unknown as DocumentViewsResponse;
+  }, []);
 
   const collections = useFetch<DocumentCollection[]>(async () => {
-    const response = await apiClient('/api/v1/document-collections');
+    const { data, response } = await api.GET('/api/v1/document-collections');
     if (!response.ok) {
       throw new Error(t('organizer.error.collections', 'Failed to load your collections'));
     }
-    const body = (await response.json()) as { data?: DocumentCollection[] };
+    const body = data as unknown as { data?: DocumentCollection[] };
     return body.data ?? [];
-  }, [apiClient]);
+  }, []);
 
   /**
    * The published editor templates the caller may issue a document from.
@@ -239,14 +286,14 @@ export default function DocumentLibraryPage() {
    * cannot be read the picker shows the type's key.
    */
   const templates = useFetch<CreatableTemplate[]>(async () => {
-    const [response, catalogue] = await Promise.all([
-      apiClient('/api/v1/document-sources?kind=template'),
-      apiClient('/api/v1/document-embeds').catch(() => null),
+    const [{ data, response }, catalogue] = await Promise.all([
+      api.GET('/api/v1/document-sources', { params: { query: { kind: 'template' } } }),
+      api.GET('/api/v1/document-embeds').catch(() => null),
     ]);
     if (!response.ok) {
       throw new Error(t('organizer.error.templates', 'Failed to load the full template list'));
     }
-    const body = (await response.json()) as {
+    const body = data as unknown as {
       data?: {
         id: number;
         title?: string;
@@ -255,8 +302,8 @@ export default function DocumentLibraryPage() {
       }[];
     };
     const typeNames = new Map<string, string>();
-    if (catalogue?.ok) {
-      const parsed = (await catalogue.json().catch(() => null)) as {
+    if (catalogue?.response.ok) {
+      const parsed = (catalogue.data ?? null) as unknown as {
         data?: { record_types?: { key: string; label: string }[] };
       } | null;
       for (const type of parsed?.data?.record_types ?? []) typeNames.set(type.key, type.label);
@@ -269,18 +316,20 @@ export default function DocumentLibraryPage() {
         recordType: row.record_type || null,
         recordTypeLabel: row.record_type ? (typeNames.get(row.record_type) ?? null) : null,
       }));
-  }, [apiClient]);
+  }, []);
 
   const ous = useFetch<OuOption[]>(async () => {
     // A partial walk is reported rather than presented as the whole tree: an
     // anchor list missing units silently scopes somebody's folder to less than
     // they asked for.
-    const result = await fetchAllPages<OuOption>(apiClient, '/api/v1/ous');
+    const result = await fetchAllPagesTyped<OuOption>((query) =>
+      api.GET('/api/v1/ous', { params: { query } })
+    );
     if (!result.complete) {
       throw new Error(t('organizer.error.ous', 'Failed to load the full unit list'));
     }
     return result.items;
-  }, [apiClient]);
+  }, []);
   const units = useLocalizedUnits(ous.data);
 
   const selectedView: DocumentView | null = useMemo(() => {
@@ -292,6 +341,17 @@ export default function DocumentLibraryPage() {
   // invalidate the two useMemos below (which the lint rule catches, and which
   // would recompute the rail's props on every keystroke in the search box).
   const collectionList = useMemo(() => collections.data ?? [], [collections.data]);
+
+  // The phone's chips: Starred first (it is a folder), then the person's own
+  // collections.
+  const starredView = useMemo(
+    () => (views.data?.data ?? []).find((v) => v.key === 'starred') ?? null,
+    [views.data]
+  );
+  const phoneCollections = useMemo(
+    () => collectionList.filter((c) => c.system_key === null),
+    [collectionList]
+  );
 
   const starredCollection = useMemo(
     () => collectionList.find((c) => c.system_key === 'starred') ?? null,
@@ -306,31 +366,39 @@ export default function DocumentLibraryPage() {
   // ── the page of documents ───────────────────────────────────────────────
 
   const documents = useFetch<DocumentListResponse>(async () => {
-    const params = new URLSearchParams({ view: viewKey, page: String(page) });
-    if (anchorOuId !== null) params.set('ou_id', String(anchorOuId));
-    if (collectionId !== null) params.set('collection_id', String(collectionId));
-    if (appliedSearch !== '') params.set('q', appliedSearch);
+    const query: {
+      view: string;
+      page: number;
+      ou_id?: number;
+      collection_id?: number;
+      q?: string;
+      sort?: string;
+      direction?: string;
+    } = { view: viewKey, page };
+    if (anchorOuId !== null) query.ou_id = anchorOuId;
+    if (collectionId !== null) query.collection_id = collectionId;
+    if (appliedSearch !== '') query.q = appliedSearch;
     if (sortField !== null) {
-      params.set('sort', sortField);
+      query.sort = sortField;
       // Sent only when the caller overrode it. The server refuses `direction`
       // without `sort` for a reason worth honouring here rather than working
       // around: the unnamed default order is a surrogate key, and reversing it
       // would publish that key as a sortable column.
-      if (sortDirection !== null) params.set('direction', sortDirection);
+      if (sortDirection !== null) query.direction = sortDirection;
     }
 
-    const response = await apiClient(`/api/v1/documents?${params.toString()}`);
+    const { data, error, response } = await api.GET('/api/v1/documents', { params: { query } });
     if (response.status === 403) throw new ForbiddenError();
     if (!response.ok) {
       // A 422 carries the server's own reason — "you do not belong to an
       // organizational unit" — and surfacing it verbatim is the point: a
       // generic "failed to load" would put this screen back in the position
       // #951 describes, where three unrelated causes read the same.
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const body = (error ?? null) as { error?: string } | null;
       throw new Error(body?.error ?? t('organizer.error.list', 'Failed to load documents'));
     }
-    return (await response.json()) as DocumentListResponse;
-  }, [apiClient, viewKey, collectionId, anchorOuId, page, appliedSearch, sortField, sortDirection]);
+    return data as unknown as DocumentListResponse;
+  }, [viewKey, collectionId, anchorOuId, page, appliedSearch, sortField, sortDirection]);
 
   // Who these rows name, sent with the page (S5), so no directory is needed.
   const people = useMemo(() => documents.data?.people ?? {}, [documents.data]);
@@ -348,8 +416,8 @@ export default function DocumentLibraryPage() {
   );
   const pageUnitKey = labelRequestKey({ ous: pageUnitIds });
   const unitLabels = useFetch(
-    () => resolveLabels(apiClient, 'documents', { ous: pageUnitIds }),
-    [apiClient, pageUnitKey]
+    () => resolveLabels(apiFetch, 'documents', { ous: pageUnitIds }),
+    [pageUnitKey]
   );
 
   // `refetch` is stable (useFetch memoises it with no deps); the fetch RESULT
@@ -367,12 +435,14 @@ export default function DocumentLibraryPage() {
     setViewKey(key);
     setCollectionId(null);
     setPage(1);
+    setRailOpen(false);
   }, []);
 
   const selectCollection = useCallback((id: number) => {
     setViewKey('collection');
     setCollectionId(id);
     setPage(1);
+    setRailOpen(false);
   }, []);
 
   const selectAnchor = useCallback((ouId: number | null) => {
@@ -430,19 +500,14 @@ export default function DocumentLibraryPage() {
    */
   const mutate = useCallback(
     async (
-      path: string,
-      method: 'PUT' | 'POST' | 'PATCH' | 'DELETE',
       fallbackMessage: string,
-      body?: unknown
+      send: () => Promise<{ response: Response; error?: unknown }>
     ): Promise<boolean> => {
       setBusy(true);
       try {
-        const response = await apiClient(path, {
-          method,
-          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        });
+        const { response, error } = await send();
         if (!response.ok) {
-          const failure = (await response.json().catch(() => null)) as { error?: string } | null;
+          const failure = (error ?? null) as { error?: string } | null;
           throw new Error(failure?.error ?? fallbackMessage);
         }
         refetchDocuments();
@@ -457,15 +522,16 @@ export default function DocumentLibraryPage() {
         setBusy(false);
       }
     },
-    [apiClient, addToast, refetchDocuments, refetchCollections]
+    [addToast, refetchDocuments, refetchCollections]
   );
 
   const toggleStar = useCallback(
     (row: DocumentRow) => {
-      void mutate(
-        `/api/v1/documents/${row.id}/star`,
-        row.starred ? 'DELETE' : 'PUT',
-        t('organizer.error.star', 'Failed to update the star')
+      const params = { params: { path: { id: row.id } } };
+      void mutate(t('organizer.error.star', 'Failed to update the star'), () =>
+        row.starred
+          ? api.DELETE('/api/v1/documents/{id}/star', params)
+          : api.PUT('/api/v1/documents/{id}/star', params)
       );
     },
     [mutate, t]
@@ -473,10 +539,8 @@ export default function DocumentLibraryPage() {
 
   const createCollection = useCallback(async () => {
     const created = await mutate(
-      '/api/v1/document-collections',
-      'POST',
       t('organizer.error.createCollection', 'Failed to create the collection'),
-      { name: newCollectionName }
+      () => api.POST('/api/v1/document-collections', { body: { name: newCollectionName } })
     );
     if (created) {
       setCreatingCollection(false);
@@ -487,10 +551,12 @@ export default function DocumentLibraryPage() {
   const renameCollection = useCallback(async () => {
     if (renamingCollection === null) return;
     const renamed = await mutate(
-      `/api/v1/document-collections/${renamingCollection.id}`,
-      'PATCH',
       t('organizer.error.renameCollection', 'Failed to rename the collection'),
-      { name: renameName }
+      () =>
+        api.PATCH('/api/v1/document-collections/{id}', {
+          params: { path: { id: renamingCollection.id } },
+          body: { name: renameName },
+        })
     );
     if (renamed) {
       setRenamingCollection(null);
@@ -500,9 +566,11 @@ export default function DocumentLibraryPage() {
   const deleteCollection = useCallback(async () => {
     if (deletingCollection === null) return;
     const deleted = await mutate(
-      `/api/v1/document-collections/${deletingCollection.id}`,
-      'DELETE',
-      t('organizer.error.deleteCollection', 'Failed to delete the collection')
+      t('organizer.error.deleteCollection', 'Failed to delete the collection'),
+      () =>
+        api.DELETE('/api/v1/document-collections/{id}', {
+          params: { path: { id: deletingCollection.id } },
+        })
     );
     if (deleted) {
       // The open folder just stopped existing. Navigating away is the honest
@@ -518,10 +586,11 @@ export default function DocumentLibraryPage() {
   const toggleFiling = useCallback(
     (targetCollectionId: number, next: boolean) => {
       if (filingDocument === null) return;
-      void mutate(
-        `/api/v1/document-collections/${targetCollectionId}/documents/${filingDocument.id}`,
-        next ? 'PUT' : 'DELETE',
-        t('organizer.error.file', 'Failed to change what this document is filed in')
+      const params = { params: { path: { id: targetCollectionId, documentId: filingDocument.id } } };
+      void mutate(t('organizer.error.file', 'Failed to change what this document is filed in'), () =>
+        next
+          ? api.PUT('/api/v1/document-collections/{id}/documents/{documentId}', params)
+          : api.DELETE('/api/v1/document-collections/{id}/documents/{documentId}', params)
       );
     },
     [mutate, filingDocument, t]
@@ -530,10 +599,10 @@ export default function DocumentLibraryPage() {
   const removeFromOpenCollection = useCallback(
     (row: DocumentRow) => {
       if (collectionId === null) return;
-      void mutate(
-        `/api/v1/document-collections/${collectionId}/documents/${row.id}`,
-        'DELETE',
-        t('organizer.error.unfile', 'Failed to remove the document from this collection')
+      void mutate(t('organizer.error.unfile', 'Failed to remove the document from this collection'), () =>
+        api.DELETE('/api/v1/document-collections/{id}/documents/{documentId}', {
+          params: { path: { id: collectionId, documentId: row.id } },
+        })
       );
     },
     [mutate, collectionId, t]
@@ -711,7 +780,71 @@ export default function DocumentLibraryPage() {
       )}
 
       {!(views.forbidden || documents.forbidden) && (
-      <div className="flex gap-8">
+      <div className="flex flex-col gap-4 md:flex-row md:gap-8">
+        <div className="flex flex-col gap-3 md:hidden">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-12 w-full justify-between"
+            aria-haspopup="dialog"
+            data-testid="folders-trigger"
+            aria-expanded={railOpen}
+            onClick={() => setRailOpen(true)}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <IconFolder size={20} aria-hidden className="shrink-0 text-primary" />
+              <span className="flex min-w-0 flex-col items-start text-start leading-tight">
+                <span className="text-xs text-muted-foreground">
+                  {t('organizer.rail.folder', 'Folder')}
+                </span>
+                <span className="w-full truncate" dir="auto">
+                  {openCollection !== null
+                    ? openCollection.name
+                    : selectedView
+                      ? viewLabel(t, selectedView)
+                      : t('organizer.view.all', 'All documents')}
+                </span>
+              </span>
+            </span>
+            <IconChevronDown size={16} aria-hidden className="shrink-0" />
+          </Button>
+          {(starredView !== null || phoneCollections.length > 0) && (
+            <ul
+              className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+              aria-label={t('organizer.chips.label', 'Collections')}
+            >
+              {starredView !== null && (
+                <li className="shrink-0">
+                  <CollectionChip
+                    selected={viewKey === 'starred' && collectionId === null}
+                    disabled={!starredView.available}
+                    onClick={() =>
+                      viewKey === 'starred' ? selectView(DEFAULT_VIEW) : selectView('starred')
+                    }
+                  >
+                    <IconStar size={14} aria-hidden />
+                    {viewLabel(t, starredView)}
+                  </CollectionChip>
+                </li>
+              )}
+              {phoneCollections.map((collection) => (
+                <li key={collection.id} className="shrink-0">
+                  <CollectionChip
+                    selected={collectionId === collection.id}
+                    onClick={() =>
+                      collectionId === collection.id
+                        ? selectView(DEFAULT_VIEW)
+                        : selectCollection(collection.id)
+                    }
+                  >
+                    <span dir="auto">{collection.name}</span>
+                  </CollectionChip>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="hidden md:block">
         <ViewRail
           views={views.data?.data ?? []}
           groups={views.data?.groups ?? []}
@@ -724,6 +857,74 @@ export default function DocumentLibraryPage() {
           onCreateCollection={() => setCreatingCollection(true)}
           createDisabledReason={filingDisabledReason}
         />
+        </div>
+        <Sheet open={railOpen} onOpenChange={setRailOpen}>
+          <SheetContent
+            side="bottom"
+            closeLabel={t('organizer.rail.close', 'Close')}
+            className="max-h-[85dvh] gap-3 overflow-y-auto rounded-t-2xl pb-[calc(1.25rem+env(safe-area-inset-bottom))] text-sm md:hidden"
+            data-testid="folders-sheet"
+          >
+            <div aria-hidden className="mx-auto h-1 w-10 rounded-full bg-border" />
+            <SheetHeader>
+              <SheetTitle className="text-lg font-semibold">
+                {t('organizer.rail.sheetTitle', 'Folders')}
+              </SheetTitle>
+              <SheetDescription className="sr-only">
+                {t('organizer.rail.sheetDescription', 'Choose which folder of documents to show')}
+              </SheetDescription>
+            </SheetHeader>
+            {units.length > 0 && (
+              <div className="flex flex-col gap-1 text-sm">
+                <span className="text-xs text-muted-foreground">
+                  {t('organizer.anchor.label', 'Unit')}
+                </span>
+                <Select
+                  value={anchorOuId === null ? '__mine__' : String(anchorOuId)}
+                  onValueChange={(value) =>
+                    selectAnchor(value === '__mine__' ? null : Number(value))
+                  }
+                >
+                  <SelectTrigger
+                    className="h-12 w-full"
+                    aria-label={t('organizer.anchor.label', 'Unit')}
+                  >
+                    <SelectValue placeholder={t('organizer.anchor.mine', 'My own unit')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__mine__">
+                      {t('organizer.anchor.mine', 'My own unit')}
+                    </SelectItem>
+                    {units.map((ou) => (
+                      <SelectItem key={ou.id} value={String(ou.id)}>
+                        {ou.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {t('organizer.anchor.sheetHint', 'The unit applies to the folders that work by unit.')}
+                </p>
+              </div>
+            )}
+            <ViewRail
+              roomy
+              views={views.data?.data ?? []}
+              groups={views.data?.groups ?? []}
+              collections={collectionList}
+              unavailableSubstrates={views.data?.unavailable_substrates ?? []}
+              selectedViewKey={viewKey}
+              selectedCollectionId={collectionId}
+              onSelectView={selectView}
+              onSelectCollection={selectCollection}
+              onCreateCollection={() => {
+                setRailOpen(false);
+                setCreatingCollection(true);
+              }}
+              createDisabledReason={filingDisabledReason}
+            />
+          </SheetContent>
+        </Sheet>
 
         <div className="min-w-0 flex-1">
           {/* The browser's chrome is offered only when there ARE folders.
@@ -803,6 +1004,38 @@ export default function DocumentLibraryPage() {
             </p>
           )}
 
+          {appliedSearch !== '' && !listError && !documents.loading && pagination !== null && (
+            // Search on a phone (PwLibrary): what was found and where. The API
+            // searches titles and numbers only (`?q=`) and sends no text matches
+            // or snippets, so there is one group, "In the title", and no "In the
+            // text" group to fill.
+            <div className="mb-3 md:hidden" data-testid="search-summary">
+              <p className="text-sm text-muted-foreground">
+                {t('organizer.search.results', '{count} results in {folder}')
+                  .replace('{count}', String(pagination.total))
+                  .replace(
+                    '{folder}',
+                    openCollection !== null
+                      ? openCollection.name
+                      : selectedView
+                        ? viewLabel(t, selectedView)
+                        : t('organizer.view.all', 'All documents')
+                  )}
+              </p>
+              <p className="mt-2 text-sm font-semibold">
+                {t('organizer.search.inTitle', 'In the title')}
+                {' · '}
+                {pagination.total}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t(
+                  'organizer.search.noText',
+                  'Searching inside the text of documents is not available yet.'
+                )}
+              </p>
+            </div>
+          )}
+
           {listError ? (
             // The server's own sentence, not a generic failure: for a folder the
             // caller cannot anchor this is the explanation, and replacing it
@@ -833,6 +1066,8 @@ export default function DocumentLibraryPage() {
               emptyState={{
                 title: emptyState.title,
                 description: emptyState.description,
+                moment: emptyState.moment,
+                once: emptyState.moment === 'empty-documents' ? 'document-library' : undefined,
                 action: emptyState.pastTheEnd ? (
                   <Button variant="outline" size="sm" onClick={() => setPage(1)}>
                     {t('organizer.empty.pastEndAction', 'Go to the first page')}

@@ -13,7 +13,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Button } from '@whity/ui/button';
 import { Switch } from '@whity/ui/switch';
 import { Alert, AlertDescription } from '@whity/ui/alert';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import {
   useI18nAvailability,
   useRichTranslation,
@@ -65,12 +65,17 @@ export default function LanguagesPage() {
     error,
     refetch: fetchLanguages,
   } = useFetch(async () => {
+    // Only the system tenant manages languages. Asking anyway got the server's
+    // English 403 as a toast on top of the translated access-denied page.
+    if (!isSystemTenant || !canRead) {
+      return [];
+    }
     const { data: body, error } = await api.GET('/api/v1/admin/languages');
     if (body === undefined) {
       throw new Error(errorMessage(error, t('languages.error.load', 'Failed to fetch languages')));
     }
     return body.data;
-  }, []);
+  }, [isSystemTenant, canRead]);
 
   const languages = data ?? [];
 

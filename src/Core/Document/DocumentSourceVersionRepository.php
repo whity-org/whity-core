@@ -30,9 +30,14 @@ final class DocumentSourceVersionRepository
      * `$themeResolved` is the draft's theme resolved now (editor M4d, E.44): the
      * version keeps it, and printing the version never resolves again.
      *
+     * `$freeze` turns the draft's blocks into what the version keeps: synced
+     * saved blocks expanded as they are now (editor M7, E.38), so the version
+     * prints the same until it is published again.
+     *
      * @param array<string, mixed>|null $themeResolved
+     * @param (callable(list<mixed>): list<mixed>)|null $freeze
      */
-    public function publish(int $sourceId, int $tenantId, int $draftVersion, ?int $publishedBy, ?array $themeResolved = null): ?int
+    public function publish(int $sourceId, int $tenantId, int $draftVersion, ?int $publishedBy, ?array $themeResolved = null, ?callable $freeze = null): ?int
     {
         $own = !$this->db->inTransaction();
         if ($own) {
@@ -60,6 +65,12 @@ final class DocumentSourceVersionRepository
             $max->execute([':source_id' => $sourceId, ':tenant_id' => $tenantId]);
             $version = (int) $max->fetchColumn() + 1;
 
+            $blocks = (string) $draft['blocks'];
+            if ($freeze !== null) {
+                $decoded = json_decode($blocks, true);
+                $blocks = json_encode($freeze(is_array($decoded) ? array_values($decoded) : []), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            }
+
             $this->db->prepare(
                 'INSERT INTO document_source_versions (tenant_id, source_id, version, title, page, blocks, own_fields, theme, theme_resolved, published_by_profile_id)
                  VALUES (:tenant_id, :source_id, :version, :title, :page, :blocks, :own_fields, :theme, :theme_resolved, :published_by)'
@@ -69,7 +80,7 @@ final class DocumentSourceVersionRepository
                 ':version'      => $version,
                 ':title'        => (string) $draft['title'],
                 ':page'         => $draft['page'],
-                ':blocks'       => (string) $draft['blocks'],
+                ':blocks'       => $blocks,
                 ':own_fields'   => $draft['own_fields'],
                 ':theme'        => $draft['theme'],
                 ':theme_resolved' => $themeResolved !== null ? json_encode($themeResolved, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE) : null,

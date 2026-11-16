@@ -25,10 +25,10 @@ import { render, screen, within, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { BlockRenderer } from '@/components/plugin/blocks/block-renderer';
 import type { Block } from '@/lib/plugin-features';
-import { apiClient } from '@/lib/api-client';
+import { apiFetch as apiClient } from '@/lib/api/client';
 
-jest.mock('@/lib/api-client', () => ({
-  apiClient: jest.fn(),
+jest.mock('@/lib/api/client', () => ({
+  apiFetch: jest.fn(),
 }));
 
 const mockApiClient = apiClient as jest.MockedFunction<typeof apiClient>;
@@ -167,6 +167,22 @@ describe('BlockRenderer', () => {
     expect(screen.getByText('Admin')).toBeInTheDocument();
     expect(screen.getByText('Bo')).toBeInTheDocument();
     expect(screen.getByText('Editor')).toBeInTheDocument();
+  });
+
+  it('isolates each cell value so an amount keeps its direction in an Arabic table', () => {
+    render(
+      <BlockRenderer
+        blocks={[
+          {
+            type: 'table',
+            columns: [{ key: 'value', label: 'القيمة' }],
+            rows: [{ value: '-90.000 JOD' }],
+          },
+        ]}
+      />
+    );
+    // Without <bdi> the RTL cell shows "JOD 90.000-".
+    expect(screen.getByText('-90.000 JOD').tagName).toBe('BDI');
   });
 
   it('renders code content inside a <pre>', () => {

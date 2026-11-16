@@ -8,10 +8,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Icon, type IconName } from '@whity/ui/icon';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
-import { localized, refusal, toolsetLabel, type AgentPreset, type WorkspaceAgent } from '@/components/agents/workspace-agents';
+import { refusalText, toolsetLabel, type AgentPreset, type WorkspaceAgent } from '@/components/agents/workspace-agents';
 import { useFetch } from '@/hooks/useFetch';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
+import { localizedText } from '@whity/ui/localized-text';
 
 /**
  * New agent (AI.2, TplAgentPresets): a gallery of ready agents with Start from
@@ -24,30 +25,25 @@ export function AgentPresetGallery({ open, onOpenChange }: { open: boolean; onOp
   const t = useTranslation('admin');
   const arabic = useFormattingLocale() === 'ar';
   const router = useRouter();
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
 
   const presets = useFetch<AgentPreset[]>(async () => {
     if (!open) return [];
-    const response = await apiClient('/api/v1/agent-presets');
+    const { data, response } = await api.GET('/api/v1/agent-presets');
     if (!response.ok) throw new Error(t('agents.error.presets', 'The presets could not be loaded.'));
-    return ((await response.json()) as { data: AgentPreset[] }).data;
-  }, [apiClient, open]);
+    return (data as unknown as { data: AgentPreset[] }).data;
+  }, [open]);
 
   const use = async (preset: AgentPreset) => {
     setBusy(preset.key);
     try {
-      const response = await apiClient('/api/v1/agents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ presetKey: preset.key }),
-      });
+      const { data, error, response } = await api.POST('/api/v1/agents', { body: { presetKey: preset.key } as never });
       if (!response.ok) {
-        addToast(await refusal(response, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
+        addToast(refusalText(error, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
         return;
       }
-      const body = (await response.json()) as { data: WorkspaceAgent };
+      const body = data as unknown as { data: WorkspaceAgent };
       router.push(`/admin/agents/${body.data.id}`);
     } finally {
       setBusy(null);
@@ -76,7 +72,7 @@ export function AgentPresetGallery({ open, onOpenChange }: { open: boolean; onOp
                     <Icon name={(preset.icon ?? 'robot') as IconName} size={20} />
                   </span>
                   <span className="min-w-0">
-                    <span className="block font-semibold">{localized(preset.name, preset.nameAr, arabic)}</span>
+                    <span className="block font-semibold">{localizedText({ en: preset.name, ar: preset.nameAr }, arabic ? 'ar' : 'en')}</span>
                     {preset.agentsFromIt > 0 && (
                       <span className="block text-sm text-muted-foreground">
                         {t('agents.new.fromIt', 'You have {n} from this', { n: preset.agentsFromIt })}
@@ -84,7 +80,7 @@ export function AgentPresetGallery({ open, onOpenChange }: { open: boolean; onOp
                     )}
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground">{localized(preset.role, preset.roleAr, arabic)}</p>
+                <p className="text-sm text-muted-foreground">{localizedText({ en: preset.role, ar: preset.roleAr }, arabic ? 'ar' : 'en')}</p>
                 {preset.does.length > 0 && (
                   <ul className="flex-1 list-disc space-y-1 ps-5 text-sm">
                     {(arabic && preset.doesAr.length > 0 ? preset.doesAr : preset.does).map((thing) => (

@@ -6,9 +6,18 @@
  * without a test failing.
  */
 
+type ConditionValue = string | number | boolean;
+
+/**
+ * Exactly one operator besides `field`. `notEquals` asks when the controller is
+ * answered with something else (an unanswered controller hides it, as `equals`
+ * does); `answered` asks when it holds any answer, a ticked box included.
+ */
 export type FieldConditionRule =
-  | { field: string; equals: string | number | boolean; in?: undefined }
-  | { field: string; in: string[]; equals?: undefined };
+  | { field: string; equals: ConditionValue; notEquals?: undefined; in?: undefined; answered?: undefined }
+  | { field: string; notEquals: ConditionValue; equals?: undefined; in?: undefined; answered?: undefined }
+  | { field: string; in: string[]; equals?: undefined; notEquals?: undefined; answered?: undefined }
+  | { field: string; answered: true; equals?: undefined; notEquals?: undefined; in?: undefined };
 
 export interface ConditionalField {
   field_key: string;
@@ -34,8 +43,24 @@ function operands(type: string, raw: unknown): string[] {
   return value === '' ? [] : [value];
 }
 
+/** True, a number, text that is not blank, or a list or row holding one; a blank row is no row. */
+function saysSomething(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(saysSomething);
+  if (value !== null && typeof value === 'object') return Object.values(value).some(saysSomething);
+
+  return value === true || typeof value === 'number' || (typeof value === 'string' && value.trim() !== '');
+}
+
+/** For `answered`: a checkbox only when ticked, anything else when it says something. */
+function isAnswered(type: string, raw: unknown): boolean {
+  if (type === 'checkbox') return raw === true || raw === 1 || raw === 'true' || raw === '1';
+
+  return saysSomething(raw);
+}
+
 function matches(rule: FieldConditionRule, answer: string[]): boolean {
   if (rule.equals !== undefined) return answer.includes(operand(rule.equals));
+  if (rule.notEquals !== undefined) return answer.length > 0 && !answer.includes(operand(rule.notEquals));
 
   return (rule.in ?? []).some((wanted) => answer.includes(operand(wanted)));
 }
@@ -61,7 +86,10 @@ export function fieldVisibility(
     }
     if (!resolve(rule.field, new Set(visiting).add(key))) return (resolved[key] = false);
 
-    return (resolved[key] = matches(rule, operands(controller.field_type, answers[rule.field])));
+    const raw = answers[rule.field];
+    if (rule.answered === true) return (resolved[key] = isAnswered(controller.field_type, raw));
+
+    return (resolved[key] = matches(rule, operands(controller.field_type, raw)));
   };
 
   for (const field of fields) resolve(field.field_key, new Set());

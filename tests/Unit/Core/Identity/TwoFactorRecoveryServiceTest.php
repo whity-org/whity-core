@@ -119,8 +119,25 @@ final class TwoFactorRecoveryServiceTest extends TestCase
         self::assertNotNull($confirmed);
         $requestId = $confirmed['request_id'];
 
-        $approved = $this->service->approveForTenant($requestId, $tenantId);
-        self::assertNotNull($approved);
+        $firstAdmin  = $this->seedProfileWithTwoFactor('first-admin@acme.test', $tenantId);
+        $secondAdmin = $this->seedProfileWithTwoFactor('second-admin@acme.test', $tenantId);
+
+        $first = $this->service->approveForTenant($requestId, $tenantId, $firstAdmin, 'totp');
+        self::assertIsArray($first);
+        self::assertSame('first', $first['stage']);
+        $this->assertTwoFactorStillEnabled($profileId);
+        self::assertSame(
+            TwoFactorRecoveryService::REFUSED_SAME_ADMIN,
+            $this->service->approveForTenant($requestId, $tenantId, $firstAdmin, 'totp'),
+        );
+        self::assertSame(
+            TwoFactorRecoveryService::REFUSED_OWN_REQUEST,
+            $this->service->approveForTenant($requestId, $tenantId, $profileId, 'totp'),
+        );
+
+        $approved = $this->service->approveForTenant($requestId, $tenantId, $secondAdmin, 'email_code');
+        self::assertIsArray($approved);
+        self::assertSame('cleared', $approved['stage']);
         self::assertSame($profileId, $approved['profile_id']);
         self::assertSame('approve2fa@acme.test', $approved['email']);
         self::assertNotSame('', $approved['reset_token']);
@@ -161,7 +178,8 @@ final class TwoFactorRecoveryServiceTest extends TestCase
         $confirmed = $this->service->confirm($token);
         self::assertNotNull($confirmed);
 
-        self::assertNull($this->service->approveForTenant($confirmed['request_id'], $tenantB));
+        $adminB = $this->seedProfileWithTwoFactor('admin-b@acme.test', $tenantB);
+        self::assertNull($this->service->approveForTenant($confirmed['request_id'], $tenantB, $adminB, 'totp'));
         $this->assertTwoFactorStillEnabled($profileId);
     }
 
@@ -207,9 +225,17 @@ final class TwoFactorRecoveryServiceTest extends TestCase
         $tenantId  = $this->seedTenant('ForceTenant');
         $profileId = $this->seedProfileWithTwoFactor('force@acme.test', $tenantId);
 
+        $firstAdmin  = $this->seedProfileWithTwoFactor('force-first@acme.test', $tenantId);
+        $secondAdmin = $this->seedProfileWithTwoFactor('force-second@acme.test', $tenantId);
+
         // No issue()/confirm() call at all — this is the "no prior request" path.
-        $result = $this->service->forceResetForTenant($profileId, $tenantId);
-        self::assertNotNull($result);
+        // Since AG.1 it is the first approval, and a second admin clears it.
+        $started = $this->service->forceResetForTenant($profileId, $tenantId, $firstAdmin, 'totp');
+        self::assertIsArray($started);
+        $this->assertTwoFactorStillEnabled($profileId);
+
+        $result = $this->service->approveForTenant($started['request_id'], $tenantId, $secondAdmin, 'totp');
+        self::assertIsArray($result);
         self::assertSame($profileId, $result['profile_id']);
         self::assertSame('force@acme.test', $result['email']);
 
@@ -226,7 +252,8 @@ final class TwoFactorRecoveryServiceTest extends TestCase
         $tenantB   = $this->seedTenant('ForceB');
         $profileId = $this->seedProfileWithTwoFactor('forcecross@acme.test', $tenantA);
 
-        self::assertNull($this->service->forceResetForTenant($profileId, $tenantB));
+        $adminB = $this->seedProfileWithTwoFactor('force-admin-b@acme.test', $tenantB);
+        self::assertNull($this->service->forceResetForTenant($profileId, $tenantB, $adminB, 'totp'));
         $this->assertTwoFactorStillEnabled($profileId);
     }
 

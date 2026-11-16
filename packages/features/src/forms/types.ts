@@ -26,6 +26,8 @@ export interface FormRow {
   description_i18n: LocalizedMap | []
   submit_label: LocalizedMap | null
   reference_format: string | null
+  /** WHIT-1017: when the reference is given. Absent on an older server, which meant on submit. */
+  reference_assign?: "submit" | "approval"
   sections: FormSectionDef[]
   status: FormStatus
   version: number
@@ -92,6 +94,8 @@ export interface FieldValidation {
   min?: number
   max?: number
   maxLength?: number
+  /** Design 3.4 (FP.8): a limit in words, printed as "142 of 300 words". */
+  maxWords?: number
   pattern?: string
   maxFiles?: number
   ou_type?: string
@@ -100,9 +104,21 @@ export interface FieldValidation {
   maxRows?: number
 }
 
+type ConditionValue = string | number | boolean
+
+/**
+ * "Show this question only if ...": exactly one operator besides `field`.
+ * `notEquals` waits for an answer, like `equals`; `answered` asks once the
+ * controller holds any answer (a checkbox once it is ticked).
+ */
 export type FieldCondition =
-  | { field: string; equals: string | number | boolean; in?: undefined }
-  | { field: string; in: string[]; equals?: undefined }
+  | { field: string; equals: ConditionValue; notEquals?: undefined; in?: undefined; answered?: undefined }
+  | { field: string; notEquals: ConditionValue; equals?: undefined; in?: undefined; answered?: undefined }
+  | { field: string; in: string[]; equals?: undefined; notEquals?: undefined; answered?: undefined }
+  | { field: string; answered: true; equals?: undefined; notEquals?: undefined; in?: undefined }
+
+/** How the builder offers a rule: `in` is edited as `equals` on its first value. */
+export type ConditionOperator = "equals" | "notEquals" | "answered"
 
 export type FieldAudience = "applicant" | "staff"
 

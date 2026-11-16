@@ -126,9 +126,18 @@ final class RoutesApiHandler
                 if ($event['actor_profile_id'] !== null) {
                     $people[(int) $event['actor_profile_id']] = true;
                 }
+                if (($event['on_behalf_of_profile_id'] ?? null) !== null) {
+                    $people[(int) $event['on_behalf_of_profile_id']] = true;
+                }
             }
             foreach ($items as $item) {
                 $people[(int) $item['profile_id']] = true;
+            }
+            $entered = $this->router->enteredValues($tenantId, $routeId);
+            foreach ($entered as $value) {
+                if ($value['entered_by'] !== null) {
+                    $people[$value['entered_by']] = true;
+                }
             }
 
             $routes[] = RoutingPresenter::route(
@@ -141,6 +150,8 @@ final class RoutesApiHandler
             ) + [
                 'trail' => array_map(RoutingPresenter::event(...), $trail),
                 'recipients' => array_map(RoutingPresenter::recipient(...), $items),
+                // WHIT-1016: what people entered at the steps that ask for values.
+                'values' => RoutingPresenter::values($entered),
                 // What changed since the version the caller last acted on.
                 'changes' => $changes->since($tenantId, $route, $callerId),
                 // Whether this route can send it back to anybody: a route with a
@@ -225,6 +236,7 @@ final class RoutesApiHandler
                 $parsed['verdict'],
                 $parsed['resume_from'],
                 $parsed['to_author'],
+                $parsed['values'],
             );
         } catch (RoutingRejectedException $e) {
             return Response::error($e->clientMessage, 422);

@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { NoAccess } from '@/components/no-access';
 import Link from 'next/link';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { uploadPluginPackage } from '@/lib/api/plugin-upload';
+import { Lottie } from '@whity/ui/lottie';
 import { useToast } from '@/lib/toast-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
@@ -15,6 +16,7 @@ import { classifyPluginVersion, type PluginVersionTier } from '@/lib/plugin-vers
 import { useRichTranslation, useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { PluginsTabs } from '@/components/plugins/plugins-tabs';
+import { PluginWorkspaceAccess, WorkspaceCodePlugins } from '@/components/plugins/workspace-code-plugins';
 import { PluginUpdateDialog, type PluginUpdateTarget } from '@/components/plugins/plugin-update-dialog';
 import { useDateDisplay } from '@whity/features/datetime';
 import { Button } from '@whity/ui/button';
@@ -22,7 +24,7 @@ import { Badge } from '@whity/ui/badge';
 import { DataTable, type DataTableColumn } from '@whity/ui/data-table';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
-import { AreaError, EmptyFirstTime, LoadingRows, ReadOnlyNotice } from '@whity/ui/page-states';
+import { AreaError, EmptyFirstTime, LoadingRows } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
 import {
   Dialog,
@@ -460,6 +462,14 @@ export default function PluginsPage() {
     }
   };
 
+  // Literal keys, so i18n:extract finds them (the classifier's labels are English).
+  const versionTierLabel: Record<PluginVersionTier, string> = {
+    alpha: t('plugins.version.alpha', 'Alpha'),
+    beta: t('plugins.version.beta', 'Beta'),
+    prerelease: t('plugins.version.prerelease', 'Pre-release'),
+    stable: t('plugins.version.stable', 'Stable'),
+  };
+
   const stateOf = (plugin: PluginEntry): { label: string; variant: React.ComponentProps<typeof Badge>['variant'] } => {
     switch (plugin.status) {
       case 'active':
@@ -522,7 +532,7 @@ export default function PluginsPage() {
                 variant={VERSION_BADGE_VARIANT[versionBadge.tier]}
                 data-testid={`version-badge-${plugin.id}`}
               >
-                {versionBadge.label}
+                {versionTierLabel[versionBadge.tier]}
               </Badge>
             )}
             {plugin.install?.update_waiting ? (
@@ -629,7 +639,8 @@ export default function PluginsPage() {
       ) : null}
 
       {data && !isOperator ? (
-        <ReadOnlyNotice title={t('plugins.readOnly', 'Code plugins run for every workspace on this deployment, so the platform operator manages them.')} />
+        // WHIT-1124: a workspace switches installed plugins on and off here.
+        <WorkspaceCodePlugins canEnable={hasPermission(PLUGINS_ENABLE)} canDisable={hasPermission(PLUGINS_DISABLE)} />
       ) : null}
 
       {isOperator && hasPermission(PLUGINS_INSTALL)
@@ -668,7 +679,7 @@ export default function PluginsPage() {
           })
         : null}
 
-      {error ? (
+      {data && !isOperator ? null : error ? (
         <AreaError
           message={error}
           retryLabel={t('plugins.tryAgain', 'Try again')}
@@ -686,6 +697,7 @@ export default function PluginsPage() {
       ) : plugins.length === 0 ? (
         <EmptyFirstTime
           icon="plugin"
+          moment="spot-plugin"
           title={t('plugins.empty.title', 'No plugins are installed yet')}
           description={t('plugins.empty.description', 'Find one in the Store tab and install it here.')}
           action={
@@ -705,6 +717,8 @@ export default function PluginsPage() {
           rowActionsLabel={t('plugins.col.actions', 'Actions')}
         />
       )}
+
+      {isOperator && plugins.length > 0 ? <PluginWorkspaceAccess canChange={hasPermission(PLUGINS_ENABLE)} /> : null}
 
       {(workspacePlugins ?? []).length > 0 ? (
         <section className="space-y-3" aria-labelledby="plugins-in-workspace">
@@ -796,6 +810,7 @@ export default function PluginsPage() {
           </DialogHeader>
 
           <div className="space-y-3 py-2">
+            {uploading && <Lottie name="uploading" play="loop" className="mx-auto h-20 w-[120px]" />}
             <label className="block">
               <span className="sr-only">{t('plugins.upload.fileLabel', 'Plugin package')}</span>
               <input

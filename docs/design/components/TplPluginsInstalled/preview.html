@@ -14,7 +14,7 @@
       { label: L.Documents || 'Documents', items: [it('document', 'Library'), it('routing', 'Routing')] },
       { label: L.Platform || 'Platform', items: [it('tenant', 'Tenants'), it('plugin', 'Plugins'), it('branding', 'Branding'), it('audit', 'Audit log')] }]; }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: 'Rana Haddad', role: 'Owner', nav: nav('Plugins', o.L), topActions: topBar, labels: o.shellLabels }, kids); }
+  function shell(kids, o) { o = o || {}; return h(W.AppShell, { tenant: 'Example Bakery', user: 'Amro Saleh', role: 'Owner', nav: nav('Plugins', o.L), topActions: topBar, labels: o.shellLabels }, kids); }
   function logo(p, size) { return h('span', { className: size === 'lg' ? 'wy-pdetail__ic' : 'wy-ptile__ic', style: { background: p.color }, 'aria-hidden': 'true' }, p.whity ? h(W.Mark, { size: size === 'lg' ? 34 : 22, tone: 'onbrand', label: '' }) : p.initial || p.name.charAt(0)); }
   function trust(p, L) { L = L || {}; return p.whity ? h('span', { className: 'wy-trust wy-trust--whity' }, I('success', 12), L.byWhity || 'By Whity') : p.verified ? h('span', { className: 'wy-trust wy-trust--verified' }, I('success', 12), L.verified || 'Verified') : h('span', { className: 'wy-trust wy-trust--sandbox' }, I('lock', 12), L.sandboxed || 'Sandboxed'); }
   function adds(p, L) { L = L || {}; return h('div', { className: 'wy-adds' }, (p.adds || []).map(function (a) { var m = { screens: ['dashboard', L.screens || 'Screens'], blocks: ['page', L.blocks || 'Document blocks'], agent: ['robot', L.agent || 'Agent tools'], fields: ['field', L.fields || 'Fields'], connect: ['link', L.connect || 'Connects out'] }[a];
@@ -44,7 +44,7 @@
     { id: 3, p: P.pay, s: st('warning', 'Update waiting', '3.0 asks for new access'), v: '2.9.4', u: 'Running 2.9.4 until approved', b: '[price] / month' },
     { id: 4, p: P.render, s: st('success', 'Active'), v: '4.0.2', u: 'Updated automatically 2 Oct', b: '[price] / month' },
     { id: 5, p: P.maps, s: st('destructive', 'Failed', 'Didn’t load after the last update'), v: '0.8.0', u: 'Its blocks show a placeholder', b: 'Free' },
-    { id: 6, p: P.del, s: st('secondary', 'Turned off', 'By Rana Haddad, 3 Oct'), v: '1.5.0', u: 'Data kept', b: 'Free' }];
+    { id: 6, p: P.del, s: st('secondary', 'Turned off', 'By Amro Saleh, 3 Oct'), v: '1.5.0', u: 'Data kept', b: 'Free' }];
   ReactDOM.createRoot(document.getElementById('root')).render(shell(h(F, null,
     h(W.PageHeader, { title: 'Plugins', description: 'Add apps, document blocks and agent tools to Example Bakery.' }),
     h(W.Tabs, { items: [{ value: 'store', label: 'Store' }, { value: 'installed', label: 'Installed', count: 6 }], defaultValue: 'installed' }),
@@ -58,7 +58,7 @@
         { key: 'v', label: 'Version', width: 220, render: function (r) { return h('div', null, h('span', { style: { fontFamily: 'var(--font-mono)', fontSize: 13 } }, r.v), h('span', { className: 'wy-psub' }, r.u)); } },
         { key: 'b', label: 'Billing', width: 150, render: function (r) { return r.b; } }] }),
       h('div', { style: { display: 'grid', gap: 8 } }, h('h2', { className: 'wy-store__h2', style: { fontSize: 15 } }, 'Recently removed'),
-        h('div', { className: 'wy-ptile', style: { flexDirection: 'row', alignItems: 'center', gap: 16 } }, h('div', { className: 'wy-pcell', style: { flex: 1 } }, logo(P.msg), h('div', null, h('b', null, 'Messaging for Whity'), h('small', null, 'Removed by Rana Haddad on 22 Oct · its data is kept until 21 Nov, then deleted'))), h(W.Button, { variant: 'outline', size: 'sm', icon: 'undo' }, 'Reinstall'))))), {}));
+        h('div', { className: 'wy-ptile', style: { flexDirection: 'row', alignItems: 'center', gap: 16 } }, h('div', { className: 'wy-pcell', style: { flex: 1 } }, logo(P.msg), h('div', null, h('b', null, 'Messaging for Whity'), h('small', null, 'Removed by Amro Saleh on 22 Oct · its data is kept until 21 Nov, then deleted'))), h(W.Button, { variant: 'outline', size: 'sm', icon: 'undo' }, 'Reinstall'))))), {}));
 </script>
 </body>
 </html>

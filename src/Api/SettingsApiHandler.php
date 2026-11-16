@@ -103,6 +103,7 @@ final class SettingsApiHandler
      *   settings.tab.email = Email
      *   settings.tab.email_domains = Email domains
      *   settings.tab.public_forms = Public forms
+     *   settings.tab.messages = Chat
      *   settings.tab.storage = Storage
      *   settings.tab.feature_flags = Feature flags
      *   settings.tab.security = Security
@@ -163,6 +164,9 @@ final class SettingsApiHandler
         // Email-domain policy (WC-ac35b6cf): follows the route's own permission,
         // so a deployment with a renamed administrative role still sees it.
         ['id' => 'public-forms', 'href' => '/admin/settings/public-forms', 'label' => 'Public forms', 'requiredPermission' => CorePermissions::PUBLIC_FORM_KEYS_MANAGE],
+        // Settings › Chat (design 3.5, UC.4, UC.12; was Messages, ADR 0016): web chat,
+        // where email replies come back, the workspace's bots, and who it blocked.
+        ['id' => 'messages', 'href' => '/admin/settings/messages', 'label' => 'Chat', 'requiredPermission' => CorePermissions::MESSAGES_MANAGE, 'workspaceOnly' => true],
         ['id' => 'email-domains', 'href' => '/admin/settings/email-domains', 'label' => 'Email domains', 'requiredPermission' => CorePermissions::EMAIL_DOMAINS_MANAGE],
         ['id' => 'storage', 'href' => '/admin/settings/storage', 'label' => 'Storage', 'requiredPermission' => CorePermissions::SETTINGS_MANAGE, 'systemTenantOnly' => true],
         // Feature Flags (WC-feature-flags-settings-page): a generic admin
@@ -465,6 +469,12 @@ final class SettingsApiHandler
             // surface. Refused rather than silently written, so the caller
             // learns which surface owns the key instead of watching a write
             // vanish from a screen that never showed it.
+            // A core key with its own screen (customer sign-up's starting role
+            // must be customer-safe, which only that screen checks).
+            if ($catalog->isCoreKey($key) && !$catalog->isAdminVisible($key)) {
+                $details[$key] = "{$key} is managed on its own settings screen, not on the settings API.";
+                continue;
+            }
             if (!$catalog->isCoreKey($key) && !$catalog->isAdminVisible($key)) {
                 $details[$key] = "{$key} is declared by the '"
                     . (string) $catalog->sourceOf($key)

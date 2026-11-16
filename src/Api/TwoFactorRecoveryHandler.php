@@ -10,6 +10,8 @@ use Whity\Core\Identity\RequestReason;
 use Whity\Core\Identity\TwoFactorRecoveryMailer;
 use Whity\Core\Identity\TwoFactorRecoveryService;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimited;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Settings\SettingsRegistry;
@@ -44,10 +46,6 @@ final class TwoFactorRecoveryHandler
 {
     private const SYSTEM_TENANT_ID = 0;
 
-    private const WINDOW_SECONDS = 3600;
-    private const EMAIL_MAX      = 5;
-    private const IP_MAX         = 20;
-
     public function __construct(
         private readonly TwoFactorRecoveryService $service,
         private readonly ProfileEmailRepository $emails,
@@ -77,24 +75,20 @@ final class TwoFactorRecoveryHandler
         $emailKey = '2farecovery:req:email:' . hash('sha256', $email);
         $ipKey    = $ip !== null ? '2farecovery:req:ip:' . $ip : null;
 
-        if ($this->store->count($emailKey) >= self::EMAIL_MAX
-            || ($ipKey !== null && $this->store->count($ipKey) >= self::IP_MAX)
+        $emailRule = RateLimits::twoFactorRecoveryPerEmail();
+        $ipRule    = RateLimits::twoFactorRecoveryPerAddress();
+        if ($emailRule->blocked($this->store, $emailKey) !== null
+            || ($ipKey !== null && $ipRule->blocked($this->store, $ipKey) !== null)
         ) {
-            $retryAfter = max(
+            return RateLimited::response(max(
                 $this->store->ttl($emailKey),
-                $ipKey !== null ? $this->store->ttl($ipKey) : 0,
-                1
-            );
-
-            return Response::error(
-                'Too many recovery requests. Please try again later.',
-                429
-            )->withHeaders(['Retry-After' => (string) $retryAfter]);
+                $ipKey !== null ? $this->store->ttl($ipKey) : 0
+            ));
         }
 
-        $this->store->increment($emailKey, self::WINDOW_SECONDS);
+        $emailRule->record($this->store, $emailKey);
         if ($ipKey !== null) {
-            $this->store->increment($ipKey, self::WINDOW_SECONDS);
+            $ipRule->record($this->store, $ipKey);
         }
 
         if ($this->selfServiceEnabled()) {
@@ -102,7 +96,12 @@ final class TwoFactorRecoveryHandler
             if ($row !== null) {
                 try {
                     $profileId = (int) $row['profile_id'];
-                    $token = $this->service->issue($profileId);
+                    // AG.1: the admins see where the request came from.
+                    $token = $this->service->issue(
+                        $profileId,
+                        TwoFactorRecoveryService::DEFAULT_TTL_SECONDS,
+                        \Whity\Core\Http\DeviceLabel::fromUserAgent($request->getHeader('User-Agent')),
+                    );
                     $this->mailer->sendConfirmationLink($email, $token);
                     $this->audit->record('auth.2fa_recovery.requested', [
                         'tenant_id'   => self::SYSTEM_TENANT_ID,

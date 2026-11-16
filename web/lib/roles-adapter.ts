@@ -1,7 +1,7 @@
 /**
  * web/'s RolesAdapter implementation (Path B feature-extraction pilot) — wires
  * the data-source-agnostic `RolesScreen` (@whity/features/roles) to the
- * REST API via web's own cookie-authenticated `apiClient` (silent token refresh
+ * REST API via web's own cookie-authenticated `apiFetch` (silent token refresh
  * on 401, same as every other authenticated fetch in this app).
  *
  * A desktop/Tauri client implements the exact same `RolesAdapter` against its
@@ -13,7 +13,7 @@
  * passed to the same shape. Direct sibling of `web/lib/demo-catalog-adapter.ts`.
  */
 
-import { apiClient } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api/client';
 import type {
   Permission,
   Role,
@@ -41,6 +41,18 @@ function unwrapData<T>(body: unknown): T | undefined {
     return (body as { data: T }).data;
   }
   return undefined;
+}
+
+/** A guard against a server that never reports its last page. */
+const MAX_PERMISSION_PAGES = 20;
+
+/** `pagination.totalPages` from a paginated body, when it carries one. */
+function paginationTotalPages(body: unknown): number | undefined {
+  if (typeof body !== 'object' || body === null || !('pagination' in body)) return undefined;
+  const pagination = (body as { pagination: unknown }).pagination;
+  if (typeof pagination !== 'object' || pagination === null) return undefined;
+  const totalPages = (pagination as { totalPages?: unknown }).totalPages;
+  return typeof totalPages === 'number' ? totalPages : undefined;
 }
 
 /** A server-supplied error message, when the body carries one. */
@@ -227,12 +239,25 @@ export function createRolesAdapter(transport: Transport): RolesAdapter {
     },
 
     async listPermissions(): Promise<Permission[]> {
-      // per_page=100 — same ceiling/cap as listRoles (the picker source).
-      const { status, body } = await transport.request('GET', '/api/v1/permissions?per_page=100');
-      if (!isOk(status)) {
-        throw new Error(serverMessage(body) || `Failed to fetch permissions (${status})`);
+      // The picker needs the whole catalogue, and the server caps a page at
+      // 100 (PaginationParams::MAX_PER_PAGE). Core alone passes 100 once
+      // Calendar and Messages are in, so a single page silently dropped the
+      // permissions sorting last (users:*). Read every page.
+      const all: Permission[] = [];
+      for (let page = 1; page <= MAX_PERMISSION_PAGES; page += 1) {
+        const { status, body } = await transport.request(
+          'GET',
+          `/api/v1/permissions?per_page=100&page=${page}`
+        );
+        if (!isOk(status)) {
+          throw new Error(serverMessage(body) || `Failed to fetch permissions (${status})`);
+        }
+        const rows = unwrapData<Permission[]>(body) ?? [];
+        all.push(...rows);
+        const totalPages = paginationTotalPages(body);
+        if (rows.length === 0 || totalPages === undefined || page >= totalPages) break;
       }
-      return unwrapData<Permission[]>(body) ?? [];
+      return all;
     },
 
     async createRole(input: RoleCreateInput): Promise<void> {
@@ -284,12 +309,12 @@ export function createRolesAdapter(transport: Transport): RolesAdapter {
 
 /**
  * The web transport: maps a `fetch` `Response` (via the cookie-authenticated
- * `apiClient`) into the `{ status, body }` seam. JSON is read once; a body-less
+ * `apiFetch`) into the `{ status, body }` seam. JSON is read once; a body-less
  * or non-JSON response yields `body: null` (the factory tolerates it).
  */
 const webTransport: Transport = {
   async request(method: string, path: string, body?: unknown) {
-    const response = await apiClient(path, {
+    const response = await apiFetch(path, {
       method,
       ...(body !== undefined
         ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }

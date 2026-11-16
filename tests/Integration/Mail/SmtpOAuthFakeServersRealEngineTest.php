@@ -57,17 +57,7 @@ final class SmtpOAuthFakeServersRealEngineTest extends TestCase
         $this->scenario(['mode' => 'ok']);
         $this->acceptTokens(['tok-1', 'tok-2', 'tok-3']);
 
-        $tokenPort = $this->freePort();
-        $this->smtpPort = $this->freePort();
-        $this->tokenBase = 'http://127.0.0.1:' . $tokenPort;
-
-        $this->spawn(
-            [PHP_BINARY, '-S', '127.0.0.1:' . $tokenPort, __DIR__ . '/../../Support/FakeOAuth/token-endpoint.php'],
-            ['FAKE_OAUTH_DIR' => $this->dir, 'PHP_CLI_SERVER_WORKERS' => '8'],
-        );
-        $this->spawn([PHP_BINARY, __DIR__ . '/../../Support/FakeOAuth/smtp-server.php', (string) $this->smtpPort, $this->dir]);
-        $this->waitForPort($tokenPort);
-        $this->waitForPort($this->smtpPort);
+        $this->startServers();
 
         $this->pdo = SchemaFromMigrations::make(true);
         $this->globals = new GlobalSettingsRepository($this->pdo);
@@ -96,10 +86,7 @@ final class SmtpOAuthFakeServersRealEngineTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach ($this->processes as $process) {
-            proc_terminate($process);
-            proc_close($process);
-        }
+        $this->stopServers();
         foreach (glob($this->dir . '/*') ?: [] as $file) {
             unlink($file);
         }
@@ -373,16 +360,72 @@ final class SmtpOAuthFakeServersRealEngineTest extends TestCase
         return (int) substr($name, (int) strrpos($name, ':') + 1);
     }
 
-    private function waitForPort(int $port): void
+    /**
+     * Starts both fake servers and waits until each answers as THIS test's
+     * (WHIT-1161). A free port is only free when it is picked: under paratest
+     * another test can bind it before our server does, and then any listener
+     * there is someone else's. So a server that doesn't name our directory
+     * means the port was taken: stop ours and try again on new ports.
+     */
+    private function startServers(): void
+    {
+        $me = basename($this->dir);
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $tokenPort = $this->freePort();
+            $this->smtpPort = $this->freePort();
+            $this->tokenBase = 'http://127.0.0.1:' . $tokenPort;
+
+            $this->spawn(
+                [PHP_BINARY, '-S', '127.0.0.1:' . $tokenPort, __DIR__ . '/../../Support/FakeOAuth/token-endpoint.php'],
+                ['FAKE_OAUTH_DIR' => $this->dir, 'PHP_CLI_SERVER_WORKERS' => '8'],
+            );
+            $this->spawn([PHP_BINARY, __DIR__ . '/../../Support/FakeOAuth/smtp-server.php', (string) $this->smtpPort, $this->dir]);
+
+            if ($this->tokenServerIsMine($tokenPort, $me) && $this->smtpServerIsMine($this->smtpPort, $me)) {
+                return;
+            }
+            $this->stopServers();
+        }
+        self::fail('The fake servers did not come up as this test\'s own after 3 attempts');
+    }
+
+    private function tokenServerIsMine(int $port, string $me): bool
+    {
+        $context = stream_context_create(['http' => ['timeout' => 0.5, 'ignore_errors' => true]]);
+        for ($i = 0; $i < 100; $i++) {
+            $reply = @file_get_contents('http://127.0.0.1:' . $port . '/__whoami', false, $context);
+            if ($reply !== false) {
+                return $reply === $me;
+            }
+            usleep(50_000);
+        }
+
+        return false;
+    }
+
+    private function smtpServerIsMine(int $port, string $me): bool
     {
         for ($i = 0; $i < 100; $i++) {
             $probe = @stream_socket_client('tcp://127.0.0.1:' . $port, $errno, $errstr, 0.1);
             if ($probe !== false) {
+                stream_set_timeout($probe, 2);
+                $banner = (string) fgets($probe);
                 fclose($probe);
-                return;
+
+                return rtrim($banner, "\r\n") === '220 fake ESMTP ' . $me;
             }
             usleep(50_000);
         }
-        self::fail('A fake server did not come up on port ' . $port);
+
+        return false;
+    }
+
+    private function stopServers(): void
+    {
+        foreach ($this->processes as $process) {
+            proc_terminate($process);
+            proc_close($process);
+        }
+        $this->processes = [];
     }
 }

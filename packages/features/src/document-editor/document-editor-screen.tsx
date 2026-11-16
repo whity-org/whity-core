@@ -4,8 +4,9 @@ import * as React from 'react';
 
 import { Button } from '@whity/ui/button';
 import { DocEditor, type SaveState } from '@whity/ui/editor/doc-editor';
+import { isActive, type EditorAgentChoice, type EditorAgentRequest, type EditorAgents } from '@whity/ui/editor/agents';
 import type { EditorCollab, RailSuggestion, RailThread } from '@whity/ui/editor/collab';
-import type { Actor, DocumentKind, EditorMode, ResolvedDocumentTheme, WhityDocument } from '@whity/ui/editor/contract';
+import type { Actor, DocumentKind, EditorMode, ResolvedDocumentTheme, SavedBlock, WhityDocument } from '@whity/ui/editor/contract';
 import type { FieldDef } from '@whity/ui/editor/fields';
 import { themedLetterhead } from '@whity/ui/editor/page-view';
 import type { EditorServices, FieldPreview } from '@whity/ui/editor/services';
@@ -14,7 +15,8 @@ import { useEditorLabels } from './editor-labels';
 import { IssueBar } from './issue-bar';
 import { PrintLabelsDialog } from './print-labels-dialog';
 import { RecordPicker } from './record-picker';
-import type { DocumentEditorAdapter, RecordChoice, TemplateSetup } from './types';
+import { ThemePicker } from './theme-picker';
+import type { DocumentEditorAdapter, RecordChoice, TemplateSetup, ThemeChoice } from './types';
 
 /**
  * Issuing mode (editor M4c): the screen opened to issue a document rather than
@@ -43,6 +45,8 @@ const RETRY_FIRST_MS = 2000;
 const RETRY_MAX_MS = 60000;
 /** Comments and suggestions are polled this often while the editor is open (M5). */
 const COLLAB_POLL_MS = 10000;
+/** M6: while a request waits or runs, its status is polled this often (the run "streams" in place). */
+const AGENT_POLL_MS = 2000;
 
 /** Open suggestions in the server's id order. */
 function byId<T extends { id: string }>(list: T[]): T[] {
@@ -82,6 +86,7 @@ export function DocumentEditorScreen({
   issue,
   canSuggest = false,
   canComment = false,
+  canManageLibrary = false,
   me,
 }: {
   id: string;
@@ -91,6 +96,8 @@ export function DocumentEditorScreen({
   canSuggest?: boolean;
   /** documents:comment: start threads, reply, resolve and reopen. */
   canComment?: boolean;
+  /** E.22: manages the workspace library of saved blocks (offers "Everyone in the workspace"). */
+  canManageLibrary?: boolean;
   /** The person at the keyboard, for their own cards. */
   me?: Actor & { kind: 'person' };
   onBack?: () => void;
@@ -112,6 +119,20 @@ export function DocumentEditorScreen({
   const [template, setTemplate] = React.useState<TemplateSetup | null>(null);
   // E.44: the draft's theme (or, issuing from a template, the published version's frozen one).
   const [theme, setTheme] = React.useState<ResolvedDocumentTheme | null>(null);
+  // WHIT-785: the themes the picker offers; empty until loaded (or without `listThemes`).
+  const [themeChoices, setThemeChoices] = React.useState<ThemeChoice[]>([]);
+  React.useEffect(() => {
+    let live = true;
+    adapter
+      .listThemes?.()
+      .then((list) => {
+        if (live) setThemeChoices(list);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [adapter]);
   const [preview, setPreview] = React.useState<FieldPreview | null>(null);
   const [previewRecord, setPreviewRecord] = React.useState<string | null>(null);
   const [pickerFor, setPickerFor] = React.useState<'preview' | 'pdf' | null>(null);
@@ -215,7 +236,9 @@ export function DocumentEditorScreen({
       // A label sheet's grid and sheet size are saved with it (E.43), and a template's own fields.
       const sheet = next.kind === 'label' ? { page: next.page, labels: next.labels } : {};
       const own = next.ownFields ? { ownFields: next.ownFields } : {};
-      const result = await adapter.save(id, { title: next.title, blocks: next.blocks, ...sheet, ...own }, version.current);
+      // E.44: the theme the picker chose (null follows the workspace default); untouched, it isn't sent.
+      const themed = next.theme !== undefined ? { theme: next.theme } : {};
+      const result = await adapter.save(id, { title: next.title, blocks: next.blocks, ...sheet, ...own, ...themed }, version.current);
       retryDelay.current = RETRY_FIRST_MS;
       if (result.ok) {
         version.current = result.version;
@@ -409,6 +432,101 @@ export function DocumentEditorScreen({
     };
   }, [collabOn, issuingMode, suggestions, threads, revision, canSuggest, canComment, me, adapter, id, reloadDraft, loadCollab, flushNow]);
 
+
+  // M6: Ask an agent. The person's own agent works over MCP; its suggestions
+  // arrive through the collab feed, fetched again whenever a request finishes.
+  const agentsOn = collabOn && !!adapter.agentRequests && !!adapter.askAgent && !issuingMode;
+  const [agentChoices, setAgentChoices] = React.useState<EditorAgentChoice[]>([]);
+  const [agentRequests, setAgentRequests] = React.useState<EditorAgentRequest[]>([]);
+  React.useEffect(() => {
+    if (!agentsOn) return;
+    let live = true;
+    adapter.agentChoices?.(labels.agentAny).then((c) => live && setAgentChoices(c)).catch(() => undefined);
+    adapter.agentRequests!(id).then((r) => live && setAgentRequests(r)).catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [agentsOn, adapter, id, labels.agentAny]);
+  const anyActive = agentRequests.some((r) => isActive(r.status));
+  React.useEffect(() => {
+    if (!agentsOn || !anyActive) return;
+    let live = true;
+    const timer = setInterval(() => {
+      adapter.agentRequests!(id)
+        .then(async (next) => {
+          if (!live) return;
+          setAgentRequests((prev) => {
+            const finished = next.some((r) => !isActive(r.status) && prev.find((p) => p.id === r.id && isActive(p.status)));
+            if (finished) void loadCollab().catch(() => undefined);
+            return next;
+          });
+        })
+        .catch(() => undefined);
+    }, AGENT_POLL_MS);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [agentsOn, anyActive, adapter, id, loadCollab]);
+  const agents = React.useMemo<EditorAgents | undefined>(() => {
+    if (!agentsOn) return undefined;
+    // Only "any of my agents" means none of the workspace's agents is in use; it may still be connected over MCP.
+    return {
+      choices: agentChoices,
+      requests: agentRequests,
+      connectHref: '/admin/my-agents',
+      onAsk: async (request) => {
+        const made = await adapter.askAgent!(id, request);
+        setAgentRequests((prev) => [made, ...prev.filter((r) => r.id !== made.id)]);
+      },
+      onStop: async (requestId) => {
+        if (!adapter.stopAgentRequest) return;
+        const now = await adapter.stopAgentRequest(requestId);
+        setAgentRequests((prev) => prev.map((r) => (r.id === now.id ? now : r)));
+      },
+    };
+  }, [agentsOn, agentChoices, agentRequests, adapter, id]);
+
+  // M7: saved blocks. The library loads once; a block saved here joins it at once.
+  const savedOn = !!adapter.savedBlocks && !issuingMode;
+  const [savedBlocks, setSavedBlocks] = React.useState<SavedBlock[] | undefined>(undefined);
+  React.useEffect(() => {
+    if (!savedOn) return;
+    let live = true;
+    adapter.savedBlocks!().then((list) => live && setSavedBlocks(list)).catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [savedOn, adapter]);
+  // Plugins' labels in the reader's language: the page's own `lang`.
+  const language: 'en' | 'ar' = typeof window !== 'undefined' && window.document.documentElement.lang.startsWith('ar') ? 'ar' : 'en';
+  const editorServices = React.useMemo<EditorServices | undefined>(() => {
+    // M7, E.19: switching a plugin on from its placeholder reloads what the editor knows.
+    const enablePlugin = services?.enablePlugin
+      ? async (plugin: string) => {
+          await services.enablePlugin!(plugin);
+          const next = await adapter.loadServices?.(id);
+          if (next) setServices(next);
+        }
+      : undefined;
+    // Only when plugins add blocks: otherwise the services pass through unchanged.
+    const base = services?.pluginBlocks ? { ...services, language, ...(enablePlugin ? { enablePlugin } : {}) } : services;
+    if (!savedOn) return base;
+    return {
+      ...base,
+      savedBlocks: savedBlocks ?? [],
+      canShareSavedBlocks: canManageLibrary,
+      ...(adapter.saveBlock
+        ? {
+            saveBlock: async (block) => {
+              const saved = await adapter.saveBlock!(block);
+              setSavedBlocks((prev) => [...(prev ?? []).filter((b) => b.id !== saved.id), saved]);
+              return saved;
+            },
+          }
+        : {}),
+    };
+  }, [savedOn, services, savedBlocks, canManageLibrary, adapter, id, language]);
 
   const showPreview = React.useCallback(
     async (record: string | null) => {
@@ -613,8 +731,20 @@ export function DocumentEditorScreen({
           onCommandPalette={onCommandPalette}
           labels={labels}
           collab={collab}
-          services={services}
+          agents={agents}
+          services={editorServices}
           theme={theme?.tokens ?? null}
+          headerActions={
+            // WHIT-785: the theme picker, on printed kinds the person may edit, not while issuing.
+            printed && editCapable && !issuingMode && themeChoices.length > 0 ? (
+              <ThemePicker
+                value={doc.theme}
+                themes={themeChoices}
+                disabled={conflict}
+                onChange={(next) => onChange({ ...doc, theme: next })}
+              />
+            ) : undefined
+          }
           {...(printed && template
             ? {
                 fields: template.fields,

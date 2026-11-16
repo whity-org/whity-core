@@ -11,16 +11,16 @@ import { useId } from 'react';
 import { useTranslation } from '@whity/features/i18n';
 import { BilingualInput, type BilingualValue } from '@whity/ui/bilingual-input';
 import { RadioGroup, RadioGroupItem } from '@whity/ui/radio-group';
-import type { NameLanguage } from '@/lib/localized-name';
+import { type BilingualLanguage } from '@whity/ui/localized-text';
 
 export interface LocalizedNameFieldProps {
   /** Base id for the inputs; the Arabic box is `${id}-ar`, the English `${id}-en`. */
   id: string;
   label: string;
   names: BilingualValue;
-  originalLanguage: NameLanguage;
+  originalLanguage: BilingualLanguage;
   onNamesChange: (names: BilingualValue) => void;
-  onOriginalLanguageChange: (language: NameLanguage) => void;
+  onOriginalLanguageChange: (language: BilingualLanguage) => void;
   disabled?: boolean;
   /** Shown under the boxes when the original is empty. */
   error?: string | null;
@@ -38,7 +38,7 @@ export function LocalizedNameField({
 }: LocalizedNameFieldProps) {
   const t = useTranslation('common');
   const originalId = useId();
-  const languageWord = (code: NameLanguage) =>
+  const languageWord = (code: BilingualLanguage) =>
     code === 'ar' ? t('localizedName.arabic', 'Arabic') : t('localizedName.english', 'English');
 
   return (

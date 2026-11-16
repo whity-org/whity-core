@@ -8,9 +8,13 @@ use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Agent\AgentActionRepository;
 use Whity\Core\Agent\AgentProposalEvents;
 use Whity\Core\Agent\AgentProposalRepository;
+use Whity\Core\Agent\ProposalTier;
 use Whity\Core\Audit\AuditLoggerInterface;
+use Whity\Core\Plugin\Tenant\ManifestImpact;
+use Whity\Core\Plugin\Tenant\WorkspacePluginProposalDiffs;
 use Whity\Core\Request;
 use Whity\Core\Response;
+use Whity\Core\Security\GatedApproval;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpPrincipal;
@@ -23,8 +27,11 @@ use Whity\Mcp\Tools\ToolsCallHandler;
  * 7.5b Approvals inbox; docs/design/MCP-TOOL-SURFACE.md §5.11).
  *
  *   GET  /api/me/agent-proposals                 the caller's proposals (?status=waiting)
+ *   POST /api/me/agent-proposals/{id}/identity-check  start "confirm it's you" for a Needs verifying one
  *   POST /api/me/agent-proposals/{id}/approve    run it, optionally with edited `arguments`
+ *                                                (and the check's `code` when it is Needs verifying)
  *   POST /api/me/agent-proposals/{id}/decline    don't
+ *   POST /api/me/agent-proposals/bulk-approve    several Ordinary (tier-1) ones together (AQ.1)
  *
  * ONLY THE GRANTING PERSON DECIDES (owner decision 10), because approving runs
  * the operation as their delegate. Every query is scoped to the caller's
@@ -41,6 +48,12 @@ use Whity\Mcp\Tools\ToolsCallHandler;
  */
 final class AgentProposalsApiHandler
 {
+    /** Most proposals approved in one go (AQ.1). */
+    public const BULK_LIMIT = 50;
+
+    /** WHIT-1042: the longest reason a decline keeps. */
+    public const DECLINE_REASON_MAX = 1000;
+
     public function __construct(
         private readonly AgentProposalRepository $proposals,
         private readonly ToolsCallHandler $toolsCall,
@@ -50,6 +63,8 @@ final class AgentProposalsApiHandler
         private readonly ?AgentActionRepository $actions = null,
         // WHIT-867: each tool's plain name, for the Arabic screens.
         private readonly ?\Closure $toolInfo = null,
+        // AG.1: a Needs verifying (tier 3) proposal is a gated approval.
+        private readonly ?GatedApproval $gate = null,
     ) {
     }
 
@@ -101,9 +116,144 @@ final class AgentProposalsApiHandler
             return Response::error('arguments must be an object', 422);
         }
 
+        // WHIT-1042: a destructive impact plan is approved only with the
+        // person's tick naming what is lost.
+        $acknowledged = is_array($body) && ($body['acknowledgedDestructive'] ?? false) === true;
+
+        // AG.1: a Needs verifying proposal runs only after the person confirms
+        // it's them, for this proposal, right now.
         $proposal = $this->proposals->find($id, $tenantId);
         if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
             return Response::error('Proposal not found', 404);
+        }
+        $method = null;
+        if (self::isGated($proposal)) {
+            $method = GatedApprovalHttp::confirm($this->gate, $tenantId, $profileId, GatedApproval::AGENT_PROPOSAL, (string) $id, is_array($body) ? $body : []);
+            if ($method instanceof Response) {
+                return $method;
+            }
+        }
+
+        $outcome = $this->approveOne($tenantId, $profileId, $id, $arguments, $acknowledged, $method);
+        if ($outcome instanceof Response) {
+            return $outcome;
+        }
+
+        return Response::json(['data' => $outcome], 200);
+    }
+
+    /**
+     * POST /api/me/agent-proposals/{id}/identity-check: what the person confirms
+     * with before approving a Needs verifying proposal, and for an emailed code,
+     * send it. Any other proposal needs no check (422).
+     *
+     * @param array<string, string> $params
+     */
+    public function identityCheck(Request $request, array $params = []): Response
+    {
+        $caller = $this->caller($request);
+        if ($caller instanceof Response) {
+            return $caller;
+        }
+        [$tenantId, $profileId] = $caller;
+        $id = (int) ($params['id'] ?? 0);
+
+        $proposal = $this->proposals->find($id, $tenantId);
+        if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
+            return Response::error('Proposal not found', 404);
+        }
+        if (!self::isGated($proposal)) {
+            return Response::error('This proposal needs no check. Approve it as it is.', 422);
+        }
+
+        return GatedApprovalHttp::start($this->gate, $tenantId, $profileId, GatedApproval::AGENT_PROPOSAL, (string) $id);
+    }
+
+    /** @param array<string, mixed> $proposal */
+    private static function isGated(array $proposal): bool
+    {
+        return ProposalTier::of($proposal['permissions'], $proposal['undo_window_seconds']) === ProposalTier::NEEDS_VERIFYING;
+    }
+
+    /**
+     * POST /api/me/agent-proposals/bulk-approve `{ "ids": [..] }` (AQ.1).
+     *
+     * Approves several Ordinary (tier-1) proposals together, each exactly as a
+     * single approval would: its own atomic decision, its own run, its own
+     * audit entry and its own Undo. A proposal that is Check first or Needs
+     * verifying is never approved here, whatever the screen sent; it is listed
+     * under `refused` so it can be opened on its own. The ids are as sent, so
+     * the result reads in the order the person ticked them.
+     */
+    public function bulkApprove(Request $request): Response
+    {
+        $caller = $this->caller($request);
+        if ($caller instanceof Response) {
+            return $caller;
+        }
+        [$tenantId, $profileId] = $caller;
+
+        $body = json_decode($request->getBody(), true);
+        $ids  = is_array($body) && is_array($body['ids'] ?? null) ? $body['ids'] : null;
+        if ($ids === null || $ids === []) {
+            return Response::error('ids must be a list of proposal ids', 422);
+        }
+        $ids = array_values(array_unique(array_map('intval', array_filter($ids, 'is_numeric'))));
+        if ($ids === [] || count($ids) > self::BULK_LIMIT) {
+            return Response::error('Approve between 1 and ' . self::BULK_LIMIT . ' proposals at a time', 422);
+        }
+
+        $approved = [];
+        $refused  = [];
+        foreach ($ids as $id) {
+            $proposal = $this->proposals->find($id, $tenantId);
+            if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
+                $refused[] = ['id' => $id, 'reason' => 'not_found'];
+                continue;
+            }
+            if (ProposalTier::of($proposal['permissions'], $proposal['undo_window_seconds']) !== ProposalTier::ORDINARY) {
+                $refused[] = ['id' => $id, 'reason' => 'open_on_its_own'];
+                continue;
+            }
+            // WHIT-1042: an impact plan that failed its tests or deletes data
+            // is decided on its own, with its tick.
+            $blocked = self::impactPlanRefusal($proposal, false);
+            if ($blocked !== null) {
+                $refused[] = ['id' => $id, 'reason' => 'open_on_its_own'];
+                continue;
+            }
+            $outcome = $this->approveOne($tenantId, $profileId, $id, null);
+            if ($outcome instanceof Response) {
+                $refused[] = ['id' => $id, 'reason' => $outcome->getStatusCode() === 409 ? 'not_waiting' : 'not_found'];
+                continue;
+            }
+            $approved[] = $outcome;
+        }
+
+        return Response::json(['data' => ['approved' => $approved, 'refused' => $refused]], 200);
+    }
+
+    /**
+     * One approval: re-checks the grant, decides atomically, runs, records.
+     *
+     * @param array<string, mixed>|null $arguments edited arguments, or null to run as proposed
+     * @param string|null $identityCheck how the person confirmed it's them, for a Needs verifying one
+     * @return array<string, mixed>|Response the presented proposal, or the refusal
+     */
+    private function approveOne(int $tenantId, int $profileId, int $id, ?array $arguments, bool $acknowledgedDestructive = false, ?string $identityCheck = null): array|Response
+    {
+        $proposal = $this->proposals->find($id, $tenantId);
+        if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
+            return Response::error('Proposal not found', 404);
+        }
+        // Whatever the caller, a Needs verifying proposal never runs without
+        // the person's fresh check (AG.1).
+        if ($identityCheck === null && self::isGated($proposal)) {
+            return Response::error('Confirm it is you first, then approve this on its own.', 403, ['reason' => GatedApprovalHttp::REASON_FAILED]);
+        }
+        $blocked = self::impactPlanRefusal($proposal, $acknowledgedDestructive);
+        if ($blocked !== null) {
+            return $blocked;
         }
 
         // WHIT-816: a workspace agent's proposal runs under the person's
@@ -156,16 +306,17 @@ final class AgentProposalsApiHandler
             'tenant_id'   => $tenantId,
             'target_type' => 'agent_proposal',
             'target_id'   => $id,
-            'metadata'    => ['tool' => $proposal['tool'], 'edited' => $arguments !== null, 'failed' => is_array($result) && ($result['isError'] ?? false) === true],
+            'metadata'    => ['tool' => $proposal['tool'], 'edited' => $arguments !== null, 'failed' => is_array($result) && ($result['isError'] ?? false) === true]
+                + ($identityCheck !== null ? ['identity_check' => $identityCheck] : []),
         ]);
         $this->proposals->events()?->decided($tenantId, $id, AgentProposalEvents::APPROVED, $profileId, $profileId, (string) $proposal['tool'], is_array($result) && ($result['isError'] ?? false) === true);
 
-        $fresh = $this->proposals->find($id, $tenantId);
-        return Response::json(['data' => $fresh !== null ? self::present(
+        $fresh = $this->proposals->find($id, $tenantId) ?? $proposal;
+        return self::present(
             $fresh,
             $this->proposals->agentNames($tenantId, [(string) $fresh['agent_principal_id']]),
             $this->actions?->forProposals($tenantId, [$id])[$id] ?? null,
-        ) : null], 200);
+        );
     }
 
     /** @param array<string, string> $params */
@@ -178,18 +329,24 @@ final class AgentProposalsApiHandler
         [$tenantId, $profileId] = $caller;
         $id = (int) ($params['id'] ?? 0);
 
+        // WHIT-1042: why, for the agent to read back ("Ask Whity Builder to
+        // fix it" names the failing tests). Optional; cut to 1000 characters.
+        $body   = json_decode($request->getBody(), true);
+        $reason = is_array($body) && is_string($body['reason'] ?? null) ? trim($body['reason']) : '';
+        $reason = $reason === '' ? null : mb_substr($reason, 0, self::DECLINE_REASON_MAX);
+
         $proposal = $this->proposals->find($id, $tenantId);
         if ($proposal === null || $proposal['on_behalf_of_profile_id'] !== $profileId) {
             return Response::error('Proposal not found', 404);
         }
-        if (!$this->proposals->decide($id, $tenantId, $profileId, AgentProposalRepository::DECLINED)) {
+        if (!$this->proposals->decide($id, $tenantId, $profileId, AgentProposalRepository::DECLINED, null, $reason)) {
             return Response::error('This proposal is no longer waiting', 409);
         }
         $this->audit?->record('agent.proposal.declined', [
             'tenant_id'   => $tenantId,
             'target_type' => 'agent_proposal',
             'target_id'   => $id,
-            'metadata'    => ['tool' => $proposal['tool']],
+            'metadata'    => ['tool' => $proposal['tool'], 'with_reason' => $reason !== null],
         ]);
         $this->proposals->events()?->decided($tenantId, $id, AgentProposalEvents::DECLINED, $profileId, $profileId, (string) $proposal['tool']);
 
@@ -199,6 +356,30 @@ final class AgentProposalsApiHandler
             $this->proposals->agentNames($tenantId, [(string) $fresh['agent_principal_id']]),
             $this->actions?->forProposals($tenantId, [$id])[$id] ?? null,
         ) : null], 200);
+    }
+
+    /**
+     * Why an impact plan can't be approved as it stands (WHIT-1042,
+     * TplImpactPlan), or null. A Whity Builder publish or rollback whose tests
+     * failed is refused: the person asks the builder to fix it instead. One
+     * that stops serving existing data needs the person's tick naming what is
+     * lost. Proposals without an impact plan are untouched.
+     *
+     * @param array<string, mixed> $proposal
+     */
+    public static function impactPlanRefusal(array $proposal, bool $acknowledgedDestructive): ?Response
+    {
+        $plan = WorkspacePluginProposalDiffs::planOf($proposal['tool'] ?? null, $proposal['diff'] ?? null);
+        if ($plan === null) {
+            return null;
+        }
+        if (($plan['tests']['failed'] ?? 0) > 0) {
+            return Response::error('Its tests failed, so it can not be approved. Decline it, or ask the agent to fix it.', 422, ['code' => 'tests_failed']);
+        }
+        if ($plan['level'] === ManifestImpact::DESTRUCTIVE && !$acknowledgedDestructive) {
+            return Response::error('This stops showing data people entered. Tick that you understand, then approve.', 422, ['code' => 'acknowledge_destructive']);
+        }
+        return null;
     }
 
     /** @return array{0: int, 1: int}|Response */
@@ -235,6 +416,8 @@ final class AgentProposalsApiHandler
             'agentPaused'       => $agentPaused,
             'status'            => $proposal['status'],
             'tool'              => $proposal['tool'],
+            // AQ.1: 1 Ordinary, 2 Check first, 3 Needs verifying. Only 1 may be approved together.
+            'tier'              => ProposalTier::of($proposal['permissions'], $proposal['undo_window_seconds']),
             'summary'           => $proposal['summary'],
             'arguments'         => $proposal['arguments'] === [] ? new \stdClass() : $proposal['arguments'],
             'diff'              => $proposal['diff'],
@@ -244,6 +427,8 @@ final class AgentProposalsApiHandler
             'decidedAt'         => $proposal['decided_at'],
             'expiresAt'         => $proposal['expires_at'],
             'createdAt'         => $proposal['created_at'],
+            // WHIT-1042: why the person declined, when they said.
+            'declineReason'     => $proposal['decline_reason'] ?? null,
             // WHIT-812: once approved and run, what can be undone and until when.
             'action'            => $action !== null ? AgentActionsApiHandler::present($action, $agentNames) : null,
         ];

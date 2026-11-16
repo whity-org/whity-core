@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -65,7 +65,6 @@ interface IssuedCode {
 }
 
 export default function LicensingPage() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
@@ -75,12 +74,12 @@ export default function LicensingPage() {
   const canIssue = hasPermission(LICENSING_ISSUE);
 
   const { data, loading, error, refetch } = useFetch(async () => {
-    const res = await apiClient('/api/v1/licensing/devices');
+    const { data: body, response: res } = await api.GET('/api/v1/licensing/devices');
     if (!res.ok) {
       throw new Error(t('licensing.error.load', 'Failed to load devices'));
     }
-    return ((await res.json()).data ?? []) as LicensedDevice[];
-  }, [apiClient]);
+    return ((body as { data?: LicensedDevice[] } | undefined)?.data ?? []) as LicensedDevice[];
+  }, []);
 
   const [importing, setImporting] = useState(false);
   const [serials, setSerials] = useState('');
@@ -106,10 +105,8 @@ export default function LicensingPage() {
 
     setBusy(true);
     try {
-      const res = await apiClient('/api/v1/licensing/devices', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ serial_numbers: list }),
+      const { data: importBody, response: res } = await api.POST('/api/v1/licensing/devices', {
+        body: { serial_numbers: list } as never,
       });
 
       if (!res.ok) {
@@ -117,7 +114,7 @@ export default function LicensingPage() {
         return;
       }
 
-      const body = await res.json();
+      const body = (importBody ?? {}) as { created?: number; already_present?: number };
       // BOTH NUMBERS, ALWAYS. "Imported 400" when 100 were already present
       // reads as a bigger delivery than arrived; the skipped count is how a
       // partial import stays legible rather than mysterious.
@@ -138,10 +135,8 @@ export default function LicensingPage() {
   const issueCode = async (device: LicensedDevice) => {
     setBusy(true);
     try {
-      const res = await apiClient('/api/v1/licensing/codes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ licensed_device_id: device.id }),
+      const { data: codeBody, response: res } = await api.POST('/api/v1/licensing/codes', {
+        body: { licensed_device_id: device.id } as never,
       });
 
       if (!res.ok) {
@@ -149,7 +144,7 @@ export default function LicensingPage() {
         return;
       }
 
-      setIssued((await res.json()) as IssuedCode);
+      setIssued(codeBody as unknown as IssuedCode);
       setIssuedFor(device);
     } finally {
       setBusy(false);

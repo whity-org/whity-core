@@ -103,7 +103,7 @@ final class InvitationsApiRealEngineTest extends TestCase
             $audit,
             new DatabaseSharedStore($this->pdo),
             $this->settings,
-            new InvitationMailer($this->mailer, 'https://app.test/accept-invitation', new EmailLayout(), $this->settings)
+            new InvitationMailer(new \Whity\Core\Mail\BrandedEmailSender($this->mailer, new EmailLayout(), $this->settings), 'https://app.test/accept-invitation')
         );
         $this->acceptHandler = new InvitationAcceptHandler(
             $this->service,
@@ -134,6 +134,25 @@ final class InvitationsApiRealEngineTest extends TestCase
         self::assertCount(1, $this->mailer->sent);
         self::assertSame('new@example.test', $this->mailer->sent[0]['to']);
         self::assertStringContainsString('https://app.test/accept-invitation?token=', $this->mailer->sent[0]['body']);
+    }
+
+    /** WHIT-1156: at the plan's staff limit, `block` refuses with a plain way forward, `warn` sends and says so. */
+    public function testThePlansStaffLimitIsAskedBeforeInviting(): void
+    {
+        $entitlements = new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($this->pdo));
+        $entitlements->set(self::TENANT_A, 'members.max', '1');
+        $this->handler->useSeats(new \Whity\Core\Seat\SeatService($this->pdo, $entitlements, $this->settings));
+
+        $this->settings->setGlobal(SettingsRegistry::SEATS_ENFORCEMENT, 'warn');
+        $warned = $this->create(self::TENANT_A, self::ADMIN_A, ['email' => 'second@example.test', 'role' => 'user']);
+        self::assertSame(201, $warned->getStatusCode(), $warned->getBody());
+        self::assertStringContainsString('larger plan on Billing', (string) ($this->decode($warned)['data']['seats']['message'] ?? ''));
+
+        $this->settings->setGlobal(SettingsRegistry::SEATS_ENFORCEMENT, 'block');
+        $blocked = $this->create(self::TENANT_A, self::ADMIN_A, ['email' => 'third@example.test', 'role' => 'user']);
+        self::assertSame(409, $blocked->getStatusCode());
+        self::assertStringContainsString('move the workspace to a larger plan on Billing', $blocked->getBody());
+        self::assertStringContainsString('seat_limit', $blocked->getBody());
     }
 
     public function testTheInviteResponseIsIdenticalForAKnownAndAnUnknownAddress(): void

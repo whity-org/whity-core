@@ -28,6 +28,7 @@ use Whity\Sdk\Documents\DocumentNumberingRule;
 use Whity\Sdk\Hooks\Events;
 use Whity\Sdk\Hooks\HookVetoException;
 use Whity\Storage\StorageException;
+use Whity\Core\Document\SavedBlock\SavedBlockExpander;
 
 /**
  * Issues documents from editor templates (editor M4c), and corrects them: the
@@ -89,6 +90,9 @@ final class DocumentIssuing
         private readonly ?HookManager $hooks = null,
         private readonly ?DocumentRepository $documents = null,
         private readonly ?DocumentArtifactRepository $artifacts = null,
+        // Synced saved blocks (editor M7, E.38): a one-off document is frozen
+        // with them as the library has them when it is issued.
+        private readonly ?SavedBlockExpander $savedBlocks = null,
     ) {
     }
 
@@ -129,16 +133,21 @@ final class DocumentIssuing
     {
         $last = $this->published($tenantId, $source);
         $theme = $this->print->theme($tenantId, $source['theme'] ?? null, (string) $source['kind']);
+        $blocks = is_array($source['blocks'] ?? null) ? array_values($source['blocks']) : [];
+        $lang = (string) ($source['lang'] ?? 'en');
+        $blocks = $this->savedBlocks?->expand($tenantId, $blocks, $lang) ?? $blocks;
         // Compared without key order: PostgreSQL's JSONB stores object keys in its own order.
         if ($last !== null
             && $last['title'] === (string) $source['title']
             && self::canonical($last['page']) === self::canonical($source['page'])
-            && self::canonical($last['blocks']) === self::canonical($source['blocks'])
+            && self::canonical($last['blocks']) === self::canonical($blocks)
             && self::canonical($last['own_fields']) === self::canonical($source['own_fields'] ?? [])
             && ($last['theme_resolved']['hash'] ?? null) === $theme['hash']) {
             return $last;
         }
-        $version = $this->versions->publish((int) $source['id'], $tenantId, (int) $source['draft_version'], $callerId, $theme);
+        $expander = $this->savedBlocks;
+        $freeze = $expander !== null ? static fn (array $b): array => $expander->expand($tenantId, $b, $lang) : null;
+        $version = $this->versions->publish((int) $source['id'], $tenantId, (int) $source['draft_version'], $callerId, $theme, $freeze);
 
         return $version === null ? null : $this->versions->find((int) $source['id'], $tenantId, $version);
     }
@@ -154,6 +163,49 @@ final class DocumentIssuing
         }
 
         return $value;
+    }
+
+    /**
+     * The ids of plugin blocks in these blocks, nested ones included: blocks
+     * Whity can't print as they are (editor M7, E.18-E.19).
+     *
+     * @param array<mixed> $blocks
+     * @return list<string>
+     */
+    public static function unprintableBlocks(array $blocks): array
+    {
+        $ids = [];
+        foreach ($blocks as $block) {
+            if (!is_array($block)) {
+                continue;
+            }
+            $type = $block['type'] ?? null;
+            if ($type === 'plugin') {
+                $ids[] = (string) ($block['id'] ?? '');
+            }
+            if ($type === 'toggle' && is_array($block['children'] ?? null)) {
+                array_push($ids, ...self::unprintableBlocks($block['children']));
+            }
+            if ($type === 'columns' && is_array($block['columns'] ?? null)) {
+                foreach ($block['columns'] as $column) {
+                    if (is_array($column)) {
+                        array_push($ids, ...self::unprintableBlocks($column));
+                    }
+                }
+            }
+        }
+
+        return $ids;
+    }
+
+    public static function unprintable(): DocumentIssueRefused
+    {
+        return new DocumentIssueRefused(
+            'unprintable_block',
+            "This template has a plugin block that can't print here; turn its plugin on and publish the template again",
+            422,
+            ['code' => 'unprintable_block'],
+        );
     }
 
     /**
@@ -181,6 +233,13 @@ final class DocumentIssuing
     {
         [$tenantId, $callerId] = [$actor->tenantId, $actor->issuerId()];
         [$source, $version, $values, $originKey] = [$request->source, $request->version, $request->values, $request->originKey];
+        // Editor M7 (E.18, E.19): a plugin block left in a version has no print
+        // here, so the document would print without it. Refuse before anything is
+        // written. Publishing turns plugin blocks into Whity's own, so a version
+        // only keeps one when it was published past that (a plugin's starter).
+        if (self::unprintableBlocks(is_array($version['blocks'] ?? null) ? $version['blocks'] : []) !== []) {
+            throw self::unprintable();
+        }
         if ($originKey !== null) {
             $existing = $this->documents?->findByOriginKey($originKey, $tenantId);
             if ($existing !== null) {
@@ -694,6 +753,79 @@ final class DocumentIssuing
             'version' => (int) $version['version'],
             'pages' => $pages,
         ]);
+
+        return [['attempted' => true, 'stored' => true, 'reason' => null], $artifact];
+    }
+
+    /**
+     * Design 3.4 (P1): the form printouts service over this issuing stack's
+     * printer and settings, with the plan gate read from `$db`.
+     */
+    public function formPrintouts(\PDO $db): \Whity\Core\Form\Print\FormPrintoutService
+    {
+        return new \Whity\Core\Form\Print\FormPrintoutService(
+            $db,
+            $this->print,
+            new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($db)),
+            $this->settings,
+        );
+    }
+
+    /**
+     * Render and store a payload built in code for a document with no template:
+     * a form response's automatic printout (design 3.4, P1). Same gates as a
+     * template's print (rendering and storing on, the render limits) and the
+     * same verification code, which `$build` receives so the printout's
+     * decision block can carry it. `document.rendered` names no template.
+     *
+     * @param array<string, mixed> $document The `documents` row.
+     * @param \Closure(?DocumentQrStamp): ?array<string, mixed> $build
+     * @return array{0: array{attempted: bool, stored: bool, reason: string|null}, 1: array<string, mixed>|null}
+     */
+    public function renderBuiltPayload(ActingAs $actor, array $document, \Closure $build): array
+    {
+        [$tenantId, $callerId] = [$actor->tenantId, $actor->issuerId()];
+        $effective = $this->settings->effective($tenantId);
+        if ($this->renderer === null || !$this->renderer->isEnabled($tenantId)) {
+            return [['attempted' => false, 'stored' => false, 'reason' => 'disabled'], null];
+        }
+        if (($effective[SettingsRegistry::DOCUMENTS_PERSIST_ENABLED] ?? 'true') !== 'true') {
+            return [['attempted' => false, 'stored' => false, 'reason' => 'persist_disabled'], null];
+        }
+        $payload = $build($this->stamp($tenantId, $callerId, (int) $document['id'], $effective));
+        if ($payload === null) {
+            return [['attempted' => false, 'stored' => false, 'reason' => 'rejected'], null];
+        }
+
+        $metered = false;
+        if ($this->meters !== null) {
+            if (!$this->meters->consume($tenantId, self::RENDER_METERS)->allowed) {
+                return [['attempted' => false, 'stored' => false, 'reason' => 'limit'], null];
+            }
+            $metered = true;
+        }
+        try {
+            $rendered = $this->renderer->render($tenantId, $payload);
+        } catch (DocumentRenderRejectedException $e) {
+            $this->refund($tenantId, $metered);
+            error_log('[DocumentIssuing] the printout render was refused: ' . $e->clientMessage);
+
+            return [['attempted' => true, 'stored' => false, 'reason' => 'rejected'], null];
+        } catch (RenderServiceUnavailableException $e) {
+            $this->refund($tenantId, $metered);
+            error_log('[DocumentIssuing] the printout render failed: ' . $e->getMessage());
+
+            return [['attempted' => true, 'stored' => false, 'reason' => 'unavailable'], null];
+        }
+        try {
+            $pages = $rendered->pageCount > 0 ? $rendered->pageCount : null;
+            $artifact = $this->issuer->appendArtifact($tenantId, $callerId, $document, $rendered->bytes, pages: $pages);
+        } catch (StorageException $e) {
+            error_log('[DocumentIssuing] storing the printout failed: ' . $e->getMessage());
+
+            return [['attempted' => true, 'stored' => false, 'reason' => 'storage_unavailable'], null];
+        }
+        $this->storedBuilt($tenantId, (int) $document['id'], $artifact);
 
         return [['attempted' => true, 'stored' => true, 'reason' => null], $artifact];
     }

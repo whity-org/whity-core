@@ -226,10 +226,10 @@ class Router
                 // entirely, so for an institution whose records are named in
                 // Arabic that is not an edge case but every lookup.
                 //
-                // NOTE: this file is a vendored copy that NOTHING GUARDS.
-                // `scripts/ci-vendored-sdk-parity.php` compares `php-host/sdk/src`
-                // against `sdk/src` and stops there, so `php-host/src/Core` can
-                // drift silently — and already had, by at least one method
+                // NOTE: this file is a hand-kept twin that NOTHING GUARDS.
+                // Only `php-host/sdk/src` is generated from `sdk/src`
+                // (scripts/copy-sdk.mjs), so `php-host/src/Core` can drift
+                // silently — and already had, by at least one method
                 // (`versionedPath`) before this change.
                 $params = [];
                 foreach ($matches as $key => $value) {

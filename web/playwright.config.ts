@@ -48,7 +48,15 @@ export default defineConfig({
   // One worker: the suite mutates a shared dev database, so serialised writes
   // keep runs deterministic and re-runnable.
   workers: 1,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // The JSON report (CI sets PLAYWRIGHT_JSON_OUTPUT_FILE) feeds the per-file
+  // timings scripts/e2e-shard.mjs balances the shards on (WHIT-935).
+  reporter: process.env.CI
+    ? [
+        ['list'],
+        ['html', { open: 'never' }],
+        ...(process.env.PLAYWRIGHT_JSON_OUTPUT_FILE ? [['json'] as ['json']] : []),
+      ]
+    : 'list',
   timeout: 45_000,
   expect: { timeout: 12_000 },
   use: {

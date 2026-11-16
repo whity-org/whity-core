@@ -34,6 +34,7 @@ final class HostPluginServices
     {
         \Whity\register_service(\Whity\Sdk\Audit\PluginAudit::class, new \Whity\Core\Audit\HostPluginAudit($pdo, $audit));
         \Whity\register_service(\Whity\Sdk\Jobs\PluginJobQueue::class, new \Whity\Core\Queue\HostPluginJobQueue(new \Whity\Core\Queue\JobRepository($pdo)));
+        $activation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($pdo);
         \Whity\register_service(PluginNotifier::class, new HostPluginNotifier(
             $pdo,
             new NotificationDispatcher(
@@ -46,6 +47,14 @@ final class HostPluginServices
                 $audit,
             ),
             $logger,
+            null,
+            // WHIT-1123: read fresh on every send, so a worker that outlives
+            // the switch never sends for a plugin a workspace turned off.
+            static function (string $plugin, int $tenantId) use ($activation): bool {
+                $activation->resetRequest();
+
+                return !$activation->isOn($plugin, $tenantId);
+            },
         ));
     }
 }

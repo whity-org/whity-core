@@ -38,7 +38,9 @@ while (true) {
         continue;
     }
     stream_set_timeout($conn, 10);
-    fwrite($conn, "220 fake ESMTP\r\n");
+    // The banner names this test's directory (WHIT-1161), so the test knows
+    // the server on this port is its own.
+    fwrite($conn, '220 fake ESMTP ' . basename($dir) . "\r\n");
     $signedIn = false;
 
     while (($line = fgets($conn)) !== false) {

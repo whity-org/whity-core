@@ -43,7 +43,9 @@ use Whity\Core\Hooks\HookManager;
 use Whity\Core\Tenant\TenantContext;
 use Psr\Log\LoggerInterface;
 use Composer\Semver\Semver;
+use Whity\Sdk\Frontend\Blocks\BlockText;
 use Whity\Sdk\Frontend\Blocks\BlockValidator;
+use Whity\Sdk\I18n\LocalizedText;
 use Whity\Sdk\Hooks\HookVetoException;
 use Whity\Sdk\Manifest\ManifestPlugin;
 use Whity\Sdk\Http\Request;
@@ -72,6 +74,13 @@ use Whity\Sdk\PluginEntitlementsInterface;
 use Whity\Sdk\PluginRolesInterface;
 use Whity\Sdk\PluginThemeInterface;
 use Whity\Sdk\PluginBillingPortalInterface;
+use Whity\Sdk\PluginBookingPaymentInterface;
+use Whity\Sdk\PluginCalendarBusyInterface;
+use Whity\Core\Calendar\CalendarPlugins;
+use Whity\Sdk\PluginInboxSourcesInterface;
+use Whity\Sdk\PluginMessageChannelsInterface;
+use Whity\Core\Inbox\InboxSourceRegistry;
+use Whity\Core\Messaging\MessageChannelRegistry;
 use Whity\Core\Billing\External\PluginBillingPortals;
 use Whity\Core\Billing\HostLicenceSales;
 use Whity\Sdk\PluginLicenceSalesInterface;
@@ -84,7 +93,7 @@ use Whity\Sdk\Sdk;
  * the SDK plugin contract ({@see \Whity\Sdk\PluginInterface}, WC-162), and
  * registers their routes, permissions, and hooks.
  */
-class PluginLoader
+class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
 {
     /** Arguments and messages kept per plugin prompt, and the length of each message (SDK 1.80). */
     private const MAX_PROMPT_ITEMS = 20;
@@ -161,6 +170,9 @@ class PluginLoader
 
     /** Where a plugin-provided billing portal goes (SDK 1.77); null means plugins cannot sell. */
     private ?PluginBillingPortals $billingPortals = null;
+    private ?InboxSourceRegistry $inboxSources = null;
+    private ?CalendarPlugins $calendarPlugins = null;
+    private ?MessageChannelRegistry $messageChannels = null;
 
     /** Where a plugin's licence seller goes (SDK 1.86); null means plugins cannot sell licences. */
     private ?HostLicenceSales $licenceSales = null;
@@ -194,6 +206,9 @@ class PluginLoader
     // Where code plugins' template slots and merge-field record types go
     // (SDK 1.56, WHIT-742). Set by both entry points before load().
     private ?\Whity\Core\Document\Slots\TemplateSlotRegistry $templateSlotRegistry = null;
+
+    /** Blocks plugins add to the document editor (SDK 1.103, editor M7). */
+    private ?\Whity\Core\Document\Blocks\DocumentBlockRegistry $documentBlockRegistry = null;
     private ?\Whity\Core\Agent\AgentPresetRegistry $agentPresetRegistry = null;
     private ?\Whity\Core\Document\Fields\DocumentFieldRegistry $documentFieldRegistry = null;
 
@@ -220,6 +235,12 @@ class PluginLoader
      * than a gap, which is part of why the worker's went unnoticed.
      */
     private ?AuditLogger $auditLogger = null;
+
+    /**
+     * Which workspaces have each code plugin on (WHIT-1122). Null means every
+     * plugin is on everywhere, as before.
+     */
+    private ?\Whity\Core\Plugin\Workspace\CodePluginActivation $workspaceActivation = null;
 
     /**
      * @var HookManager|null Hook manager instance
@@ -490,10 +511,397 @@ class PluginLoader
         $this->billingPortals = $billingPortals;
     }
 
+    /** Accept a booking payment step and calendar busy times (SDK 1.98, ADR 0017). */
+    public function setCalendarPlugins(CalendarPlugins $calendarPlugins): void
+    {
+        $this->calendarPlugins = $calendarPlugins;
+    }
+
+    /** Accept plugins' inbox sources (SDK 1.97, #881), stored as `<plugin>:<key>`. */
+    public function setInboxSources(InboxSourceRegistry $inboxSources): void
+    {
+        $this->inboxSources = $inboxSources;
+    }
+
+    /** Accept plugins' message channels (SDK 1.97, ADR 0016), stored as `<plugin>:<key>`. */
+    public function setMessageChannels(MessageChannelRegistry $messageChannels): void
+    {
+        $this->messageChannels = $messageChannels;
+    }
+
     /** Accept a plugin's store-licence seller (SDK 1.86, WHIT-1013). One per deployment. */
     public function setLicenceSales(HostLicenceSales $licenceSales): void
     {
         $this->licenceSales = $licenceSales;
+    }
+
+    /** Switch plugins on and off per workspace (WHIT-1122). */
+    public function setWorkspaceActivation(\Whity\Core\Plugin\Workspace\CodePluginActivation $activation): void
+    {
+        $this->workspaceActivation = $activation;
+    }
+
+    /**
+     * Is this plugin off for the current request's workspace (WHIT-1122)?
+     * The system workspace and work with no workspace see every plugin on.
+     *
+     * @param string $pluginKey The plugin's stable identity (original FQCN).
+     */
+    public function isOffForWorkspace(string $pluginKey, ?int $tenantId = null): bool
+    {
+        if ($this->workspaceActivation === null) {
+            return false;
+        }
+        $plugin = $this->registeredPlugins[$pluginKey]['plugin'] ?? null;
+        if ($plugin === null) {
+            return false;
+        }
+
+        // Read-only still shows: its pages and reads keep working (WHIT-1125).
+        return !$this->workspaceActivation->isVisible($plugin->getName(), $tenantId);
+    }
+
+    /**
+     * What a paid plugin's screens should say about its access in the current
+     * workspace, or null when there is nothing to say.
+     *
+     * @return array{state: string, reason: ?string, graceUntil: ?string}|null
+     */
+    private function screenAccessNote(string $pluginName): ?array
+    {
+        if ($this->workspaceActivation === null || $this->workspaceActivation->paidAccessOf($pluginName) === null) {
+            return null;
+        }
+        $state = $this->workspaceActivation->stateFor($pluginName);
+        if (!in_array($state['reason'], ['grace', 'lapsed', 'installation_unlicensed', 'installation_grace'], true)) {
+            return null;
+        }
+
+        return ['state' => $state['state'], 'reason' => $state['reason'], 'graceUntil' => $state['graceUntil']];
+    }
+
+    /**
+     * Is this plugin paused for the workspace: off, or read-only because its
+     * paid access ended (WHIT-1125)? Its hooks, jobs and notifications stop.
+     */
+    public function isPausedForWorkspace(string $pluginKey, ?int $tenantId = null): bool
+    {
+        if ($this->workspaceActivation === null) {
+            return false;
+        }
+        $plugin = $this->registeredPlugins[$pluginKey]['plugin'] ?? null;
+        if ($plugin === null) {
+            return false;
+        }
+
+        return !$this->workspaceActivation->isOn($plugin->getName(), $tenantId);
+    }
+
+    /** @var array<string, array{entitlement: string, product: string, trialDays: int}>|null */
+    private ?array $paidAccess = null;
+
+    /**
+     * Each plugin's validated guided setup (SDK 1.109), by plugin key.
+     *
+     * @var array<string, array<string, mixed>|null>
+     */
+    private array $onboardings = [];
+
+    /**
+     * The names of loaded plugins that offer a guided setup (SDK 1.109).
+     *
+     * @return list<string>
+     */
+    public function pluginsWithOnboarding(): array
+    {
+        $names = [];
+        foreach ($this->onboardings as $pluginKey => $onboarding) {
+            if ($onboarding !== null && isset($this->registeredPlugins[$pluginKey])) {
+                $names[] = (string) $onboarding['plugin'];
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * Guided setups of the plugins visible in the current workspace (SDK 1.109).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getOnboardings(): array
+    {
+        $out = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $onboarding = $this->onboardings[$pluginKey] ?? null;
+            if ($onboarding === null || isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive() || $this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+            $out[] = $onboarding;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Validate a plugin's guided setup: a GET status route of its own, and
+     * each step's blocks checked as a blocks screen (endpoint ownership and
+     * versioning included). Invalid steps are dropped; with none left there
+     * is no setup.
+     *
+     * @param array<string, string|null> $registeredGetRoutes
+     * @param array<string, string|null> $registeredWriteRoutes
+     * @return array<string, mixed>|null
+     */
+    private function collectOnboarding(PluginInterface $plugin, string $pluginKey, array $registeredGetRoutes, array $registeredWriteRoutes): ?array
+    {
+        if (!$plugin instanceof \Whity\Sdk\PluginOnboardingInterface) {
+            return null;
+        }
+        try {
+            // Read untyped: a plugin's array is runtime data whatever its
+            // declared shape, so every field is checked here.
+            /** @var array<string, mixed> $declared */
+            $declared = $plugin->getOnboarding();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'getOnboarding');
+
+            return null;
+        }
+
+        $name = $plugin->getName();
+        $permission = $declared['permission'] ?? null;
+        $status = $declared['status'] ?? null;
+        $ownPermissions = $plugin->getPermissions();
+        if (!is_string($permission) || !in_array($permission, $ownPermissions, true) || !is_string($status) || !array_key_exists($status, $registeredGetRoutes)) {
+            $this->logWarning("[Plugin:{$pluginKey}] getOnboarding(): needs one of its own permissions and one of its own GET routes as status; no setup offered.");
+
+            return null;
+        }
+
+        $slug = \Whity\Sdk\PluginNamespace::slug($name) ?? 'plugin';
+        $steps = [];
+        $dropped = [];
+        $declaredSteps = is_array($declared['steps'] ?? null) ? $declared['steps'] : [];
+        foreach ($declaredSteps as $step) {
+            if (!is_array($step)) {
+                continue;
+            }
+            $stepId = is_string($step['id'] ?? null) ? $step['id'] : '';
+            if (preg_match('/^[a-z][a-z0-9-]{0,40}$/', $stepId) !== 1) {
+                $this->logWarning("[Plugin:{$pluginKey}] getOnboarding(): a step has no valid id; dropped.");
+                continue;
+            }
+            // Checked as a pseudo screen, never registered as one.
+            $normalized = $this->validateFrontendFeature(
+                ['id' => $slug . '-setup-' . $stepId, 'label' => $step['title'] ?? $stepId, 'screen' => 'blocks', 'requiredPermission' => $permission, 'blocks' => $step['blocks'] ?? null],
+                $name,
+                $pluginKey,
+                $ownPermissions,
+                $registeredGetRoutes,
+                $registeredWriteRoutes,
+                $dropped,
+            );
+            if ($normalized === null) {
+                continue;
+            }
+            $steps[] = [
+                'id' => $stepId,
+                'title' => $step['title'] ?? $stepId,
+                'description' => $step['description'] ?? null,
+                'blocks' => $normalized['blocks'] ?? [],
+            ];
+        }
+        if ($steps === []) {
+            return null;
+        }
+
+        return [
+            'plugin' => $name,
+            'title' => $declared['title'] ?? $name,
+            'description' => $declared['description'] ?? null,
+            'permission' => $permission,
+            'status' => $this->router->versionedPath($status),
+            'steps' => $steps,
+        ];
+    }
+
+    private string $paidAccessFingerprint = '';
+
+    /**
+     * Every active paid plugin's declaration (SDK 1.107), by plugin name. A
+     * malformed one is logged and the plugin is treated as paid with no way in
+     * but the operator's "free for every workspace": failing open would give a
+     * paid plugin away.
+     *
+     * @return array<string, array{entitlement: string, product: string, trialDays: int}>
+     */
+    public function getPaidAccess(): array
+    {
+        // Rebuilt whenever the set of loaded plugins changes (load, reload,
+        // enable, uninstall), so a worker never serves a stale declaration.
+        $fingerprint = implode('|', array_keys($this->registeredPlugins));
+        if ($this->paidAccess !== null && $this->paidAccessFingerprint === $fingerprint) {
+            return $this->paidAccess;
+        }
+        $this->paidAccessFingerprint = $fingerprint;
+        $paid = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $plugin = $info['plugin'];
+            if (!$plugin instanceof \Whity\Sdk\PluginAccessInterface) {
+                continue;
+            }
+            $name = $plugin->getName();
+            try {
+                $declared = $plugin->getAccess();
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getAccess');
+                $declared = [];
+            }
+            if ($declared === null) {
+                continue;
+            }
+            $slug = \Whity\Sdk\PluginNamespace::slug($name);
+            $entitlement = $declared['entitlement'] ?? '';
+            $product = $declared['product'] ?? '';
+            $trialDays = $declared['trialDays'] ?? 0;
+            // The entitlement must be a boolean key of the plugin's own shape
+            // (`front_office.access`); pointing at someone else's only gives
+            // the plugin away, so the shape is all that is checked here.
+            // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+            if (!is_string($entitlement) || preg_match('/^[a-z][a-z0-9_-]*\.[a-z0-9._-]+$/', $entitlement) !== 1 || !is_string($product) || preg_match('/^plugin\.[a-z0-9][a-z0-9._-]{0,127}$/', $product) !== 1 || !is_int($trialDays) || $trialDays < 0 || $trialDays > 90) {
+                $this->logWarning("[Plugin:{$pluginKey}] getAccess(): the declaration is malformed; the plugin is paid with no way in but 'free for every workspace'.");
+                // No entitlement can grant it and no trial: only the operator's switch.
+                $paid[$name] = ['entitlement' => '', 'product' => 'plugin.' . $slug, 'trialDays' => 0];
+                continue;
+            }
+            $paid[$name] = ['entitlement' => $entitlement, 'product' => $product, 'trialDays' => $trialDays];
+            // SDK 1.110: sold per seat, counted by one of its own settings.
+            $seats = self::seatsDeclaration($declared['seats'] ?? null);
+            if ($seats !== null) {
+                $paid[$name]['seats'] = $seats;
+            }
+        }
+
+        return $this->paidAccess = $paid;
+    }
+
+    /**
+     * The plugins this one declares it depends on that are loaded here, by
+     * name (WHIT-1148): turning it on in a workspace turns them on too.
+     *
+     * @return list<string>
+     */
+    public function workspaceDependenciesOf(string $pluginName): array
+    {
+        $loaded = [];
+        foreach ($this->registeredPlugins as $info) {
+            $loaded[$info['plugin']->getName()] = $info['plugin'];
+        }
+        $plugin = $loaded[$pluginName] ?? null;
+        if (!$plugin instanceof \Whity\Sdk\PluginRequirementsInterface) {
+            return [];
+        }
+        try {
+            $declared = array_keys($plugin->getPluginDependencies());
+        } catch (Throwable) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map('strval', $declared), static fn (string $name): bool => isset($loaded[$name])));
+    }
+
+    /**
+     * The loaded plugins that depend on this one, by name.
+     *
+     * @return list<string>
+     */
+    public function dependentsOf(string $pluginName): array
+    {
+        $dependents = [];
+        foreach ($this->registeredPlugins as $info) {
+            $name = $info['plugin']->getName();
+            if ($name !== $pluginName && in_array($pluginName, $this->workspaceDependenciesOf($name), true)) {
+                $dependents[] = $name;
+            }
+        }
+
+        return $dependents;
+    }
+
+    /**
+     * A plugin's `seats` declaration (SDK 1.110), read untyped: the plugin's
+     * array is runtime data whatever its documented shape.
+     *
+     * @return array{setting: string, unit: mixed, units: mixed}|null
+     */
+    private static function seatsDeclaration(mixed $seats): ?array
+    {
+        if (!is_array($seats) || !is_string($seats['setting'] ?? null) || preg_match('/^[a-z][a-z0-9_]*$/', $seats['setting']) !== 1) {
+            return null;
+        }
+
+        return ['setting' => $seats['setting'], 'unit' => $seats['unit'] ?? null, 'units' => $seats['units'] ?? null];
+    }
+
+    /**
+     * Tell a plugin a workspace turned it on or off (SDK 1.107). A throw is
+     * logged and doesn't undo the switch.
+     */
+    public function notifyWorkspaceSwitch(string $pluginName, int $tenantId, bool $enabled): void
+    {
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $plugin = $info['plugin'];
+            if ($plugin->getName() !== $pluginName || !$plugin instanceof \Whity\Sdk\PluginWorkspaceLifecycleInterface) {
+                continue;
+            }
+            try {
+                $enabled ? $plugin->onWorkspaceEnabled($tenantId) : $plugin->onWorkspaceDisabled($tenantId);
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, $enabled ? 'onWorkspaceEnabled' : 'onWorkspaceDisabled');
+            }
+        }
+    }
+
+    public function isPluginOffForWorkspace(string $pluginName, ?int $tenantId = null): bool
+    {
+        return $this->workspaceActivation !== null && !$this->workspaceActivation->isOn($pluginName, $tenantId);
+    }
+
+    public function isToolsetOffForWorkspace(?string $toolset, ?int $tenantId = null): bool
+    {
+        if ($this->workspaceActivation === null || $toolset === null || $toolset === '') {
+            return false;
+        }
+        foreach ($this->registeredPlugins as $info) {
+            $name = $info['plugin']->getName();
+            $root = \Whity\Mcp\Tools\CoreToolsets::pluginToolsetId($name);
+            if ($root !== '' && \Whity\Mcp\Tools\ToolSurface::isWithin($toolset, $root)) {
+                return !$this->workspaceActivation->isOn($name, $tenantId);
+            }
+        }
+
+        return false;
+    }
+
+    public function isClassOffForWorkspace(string $class, ?int $tenantId = null): bool
+    {
+        if ($this->workspaceActivation === null) {
+            return false;
+        }
+        $class = ltrim($class, '\\');
+        foreach ($this->registeredPlugins as $info) {
+            $prefix = rtrim($info['namespacePrefix'], '\\');
+            if ($prefix !== '' && str_starts_with($class, $prefix . '\\')) {
+                return !$this->workspaceActivation->isOn($info['plugin']->getName(), $tenantId);
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -888,9 +1296,12 @@ class PluginLoader
     public function setDocumentRegistries(
         \Whity\Core\Document\Slots\TemplateSlotRegistry $slots,
         \Whity\Core\Document\Fields\DocumentFieldRegistry $fields,
+        // SDK 1.103 (editor M7): blocks plugins add to the document editor.
+        ?\Whity\Core\Document\Blocks\DocumentBlockRegistry $blocks = null,
     ): void {
         $this->templateSlotRegistry = $slots;
         $this->documentFieldRegistry = $fields;
+        $this->documentBlockRegistry = $blocks;
     }
 
     /**
@@ -910,8 +1321,12 @@ class PluginLoader
             // A reload re-declares them from the plugin as it is now.
             $this->templateSlotRegistry?->unregister($info['plugin']->getName());
             $this->documentFieldRegistry?->removeOwner($info['plugin']->getName());
+            $this->documentBlockRegistry?->unregister($info['plugin']->getName());
             // A reload must not leave a removed plugin's webhook public (WHIT-671).
             \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
+            // Nor its customer-grade permissions (#1872). Only this loader's
+            // plugins: another loader in the same process keeps its own.
+            \Whity\Core\Identity\CustomerGradePermissions::remove((string) $pluginKey);
         \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
 
             if ($this->hookManager !== null) {
@@ -2266,6 +2681,10 @@ class PluginLoader
         // plugin leaves nothing reachable without tenant resolution.
         \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
         \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
+        // A disabled or uninstalled plugin vouches for nothing (#1872): its
+        // customer-grade permissions are privileged for customers again.
+        \Whity\Core\Identity\CustomerGradePermissions::remove($pluginKey);
+        \Whity\Auth\RoleChecker::clearCache();
 
         if ($this->hookManager !== null) {
             foreach ($info['hooks'] as $hook) {
@@ -3208,6 +3627,99 @@ class PluginLoader
     }
 
     /**
+     * Record which of this plugin's own permissions it says a customer may hold
+     * (#1872). A slug it does not own (claimed first by another plugin, or not
+     * declared at all) is refused here; the rest is decided by
+     * {@see \Whity\Core\Identity\CustomerGradePermissions}. Refusals are
+     * logged and the rest stays, like a refused role grant.
+     */
+    private function registerCustomerPermissions(PluginInterface $plugin, string $pluginKey): void
+    {
+        // Every resource the plugin declares counts against other plugins'
+        // vouches, so it is recorded even when the declaration below throws.
+        // The registry holds the set registered above; asking the plugin again
+        // could answer differently.
+        $declared = [];
+        try {
+            $source = $this->permissionRegistry !== null
+                ? $this->permissionRegistry->getBySource($plugin->getName())
+                : $plugin->getPermissions();
+            foreach ($source as $permission) {
+                if (is_string($permission)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                    $declared[] = $permission;
+                }
+            }
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'customer permission declaration');
+        }
+
+        $namespace = \Whity\Sdk\PluginNamespace::slug($plugin->getName());
+        $customer = [];
+        $refused = [];
+        try {
+            if ($plugin instanceof \Whity\Sdk\PluginCustomerPermissionsInterface) {
+                foreach ($plugin->getCustomerPermissions() as $slug) {
+                    if (!is_string($slug)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                        continue;
+                    }
+                    if (($this->claimedPermissions[$slug] ?? null) !== $pluginKey) {
+                        $refused[] = $slug;
+                        continue;
+                    }
+                    $customer[] = $slug;
+                }
+            }
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'customer permission declaration');
+            $customer = [];
+            $refused = [];
+        }
+
+        $refused = [
+            ...$refused,
+            ...\Whity\Core\Identity\CustomerGradePermissions::declare($pluginKey, $namespace, $declared, $customer),
+        ];
+        foreach ($refused as $slug) {
+            $this->logWarning(sprintf(
+                'Plugin %s declares "%s" customer-grade, but a plugin may vouch only for permissions it '
+                . 'declares under its own name (its slug or slug_*), never a core or administrative one; '
+                . 'customers will not hold it',
+                $pluginKey,
+                $slug
+            ));
+        }
+    }
+
+    private function registerDocumentBlocks(PluginInterface&\Whity\Sdk\PluginDocumentBlocksInterface $plugin, string $pluginKey): void
+    {
+        $registry = $this->documentBlockRegistry;
+        if ($registry === null) {
+            return;
+        }
+        try {
+            $declared = $plugin->getDocumentBlocks();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'document blocks');
+
+            return;
+        }
+        $blocks = [];
+        foreach ($declared as $block) {
+            if (!$block instanceof \Whity\Sdk\Documents\DocumentBlock) { // @phpstan-ignore instanceof.alwaysTrue (plugin-supplied value; the SDK type is PHPDoc only)
+                $this->logWarning("Plugin {$pluginKey} declares a document block that is not a DocumentBlock");
+                continue;
+            }
+            if (isset($blocks[$block->name])) {
+                $this->logWarning("Plugin {$pluginKey} declares document block '{$block->name}' twice; the second is dropped");
+                continue;
+            }
+            $blocks[$block->name] = $block->definition;
+        }
+        $name = $plugin->getName();
+        $registry->register($name, ['en' => $name, 'ar' => $name], $blocks);
+    }
+
+    /**
      * A plugin's document declarations (SDK 1.56, WHIT-742): record types
      * first, so its slots can name them.
      */
@@ -3692,6 +4204,23 @@ class PluginLoader
             }
         }
 
+        // 2a-ter-bis. Accept a plugin's BOOKING PAYMENT STEP and CALENDAR BUSY
+        //     TIMES (SDK 1.98, ADR 0017). One payment step per deployment: a
+        //     second is refused and logged by the registry. Busy sources are
+        //     wrapped so a slow or failing plugin never stops bookings.
+        if ($this->calendarPlugins !== null && $plugin instanceof PluginBookingPaymentInterface) {
+            try {
+                if (!$this->calendarPlugins->offerPaymentStep($plugin->getName(), $plugin->getBookingPaymentStep())) {
+                    $this->logWarning("Plugin {$pluginKey} offers a booking payment step, but another plugin already provides one; it was not used.");
+                }
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getBookingPaymentStep');
+            }
+        }
+        if ($this->calendarPlugins !== null && $plugin instanceof PluginCalendarBusyInterface) {
+            $this->calendarPlugins->addBusyPlugin($plugin->getName(), $plugin);
+        }
+
         // 2a-quater. Accept a plugin BILLING PORTAL (SDK 1.77, WHIT-1010). One
         //     per deployment: the slot refuses a second and says so, because two
         //     plugins both taking a deployment's subscription money would make
@@ -3707,6 +4236,30 @@ class PluginLoader
                 }
             } catch (Throwable $e) {
                 $this->handlePluginThrowable($pluginKey, $e, 'getBillingPortal');
+            }
+        }
+
+        // 2a-quater-bis. Accept a plugin's INBOX SOURCES and MESSAGE CHANNELS
+        //     (SDK 1.97, #881, ADR 0016). Both registries namespace by the
+        //     plugin's own name. A malformed declaration is the plugin's mistake
+        //     and is logged; a getter that throws goes through the lifecycle
+        //     error boundary like every other contribution point.
+        if ($this->inboxSources !== null && $plugin instanceof PluginInboxSourcesInterface) {
+            try {
+                $this->inboxSources->register($plugin->getName(), $plugin->getInboxSources());
+            } catch (\Whity\Core\Inbox\InvalidInboxSourceException $e) {
+                $this->logWarning("Plugin {$pluginKey} declares an invalid inbox source: " . $e->getMessage());
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getInboxSources');
+            }
+        }
+        if ($this->messageChannels !== null && $plugin instanceof PluginMessageChannelsInterface) {
+            try {
+                $this->messageChannels->register($plugin->getName(), $plugin->getMessageChannels());
+            } catch (\InvalidArgumentException $e) {
+                $this->logWarning("Plugin {$pluginKey} declares an invalid message channel: " . $e->getMessage());
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getMessageChannels');
             }
         }
 
@@ -3772,6 +4325,14 @@ class PluginLoader
         //     record type the host serves once the plugin's own are in.
         if ($plugin instanceof PluginDocumentsInterface) {
             $this->registerDocuments($plugin, $pluginKey);
+        }
+
+        // 2a-sexies-bis. Document blocks (SDK 1.103, editor M7): declarations
+        //     Whity's renderer draws. A DocumentBlock can't be built invalid, so
+        //     only a non-DocumentBlock or a name used twice is dropped, with a
+        //     logged reason, while the plugin keeps loading.
+        if ($plugin instanceof \Whity\Sdk\PluginDocumentBlocksInterface) {
+            $this->registerDocumentBlocks($plugin, $pluginKey);
         }
 
         // 2a-quater-bis. Agent presets (SDK 1.61, WHIT-818). Same shape: optional,
@@ -3842,6 +4403,15 @@ class PluginLoader
         } catch (Throwable $e) {
             $this->handlePluginThrowable($pluginKey, $e, 'permission declaration');
         }
+
+        // 2c. Customer-grade permissions (#1872, SDK 1.104): the plugin's own
+        //     permissions it scopes to the caller's own records, which a
+        //     customer membership may then hold. Only slugs this plugin claimed
+        //     above are passed on; CustomerGradePermissions refuses core and
+        //     admin resources and, at ask time, any resource another plugin
+        //     also declares. Every plugin's resources are recorded, so a later
+        //     plugin on the same resource cancels the vouch.
+        $this->registerCustomerPermissions($plugin, $pluginKey);
 
         // 3. Register hooks with the hook manager, tracking each subscription so
         //    it can be unsubscribed on a later reload/removal/disable. Hook
@@ -3917,6 +4487,11 @@ class PluginLoader
             $registeredGetRoutes,
             $registeredWriteRoutes
         );
+
+        // 4b. The plugin's guided setup (SDK 1.109, WHIT-1148): each step is
+        //     checked exactly like a blocks screen, so its forms may only post
+        //     to the plugin's own routes.
+        $this->onboardings[$pluginKey] = $this->collectOnboarding($plugin, $pluginKey, $registeredGetRoutes, $registeredWriteRoutes);
 
         // 5. Collect the plugin's optional theme-override route (WC-242),
         //    same error-boundary + ownership-verification philosophy as (4).
@@ -4282,7 +4857,17 @@ class PluginLoader
             return $drop('id must be a kebab-case slug matching ' . self::FEATURE_ID_PATTERN, is_string($id) ? $id : null);
         }
 
-        $label = $descriptor['label'] ?? null;
+        // SDK 1.101: the label may be {en, ar}. It is KEPT as written and
+        // resolved per request, where the reader's language is known
+        // (FrontendFeaturesApiHandler via BlockText::resolve, the nav through
+        // PluginNavigationBridge::toNavItem). Resolving it to English here,
+        // once, at load, left every Arabic reader with an English page title
+        // and nav entry while the screen under it was Arabic. `$label` is the
+        // English text, for validation and log messages only.
+        $servedLabel = $descriptor['label'] ?? null;
+        $label = BlockText::isLocalized($servedLabel)
+            ? LocalizedText::resolve($servedLabel, 'en')
+            : $servedLabel;
         if (!is_string($label) || $label === '') {
             return $drop('label must be a non-empty string', $id);
         }
@@ -4616,9 +5201,18 @@ class PluginLoader
                         // An `apiPath` keeps its exact-string comparison, which
                         // is stricter — nothing that validates today starts
                         // matching by shape.
+                        // The query string is a filter on the route, not part
+                        // of it: `/api/x/adjustments?status=pending` is the GET
+                        // the plugin registered as `/api/x/adjustments`, and the
+                        // dispatcher routes and checks it as that. BlockValidator
+                        // accepts a query and the renderer appends `params` after
+                        // one, so comparing the whole string dropped every screen
+                        // that filtered its source (Front Office's Stock and
+                        // Reports). Only the path is compared; the query is kept.
+                        $sourceRoute = explode('?', $source, 2)[0];
                         $owned = $sourceKind === 'apiPath'
-                            ? array_key_exists($source, $registeredGetRoutes)
-                            : self::matchesRegisteredGetRoute($source, $registeredGetRoutes);
+                            ? array_key_exists($sourceRoute, $registeredGetRoutes)
+                            : self::matchesRegisteredGetRoute($sourceRoute, $registeredGetRoutes);
                         if (!$owned) {
                             // Ownership violation — record the offending path
                             // and signal the caller to drop the feature.
@@ -4985,7 +5579,7 @@ class PluginLoader
         $normalized = [
             'id' => $id,
             'plugin' => $pluginName,
-            'label' => $label,
+            'label' => $servedLabel,
             'icon' => $icon,
             'group' => $group,
             'order' => $order,
@@ -5028,7 +5622,18 @@ class PluginLoader
                 continue;
             }
 
+            if ($this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+
+            // A paid plugin in grace or read-only says so on its own screens
+            // (WHIT-1127); the people using it are rarely the ones who buy it.
+            $access = $this->screenAccessNote($info['plugin']->getName());
+
             foreach ($info['frontendFeatures'] as $feature) {
+                if ($access !== null) {
+                    $feature['pluginAccess'] = $access;
+                }
                 $features[] = $feature;
             }
         }
@@ -5053,6 +5658,10 @@ class PluginLoader
 
             $lifecycle = $this->lifecycles[$pluginKey] ?? null;
             if ($lifecycle === null || !$lifecycle->isActive()) {
+                continue;
+            }
+
+            if ($this->isOffForWorkspace($pluginKey)) {
                 continue;
             }
 
@@ -5190,6 +5799,23 @@ class PluginLoader
                 return Response::error('Plugin temporarily unavailable', 503);
             }
 
+            // Off for this workspace (WHIT-1122): it isn't there at all. The
+            // answer is the same as for a route that doesn't exist, so a
+            // workspace can't learn what another workspace has turned on.
+            if ($this->isOffForWorkspace($pluginKey)) {
+                return Response::error('Not Found', 404, ['reason' => 'plugin_off']);
+            }
+
+            // Read-only after paid access ended (WHIT-1125): reads keep
+            // working, nothing can be changed until access is back.
+            if (!in_array(strtoupper($request->getMethod()), ['GET', 'HEAD', 'OPTIONS'], true)
+                && $this->workspaceActivation !== null
+                && ($plugin = $this->registeredPlugins[$pluginKey]['plugin'] ?? null) !== null
+                && $this->workspaceActivation->stateFor($plugin->getName())['state'] === \Whity\Core\Plugin\Workspace\CodePluginActivation::STATE_READ_ONLY
+            ) {
+                return Response::error('This plugin is read-only until its access is renewed', 402, ['reason' => 'plugin_read_only']);
+            }
+
             try {
                 $result = $handler($request, $params);
 
@@ -5247,6 +5873,12 @@ class PluginLoader
                 return $data;
             }
 
+            // Off for the workspace this event belongs to (WHIT-1123): the
+            // listener doesn't run, and the data passes through unchanged.
+            if ($this->isPausedForWorkspace($pluginKey, self::hookTenant($context))) {
+                return $data;
+            }
+
             try {
                 $result = $callback($data, $context);
                 $lifecycle?->recordSuccess();
@@ -5286,6 +5918,10 @@ class PluginLoader
                 return;
             }
 
+            if ($this->isPausedForWorkspace($pluginKey, self::hookTenant($context))) {
+                return;
+            }
+
             try {
                 $callback($data, $context);
                 $lifecycle?->recordSuccess();
@@ -5300,6 +5936,20 @@ class PluginLoader
                 $this->handlePluginThrowable($pluginKey, $e, 'hook callback');
             }
         };
+    }
+
+    /**
+     * The workspace a hook event belongs to: the event's own `tenant_id` when
+     * it names one (a job or a CLI run has no request workspace), else the
+     * current request's.
+     *
+     * @param array<mixed> $context
+     */
+    private static function hookTenant(array $context): ?int
+    {
+        $tenant = $context['tenant_id'] ?? null;
+
+        return is_int($tenant) ? $tenant : \Whity\Core\Tenant\TenantContext::getTenantId();
     }
 
     /**

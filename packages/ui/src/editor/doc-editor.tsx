@@ -17,8 +17,10 @@ import { Icon, type IconName } from "../icon"
 import { IconButton } from "../icon-button"
 import { cn } from "../utils"
 import { BlockList } from "./block-list"
+import { AgentPanel, type AgentAskStart } from "./agent-panel"
+import type { EditorAgents } from "./agents"
 import { SelectionBubble } from "./bubble"
-import { applyItem, filterCatalogue } from "./catalogue"
+import { applyItem, filterCatalogue, pluginBlockItems, savedBlockItems } from "./catalogue"
 import type { Actor, DocumentKind, EditorMode, PublishBlocker, ResolvedThemeTokens, WhityDocument } from "./contract"
 import { fromEditorContent, toEditorContent } from "./convert"
 import { DocumentBehaviour } from "./behaviour"
@@ -28,7 +30,7 @@ import { EDITOR_LABELS, fill, type EditorLabels } from "./labels"
 import { LinkCard, LinkPopover } from "./link-tools"
 import { SlashCommand, type SlashState } from "./slash"
 import { EditorToolbar, insertField, type EditorView, type PageZoom } from "./toolbar"
-import { UnknownBlock } from "./schema"
+import { PerDocument, UnknownBlock } from "./schema"
 import { BlockToolbar } from "./block-toolbar"
 import { FieldBar } from "./field-bar"
 import { EditorServicesProvider, type EditorServices, type FieldPreview } from "./services"
@@ -37,6 +39,7 @@ import { FieldPicker, flatFields } from "./field-picker"
 import { DEFAULT_LABEL_GRID, LabelSetup, LabelSheetView, labelCells, type SheetSize } from "./label-sheet"
 import { PagePagination, PageView, fitZoom, themeStyle, type Letterhead } from "./page-view"
 import { PublishCheck } from "./publish-check"
+import { MoreToolsSheet, ModeSheet, PhoneToolbar, useEditorPhone, useKeyboardInset, type MoreAction } from "./phone"
 import type { EditorCollab, RailSuggestion } from "./collab"
 import { CollabDrawer, CollabRail, useWideRail, type RailActions, type RailItem } from "./collab-rail"
 import { collectPatches, hasSuggestionMarks, renderSuggestions, stripSuggestions, type LocalChange } from "./suggestions"
@@ -140,11 +143,24 @@ export interface DocEditorProps {
   onExportPdf?: () => Promise<void> | void
   /** Label sheets: Print fills one label per record or CSV row (E.43); the screen asks which. */
   onPrintLabels?: () => void
+  /** More header controls from the host, before Preview (the theme picker, E.44). */
+  headerActions?: React.ReactNode
   /**
    * Comments and suggestions (M5): the margin rail, Suggesting mode and
    * Comment. Without it the editor offers Editing and Viewing only.
    */
   collab?: EditorCollab
+  /**
+   * M6: Ask an agent (EditorAgents). The person's own agent works on the
+   * request over MCP; what it writes arrives as suggestions through `collab`.
+   */
+  agents?: EditorAgents
+  /**
+   * M7, E.23: this is a saved block's original. The selection bubble offers
+   * "Filled per document", marking text each document using the synced
+   * block fills itself.
+   */
+  perDocumentParts?: boolean
   className?: string
 }
 
@@ -171,15 +187,24 @@ function countWords(editor: Editor): number {
  * with a record and Publish are M4's; comments and suggestions, agents and
  * plugin blocks join in M5–M7.
  */
+/** Strips underscores from both ends in linear time (a `^_+|_+$` regex can backtrack). */
+function trimUnderscores(value: string): string {
+  let start = 0
+  let end = value.length
+  while (start < end && value[start] === "_") start++
+  while (end > start && value[end - 1] === "_") end--
+  return value.slice(start, end)
+}
+
 /** A key for a new own field from its name: lowercase letters, digits and _, unique. */
 export function ownFieldKey(label: string, taken: string[]): string {
   const base =
-    label
-      .normalize("NFKD")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .slice(0, 32) || "field"
+    trimUnderscores(
+      label
+        .normalize("NFKD")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_"),
+    ).slice(0, 32) || "field"
   let key = base
   for (let n = 2; taken.includes(key); n++) key = `${base}_${n}`
   return key
@@ -212,7 +237,10 @@ function DocEditor({
   publish,
   onExportPdf,
   onPrintLabels,
+  headerActions,
   collab,
+  agents,
+  perDocumentParts = false,
   className,
 }: DocEditorProps) {
   const labels = React.useMemo(() => ({ ...EDITOR_LABELS, ...labelProp }), [labelProp])
@@ -308,7 +336,9 @@ function DocEditor({
             ? UnknownBlock.configure({ label: (type) => fill(labels.laterBlock, { block: type }) })
             : ext.name === "suggesting"
               ? Suggesting.configure({ isLocal, onActivate: (id) => activeRef.current(id) })
-              : ext
+              : ext.name === "perDocument"
+                ? PerDocument.configure({ keep: perDocumentParts })
+                : ext
       ),
     ],
     content: toEditorContent(collab ? rendered.blocks : doc.blocks),
@@ -476,6 +506,18 @@ function DocEditor({
     if (wide) setRailOpen(true)
     else setDrawerOpen(true)
   }, [editor, canComment, wide])
+
+  // M6: the Ask an agent sheet; Rewrite opens it with the selection.
+  const [agentStart, setAgentStart] = React.useState<AgentAskStart | null>(null)
+  const canAskAgent = !!agents && showCollab && canSuggest
+  const askAgent = React.useCallback(() => setAgentStart({}), [])
+  const rewriteWithAgent = React.useCallback(() => {
+    if (!editor) return
+    const { from, to, $from } = editor.state.selection
+    const blockId = ($from.parent.attrs.id as string | null) ?? null
+    const quote = from === to ? "" : editor.state.doc.textBetween(from, Math.min(to, $from.end()), undefined, "\uFFFC")
+    setAgentStart({ request: labels.agentRewriteRequest, quote: quote.trim() ? quote : null, anchorBlockId: blockId })
+  }, [editor, labels.agentRewriteRequest])
 
   // ⌥⌘M (Ctrl+Alt+M): comment on the selection.
   React.useEffect(() => {
@@ -663,7 +705,15 @@ function DocEditor({
     }
   }, [editor, relative])
 
-  const slashItems = React.useMemo(() => filterCatalogue(slash.query, labels, EDITOR_LABELS), [slash.query, labels])
+  // Saved blocks (E.21), then each plugin's blocks for this kind of document (E.18, E.20).
+  const savedItems = React.useMemo(
+    () => [
+      ...savedBlockItems(services.savedBlocks),
+      ...pluginBlockItems(services.pluginBlocks, doc.kind, services.language ?? (doc.lang === "ar" ? "ar" : "en")),
+    ],
+    [services.savedBlocks, services.pluginBlocks, services.language, doc.kind, doc.lang]
+  )
+  const slashItems = React.useMemo(() => filterCatalogue(slash.query, labels, EDITOR_LABELS, savedItems), [slash.query, labels, savedItems])
   React.useEffect(() => setSlashActive(0), [slash.query, slash.open])
   const pickSlash = React.useCallback(
     (index: number) => {
@@ -803,6 +853,14 @@ function DocEditor({
     },
   })
 
+  // PW.6: under 640px the header is two lines, the mode switch and More tools are
+  // bottom sheets, and the toolbar docks at the bottom above the keyboard.
+  const phone = useEditorPhone()
+  const keyboardInset = useKeyboardInset(phone)
+  const [modeSheetOpen, setModeSheetOpen] = React.useState(false)
+  const [moreOpen, setMoreOpen] = React.useState(false)
+  const phoneBar = phone && !hideToolbar && !!editor
+
   const lineDir = doc.lang === "ar" ? "rtl" : "ltr"
   const modeLabel = mode === "editing" ? labels.modeEditing : suggesting ? labels.modeSuggesting : labels.modeViewing
   const saveText =
@@ -816,146 +874,234 @@ function DocEditor({
             ? labels.offline
             : labels.saveFailed
 
+  const saveStatus = saveText ? (
+    <span role="status" className="inline-flex items-center gap-1">
+      {save?.state === "saved" && <Icon name="check" size={12} />}
+      {save?.state === "error" && <Icon name="alert" size={12} className="text-error-text" />}
+      {publish && save?.state === "saved" ? fill(labels.draftSaved, { time: save.at }) : saveText}
+      {publish && (
+        <span>
+          {" · "}
+          {publish.publishedVersion ? fill(labels.publishedInUse, { n: publish.publishedVersion }) : labels.notPublished}
+        </span>
+      )}
+    </span>
+  ) : null
+  const modeChoices = [
+    {
+      mode: "editing" as const,
+      icon: (canEdit ? "edit" : "lock") as IconName,
+      title: labels.modeEditing,
+      hint: canEdit ? labels.modeEditingHint : labels.modeEditingLocked,
+      disabled: !canEdit,
+    },
+    ...(canSuggest
+      ? [{ mode: "suggesting" as const, icon: "suggest" as IconName, title: labels.modeSuggesting, hint: canEdit ? labels.modeSuggestingHint : labels.modeSuggestingHintNoEdit }]
+      : []),
+    { mode: "viewing" as const, icon: "view" as IconName, title: labels.modeViewing, hint: canComment ? labels.modeViewingCommentHint : labels.modeViewingHint },
+  ]
+  const moreActions: MoreAction[] = [
+    ...(onPreview && !preview ? [{ id: "preview", icon: "view" as IconName, label: labels.preview, onSelect: onPreview }] : []),
+    ...(preview && onClosePreview ? [{ id: "back", icon: "edit" as IconName, label: labels.backToEditing, onSelect: onClosePreview }] : []),
+    ...(doc.kind !== "label" ? [{ id: "view", icon: "page" as IconName, label: labels.viewPage, on: view === "page", onSelect: () => setView(view === "page" ? "continuous" : "page") }] : []),
+    ...(isLabel && onPrintLabels ? [{ id: "labels", icon: "print" as IconName, label: labels.printLabels, onSelect: onPrintLabels }] : []),
+    ...(onExportPdf ? [{ id: "pdf", icon: "download" as IconName, label: labels.pdf, onSelect: () => void onExportPdf() }] : []),
+    ...(showCollab ? [{ id: "comments", icon: "comment" as IconName, label: labels.commentsAndSuggestions, onSelect: () => setDrawerOpen(true) }] : []),
+    { id: "outline", icon: "outline" as IconName, label: labels.outline, onSelect: () => setOutlineOpen((o) => !o) },
+  ]
+
   return (
     <div
       data-slot="doc-editor"
       dir={lineDir}
       lang={doc.lang}
-      className={cn("grid h-full min-h-0 grid-rows-[auto_auto_1fr_auto] overflow-hidden bg-background text-sm text-foreground", className)}
+      className={cn("grid h-full min-h-0 overflow-hidden bg-background text-sm text-foreground", phoneBar ? "grid-rows-[auto_minmax(0,1fr)]" : "grid-rows-[auto_auto_1fr_auto]", className)}
     >
-      {/* Header (56px) */}
-      <header className="flex h-14 min-w-0 items-center gap-3 border-b border-border bg-card ps-2 pe-4">
-        {back && <IconButton icon="chevron-left" label={back.label} tooltip="bottom" onClick={back.onClick} />}
-        <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-[8px] bg-primary-tint text-primary-tint-foreground">
-          <Icon name={KIND_ICON[doc.kind]} />
-        </span>
-        <div className="grid min-w-0 flex-1 gap-px">
-          <input
-            aria-label={labels.documentTitle}
-            value={doc.title}
-            placeholder={labels.untitled}
-            readOnly={!editable || suggesting}
-            onChange={(e) => onChange({ ...latest.current, title: e.target.value })}
-            size={Math.max(12, Math.min(48, doc.title.length + 2))}
-            className="-ms-[7px] w-fit max-w-full rounded-[6px] border border-transparent bg-transparent px-1.5 py-px text-[0.9375rem] leading-[1.3] font-semibold text-foreground outline-none hover:border-border focus-visible:border-input"
-          />
-          <div className="flex items-center gap-1.5 overflow-hidden text-xs whitespace-nowrap text-muted-foreground">
-            {path && (
-              <>
-                {path}
-                {saveText && <span aria-hidden="true">·</span>}
-              </>
+      {/* Header (56px). On a phone the actions take a second line under the
+          title, wrapping, so the title stays readable and Publish stays on screen. */}
+      {phone ? (
+        <header className="border-b border-border bg-card">
+          <div className="flex min-h-12 min-w-0 items-center gap-1 ps-1 pe-3 pt-1">
+            {back && <IconButton icon="chevron-left" label={back.label} size="lg" tooltip={false} onClick={back.onClick} className="shrink-0" />}
+            <input
+              aria-label={labels.documentTitle}
+              value={doc.title}
+              placeholder={labels.untitled}
+              readOnly={!editable || suggesting}
+              onChange={(e) => onChange({ ...latest.current, title: e.target.value })}
+              className="h-11 min-w-0 flex-1 rounded-control border border-transparent bg-transparent px-2 text-base font-semibold text-foreground outline-none focus-visible:border-input"
+            />
+            {publish ? (
+              <Button size="lg" disabled={!canEdit} onClick={() => void openPublish()} className="shrink-0">
+                {labels.publish}
+              </Button>
+            ) : (
+              <IconButton icon="more" label={labels.moreTools} size="lg" tooltip={false} onClick={() => setMoreOpen(true)} />
             )}
-            {saveText && (
-              <span role="status" className="inline-flex items-center gap-1">
-                {save?.state === "saved" && <Icon name="check" size={12} />}
-                {save?.state === "error" && <Icon name="alert" size={12} className="text-error-text" />}
-                {publish && save?.state === "saved" ? fill(labels.draftSaved, { time: save.at }) : saveText}
-                {publish && (
-                  <span>
-                    {" · "}
-                    {publish.publishedVersion ? fill(labels.publishedInUse, { n: publish.publishedVersion }) : labels.notPublished}
-                  </span>
+          </div>
+          <div className="flex min-h-11 items-center justify-between gap-2 ps-3 pe-3 pb-2 text-xs text-muted-foreground">
+            <button
+              type="button"
+              aria-label={`${labels.modeMenu}: ${modeLabel}`}
+              onClick={() => setModeSheetOpen(true)}
+              className={cn(
+                "inline-flex h-11 shrink-0 items-center gap-1.5 rounded-control-lg border border-input bg-card ps-3 pe-2.5 text-sm font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                suggesting && "border-primary bg-primary-tint text-primary-tint-foreground"
+              )}
+            >
+              <Icon name={MODE_ICON[mode]} size={18} />
+              {modeLabel}
+              <Icon name="chevron-down" size={16} />
+            </button>
+            <div className="min-w-0 truncate text-[0.8125rem]">{saveStatus}</div>
+          </div>
+        </header>
+      ) : (
+        <header className="flex h-14 min-w-0 items-center gap-3 border-b border-border bg-card ps-2 pe-4 max-sm:h-auto max-sm:flex-wrap max-sm:gap-y-2 max-sm:py-2">
+          {back && <IconButton icon="chevron-left" label={back.label} tooltip="bottom" onClick={back.onClick} />}
+          <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-[8px] bg-primary-tint text-primary-tint-foreground">
+            <Icon name={KIND_ICON[doc.kind]} />
+          </span>
+          <div className="grid min-w-0 flex-1 gap-px">
+            <input
+              aria-label={labels.documentTitle}
+              value={doc.title}
+              placeholder={labels.untitled}
+              readOnly={!editable || suggesting}
+              onChange={(e) => onChange({ ...latest.current, title: e.target.value })}
+              size={Math.max(12, Math.min(48, doc.title.length + 2))}
+              className="-ms-[7px] w-fit max-w-full rounded-[6px] border border-transparent bg-transparent px-1.5 py-px text-[0.9375rem] leading-[1.3] font-semibold text-foreground outline-none hover:border-border focus-visible:border-input"
+            />
+            <div className="flex items-center gap-1.5 overflow-hidden text-xs whitespace-nowrap text-muted-foreground">
+              {path && (
+                <>
+                  {path}
+                  {saveText && <span aria-hidden="true">·</span>}
+                </>
+              )}
+              {saveText && (
+                <span role="status" className="inline-flex items-center gap-1">
+                  {save?.state === "saved" && <Icon name="check" size={12} />}
+                  {save?.state === "error" && <Icon name="alert" size={12} className="text-error-text" />}
+                  {publish && save?.state === "saved" ? fill(labels.draftSaved, { time: save.at }) : saveText}
+                  {publish && (
+                    <span>
+                      {" · "}
+                      {publish.publishedVersion ? fill(labels.publishedInUse, { n: publish.publishedVersion }) : labels.notPublished}
+                    </span>
+                  )}
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 max-sm:basis-full max-sm:flex-wrap max-sm:ps-1">
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={`${labels.modeMenu}: ${modeLabel}`}
+                  className={cn(
+                    "inline-flex h-7 items-center gap-1.5 rounded-control-sm border border-input bg-card ps-2.5 pe-2 text-[0.8125rem] font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+                    // While suggesting the button sits on the tint, so it's never forgotten (E.10).
+                    suggesting && "border-primary bg-primary-tint text-primary-tint-foreground"
+                  )}
+                >
+                  <Icon name={MODE_ICON[mode]} size={14} />
+                  {modeLabel}
+                  <Icon name="chevron-down" size={14} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[300px] p-1">
+                <ModeItem
+                  icon={canEdit ? "edit" : "lock"}
+                  title={labels.modeEditing}
+                  hint={canEdit ? labels.modeEditingHint : labels.modeEditingLocked}
+                  on={mode === "editing"}
+                  disabled={!canEdit}
+                  onSelect={() => onModeChange?.("editing")}
+                />
+                {canSuggest && (
+                  <ModeItem
+                    icon="suggest"
+                    title={labels.modeSuggesting}
+                    hint={canEdit ? labels.modeSuggestingHint : labels.modeSuggestingHintNoEdit}
+                    on={suggesting}
+                    onSelect={() => onModeChange?.("suggesting")}
+                  />
+                )}
+                <ModeItem
+                  icon="view"
+                  title={labels.modeViewing}
+                  hint={canComment ? labels.modeViewingCommentHint : labels.modeViewingHint}
+                  on={mode === "viewing"}
+                  onSelect={() => onModeChange?.("viewing")}
+                />
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {showCollab && (
+              <span className="relative">
+                <IconButton
+                  icon="comment"
+                  label={labels.commentsAndSuggestions}
+                  tooltip="bottom"
+                  pressed={railShown || drawerOpen}
+                  onClick={() => (wide ? setRailOpen((o) => !o) : setDrawerOpen(true))}
+                />
+                {collabCount > 0 && (
+                  <b
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -top-0.5 -end-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-2xs leading-none font-semibold text-primary-foreground"
+                  >
+                    {collabCount}
+                  </b>
                 )}
               </span>
             )}
+            {headerActions}
+            {onPreview && !preview && (
+              <Button variant="outline" size="sm" icon="view" onClick={onPreview}>
+                {labels.preview}
+              </Button>
+            )}
+            {/* Preview takes its own button's place, so the way back is where
+                the way in was: the pill's Show fields was easy to miss. */}
+            {preview && onClosePreview && (
+              <Button variant="outline" size="sm" icon="edit" onClick={onClosePreview}>
+                {labels.backToEditing}
+              </Button>
+            )}
+            {isLabel && onPrintLabels && (
+              <Button variant="outline" size="sm" icon="print" onClick={onPrintLabels}>
+                {labels.printLabels}
+              </Button>
+            )}
+            {onExportPdf && (
+              <Button variant="outline" size="sm" icon="download" onClick={() => void onExportPdf()}>
+                {labels.pdf}
+              </Button>
+            )}
+            {publish && (
+              <Button size="sm" icon="check" disabled={!canEdit} onClick={() => void openPublish()}>
+                {labels.publish}
+              </Button>
+            )}
           </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <DropdownMenu modal={false}>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label={`${labels.modeMenu}: ${modeLabel}`}
-                className={cn(
-                  "inline-flex h-7 items-center gap-1.5 rounded-control-sm border border-input bg-card ps-2.5 pe-2 text-[0.8125rem] font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
-                  // While suggesting the button sits on the tint, so it's never forgotten (E.10).
-                  suggesting && "border-primary bg-primary-tint text-primary-tint-foreground"
-                )}
-              >
-                <Icon name={MODE_ICON[mode]} size={14} />
-                {modeLabel}
-                <Icon name="chevron-down" size={14} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-[300px] p-1">
-              <ModeItem
-                icon={canEdit ? "edit" : "lock"}
-                title={labels.modeEditing}
-                hint={canEdit ? labels.modeEditingHint : labels.modeEditingLocked}
-                on={mode === "editing"}
-                disabled={!canEdit}
-                onSelect={() => onModeChange?.("editing")}
-              />
-              {canSuggest && (
-                <ModeItem
-                  icon="suggest"
-                  title={labels.modeSuggesting}
-                  hint={canEdit ? labels.modeSuggestingHint : labels.modeSuggestingHintNoEdit}
-                  on={suggesting}
-                  onSelect={() => onModeChange?.("suggesting")}
-                />
-              )}
-              <ModeItem
-                icon="view"
-                title={labels.modeViewing}
-                hint={canComment ? labels.modeViewingCommentHint : labels.modeViewingHint}
-                on={mode === "viewing"}
-                onSelect={() => onModeChange?.("viewing")}
-              />
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {showCollab && (
-            <span className="relative">
-              <IconButton
-                icon="comment"
-                label={labels.commentsAndSuggestions}
-                tooltip="bottom"
-                pressed={railShown || drawerOpen}
-                onClick={() => (wide ? setRailOpen((o) => !o) : setDrawerOpen(true))}
-              />
-              {collabCount > 0 && (
-                <b
-                  aria-hidden="true"
-                  className="pointer-events-none absolute -top-0.5 -end-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-2xs leading-none font-semibold text-primary-foreground"
-                >
-                  {collabCount}
-                </b>
-              )}
-            </span>
-          )}
-          {onPreview && !preview && (
-            <Button variant="outline" size="sm" icon="view" onClick={onPreview}>
-              {labels.preview}
-            </Button>
-          )}
-          {/* Preview takes its own button's place, so the way back is where
-              the way in was: the pill's Show fields was easy to miss. */}
-          {preview && onClosePreview && (
-            <Button variant="outline" size="sm" icon="edit" onClick={onClosePreview}>
-              {labels.backToEditing}
-            </Button>
-          )}
-          {isLabel && onPrintLabels && (
-            <Button variant="outline" size="sm" icon="print" onClick={onPrintLabels}>
-              {labels.printLabels}
-            </Button>
-          )}
-          {onExportPdf && (
-            <Button variant="outline" size="sm" icon="download" onClick={() => void onExportPdf()}>
-              {labels.pdf}
-            </Button>
-          )}
-          {publish && (
-            <Button size="sm" icon="check" disabled={!canEdit} onClick={() => void openPublish()}>
-              {labels.publish}
-            </Button>
-          )}
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* Toolbar (44px) */}
-      {hideToolbar ? null : editor ? (
+      {hideToolbar ? null : editor && phone ? (
+        <PhoneToolbar
+          editor={editor}
+          labels={labels}
+          editable={editable}
+          suggesting={suggesting}
+          inset={keyboardInset}
+          onMore={() => setMoreOpen(true)}
+          onInsert={() => setMoreOpen(true)}
+          onComment={showCollab && canComment ? startComment : undefined}
+        />
+      ) : editor ? (
         <EditorToolbar
           editor={editor}
           labels={labels}
@@ -966,6 +1112,7 @@ function DocEditor({
           fields={allFields}
           onCreateField={fields && editable && !suggesting ? createField : undefined}
           onComment={showCollab && canComment ? startComment : undefined}
+          onAskAgent={canAskAgent ? askAgent : undefined}
           view={view}
           onView={doc.kind === "label" ? undefined : setView}
           zoom={zoom}
@@ -986,6 +1133,16 @@ function DocEditor({
         />
       ) : (
         <div className="h-11 border-b border-border bg-card" />
+      )}
+
+      {canAskAgent && agentStart && agents && (
+        <AgentPanel
+          agents={agents}
+          labels={labels}
+          me={collab?.me?.name}
+          start={agentStart}
+          onClose={() => setAgentStart(null)}
+        />
       )}
 
       {/* Body: outline, canvas */}
@@ -1028,7 +1185,7 @@ function DocEditor({
             ))}
           </nav>
         )}
-        <div ref={canvasRef} className={cn("min-w-0 pb-16", view === "page" ? "overflow-x-auto px-6 pt-5" : "px-6 pt-8")}>
+        <div ref={canvasRef} className={cn("min-w-0", phoneBar ? "pb-40" : "pb-16", view === "page" ? "overflow-x-auto px-6 pt-5" : "px-6 pt-8")}>
           {preview && (
             <div className="wy-previewbar" role="status">
               <Icon name="view" size={14} />
@@ -1055,12 +1212,24 @@ function DocEditor({
                   <>
                     <BlockToolbar editor={editor} labels={labels} container={contentRef} />
                     <FieldBar editor={editor} labels={labels} groups={allFields} container={contentRef} />
-                    <BlockGutter editor={editor} labels={labels} container={contentRef} menuAt={menuAt} onMenuAtChange={setMenuAt} blockUrl={blockUrl} />
+                    <BlockGutter
+                      editor={editor}
+                      labels={labels}
+                      container={contentRef}
+                      menuAt={menuAt}
+                      onMenuAtChange={setMenuAt}
+                      blockUrl={blockUrl}
+                      savedItems={savedItems}
+                      saveBlock={services.saveBlock}
+                      canShareSavedBlocks={services.canShareSavedBlocks ?? false}
+                    />
                     <SelectionBubble
                       editor={editor}
                       labels={labels}
                       onLink={() => openLink()}
                       onComment={showCollab && canComment ? startComment : undefined}
+                      onRewrite={canAskAgent ? rewriteWithAgent : undefined}
+                      perDocument={perDocumentParts}
                     />
                   </>
                 )}
@@ -1146,7 +1315,7 @@ function DocEditor({
                 style={themeStyle(theme)}
               >
                 <h1
-                  className="wy-sheet__title m-0 mb-1.5 font-display text-[1.9375rem] leading-[1.15] font-semibold tracking-[-0.01em]"
+                  className="wy-sheet__title m-0 mb-1.5 text-[1.9375rem] leading-[1.15] font-semibold tracking-[-0.01em]"
                   dir="auto"
                 >
                   {doc.title || <span className="text-muted-foreground">{labels.untitled}</span>}
@@ -1194,7 +1363,7 @@ function DocEditor({
       )}
 
       {/* Status bar (28px) */}
-      <footer className="flex h-7 items-center gap-4 overflow-hidden border-t border-border bg-card px-4 text-xs whitespace-nowrap text-muted-foreground">
+      {!phoneBar && <footer className="flex h-7 items-center gap-4 overflow-hidden border-t border-border bg-card px-4 text-xs whitespace-nowrap text-muted-foreground">
         <span>{meta?.words === 1 ? labels.word : fill(labels.words, { n: meta?.words ?? 0 })}</span>
         {isLabel ? (
           <>
@@ -1228,7 +1397,20 @@ function DocEditor({
                 // "Last edited at 21:51", not "Last edited by  at".
                 fill(labels.lastEditedAt, { time: formatTime(doc.updatedAt) })}
         </span>
-      </footer>
+      </footer>}
+      {phone && (
+        <>
+          <ModeSheet
+            open={modeSheetOpen}
+            onOpenChange={setModeSheetOpen}
+            labels={labels}
+            mode={mode}
+            choices={modeChoices}
+            onPick={(m) => onModeChange?.(m)}
+          />
+          <MoreToolsSheet open={moreOpen} onOpenChange={setMoreOpen} labels={labels} editor={editor} editable={editable} actions={moreActions} extra={headerActions} />
+        </>
+      )}
       {publish && (
         <PublishCheck
           open={checkOpen}

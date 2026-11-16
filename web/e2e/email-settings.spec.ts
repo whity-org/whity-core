@@ -149,7 +149,7 @@ test.describe('Email settings — non-system-tenant admin is denied', () => {
   // system-tenant-only surface, so it must be Access Denied here.
   test('a regular tenant admin cannot reach the email settings', async ({ page }) => {
     await page.goto('/admin/settings/email');
-    await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
     await expect(page.getByTestId('email-transport-card')).toHaveCount(0);
   });
 });

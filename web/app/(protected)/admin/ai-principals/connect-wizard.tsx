@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/lib/auth-context';
+import { apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   Dialog,
@@ -18,6 +18,7 @@ import { Badge } from '@whity/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@whity/ui/radio-group';
 import { Spinner } from '@whity/ui/spinner';
+import { Lottie } from '@whity/ui/lottie';
 import { Checkbox } from '@whity/ui/checkbox';
 import {
   Select,
@@ -88,7 +89,6 @@ export function ConnectWizard({
    */
   renew?: { jti: string; name: string; scope: string[] } | null;
 }) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
 
@@ -114,7 +114,7 @@ export function ConnectWizard({
     let cancelled = false;
     (async () => {
       try {
-        const response = await apiClient('/api/v1/mcp/connect');
+        const response = await apiFetch('/api/v1/mcp/connect');
         if (!response.ok) throw new Error(String(response.status));
         const body = (await response.json()) as McpConnectInfo;
         if (!cancelled) setInfo(body);
@@ -125,7 +125,7 @@ export function ConnectWizard({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, apiClient]);
+  }, [isOpen]);
 
   const endpoint =
     info?.endpoint ?? (typeof window !== 'undefined' ? `${window.location.origin}/mcp` : '/mcp');
@@ -158,7 +158,7 @@ export function ConnectWizard({
     const timer = setTimeout(async () => {
       let tools: McpPreviewTool[] | null = null;
       try {
-        const response = await apiClient('/api/v1/mcp/connect/preview', {
+        const response = await apiFetch('/api/v1/mcp/connect/preview', {
           method: 'POST',
           body: JSON.stringify({ scope: JSON.parse(scopeKey) as string[] }),
         });
@@ -172,7 +172,7 @@ export function ConnectWizard({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [scopeKey, apiClient]);
+  }, [scopeKey]);
   const previewTools = preview !== null && preview.key === scopeKey ? preview.tools : null;
   const previewLoading = scopeKey !== null && (preview === null || preview.key !== scopeKey);
 
@@ -183,13 +183,13 @@ export function ConnectWizard({
     const interval = setInterval(async () => {
       if (Date.now() - startedAt > HINT_AFTER_MS) setWaitedLong(true);
       try {
-        const response = await apiClient('/api/v1/mcp/tokens');
+        const response = await apiFetch('/api/v1/mcp/tokens');
         if (!response.ok) return;
         const body = (await response.json()) as { tokens: OwnMcpToken[] };
         if (body.tokens.some((token) => token.jti === issued.jti && token.last_used_at !== null)) {
           setConnected(true);
           if (renew !== null) {
-            const revoked = await apiClient(`/api/v1/mcp/tokens/${encodeURIComponent(renew.jti)}`, { method: 'DELETE' })
+            const revoked = await apiFetch(`/api/v1/mcp/tokens/${encodeURIComponent(renew.jti)}`, { method: 'DELETE' })
               .then((r) => r.ok)
               .catch(() => false);
             setOldRevoked(revoked);
@@ -201,7 +201,7 @@ export function ConnectWizard({
       }
     }, POLL_MS);
     return () => clearInterval(interval);
-  }, [step, issued, connected, apiClient, renew, onConnected]);
+  }, [step, issued, connected, renew, onConnected]);
 
   const reset = () => {
     setStep('app');
@@ -237,7 +237,7 @@ export function ConnectWizard({
     if (issueScope === null || id === null) return;
     setSubmitting(true);
     try {
-      const response = await apiClient('/api/v1/mcp/tokens', {
+      const response = await apiFetch('/api/v1/mcp/tokens', {
         method: 'POST',
         body: JSON.stringify({ name: issueName.trim() || mcpClient(id).name, scope: issueScope }),
       });
@@ -333,6 +333,14 @@ export function ConnectWizard({
               </button>
             ))}
           </div>
+        )}
+        {step === 'app' && renew === null && (
+          <p className="text-sm text-muted-foreground">
+            {t('aiPrincipals.connect.unattended', 'For an agent that runs on its own, like a nightly check, make it its own key.')}{' '}
+            <Link href="/admin/ai-principals/new-agent-key" className="font-medium text-primary hover:underline">
+              {t('aiPrincipals.connect.unattendedLink', 'New key for an agent')}
+            </Link>
+          </p>
         )}
 
         {step === 'access' && info !== null && (
@@ -605,6 +613,7 @@ function ConnectionStatus({ connected, waitedLong, app }: { connected: boolean; 
   }
   return (
     <div className="space-y-2 rounded-md border border-dashed border-border p-3">
+      <Lottie name="waiting-reply" play="loop" className="mx-auto h-20 w-[120px]" />
       <div className="flex items-center gap-2 text-sm">
         <IconPlugConnected size={16} className="text-muted-foreground" />
         <span>{t('aiPrincipals.connect.status.waiting', 'Waiting for {app} to connect…', { app })}</span>

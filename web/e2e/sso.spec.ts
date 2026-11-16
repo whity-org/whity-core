@@ -194,7 +194,7 @@ test.describe('SSO providers — permission gating', () => {
   test('a user without auth_providers:manage is denied the admin page', async ({ page }) => {
     await new LoginPage(page).loginExpectingSuccess(REGULAR_USER);
     await page.goto('/admin/settings/sso');
-    await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
     await expect(page.getByTestId('sso-add-provider')).toHaveCount(0);
   });
 });

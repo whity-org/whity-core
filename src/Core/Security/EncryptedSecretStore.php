@@ -148,6 +148,43 @@ final class EncryptedSecretStore
     }
 
     /**
+     * Whether $stored carries the `"<keyId>:"` prefix {@see encrypt()} writes.
+     *
+     * Values written before a feature moved onto this store have no prefix;
+     * {@see decryptUnprefixed()} reads those.
+     */
+    public function hasKeyIdPrefix(string $stored): bool
+    {
+        return preg_match('/^[A-Za-z0-9_]+:/', $stored) === 1;
+    }
+
+    /**
+     * Decrypt a bare ciphertext written by `Crypto::encryptWithPassword()`
+     * before its feature used this store, so it names no key id.
+     *
+     * Tries the current key first, then each retired key, so such values keep
+     * decrypting after a rotation retires the key they were written under.
+     *
+     * @throws \RuntimeException When no configured key decrypts the value.
+     */
+    public function decryptUnprefixed(string $ciphertext): string
+    {
+        $order = [$this->currentKeyId => $this->keys[$this->currentKeyId]] + $this->keys;
+        foreach ($order as $key) {
+            if ($key === '') {
+                continue;
+            }
+            try {
+                return Crypto::decryptWithPassword($ciphertext, $key);
+            } catch (CryptoException) {
+                // Try the next key.
+            }
+        }
+
+        throw new \RuntimeException('EncryptedSecretStore: failed to decrypt secret.');
+    }
+
+    /**
      * Whether $stored was encrypted under the CURRENT key. When false, the caller
      * may re-encrypt (read the plaintext via {@see decrypt()} then {@see encrypt()})
      * to complete a key rotation lazily.

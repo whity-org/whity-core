@@ -9,7 +9,7 @@
  * similar names and different lifetimes, and a `RouteStep` and a
  * `RouteTemplateStep` are not interchangeable however alike they read.
  *
- * Hand-written rather than taken from `@/lib/api/schema`, for the reason
+ * Hand-written rather than taken from `@whity/api-client`, for the reason
  * `routing-wire.ts` records in full: the generated client is built from the
  * DYNAMIC `/api/openapi.json`, which describes whatever plugin routes a given
  * install happens to have loaded, so depending on it would make a core screen's
@@ -58,7 +58,7 @@ export interface RouteTemplateStep {
    * becomes". The graph response carries `default_quorum` so a reader can show
    * what that currently resolves to without holding `settings:read`.
    */
-  decision_quorum: 'all' | 'any' | 'majority' | null;
+  decision_quorum: 'all' | 'any' | 'majority' | 'first' | null;
 }
 
 /** Where a settled verdict sends the document. Both ends are POSITIONS. */
@@ -70,7 +70,7 @@ export interface RouteTemplateEdge {
 
 /** `GET /api/v1/document-route-templates/{id}` — the design with its graph. */
 export interface RouteTemplateGraph extends RouteTemplateSummary {
-  default_quorum: 'all' | 'any' | 'majority';
+  default_quorum: 'all' | 'any' | 'majority' | 'first';
   max_steps: number;
   steps: RouteTemplateStep[];
   edges: RouteTemplateEdge[];

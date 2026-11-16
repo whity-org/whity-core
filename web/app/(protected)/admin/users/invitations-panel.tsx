@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -109,9 +109,12 @@ type InviteFormData = z.infer<ReturnType<typeof buildInviteSchema>>;
 export function InvitationsPanel({
   inviteOpen,
   onInviteOpenChange,
+  inviteEmail,
 }: {
   inviteOpen?: boolean;
   onInviteOpenChange?: (open: boolean) => void;
+  /** Filled into the invite form when it opens (⌘K `/invite`, WHIT-1069). */
+  inviteEmail?: string;
 } = {}) {
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
@@ -337,6 +340,7 @@ export function InvitationsPanel({
       <InviteModal
         isOpen={isInviteOpen}
         onOpenChange={setIsInviteOpen}
+        initialEmail={inviteEmail}
         onSuccess={() => {
           setIsInviteOpen(false);
           refetch();
@@ -350,13 +354,14 @@ interface InviteModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  initialEmail?: string;
 }
 
 /**
  * Invite by email. No password field, deliberately — the point of the whole
  * flow is that nobody but the invitee ever chooses or handles their password.
  */
-function InviteModal({ isOpen, onOpenChange, onSuccess }: InviteModalProps) {
+function InviteModal({ isOpen, onOpenChange, onSuccess, initialEmail }: InviteModalProps) {
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -367,6 +372,11 @@ function InviteModal({ isOpen, onOpenChange, onSuccess }: InviteModalProps) {
     resolver: zodResolver(schema),
     defaultValues: { email: '', role: '' },
   });
+
+  // Filled in, never sent: the person still chooses a role and presses Invite.
+  useEffect(() => {
+    if (isOpen && initialEmail) form.setValue('email', initialEmail);
+  }, [isOpen, initialEmail, form]);
 
   const onSubmit = async (values: InviteFormData) => {
     try {

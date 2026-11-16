@@ -24,9 +24,7 @@ use Whity\Http\ListSpec;
  * Migration 037 re-pointed `grantor_user_id → grantor_profile_id` (references
  * `profiles.id`) and updated `grantee_id` for `grantee_type = 'profile'` rows
  * to reference `profiles.id` as well. The discriminator for user-grantees is
- * now {@see self::GRANTEE_PROFILE}; the value {@see self::GRANTEE_USER} is kept
- * as a deprecated alias that resolves to the same discriminator value so
- * existing call-sites continue to work during Phase B.
+ * now {@see self::GRANTEE_PROFILE}.
  *
  * Tenant isolation: every delegation is scoped by `tenant_id`; grantee
  * visibility is confirmed via the `memberships` table (profile_id + tenant_id)
@@ -44,18 +42,8 @@ class DelegationRepository
 
     /**
      * Discriminator value: the grantee is a profile (WC-bc07b6de).
-     *
-     * New callers must use GRANTEE_PROFILE. GRANTEE_USER is kept as a deprecated
-     * alias (same string value) for backward compatibility during Phase B.
      */
     public const GRANTEE_PROFILE = 'profile';
-
-    /**
-     * Deprecated alias for GRANTEE_PROFILE.
-     *
-     * @deprecated Use {@see self::GRANTEE_PROFILE} for new code.
-     */
-    public const GRANTEE_USER = 'profile';
 
     private PDO $db;
 

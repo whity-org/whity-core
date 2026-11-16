@@ -18,9 +18,14 @@ test.describe('Audit Logs (role matrix)', () => {
     role,
     page,
   }) => {
+    // Audit Logs is a workspace setting since WHIT-1082: Settings › Security.
+    await page.goto('/settings/profile');
+    await expect(page.getByTestId('settings-area-link-profile')).toBeVisible();
+    const link = page.getByTestId('settings-area-link-audit-logs');
     if (role === 'user') {
-      // The "Audit Logs" nav link is filtered out server-side for the plain
-      // user (no audit:read), so the page is not reachable via nav.
+      // Filtered out server-side for the plain user (no audit:read), so the
+      // page is not reachable from Settings either.
+      await expect(link).toHaveCount(0);
       await expect(roleSession.shell.navLink('Audit Logs')).toHaveCount(0);
       return;
     }
@@ -30,7 +35,7 @@ test.describe('Audit Logs (role matrix)', () => {
         res.url().includes('/api/v1/audit-logs') &&
         res.request().method() === 'GET'
     );
-    await roleSession.shell.clickNav('Audit Logs');
+    await link.click();
     await page.waitForURL('**/admin/audit-logs');
     expect((await listResponse).status()).toBe(200);
 

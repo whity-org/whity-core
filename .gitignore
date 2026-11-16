@@ -89,3 +89,9 @@ ops/watchdog/.wrangler/
 
 # Design-card screenshot check output (scripts/design-cards-compare.mjs)
 /.design-check/
+
+# install.sh logs (whity.dev/install.sh)
+/.whity-install/
+
+# Copied from sdk/src before every desktop dev/build (WHIT-1054).
+/templates/tauri-desktop/php-host/sdk/

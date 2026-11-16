@@ -3,118 +3,52 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import type { Membership } from '@/lib/auth-context';
 import { useNavigation } from '@/lib/navigation-context';
+import type { Membership } from '@/lib/auth-context';
 import { useBranding } from '@/lib/branding-context';
 import { useThemeMode } from '@/lib/theme-mode-context';
 import { useToast } from '@/lib/toast-context';
-import { Button } from '@whity/ui/button';
+import { Avatar } from '@whity/ui/avatar';
+import { Lockup } from '@whity/ui/lockup';
+import { Mark } from '@whity/ui/mark';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@whity/ui/dropdown-menu';
 import { TenantSwitcher as WorkspaceSwitcher } from '@whity/ui/tenant-switcher';
 import { AppSidebar, useForcedRail } from '@whity/ui/app-sidebar';
-import { navGroupsFromServerItems } from '@whity/features/nav';
-import { LanguageSwitcher, useLanguageCode, useI18nEnabled, useTranslation } from '@whity/features/i18n';
-import { localizedName } from '@/lib/localized-name';
-import * as TablerIcons from '@tabler/icons-react';
+import { useCurrentLanguage, useLanguageCode, useI18nEnabled, useTranslation } from '@whity/features/i18n';
+import { roleLabel } from '@whity/features/roles/role-label';
+import { rolesLabel } from '@/lib/workspace-memberships';
+import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
 import {
   IconLogout,
-  IconDashboard,
   IconUserCog,
-  IconSettings,
-  IconWorld,
+  IconBell,
+  IconSelector,
   IconSun,
   IconMoon,
+  IconLanguage,
 } from '@tabler/icons-react';
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useNavItemLabels } from '@/lib/nav-item-labels';
-import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
-import {
-  PLATFORM_SETTINGS_TABS,
-  SETTINGS_AREA_NAV_IDS,
-  SETTINGS_AREA_PREFIXES,
-} from '@/components/settings/settings-area';
-import type { Icon } from '@tabler/icons-react';
+import { useState, useCallback, useMemo } from 'react';
+import { useShellNav } from '@/components/shell/use-shell-nav';
+import { localizedText } from '@whity/ui/localized-text';
+import { useCalendarSidebarOpen } from '@/lib/calendar/choices';
 
-/**
- * Resolve a navigation `icon` name to a Tabler icon component.
- *
- * Core nav items emit kebab-case names (e.g. `"building-community"`), but
- * plugins may supply any Tabler icon by its kebab/snake name or its full
- * PascalCase component name (e.g. `"IconUsers"`). We normalize the name to the
- * `Icon<PascalCase>` export and look it up dynamically against the full
- * `@tabler/icons-react` set, falling back to a safe default for unknown names
- * so a plugin can never render a missing-icon hole.
- */
-const tablerIcons = TablerIcons as unknown as Record<string, Icon | undefined>;
+/** Settings stays at the foot with the account row on short windows (PW.10). */
+const PINNED_GROUP_IDS = ['settings'];
 
-function resolveIcon(name: string | undefined): Icon {
-  if (!name) {
-    return IconDashboard;
-  }
-
-  // Split on hyphen/underscore/whitespace, capitalize each segment, join.
-  const pascal = name
-    .trim()
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join('');
-
-  const componentName = pascal.startsWith('Icon') ? pascal : `Icon${pascal}`;
-
-  return tablerIcons[componentName] ?? IconDashboard;
-}
-
-/**
- * The order the nav's groups appear in, and the only place that sequence is
- * decided. The server says which group each page belongs to (`group` on every
- * `navigation.register` item) and where it sits WITHIN that group (`order`);
- * it deliberately does not say which group comes first, because that is a
- * layout question and the answer differs per client — a Flutter nav rail may
- * want the same pages in a different sequence.
- *
- * A group id missing from this list still renders, after the declared ones —
- * a plugin inventing its own group appears rather than vanishing. `plugins` is
- * listed because `PluginNavigationBridge` defaults every plugin-contributed
- * feature to it, so it is a known-but-not-core group.
- */
-const NAV_GROUP_ORDER = [
-  'overview',
-  'people',
-  'ai',
-  'documents',
-  'platform',
-  'settings',
-  'plugins',
-] as const;
-
-/**
- * The groups core used before the app map's (WHIT-805), still accepted from
- * plugins that name them: each lands in the group that now holds its pages,
- * so a plugin's item sits beside its neighbours instead of under an old
- * heading of its own.
- */
-const LEGACY_NAV_GROUPS: Readonly<Record<string, string>> = {
-  access: 'people',
-  records: 'documents',
-  extend: 'platform',
-  system: 'platform',
-};
-
-/** The personal account page's nav item; the footer's user row opens it instead. */
-const ACCOUNT_SETTINGS_ITEM_ID = 'settings';
-
-/** The system tenant: the only one that runs the platform itself. */
-const SYSTEM_TENANT_ID = 0;
-
-/** Fallback heading for a group the shell has no translated label for. */
-function prettifyGroupId(groupId: string): string {
-  return groupId
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(' ');
-}
-
+/** The installation's name when nobody has renamed it: the header shows the lockup. */
+const DEFAULT_SITE_NAME = 'Whity';
 // ---------------------------------------------------------------------------
 // TenantSwitcher — uses the shared Switcher primitive from @whity/ui.
 // ---------------------------------------------------------------------------
@@ -128,7 +62,11 @@ interface TenantSwitcherProps {
   collapsed: boolean;
 }
 
-function TenantSwitcher({ memberships, activeTenantId, collapsed }: TenantSwitcherProps) {
+function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+export function TenantSwitcher({ memberships, activeTenantId, collapsed }: TenantSwitcherProps) {
   const { switchTenant } = useAuth();
   const { refresh: refreshNav } = useNavigation();
   const { addToast } = useToast();
@@ -141,8 +79,8 @@ function TenantSwitcher({ memberships, activeTenantId, collapsed }: TenantSwitch
       memberships.map((m) => ({
         id: String(m.tenant_id),
         // #821: the reader's language, else the original name.
-        name: localizedName(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
-        role: m.role ? m.role.charAt(0).toUpperCase() + m.role.slice(1) : undefined,
+        name: localizedText(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
+        role: capitalise(rolesLabel(m)) || undefined,
       })),
     [memberships, currentLanguage],
   );
@@ -160,7 +98,7 @@ function TenantSwitcher({ memberships, activeTenantId, collapsed }: TenantSwitch
           const message =
             err instanceof Error
               ? err.message
-              : t('sidebar.tenantSwitcher.error', 'Couldn’t switch tenant');
+              : t('sidebar.tenantSwitcher.error', 'Couldn’t switch workspace');
           addToast(message, 'error');
         } finally {
           setIsSwitching(false);
@@ -189,59 +127,6 @@ function TenantSwitcher({ memberships, activeTenantId, collapsed }: TenantSwitch
 }
 
 // ---------------------------------------------------------------------------
-
-/**
- * How many things wait for the person, by nav item id: the Inbox's open items,
- * summed over its sources (`GET /api/me/inbox/sources` carries each source's
- * open count for exactly this badge), and the agent proposals waiting for
- * their approval (`GET /api/me/agent-proposals?status=waiting`). Re-read on every page change, so acting
- * on an item and moving on updates the count. A failed read shows no count
- * rather than a wrong one.
- */
-function useWaitingCounts(pathname: string | null): Record<string, number> {
-  const [counts, setCounts] = useState<Record<string, number>>({});
-  // A page that just changed what waits (Approvals after a decision) says so
-  // with WAITING_CHANGED_EVENT, so the count follows without a navigation.
-  const [nudge, setNudge] = useState(0);
-  useEffect(() => {
-    const onChanged = () => setNudge((n) => n + 1);
-    window.addEventListener(WAITING_CHANGED_EVENT, onChanged);
-    return () => window.removeEventListener(WAITING_CHANGED_EVENT, onChanged);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      let inbox = 0;
-      try {
-        const response = await fetch('/api/v1/me/inbox/sources', { credentials: 'include' });
-        if (response.ok) {
-          const body = (await response.json()) as { data?: { open_count?: number }[] };
-          inbox = (body.data ?? []).reduce((sum, source) => sum + (source.open_count ?? 0), 0);
-        }
-      } catch {
-        inbox = 0;
-      }
-      let approvals = 0;
-      try {
-        const response = await fetch('/api/v1/me/agent-proposals?status=waiting', { credentials: 'include' });
-        if (response.ok) {
-          const body = (await response.json()) as { data?: unknown[] };
-          approvals = body.data?.length ?? 0;
-        }
-      } catch {
-        approvals = 0;
-      }
-      if (!cancelled) setCounts((prev) => ({ ...prev, inbox, approvals }));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [pathname, nudge]);
-
-  return counts;
-}
-
 /**
  * The app's composed sidebar: it owns the DATA (nav items from
  * `/api/navigation`, branding, tenant memberships, theme/language controls)
@@ -251,15 +136,15 @@ function useWaitingCounts(pathname: string | null): Record<string, number> {
  * Tauri desktop client gets the same behaviour from the same code.
  */
 export function Sidebar() {
-  const pathname = usePathname();
   const router = useRouter();
   const { logout, user, memberships } = useAuth();
-  const { items: navItems } = useNavigation();
   const branding = useBranding();
-  const { resolved: resolvedTheme, toggle: toggleTheme } = useThemeMode();
+  const { resolved: resolvedTheme, setPreference } = useThemeMode();
   const t = useTranslation('common');
   // Whether this instance offers a language choice at all (`i18n.enabled`).
   const isI18nEnabled = useI18nEnabled();
+  const { groups } = useShellNav();
+  const { currentLanguage, availableLanguages, setLanguage } = useCurrentLanguage();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -270,102 +155,18 @@ export function Sidebar() {
   // Between 768 and 1023px the sidebar is the rail whatever the toggle says
   // (register 4.5); the logo, switcher and footer follow the same state.
   const forcedRail = useForcedRail();
-  const collapsed = (isCollapsed || forcedRail) && !isMobileOpen;
-
-  // Literal `t()` calls, not a computed key — `i18n:extract` rebuilds the
-  // catalogue by scanning the source for them, so a dynamic
-  // `t('sidebar.group.' + id)` would never make it into the translations
-  // table and every heading would render as a raw key.
-  const isSystemTenant = user?.tenant_id === SYSTEM_TENANT_ID;
-  const counts = useWaitingCounts(pathname);
-
-  // The top group (Dashboard, Inbox) has no heading, as on the app map. The
-  // admin group is the Platform on the system tenant, which runs the whole
-  // deployment, and the Workspace everywhere else.
-  const groupLabels = useMemo<Record<string, string | undefined>>(
-    () => ({
-      overview: undefined,
-      people: t('sidebar.group.people', 'People'),
-      ai: t('sidebar.group.ai', 'AI'),
-      documents: t('sidebar.group.documents', 'Documents'),
-      platform: isSystemTenant
-        ? t('sidebar.group.platform', 'Platform')
-        : t('sidebar.group.workspace', 'Workspace'),
-      settings: t('sidebar.group.settings', 'Settings'),
-      plugins: t('sidebar.group.plugins', 'Plugins'),
-    }),
-    [t, isSystemTenant],
+  // Calendar screens start as the 56px rail so the grid gets the room; a
+  // person who opens the sidebar there keeps it open on their calendar (CV.1).
+  const pathname = usePathname();
+  const onCalendar = pathname === '/calendar' || (pathname?.startsWith('/calendar/') ?? false);
+  const [calendarOpen, setCalendarOpen] = useCalendarSidebarOpen();
+  const chosenRail = onCalendar ? !calendarOpen : isCollapsed;
+  const collapsed = (chosenRail || forcedRail) && !isMobileOpen;
+  const onCollapsedChange = useCallback(
+    (next: boolean) => (onCalendar ? setCalendarOpen(!next) : setIsCollapsed(next)),
+    [onCalendar, setCalendarOpen]
   );
 
-  // The same literal-`t()` discipline as the group headings above, for the
-  // same reason and one more: an item's `label` arrives from
-  // `GET /api/v1/navigation`, where it is a hardcoded English string in the
-  // registry rather than a `t()` call. Nothing scans that registry, so none of
-  // these names has ever reached the catalogue — which is why an Arabic sidebar
-  // used to read its GROUP headings in Arabic and every PAGE name under them in
-  // English.
-  //
-  // Keyed by the server's stable item `id`, never by its English text, so
-  // rewording a label upstream is a translation edit and not a key rename. An
-  // id this map does not know keeps the server's label: that is the case for
-  // every plugin-contributed entry, whose name is a plugin's to give.
-  const itemLabels = useNavItemLabels();
-
-  const groups = useMemo(() => {
-    // The Settings area (WHIT-806, owner decision D1): every settings page,
-    // the data pages it holds and the server's `settings` group become ONE
-    // entry at the foot, opening the area's own sub-nav. The personal account
-    // page leaves the nav too: it is the user row in the footer.
-    const inSettingsArea = (item: { id: string; group?: string }) =>
-      item.group === 'settings' || (SETTINGS_AREA_NAV_IDS as readonly string[]).includes(item.id);
-    const settingsEntry = navItems.find((item) => item.id === 'website-settings') ?? navItems.find(inSettingsArea);
-    const regrouped = navItems
-      .filter((item) => !inSettingsArea(item) && item.id !== ACCOUNT_SETTINGS_ITEM_ID)
-      .map((item) =>
-        item.group && LEGACY_NAV_GROUPS[item.group]
-          ? { ...item, group: LEGACY_NAV_GROUPS[item.group] }
-          : item,
-      );
-    const built = navGroupsFromServerItems(regrouped, {
-      currentPath: pathname,
-      groupOrder: NAV_GROUP_ORDER,
-      groupLabel: (groupId) =>
-        groupId in groupLabels ? groupLabels[groupId] : prettifyGroupId(groupId),
-      itemLabel: (itemId) => itemLabels[itemId],
-      renderIcon: (icon) => {
-        const IconComponent = resolveIcon(icon);
-        return <IconComponent size={20} />;
-      },
-    });
-    const countLabel = (count: number) =>
-      t('sidebar.count.waiting', '{count} waiting').replace('{count}', String(count));
-    const withCounts = built.map((group) => ({
-      ...group,
-      items: group.items.map((item) =>
-        counts[item.id] ? { ...item, count: counts[item.id], countLabel: countLabel(counts[item.id]) } : item,
-      ),
-    }));
-    if (!settingsEntry) return withCounts;
-    return [
-      ...withCounts,
-      {
-        id: 'settings',
-        items: [
-          {
-            id: 'settings-area',
-            label: t('sidebar.item.settings', 'Settings'),
-            href: settingsEntry.href,
-            icon: <IconSettings size={20} />,
-            active:
-              !Object.values(PLATFORM_SETTINGS_TABS).includes(pathname ?? '') &&
-              SETTINGS_AREA_PREFIXES.some(
-                (prefix) => pathname === prefix || (pathname ?? '').startsWith(`${prefix}/`),
-              ),
-          },
-        ],
-      },
-    ];
-  }, [navItems, pathname, groupLabels, itemLabels, counts, t]);
 
   const handleLogout = () => {
     logout();
@@ -380,9 +181,15 @@ export function Sidebar() {
         className="mx-auto h-8 w-8 object-contain"
       />
     ) : (
-      <div className="text-center text-xl font-semibold">
-        {branding.siteName.charAt(0).toUpperCase()}
-      </div>
+      branding.siteName === DEFAULT_SITE_NAME ? (
+        <div className="flex justify-center">
+          <Mark size={24} />
+        </div>
+      ) : (
+        <div className="text-center text-xl font-semibold">
+          {branding.siteName.charAt(0).toUpperCase()}
+        </div>
+      )
     )
   ) : (
     <>
@@ -392,109 +199,129 @@ export function Sidebar() {
           alt={branding.siteName}
           className="h-8 w-auto max-w-[180px] object-contain"
         />
+      ) : branding.siteName === DEFAULT_SITE_NAME ? (
+        // The Whity lockup, as on every 3.3 card; a renamed installation keeps
+        // its own name in text.
+        <h1 className="m-0">
+          <Lockup size={24} />
+        </h1>
       ) : (
         <h1 className="text-xl font-semibold">{branding.siteName}</h1>
       )}
     </>
   );
 
+  // The foot is the person, as on every 3.3 card: avatar, name and role in one
+  // row that opens the account menu (account settings, language, light or
+  // dark, sign out). The user menu has no card of its own yet (WHIT-827), so
+  // it is built to the nearest one: the row is the cards', and the menu holds
+  // what the old foot showed as four stacked controls.
+  const displayName = user?.display_name || user?.email || '';
+  const activeMembership = memberships.find((membership) => membership.tenant_id === user?.tenant_id);
+  const activeRole = (activeMembership ? rolesLabel(activeMembership) : '') || user?.role || '';
   const footer = (
-    <div className="space-y-2">
-      {/*
-        User menu: the "logged in as" footer doubles as the entry point to the
-        self-service profile page (WC-64), which was previously orphaned (no
-        nav link pointed to /settings). Linking it here guarantees the page is
-        reachable regardless of the dynamic navigation set.
-      */}
-      {!collapsed ? (
-        <Link
-          href="/settings"
-          onClick={() => setIsMobileOpen(false)}
-          aria-label={t('sidebar.accountSettings', 'Account settings')}
-          className="flex items-center gap-2 rounded-lg bg-background px-2 py-2 text-center transition-colors hover:bg-background/70 md:text-start"
-          title={t('sidebar.accountSettings', 'Account settings')}
-        >
-          <IconUserCog size={20} className="shrink-0 text-muted-foreground" />
-          <span className="min-w-0">
-            <span className="block truncate text-xs text-muted-foreground">
-              {t('sidebar.loggedInAs', 'Logged in as')}
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className={`flex min-h-12 w-full items-center gap-3 rounded-lg px-2 py-2 text-start transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring ${collapsed ? 'justify-center' : ''}`}
+        aria-label={t('sidebar.accountMenu', 'Account menu')}
+        title={collapsed ? displayName : undefined}
+        data-testid="account-menu"
+      >
+        <Avatar name={displayName} size={32} />
+        {!collapsed && (
+          <>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium" data-testid="account-name">
+                {displayName}
+              </span>
+              {activeRole && (
+                <span className="block truncate text-xs text-muted-foreground">{roleLabel(activeRole)}</span>
+              )}
             </span>
-            <span className="block truncate text-sm font-medium">{user?.email}</span>
-          </span>
-        </Link>
-      ) : (
-        <Link
-          href="/settings"
-          aria-label={t('sidebar.accountSettings', 'Account settings')}
-          className="flex justify-center rounded-lg bg-background px-2 py-2 transition-colors hover:bg-background/70"
-          title={t('sidebar.accountSettings', 'Account settings')}
-        >
-          <IconUserCog size={20} className="shrink-0 text-muted-foreground" />
-        </Link>
-      )}
-      {/*
-        Interface language. This is ALSO the direction control: each
-        language carries its own writing direction, so choosing Arabic
-        mirrors the interface and choosing English un-mirrors it (see
-        lib/direction-context.tsx). There is deliberately no separate
-        direction toggle — a language and a direction that disagree is not
-        a state a user can usefully be in, and the pair used to drift
-        apart. The choice is stored on the profile, so it follows the user
-        across devices.
-
-        The WHOLE ROW — frame, globe icon and control — is gated on
-        `i18n.enabled`. The switcher self-suppresses too, but this wrapper
-        has to ask as well: otherwise an instance with i18n off would show
-        an empty bordered box with a globe in it, which is a worse
-        affordance than the switcher was.
-      */}
-      {isI18nEnabled && !collapsed && (
-        <div
-          className="flex h-10 w-full items-center gap-2 rounded-lg border border-input bg-input/20 px-3"
-          data-testid="language-switcher"
-        >
-          <IconWorld size={20} className="shrink-0 text-muted-foreground" />
-          <LanguageSwitcher
-            variant="dropdown"
-            className="h-full min-w-0 flex-1 cursor-pointer border-0 bg-transparent text-sm font-medium text-foreground outline-none"
-          />
-        </div>
-      )}
-      {/* Light / dark color scheme (see lib/theme-mode-context.tsx). */}
-      <Button
-        onClick={toggleTheme}
-        variant="outline"
-        size={collapsed ? 'icon' : 'default'}
-        className={`w-full ${collapsed ? 'justify-center' : 'justify-start'}`}
-        title={
-          resolvedTheme === 'dark'
-            ? t('sidebar.theme.switchToLight', 'Switch to light mode')
-            : t('sidebar.theme.switchToDark', 'Switch to dark mode')
-        }
-        aria-label={t('sidebar.theme.toggle', 'Toggle color scheme')}
-        data-testid="theme-toggle"
-      >
-        {resolvedTheme === 'dark' ? (
-          <IconSun size={20} className={collapsed ? '' : 'me-3 shrink-0'} />
-        ) : (
-          <IconMoon size={20} className={collapsed ? '' : 'me-3 shrink-0'} />
+            <IconSelector size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+          </>
         )}
-        {!collapsed &&
-          (resolvedTheme === 'dark'
-            ? t('sidebar.theme.light', 'Light mode')
-            : t('sidebar.theme.dark', 'Dark mode'))}
-      </Button>
-      <Button
-        onClick={handleLogout}
-        variant="outline"
-        size={collapsed ? 'icon' : 'default'}
-        className={`w-full ${collapsed ? 'justify-center' : 'justify-start'}`}
-        title={collapsed ? t('sidebar.logout', 'Logout') : undefined}
-      >
-        <IconLogout size={20} className={collapsed ? '' : 'me-3 shrink-0'} />
-        {!collapsed && t('sidebar.logout', 'Logout')}
-      </Button>
-    </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start" className="w-72">
+        <DropdownMenuLabel className="font-normal">
+          <span className="block truncate text-sm font-medium text-foreground">{displayName}</span>
+          {user?.email && user.email !== displayName && (
+            <span className="block truncate text-xs text-muted-foreground">{user.email}</span>
+          )}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/settings" onClick={() => setIsMobileOpen(false)}>
+            <IconUserCog />
+            {t('sidebar.accountSettings', 'My settings')}
+          </Link>
+        </DropdownMenuItem>
+        {/* WHIT-1078: notifications on this device, straight to the card. */}
+        <DropdownMenuItem asChild>
+          <Link href={NOTIFICATIONS_HREF} onClick={() => setIsMobileOpen(false)} data-testid="account-menu-notifications">
+            <IconBell />
+            {t('sidebar.notifications', 'Notifications')}
+          </Link>
+        </DropdownMenuItem>
+        {isI18nEnabled && availableLanguages.length > 1 && (
+          // The language is also the direction (lib/direction-context.tsx):
+          // choosing Arabic mirrors the interface. Stored on the profile, so it
+          // follows the person across devices.
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger data-testid="language-switcher">
+              <IconLanguage />
+              <span className="flex-1">{t('sidebar.language', 'Language')}</span>
+              <span className="text-xs text-muted-foreground">
+                {availableLanguages.find((language) => language.code === (currentLanguage || 'en'))?.name}
+              </span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuRadioGroup
+                value={currentLanguage || 'en'}
+                onValueChange={(code) => void setLanguage(code)}
+              >
+                {availableLanguages.map((language) => (
+                  <DropdownMenuRadioItem key={language.code} value={language.code} lang={language.code}>
+                    {language.name}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        )}
+        {/* Appearance as two choices, as on PwShortSidebar: Light or Dark. */}
+        <div
+          role="group"
+          aria-label={t('sidebar.appearance', 'Appearance')}
+          data-testid="theme-toggle"
+          className="flex min-h-9 items-center gap-2 px-2 py-1 text-sm"
+        >
+          <IconSun className="size-4 text-muted-foreground" aria-hidden />
+          <span className="flex-1">{t('sidebar.appearance', 'Appearance')}</span>
+          <span className="flex rounded-md bg-muted p-0.5">
+            {(['light', 'dark'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={resolvedTheme === mode}
+                onClick={() => setPreference(mode)}
+                className={`flex min-h-7 items-center gap-1 rounded px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                  resolvedTheme === mode ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
+                }`}
+              >
+                {mode === 'light' ? <IconSun className="size-3.5" aria-hidden /> : <IconMoon className="size-3.5" aria-hidden />}
+                {mode === 'light' ? t('sidebar.theme.lightShort', 'Light') : t('sidebar.theme.darkShort', 'Dark')}
+              </button>
+            ))}
+          </span>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={handleLogout}>
+          <IconLogout className="rtl:-scale-x-100" />
+          {t('sidebar.logout', 'Sign out')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 
   return (
@@ -511,15 +338,14 @@ export function Sidebar() {
       }
       footer={footer}
       collapsed={collapsed}
-      onCollapsedChange={setIsCollapsed}
+      onCollapsedChange={onCollapsedChange}
       mobileOpen={isMobileOpen}
       onMobileOpenChange={setIsMobileOpen}
       linkComponent={Link}
+      phoneTabBar
+      pinnedGroupIds={PINNED_GROUP_IDS}
       collapsibleGroups
-      searchable
-      searchPlaceholder={t('sidebar.search.placeholder', 'Search pages')}
-      clearSearchLabel={t('sidebar.search.clear', 'Clear search')}
-      searchNoResultsLabel={t('sidebar.search.noResults', 'No matching pages')}
+      // One search (WHIT-1082): the top bar's, Ctrl+K. The sidebar's own filter box went.
       navLabel={t('sidebar.navLabel', 'Main')}
       openNavLabel={t('sidebar.openNav', 'Open navigation')}
       closeNavLabel={t('sidebar.closeNav', 'Close navigation')}

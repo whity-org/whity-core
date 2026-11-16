@@ -451,7 +451,7 @@ $jwtParser = new JwtParser($jwtSecret);
 // Single source of truth shared by the setup/confirm path and the login-validation path so the
 // 2FA secret is always encrypted and decrypted with the SAME key. Fails fast in non-development
 // when ENCRYPTION_KEY is missing/empty, mirroring the JWT_SECRET guard above.
-$totpService = new TotpService(TotpService::resolveEncryptionKey());
+$totpService = TotpService::fromEnv();
 
 // 4. Initialize permission registry
 $permissionRegistry = new PermissionRegistry();
@@ -741,6 +741,54 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // and the plain member's sidebar would otherwise have no way home.
     ];
     $items[] = [
+        'id' => 'calendar',
+        'label' => 'Calendar',
+        'href' => '/calendar',
+        'icon' => 'calendar',
+        // The Work group (register, section 27: Tasks, Boards, then the
+        // team's meetings and appointments), after Tasks and Boards
+        // (WHIT-944, ADR 0017).
+        'group' => 'work',
+        'order' => 3,
+        // Mirrors GET /api/calendar/settings and the rest of the read routes.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CALENDAR_READ,
+    ];
+    $items[] = [
+        'id' => 'tasks',
+        'label' => 'Tasks',
+        'href' => '/tasks',
+        'icon' => 'list-todo',
+        // First in the Work group (register, section 27): tasks and boards on
+        // Taskaat (A10, WHIT-962).
+        'group' => 'work',
+        'order' => 1,
+        // Mirrors GET /api/taskaat/connection.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::TASKS_READ,
+    ];
+    $items[] = [
+        'id' => 'boards',
+        'label' => 'Boards',
+        'href' => '/boards',
+        'icon' => 'columns',
+        'group' => 'work',
+        // Right after Tasks: the same tasks as columns (T.2).
+        'order' => 2,
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::TASKS_READ,
+    ];
+    $items[] = [
+        'id' => 'contacts',
+        'label' => 'Contacts',
+        'href' => '/contacts',
+        'icon' => 'customer',
+        // Customers and suppliers (WHIT-955, design 3.3 A8). In Work since
+        // WHIT-1082: Operations held nothing else, so it was a heading for one
+        // link. Tasks, Boards and Calendar hold orders 1-3.
+        'group' => 'work',
+        'order' => 4,
+        // Mirrors GET /api/contacts.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CONTACTS_READ,
+    ];
+    $items[] = [
         'id' => 'users',
         'label' => 'Users',
         'href' => '/admin/users',
@@ -834,19 +882,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     // the permission its own screen's primary fetch requires, so a link somebody
     // can see is a link that works.
     //
-    // The hrefs point at `/admin/x/{featureId}`, the descriptor host, because
-    // these screens are `screen:'blocks'` descriptors rather than hand-written
-    // pages ({@see \Whity\Core\Form\FormFrontendFeatures}) — which is what lets
-    // the desktop and mobile clients render them at all.
+    // The hrefs keep their `/admin/x/...` addresses, which the web app's own
+    // form pages answer. The `screen:'blocks'` descriptors that once drew these
+    // screens are gone (WHIT-1049): every client draws the React pages.
     //
     // Registered HERE rather than left to PluginNavigationBridge: that bridge
-    // reads PluginLoader, and these descriptors are core's, not a plugin's. The
+    // reads PluginLoader, and these screens are core's, not a plugin's. The
     // ids therefore carry no `plugin-` prefix, and cannot collide with one.
     $items[] = [
         'id' => 'forms-builder',
         'label' => 'Form Builder',
         'icon' => 'forms',
-        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::BUILDER_ID,
+        'href' => '/admin/x/forms-builder',
         'group' => 'documents',
         // Group-local, a unique positive integer (#1007/#1010 — a fractional
         // order is silently skipped by a regroup that matches integers, and a
@@ -863,7 +910,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'id' => 'forms-catalog',
         'label' => 'Forms',
         'icon' => 'clipboard-list',
-        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::CATALOG_ID,
+        'href' => '/admin/x/forms-catalog',
         'group' => 'documents',
         'order' => 6,
         // Mirrors GET /api/v1/forms and /api/v1/form-submissions, both gated
@@ -874,7 +921,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'id' => 'my-form-submissions',
         'label' => 'My Submissions',
         'icon' => 'file-check',
-        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::MY_SUBMISSIONS_ID,
+        'href' => '/admin/x/my-form-submissions',
         'group' => 'overview',
         // In `overview` beside Dashboard (1) and Inbox (2) rather than in
         // `records`: this is a surface a person opens about THEIR OWN work, like
@@ -890,7 +937,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // their workspace has opened a form to them. Same page, so never both.
         'id' => 'member-forms',
         'label' => 'Forms',
-        'href' => '/admin/x/' . \Whity\Core\Form\FormFrontendFeatures::CATALOG_ID,
+        'href' => '/admin/x/forms-catalog',
         'icon' => 'forms',
         'group' => 'overview',
         'order' => 5,
@@ -898,7 +945,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'tenants',
-        'label' => 'Tenants',
+        'label' => 'Workspaces',
         'href' => '/admin/tenants',
         'icon' => 'building',
         'group' => 'platform',
@@ -947,7 +994,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'billing',
-        'label' => 'Plans & pricing',
+        'label' => 'Plans and pricing',
         'href' => '/admin/billing',
         'icon' => 'receipt',
         'group' => 'platform',
@@ -1012,7 +1059,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'notifications',
-        'label' => 'Notification Delivery',
+        'label' => 'Notification log',
         'href' => '/admin/notifications',
         'icon' => 'bell-cog',
         'group' => 'platform',
@@ -1042,7 +1089,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'website-settings',
-        'label' => 'Website Settings',
+        'label' => 'Workspace settings',
         'href' => '/admin/settings',
         'icon' => 'settings',
         'group' => 'settings',
@@ -1094,6 +1141,33 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // granting person may decide them, so there is nobody a permission
         // could usefully keep out.
     ];
+    // One chat (design 3.5, UC.1, WHIT-1093): customer conversations moved
+    // into Chat, so there is no Messages item; /admin/messages redirects there.
+    $items[] = [
+        'id' => 'my-messages',
+        'label' => 'Messages',
+        'href' => '/messages',
+        'icon' => 'messages',
+        'group' => 'overview',
+        'order' => 8,
+        // A customer's own conversations (/api/me/messages): ownership is the check.
+        'visibleIf' => 'messages-for-customer',
+    ];
+    $items[] = [
+        'id' => 'chat',
+        'label' => 'Chat',
+        'href' => '/chat',
+        'icon' => 'comment',
+        'group' => 'overview',
+        // After Approvals (3) and the forms items (4, 5), where Messages (7)
+        // and Chat (9) stood: one item now, as the 3.5 cards draw it.
+        'order' => 6,
+        // One chat (UC.1): the team's chats, people and agents together, and
+        // for people who may read them the customer conversations. Ungated
+        // like its routes; shown to the people who work here, never to
+        // customers.
+        'visibleIf' => 'chat-for-staff',
+    ];
     $items[] = [
         'id' => 'document-library',
         'label' => 'Documents',
@@ -1124,6 +1198,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         // Editor M2: notes and wiki pages written in the block editor. Mirrors
         // GET /api/document-sources (DocumentSourcesApiHandler), gated on
         // documents:read; rows are filtered by DocumentAccessPolicy on top.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::DOCUMENTS_READ,
+    ];
+    $items[] = [
+        'id' => 'saved-blocks',
+        'label' => 'Saved blocks',
+        'href' => '/admin/document-sources/saved-blocks',
+        'icon' => 'stack-2',
+        'group' => 'documents',
+        'order' => 7,
+        // Editor M7 (E.21-E.22): a person's own saved blocks and the workspace
+        // library, to rename, delete, see where a synced block is used and
+        // edit the original. Mirrors GET /api/saved-blocks, gated documents:read.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::DOCUMENTS_READ,
     ];
     $items[] = [
@@ -1177,7 +1263,7 @@ $hookManager->listen('navigation.register', function ($data, $context) {
     ];
     $items[] = [
         'id' => 'approval-gating',
-        'label' => 'Approval Gating',
+        'label' => 'Sign-up approvals',
         'href' => '/admin/registrations',
         'icon' => 'user-check',
         'group' => 'people',
@@ -1671,28 +1757,47 @@ $profileEmailRepository = new ProfileEmailRepository($db->getPdo());
 // own frontend. See docs/wiki/Headless.md.
 $frontendUrls = \Whity\Core\Http\FrontendUrls::fromEnv();
 $verifyUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::EMAIL_VERIFICATION);
+// EM.1: one sender for every email core sends (E2): a workspace's in its brand
+// and language, the instance's own (tenant 0) in the instance's brand. The
+// workspace branding source is handed over once the entitlement service exists (below).
+$brandedEmailSender = new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService, $logger);
+// E2: the one gate every email asks (operator, workspace, agent and person switches).
+$brandedEmailSender->useGate(new \Whity\Core\Mail\EmailGate($settingsService, $db->getPdo()));
 $emailVerificationProvider = new TokenEmailVerificationProvider(
     $emailVerificationService,
     $profileEmailRepository,
-    $mailer,
+    $brandedEmailSender,
     $verifyUrlBase,
-    // WC-email: render the link as a branded HTML email (with a text fallback),
-    // driven by the instance branding/mail settings.
-    new \Whity\Core\Mail\EmailLayout(),
-    $settingsService
 );
 // WC-email: customer lifecycle emails. The subscriber listens on lifecycle hooks
 // (welcome on registration today; approval/invitation to follow) and sends via
 // the branded EmailLayout, gated per-event on the mail.events.* toggles. Sends
 // are best-effort — a failure can never break the originating request.
 $emailNotifications = new \Whity\Core\Mail\EmailNotifications(
-    $mailer,
-    new \Whity\Core\Mail\EmailLayout(),
+    $brandedEmailSender,
     $settingsService,
     $frontendUrls->base(),
-    $logger
 );
 $emailNotifications->subscribe($hookManager);
+// SDK 1.99 (WHIT-978): plugins send as the workspace through the same sender.
+\Whity\register_service(\Whity\Sdk\Mail\WorkspaceEmails::class, new \Whity\Core\Mail\SdkWorkspaceEmails($brandedEmailSender)); // @phpstan-ignore-line
+// SDK 1.102 (WHIT-985): Whity's own billing emails to a workspace's payers, only from a plugin
+// the operator granted (plugins.billing_email_senders), a few a day per workspace at most.
+\Whity\register_service(\Whity\Sdk\Mail\BillingEmails::class, new \Whity\Core\Mail\SdkBillingEmails( // @phpstan-ignore-line
+    $brandedEmailSender,
+    new \Whity\Core\Mail\WorkspaceRecipients($db->getPdo(), $roleChecker),
+    $settingsService,
+    new DatabaseSharedStore($db->getPdo()),
+    $frontendUrls->base(),
+    $logger,
+));
+$accountSecurityMailer = new \Whity\Core\Mail\AccountSecurityMailer(
+    $brandedEmailSender,
+    $profileEmailRepository,
+    $db->getPdo(),
+    $frontendUrls->base() . '/settings',
+);
+$authHandler->setSecurityMailer($accountSecurityMailer);
 
 $registerHandler = new RegisterApiHandler($db->getPdo(), $settingsService, $emailVerificationProvider, $hookManager);
 $router->register('POST', '/api/register', [$registerHandler, 'register'], null);
@@ -1783,6 +1888,7 @@ $twoFactorProofThrottle = new LoginThrottleService(
     'two_factor_proof',
 );
 $twoFactorHandler = new TwoFactorHandler($db->getPdo(), $totpService, $backupCodesService, $tokenValidator, $auditLogger, $twoFactorProofThrottle);
+$twoFactorHandler->setSecurityMailer($accountSecurityMailer);
 $router->register('POST', '/api/auth/2fa/setup', [$twoFactorHandler, 'setup'], null);
 $router->register('POST', '/api/auth/2fa/confirm', [$twoFactorHandler, 'confirm'], null);
 $router->register('POST', '/api/auth/2fa/disable', [$twoFactorHandler, 'disable'], null);
@@ -1796,10 +1902,8 @@ $router->register('GET', '/api/auth/2fa/status', [$twoFactorHandler, 'status'], 
 $passwordResetService = new \Whity\Core\Identity\PasswordResetService($db->getPdo());
 $resetUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::PASSWORD_RESET);
 $passwordResetMailer = new \Whity\Core\Identity\PasswordResetMailer(
-    $mailer,
+    $brandedEmailSender,
     $resetUrlBase,
-    new \Whity\Core\Mail\EmailLayout(),
-    $settingsService
 );
 $passwordResetHandler = new \Whity\Api\PasswordResetHandler(
     $passwordResetService,
@@ -1812,13 +1916,27 @@ $passwordResetHandler = new \Whity\Api\PasswordResetHandler(
 $router->register('POST', '/api/auth/password/forgot', [$passwordResetHandler, 'forgot'], null);
 $router->register('POST', '/api/auth/password/reset', [$passwordResetHandler, 'reset'], null);
 
+// AG.1: every gated approval (a password reset, a two-step reset, a Needs
+// verifying agent proposal) confirms the approver is who they say, through one
+// contract, right before it takes effect.
+$gatedApproval = new \Whity\Core\Security\GatedApproval(
+    new \Whity\Core\Security\IdentityCheck(
+        $db->getPdo(),
+        new \Whity\Core\Document\Signing\SigningChallengeRepository($db->getPdo()),
+        $totpService,
+        new \Whity\Core\Security\IdentityCheckMailer($brandedEmailSender),
+    )
+);
+
 $passwordResetApprovalsHandler = new \Whity\Api\PasswordResetApprovalsApiHandler(
     $passwordResetService,
     $roleChecker,
     $auditLogger,
-    $passwordResetMailer
+    $passwordResetMailer,
+    $gatedApproval
 );
 $router->register('GET',  '/api/password-resets/pending',      [$passwordResetApprovalsHandler, 'listPending'], null, null, CorePermissions::PASSWORD_RESETS_APPROVE);
+$router->register('POST', '/api/password-resets/identity-check',  [$passwordResetApprovalsHandler, 'identityCheck'], null, null, CorePermissions::PASSWORD_RESETS_APPROVE);
 $router->register('POST', '/api/password-resets/{id:\d+}/approve', [$passwordResetApprovalsHandler, 'approve'], null, null, CorePermissions::PASSWORD_RESETS_APPROVE);
 $router->register('POST', '/api/password-resets/{id:\d+}/reject',  [$passwordResetApprovalsHandler, 'reject'],  null, null, CorePermissions::PASSWORD_RESETS_APPROVE);
 
@@ -1847,10 +1965,8 @@ $twoFactorRecoveryService = new \Whity\Core\Identity\TwoFactorRecoveryService(
 );
 $twoFactorRecoveryConfirmUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::TWO_FACTOR_RECOVERY);
 $twoFactorRecoveryMailer = new \Whity\Core\Identity\TwoFactorRecoveryMailer(
-    $mailer,
+    $brandedEmailSender,
     $twoFactorRecoveryConfirmUrlBase,
-    new \Whity\Core\Mail\EmailLayout(),
-    $settingsService
 );
 $twoFactorRecoveryHandler = new \Whity\Api\TwoFactorRecoveryHandler(
     $twoFactorRecoveryService,
@@ -1867,14 +1983,18 @@ $twoFactorRecoveryApprovalsHandler = new \Whity\Api\TwoFactorRecoveryApprovalsAp
     $twoFactorRecoveryService,
     $roleChecker,
     $auditLogger,
-    $passwordResetMailer
+    $passwordResetMailer,
+    // AG.1: each approval confirms the admin is who they say first.
+    $gatedApproval
 );
 $router->register('GET',  '/api/2fa-recovery/pending',           [$twoFactorRecoveryApprovalsHandler, 'listPending'], null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
 $router->register('POST', '/api/2fa-recovery/{id:\d+}/approve',  [$twoFactorRecoveryApprovalsHandler, 'approve'],     null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
 $router->register('POST', '/api/2fa-recovery/{id:\d+}/reject',   [$twoFactorRecoveryApprovalsHandler, 'reject'],      null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
-// Secondary fallback (no prior request): an admin forces the same primitive
-// directly onto a named profile, e.g. when the locked-out user cannot even
-// receive email and reaches an admin out-of-band.
+$router->register('POST', '/api/2fa-recovery/{id:\d+}/checks',   [$twoFactorRecoveryApprovalsHandler, 'addCheck'],    null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
+$router->register('POST', '/api/2fa-recovery/identity-check',    [$twoFactorRecoveryApprovalsHandler, 'identityCheck'], null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
+// Secondary fallback (no prior request): an admin starts a reset for a named
+// profile, e.g. when the locked-out user cannot even receive email and reaches
+// an admin out-of-band. It is the first approval; a second admin still approves.
 $router->register('POST', '/api/2fa-recovery/force-reset',       [$twoFactorRecoveryApprovalsHandler, 'forceReset'],  null, null, CorePermissions::TWO_FACTOR_RECOVERY_APPROVE);
 
 // 10d. Tenant invitations (WHIT-417 / #797 item 3) — how a tenant administrator
@@ -1891,10 +2011,8 @@ $invitationService = new \Whity\Core\Identity\InvitationService(
 );
 $invitationUrlBase = $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::INVITATION_ACCEPT);
 $invitationMailer = new \Whity\Core\Identity\InvitationMailer(
-    $mailer,
+    $brandedEmailSender,
     $invitationUrlBase,
-    new \Whity\Core\Mail\EmailLayout(),
-    $settingsService
 );
 $invitationsHandler = new \Whity\Api\InvitationsApiHandler(
     $db->getPdo(),
@@ -1961,6 +2079,9 @@ $router->register('DELETE', '/api/users/{id:\d+}/memberships/{membershipId:\d+}'
 // catalogue and role grants hide other workspaces' plugin permissions.
 $tenantPluginRepository = new \Whity\Core\Plugin\Tenant\TenantPluginRepository($db->getPdo());
 $tenantManifestHost = new \Whity\Core\Plugin\Tenant\TenantManifestHost($tenantPluginRepository, $permissionRegistry, $logger);
+// WHIT-1122: installed code plugins, switched on per workspace.
+$codePluginActivation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($db->getPdo());
+$pluginLoader->setWorkspaceActivation($codePluginActivation);
 
 $rolesHandler = new RolesApiHandler(
     $db->getPdo(),
@@ -2042,6 +2163,10 @@ $formsNavConditions = new \Whity\Core\Form\FormsNavConditions($db->getPdo(), $ro
 $navigationHandler = new NavigationApiHandler($hookManager, $roleChecker, [
     'forms-open-to-member' => [$formsNavConditions, 'hasFormsOpenToThem'],
     'forms-own-submissions' => [$formsNavConditions, 'hasOwnSubmissionsToSee'],
+    // ADR 0016: a customer's own conversations with the workspace.
+    'messages-for-customer' => [new \Whity\Core\Messaging\MessagesNavConditions($db->getPdo()), 'isCustomerWithMessages'],
+    // Team chat (CH.1): the people who work here.
+    'chat-for-staff' => [new \Whity\Core\Chat\ChatNavConditions(new \Whity\Core\Chat\ChatRepository($db->getPdo())), 'isStaff'],
 ]);
 $router->register('GET', '/api/navigation', [$navigationHandler, 'list']);
 
@@ -2088,14 +2213,6 @@ $router->register('POST', '/api/me/permitted-actions', [$permittedActionsHandler
 // fails host validation is dropped fail-closed with a structured, secret-free
 // reason (feature id + validator errors) — never leaked to the client.
 
-// FORMS (migrations 127/128): core's own `screen:'blocks'` descriptors — the
-// form builder, the form catalogue, and one person's own submissions. They are
-// passed as the fifth argument rather than being hand-written React pages
-// because the desktop and mobile clients render descriptors and cannot render a
-// bespoke page, and they go through the SAME per-caller permission filter and
-// the same fail-closed block validation as any plugin's. See
-// FormFrontendFeatures and FrontendFeaturesApiHandler::allFeatures().
-
 // #convening: CORE-declared `screen:'blocks'` features. The loader's validator
 // refuses any PLUGIN descriptor gated on a core permission ("core names are not
 // plugin-ownable"), which is right for a plugin and left core with nowhere to
@@ -2137,10 +2254,7 @@ $frontendFeaturesHandler = new FrontendFeaturesApiHandler(
     // #1044: core's own declarations answer in the caller's language.
     $serverLabels,
     $logger,
-    array_merge(
-        \Whity\Core\Form\FormFrontendFeatures::all(),
-        \Whity\Core\Convening\ConveningFeatures::all($router)
-    ),
+    \Whity\Core\Convening\ConveningFeatures::all($router),
     $tenantManifestHost
 );
 $router->register('GET', '/api/frontend/features', [$frontendFeaturesHandler, 'list'], null);
@@ -2237,6 +2351,17 @@ $router->register('POST', '/api/workspace-plugins/test', [$tenantPluginVersionsH
 $router->register('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions', [$tenantPluginVersionsHandler, 'versions'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('GET', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions/{id:\d+}', [$tenantPluginVersionsHandler, 'version'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/workspace-plugins/{plugin:[a-z][a-z0-9_]*}/versions/{id:\d+}/activate', [$tenantPluginVersionsHandler, 'activate'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_PUBLISH);
+
+// Installed code plugins, switched on per workspace (WHIT-1122).
+$workspaceCodePluginsHandler = new \Whity\Api\WorkspaceCodePluginsApiHandler($pluginLoader, $codePluginActivation, $db->getPdo(), $auditLogger, $roleChecker, static fn (): string => $serverLabels->languageCode());
+$router->register('GET', '/api/workspace/code-plugins', [$workspaceCodePluginsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/enable', [$workspaceCodePluginsHandler, 'enable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
+$router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/disable', [$workspaceCodePluginsHandler, 'disable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_DISABLE);
+$router->register('GET', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/history', [$workspaceCodePluginsHandler, 'history'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/trial', [$workspaceCodePluginsHandler, 'trial'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
+$router->register('GET', '/api/workspace/onboarding', [$workspaceCodePluginsHandler, 'onboarding'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('GET', '/api/plugins/workspace-access', [$workspaceCodePluginsHandler, 'accessList'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('PUT', '/api/plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/workspace-access', [$workspaceCodePluginsHandler, 'setAccess'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
 
 // Health monitoring endpoint (WC-4). Registered UNVERSIONED so load-balancer
 // probes that target GET /api/health never break regardless of the API version.
@@ -2588,6 +2713,13 @@ $router->register('POST', '/api/time-windows/{id:\d+}/reopen', [$timeWindowsHand
 // invariant is enforced independently inside DelegationService.
 $delegationsHandler = new DelegationsApiHandler($db->getPdo(), $delegationService, $logger);
 $router->register('GET', '/api/delegations', [$delegationsHandler, 'list'], null, null, CorePermissions::DELEGATION_MANAGE);
+// OR.1: "I'm away". A person sets their own, from their own account (session,
+// self-scoped); the Delegations list shows everyone's.
+$awayHandler = new \Whity\Api\AwayApiHandler(new \Whity\Core\Delegation\AwayService($db->getPdo()), $auditLogger);
+$router->register('GET', '/api/me/away', [$awayHandler, 'show'], null);
+$router->register('PUT', '/api/me/away', [$awayHandler, 'set'], null);
+$router->register('DELETE', '/api/me/away', [$awayHandler, 'end'], null);
+$router->register('GET', '/api/away-periods', [$awayHandler, 'list'], null, null, CorePermissions::DELEGATION_MANAGE);
 $router->register('POST', '/api/delegations', [$delegationsHandler, 'create'], null, null, CorePermissions::DELEGATION_MANAGE);
 $router->register('DELETE', '/api/delegations/{id:\d+}', [$delegationsHandler, 'revoke'], null, null, CorePermissions::DELEGATION_MANAGE);
 $router->register('POST', '/api/delegations/{id:\d+}/restore', [$delegationsHandler, 'restore'], null, null, CorePermissions::DELEGATION_MANAGE);
@@ -2741,6 +2873,44 @@ $router->register('POST', '/api/instance/complete-setup', [$instanceHandler, 'co
 $entitlementService = new \Whity\Core\Entitlement\EntitlementService(
     new \Whity\Core\Entitlement\TenantEntitlementRepository($db->getPdo())
 );
+// WHIT-1125: paid plugins. A workspace may use one its plan or add-on grants,
+// during its trial or grace, or when the operator made it free for everyone.
+// One installed from the store also needs this installation's store licence.
+$codePluginActivation->usePaidAccess(static fn (): array => $pluginLoader->getPaidAccess());
+$codePluginActivation->useEntitlements(static function (int $tenantId, string $key) use ($entitlementService): bool {
+    try {
+        return $entitlementService->isGranted($tenantId, $key);
+    } catch (\Throwable) {
+        return false; // an undeclared entitlement grants nothing
+    }
+});
+$codePluginRecords = new \Whity\Core\Plugin\PluginRecords($db->getPdo());
+$codePluginActivation->useInstallLicence(static function (string $plugin) use ($codePluginRecords, $hostStoreLicence): ?string {
+    $install = $codePluginRecords->install($plugin);
+    $slug = $install['store_slug'] ?? null;
+    if (($install['source'] ?? null) !== 'store' || !is_string($slug) || $slug === '') {
+        return null;
+    }
+
+    return $hostStoreLicence->status($slug)->state;
+});
+\Whity\register_service(\Whity\Sdk\Billing\WorkspaceAddons::class, new \Whity\Core\Plan\HostWorkspaceAddons($db->getPdo(), $codePluginActivation, $auditLogger)); // @phpstan-ignore-line
+// WHIT-1156: while a paid plugin is on in a workspace (trial, cash, grace),
+// its add-on plan's number limits apply as if the add-on were held: Salons
+// lifts the staff limit for as long as the salon has it.
+$pluginLimitPacks = new \Whity\Core\Plugin\Workspace\PluginLimitPacks(
+    $db->getPdo(),
+    $codePluginActivation,
+    static fn (): array => $pluginLoader->getPaidAccess(),
+);
+$entitlementService->usePluginPacks(static fn (int $tenantId): array => $pluginLimitPacks->packsFor($tenantId));
+// WHIT-1156: invitations ask the plan's staff limit first, as `seats.enforcement` says.
+$invitationsHandler->useSeats(new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService));
+// WHIT-1129 (SDK 1.108): packs set a workspace up through core's own routes,
+// as the person acting there, limited to WorkspaceSetup::ROUTES.
+\Whity\register_service(\Whity\Sdk\Setup\WorkspaceSetup::class, new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker)); // @phpstan-ignore-line
+// EM.1: workspace emails carry the workspace's brand, and white-label by plan.
+$brandedEmailSender->useBranding(new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService));
 $tenantEntitlementsHandler = new \Whity\Api\TenantEntitlementsApiHandler(
     $db->getPdo(),
     $entitlementService,
@@ -3037,6 +3207,31 @@ $externalBillingHandler = new \Whity\Api\ExternalBillingApiHandler(
     $logger,
     $auditLogger
 );
+// WHIT-1152 (SDK 1.110): plugins sold per seat. Checkout buys the count the
+// workspace set; when the count changes, the subscription's quantity follows.
+$pluginSeats = new \Whity\Core\Plugin\Workspace\PluginSeats(
+    static fn (int $tenantId): array => $settingsService->effective($tenantId),
+    static fn (): array => $pluginLoader->getPaidAccess(),
+    $db->getPdo(),
+    $billingPortal,
+    $logger,
+);
+$externalBillingHandler->usePluginSeats($pluginSeats);
+// WHIT-1153: cash payments the operator records cover a workspace's paid plugin
+// like a subscription, and show in its billing history.
+$cashPayments = new \Whity\Core\Billing\Cash\CashPayments($db->getPdo());
+$codePluginActivation->useCashCover(static fn (int $tenantId, string $product): ?array => $cashPayments->coverOf($tenantId, $product));
+$externalBillingHandler->useCashPayments($cashPayments);
+$cashPaymentsHandler = new \Whity\Api\CashPaymentsApiHandler($cashPayments, $auditLogger);
+$router->register('GET', '/api/billing/cash-payments', [$cashPaymentsHandler, 'list'], null, null, CorePermissions::PLANS_MANAGE);
+$router->register('POST', '/api/billing/cash-payments', [$cashPaymentsHandler, 'record'], null, null, CorePermissions::PLANS_MANAGE);
+$router->register('POST', '/api/billing/cash-payments/{id:\d+}/void', [$cashPaymentsHandler, 'void'], null, null, CorePermissions::PLANS_MANAGE);
+$workspaceCodePluginsHandler->useSeats($pluginSeats);
+$hookManager->listen(\Whity\Sdk\Hooks\Events::PLUGIN_SETTINGS_CHANGED, static function (array $data) use ($pluginSeats): array {
+    $pluginSeats->onSettingChanged($data);
+
+    return $data;
+});
 
 $router->register('POST', '/api/billing/checkout', [$externalBillingHandler, 'checkout'], null, null, CorePermissions::BILLING_PAY);
 $router->register('GET',  '/api/billing/return',   [$externalBillingHandler, 'returnFrom'], null, null, CorePermissions::BILLING_VIEW);
@@ -3048,6 +3243,48 @@ $router->register('GET',  '/api/billing/plans',    [$externalBillingHandler, 'pl
 // the local run stands down so nobody is charged twice — so without this the
 // billing screen showed an empty table to somebody who had just paid.
 $router->register('GET',  '/api/billing/receipts', [$externalBillingHandler, 'receipts'], null, null, CorePermissions::BILLING_VIEW);
+
+// WHIT-1040: the plan limits the business model sells, and where a workspace
+// stands against them. Every one of them warns and none refuses: customers are
+// counted from the events that serve them, agent work is metered as usage past
+// its allowance, and the workspace's admins read the result on Billing.
+$customerUsage = new \Whity\Core\Usage\CustomerUsage($db->getPdo(), $entitlementService, $settingsService);
+$customerUsage->subscribe($hookManager);
+$planLimitMeters = new \Whity\Core\Entitlement\MeterService(
+    new DatabaseSharedStore($db->getPdo()),
+    $entitlementService,
+    $settingsService
+);
+// EM.1 `plan-limit`: the people who can choose a plan hear when the workspace
+// comes close to a limit, or passes it on an instance that warns.
+$planLimitMailer = new \Whity\Core\Mail\PlanLimitMailer(
+    $brandedEmailSender,
+    new \Whity\Core\Mail\WorkspaceRecipients($db->getPdo(), $roleChecker),
+    $settingsService,
+    $frontendUrls->base() . '/billing',
+    static function (int $tenantId) use ($db): string {
+        $stmt = $db->getPdo()->prepare('SELECT name FROM tenants WHERE id = :id');
+        $stmt->execute([':id' => $tenantId]);
+        $name = $stmt->fetchColumn();
+
+        return is_string($name) && $name !== '' ? $name : 'your workspace';
+    },
+);
+$planLimitThreshold = \Closure::fromCallable([$planLimitMailer, 'crossed']);
+$planLimitMeters->onThreshold(static function (int $t, string $k, int $u, int $l, string $st, string $r) use ($planLimitThreshold): void {
+    $planLimitThreshold($t, $k, $u, $l, $st, $r);
+});
+$planLimitsHandler = new \Whity\Api\PlanLimitsApiHandler(
+    new \Whity\Core\Usage\PlanLimitsReport(
+        $db->getPdo(),
+        $entitlementService,
+        new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService),
+        $customerUsage,
+        $planLimitMeters
+    ),
+    $roleChecker
+);
+$router->register('GET',  '/api/billing/limits',   [$planLimitsHandler, 'show'],      null, null, CorePermissions::BILLING_VIEW);
 // More seats, or fewer. The only change the billing service supports in place:
 // a PLAN swap would mean cancelling and buying again, which either double-charges
 // or leaves a gap, so it is refused rather than faked.
@@ -3132,6 +3369,9 @@ $router->register('PATCH',  '/api/affiliate-payouts/{id:\d+}',  [$affiliatesHand
 $router->register('DELETE', '/api/affiliate-payouts/{id:\d+}',  [$affiliatesHandler, 'discardPayout'],  null, null, CorePermissions::PLANS_MANAGE);
 $router->register('POST',   '/api/tenants/{id:\d+}/plan',       [$plansHandler, 'applyToTenant'],   null, null, CorePermissions::PLANS_MANAGE);
 $router->register('GET',    '/api/tenants/{id:\d+}/plan',       [$plansHandler, 'getTenantPlan'],   null, null, CorePermissions::PLANS_MANAGE);
+// Add-on packs beside the tier (WHIT-1040): they stack onto its limits.
+$router->register('GET',    '/api/tenants/{id:\d+}/addons',     [$plansHandler, 'listTenantAddons'], null, null, CorePermissions::PLANS_MANAGE);
+$router->register('PUT',    '/api/tenants/{id:\d+}/addons',     [$plansHandler, 'setTenantAddon'],   null, null, CorePermissions::PLANS_MANAGE);
 
 // 13a-quinquies. Subscription (billing-state) API (WC-billing). Operator routes
 // (system-tenant gated) reflect an out-of-band payment into a tenant's state and
@@ -3253,6 +3493,8 @@ $documentSourcesHandler = new \Whity\Api\DocumentSourcesApiHandler(
     $documentThemeResolver,
     $documentCollab,
     new \Whity\Core\Document\DocumentPeople($db->getPdo()),
+    // Editor M7: records which saved blocks each document uses on every save.
+    new \Whity\Core\Document\SavedBlock\SavedBlockRepository($db->getPdo()),
 );
 $router->register('GET',    '/api/document-sources',                [$documentSourcesHandler, 'list'],      null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('POST',   '/api/document-sources',                [$documentSourcesHandler, 'create'],    null, null, CorePermissions::DOCUMENTS_WRITE);
@@ -3263,7 +3505,7 @@ $router->register('DELETE', '/api/document-sources/{id:\d+}',       [$documentSo
 // Document themes (editor M4d, E.44, DOCUMENT-THEMES.md 5): reads with
 // documents:read, the workspace's own themes managed with documents:themes.
 // A theme is addressed by its ref: whity.standard or tenant.<key>.
-$documentThemesHandler = new \Whity\Api\DocumentThemesApiHandler($documentThemeRepository, $documentThemeResolver, $settingsService);
+$documentThemesHandler = new \Whity\Api\DocumentThemesApiHandler($documentThemeRepository, $documentThemeResolver, $settingsService, $entitlementService);
 // Each path is written out, not built from a variable: the OpenAPI catalogue
 // tests read these registrations as literals and match them against
 // CoreApiSchemas::documentThemeRoutes().
@@ -3285,6 +3527,48 @@ $templateSlotRegistry = new \Whity\Core\Document\Slots\TemplateSlotRegistry(
     static fn (int $tenantId): array => $tenantManifestHost->manifestsFor($tenantId)
 );
 \Whity\register_service(\Whity\Core\Document\Slots\TemplateSlotRegistry::class, $templateSlotRegistry);
+// Blocks plugins add to the document editor (editor M7, E.17-E.20; SDK 1.103).
+// Code plugins register theirs at load; a workspace's own plugins are read per
+// request from their manifests. Verified comes from Whity's marks only.
+$codePluginVerification = new \Whity\Core\Plugin\Trust\CodePluginVerification($db->getPdo(), $storeMarks);
+$documentBlockRegistry = new \Whity\Core\Document\Blocks\DocumentBlockRegistry(
+    static function (int $tenantId) use ($tenantManifestHost, $tenantPluginRepository, $pluginTrust): array {
+        $versions = [];
+        foreach ($tenantPluginRepository->plugins($tenantId) as $row) {
+            $versions[$row['plugin']] = $row;
+        }
+        $out = [];
+        foreach ($tenantManifestHost->manifestsFor($tenantId) as $manifest) {
+            $blocks = $manifest->documentBlocks();
+            if ($blocks === []) {
+                continue;
+            }
+            $row = $versions[$manifest->name()] ?? null;
+            $out[] = [
+                'plugin' => $manifest->name(),
+                'label' => $manifest->label(),
+                'verified' => $row !== null && $pluginTrust->isVerified($row['plugin'], $row['version'], $row['hash']),
+                'blocks' => $blocks,
+            ];
+        }
+
+        return $out;
+    },
+    static function (int $tenantId) use ($tenantPluginRepository): array {
+        $off = [];
+        foreach ($tenantPluginRepository->plugins($tenantId) as $row) {
+            if (!$row['enabled']) {
+                $off[] = ['plugin' => $row['plugin'], 'label' => ['en' => $row['plugin'], 'ar' => $row['plugin']]];
+            }
+        }
+
+        return $off;
+    },
+    static fn (string $plugin): bool => $codePluginVerification->isVerified($plugin),
+);
+\Whity\register_service(\Whity\Core\Document\Blocks\DocumentBlockRegistry::class, $documentBlockRegistry);
+$documentBlocksHandler = new \Whity\Api\DocumentBlocksApiHandler($documentBlockRegistry, $roleChecker);
+$router->register('GET',    '/api/document-blocks',                     [$documentBlocksHandler, 'list'], null, null, CorePermissions::DOCUMENTS_READ);
 // A workspace's own plugins' agent presets are read per call, like its slots (WHIT-818).
 $agentPresetRegistry->useManifests(static fn (int $tenantId): array => $tenantManifestHost->manifestsFor($tenantId));
 // Template slots and the workspace's bindings (WHIT-742, DOCUMENT-AUTOMATION
@@ -3382,6 +3666,9 @@ $documentRenderMeters = new \Whity\Core\Entitlement\MeterService(
     $entitlementService,
     $settingsService
 );
+$documentRenderMeters->onThreshold(static function (int $t, string $k, int $u, int $l, string $st, string $r) use ($planLimitThreshold): void {
+    $planLimitThreshold($t, $k, $u, $l, $st, $r);
+});
 
 // 13a-nonies-bis. ISSUED DOCUMENTS (#947 item 1) — the records a persisted
 // render creates, and their immutable artifacts. Reads are gated on
@@ -3451,6 +3738,12 @@ $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentFieldP
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\CompanyFieldProvider($settingsService, $documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\TodayFieldProvider($documentFieldLabels));
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\IssuedDocumentNumberFieldProvider($documentFieldLabels));
+// WHIT-1016: values entered at route steps (`route.value.<key>`), filled by the final document stage.
+$documentFieldRegistry->add(new \Whity\Core\Document\Fields\RouteValueFieldProvider($db->getPdo(), $documentFieldLabels));
+// WHIT-1018: who approved (`route.approvals.*.name`), a table row each, filled by the final document stage.
+$documentFieldRegistry->add(new \Whity\Core\Document\Fields\RouteApprovalFieldProvider($db->getPdo(), $documentFieldLabels));
+// WHIT-954: contacts as a record type, with the workspace's own fields (`{{contact.<key>}}`).
+$documentFieldRegistry->add(new \Whity\Core\Contacts\ContactFieldProvider($db->getPdo(), $documentFieldLabels));
 // WHIT-742: each workspace plugin's record types, in the workspaces where
 // the plugin is published and on (`CakeOrders.order`), so a template can be
 // written for them and a slot can be issued from them.
@@ -3524,6 +3817,12 @@ $documentIssuing = new \Whity\Core\Document\Issuing\DocumentIssuing(
     $hookManager,
     $documentRepository,
     $documentArtifactRepository,
+    // Editor M7 (E.38): a one-off document freezes its synced blocks when issued.
+    new \Whity\Core\Document\SavedBlock\SavedBlockExpander(
+        new \Whity\Core\Document\SavedBlock\SavedBlockRepository($db->getPdo()),
+        // E.17-E.18: and its plugin blocks as printed from their print views.
+        new \Whity\Core\Document\Blocks\PluginBlockPrinter($documentBlockRegistry),
+    ),
 );
 $documentPublishingHandler = new \Whity\Api\DocumentPublishingApiHandler(
     $documentSourcesHandler,
@@ -3543,6 +3842,10 @@ $documentPublishingHandler = new \Whity\Api\DocumentPublishingApiHandler(
     $documentThemeRepository,
     $documentCollab,
     new \Whity\Core\Document\Print\WorkspaceName($db->getPdo()),
+    // Editor M7 (E.38): drafts print synced blocks as the library has them; publishing freezes them.
+    new \Whity\Core\Document\SavedBlock\SavedBlockRepository($db->getPdo()),
+    // Editor M7 (E.17-E.19): plugin blocks print from their print views; an off plugin blocks publishing.
+    $documentBlockRegistry,
 );
 $router->register('GET',  '/api/document-fields',                         [$documentPublishingHandler, 'fields'],       null, null, CorePermissions::DOCUMENTS_READ);
 $router->register('GET',  '/api/document-fields/records',                 [$documentPublishingHandler, 'records'],      null, null, CorePermissions::DOCUMENTS_READ);
@@ -3804,6 +4107,14 @@ $documentQrHandler = new \Whity\Api\DocumentQrApiHandler(
     $roleChecker,
     $settingsService
 );
+// Built here rather than with the branding API below: the verification page
+// wears the issuer's brand (WHIT-1044). Its inputs are all built above.
+$brandingService = new \Whity\Core\Branding\BrandingService(
+    $settingsService,
+    $storageDriver,
+    new \Whity\Core\Branding\BrandingAssetValidator(new \Whity\Core\Branding\SvgSanitizer()),
+    $entitlementService
+);
 $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     $documentQrService,
     $documentRepository,
@@ -3812,6 +4123,7 @@ $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     new DatabaseSharedStore($db->getPdo()),
     $documentSourceRepository,
     $documentArtifactRepository,
+    $brandingService,
 );
 
 // `/api/documents/views` is registered BEFORE the `{id:\d+}` routes and cannot
@@ -4033,7 +4345,7 @@ $signingService = new \Whity\Core\Document\Signing\SigningService(
     ),
     $signingChallengeRepository,
     $instanceSealKeys,
-    new \Whity\Core\Document\Signing\SigningCodeMailer($mailer, new \Whity\Core\Mail\EmailLayout(), $settingsService),
+    new \Whity\Core\Document\Signing\SigningCodeMailer($brandedEmailSender),
 );
 $documentSigningHandler = new \Whity\Api\DocumentSigningApiHandler(
     $documentRepository,
@@ -4353,20 +4665,20 @@ $formSubmissionsHandler = new \Whity\Api\FormSubmissionsApiHandler(
     $routeFinalisationRepository,
     $routeFinalDocumentFile,
 );
-$formSubmissionReviewsHandler = new \Whity\Api\FormSubmissionReviewsApiHandler(
-    $formFieldRepository,
-    $formSubmissionRepository,
-    new \Whity\Core\Form\FormSubmissionReviewRepository($db->getPdo()),
-    $submissionIssuer,
-    $hookManager
-);
 $router->register('POST', '/api/forms/{id:\d+}/submissions', [$formSubmissionsHandler, 'submit'], null, null, CorePermissions::FORMS_SUBMIT);
 $router->register('GET', '/api/form-submissions', [$formSubmissionsHandler, 'list'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/form-submissions/{id:\d+}', [$formSubmissionsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/form-submissions/{id:\d+}/files/{fileId:\d+}', [$formSubmissionsHandler, 'fileContent'], null, null, CorePermissions::FORMS_READ);
-// The office's record on a submission (migration 194). Somebody who can read a
-// submission can read what became of it; recording takes `forms:review`.
-$router->register('GET', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'show'], null, null, CorePermissions::FORMS_READ);
+// Design 3.4 (P1): a response in the automatic printout layout, and the
+// Form printouts tab's live preview of unsaved theme options.
+$formPrintoutsHandler = new \Whity\Api\FormPrintoutsApiHandler(
+    $db->getPdo(),
+    new \Whity\Core\Form\Print\FormPrintoutService($db->getPdo(), $sourceDocumentPrinter, $entitlementService, $settingsService),
+    $flowDocumentRenderer,
+    $documentRenderMeters,
+);
+$router->register('GET', '/api/form-submissions/{id:\d+}/printout', [$formPrintoutsHandler, 'submission'], null, null, CorePermissions::FORMS_READ);
+$router->register('POST', '/api/document-themes/form-printout-preview', [$formPrintoutsHandler, 'themePreview'], null, null, CorePermissions::DOCUMENTS_THEMES);
 // What the responses add up to, and the export. `forms:read`, which reads these rows anyway.
 $formResponsesHandler = new \Whity\Api\FormResponsesApiHandler(
     $formRepository,
@@ -4376,7 +4688,6 @@ $formResponsesHandler = new \Whity\Api\FormResponsesApiHandler(
 );
 $router->register('GET', '/api/forms/{id:\d+}/responses/summary', [$formResponsesHandler, 'summary'], null, null, CorePermissions::FORMS_READ);
 $router->register('GET', '/api/forms/{id:\d+}/responses/export', [$formResponsesHandler, 'export'], null, null, CorePermissions::FORMS_READ);
-$router->register('POST', '/api/form-submissions/{id:\d+}/review', [$formSubmissionReviewsHandler, 'record'], null, null, CorePermissions::FORMS_REVIEW);
 // Only ever the caller's own rows — the ROUTE decides whose, not a query param,
 // so no client can widen it. No permission: the rows already name exactly one
 // person, so a tenant-wide permission has nothing left to decide (migration 113's
@@ -4497,7 +4808,9 @@ $publicFormsHandler = new \Whity\Api\PublicFormsApiHandler(
     // The SAME store the authenticated path uses. An anonymous upload differs
     // only in its ceiling, its throttle and its null uploader — none of which is
     // a reason for a second storage path.
-    $formUploadStore
+    $formUploadStore,
+    // WHIT-1040: whether the workspace's plan removes "Built on Whity".
+    new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService)
 );
 $publicFormKeysHandler = new \Whity\Api\PublicFormKeysApiHandler(
     $publicFormKeyRepository,
@@ -4543,6 +4856,8 @@ $meInboxHandler = new \Whity\Api\MeInboxApiHandler($tokenValidator, $inboxSource
 // already names exactly one person.
 $router->register('GET', '/api/me/inbox/sources', [$meInboxHandler, 'sources'], null);
 $router->register('GET', '/api/me/inbox',         [$meInboxHandler, 'list'],    null);
+// #881, ADR 0016: every source as one list, urgent first then newest, keyset-paged.
+$router->register('GET', '/api/me/inbox/merged',  [$meInboxHandler, 'merged'],  null);
 
 // WHIT-783: one search across documents, forms, people, units and plugin
 // records that opted in, for the "search records" MCP tool and ⌘K. Session-
@@ -4650,7 +4965,10 @@ $resourceRoleGrantsHandler = new \Whity\Api\ResourceRoleGrantsApiHandler(
     $roleChecker,
     $hookManager
 );
-$router->register('GET',    '/api/resource-role-grants',          [$resourceRoleGrantsHandler, 'list'],   null, null, CorePermissions::ROLES_READ);
+// No route-level permission on the list: a caller may read their OWN grants
+// (?profile_id=<self>, #1074) without roles:read. The handler requires
+// roles:read for every other read, in the caller's tenant.
+$router->register('GET',    '/api/resource-role-grants',          [$resourceRoleGrantsHandler, 'list'],   null);
 $router->register('POST',   '/api/resource-role-grants',          [$resourceRoleGrantsHandler, 'create'], null, null, CorePermissions::ROLES_MANAGE);
 $router->register('DELETE', '/api/resource-role-grants/{id:\d+}', [$resourceRoleGrantsHandler, 'revoke'], null, null, CorePermissions::ROLES_MANAGE);
 // WC-712 §4: the record-delete cleanup an owner runs when it deletes the record
@@ -4756,7 +5074,11 @@ $router->register('POST',   '/api/data-types/{type}/bulk',           [$dataTypes
 // records a per-channel delivery, and enqueues the durable send job. Also
 // subscribed on the HookManager, so firing the `notification.dispatch` hook (from
 // core or a plugin) dispatches a notification (hook-subscriber mode).
-$transportRegistry = \Whity\Core\Notification\CoreTransports::make($logger);
+// E2: the `email` channel is delivered through core mail, not only logged.
+$transportRegistry = \Whity\Core\Notification\CoreTransports::make($logger, $brandedEmailSender, $profileEmailRepository);
+// WHIT-1074: web push. Registered here so the dispatcher adds `push` for a
+// person with a device on; the worker sends it.
+$transportRegistry->register(\Whity\Core\Notification\Push\PushTransport::fromEnv($db->getPdo(), $logger, $_ENV));
 $notificationRepository = new \Whity\Core\Notification\NotificationRepository($db->getPdo());
 // Per-user preference resolver — the dispatcher consults it to filter a
 // recipient's channels (transactional types always bypass; #c56a6455).
@@ -4771,7 +5093,8 @@ $notificationDispatcher = new \Whity\Core\Notification\NotificationDispatcher(
     ),
     $logger,
     $notificationPreferenceResolver,
-    $auditLogger
+    $auditLogger,
+    $brandedEmailSender->gate()
 );
 $notificationDispatcher->subscribe($hookManager);
 \Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger, $logger);
@@ -4803,6 +5126,50 @@ $router->register('GET',  '/api/document-sources/{id:\d+}/changes',             
 // The people a comment may @mention: members who can read the document.
 $router->register('GET',  '/api/document-sources/{id:\d+}/mentionable',                     [$documentCollabHandler, 'mentionable'],      null, null, CorePermissions::DOCUMENTS_COMMENT);
 
+// Saved blocks (editor M7; E.21-E.24, E.38). Reading needs documents:read and
+// changing documents:write; managing the workspace library uses
+// documents:publish until the register's documents:library:manage is minted.
+// The usage list shows only documents the caller can see (visibleRow).
+// Deleting is agentPolicy refuse.
+$savedBlocksHandler = new \Whity\Api\SavedBlocksApiHandler(
+    new \Whity\Core\Document\SavedBlock\SavedBlockRepository($db->getPdo()),
+    $documentSourcesHandler,
+    $roleChecker,
+    $auditLogger,
+);
+$router->register('GET',    '/api/saved-blocks',                                    [$savedBlocksHandler, 'list'],    null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST',   '/api/saved-blocks',                                    [$savedBlocksHandler, 'create'],  null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('GET',    '/api/saved-blocks/{id:\d+}',                           [$savedBlocksHandler, 'show'],    null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('PATCH',  '/api/saved-blocks/{id:\d+}',                           [$savedBlocksHandler, 'update'],  null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('DELETE', '/api/saved-blocks/{id:\d+}',                           [$savedBlocksHandler, 'delete'],  null, null, CorePermissions::DOCUMENTS_WRITE);
+$router->register('GET',    '/api/saved-blocks/{id:\d+}/versions/{version:\d+}',    [$savedBlocksHandler, 'version'], null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('GET',    '/api/saved-blocks/{id:\d+}/usage',                     [$savedBlocksHandler, 'usage'],   null, null, CorePermissions::DOCUMENTS_READ);
+
+// Agents in the editor (editor M6; E.30, E.31; owner's answers Q3, Q4, Q9).
+// Whity hosts no model: a person's request waits until their own agent picks
+// it up over MCP (document_agent_requests_next). The agent's tools are named by
+// their operationId and only ever write suggestions and comments, through the
+// collab handler above, with the agent and the person it acts for.
+$documentAgentHandler = new \Whity\Api\DocumentAgentApiHandler(
+    $documentSourcesHandler,
+    $documentCollabHandler,
+    $documentCollab,
+    new \Whity\Core\Document\Agent\DocumentAgentRequestRepository($db->getPdo()),
+    new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
+    new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo()),
+    $roleChecker,
+    $auditLogger,
+);
+$router->register('POST', '/api/document-sources/{id:\d+}/agent-requests',               [$documentAgentHandler, 'ask'],            null, null, CorePermissions::DOCUMENTS_SUGGEST);
+$router->register('GET',  '/api/document-sources/{id:\d+}/agent-requests',               [$documentAgentHandler, 'listRequests'],   null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-agent-requests/{rid:\d+}/stop',                 [$documentAgentHandler, 'stop'],           null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-agent-requests/next',                           [$documentAgentHandler, 'next'],           null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-agent-requests/{rid:\d+}/progress',             [$documentAgentHandler, 'progress'],       null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('GET',  '/api/document-sources/{id:\d+}/agent-view',                   [$documentAgentHandler, 'read'],           null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST', '/api/document-sources/{id:\d+}/agent-suggestions/blocks',     [$documentAgentHandler, 'suggestBlocks'],  null, null, CorePermissions::DOCUMENTS_SUGGEST);
+$router->register('POST', '/api/document-sources/{id:\d+}/agent-suggestions/rewrite',    [$documentAgentHandler, 'suggestRewrite'], null, null, CorePermissions::DOCUMENTS_SUGGEST);
+$router->register('POST', '/api/document-sources/{id:\d+}/comments/{tid:\d+}/reply',     [$documentAgentHandler, 'reply'],          null, null, CorePermissions::DOCUMENTS_COMMENT);
+
 // 13b-quinquies-bis. ROUTING NOTIFICATIONS (#1054) — the subscriber that turns a
 // routing broadcast into notifications.
 //
@@ -4823,9 +5190,18 @@ $router->register('GET',  '/api/document-sources/{id:\d+}/mentionable',         
 // reached is operator configuration.
 $routingNotifications = new \Whity\Core\Document\Routing\RoutingNotifications(
     $notificationDispatcher,
-    $settingsService
+    $settingsService,
+    // E2: people at a sign step get the sign-request email instead of an emailed notice.
+    $db->getPdo(),
 );
 $routingNotifications->subscribe($hookManager);
+// E2 `EmailForms`: "Please sign this" to people a route asks to sign, and
+// "We received it" to a signed-in person who sends a form.
+(new \Whity\Core\Document\Routing\SignRequestEmail($db->getPdo(), $profileEmailRepository, $brandedEmailSender, $frontendUrls->base()))->subscribe($hookManager);
+(new \Whity\Core\Form\FormReceivedEmail($db->getPdo(), $profileEmailRepository, $brandedEmailSender, $settingsService, $frontendUrls->base()))->subscribe($hookManager);
+// E2 `form-decision` (WHIT-1034): the decision, with the final document's PDF (P1) when there is one.
+// The worker subscribes it too, for a final document its retry makes; the shared store keeps it to one email.
+(new \Whity\Core\Form\FormDecisionEmail($db->getPdo(), $profileEmailRepository, $brandedEmailSender, $settingsService, $frontendUrls->base(), $documentArtifactStore, new DatabaseSharedStore($db->getPdo())))->subscribe($hookManager);
 
 // THE EFFECT ENGINE (#1032), beside the notifier and for the same reasons.
 //
@@ -4883,12 +5259,34 @@ $meetingInvitationRepository = new \Whity\Core\Convening\InvitationRepository($d
 // has nowhere to record them. Migration 134 carries the argument.
 $meetingAttendanceRepository = new \Whity\Core\Convening\AttendanceRepository($db->getPdo());
 
+// ADR 0018: one invite path for every event with people, meetings included.
+$calendarInvites = \Whity\Core\Calendar\CalendarServices::invites(
+    $db->getPdo(),
+    $notificationDispatcher,
+    $brandedEmailSender,
+    $settingsService,
+    $frontendUrls,
+    $logger,
+);
+// ADR 0018: a push 15 minutes before events and meetings (owner, 16 Nov 2026).
+$eventReminders = new \Whity\Core\Calendar\EventReminders(
+    $db->getPdo(),
+    new \Whity\Core\Calendar\CalendarRepository($db->getPdo()),
+    $queueService,
+    $notificationDispatcher,
+    $logger,
+);
+
 $meetingService = new \Whity\Core\Convening\MeetingService(
     $conveningBodyRepository,
     $meetingRepository,
     $meetingInvitationRepository,
     new \Whity\Core\Convening\MeetingNotifications($notificationDispatcher),
-    $meetingAttendanceRepository
+    $meetingAttendanceRepository,
+    // ADR 0018: a meeting's time, place and guests live on a calendar event.
+    new \Whity\Core\Convening\MeetingCalendar($db->getPdo()),
+    $calendarInvites,
+    $eventReminders
 );
 
 $decisionRecorder = new \Whity\Core\Convening\DecisionRecorder(
@@ -4919,6 +5317,145 @@ $router->register('DELETE', '/api/convening-bodies/{id:\d+}',               [$co
 $router->register('GET',    '/api/convening-bodies/{id:\d+}/members',       [$conveningBodiesHandler, 'listMembers'],  null, null, CorePermissions::CONVENING_READ);
 $router->register('POST',   '/api/convening-bodies/{id:\d+}/members',       [$conveningBodiesHandler, 'addMember'],    null, null, CorePermissions::CONVENING_MANAGE);
 $router->register('DELETE', '/api/convening-bodies/{id:\d+}/members/{profileId:\d+}', [$conveningBodiesHandler, 'removeMember'], null, null, CorePermissions::CONVENING_MANAGE);
+
+// ── Calendar and bookings (WHIT-941, ADR 0017) ─────────────────────────────
+// Staff calendars, services, availability and bookings. Every write that can
+// take time on a person's calendar runs under that person's lock row, so two
+// requests can never book the same time (BookingService). Reading on
+// calendar:read; booking and one's own events, hours and time off on
+// calendar:write (the handler checks calendar:manage when the person is not
+// the caller); services, settings and the staff list on calendar:manage.
+$calendarRepository = new \Whity\Core\Calendar\CalendarRepository($db->getPdo());
+$calendarServiceRepository = new \Whity\Core\Calendar\ServiceRepository($db->getPdo());
+$calendarBookingRepository = new \Whity\Core\Calendar\BookingRepository($db->getPdo());
+// Customer emails (with the manage link) and reminders are wired here and in
+// CoreJobs the same way, through CalendarServices (WHIT-942).
+$calendarPlugins = new \Whity\Core\Calendar\CalendarPlugins($logger);
+$calendarBookingService = \Whity\Core\Calendar\CalendarServices::bookingService(
+    $db->getPdo(),
+    $settingsService,
+    $hookManager,
+    $brandedEmailSender,
+    $frontendUrls,
+    $queueService,
+    $logger,
+    $calendarPlugins,
+    $calendarInvites,
+);
+$calendarBookingService->setReminders($eventReminders);
+// SDK 1.98: a payment step settles held bookings, a sync plugin keeps outside
+// events, through these host services.
+\Whity\register_service(\Whity\Sdk\Calendar\Bookings::class, new \Whity\Core\Calendar\HostBookings($calendarBookingService));
+\Whity\register_service(\Whity\Sdk\Calendar\CalendarEvents::class, new \Whity\Core\Calendar\HostCalendarEvents($calendarBookingService, $calendarRepository));
+$calendarFeed = new \Whity\Core\Calendar\CalendarFeed($db->getPdo(), $calendarRepository, $calendarBookingRepository);
+$calendarHandler = new \Whity\Api\CalendarApiHandler(
+    $calendarRepository,
+    $calendarServiceRepository,
+    $calendarBookingRepository,
+    $calendarBookingService,
+    $settingsService,
+    $roleChecker,
+    $calendarFeed,
+    $frontendUrls->base(),
+);
+$router->register('GET',    '/api/calendar/settings',                       [$calendarHandler, 'getSettings'],     null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/settings',                       [$calendarHandler, 'putSettings'],     null, null, CorePermissions::CALENDAR_MANAGE);
+// Design 3.5: each person's own calendar choices (view, Colour by, ticks).
+$router->register('GET',    '/api/calendar/my-view',                        [$calendarHandler, 'getMyView'],       null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/my-view',                        [$calendarHandler, 'putMyView'],       null, null, CorePermissions::CALENDAR_READ);
+$router->register('GET',    '/api/calendar/staff',                          [$calendarHandler, 'listStaff'],       null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/staff/{profileId:\d+}',          [$calendarHandler, 'putStaff'],        null, null, CorePermissions::CALENDAR_MANAGE);
+// A person's ICS feed URL: shown once when turned on; turning it on again
+// replaces it. Own feed on calendar:write, anyone's with calendar:manage.
+$router->register('POST',   '/api/calendar/staff/{profileId:\d+}/feed',     [$calendarHandler, 'enableFeed'],      null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('DELETE', '/api/calendar/staff/{profileId:\d+}/feed',     [$calendarHandler, 'disableFeed'],     null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/staff/{profileId:\d+}/hours',    [$calendarHandler, 'getHours'],        null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/staff/{profileId:\d+}/hours',    [$calendarHandler, 'putHours'],        null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/time-off',                       [$calendarHandler, 'listExceptions'],  null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/time-off',                       [$calendarHandler, 'createException'], null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('DELETE', '/api/calendar/time-off/{id:\d+}',              [$calendarHandler, 'deleteException'], null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/services',                       [$calendarHandler, 'listServices'],    null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/services',                       [$calendarHandler, 'createService'],   null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('GET',    '/api/calendar/services/{id:\d+}',              [$calendarHandler, 'showService'],     null, null, CorePermissions::CALENDAR_READ);
+$router->register('PATCH',  '/api/calendar/services/{id:\d+}',              [$calendarHandler, 'updateService'],   null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('GET',    '/api/calendar/availability',                   [$calendarHandler, 'availability'],    null, null, CorePermissions::CALENDAR_READ);
+$router->register('GET',    '/api/calendar/bookings',                       [$calendarHandler, 'listBookings'],    null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/bookings',                       [$calendarHandler, 'createBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/bookings/{id:\d+}',              [$calendarHandler, 'showBooking'],     null, null, CorePermissions::CALENDAR_READ);
+// Design 3.5 Year view: live bookings a day, up to a year at a time.
+$router->register('GET',    '/api/calendar/day-counts',                     [$calendarHandler, 'dayCounts'],       null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/move',         [$calendarHandler, 'moveBooking'],     null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/cancel',       [$calendarHandler, 'cancelBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
+// Design 3.3: rooms, requests (Accept, Suggest another time), check-in, Today.
+$router->register('GET',    '/api/calendar/rooms',                          [$calendarHandler, 'listRooms'],       null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/rooms',                          [$calendarHandler, 'createRoom'],      null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('PATCH',  '/api/calendar/rooms/{id:\d+}',                 [$calendarHandler, 'updateRoom'],      null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/accept',       [$calendarHandler, 'acceptBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/suggest',      [$calendarHandler, 'suggestBooking'],  null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/check-in',     [$calendarHandler, 'checkIn'],         null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('DELETE', '/api/calendar/bookings/{id:\d+}/check-in',     [$calendarHandler, 'checkIn'],         null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/today',                          [$calendarHandler, 'today'],           null, null, CorePermissions::CALENDAR_READ);
+$router->register('GET',    '/api/calendar/items',                          [$calendarHandler, 'items'],           null, null, CorePermissions::CALENDAR_READ);
+$router->register('GET',    '/api/calendar/events',                         [$calendarHandler, 'listEvents'],      null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/events/{id:\d+}/answer',        [$calendarHandler, 'answerEvent'],     null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/events',                         [$calendarHandler, 'createEvent'],     null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('PATCH',  '/api/calendar/events/{id:\d+}',                [$calendarHandler, 'updateEvent'],     null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('DELETE', '/api/calendar/events/{id:\d+}',                [$calendarHandler, 'deleteEvent'],     null, null, CorePermissions::CALENDAR_WRITE);
+
+// ── Contacts and import (WHIT-953, design 3.3 A8) ──────────────────────────
+// Customers and suppliers as one record, with tags on core's taxonomy and a
+// spreadsheet import that shows what it will do before anything changes and
+// can be undone for 24 hours.
+$contactRepository = new \Whity\Core\Contacts\ContactRepository($db->getPdo());
+$contactTags = new \Whity\Core\Contacts\ContactTags($db->getPdo());
+// WHIT-954: the workspace's own fields on core's records. Core registers
+// `contact`; a plugin registers its own type on $customFieldRecordTypes with
+// registerOwned() (its key starts with its name and a dot).
+$customFieldRecordTypes = new \Whity\Core\CustomFields\CustomFieldRecordTypes();
+$customFieldRecordTypes->register(new \Whity\Core\CustomFields\CustomFieldRecordType(
+    'contact',
+    'Contacts',
+    'جهات الاتصال',
+    CorePermissions::CONTACTS_READ,
+    CorePermissions::CONTACTS_WRITE,
+    static fn (int $tenantId, int $id): bool => $contactRepository->find($tenantId, $id) !== null,
+    \Whity\Core\Contacts\ContactFieldProvider::reservedKeys(),
+));
+\Whity\register_service(\Whity\Core\CustomFields\CustomFieldRecordTypes::class, $customFieldRecordTypes);
+$customFieldRepository = new \Whity\Core\CustomFields\CustomFieldRepository($db->getPdo());
+$customFieldService = new \Whity\Core\CustomFields\CustomFieldService($db->getPdo(), $customFieldRepository, $customFieldRecordTypes);
+$contactService = new \Whity\Core\Contacts\ContactService($contactRepository, $contactTags, $customFieldService);
+$contactImportService = new \Whity\Core\Contacts\Import\ContactImportService(
+    $db->getPdo(),
+    $contactRepository,
+    $contactTags,
+    new \Whity\Core\Contacts\Import\ContactImportRepository($db->getPdo()),
+);
+$contactImportService->addTargets(new \Whity\Core\CustomFields\CustomFieldImportTargets($customFieldService, $customFieldRepository, 'contact'));
+$contactsHandler = new \Whity\Api\ContactsApiHandler($contactService, $contactTags, $contactImportService, $roleChecker, new \Whity\Core\Contacts\CustomerActivity($db->getPdo()));
+$customFieldsHandler = new \Whity\Api\CustomFieldsApiHandler($customFieldService, $roleChecker);
+// Listing a type's fields checks that type's read permission in the handler.
+$router->register('GET',    '/api/custom-fields/record-types',             [$customFieldsHandler, 'recordTypes'], null);
+$router->register('GET',    '/api/custom-fields',                          [$customFieldsHandler, 'list'],        null);
+$router->register('POST',   '/api/custom-fields',                          [$customFieldsHandler, 'create'],      null, null, CorePermissions::FIELDS_MANAGE);
+$router->register('PATCH',  '/api/custom-fields/{id:\d+}',                 [$customFieldsHandler, 'update'],      null, null, CorePermissions::FIELDS_MANAGE);
+$router->register('POST',   '/api/custom-fields/{id:\d+}/archive',         [$customFieldsHandler, 'archive'],     null, null, CorePermissions::FIELDS_MANAGE);
+$router->register('POST',   '/api/custom-fields/{id:\d+}/restore',         [$customFieldsHandler, 'restore'],     null, null, CorePermissions::FIELDS_MANAGE);
+$router->register('GET',    '/api/contacts',                               [$contactsHandler, 'list'],        null, null, CorePermissions::CONTACTS_READ);
+$router->register('POST',   '/api/contacts',                               [$contactsHandler, 'create'],      null, null, CorePermissions::CONTACTS_WRITE);
+$router->register('GET',    '/api/contacts/tags',                          [$contactsHandler, 'listTags'],    null, null, CorePermissions::CONTACTS_READ);
+$router->register('GET',    '/api/contacts/{id:\d+}',                      [$contactsHandler, 'show'],        null, null, CorePermissions::CONTACTS_READ);
+$router->register('GET',    '/api/contacts/{id:\d+}/activity',             [$contactsHandler, 'activity'],    null, null, CorePermissions::CONTACTS_READ);
+$router->register('PATCH',  '/api/contacts/{id:\d+}',                      [$contactsHandler, 'update'],      null, null, CorePermissions::CONTACTS_WRITE);
+$router->register('POST',   '/api/contacts/{id:\d+}/archive',              [$contactsHandler, 'archive'],     null, null, CorePermissions::CONTACTS_WRITE);
+$router->register('POST',   '/api/contacts/{id:\d+}/restore',              [$contactsHandler, 'restore'],     null, null, CorePermissions::CONTACTS_WRITE);
+$router->register('GET',    '/api/contacts/imports',                       [$contactsHandler, 'listImports'], null, null, CorePermissions::CONTACTS_IMPORT);
+$router->register('POST',   '/api/contacts/imports',                       [$contactsHandler, 'upload'],      null, null, CorePermissions::CONTACTS_IMPORT);
+$router->register('GET',    '/api/contacts/imports/{id:\d+}',              [$contactsHandler, 'showImport'],  null, null, CorePermissions::CONTACTS_IMPORT);
+$router->register('POST',   '/api/contacts/imports/{id:\d+}/check',        [$contactsHandler, 'checkImport'], null, null, CorePermissions::CONTACTS_IMPORT);
+$router->register('POST',   '/api/contacts/imports/{id:\d+}/run',          [$contactsHandler, 'runImport'],   null, null, CorePermissions::CONTACTS_IMPORT);
+$router->register('POST',   '/api/contacts/imports/{id:\d+}/undo',         [$contactsHandler, 'undoImport'],  null, null, CorePermissions::CONTACTS_IMPORT);
+$router->register('GET',    '/api/contacts/imports/{id:\d+}/skipped.csv',  [$contactsHandler, 'skippedCsv'],  null, null, CorePermissions::CONTACTS_IMPORT);
 
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,
@@ -5001,7 +5538,8 @@ $hookManager->listen('navigation.register', function ($data, $context) use ($rou
 // In-app notification INBOX (WC-notifications, 6e10d9ea). Self-scoped to the
 // caller's (tenant, profile) — session-gated, no RBAC permission (like
 // /api/me/sessions). Reads the notifications the dispatcher persisted.
-$inboxHandler = new \Whity\Api\InboxApiHandler($tokenValidator, $notificationRepository);
+// #1934: the person's notices (Inbox › Mentions and Updates), not the waiting list.
+$inboxHandler = new \Whity\Api\NotificationsApiHandler($tokenValidator, $notificationRepository);
 $router->register('GET',  '/api/me/notifications',                [$inboxHandler, 'list'],         null);
 $router->register('GET',  '/api/me/notifications/unread-count',   [$inboxHandler, 'unreadCount'],  null);
 $router->register('POST', '/api/me/notifications/read-all',       [$inboxHandler, 'markAllRead'],  null);
@@ -5017,6 +5555,33 @@ $notificationPreferencesHandler = new \Whity\Api\NotificationPreferencesApiHandl
 );
 $router->register('GET', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'list'],   null);
 $router->register('PUT', '/api/me/notification-preferences', [$notificationPreferencesHandler, 'update'], null);
+
+// Your notifications in each of your workspaces, read-only (WHIT-1081): push
+// devices and whether email and push are on, so a person in several
+// workspaces can see where they will hear from. Self-scoped, no permission.
+$notificationSummaryHandler = new \Whity\Api\NotificationSummaryApiHandler(
+    $tokenValidator,
+    $db->getPdo(),
+    $notificationPreferenceRepository,
+    new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
+);
+$router->register('GET', '/api/me/notification-summary', [$notificationSummaryHandler, 'summary'], null);
+
+// Web push: a person's devices and the instance's public key (WHIT-1073).
+// Self-scoped, session-gated, no RBAC permission. The key pair is made on
+// first use and kept encrypted with the shared key ring.
+$pushSubscriptionsHandler = new \Whity\Api\PushSubscriptionsApiHandler(
+    $tokenValidator,
+    new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
+    static fn (): \Whity\Core\Notification\Push\VapidKeys => new \Whity\Core\Notification\Push\VapidKeys(
+        $globalSettingsRepository,
+        \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+    ),
+    \Whity\Core\Notification\Push\PushEndpoint::extraHostsFrom($_ENV),
+);
+$router->register('GET',    '/api/me/push-subscriptions',             [$pushSubscriptionsHandler, 'list'],      null);
+$router->register('POST',   '/api/me/push-subscriptions',             [$pushSubscriptionsHandler, 'subscribe'], null);
+$router->register('DELETE', '/api/me/push-subscriptions/{id:\d+}',    [$pushSubscriptionsHandler, 'remove'],    null);
 
 // A person's text size and Show technical details (design decisions W.3, A.3).
 // Self-scoped, session-gated, no RBAC permission.
@@ -5111,23 +5676,50 @@ $router->register('POST', '/api/settings/mail/test',         [$mailSettingsHandl
 // consumer until persisted documents became a second one, and those are wired
 // above this point. It is the same per-tenant routing driver described there —
 // shared, never rebuilt, so reads and writes can never split across backends.
-$brandingService = new \Whity\Core\Branding\BrandingService(
-    $settingsService,
-    $storageDriver,
-    new \Whity\Core\Branding\BrandingAssetValidator(new \Whity\Core\Branding\SvgSanitizer())
-);
+// $brandingService is built earlier, before the document verification handler
+// (WHIT-1044), which also sends the issuer's brand.
 $brandingHostRepo = new \Whity\Core\Branding\TenantHostRepository($db->getPdo());
 $hostResolver = new \Whity\Core\Branding\HostResolver(
     $brandingHostRepo,
     getenv('BRANDING_BASE_DOMAIN') ?: ''
 );
+
+// ── Public booking page, manage links, staff feed (WHIT-942, ADR 0017) ─────
+// UNAUTHENTICATED (null, null). The workspace comes from the path slug,
+// checked against the host, or from a 256-bit token naming its own row; each
+// path is an anchored pattern in EnforceTenantIsolation. The handler throttles
+// per IP before it looks anything up.
+$publicBookingHandler = new \Whity\Api\PublicBookingApiHandler(
+    $calendarBookingService,
+    $calendarRepository,
+    $calendarServiceRepository,
+    $calendarBookingRepository,
+    new \Whity\Core\Calendar\ManageLinks($db->getPdo()),
+    $calendarFeed,
+    $brandingHostRepo,
+    $hostResolver,
+    $publicFormBotCheck,
+    new DatabaseSharedStore($db->getPdo()),
+    $brandingService,
+);
+$router->register('GET',  '/api/public/booking/{workspace}',                       [$publicBookingHandler, 'page'],        null);
+$router->register('GET',  '/api/public/booking/{workspace}/slots',                 [$publicBookingHandler, 'slots'],       null);
+$router->register('POST', '/api/public/booking/{workspace}/bookings',              [$publicBookingHandler, 'book'],        null);
+$router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}',             [$publicBookingHandler, 'showBooking'], null);
+$router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/slots',       [$publicBookingHandler, 'manageSlots'], null);
+$router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/move',        [$publicBookingHandler, 'move'],        null);
+$router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/cancel',      [$publicBookingHandler, 'cancel'],      null);
+$router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/accept',      [$publicBookingHandler, 'acceptSuggestion'], null);
+$router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/ics',         [$publicBookingHandler, 'ics'],         null);
+$router->register('GET',  '/api/public/calendar/feeds/{token:[a-f0-9]{64}\.ics}', [$publicBookingHandler, 'feed'],        null);
 $brandingHandler = new \Whity\Api\BrandingApiHandler(
     $brandingService,
     $hostResolver,
     $roleChecker,
     $brandingHostRepo,
     $storageDriver,
-    $jwtParser
+    $jwtParser,
+    $entitlementService
 );
 $router->register('GET',    '/api/branding',                        [$brandingHandler, 'get'],          null, null, null);
 $router->register('GET',    '/api/branding/asset/{tenantId}/{name}', [$brandingHandler, 'serveAsset'],   null, null, null);
@@ -5152,6 +5744,20 @@ $customerSignupService = new \Whity\Core\Signup\CustomerSignupService(
     $customerSafeRoles,
     $hookManager
 );
+// Merge map A4: a join request is decided on a route: the workspace's chosen
+// template, or one step for everyone who can manage sign-ups.
+$routeSubjectRegistry->register(new \Whity\Core\Signup\CustomerSignupRouteSubject($db->getPdo(), $customerSignupService));
+$customerSignupRoutes = new \Whity\Core\Signup\CustomerSignupRoutes(
+    $db->getPdo(),
+    $documentRouter,
+    $routeRepository,
+    $routeTemplateRepository,
+    $signupSettings,
+    $roleChecker,
+);
+$customerSignupService->whenPending(static function (int $tenantId, int $signupId) use ($customerSignupRoutes): void {
+    $customerSignupRoutes->issue($tenantId, $signupId);
+});
 $joinProviders = new \Whity\Core\Signup\JoinProviders(
     new \Whity\Core\Identity\IdentityProviderRepository($db->getPdo()),
     $settingsService
@@ -5163,22 +5769,204 @@ $publicSignupHandler = new \Whity\Api\PublicSignupApiHandler(
     $hostResolver,
     $publicFormBotCheck,
     new \Whity\Core\Signup\CustomerSignupMailer(
-        $mailer,
+        $brandedEmailSender,
         $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::SIGNUP_CONFIRM),
-        new \Whity\Core\Mail\EmailLayout(),
-        $settingsService
     ),
     new DatabaseSharedStore($db->getPdo()),
     $auditLogger,
     // WHIT-917: the sign-in providers a visitor may join with, listed up front.
-    $joinProviders
+    $joinProviders,
+    // WHIT-1044: the workspace's logo and colour on the join pages.
+    $brandingService,
 );
 // The confirm pair first, so it can never be read as a workspace slug.
 $router->register('GET',  '/api/public/signup/confirm',               [$publicSignupHandler, 'preview'], null);
 $router->register('POST', '/api/public/signup/confirm',               [$publicSignupHandler, 'confirm'], null);
 $router->register('GET',  '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'info'],    null);
 $router->register('POST', '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'request'], null);
-$workspaceSignupHandler = new \Whity\Api\WorkspaceSignupApiHandler(
+
+// MESSAGES (ADR 0016, WHIT-938): conversations with customers by email and web
+// chat, one send API for every core module, channels a store plugin can add,
+// and outbound messages metered in warn mode. (The calendar's booking emails
+// keep their own templates through EmailBookingMessenger; booking reminders
+// by text go through here, on every channel a plugin adds: C4,
+// BookingTextReminders.)
+// Plugin channels join this registry when plugins load below.
+$messageChannelRegistry = new \Whity\Core\Messaging\MessageChannelRegistry();
+\Whity\register_service(\Whity\Core\Messaging\MessageChannelRegistry::class, $messageChannelRegistry);
+$messagingService = \Whity\Core\Messaging\CoreMessaging::build(
+    $db->getPdo(),
+    $messageChannelRegistry,
+    $mailer,
+    $secretStore,
+    static fn (string $name, array $payload, array $opts): ?int => $queueService->dispatch($name, $payload, $opts),
+    $planLimitMeters,
+    (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+    $brandedEmailSender,
+);
+\Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messagingService);
+// WHIT-967 (SDK 1.99): a plugin messages a workspace's customer through Messages.
+\Whity\register_service(\Whity\Sdk\Messaging\CustomerMessages::class, new \Whity\Core\Messaging\HostCustomerMessages(static fn (): \Whity\Core\Messaging\MessagingService => $messagingService));
+$jobsRegistry->register(
+    \Whity\Core\Messaging\Jobs\DeliverMessageJob::NAME,
+    new \Whity\Core\Messaging\Jobs\DeliverMessageJob(static fn (): \Whity\Core\Messaging\MessagingService => $messagingService),
+    false
+);
+$inboxSourceRegistry->registerCoreSource(
+    \Whity\Core\Messaging\MessagesInboxSource::KEY,
+    new \Whity\Core\Messaging\MessagesInboxSource($messagingService->conversations())
+);
+// Merge map C3: an agent's chat lines held for the person ("Ask first") wait
+// in Waiting for me too, and open their chat, where they are decided.
+$inboxSourceRegistry->registerCoreSource(
+    \Whity\Core\Chat\HeldLinesInboxSource::KEY,
+    new \Whity\Core\Chat\HeldLinesInboxSource($db->getPdo())
+);
+$messagingSettings = new \Whity\Core\Messaging\MessagingSettings($db->getPdo(), $secretStore);
+$messagesHandler = new \Whity\Api\MessagesApiHandler($messagingService, $messagingSettings);
+$router->register('GET',   '/api/messages/conversations',                 [$messagesHandler, 'list'],   null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_READ);
+$router->register('POST',  '/api/messages/conversations',                 [$messagesHandler, 'start'],  null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_REPLY);
+$router->register('GET',   '/api/messages/conversations/{id:\d+}',        [$messagesHandler, 'show'],   null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_READ);
+$router->register('PATCH', '/api/messages/conversations/{id:\d+}',        [$messagesHandler, 'update'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
+$router->register('POST',  '/api/messages/conversations/{id:\d+}/replies', [$messagesHandler, 'reply'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_REPLY);
+$router->register('POST',  '/api/messages/conversations/{id:\d+}/notes',  [$messagesHandler, 'note'],   null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_REPLY);
+$router->register('POST',  '/api/messages/{id:\d+}/cancel',               [$messagesHandler, 'cancel'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_REPLY);
+$router->register('GET',   '/api/messages/channels',                      [$messagesHandler, 'channels'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_READ);
+$router->register('GET',   '/api/messages/settings',                      [$messagesHandler, 'getSettings'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
+$router->register('PUT',   '/api/messages/settings',                      [$messagesHandler, 'putSettings'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
+$router->register('POST',  '/api/messages/settings/inbound-secret',       [$messagesHandler, 'rotateInboundSecret'], null, null, \Whity\Core\RBAC\CorePermissions::MESSAGES_MANAGE);
+// A signed-in customer's own conversations: ownership is the check, like /api/me/forms.
+// Team chat (CH.1, CH.2; migration 253): the team's own chats on the Messages
+// tables. DELIBERATELY UNGATED at the router, like the Inbox: the handler lets
+// in only staff of the workspace, and only members see a chat, so a chat the
+// caller (or the calling agent) is not in answers 404. What an agent may do in
+// a chat is set per chat, by the person who added it.
+$chatRepository = new \Whity\Core\Chat\ChatRepository($db->getPdo());
+// WHIT-1077: each chat line is pushed to the chat's other people who have a
+// device on and aren't looking at that chat.
+$chatStore = new \Whity\Core\Store\DatabaseSharedStore($db->getPdo());
+$chatService = new \Whity\Core\Chat\ChatService($chatRepository, new \Whity\Core\Chat\ChatPushNotifier(
+    $notificationDispatcher,
+    $chatRepository,
+    new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
+    $chatStore,
+    $logger,
+), $chatStore, new \Whity\Core\Chat\ChatAttachments($db->getPdo(), $storageDriver), new \Whity\Core\Chat\ChatBlocks($db->getPdo()));
+// One chat (UC.1, WHIT-1093): team chats and, for people with messages.read,
+// the customer conversations, in one list with each person's pins.
+$chatHandler = new \Whity\Api\ChatApiHandler(
+    $chatService,
+    new \Whity\Core\Chat\ChatInbox($db->getPdo(), $chatService),
+    $permissionResolver,
+    new \Whity\Core\Chat\ChatBots($db->getPdo()),
+    new \Whity\Core\Chat\ChatBlocking($db->getPdo()),
+    // UC.5 (WHIT-1106): booking times, forms and payment links in customer chats.
+    new \Whity\Core\Chat\CustomerBlocks(
+        $db->getPdo(),
+        $publicFormLink,
+        $frontendUrls->base(),
+        static fn (int $tenantId): array => $settingsService->effective($tenantId),
+    ),
+    $messagingService,
+);
+$router->register('GET',    '/api/chat/inbox',                                  [$chatHandler, 'inbox'],         null);
+$router->register('POST',   '/api/chat/inbox/{id:\d+}/pin',                     [$chatHandler, 'pin'],           null);
+$router->register('POST',   '/api/chat/inbox/{id:\d+}/read',                    [$chatHandler, 'readCustomer'],  null);
+// Mute, blocking and bots (UC.4, UC.8, UC.12; WHIT-1097). Blocking and bots
+// need messages.manage, checked in the handler like the rest of Chat.
+$router->register('GET',    '/api/chat/inbox/{id:\d+}/block-options',           [$chatHandler, 'customerBlockOptions'], null);
+$router->register('POST',   '/api/chat/inbox/{id:\d+}/send-block',              [$chatHandler, 'sendCustomerBlock'],    null);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/forward',              [$chatHandler, 'forward'],       null);
+$router->register('POST',   '/api/chat/inbox/{id:\d+}/mute',                    [$chatHandler, 'mute'],          null);
+$router->register('GET',    '/api/chat/inbox/{id:\d+}/block',                   [$chatHandler, 'blockStatus'],   null);
+$router->register('POST',   '/api/chat/inbox/{id:\d+}/block',                   [$chatHandler, 'block'],         null);
+$router->register('GET',    '/api/chat/blocked',                                [$chatHandler, 'blocked'],       null);
+$router->register('DELETE', '/api/chat/blocked/{id:\d+}',                       [$chatHandler, 'unblock'],       null);
+$router->register('GET',    '/api/chat/bots',                                   [$chatHandler, 'bots'],          null);
+$router->register('PUT',    '/api/chat/bots/{kind:[a-z]+}',                     [$chatHandler, 'bots'],          null);
+$router->register('GET',    '/api/chat/chats',                                  [$chatHandler, 'list'],          null);
+$router->register('POST',   '/api/chat/chats',                                  [$chatHandler, 'create'],        null);
+// Merge map C2: "Discuss in chat" opens the record's one chat, or starts it.
+$router->register('POST',   '/api/chat/chats/discuss',                          [$chatHandler, 'discuss'],       null);
+$router->register('GET',    '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'show'],          null);
+$router->register('PATCH',  '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'update'],        null);
+$router->register('GET',    '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'messages'],      null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/messages',                [$chatHandler, 'post'],          null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/proposals',               [$chatHandler, 'shareProposal'], null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/read',                    [$chatHandler, 'markRead'],      null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/focus',                   [$chatHandler, 'focus'],         null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/members',                 [$chatHandler, 'addMember'],     null);
+$router->register('DELETE', '/api/chat/chats/{id:\d+}/members/{member:\d+}',    [$chatHandler, 'removeMember'],  null);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/approve',              [$chatHandler, 'approve'],       null);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/decline',              [$chatHandler, 'decline'],       null);
+// The parts of a message (UC.6-UC.12, WHIT-1094): replies, threads, reactions,
+// pins, edit and delete your own, search, seen and typing. Ungated like the
+// rest of Chat: membership is the check, in ChatService.
+$router->register('PATCH',  '/api/chat/messages/{id:\d+}',                      [$chatHandler, 'edit'],          null);
+$router->register('DELETE', '/api/chat/messages/{id:\d+}',                      [$chatHandler, 'deleteMessage'], null);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/reactions',            [$chatHandler, 'react'],         null);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/pin',                  [$chatHandler, 'pinMessage'],    null);
+$router->register('GET',    '/api/chat/messages/{id:\d+}/thread',               [$chatHandler, 'thread'],        null);
+$router->register('GET',    '/api/chat/chats/{id:\d+}/search',                  [$chatHandler, 'search'],        null);
+$router->register('GET',    '/api/chat/chats/{id:\d+}/state',                   [$chatHandler, 'state'],         null);
+$router->register('POST',   '/api/chat/chats/{id:\d+}/typing',                  [$chatHandler, 'typing'],        null);
+// Blocks inside messages (UC.5, WHIT-1096): polls and Whity records.
+$router->register('POST',   '/api/chat/messages/{id:\d+}/vote',                 [$chatHandler, 'vote'],          null);
+$router->register('GET',    '/api/chat/records',                                [$chatHandler, 'records'],       null);
+// Files, photos and voice (UC.10, WHIT-1095): upload to a chat, then send.
+$router->register('POST',   '/api/chat/chats/{id:\d+}/attachments',             [$chatHandler, 'upload'],        null);
+$router->register('GET',    '/api/chat/chats/{id:\d+}/media',                   [$chatHandler, 'media'],         null);
+$router->register('GET',    '/api/chat/attachments/{id:\d+}',                   [$chatHandler, 'file'],          null);
+$router->register('PATCH',  '/api/chat/attachments/{id:\d+}',                   [$chatHandler, 'transcribe'],    null);
+$router->register('GET',    '/api/chat/preferences',                            [$chatHandler, 'preferences'],   null);
+$router->register('PUT',    '/api/chat/preferences',                            [$chatHandler, 'preferences'],   null);
+$router->register('GET',    '/api/chat/directory',                              [$chatHandler, 'directory'],     null);
+
+$meMessagesHandler = new \Whity\Api\MeMessagesApiHandler($messagingService);
+$router->register('GET',  '/api/me/messages',            [$meMessagesHandler, 'list'],  null);
+$router->register('POST', '/api/me/messages',            [$meMessagesHandler, 'start'], null);
+$router->register('GET',  '/api/me/messages/{id:\d+}',   [$meMessagesHandler, 'show'],  null);
+$router->register('POST', '/api/me/messages/{id:\d+}',   [$meMessagesHandler, 'send'],  null);
+// Public: web chat for visitors, and the providers' inbound webhook. Both find the
+// workspace from its slug; each path is listed in EnforceTenantIsolation one by one.
+$publicChatHandler = new \Whity\Api\PublicChatApiHandler(
+    $db->getPdo(),
+    $messagingService,
+    $messagingSettings,
+    $brandingHostRepo,
+    $hostResolver,
+    $publicFormBotCheck,
+    new DatabaseSharedStore($db->getPdo()),
+    hash('sha256', 'whity.webchat.ip|' . $jwtSecret),
+    $brandingService,
+);
+$router->register('GET',  '/api/public/chat/{workspace}',               [$publicChatHandler, 'info'],  null);
+$router->register('POST', '/api/public/chat/{workspace}/conversations', [$publicChatHandler, 'start'], null);
+$router->register('POST', '/api/public/chat/{workspace}/messages',      [$publicChatHandler, 'send'],  null);
+$router->register('GET',  '/api/public/chat/{workspace}/messages',      [$publicChatHandler, 'poll'],  null);
+$inboundMessagesHandler = new \Whity\Api\InboundMessagesApiHandler(
+    $messagingService,
+    $brandingHostRepo,
+    new DatabaseSharedStore($db->getPdo()),
+);
+$router->register('POST', '/api/public/messages/inbound/{channel}/{workspace}', [$inboundMessagesHandler, 'receive'], null);
+// The website (WS.5, section 29): the plans whity.dev shows and its contact form.
+// CORS for both is WebsiteCors's, set where the request starts below.
+$publicPlansHandler = new \Whity\Api\PublicPlansApiHandler(
+    new \Whity\Core\Plan\WebsitePlans($db->getPdo()),
+    $globalSettingsRepository,
+    (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+);
+$router->register('GET', '/api/public/plans', [$publicPlansHandler, 'index'], null);
+$publicContactHandler = new \Whity\Api\PublicContactApiHandler(
+    $messagingService,
+    $brandingHostRepo,
+    $globalSettingsRepository,
+    new DatabaseSharedStore($db->getPdo()),
+);
+$router->register('POST', '/api/public/contact', [$publicContactHandler, 'send'], null);
+
+$workspaceSignupHandler =new \Whity\Api\WorkspaceSignupApiHandler(
     $db->getPdo(),
     $roleChecker,
     $signupSettings,
@@ -5186,13 +5974,35 @@ $workspaceSignupHandler = new \Whity\Api\WorkspaceSignupApiHandler(
     $customerSignupService,
     $auditLogger,
     $publicFormBotCheck,
-    $joinProviders
+    $joinProviders,
+    new \Whity\Core\Signup\JoinDecisionMailer($brandedEmailSender, $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::SSO_LOGIN)),
+    $customerSignupRoutes,
+    $documentRouter,
 );
 $router->register('GET',  '/api/signup/settings',                   [$workspaceSignupHandler, 'getSettings'],    null, null, CorePermissions::SIGNUP_MANAGE);
 $router->register('PUT',  '/api/signup/settings',                   [$workspaceSignupHandler, 'updateSettings'], null, null, CorePermissions::SIGNUP_MANAGE);
 $router->register('GET',  '/api/signup/requests',                   [$workspaceSignupHandler, 'listRequests'],   null, null, CorePermissions::SIGNUP_MANAGE);
 $router->register('POST', '/api/signup/requests/{id:\d+}/approve',  [$workspaceSignupHandler, 'approve'],        null, null, CorePermissions::SIGNUP_MANAGE);
 $router->register('POST', '/api/signup/requests/{id:\d+}/reject',   [$workspaceSignupHandler, 'reject'],         null, null, CorePermissions::SIGNUP_MANAGE);
+// #1872 (WHIT-996): customers invite their own team, when Settings > Sign-up
+// allows it. No permission: the handler admits only a person who is ONLY a
+// customer here, invites into their own role as a customer, and is
+// rate-limited. Plugins may refuse or annotate (membership.customer_inviting).
+$teamInvitationsHandler = new \Whity\Api\TeamInvitationsApiHandler(
+    $db->getPdo(),
+    $invitationService,
+    $roleChecker,
+    $signupSettings,
+    $customerSafeRoles,
+    $auditLogger,
+    new DatabaseSharedStore($db->getPdo()),
+    $settingsService,
+    $hookManager,
+    $invitationMailer
+);
+$router->register('GET',    '/api/team-invitations',          [$teamInvitationsHandler, 'list'],   null);
+$router->register('POST',   '/api/team-invitations',          [$teamInvitationsHandler, 'create'], null);
+$router->register('DELETE', '/api/team-invitations/{id:\d+}', [$teamInvitationsHandler, 'revoke'], null);
 
 // 13c-ter. UI display preferences (#1068) — public GET /api/v1/ui/preferences.
 // Registered here rather than beside the settings routes because it resolves
@@ -5289,7 +6099,8 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     ),
     $settingsService,
     (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
-    // Off unless the operator sets auth.sso_self_provision_workspace.
+    // Where a sign-in with no workspace lands (WHIT-994): the create step only
+    // when the operator sets auth.sso_self_provision_workspace.
     new \Whity\Core\Tenant\FederatedWorkspaceProvisioner($db->getPdo(), $settingsService, $hookManager),
     // Announces each verified federated sign-in (auth.federated.signed_in).
     $hookManager,
@@ -5308,6 +6119,19 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
 $router->register('GET', '/api/auth/sso/providers',                      [$ssoAuthHandler, 'providers'], null);
 $router->register('GET', '/api/auth/sso/{provider:[a-z0-9_]+}/start',    [$ssoAuthHandler, 'start'],    null);
 $router->register('GET', '/api/auth/sso/{provider:[a-z0-9_]+}/callback', [$ssoAuthHandler, 'callback'], null);
+// WHIT-994: after a sign-in that found no workspace. Public like select-tenant:
+// the caller holds only the short-lived workspace_setup cookie the callback
+// set (no session). The POST creates their workspace only when every gate in
+// FederatedWorkspaceProvisioner still holds, then signs them into it.
+$ssoWorkspaceSetupHandler = new \Whity\Api\SsoWorkspaceSetupHandler(
+    $jwtParser,
+    new \Whity\Core\Identity\IdentityProviderRepository($db->getPdo()),
+    new \Whity\Core\Tenant\FederatedWorkspaceProvisioner($db->getPdo(), $settingsService, $hookManager),
+    $authHandler,
+    $settingsService,
+);
+$router->register('GET', '/api/auth/sso/workspace', [$ssoWorkspaceSetupHandler, 'show'], null);
+$router->register('POST', '/api/auth/sso/workspace', [$ssoWorkspaceSetupHandler, 'create'], null);
 
 // 13g. Authenticated "connected accounts" management (WC-f3b17bd2): the caller
 // lists / unlinks their own federated identities. Self-authenticating via the
@@ -5382,6 +6206,7 @@ $mcpTokenHandler = new McpTokenHandler(
 );
 $router->register('POST',   '/api/mcp/tokens',       [$mcpTokenHandler, 'create']);
 $router->register('GET',    '/api/mcp/tokens',       [$mcpTokenHandler, 'list']);
+$router->register('GET',    '/api/mcp/tokens/starting-grant', [$mcpTokenHandler, 'startingGrant']);
 $router->register('DELETE', '/api/mcp/tokens/{jti}', [$mcpTokenHandler, 'revoke']);
 $router->register('GET',    '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'grant']);
 $router->register('PATCH',  '/api/mcp/tokens/{jti}/grant', [$mcpTokenHandler, 'updateGrant']);
@@ -5432,7 +6257,10 @@ CorePrompts::register($promptRegistry);
 // Collected from the grants as they stand at boot and on every reload, and asked
 // again on every call, so a revoke applies at once.
 $agentContextGrants = new \Whity\Core\Plugin\Trust\AgentContextGrants($db->getPdo(), new \Whity\Core\Plugin\Trust\CodePluginVerification($db->getPdo(), $storeMarks), $auditLogger);
-$agentContextGranted = static fn (string $plugin): bool => $agentContextGrants->isGranted($plugin);
+// Asked on every call: granted agent context by the operator, and on for the
+// caller's workspace (WHIT-1123).
+$agentContextGranted = static fn (string $plugin): bool => $agentContextGrants->isGranted($plugin)
+    && !$pluginLoader->isPluginOffForWorkspace($plugin);
 $agentContextGrantedNow = static function () use ($agentContextGrants): \Closure {
     $names = array_flip($agentContextGrants->granted());
 
@@ -5475,6 +6303,43 @@ $mcpListChangedNotifier = new ListChangedNotifier(
 // ONE registry — a second instance would answer tools/list from a different set
 // than tools/call dispatches from.
 $authoredMcpTools = new AuthoredToolRegistry();
+// A10 (WHIT-962): tasks and boards live in the workspace's Taskaat (T.3). The
+// connection per workspace, the routes that make it, and Taskaat's tools in the
+// workspace MCP, registered ahead of the plugins' tools and again on every refresh.
+$taskaatConnection = new \Whity\Core\Taskaat\TaskaatConnection(
+    new \Whity\Core\Settings\TenantSettingsRepository($db->getPdo()),
+    $secretStore,
+    \Whity\Core\Taskaat\TaskaatConnection::originFromEnv(),
+    $frontendUrls->link(\Whity\Core\Http\FrontendUrls::TASKAAT_CONNECT),
+    'Whity (' . ((string) parse_url($frontendUrls->base(), PHP_URL_HOST) ?: 'installation') . ')',
+    static fn (string $url, array $headers = []): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->getJson($url, $headers),
+    static fn (string $url, array $params): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postForm($url, $params),
+    static fn (string $url, array $payload): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 10))->postJson($url, $payload),
+);
+$taskaatClient = new \Whity\Core\Taskaat\TaskaatClient(
+    $taskaatConnection,
+    static fn (string $url, array $payload, array $headers): ?array => (new \Whity\Core\Http\HttpFetcher(timeoutSeconds: 30, maxBytes: 4194304))->postJson($url, $payload, $headers),
+);
+$taskaatTools = new \Whity\Core\Taskaat\TaskaatTools($taskaatClient);
+$taskaatHandler = new \Whity\Api\TaskaatApiHandler($taskaatConnection, $auditLogger);
+$router->register('GET',    '/api/taskaat/connection',       [$taskaatHandler, 'status'],     null, null, CorePermissions::TASKS_READ);
+$router->register('POST',   '/api/taskaat/connect',          [$taskaatHandler, 'connect'],    null, null, CorePermissions::TASKS_MANAGE);
+$router->register('POST',   '/api/taskaat/connect/complete', [$taskaatHandler, 'complete'],   null, null, CorePermissions::TASKS_MANAGE);
+$router->register('DELETE', '/api/taskaat/connection',       [$taskaatHandler, 'disconnect'], null, null, CorePermissions::TASKS_MANAGE);
+// Tasks and Boards read and written through Taskaat's record tools (TplTasks, TplBoard).
+// ADR 0018: tasks due show on the calendar, read from Taskaat when asked for.
+$calendarHandler->setTaskDueDates(new \Whity\Core\Taskaat\TaskDueDates($taskaatClient, $logger));
+$tasksHandler = new \Whity\Api\TasksApiHandler(
+    $taskaatClient,
+    new \Whity\Core\Taskaat\TaskPeople($db->getPdo(), new \Whity\Core\Agent\AgentRepository($db->getPdo())),
+);
+$router->register('GET',   '/api/tasks/boards',         [$tasksHandler, 'boards'], null, null, CorePermissions::TASKS_READ);
+$router->register('GET',   '/api/tasks/boards/{board}', [$tasksHandler, 'board'],  null, null, CorePermissions::TASKS_READ);
+$router->register('GET',   '/api/tasks',                [$tasksHandler, 'list'],   null, null, CorePermissions::TASKS_READ);
+$router->register('POST',  '/api/tasks',                [$tasksHandler, 'create'], null, null, CorePermissions::TASKS_WRITE);
+$router->register('GET',   '/api/tasks/{task}',         [$tasksHandler, 'show'],   null, null, CorePermissions::TASKS_READ);
+$router->register('PATCH', '/api/tasks/{task}',         [$tasksHandler, 'update'], null, null, CorePermissions::TASKS_WRITE);
+$router->register('POST',  '/api/tasks/{task}/review',  [$tasksHandler, 'review'], null, null, CorePermissions::TASKS_WRITE);
 // WHIT-754: the plugin MCP tools a workspace turned on as always-on.
 $mcpEnabledPluginAlwaysOn = static function (int $tenantId) use ($settingsService): array {
     $raw = (string) ($settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::MCP_ALWAYS_ON_PLUGIN_TOOLS] ?? '');
@@ -5507,6 +6372,7 @@ $mcpToolCatalogue = static function () use ($toolDeriver, $authoredMcpTools): ar
 $mcpToolsAdminHandler = new McpToolsAdminHandler($toolDeriver, $roleChecker, $authoredMcpTools, $mcpEnabledPluginAlwaysOn);
 $router->register('GET', '/api/admin/mcp/tools', [$mcpToolsAdminHandler, 'list'], null, null, CorePermissions::MCP_TOKENS_MANAGE);
 $mcpToolsListHandler = new ToolsListHandler($toolDeriver, $roleChecker, $tokenValidator, $authoredMcpTools);
+$mcpToolsListHandler->setWorkspaceGate($pluginLoader);
 $mcpServerEnabled = (bool) filter_var($_ENV['MCP_ENABLED'] ?? 'false', FILTER_VALIDATE_BOOLEAN);
 // WHIT-784: an agent's Ask-first call is stored for its person to approve.
 $agentProposals = new \Whity\Core\Agent\AgentProposalRepository(
@@ -5514,6 +6380,18 @@ $agentProposals = new \Whity\Core\Agent\AgentProposalRepository(
     // WHIT-991: created, decided and undone, for plugins.
     new \Whity\Core\Agent\AgentProposalEvents($hookManager),
 );
+// A12 / EM.1 `needs-approval`: the person an agent acts for hears by email that
+// something waits for them (only opens the app; one an hour per agent; the
+// agent's page and Preferences turn it off).
+(new \Whity\Core\Notification\AgentEmailNotifier(
+    $db->getPdo(),
+    $agentProposals,
+    $profileEmailRepository,
+    new DatabaseSharedStore($db->getPdo()),
+    $brandedEmailSender,
+    $frontendUrls->base() . '/admin/approvals',
+    $logger,
+))->subscribe($hookManager);
 // WHIT-833: previews of what a proposed call would change. Register one with
 // $proposalDiffs->register('<tool name>', fn (array $arguments, int $tenantId): ?array => ...).
 $proposalDiffs = new \Whity\Mcp\Tools\ProposalDiffRegistry();
@@ -5531,16 +6409,19 @@ $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnl
 ))->registerOn($proposalDiffs);
 // WHIT-812: what an agent did that its person can still undo.
 $agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService));
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters);
+$mcpToolsCallHandler->setWorkspaceGate($pluginLoader);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
 // an agent must not be able to approve its own proposal.
 // WHIT-816: a workspace agent's proposal runs under the person's assignment as it is now.
 $agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo(), $mcpConnectionEvents);
-$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue);
+$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue, $gatedApproval);
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
+$router->register('POST', '/api/me/agent-proposals/{id:\d+}/identity-check', [$agentProposalsHandler, 'identityCheck'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/decline',  [$agentProposalsHandler, 'decline'], null);
+$router->register('POST', '/api/me/agent-proposals/bulk-approve',        [$agentProposalsHandler, 'bulkApprove'], null);
 // WHIT-872 (H.2): every inbox source and the caller's proposals in one list, oldest
 // first. Session-gated and self-scoped like the two surfaces it reads.
 $meWaitingHandler = new \Whity\Api\MeWaitingApiHandler($inboxSourceRegistry, $agentProposals, $agentAssignments);
@@ -5858,6 +6739,18 @@ $router->register('POST', '/api/mcp/connect/preview', [$mcpConnectHandler, 'prev
 $pluginLoader->setAgentPresetRegistry($agentPresetRegistry);
 // A plugin's billing portal goes into its slot (SDK 1.77, WHIT-1010).
 $pluginLoader->setBillingPortals($pluginBillingPortals);
+// Plugins' inbox sources and message channels (SDK 1.97, #881, ADR 0016). The
+// channel registry is built with Messages above, holding core's email and web chat.
+$pluginLoader->setInboxSources($inboxSourceRegistry);
+$pluginLoader->setMessageChannels($messageChannelRegistry);
+// A plugin's booking payment step and calendar busy times (SDK 1.98, ADR 0017).
+$pluginLoader->setCalendarPlugins($calendarPlugins);
+// WHIT-1123: what plugins add to these registries disappears in a workspace
+// that has the plugin off.
+$agentPresetRegistry->setWorkspaceGate($pluginLoader);
+$calendarPlugins->setWorkspaceGate($pluginLoader);
+$inboxSourceRegistry->setWorkspaceGate($pluginLoader);
+$messageChannelRegistry->setWorkspaceGate($pluginLoader);
 // WHIT-1011: plugin SERVICE routes accept a client-credentials token from the
 // trusted issuer (SERVICE_TOKEN_ISSUER, else MCP_OAUTH_ISSUER) for a client on
 // SERVICE_TOKEN_CLIENTS. Off, so no service route opens, until both are set.
@@ -5877,13 +6770,16 @@ $hostLicenceSales = new \Whity\Core\Billing\HostLicenceSales($logger);
 \Whity\register_service(\Whity\Sdk\Billing\LicenceSales::class, $hostLicenceSales);
 $pluginLoader->setLicenceSales($hostLicenceSales);
 // Code plugins' template slots and record types as merge fields (SDK 1.56, WHIT-742).
-$pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry);
+$pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry, $documentBlockRegistry);
 $pluginLoader->load();
 $pluginLoader->collectMcpPrompts($promptRegistry, $agentContextGrantedNow());
 $pluginLoader->collectMcpResources($pluginResources, $agentContextGrantedNow());
 // SDK 1.43. Collect FIRST, then hand the deriver the suppressions: a plugin
 // that authors its own tools may ask for its routes not to be derived, and the
 // deriver has to know that before anything asks it for a tool list.
+foreach ($taskaatTools->register($authoredMcpTools) as $taskaatRefused) {
+    error_log('[Taskaat] tool refused: ' . $taskaatRefused);
+}
 $pluginLoader->collectMcpTools($authoredMcpTools);
 $toolDeriver->suppressNamespaces($authoredMcpTools->suppressedPlugins());
 
@@ -5906,7 +6802,8 @@ $refreshMcpCatalog = static function (string $trigger) use (
     $authoredMcpTools,
     $toolDeriver,
     $pluginResources,
-    $agentContextGrantedNow
+    $agentContextGrantedNow,
+    $taskaatTools
 ): void {
     ToolDeriver::clearCache();
     $promptRegistry->reset();
@@ -5921,6 +6818,7 @@ $refreshMcpCatalog = static function (string $trigger) use (
     // included — a suppression from a plugin that is no longer active must stop
     // hiding derived tools.
     $authoredMcpTools->reset();
+    $taskaatTools->register($authoredMcpTools);
     $pluginLoader->collectMcpTools($authoredMcpTools);
     $toolDeriver->suppressNamespaces($authoredMcpTools->suppressedPlugins());
     // Last: the signature must be computed from the refreshed catalogue, not the
@@ -5938,7 +6836,7 @@ $pluginLoader->collectJobs($jobsRegistry);
 // Descriptor-derived navigation (WC-169): every validated plugin frontend
 // feature gets a menu entry pointing at the dynamic screen route /admin/x/{id}.
 // Features are read at dispatch time, so runtime disable drops the entry.
-\Whity\Core\PluginNavigationBridge::subscribe($hookManager, $pluginLoader);
+\Whity\Core\PluginNavigationBridge::subscribe($hookManager, $pluginLoader, static fn (): string => $languageRegistry->getCurrentLanguageCode());
 \Whity\Core\Plugin\Tenant\TenantPluginNavigation::subscribe($hookManager, $tenantManifestHost);
 
 // Handle requests (persistent worker mode or fallback single-request mode)
@@ -5964,7 +6862,7 @@ if ($isWorker) {
         // are gated behind development/DEBUG. Decision is computed once per
         // iteration and captured by the request closure below.
         $logLifecycle = WorkerRuntime::shouldLogLifecycle($_ENV);
-        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost, $documentFieldRegistry, $publicFormGate) {
+        $keepRunning = \frankenphp_handle_request(static function () use ($kernel, $hookManager, $pluginLoader, $db, $logLifecycle, $securityHeaders, $errorTracker, $tenantManifestHost, $documentFieldRegistry, $publicFormGate, $codePluginActivation) {
             try {
                 // Dispatch request start hook
                 if ($logLifecycle) {
@@ -5990,7 +6888,15 @@ if ($isWorker) {
 
                 // Resolve CORS headers once per request from the allowlist (WC-53).
                 // A plugin's public form sets its own (WHIT-906): they never allow credentials.
-                $corsHeaders = $publicFormGate->ownsCors($request) ? [] : Cors::headers($request->getHeader('Origin'));
+                $corsHeaders = \Whity\Http\WebsiteCors::owns($request)
+                    ? \Whity\Http\WebsiteCors::headers($request->getHeader('Origin'))
+                    : ($publicFormGate->ownsCors($request) ? [] : Cors::headers($request->getHeader('Origin')));
+
+                $websitePreflight = \Whity\Http\WebsiteCors::preflight($request);
+                if ($websitePreflight !== null) {
+                    $websitePreflight->withHeaders($securityHeaders)->send();
+                    return;
+                }
 
                 $publicFormPreflight = $publicFormGate->preflight($request);
                 if ($publicFormPreflight !== null) {
@@ -6022,6 +6928,9 @@ if ($isWorker) {
 
                 // Send response to client
                 $response->send();
+                // #1872: work deferred until the client has its answer (a customer
+                // team invitation's email). A no-op when nothing was deferred.
+                \Whity\Core\Http\AfterResponse::run();
             } catch (\Throwable $e) {
                 // Handle any uncaught exceptions
                 try {
@@ -6069,8 +6978,11 @@ if ($isWorker) {
                 // stay live. Scope the cache to the request instead; it still
                 // de-duplicates the repeated resolutions within a single one.
                 RoleChecker::clearCache();
+                // Nothing deferred by a request that failed may leak into the next.
+                \Whity\Core\Http\AfterResponse::reset();
                 // WHIT-760: the workspace-plugin reads are per request too.
                 $tenantManifestHost->resetRequest();
+                $codePluginActivation->resetRequest();
                 // WHIT-742: and the workspace record types the field registry read from them.
                 $documentFieldRegistry->resetRequest();
                 // DB session hygiene (WC-21/PR #84): after the response is sent,
@@ -6131,7 +7043,15 @@ if ($isWorker) {
 
         // Resolve CORS headers once per request from the allowlist (WC-53).
         // A plugin's public form sets its own (WHIT-906): they never allow credentials.
-        $corsHeaders = $publicFormGate->ownsCors($request) ? [] : Cors::headers($request->getHeader('Origin'));
+        $corsHeaders = \Whity\Http\WebsiteCors::owns($request)
+            ? \Whity\Http\WebsiteCors::headers($request->getHeader('Origin'))
+            : ($publicFormGate->ownsCors($request) ? [] : Cors::headers($request->getHeader('Origin')));
+
+        $websitePreflight = \Whity\Http\WebsiteCors::preflight($request);
+        if ($websitePreflight !== null) {
+            $websitePreflight->withHeaders($securityHeaders)->send();
+            exit;
+        }
 
         $publicFormPreflight = $publicFormGate->preflight($request);
         if ($publicFormPreflight !== null) {
@@ -6163,6 +7083,7 @@ if ($isWorker) {
 
         // Send response to client
         $response->send();
+        \Whity\Core\Http\AfterResponse::run();
     } catch (\Throwable $e) {
         // Handle any uncaught exceptions
         try {
@@ -6197,7 +7118,9 @@ if ($isWorker) {
         // Same reasoning as the worker loop above: the effective-permission
         // cache must not outlive the request that filled it.
         RoleChecker::clearCache();
+        \Whity\Core\Http\AfterResponse::reset();
         $tenantManifestHost->resetRequest();
+        $codePluginActivation->resetRequest();
         $documentFieldRegistry->resetRequest();
     }
 }

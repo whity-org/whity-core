@@ -8,6 +8,8 @@ use Whity\Core\Document\Theme\DocumentThemeRef;
 use Whity\Core\Document\Theme\DocumentThemeRepository;
 use Whity\Core\Document\Theme\DocumentThemeResolver;
 use Whity\Core\Document\Theme\DocumentThemeTokens;
+use Whity\Core\Entitlement\EntitlementRegistry;
+use Whity\Core\Entitlement\EntitlementService;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Settings\SettingsRegistry;
@@ -37,6 +39,7 @@ final class DocumentThemesApiHandler
         private readonly DocumentThemeRepository $themes,
         private readonly DocumentThemeResolver $resolver,
         private readonly SettingsService $settings,
+        private readonly ?EntitlementService $entitlements = null,
     ) {
     }
 
@@ -69,15 +72,23 @@ final class DocumentThemesApiHandler
         return Response::json(['data' => $out, 'meta' => ['total' => count($out)]]);
     }
 
-    /** GET /api/document-themes/schema */
+    /**
+     * GET /api/document-themes/schema. `form.allowed` says whether this
+     * workspace may customise its form printouts (`documents.form_printouts`,
+     * FP.2), so the Form printouts tab can show its options locked on a free
+     * plan; the gate itself is applied when a printout is made.
+     */
     public function schema(Request $request): Response
     {
         $ctx = $this->context($request);
         if ($ctx instanceof Response) {
             return $ctx;
         }
+        [$tenantId] = $ctx;
+        $schema = DocumentThemeTokens::schema();
+        $schema['form']['allowed'] = $this->entitlements?->isGranted($tenantId, EntitlementRegistry::DOCUMENTS_FORM_PRINTOUTS) ?? true;
 
-        return Response::json(['data' => DocumentThemeTokens::schema()]);
+        return Response::json(['data' => $schema]);
     }
 
     /** @param array<string, string> $params */

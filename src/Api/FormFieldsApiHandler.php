@@ -10,7 +10,8 @@ use Whity\Core\Form\FormFieldRepository;
 use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormStatus;
-use Whity\Core\Form\LocalizedLabel;
+use Whity\Core\i18n\LocalizedText;
+use Whity\Core\i18n\LocalizedTextRejected;
 use Whity\Core\Form\PrefillSource;
 use Whity\Core\Form\SubmissionValidator;
 use Whity\Core\Request;
@@ -176,7 +177,7 @@ final class FormFieldsApiHandler
                 );
             }
 
-            $label = LocalizedLabel::fromInput($body['label'] ?? null, 'label');
+            $label = LocalizedText::label($body['label'] ?? null, 'label');
 
             $options = self::options($body, $fieldType);
             if ($options instanceof Response) {
@@ -193,20 +194,20 @@ final class FormFieldsApiHandler
                 return $prefill;
             }
 
-            $helpText = LocalizedLabel::optionalForStorage($body['help_text'] ?? null, 'help_text', InputLimits::TEXT_MAX);
+            $helpText = LocalizedText::optionalLabel($body['help_text'] ?? null, 'help_text', InputLimits::TEXT_MAX);
             $sectionKey = self::optionalName($body, 'section_key');
             if ($sectionKey instanceof Response) {
                 return $sectionKey;
             }
 
             $visibleWhen = FieldCondition::parse($body['visible_when'] ?? null);
-            $audience = self::audience($body);
-            if ($audience instanceof Response) {
-                return $audience;
+            $staff = self::refuseStaff($body);
+            if ($staff !== null) {
+                return $staff;
             }
             FieldCondition::assertAuthorable([
                 ...$this->fields->listForForm($tenantId, (int) $form['id']),
-                ['field_key' => $fieldKey, 'field_type' => $fieldType, 'visible_when' => $visibleWhen, 'audience' => $audience],
+                ['field_key' => $fieldKey, 'field_type' => $fieldType, 'visible_when' => $visibleWhen],
             ]);
 
             $id = $this->fields->create(
@@ -223,13 +224,12 @@ final class FormFieldsApiHandler
                 $sectionKey,
                 self::intField($body, 'position'),
                 $visibleWhen,
-                $audience,
             );
 
             return Response::json([
                 'data' => $this->fields->find($tenantId, (int) $form['id'], $id),
             ], 201);
-        } catch (FormRejectedException $e) {
+        } catch (FormRejectedException | LocalizedTextRejected $e) {
             // ->clientMessage, never ->getMessage() (WC-186).
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
@@ -311,7 +311,7 @@ final class FormFieldsApiHandler
                     );
                 }
 
-                $label = LocalizedLabel::fromInput($entry['label'] ?? null, "fields[{$index}].label");
+                $label = LocalizedText::label($entry['label'] ?? null, "fields[{$index}].label");
 
                 $options = self::options($entry, $fieldType);
                 if ($options instanceof Response) {
@@ -325,7 +325,7 @@ final class FormFieldsApiHandler
                 if ($prefill instanceof Response) {
                     return $prefill;
                 }
-                $helpText = LocalizedLabel::optionalForStorage(
+                $helpText = LocalizedText::optionalLabel(
                     $entry['help_text'] ?? null,
                     "fields[{$index}].help_text",
                     InputLimits::TEXT_MAX,
@@ -335,9 +335,9 @@ final class FormFieldsApiHandler
                 if ($sectionKey instanceof Response) {
                     return $sectionKey;
                 }
-                $audience = self::audience($entry);
-                if ($audience instanceof Response) {
-                    return $audience;
+                $staff = self::refuseStaff($entry);
+                if ($staff !== null) {
+                    return $staff;
                 }
 
                 $normalised[] = [
@@ -351,7 +351,6 @@ final class FormFieldsApiHandler
                     'prefill_source' => $prefill,
                     'section_key' => $sectionKey,
                     'visible_when' => FieldCondition::parse($entry['visible_when'] ?? null),
-                    'audience' => $audience,
                 ];
             }
 
@@ -360,7 +359,7 @@ final class FormFieldsApiHandler
             return Response::json([
                 'data' => $this->fields->replaceAll($tenantId, (int) $form['id'], $normalised),
             ]);
-        } catch (FormRejectedException $e) {
+        } catch (FormRejectedException | LocalizedTextRejected $e) {
             // ->clientMessage, never ->getMessage() (WC-186).
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
@@ -426,7 +425,7 @@ final class FormFieldsApiHandler
             }
 
             if (array_key_exists('label', $body)) {
-                $changes['label'] = LocalizedLabel::fromInput($body['label'], 'label');
+                $changes['label'] = LocalizedText::label($body['label'], 'label');
             }
             if (array_key_exists('is_required', $body)) {
                 $changes['is_required'] = $body['is_required'] === true;
@@ -434,7 +433,7 @@ final class FormFieldsApiHandler
             if (array_key_exists('help_text', $body)) {
                 /** @var array<string, string> $existingHelpText */
                 $existingHelpText = is_array($field['help_text_i18n']) ? $field['help_text_i18n'] : [];
-                $changes['help_text'] = LocalizedLabel::optionalForStorage(
+                $changes['help_text'] = LocalizedText::optionalLabel(
                     $body['help_text'],
                     'help_text',
                     InputLimits::TEXT_MAX,
@@ -492,19 +491,15 @@ final class FormFieldsApiHandler
             if (array_key_exists('visible_when', $body)) {
                 $changes['visible_when'] = FieldCondition::parse($body['visible_when']);
             }
-            if (array_key_exists('audience', $body)) {
-                $audience = self::audience($body);
-                if ($audience instanceof Response) {
-                    return $audience;
-                }
-                $changes['audience'] = $audience;
+            $staff = self::refuseStaff($body);
+            if ($staff !== null) {
+                return $staff;
             }
-            // Asked of the set as it would be, because a change of TYPE or AUDIENCE
-            // can break another question's rule as surely as a change of rule can.
+            // Asked of the set as it would be, because a change of TYPE can break
+            // another question's rule as surely as a change of rule can.
             if (
                 array_key_exists('visible_when', $changes)
                 || array_key_exists('field_type', $changes)
-                || array_key_exists('audience', $changes)
             ) {
                 $after = [];
                 foreach ($this->fields->listForForm($tenantId, $formId) as $row) {
@@ -520,7 +515,7 @@ final class FormFieldsApiHandler
             $this->fields->update($tenantId, $formId, $fieldId, $changes);
 
             return Response::json(['data' => $this->fields->find($tenantId, $formId, $fieldId)]);
-        } catch (FormRejectedException $e) {
+        } catch (FormRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[FormFieldsApiHandler] update failed: ' . $e->getMessage());
@@ -668,7 +663,7 @@ final class FormFieldsApiHandler
             $columns[] = [
                 'key' => $key,
                 'type' => $type,
-                'label' => LocalizedLabel::fromInput($column['label'] ?? null, "validation.columns[{$index}].label"),
+                'label' => LocalizedText::label($column['label'] ?? null, "validation.columns[{$index}].label"),
                 'required' => ($column['required'] ?? false) === true,
                 'options' => $options,
             ];
@@ -694,14 +689,20 @@ final class FormFieldsApiHandler
     /**
      * @param array<string, mixed> $body
      */
-    private static function audience(array $body): string|Response
+    private static function refuseStaff(array $body): ?Response
     {
-        $audience = $body['audience'] ?? FormFieldRepository::AUDIENCE_APPLICANT;
-        if ($audience !== FormFieldRepository::AUDIENCE_APPLICANT && $audience !== FormFieldRepository::AUDIENCE_STAFF) {
-            return Response::error("audience must be 'applicant' or 'staff'", 422);
+        // Merge map A3: every question on a form is the applicant's. What the
+        // office records (a supervisor, a meeting number) is asked at a route
+        // step instead, so it is decided and recorded where the review happens.
+        $audience = $body['audience'] ?? 'applicant';
+        if ($audience !== 'applicant') {
+            return Response::error(
+                'Every question on a form is answered by the person filling it in. Ask for what the office records at a step of the form\'s route instead.',
+                422
+            );
         }
 
-        return $audience;
+        return null;
     }
 
     private static function validateKey(string $key): ?Response
@@ -772,8 +773,8 @@ final class FormFieldsApiHandler
             $seen[$value] = true;
 
             try {
-                $label = LocalizedLabel::fromInput($option['label'] ?? $value, "options[{$index}].label");
-            } catch (FormRejectedException $e) {
+                $label = LocalizedText::label($option['label'] ?? $value, "options[{$index}].label");
+            } catch (LocalizedTextRejected $e) {
                 return Response::error($e->clientMessage, 422);
             }
 

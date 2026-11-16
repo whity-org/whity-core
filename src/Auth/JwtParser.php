@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Whity\Auth;
 
-use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
+use Whity\Sdk\Auth\Jwt\IssuerTokenVerifier;
+use Whity\Sdk\Auth\Jwt\JwsVerifier;
 
 /**
  * JWT parser/issuer (HS256) built on firebase/php-jwt.
@@ -128,29 +129,17 @@ class JwtParser
         string $expectedAudience,
         ?string $expectedNonce = null,
     ): ?array {
-        JWT::$leeway = self::LEEWAY_SECONDS;
-
-        try {
-            // parseKeySet builds a kid => Key map, each Key carrying the JWKS
-            // entry's own algorithm; JWT::decode then selects the key by the
-            // token's `kid` header and verifies with that key's asymmetric alg.
-            // An RS256 default covers JWKS entries that omit `alg` (e.g. some
-            // providers) without ever enabling a symmetric algorithm.
-            $keySet = JWK::parseKeySet($jwks, 'RS256');
-            $decoded = JWT::decode($token, $keySet);
-        } catch (\Throwable) {
-            // Unknown kid, bad signature, malformed, expired, or not-yet-valid.
+        // Signature and times are the plugin SDK's checks (WHIT-1026), shared
+        // with the Whity ID token verifier: asymmetric algorithms only (RS*,
+        // ES*), the key named by `kid`, the key's own `alg` (RS256 when the
+        // JWKS entry omits it); then `exp` required, `nbf` / `iat` not in the
+        // future, with this parser's leeway.
+        $verified = JwsVerifier::verify($token, $jwks);
+        if ($verified === null) {
             return null;
         }
-
-        /** @var array<string, mixed>|null $claims */
-        $claims = json_decode((string) json_encode($decoded), true);
-        if (!is_array($claims)) {
-            return null;
-        }
-
-        // exp is mandatory for an ID token (firebase enforces it only when present).
-        if (!isset($claims['exp'])) {
+        $claims = $verified['claims'];
+        if (!IssuerTokenVerifier::timesAreValid($claims, time(), self::LEEWAY_SECONDS)) {
             return null;
         }
 

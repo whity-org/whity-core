@@ -16,10 +16,11 @@ import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { AgentsTabs } from '@/components/agents/agents-tabs';
 import { OnItsOwn } from '@/components/agents/agent-status';
-import { localized, refusal, type MyAgent } from '@/components/agents/workspace-agents';
+import { refusalText, type MyAgent } from '@/components/agents/workspace-agents';
 import { useFetch } from '@/hooks/useFetch';
-import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
+import { localizedText } from '@whity/ui/localized-text';
 
 /**
  * My agents (A20, TplAgents): the workspace's agents and which ones this
@@ -34,24 +35,26 @@ export default function MyAgentsPage() {
   const t = useTranslation('admin');
   const arabic = useFormattingLocale() === 'ar';
   const dates = useDateDisplay();
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const [connecting, setConnecting] = useState<MyAgent | null>(null);
   const [stopping, setStopping] = useState<MyAgent | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const agents = useFetch<MyAgent[]>(async () => {
-    const response = await apiClient('/api/v1/me/agents');
+    const { data, response } = await api.GET('/api/v1/me/agents');
     if (!response.ok) throw new Error(t('agents.error.load', 'The agents could not be loaded.'));
-    return ((await response.json()) as { data: MyAgent[] }).data;
-  }, [apiClient]);
+    return (data as unknown as { data: MyAgent[] }).data;
+  }, []);
 
   const act = async (agent: MyAgent, method: 'POST' | 'DELETE') => {
     setBusyId(agent.id);
     try {
-      const response = await apiClient(`/api/v1/me/agents/${agent.id}/assignment`, { method });
+      const params = { params: { path: { id: agent.id } } };
+      const { response, error } = method === 'POST'
+        ? await api.POST('/api/v1/me/agents/{id}/assignment', params)
+        : await api.DELETE('/api/v1/me/agents/{id}/assignment', params);
       if (!response.ok) {
-        addToast(await refusal(response, t('myAgents.error.save', 'That could not be done. Try again.')), 'error');
+        addToast(refusalText(error, t('myAgents.error.save', 'That could not be done. Try again.')), 'error');
         return;
       }
       setStopping(null);
@@ -66,14 +69,14 @@ export default function MyAgentsPage() {
   const list = agents.data ?? [];
   const mine = list.filter((agent) => agent.assignment !== null);
   const rest = list.filter((agent) => agent.assignment === null);
-  const nameOf = (agent: MyAgent) => localized(agent.name, agent.nameAr, arabic);
+  const nameOf = (agent: MyAgent) => localizedText({ en: agent.name, ar: agent.nameAr }, arabic ? 'ar' : 'en');
 
   const row = (agent: MyAgent) => (
     <li key={agent.id} className="flex flex-wrap items-center gap-4 border-t border-divider px-4 py-3 first:border-t-0">
       <Avatar kind="agent" name={nameOf(agent)} size={40} />
       <div className="min-w-0 flex-1">
         <p className="font-medium">{nameOf(agent)}</p>
-        <p className="text-sm text-muted-foreground">{localized(agent.role, agent.roleAr, arabic)}</p>
+        <p className="text-sm text-muted-foreground">{localizedText({ en: agent.role, ar: agent.roleAr }, arabic ? 'ar' : 'en')}</p>
         {agent.assignment !== null && (
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
             <OnItsOwn counts={agent.onItsOwn} />
@@ -136,6 +139,8 @@ export default function MyAgentsPage() {
       ) : list.length === 0 ? (
         <EmptyFirstTime
           icon="robot"
+          moment="agents-propose"
+          onceEver="agents-first"
           title={t('myAgents.empty.title', 'No agents yet')}
           description={t('myAgents.empty.description', 'Someone who manages agents for this workspace adds them. Then you can start using one.')}
         />
@@ -178,30 +183,29 @@ export default function MyAgentsPage() {
  */
 function ConnectDialog({ agent, onClose }: { agent: MyAgent; onClose: () => void }) {
   const t = useTranslation('admin');
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const [token, setToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const info = useFetch<{ endpoint: string | null }>(async () => {
-    const response = await apiClient('/api/v1/mcp/connect');
+    // apiFetch: /api/v1/mcp/connect is not in the OpenAPI spec.
+    const response = await apiFetch('/api/v1/mcp/connect');
     return response.ok ? ((await response.json()) as { endpoint: string | null }) : { endpoint: null };
-  }, [apiClient]);
+  }, []);
   const base = info.data?.endpoint ?? `${window.location.origin}/mcp`;
 
   const issue = async () => {
     setBusy(true);
     try {
-      const response = await apiClient(`/api/v1/me/agents/${agent.id}/credentials`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+      const { data, response, error } = await api.POST('/api/v1/me/agents/{id}/credentials', {
+        params: { path: { id: agent.id } },
+        body: {},
       });
       if (!response.ok) {
-        addToast(await refusal(response, t('myAgents.error.save', 'That could not be done. Try again.')), 'error');
+        addToast(refusalText(error, t('myAgents.error.save', 'That could not be done. Try again.')), 'error');
         return;
       }
-      setToken(((await response.json()) as { data: { token: string } }).data.token);
+      setToken((data as unknown as { data: { token: string } }).data.token);
     } catch {
       addToast(t('myAgents.error.save', 'That could not be done. Try again.'), 'error');
     } finally {

@@ -28,6 +28,8 @@ A role is customer-safe when it holds no privileged permission, counting every r
 - an action that changes access, decides on someone's behalf, or removes things: `manage`, `approve`, `assign`, `delete`, `issue`, `publish`, `review`, `route` and similar;
 - a wildcard.
 
+One exception: a plugin permission that the plugin itself marks **customer-grade** (see [For plugins](#for-plugins)) is not privileged, whatever its action. So a dental lab plugin can let a clinic that signed up add its own patients (`dlaas_patient:manage`) or upload its own scans (`dlaas_scan:upload`).
+
 The role is checked when an admin saves the settings and again each time someone signs up. If a role gains an admin permission after it was saved, sign-ups stop until an admin chooses a role again. The settings screen shows a warning while that is the case.
 
 ### Customers are never staff
@@ -35,6 +37,28 @@ The role is checked when an admin saves the settings and again each time someone
 Each membership has a **kind**: `member` (staff) or `customer`. When every active membership a person holds in a workspace is a customer one, RBAC drops privileged permissions from what they can do, whatever their role, unit, resource grants or delegations say. So putting a customer into the admin role does not make them an admin. `GET /api/v1/me` returns `kind` on each membership, and the app hides admin screens and "create workspace" from customers.
 
 Profiles stay global (ADR 0005). The same email can be a customer in one workspace and staff in another. A person who already has an account, including one who signs in with Whity ID, joins with that account and keeps its password.
+
+## Customers invite their own team
+
+Settings → Sign-up has a switch, **Customers can invite their team**. It is off by default. When it is on, a person who is only a customer in this workspace can invite colleagues by email, for example a clinic owner bringing in their dentists.
+
+- **Into what.** The colleague joins in the inviter's own role, as a customer. Nobody can choose a different role, a unit or staff. If the inviter's role has since gained an admin permission, or they hold more than one role here, they can't invite (409 `role_not_customer_safe`).
+- **Who.** People only, never an agent acting for them, and never staff: staff invite from People.
+- **Nothing is revealed.** Every address the workspace's domain list allows gets the same answer (202), the email is sent after the answer so timing doesn't tell either, and the inviter's own list shows every address they tried as pending. Nothing is sent when the address already has a membership here, was turned away from sign-up, or has an invitation someone else sent. A customer's invitation never replaces an admin's or another customer's, and never completes a membership an admin staged.
+- **The domain list** in Sign-up settings applies to invitations too.
+- **No approval queue.** Invited people join when they accept, even when sign-up is Off or Approval required. The switch is separate from the sign-up mode.
+- **Links stop working** when an admin turns the switch off, suspends or removes the inviter, or gives the inviter's role an admin permission. A link that wasn't used works again if things are put back.
+- **Limits.** 10 an hour and 30 a day per customer, 100 an hour per workspace.
+- **Audit.** Each invitation is recorded with the inviter as the actor (`tenant.invitation.created`, `kind: customer`). Staff see customer invitations in People → Invitations with `kind: customer` and who sent them, and can withdraw them there.
+- **Email.** Invitations are emailed, so they need the instance's mail transport and the Invitation email turned on (Settings → Email). Without it nothing reaches the colleague.
+
+| Method | Path | Who |
+|---|---|---|
+| GET | `/api/v1/team-invitations` | a customer: whether they may invite (`enabled`) and what they sent |
+| POST | `/api/v1/team-invitations` | a customer: `{ "email": "…" }` |
+| DELETE | `/api/v1/team-invitations/{id}` | a customer: withdraw one they sent |
+
+Promoting a customer to staff stays an admin's decision: it is a membership change, and there is no API or plugin seam that does it.
 
 ## The pages
 
@@ -82,6 +106,52 @@ Email sign-up needs the instance's bot check (Settings → Public forms), unless
 Refusals from the settings and queue endpoints carry a stable `code` in `details` beside the English sentence, so a client can show them in the reader's language: `mode_invalid`, `role_required`, `role_not_customer_safe`, `workspace_slug_missing`, `domain_invalid` (with `value`, the line at fault), `domains_too_many` (with `max`), `membership_conflict` and `request_not_found`.
 
 ## For plugins
+
+### Customer-grade permissions (SDK 1.104)
+
+The customer rule drops `manage`, `upload`, `review` and the other privileged actions on every resource, because core can't tell whether a plugin's `manage` reaches one record or all of them. A plugin that scopes a permission to the caller's own records says so by implementing `Whity\Sdk\PluginCustomerPermissionsInterface`:
+
+```php
+final class DlaasPlugin implements PluginInterface, PluginRolesInterface, PluginCustomerPermissionsInterface
+{
+    public function getPermissions(): array
+    {
+        return ['dlaas_patient:read', 'dlaas_patient:manage', 'dlaas_scan:upload', 'dlaas_case:review'];
+    }
+
+    /** Every route checking these binds the caller's own clinic and answers 404 for any other. */
+    public function getCustomerPermissions(): array
+    {
+        return ['dlaas_patient:manage', 'dlaas_scan:upload', 'dlaas_case:review'];
+    }
+    // ...
+}
+```
+
+What happens then:
+
+- A customer keeps these permissions instead of losing them.
+- Settings → Sign-up can offer a role made of customer-safe core permissions plus these. Seed one with `PluginRolesInterface` (for example `clinic_owner`) or build it in Roles. The workspace admin still chooses it.
+- The plugin promises the scoping. Core can't check it, so every route that checks one of these permissions must limit the caller to their own records.
+
+The host refuses, skips and logs:
+
+- a slug the plugin doesn't declare in `getPermissions()`, or one another plugin claimed first;
+- a resource outside the plugin's own namespace. The resource must be the plugin's slug, or start with it and `_`: `dlaas_patient` for a plugin named DLaaS. Workspace plugins can't take a name inside an installed plugin's namespace, so none can reuse these slugs;
+- a core permission, or anything under a core or administration resource (`users`, `roles`, `settings`, `billing`, ...), whatever the action;
+- a resource another active plugin also declares permissions under. A plugin vouches only for resources it alone owns.
+
+When the plugin is disabled or uninstalled, its list is withdrawn at once: customers lose those permissions, and a sign-up role that needs them stops being offered and stops letting people join, until the plugin is back.
+
+Renaming actions to get past the rule (`dlaas_case:respond` instead of `dlaas_case:review`) is not the way: declare the permission customer-grade instead.
+
+Workspace (data-only) plugins can't declare customer-grade permissions. They have no routes of their own to do the scoping.
+
+### Events
+
+`membership.customer_inviting` (SDK 1.105) runs before a customer's team invitation is written. The payload is `tenant_id`, `inviter_profile_id`, `email`, `role_id` and `annotations`. Refuse with `HookVetoException` and the customer sees your reason. Or return `annotations`, a small JSON object keyed by your plugin's name: DLaaS would check that the inviter owns a clinic and attach `{"dlaas": {"clinic_id": 42}}`. The email, role and inviter can't be changed.
+
+When the colleague accepts, `membership.customer_joined` fires with `via: invitation`, plus `invitation_id`, `invited_by` and the `annotations`, so the plugin can bind the newcomer to the inviter's clinic.
 
 `membership.customer_joined` (SDK 1.73, `Whity\Sdk\Hooks\Events::MEMBERSHIP_CUSTOMER_JOINED`) fires after a customer membership is committed: at once in Open mode, or on approval. The payload is ids only: `tenant_id`, `profile_id`, `membership_id`, `role_id`, `role_name`, `via` (`open` or `approval`) and `approved_by`. The return value is ignored.
 

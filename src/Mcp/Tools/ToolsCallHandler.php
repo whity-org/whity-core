@@ -8,6 +8,8 @@ use Whity\Auth\RoleChecker;
 use Whity\Auth\TokenValidator;
 use Whity\Core\Audit\AuditContext;
 use Whity\Core\Audit\AuditLoggerInterface;
+use Whity\Core\Entitlement\EntitlementRegistry;
+use Whity\Core\Entitlement\MeterService;
 use Whity\Core\i18n\RequestLanguageResolver;
 use Whity\Core\Router;
 use Whity\Core\Tenant\TenantContext;
@@ -72,7 +74,22 @@ final class ToolsCallHandler implements MethodHandler
         private readonly ?AgentActionRepository $actions = null,
         // WHIT-1015: the language a plugin's route handler reads on its Request.
         private readonly ?RequestLanguageResolver $languages = null,
+        // WHIT-932: counts agent work against `agents.runs.per_month`. Never
+        // refuses; null counts nothing.
+        private readonly ?MeterService $agentWork = null,
     ) {}
+
+    /**
+     * Plugins switched off for a workspace (WHIT-1123): their authored tools
+     * answer as unknown there. Derived tools reach the plugin's route, whose
+     * wrapper refuses the same way.
+     */
+    private ?\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $workspaceGate = null;
+
+    public function setWorkspaceGate(\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $gate): void
+    {
+        $this->workspaceGate = $gate;
+    }
 
     /** WHIT-812: on an agent's result, the action to undo and until when. */
     public const META_UNDO = 'dev.whity/undo';
@@ -344,7 +361,30 @@ final class ToolsCallHandler implements MethodHandler
             }
         }
 
+        $this->countAgentWork($principal);
+
         return $this->run($principal, $toolName, $arguments, false, $surface->split);
+    }
+
+    /**
+     * One agent tool call is one unit of agent work (WHIT-932).
+     *
+     * Counted when the agent asks, whether the call runs at once or waits for
+     * its person as a proposal: the agent did the work of asking either way.
+     * Approving a proposal later is the person's act and counts nothing more.
+     * Never refuses, and a counting failure never stops the call.
+     */
+    private function countAgentWork(McpPrincipal $principal): void
+    {
+        if ($this->agentWork === null || !$principal->isAgent()) {
+            return;
+        }
+
+        try {
+            $this->agentWork->record($principal->tenantId, [EntitlementRegistry::AGENTS_RUNS_PER_MONTH]);
+        } catch (\Throwable $e) {
+            $this->warn('Could not count agent work: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -375,6 +415,9 @@ final class ToolsCallHandler implements MethodHandler
         }
         if ($declaration === null) {
             $authored = $this->authoredTools?->get($toolName);
+            if ($authored !== null && $this->workspaceGate?->isToolsetOffForWorkspace($this->authoredTools->toolsetOf($toolName), $principal->tenantId) === true) {
+                throw new McpException(ErrorCode::METHOD_NOT_FOUND, "Unknown tool: {$toolName}");
+            }
             if ($authored !== null) {
                 try {
                     $this->assertInTokenToolsets($principal, $this->authoredTools->toolsetOf($toolName));
@@ -951,6 +994,10 @@ final class ToolsCallHandler implements MethodHandler
             'type'             => 'mcp',
             'principal_kind'   => $principal->principalKind,
             'scope'            => $principal->scope,
+            // Which agent is calling (`agent:<assignmentId>`), for handlers whose
+            // answer depends on the agent and not only its person: a team chat
+            // shows an agent only the chats it is a member of (CH.2).
+            'agent_principal_id' => $principal->isAgent() ? $principal->agentPrincipalId() : null,
         ];
         $request->setAttribute(Request::ATTR_JWT_CLAIMS, $claims);
         $request->user = (object) $claims;

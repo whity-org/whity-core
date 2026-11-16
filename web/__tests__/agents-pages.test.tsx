@@ -11,10 +11,11 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { isReadPermission, localized, templateGroups, toolsetsFromSplits, type WorkspaceAgent } from '@/components/agents/workspace-agents';
+import { isReadPermission, templateGroups, toolsetsFromSplits, type WorkspaceAgent } from '@/components/agents/workspace-agents';
 
 const mockApiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient: mockApiClient }) }));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));
 jest.mock('@/hooks/useCapabilities', () => ({ useCapabilities: () => ({ hasPermission: () => true }) }));
@@ -33,6 +34,7 @@ import AgentsPage from '@/app/(protected)/admin/agents/page';
 import MyAgentsPage from '@/app/(protected)/admin/my-agents/page';
 import { PersonaEditor } from '@/components/agents/persona-editor';
 import { AgentRecord } from '@/components/agents/agent-record';
+import { localizedText } from '@whity/ui/localized-text';
 
 const json = (status: number, body: unknown) =>
   Promise.resolve({ ok: status >= 200 && status < 300, status, json: () => Promise.resolve(body) });
@@ -91,9 +93,9 @@ beforeEach(() => {
 
 describe('workspace agent helpers', () => {
   it('falls back to English where there is no Arabic', () => {
-    expect(localized('Clerk', 'كاتب', true)).toBe('كاتب');
-    expect(localized('Clerk', '  ', true)).toBe('Clerk');
-    expect(localized('Clerk', 'كاتب', false)).toBe('Clerk');
+    expect(localizedText({ en: 'Clerk', ar: 'كاتب' }, 'ar')).toBe('كاتب');
+    expect(localizedText({ en: 'Clerk', ar: '  ' }, 'ar')).toBe('Clerk');
+    expect(localizedText({ en: 'Clerk', ar: 'كاتب' }, 'en')).toBe('Clerk');
   });
 
   it('tells reads from writes as the server does', () => {
@@ -166,7 +168,7 @@ describe('Persona editor', () => {
 
     expect(await screen.findByText('Documents')).toBeInTheDocument();
     expect(screen.queryByText('core.documents')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('What it does', { selector: '#agent-role-ar' }), { target: { value: 'يجهّز الفواتير.' } });
+    fireEvent.change(screen.getByLabelText('Role in Arabic, in one line'), { target: { value: 'يجهّز الفواتير.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(sent('PATCH /api/v1/agents/3')).toBeDefined());
@@ -192,6 +194,25 @@ describe('Persona editor', () => {
 
     expect(await screen.findByText(/can start at off or ask/)).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it('counts the instructions and holds Save until a name is given and they fit (TplAgentPersona)', async () => {
+    route({ 'GET /api/v1/mcp/splits': () => json(200, { data: [] }) });
+    render(<PersonaEditor agent={null} />);
+
+    expect(screen.getAllByText('0 / 4000')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Give it a name people will recognise.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Role name', { selector: '#agent-name' }), { target: { value: 'Clerk' } });
+    fireEvent.change(screen.getByLabelText('English'), { target: { value: 'x'.repeat(4012) } });
+    expect(screen.getByText('4,012 of 4,000 characters. Shorten it a little.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('English'), { target: { value: 'Take orders.' } });
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Plain', pressed: true })).toBeInTheDocument();
   });
 });
 

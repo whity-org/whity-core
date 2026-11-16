@@ -10,6 +10,8 @@ use Whity\Core\Document\Slots\BackgroundIssuing;
 use Whity\Core\Document\Slots\SlotBindings;
 use Whity\Core\Document\Theme\DocumentThemeRef;
 use Whity\Core\Identity\InvitationService;
+use Whity\Core\Plan\PlanService;
+use Whity\Core\Plan\PlanValidationException;
 
 /**
  * The code registry of known website-settings keys (Website Settings feature).
@@ -237,6 +239,11 @@ final class SettingsRegistry
     public const SEATS_ENFORCEMENT = 'seats.enforcement';
     public const SEATS_COUNT_INVITED = 'seats.count_invited';
 
+    // METERED LIMITS (documents rendered per day or month). 'block' refuses past
+    // the limit, as metering always has; 'warn' counts and lets the action go
+    // ahead. Global-only for the same reason as seats.enforcement.
+    public const METERS_ENFORCEMENT = 'meters.enforcement';
+
     // INVOICING (#billing). Every one of these differs per deployment, which
     // is exactly why none of them is a constant in the invoicing code.
     //
@@ -252,7 +259,17 @@ final class SettingsRegistry
     // invariant holds; this only decides how a price is decomposed.
     //
     // The seller an invoice is from is the workspace's company (COMPANY_*).
+    //
+    // `default_currency` is THE WORKSPACE'S CURRENCY (CU.4): what new prices,
+    // services and documents start in, and what Money shows when a screen has
+    // no row of its own. USD since design 3.5.1; workspaces that existed before
+    // were pinned to the currency they had (migration 277), and every stored
+    // amount keeps its own row's currency whatever this says.
     public const BILLING_DEFAULT_CURRENCY = 'billing.default_currency';
+    // The plan_key a new workspace is put on. Empty means none, which is every
+    // install that does not sell plans. Global-only: a workspace does not get to
+    // choose what the operator gives new workspaces.
+    public const BILLING_DEFAULT_PLAN = 'billing.default_plan';
     public const BILLING_TAX_RATE_BP = 'billing.tax_rate_bp';
     public const BILLING_TAX_LABEL = 'billing.tax_label';
     public const BILLING_TAX_INCLUSIVE = 'billing.tax_inclusive';
@@ -268,6 +285,27 @@ final class SettingsRegistry
     public const COMPANY_TAX_ID = 'company.tax_id';
     public const COMPANY_PHONE = 'company.phone';
     public const COMPANY_EMAIL = 'company.email';
+    /**
+     * The company's name and address in Arabic, for a letterhead printed in
+     * English and Arabic (design 3.4, `letterhead.layout: bilingual`).
+     */
+    public const COMPANY_NAME_AR = 'company.name_ar';
+    public const COMPANY_ADDRESS_AR = 'company.address_ar';
+
+    // THE WEBSITE (WS.5, WS.19): what whity.dev reads from this instance.
+    // Global-only: the operator's own marketing site, not any workspace's.
+    /**
+     * The plans page's marketing layer as JSON: per plan key the Arabic name,
+     * tagline, features shown, highlight and the link, plus the currency and the
+     * dedicated-hosting "from" price. Prices, limits, order and visibility come
+     * from the plans themselves. Read by {@see \Whity\Core\Plan\WebsitePlans}.
+     */
+    public const WEBSITE_PLANS = 'website.plans';
+    /**
+     * The slug of the workspace whose inbox receives the website's contact form.
+     * Empty turns the form off ({@see \Whity\Api\PublicContactApiHandler}).
+     */
+    public const WEBSITE_CONTACT_WORKSPACE = 'website.contact_workspace';
 
     // NUMBERING is GLOBAL-ONLY, unlike everything above. A per-tenant
     // override would make the meaning of the (series, number) uniqueness
@@ -378,6 +416,13 @@ final class SettingsRegistry
     // their prompts stop with it on. GLOBAL-ONLY: code plugins are install-wide. Tools are not
     // gated by this; they keep their own permission checks.
     public const PLUGINS_MCP_PROMPTS_REQUIRE_MARK = 'plugins.mcp_prompts_require_mark';
+
+    // SDK 1.102 (WHIT-985): the code plugins the operator lets send Whity's own billing
+    // emails (receipts, failed payments) to a workspace's payers, in the INSTANCE's brand
+    // (Mail\BillingEmails). Comma-separated plugin names; EMPTY by default, so nothing can
+    // send them until the operator names a plugin. GLOBAL-ONLY: mail in the instance's
+    // brand to any workspace is a phishing path, and code plugins are install-wide.
+    public const PLUGINS_BILLING_EMAIL_SENDERS = 'plugins.billing_email_senders';
 
     // Document/label designer server-side render tier (ADR 0012 / WC-docdesigner
     // Track 2). GLOBAL-ONLY operator switch: the render endpoint calls out to the
@@ -747,6 +792,27 @@ final class SettingsRegistry
     public const LABELS_RESOLVE_MAX_IDS = 'labels.resolve_max_ids';
 
     /**
+     * Calendar and bookings (WHIT-941, ADR 0017). Tenant-overridable.
+     * The booking page is off until a workspace turns it on. Notice is the
+     * least time between booking and start; the window is how many days
+     * ahead a booking may be; slots are offered every step minutes; one
+     * reminder goes out this many hours before (0 = none); a payment step
+     * holds a slot this many minutes. Week start and weekend days record the
+     * design register's rule (Saturday first, Friday and Saturday off) as
+     * settings a workspace can change.
+     */
+    public const CALENDAR_BOOKING_PAGE_ENABLED = 'calendar.booking_page_enabled';
+    public const CALENDAR_MIN_NOTICE_MINUTES = 'calendar.min_notice_minutes';
+    public const CALENDAR_MAX_ADVANCE_DAYS = 'calendar.max_advance_days';
+    public const CALENDAR_SLOT_STEP_MINUTES = 'calendar.slot_step_minutes';
+    public const CALENDAR_REMINDER_HOURS_BEFORE = 'calendar.reminder_hours_before';
+    public const CALENDAR_PAYMENT_HOLD_MINUTES = 'calendar.payment_hold_minutes';
+    public const CALENDAR_WEEK_START = 'calendar.week_start';
+    public const CALENDAR_WEEKEND_DAYS = 'calendar.weekend_days';
+    /** Design 3.3: off turns every booking from the booking page into a request staff accept. */
+    public const CALENDAR_INSTANT_BOOKING = 'calendar.instant_booking';
+
+    /**
      * Whether the web app offers itself as an installable app (#1733): the web
      * manifest, the service worker and the offline page. GLOBAL-ONLY — it is
      * a question about the whole installation, not one workspace.
@@ -759,6 +825,60 @@ final class SettingsRegistry
      * See {@see \Whity\Core\Branding\BrandingService::installableFrom()}.
      */
     public const APP_INSTALLABLE = 'app.installable';
+
+    // Customer sign-up for one workspace (WHIT-915, #1872), kept in the
+    // workspace_signup_settings table until WHIT-1035 folded it in here. Set on
+    // the workspace's own Customer sign-up screen (signup:manage), which checks
+    // the starting role is customer-safe, so these are OWN-SCREEN keys: never
+    // published or writable on the generic settings API. Per workspace only;
+    // the global layer is just the default.
+    //   - mode: off, approval (an admin approves each request) or open.
+    //   - role_id: the starting role; 0 is "not chosen", which refuses sign-ups.
+    //   - allowed_domains: a JSON list of email domains; [] allows every address.
+    //   - customer_invites: whether customers may invite colleagues.
+    public const SIGNUP_MODE = 'signup.mode';
+    public const SIGNUP_ROLE_ID = 'signup.role_id';
+    public const SIGNUP_ALLOWED_DOMAINS = 'signup.allowed_domains';
+    public const SIGNUP_CUSTOMER_INVITES = 'signup.customer_invites';
+    //   - invites_per_customer: how many people one customer may invite (open,
+    //     accepted and not sent count); 0 is no limit (WHIT-1043, SC.11).
+    public const SIGNUP_INVITES_PER_CUSTOMER = 'signup.invites_per_customer';
+    //   - route_template_id: the route a join request travels on (merge map
+    //     A4); 0 is the default, one step for everyone with signup:manage.
+    public const SIGNUP_ROUTE_TEMPLATE_ID = 'signup.route_template_id';
+
+    // A workspace's Messages settings (ADR 0016 §4-5), kept in the
+    // messaging_settings table until migration 294 folded them in here (merge
+    // map, plumbing). Set on the workspace's own Messages screen, so these are
+    // OWN-SCREEN keys too. The inbound email secret is not a setting: it is
+    // kept encrypted under an unregistered key, so no settings read returns it
+    // ({@see \Whity\Core\Messaging\MessagingSettings}).
+    //   - webchat_enabled: whether the web chat bubble is on.
+    //   - webchat_greeting: the line it opens with; '' for none.
+    //   - inbound_email_address: where replies to email come back; '' for none.
+    public const MESSAGING_WEBCHAT_ENABLED = 'messaging.webchat_enabled';
+    public const MESSAGING_WEBCHAT_GREETING = 'messaging.webchat_greeting';
+    public const MESSAGING_INBOUND_EMAIL_ADDRESS = 'messaging.inbound_email_address';
+
+    /**
+     * Keys a dedicated screen and endpoint manage, with checks the generic
+     * settings API cannot make (a customer-safe role, a permission other than
+     * settings:write). Stored and resolved like every other key, but left out
+     * of {@see textKeys()} and refused by the generic settings write.
+     *
+     * @var list<string>
+     */
+    private const OWN_SCREEN_KEYS = [
+        self::SIGNUP_MODE,
+        self::SIGNUP_ROLE_ID,
+        self::SIGNUP_ALLOWED_DOMAINS,
+        self::SIGNUP_CUSTOMER_INVITES,
+        self::SIGNUP_INVITES_PER_CUSTOMER,
+        self::SIGNUP_ROUTE_TEMPLATE_ID,
+        self::MESSAGING_WEBCHAT_ENABLED,
+        self::MESSAGING_WEBCHAT_GREETING,
+        self::MESSAGING_INBOUND_EMAIL_ADDRESS,
+    ];
 
     /**
      * The asset-kind keys (Tenant Branding). Their stored value is a storage
@@ -836,9 +956,12 @@ final class SettingsRegistry
         self::LICENSING_BILLING_BASIS,
         self::SEATS_ENFORCEMENT,
         self::SEATS_COUNT_INVITED,
+        self::METERS_ENFORCEMENT,
+        self::BILLING_DEFAULT_PLAN,
         self::PLUGINS_STORE_ALLOWED_HOSTS,
         self::PLUGINS_STORE_ENABLED,
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK,
+        self::PLUGINS_BILLING_EMAIL_SENDERS,
         // Master on/off switch for the render tier: infrastructure-level (is the
         // whole optional subsystem available on this instance), not a per-tenant
         // preference — a per-tenant override would be inert/misleading. The
@@ -853,6 +976,9 @@ final class SettingsRegistry
         // Installing the web app is a property of the installation, and the
         // service worker it controls is per origin, not per workspace.
         self::APP_INSTALLABLE,
+        // The operator's own website; no workspace has one of these.
+        self::WEBSITE_PLANS,
+        self::WEBSITE_CONTACT_WORKSPACE,
     ];
 
     /**
@@ -862,6 +988,8 @@ final class SettingsRegistry
      * @var list<string>
      */
     private const BOOL_KEYS = [
+        self::SIGNUP_CUSTOMER_INVITES,
+        self::MESSAGING_WEBCHAT_ENABLED,
         self::MAINTENANCE_ACTIVE,
         self::ERROR_TRACKING_ENABLED,
         self::ERROR_TRACKING_NOTIFY_ADMINS,
@@ -889,6 +1017,8 @@ final class SettingsRegistry
         self::FORMS_SHOW_REVIEWER_NAMES,
         self::I18N_ENABLED,
         self::UI_HIDE_DATES,
+        self::CALENDAR_BOOKING_PAGE_ENABLED,
+        self::CALENDAR_INSTANT_BOOKING,
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
         self::AFFILIATE_CLAWBACK_ON_REFUND,
@@ -958,6 +1088,7 @@ final class SettingsRegistry
      * @var array<string, list<string>>
      */
     private const ENUM_OPTIONS = [
+        self::SIGNUP_MODE => ['off', 'approval', 'open'],
         self::MAIL_TRANSPORT => ['none', 'log', 'smtp'],
         self::MAIL_SMTP_ENCRYPTION => ['none', 'tls', 'ssl'],
         self::MAIL_SMTP_AUTH_MODE => ['password', 'oauth2'],
@@ -971,6 +1102,7 @@ final class SettingsRegistry
         // "block writes" and "block everything" would be the same rule.
         self::LICENSING_BILLING_BASIS => ['activated', 'provisioned', 'active_in_period'],
         self::SEATS_ENFORCEMENT => ['off', 'warn', 'block'],
+        self::METERS_ENFORCEMENT => ['block', 'warn'],
         self::BILLING_INVOICE_NUMBER_SCOPE => ['shared', 'per_tenant'],
         self::BILLING_INVOICE_NUMBER_RESET => ['never', 'yearly', 'monthly'],
         // What a STRANGER holding a printed document is told when they scan it
@@ -990,6 +1122,7 @@ final class SettingsRegistry
         // hosted Sentry, or a self-hosted GlitchTip/Bugsink — via the encrypted
         // DSN. Switching is a settings change, not a code change.
         self::ERROR_TRACKING_PROVIDER => ['internal', 'sentry'],
+        self::CALENDAR_WEEK_START => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
     ];
 
     /**
@@ -1077,8 +1210,10 @@ final class SettingsRegistry
         self::LICENSING_BILLING_BASIS => 'activated',
         self::SEATS_ENFORCEMENT => 'warn',
         self::SEATS_COUNT_INVITED => 'true',
+        self::METERS_ENFORCEMENT => 'block',
         // Zero tax until an operator says otherwise — see the constant.
-        self::BILLING_DEFAULT_CURRENCY => 'JOD',
+        self::BILLING_DEFAULT_CURRENCY => 'USD',
+        self::BILLING_DEFAULT_PLAN => '',
         self::BILLING_TAX_RATE_BP => '0',
         self::BILLING_TAX_LABEL => '',
         self::BILLING_TAX_INCLUSIVE => 'false',
@@ -1089,6 +1224,8 @@ final class SettingsRegistry
         self::COMPANY_TAX_ID => '',
         self::COMPANY_PHONE => '',
         self::COMPANY_EMAIL => '',
+        self::COMPANY_NAME_AR => '',
+        self::COMPANY_ADDRESS_AR => '',
         self::BILLING_INVOICE_NUMBER_FORMAT => 'INV-{YYYY}-{SEQ:5}',
         self::BILLING_INVOICE_NUMBER_SCOPE => 'shared',
         self::BILLING_INVOICE_NUMBER_RESET => 'yearly',
@@ -1114,6 +1251,7 @@ final class SettingsRegistry
         // before this flag existed.
         self::PLUGINS_STORE_ENABLED => 'true',
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => 'false',
+        self::PLUGINS_BILLING_EMAIL_SENDERS => '',
         // Heavyweight optional add-on (a whole separate Chromium-bearing
         // container) — opt-in, not opt-out. A sovereign deploy that never runs
         // the `render` compose profile stays disabled here regardless.
@@ -1207,8 +1345,33 @@ final class SettingsRegistry
         // most of them have not expressed.
         self::UI_HIDE_DATES => 'false',
         self::LABELS_RESOLVE_MAX_IDS => '100',
+        self::CALENDAR_BOOKING_PAGE_ENABLED => 'false',
+        self::CALENDAR_MIN_NOTICE_MINUTES => '120',
+        self::CALENDAR_MAX_ADVANCE_DAYS => '60',
+        self::CALENDAR_SLOT_STEP_MINUTES => '15',
+        self::CALENDAR_REMINDER_HOURS_BEFORE => '24',
+        self::CALENDAR_PAYMENT_HOLD_MINUTES => '15',
+        self::CALENDAR_WEEK_START => 'saturday',
+        self::CALENDAR_WEEKEND_DAYS => 'friday,saturday',
+        self::CALENDAR_INSTANT_BOOKING => 'true',
         // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
         self::APP_INSTALLABLE => 'true',
+        // Empty: the plans page shows the active plans as they are, and the
+        // contact form is off until a workspace is named.
+        self::WEBSITE_PLANS => '',
+        self::WEBSITE_CONTACT_WORKSPACE => '',
+        // Off with no starting role and no domain limit: a workspace that never
+        // opened sign-up takes nobody.
+        self::SIGNUP_MODE => 'off',
+        self::SIGNUP_ROLE_ID => '0',
+        self::SIGNUP_ALLOWED_DOMAINS => '[]',
+        self::SIGNUP_CUSTOMER_INVITES => 'false',
+        // No limit, as before the setting existed.
+        self::SIGNUP_INVITES_PER_CUSTOMER => '0',
+        self::SIGNUP_ROUTE_TEMPLATE_ID => '0',
+        self::MESSAGING_WEBCHAT_ENABLED => 'false',
+        self::MESSAGING_WEBCHAT_GREETING => '',
+        self::MESSAGING_INBOUND_EMAIL_ADDRESS => '',
     ];
 
     /**
@@ -1242,7 +1405,87 @@ final class SettingsRegistry
         return array_values(array_filter(
             self::keys(),
             static fn (string $k): bool => !in_array($k, self::ASSET_KEYS, true)
+                && !in_array($k, self::OWN_SCREEN_KEYS, true)
         ));
+    }
+
+    /**
+     * Whether the key is managed only on its own screen and endpoint, never on
+     * the generic settings API. See {@see OWN_SCREEN_KEYS}.
+     */
+    public static function isOwnScreen(string $key): bool
+    {
+        return in_array($key, self::OWN_SCREEN_KEYS, true);
+    }
+
+    // ── Notification senders (WHIT-1036) ────────────────────────────────────
+    //
+    // A workspace's sender for each notification channel, kept in the
+    // tenant_notification_settings table until WHIT-1036 folded it in here.
+    // Channels come and go with plugins, so these are a key FAMILY, not fixed
+    // keys: `notifications.<channel>.<field>`, the channel `[a-z0-9_]{1,64}`.
+    // They live per workspace in tenant_settings, are written only through
+    // {@see \Whity\Core\Notification\TenantNotificationSettingsRepository} (the
+    // notification-settings screen, notifications:manage), and are never on the
+    // generic settings API, which knows only the fixed keys above.
+    //
+    // `credentials_encrypted` holds the provider secret as EncryptedSecretStore
+    // wrote it; like mail.smtp.password_encrypted it is never returned by any
+    // read that leaves the server.
+
+    public const NOTIFICATIONS_PREFIX = 'notifications.';
+
+    /** @var list<string> */
+    public const NOTIFICATION_FIELDS = ['enabled', 'transport', 'from_address', 'from_name', 'reply_to', 'config', 'credentials_encrypted'];
+
+    /** `enabled` when a workspace never set it: a channel is on until turned off. */
+    public const NOTIFICATION_ENABLED_DEFAULT = 'true';
+
+    /** The tenant_settings key of one field of one channel's sender. */
+    public static function notificationKey(string $channel, string $field): string
+    {
+        if (preg_match('/^[a-z0-9_]{1,64}$/i', $channel) !== 1 || !in_array($field, self::NOTIFICATION_FIELDS, true)) {
+            throw new \InvalidArgumentException("Not a notification setting: {$channel}.{$field}");
+        }
+
+        return self::NOTIFICATIONS_PREFIX . $channel . '.' . $field;
+    }
+
+    /**
+     * The channel and field a key names, or null when it isn't one.
+     *
+     * @return array{channel: string, field: string}|null
+     */
+    public static function parseNotificationKey(string $key): ?array
+    {
+        if (preg_match('/^notifications\.([a-z0-9_]{1,64})\.([a-z_]+)$/i', $key, $m) !== 1
+            || !in_array($m[2], self::NOTIFICATION_FIELDS, true)) {
+            return null;
+        }
+
+        return ['channel' => $m[1], 'field' => $m[2]];
+    }
+
+    /** Why a value can't be stored for a notification field, or null when it can. */
+    public static function validateNotificationValue(string $field, string $value): ?string
+    {
+        return match ($field) {
+            'enabled' => self::validateBoolean($value, 'enabled'),
+            'transport' => preg_match('/^[a-z0-9_.-]{1,64}$/i', $value) === 1 ? null : 'transport must be a transport name.',
+            'from_address', 'reply_to' => filter_var($value, FILTER_VALIDATE_EMAIL) !== false ? null : "{$field} must be an email address.",
+            'from_name' => mb_strlen($value) <= 255 ? null : 'from_name must be at most 255 characters.',
+            'config' => self::isJsonObject($value) ? null : 'config must be a JSON object.',
+            'credentials_encrypted' => $value !== '' ? null : 'credentials_encrypted must not be empty.',
+            default => "Not a notification setting: {$field}",
+        };
+    }
+
+    /** `{}` or an object with keys; a list or a scalar is not one. */
+    private static function isJsonObject(string $value): bool
+    {
+        $decoded = json_decode($value);
+
+        return $decoded instanceof \stdClass;
     }
 
     /**
@@ -1503,7 +1746,9 @@ final class SettingsRegistry
             self::BILLING_ENFORCEMENT_DEFAULT => self::validateEnum($key, $value),
             self::BILLING_GRACE_DAYS => self::validateGraceDays($value),
             self::SEATS_ENFORCEMENT => self::validateEnum($key, $value),
+            self::METERS_ENFORCEMENT => self::validateEnum($key, $value),
             self::BILLING_DEFAULT_CURRENCY => self::validateCurrencyCode($value),
+            self::BILLING_DEFAULT_PLAN => self::validatePlanKey($value),
             self::BILLING_TAX_RATE_BP => self::validateTaxRateBasisPoints($value),
             self::BILLING_TAX_INCLUSIVE => self::validateBoolean($value, self::BILLING_TAX_INCLUSIVE),
             self::BILLING_PAYMENT_TERMS_DAYS => self::validatePaymentTermsDays($value),
@@ -1530,6 +1775,7 @@ final class SettingsRegistry
             self::PLUGINS_STORE_ALLOWED_HOSTS => null, // free-form strings
             self::PLUGINS_STORE_ENABLED => self::validateBoolean($value, self::PLUGINS_STORE_ENABLED),
             self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => self::validateBoolean($value, self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK),
+            self::PLUGINS_BILLING_EMAIL_SENDERS => self::validatePluginNameList($value, self::PLUGINS_BILLING_EMAIL_SENDERS),
             self::DOCUMENTS_RENDER_ENABLED => self::validateBoolean($value, self::DOCUMENTS_RENDER_ENABLED),
             self::DOCUMENTS_RENDER_MAX_ROWS => self::validateRenderMaxRows($value),
             self::DOCUMENTS_RENDER_MAX_PAGES => self::validateRenderMaxPages($value),
@@ -1570,6 +1816,15 @@ final class SettingsRegistry
             self::INVITATION_TTL_DAYS => self::validateInvitationTtlDays($value),
             self::UI_HIDE_DATES => self::validateBoolean($value, self::UI_HIDE_DATES),
             self::LABELS_RESOLVE_MAX_IDS => self::validateLabelsResolveMaxIds($value),
+            self::CALENDAR_BOOKING_PAGE_ENABLED => self::validateBoolean($value, self::CALENDAR_BOOKING_PAGE_ENABLED),
+            self::CALENDAR_MIN_NOTICE_MINUTES => self::validateWholeNumberBetween($value, self::CALENDAR_MIN_NOTICE_MINUTES, 0, 43200),
+            self::CALENDAR_MAX_ADVANCE_DAYS => self::validateWholeNumberBetween($value, self::CALENDAR_MAX_ADVANCE_DAYS, 1, 730),
+            self::CALENDAR_SLOT_STEP_MINUTES => self::validateWholeNumberBetween($value, self::CALENDAR_SLOT_STEP_MINUTES, 5, 240),
+            self::CALENDAR_REMINDER_HOURS_BEFORE => self::validateWholeNumberBetween($value, self::CALENDAR_REMINDER_HOURS_BEFORE, 0, 168),
+            self::CALENDAR_PAYMENT_HOLD_MINUTES => self::validateWholeNumberBetween($value, self::CALENDAR_PAYMENT_HOLD_MINUTES, 1, 1440),
+            self::CALENDAR_WEEK_START => in_array($value, self::ENUM_OPTIONS[self::CALENDAR_WEEK_START], true) ? null : 'calendar.week_start must be a day of the week.',
+            self::CALENDAR_WEEKEND_DAYS => self::validateWeekdayList($value),
+            self::CALENDAR_INSTANT_BOOKING => self::validateBoolean($value, self::CALENDAR_INSTANT_BOOKING),
             self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the
@@ -1586,12 +1841,51 @@ final class SettingsRegistry
             self::COMPANY_NAME,
             self::COMPANY_ADDRESS,
             self::COMPANY_TAX_ID,
-            self::COMPANY_PHONE => null,
+            self::COMPANY_PHONE,
+            self::COMPANY_NAME_AR,
+            self::COMPANY_ADDRESS_AR => null,
             self::COMPANY_EMAIL => $value === '' || filter_var($value, FILTER_VALIDATE_EMAIL) !== false
                 ? null
                 : self::COMPANY_EMAIL . ' must be an email address.',
+            self::WEBSITE_PLANS => \Whity\Core\Plan\WebsitePlans::problem($value),
+            self::WEBSITE_CONTACT_WORKSPACE => $value === '' || preg_match('/^[a-z0-9][a-z0-9-]{0,254}$/', $value) === 1
+                ? null
+                : self::WEBSITE_CONTACT_WORKSPACE . ' must be a workspace slug (lowercase letters, digits and hyphens).',
+            self::SIGNUP_MODE => self::validateEnum(self::SIGNUP_MODE, $value),
+            self::SIGNUP_ROLE_ID => preg_match('/^(0|[1-9][0-9]{0,9})$/', $value) === 1
+                ? null
+                : self::SIGNUP_ROLE_ID . ' must be a role id, or 0 for none.',
+            self::SIGNUP_ALLOWED_DOMAINS => self::validateSignupDomains($value),
+            self::SIGNUP_CUSTOMER_INVITES => self::validateBoolean($value, self::SIGNUP_CUSTOMER_INVITES),
+            self::SIGNUP_INVITES_PER_CUSTOMER => self::validateWholeNumberBetween($value, self::SIGNUP_INVITES_PER_CUSTOMER, 0, 1000),
+            self::SIGNUP_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
+                ? null
+                : self::SIGNUP_ROUTE_TEMPLATE_ID . ' must be a route template id, or 0 for the default.',
+            self::MESSAGING_WEBCHAT_ENABLED => self::validateBoolean($value, self::MESSAGING_WEBCHAT_ENABLED),
+            self::MESSAGING_WEBCHAT_GREETING => mb_strlen($value) <= 500
+                ? null
+                : self::MESSAGING_WEBCHAT_GREETING . ' must be 500 characters or fewer.',
+            self::MESSAGING_INBOUND_EMAIL_ADDRESS => $value === '' || (strlen($value) <= 320 && filter_var($value, FILTER_VALIDATE_EMAIL) !== false)
+                ? null
+                : self::MESSAGING_INBOUND_EMAIL_ADDRESS . ' must be an email address, or empty for none.',
             default => "Unknown setting key: {$key}",
         };
+    }
+
+    /**
+     * A JSON list of plain email domains, already normalised, at most
+     * {@see \Whity\Core\Signup\WorkspaceSignupSettings::MAX_DOMAINS}.
+     */
+    private static function validateSignupDomains(string $value): ?string
+    {
+        $list = json_decode($value, true);
+        $normalised = is_array($list) && array_is_list($list)
+            ? \Whity\Core\Signup\WorkspaceSignupSettings::normaliseDomains($list)
+            : null;
+
+        return $normalised !== null && $normalised === $list
+            ? null
+            : self::SIGNUP_ALLOWED_DOMAINS . ' must be a JSON list of lowercase email domains.';
     }
 
     /**
@@ -1699,6 +1993,35 @@ final class SettingsRegistry
      * The setting can only shorten that lifetime, never extend it, so a value
      * above the ceiling is rejected rather than silently clamped.
      */
+    private static function validateWholeNumberBetween(string $value, string $key, int $min, int $max): ?string
+    {
+        if (preg_match('/^\d+$/', $value) !== 1) {
+            return "{$key} must be a whole number.";
+        }
+        if ((int) $value < $min || (int) $value > $max) {
+            return "{$key} must be between {$min} and {$max}.";
+        }
+
+        return null;
+    }
+
+    /** Comma-separated day names, each at most once; empty means no weekend. */
+    private static function validateWeekdayList(string $value): ?string
+    {
+        if ($value === '') {
+            return null;
+        }
+        $seen = [];
+        foreach (explode(',', $value) as $day) {
+            if (!in_array($day, self::ENUM_OPTIONS[self::CALENDAR_WEEK_START], true) || isset($seen[$day])) {
+                return 'calendar.weekend_days must be day names separated by commas, such as friday,saturday.';
+            }
+            $seen[$day] = true;
+        }
+
+        return null;
+    }
+
     private static function validateLabelsResolveMaxIds(string $value): ?string
     {
         if (preg_match('/^\d+$/', $value) !== 1) {
@@ -1838,7 +2161,27 @@ final class SettingsRegistry
     {
         return preg_match('/^[A-Z]{3}$/', strtoupper(trim($value))) === 1
             ? null
-            : 'must be a three-letter ISO 4217 currency code, such as JOD';
+            : 'must be a three-letter ISO 4217 currency code, such as USD';
+    }
+
+    /**
+     * Empty, or a well-formed plan key. Whether that plan exists is not asked
+     * here: it can be retired after this is saved, so creating a workspace has
+     * to cope with a missing plan anyway.
+     */
+    private static function validatePlanKey(string $value): ?string
+    {
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            PlanService::assertValidKey($value);
+        } catch (PlanValidationException $e) {
+            return $e->getMessage();
+        }
+
+        return null;
     }
 
     /**
@@ -1984,6 +2327,24 @@ final class SettingsRegistry
     }
 
     /** Comma-separated MCP tool names, each `[A-Za-z0-9_-]{1,64}`; empty is fine. */
+    /**
+     * Comma-separated plugin names, each one a plugin could be loaded under (it has a slug).
+     */
+    private static function validatePluginNameList(string $value, string $key): ?string
+    {
+        if (trim($value) === '') {
+            return null;
+        }
+        foreach (explode(',', $value) as $name) {
+            $name = trim($name);
+            if ($name === '' || strlen($name) > 128 || \Whity\Sdk\PluginNamespace::slug($name) === null) {
+                return "{$key} must be a comma-separated list of plugin names.";
+            }
+        }
+
+        return null;
+    }
+
     private static function validateToolNameList(string $value, string $key): ?string
     {
         if (trim($value) === '') {

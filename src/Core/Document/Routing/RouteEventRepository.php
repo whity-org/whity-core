@@ -87,7 +87,7 @@ final class RouteEventRepository
      * @param array{route_id: int, step_id?: ?int, actor_profile_id?: ?int, action: string,
      *              from_ou_id?: ?int, to_ou_id?: ?int, note?: ?string, verdict?: ?string,
      *              subject_version?: ?int, content_hash?: ?string, to_author?: bool,
-     *              resume_from?: ?string} $event
+     *              resume_from?: ?string, on_behalf_of_profile_id?: ?int} $event
      */
     public function append(int $tenantId, ?int $documentId, array $event): int
     {
@@ -107,6 +107,8 @@ final class RouteEventRepository
             'content_hash' => $event['content_hash'] ?? null,
             'to_author' => ($event['to_author'] ?? false) === true,
             'resume_from' => $event['resume_from'] ?? null,
+            // Merge map A2: the away person a delegate acted for.
+            'on_behalf_of_profile_id' => $event['on_behalf_of_profile_id'] ?? null,
         ]);
     }
 
@@ -149,7 +151,7 @@ final class RouteEventRepository
      * @param array{route_id: int, step_id: ?int, actor_profile_id: ?int, action: string,
      *              from_ou_id: ?int, to_ou_id: ?int, note: ?string, verdict: ?string, withdrawal: bool,
      *              subject_version: ?int, content_hash: ?string, to_author: bool,
-     *              resume_from: ?string} $fields
+     *              resume_from: ?string, on_behalf_of_profile_id?: ?int} $fields
      */
     private function insertLinked(int $tenantId, ?int $documentId, array $fields): int
     {
@@ -183,11 +185,11 @@ final class RouteEventRepository
                      (tenant_id, document_id, route_id, step_id, actor_profile_id,
                       action, from_ou_id, to_ou_id, note, verdict, withdrawal,
                       subject_version, content_hash, to_author, resume_from, occurred_at,
-                      prev_hash, entry_hash, entry_body)
+                      on_behalf_of_profile_id, prev_hash, entry_hash, entry_body)
                  VALUES (:tenant_id, :document_id, :route_id, :step_id, :actor_profile_id,
                          :action, :from_ou_id, :to_ou_id, :note, :verdict, :withdrawal,
                          :subject_version, :content_hash, :to_author, :resume_from, :occurred_at,
-                         :prev_hash, :entry_hash, :entry_body)'
+                         :on_behalf_of, :prev_hash, :entry_hash, :entry_body)'
             );
             $stmt->execute([
                 ':tenant_id' => $tenantId,
@@ -208,6 +210,7 @@ final class RouteEventRepository
                 ':to_author' => $row['to_author'] ? 1 : 0,
                 ':resume_from' => $row['resume_from'],
                 ':occurred_at' => $row['occurred_at'],
+                ':on_behalf_of' => $row['on_behalf_of_profile_id'] ?? null,
                 ':prev_hash' => $prevHash,
                 ':entry_hash' => $entryHash,
                 ':entry_body' => $body,
@@ -294,7 +297,7 @@ final class RouteEventRepository
             'SELECT id, tenant_id, document_id, route_id, step_id, actor_profile_id,
                     action, from_ou_id, to_ou_id, note, verdict, withdrawal,
                     subject_version, content_hash, to_author, resume_from, occurred_at,
-                    prev_hash, entry_hash
+                    on_behalf_of_profile_id, prev_hash, entry_hash
                FROM document_route_events
               WHERE id = :id AND tenant_id = :tenant_id'
         );
@@ -320,7 +323,7 @@ final class RouteEventRepository
             'SELECT id, tenant_id, document_id, route_id, step_id, actor_profile_id,
                     action, from_ou_id, to_ou_id, note, verdict, withdrawal,
                     subject_version, content_hash, to_author, resume_from, occurred_at,
-                    prev_hash, entry_hash
+                    on_behalf_of_profile_id, prev_hash, entry_hash
                FROM document_route_events
               WHERE tenant_id = :tenant_id AND document_id = :document_id
               ORDER BY id ASC
@@ -353,7 +356,7 @@ final class RouteEventRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, document_id, route_id, step_id, actor_profile_id,
                     action, from_ou_id, to_ou_id, note, verdict, withdrawal,
-                    subject_version, content_hash, to_author, resume_from, occurred_at
+                    subject_version, content_hash, to_author, resume_from, occurred_at, on_behalf_of_profile_id
                FROM document_route_events
               WHERE tenant_id = :tenant_id AND route_id = :route_id
               ORDER BY id ASC'
@@ -476,6 +479,8 @@ final class RouteEventRepository
             'to_author' => $row['to_author'] ?? false,
             'resume_from' => isset($row['resume_from']) ? (string) $row['resume_from'] : null,
             'occurred_at' => (string) $row['occurred_at'],
+            // Merge map A2: whom a delegate acted for while they were away.
+            'on_behalf_of_profile_id' => isset($row['on_behalf_of_profile_id']) ? (int) $row['on_behalf_of_profile_id'] : null,
             // WHIT-922: the hash of the entry before this one, and this entry's
             // own. NULL on entries written before migration 232.
             'prev_hash' => isset($row['prev_hash']) ? (string) $row['prev_hash'] : null,

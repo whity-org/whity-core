@@ -10,9 +10,8 @@ test.describe('Authentication flow', () => {
 
     await page.waitForURL('**/dashboard');
     await expect(page.getByRole('heading', { name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
-    // The signed-in person is shown in the sidebar footer; the home no longer repeats it.
-    await expect(page.getByText('Logged in as')).toBeVisible();
-    await expect(page.getByText(ADMIN.email, { exact: true })).toBeVisible();
+    // The signed-in person is the sidebar foot's account menu; the home no longer repeats it.
+    await new AppShell(page).expectLoggedInAs(ADMIN.email);
   });
 
   test('invalid password keeps the user on /login and shows an error (WC-98)', async ({

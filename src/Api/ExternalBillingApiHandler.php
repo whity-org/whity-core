@@ -124,6 +124,10 @@ final class ExternalBillingApiHandler
         // not paid" is a double charge and the cost of a wrong "they have" is a
         // retry.
         $isAddon = $this->planIsAddon($planKey);
+        // A PAID PLUGIN (`plugin.<slug>.<plan>`, WHIT-1127) is its own product:
+        // a Free workspace may buy one, and it never touches the tier. What
+        // must not happen is buying the same plugin twice.
+        $isPluginAddon = $isAddon && str_starts_with(trim($planKey), 'plugin.');
 
         try {
             $hasAccess = $this->portal->accessFor(BillingSubject::forTenant($tenantId))->hasAccess;
@@ -131,11 +135,15 @@ final class ExternalBillingApiHandler
             return $this->portalFailure($e, 'check an existing subscription', ['tenant_id' => $tenantId]);
         }
 
+        if ($isPluginAddon && $this->holdsPluginProduct($tenantId, trim($planKey))) {
+            return Response::error('This workspace already has this plugin.', 409);
+        }
+
         if (!$isAddon && $hasAccess) {
             return Response::error('This workspace already has an active subscription.', 409);
         }
 
-        if ($isAddon && !$hasAccess) {
+        if ($isAddon && !$isPluginAddon && !$hasAccess) {
             return Response::error(
                 'This workspace needs an active subscription before it can buy add-ons.',
                 409
@@ -156,6 +164,31 @@ final class ExternalBillingApiHandler
         }
         if ($priceRef === null) {
             return Response::error('That plan cannot be bought on these terms.', 422);
+        }
+
+        // SDK 1.110: a plugin sold per seat (Whity for Salons per chair) is
+        // bought for the count the workspace set, never a number the caller
+        // sends.
+        $quantity = $isPluginAddon ? ($this->pluginSeats?->quantityForPlan(trim($planKey), $tenantId) ?? 1) : 1;
+        if ($quantity > 1) {
+            $bridge = $this->pluginBridge();
+            if ($bridge === null) {
+                return Response::error('This payment provider can\'t sell several at once.', 422, ['reason' => 'quantity_unsupported']);
+            }
+            try {
+                $handoff = $bridge->startCheckoutForQuantity(
+                    $this->actorFor($request),
+                    BillingSubject::forTenant($tenantId),
+                    $priceRef,
+                    $quantity,
+                    $this->appUrl . '/billing/return',
+                    $this->appUrl . '/billing',
+                );
+            } catch (BillingPortalException $e) {
+                return $this->portalFailure($e, 'start a checkout', ['tenant_id' => $tenantId]);
+            }
+
+            return Response::json(['data' => ['url' => $handoff->url, 'quantity' => $quantity]]);
         }
 
         try {
@@ -367,10 +400,25 @@ final class ExternalBillingApiHandler
             return $tenantId;
         }
 
+        // WHIT-1153: payments made in cash, recorded by the operator, sit in
+        // the same history, marked "cash", whether or not a provider is set up.
+        $cash = array_map(static fn (array $c): array => [
+            'number' => $c['receipt_number'],
+            'status' => $c['voided_at'] !== null ? 'voided' : 'paid',
+            'total_minor' => $c['amount_minor'],
+            'currency' => $c['currency'],
+            'paid_at' => $c['paid_on'],
+            'issued_at' => $c['recorded_at'],
+            'source' => 'cash',
+            'plan_key' => $c['plan_key'],
+            'quantity' => $c['quantity'],
+            'covers_until' => $c['period_end'],
+        ], $this->cashPayments?->forWorkspace($tenantId) ?? []);
+
         if (!$this->portal->isConfigured()) {
             // Nothing was ever paid through a service this deployment does not
-            // have. An empty list, not an error.
-            return Response::json(['data' => []]);
+            // have; only what was paid in cash, if anything.
+            return Response::json(['data' => $cash]);
         }
 
         try {
@@ -379,9 +427,10 @@ final class ExternalBillingApiHandler
             return $this->portalFailure($e, 'read payment history', ['tenant_id' => $tenantId]);
         }
 
-        return Response::json([
-            'data' => array_map(static fn (Receipt $r): array => $r->toArray(), $receipts),
-        ]);
+        $rows = [...array_map(static fn (Receipt $r): array => $r->toArray(), $receipts), ...$cash];
+        usort($rows, static fn (array $a, array $b): int => strcmp((string) ($b['paid_at'] ?? ''), (string) ($a['paid_at'] ?? '')));
+
+        return Response::json(['data' => $rows]);
     }
 
     /**
@@ -746,6 +795,22 @@ final class ExternalBillingApiHandler
     }
 
     /** The plugin portal's bridge, only when a plugin portal is the one in use. */
+    private ?\Whity\Core\Plugin\Workspace\PluginSeats $pluginSeats = null;
+
+    private ?\Whity\Core\Billing\Cash\CashPayments $cashPayments = null;
+
+    /** Cash payments in the billing history (WHIT-1153). */
+    public function useCashPayments(\Whity\Core\Billing\Cash\CashPayments $cash): void
+    {
+        $this->cashPayments = $cash;
+    }
+
+    /** Plugins sold per seat (SDK 1.110): the count a checkout buys. */
+    public function usePluginSeats(\Whity\Core\Plugin\Workspace\PluginSeats $seats): void
+    {
+        $this->pluginSeats = $seats;
+    }
+
     private function pluginBridge(): ?SdkBillingPortalBridge
     {
         return $this->portal instanceof ResolvingBillingPortal ? $this->portal->pluginBridge() : null;
@@ -835,7 +900,7 @@ final class ExternalBillingApiHandler
      */
     private function monthlyPrice(int $tenantId, string $planKey, string $preferredPeriod): ?float
     {
-        $currency = strtoupper($this->setting($tenantId, SettingsRegistry::BILLING_DEFAULT_CURRENCY, 'JOD'));
+        $currency = strtoupper($this->setting($tenantId, SettingsRegistry::BILLING_DEFAULT_CURRENCY, 'USD'));
         $statement = $this->pdo->prepare(
             'SELECT pp.unit_amount, pp.billing_period
                FROM plan_prices pp
@@ -861,7 +926,7 @@ final class ExternalBillingApiHandler
             return null;
         }
 
-        $months = ['month' => 1, 'quarter' => 3, 'year' => 12][(string) $chosen['billing_period']] ?? null;
+        $months = ['month' => 1, 'quarter' => 3, 'half_year' => 6, 'year' => 12][(string) $chosen['billing_period']] ?? null;
 
         return $months === null ? null : ((int) $chosen['unit_amount']) / $months;
     }
@@ -893,7 +958,7 @@ final class ExternalBillingApiHandler
         $currency = strtoupper($this->setting(
             $tenantId,
             SettingsRegistry::BILLING_DEFAULT_CURRENCY,
-            'JOD'
+            'USD'
         ));
 
         $statement = $this->pdo->prepare(
@@ -956,7 +1021,7 @@ final class ExternalBillingApiHandler
         $currency = strtoupper($this->setting(
             $tenantId,
             SettingsRegistry::BILLING_DEFAULT_CURRENCY,
-            'JOD'
+            'USD'
         ));
 
         $bridge = $this->pluginBridge();
@@ -994,6 +1059,28 @@ final class ExternalBillingApiHandler
      * moment later by the price lookup, and guessing "add-on" here would give
      * the caller a different error about a plan that is not there.
      */
+    /**
+     * Does the workspace already hold an add-on of the same plugin product
+     * (any plan of `plugin.<slug>`)?
+     */
+    private function holdsPluginProduct(int $tenantId, string $planKey): bool
+    {
+        $cut = strrpos($planKey, '.');
+        $product = $cut === false ? $planKey : substr($planKey, 0, $cut);
+        $statement = $this->pdo->prepare(
+            'SELECT p.plan_key FROM tenant_plan_addons ta JOIN plans p ON p.id = ta.plan_id WHERE ta.tenant_id = :tenant_id'
+        );
+        $statement->bindValue(':tenant_id', $tenantId, \PDO::PARAM_INT);
+        $statement->execute();
+        foreach ($statement->fetchAll(\PDO::FETCH_COLUMN) as $held) {
+            if (is_string($held) && str_starts_with($held, $product . '.')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function planIsAddon(string $planKey): bool
     {
         $statement = $this->pdo->prepare('SELECT is_addon FROM plans WHERE plan_key = :plan_key');

@@ -242,9 +242,21 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.94.0',
+            '1.110.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.94 ADDS route and form events: constants for document.routed and document.route_acted, and route.*, document.finalised, form.submitted and submission.* with ids only. '
+            'SDK 1.110 ADDS per-seat plugins (getAccess seats) and Billing\\QuantityCheckout (WHIT-1152). '
+            . 'SDK 1.109 ADDS PluginOnboardingInterface and more WorkspaceSetup routes: guided setups (WHIT-1148). '
+            . 'SDK 1.108 ADDS Setup\\WorkspaceSetup: packs set a workspace up through core routes as the acting person (WHIT-1129). '
+            . 'SDK 1.107 ADDS PluginAccessInterface, PluginWorkspaceLifecycleInterface and Billing\\WorkspaceAddons: paid plugins switched on per workspace (WHIT-1125). '
+            . 'SDK 1.106 ADDS Auth\Jwt\IssuerTokenVerifier, JwsVerifier, JwksCache and HttpsJson: one Whity ID token verifier for the host, plugins and services (WHIT-1026). '
+            . 'SDK 1.105 ADDS Events::MEMBERSHIP_CUSTOMER_INVITING and the invitation form of membership.customer_joined: customers invite their own team (#1872, WHIT-996). '
+            . 'SDK 1.104 ADDS PluginCustomerPermissionsInterface: a plugin\'s own permissions that reach only the caller\'s records, which customers may hold (#1872, WHIT-995). '
+            . 'SDK 1.102 ADDS the Mail\BillingEmails host service and PluginBillingEmailsInterface: Whity\'s own billing emails to a workspace\'s payers, operator-granted and capped (WHIT-985). '
+            . 'SDK 1.101 ADDS Frontend\Blocks\BlockText: block screens take {en, ar} text, served in the language of the reader (WHIT-984). '
+            . 'SDK 1.100 ADDS the Mail\WorkspaceEmails host service and the Mail\WorkspaceEmail value object: plugins email as the workspace (WHIT-978). '
+            . 'SDK 1.99 ADDS the Messaging\\CustomerMessages host service: a plugin tells a workspace\'s customer something through Messages, WhatsApp first then email (WHIT-967). SDK 1.98 ADDS PluginBookingPaymentInterface with Calendar\\BookingPaymentStep and the Calendar\\Bookings host service, PluginCalendarBusyInterface, the Calendar\\CalendarEvents host service, and calendar and booking events (ADR 0017, WHIT-943). '
+            . 'SDK 1.97 ADDS Messaging\MessageChannel and PluginMessageChannelsInterface (channels such as WhatsApp or SMS), and Inbox\InboxSource with PluginInboxSourcesInterface, ordered by InboxOrder and paged by InboxCursor (#881, WHIT-937). '
+            . 'SDK 1.94 ADDS route and form events: constants for document.routed and document.route_acted, and route.*, document.finalised, form.submitted and submission.* with ids only. '
             . 'SDK 1.93 ADDS I18n\LocalizedText, the translatable-field marker and value contract (#521). '
             . 'SDK 1.92 ADDS Audit\\PluginAudit, entries attributed by the host and readable only by the plugin that wrote them (WHIT-1032). '
             . 'SDK 1.91 ADDS Jobs\\PluginJobQueue and PluginScheduledJobsInterface, limited to the plugin\'s own jobs in the current workspace (WHIT-1031). '

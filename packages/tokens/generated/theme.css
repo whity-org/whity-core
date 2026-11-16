@@ -207,6 +207,13 @@
   --radius: 0.5625rem;
   --plane-offset: 0.1875rem;
   --plane-lift: 0.3125rem;
+  --space-0: 0px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
   --control-h-sm: 32px;
   --control-h: 40px;
   --control-h-lg: 44px;
@@ -217,6 +224,11 @@
   --content-max: 1280px;
   --form-max: 720px;
   --gutter: 24px;
+  --logo-min-mark: 16px;
+  --logo-min-horizontal: 20px;
+  --logo-min-stacked: 48px;
+  --mark-cut-switch: 24px;
+  --logo-clear-space: 25%;
   --dur-fast: 120ms;
   --dur-base: 180ms;
   --dur-slow: 250ms;

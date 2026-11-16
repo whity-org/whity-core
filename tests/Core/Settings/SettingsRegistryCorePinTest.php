@@ -96,19 +96,21 @@ final class SettingsRegistryCorePinTest extends TestCase
             'licensing.billing_basis',
             'seats.enforcement',
             'seats.count_invited',
+            'meters.enforcement',
             // #billing — invoicing. Eight tenant-overridable (tax treatment
             // and seller identity both differ per tenant in a white-label
             // deployment) and three global-only (numbering, whose per-tenant
             // override would make the uniqueness index mean something a tenant
             // admin can change).
             'billing.default_currency',
+            'billing.default_plan',
             'billing.tax_rate_bp',
             'billing.tax_label',
             'billing.tax_inclusive',
             'billing.payment_terms_days',
             'company.name',
             'company.address',
-            'company.tax_id', 'company.phone', 'company.email',
+            'company.tax_id', 'company.phone', 'company.email', 'company.name_ar', 'company.address_ar',
             'billing.invoice_number_format',
             'billing.invoice_number_scope',
             'billing.invoice_number_reset',
@@ -132,6 +134,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'plugins.store_allowed_hosts',
             'plugins.store_enabled',
             'plugins.mcp_prompts_require_mark',
+            'plugins.billing_email_senders',
             'documents.render_enabled',
             'documents.theme',
             'documents.theme_by_kind',
@@ -180,8 +183,35 @@ final class SettingsRegistryCorePinTest extends TestCase
             'ui.hide_dates',
             // #1019. The cap on one label-resolution request.
             'labels.resolve_max_ids',
+            // WHIT-941. Calendar and bookings (ADR 0017).
+            'calendar.booking_page_enabled',
+            'calendar.min_notice_minutes',
+            'calendar.max_advance_days',
+            'calendar.slot_step_minutes',
+            'calendar.reminder_hours_before',
+            'calendar.payment_hold_minutes',
+            'calendar.week_start',
+            'calendar.weekend_days',
+            // Design 3.3: off makes booking-page bookings requests.
+            'calendar.instant_booking',
             // #1733. Whether the web app can be installed (instance-wide).
             'app.installable',
+            // WS.5, WS.19: the operator's website (global-only).
+            'website.plans',
+            'website.contact_workspace',
+            // WHIT-1035: customer sign-up, moved from workspace_signup_settings.
+            'signup.mode',
+            'signup.role_id',
+            'signup.allowed_domains',
+            'signup.customer_invites',
+            // WHIT-1043: how many people one customer may invite.
+            'signup.invites_per_customer',
+            // Merge map A4: the route a join request travels on.
+            'signup.route_template_id',
+            // Migration 294: Messages settings, moved from messaging_settings.
+            'messaging.webchat_enabled',
+            'messaging.webchat_greeting',
+            'messaging.inbound_email_address',
         ];
     }
 
@@ -281,18 +311,20 @@ final class SettingsRegistryCorePinTest extends TestCase
             'licensing.billing_basis' => 'activated',
             'seats.enforcement' => 'warn',
             'seats.count_invited' => 'true',
+            'meters.enforcement' => 'block',
             // Tax defaults to ZERO, not to any country's rate: charging tax
             // an operator is not registered to collect is a worse failure than
             // not charging it, and a default correct for one jurisdiction and
             // wrong for every other gets shipped unnoticed.
-            'billing.default_currency' => 'JOD',
+            'billing.default_currency' => 'USD',
+            'billing.default_plan' => '',
             'billing.tax_rate_bp' => '0',
             'billing.tax_label' => '',
             'billing.tax_inclusive' => 'false',
             'billing.payment_terms_days' => '14',
             'company.name' => '',
             'company.address' => '',
-            'company.tax_id' => '', 'company.phone' => '', 'company.email' => '',
+            'company.tax_id' => '', 'company.phone' => '', 'company.email' => '', 'company.name_ar' => '', 'company.address_ar' => '',
             'billing.invoice_number_format' => 'INV-{YYYY}-{SEQ:5}',
             'billing.invoice_number_scope' => 'shared',
             'billing.invoice_number_reset' => 'yearly',
@@ -313,6 +345,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'plugins.store_allowed_hosts' => 'app.whity.dev',
             'plugins.store_enabled' => 'true',
             'plugins.mcp_prompts_require_mark' => 'false',
+            'plugins.billing_email_senders' => '',
             // WHIT-1001: on by default; printing also needs a ready render
             // service, so an install without one still prints nothing.
             'documents.render_enabled' => 'true',
@@ -385,9 +418,31 @@ final class SettingsRegistryCorePinTest extends TestCase
             // argument i18n.enabled won above, pointing the other way.
             'ui.hide_dates' => 'false',
             'labels.resolve_max_ids' => '100',
+            // WHIT-941: the booking page is off until a workspace turns it on;
+            // the week starts on Saturday with Friday and Saturday off (design register).
+            'calendar.booking_page_enabled' => 'false',
+            'calendar.min_notice_minutes' => '120',
+            'calendar.max_advance_days' => '60',
+            'calendar.slot_step_minutes' => '15',
+            'calendar.reminder_hours_before' => '24',
+            'calendar.payment_hold_minutes' => '15',
+            'calendar.week_start' => 'saturday',
+            'calendar.weekend_days' => 'friday,saturday',
+            'calendar.instant_booking' => 'true',
             // #1733: on, which is what app.whity.dev wants; an operator turns
             // it off here or with PWA_ENABLED.
             'app.installable' => 'true',
+            'website.plans' => '',
+            'website.contact_workspace' => '',
+            'signup.mode' => 'off',
+            'signup.role_id' => '0',
+            'signup.allowed_domains' => '[]',
+            'signup.customer_invites' => 'false',
+            'signup.invites_per_customer' => '0',
+            'signup.route_template_id' => '0',
+            'messaging.webchat_enabled' => 'false',
+            'messaging.webchat_greeting' => '',
+            'messaging.inbound_email_address' => '',
         ];
     }
 
@@ -540,8 +595,27 @@ final class SettingsRegistryCorePinTest extends TestCase
             ['labels.resolve_max_ids', '500', true],
             ['labels.resolve_max_ids', '501', false],
             ['labels.resolve_max_ids', '0', false],
+            ['calendar.booking_page_enabled', 'true', true],
+            ['calendar.booking_page_enabled', '1', false],
+            ['calendar.min_notice_minutes', '0', true],
+            ['calendar.min_notice_minutes', '-5', false],
+            ['calendar.max_advance_days', '0', false],
+            ['calendar.slot_step_minutes', '4', false],
+            ['calendar.reminder_hours_before', '169', false],
+            ['calendar.payment_hold_minutes', '30', true],
+            ['calendar.week_start', 'sunday', true],
+            ['calendar.week_start', 'Sunday', false],
+            ['calendar.weekend_days', 'friday,saturday', true],
+            ['calendar.weekend_days', '', true],
+            ['calendar.weekend_days', 'friday,friday', false],
+            ['calendar.weekend_days', 'fri', false],
             ['app.installable', 'false', true],
             ['app.installable', '1', false],
+            ['website.plans', '', true],
+            ['website.plans', '{"plans":{"team":{"highlight":true}}}', true],
+            ['website.plans', 'not json', false],
+            ['website.contact_workspace', 'whity-team', true],
+            ['website.contact_workspace', 'Whity Team', false],
             ['branding_favicon', 'anything', false],
             ['not_a_setting_at_all', 'x', false],
         ];

@@ -24,6 +24,13 @@ use PDO;
  * Like the plugin role seeder's guard (GHSA-r4hx-wj99-jw8m), the decision is
  * made on the permission set, never on what the role is called: a role named
  * "customer" that someone gave `roles:write` is not customer-safe.
+ *
+ * ONE EXCEPTION, VOUCHED FOR BY A PLUGIN (#1872, SDK 1.104): a plugin
+ * permission that an active plugin declares customer-grade
+ * ({@see \Whity\Sdk\PluginCustomerPermissionsInterface}) is not privileged
+ * whatever its action, because the plugin scopes it to the caller's own
+ * records. {@see CustomerGradePermissions} decides which declarations count;
+ * a core or administrative resource never does.
  */
 final class CustomerSafeRole
 {
@@ -85,7 +92,22 @@ final class CustomerSafeRole
             return true;
         }
 
-        return in_array($action, self::PRIVILEGED_ACTIONS, true);
+        if (!in_array($action, self::PRIVILEGED_ACTIONS, true)) {
+            return false;
+        }
+
+        // A plugin permission the owning, active plugin scopes to the caller's
+        // own records (#1872). Never a core or admin resource: refused above
+        // and again inside CustomerGradePermissions.
+        return !CustomerGradePermissions::isCustomerGrade($permission);
+    }
+
+    /** Whether a resource is the administration of a workspace or the installation. */
+    public static function isAdminResource(string $resource): bool
+    {
+        $resource = strtolower(trim($resource));
+
+        return $resource === '*' || in_array($resource, self::ADMIN_RESOURCES, true);
     }
 
     /**

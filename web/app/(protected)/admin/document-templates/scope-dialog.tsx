@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { describeAudience, needsPublish, scopeLabel } from './audience';
-import { patchTemplate, type AddToast, type ApiClient } from './api';
+import { patchTemplate, type AddToast } from './api';
 import { DOCUMENT_SCOPES, type DocumentScope, type OuOption, type PermissionSource, type TemplateRow } from './types';
 
 /** The sentinel a `Select` uses for "no value" — Radix cannot hold an empty string. */
@@ -67,7 +67,6 @@ export function ScopeDialog({
   permissionNames,
   permissionSource,
   viewerProfileId,
-  apiClient,
   addToast,
   onClose,
   onSaved,
@@ -80,7 +79,6 @@ export function ScopeDialog({
   permissionNames: string[];
   permissionSource: PermissionSource;
   viewerProfileId: number | null;
-  apiClient: ApiClient;
   addToast: AddToast;
   onClose: () => void;
   onSaved: () => void;
@@ -140,7 +138,6 @@ export function ScopeDialog({
     setSubmitting(true);
     try {
       const failure = await patchTemplate(
-        apiClient,
         row.id,
         {
           scope,

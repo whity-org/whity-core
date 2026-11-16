@@ -26,7 +26,6 @@ final class WhityDocumentPrinter
         'divider', 'pageBreak', 'table', 'image', 'file', 'record', 'chart', 'signature', 'barcode', 'qr', 'math',
     ];
 
-    private const MARGIN_MM = 16.0;
 
     /**
      * @param array<string, string|null> $values Field values by path; null is a missing value.
@@ -101,9 +100,7 @@ final class WhityDocumentPrinter
         $payload = [
             'title' => $title,
             'direction' => $doc['lang'] === 'ar' ? 'rtl' : 'ltr',
-            'page' => self::pageSize($doc['page']['size'] ?? null) + [
-                'margin' => ['topMm' => self::MARGIN_MM, 'rightMm' => self::MARGIN_MM, 'bottomMm' => self::MARGIN_MM, 'leftMm' => self::MARGIN_MM],
-            ],
+            'page' => self::pageSize($doc['page']['size'] ?? null),
             'content' => $content,
             'header' => ['start' => $letterhead['name'] ?? '', 'end' => $this->labels->continued($title), 'fromPage' => 2],
             'footer' => [
@@ -117,6 +114,13 @@ final class WhityDocumentPrinter
             if (($theme['accentUse'] ?? null) === 'title-and-headings') {
                 $payload['theme']['accentUse'] = 'title-and-headings';
             }
+        }
+        // E.46 and E.47: the title face and large print, whatever the accent.
+        if (($theme['titleFace'] ?? null) === 'noto') {
+            $payload['theme'] = ($payload['theme'] ?? []) + ['titleFace' => 'noto'];
+        }
+        if (($theme['largePrint'] ?? false) === true) {
+            $payload['theme'] = ($payload['theme'] ?? []) + ['largePrint' => true];
         }
 
         return $payload;
@@ -321,11 +325,15 @@ final class WhityDocumentPrinter
 
         $rows = [];
         foreach ((is_array($block['rows'] ?? null) ? $block['rows'] : []) as $row) {
-            $cells = [];
-            foreach (is_array($row) ? $row : [] as $cell) {
-                $cells[] = $this->text(is_array($cell) ? $cell : []);
+            // WHIT-1018: a row holding a list field (`route.approvals.*.name`)
+            // prints once per item, and not at all when the list is empty.
+            foreach ($this->repeated(is_array($row) ? $row : []) as $copy) {
+                $cells = [];
+                foreach ($copy as $cell) {
+                    $cells[] = $this->text(is_array($cell) ? $cell : []);
+                }
+                $rows[] = $cells;
             }
-            $rows[] = $cells;
         }
         if ($rows === []) {
             return;
@@ -338,17 +346,73 @@ final class WhityDocumentPrinter
     }
 
     /**
-     * The paper a document names (6.1); A4 when it names none.
+     * A table row once per item of the list its fields read (WHIT-1018), or
+     * the row itself when it holds no list field. A list field's path has a
+     * `*` for the item number, `route.approvals.*.name`, and the list's length
+     * is the value of `route.approvals.count`; the first list field in the row
+     * decides it.
      *
-     * @return array{widthMm: float, heightMm: float}
+     * @param array<mixed> $row
+     * @return list<array<mixed>>
+     */
+    private function repeated(array $row): array
+    {
+        $list = null;
+        foreach (self::fieldRefs($row) as $ref) {
+            $path = (string) ($ref['path'] ?? '');
+            $star = strpos($path, '.*.');
+            if ($star !== false) {
+                $list = substr($path, 0, $star);
+                break;
+            }
+        }
+        if ($list === null) {
+            return [$row];
+        }
+
+        $count = max(0, min(500, (int) ($this->values[$list . '.count'] ?? 0)));
+        $copies = [];
+        for ($n = 1; $n <= $count; $n++) {
+            $copies[] = self::numbered($row, $list . '.*.', $list . '.' . $n . '.');
+        }
+
+        return $copies;
+    }
+
+    /**
+     * @param array<mixed> $node
+     * @return array<mixed>
+     */
+    private static function numbered(array $node, string $from, string $to): array
+    {
+        foreach ($node as $key => $child) {
+            if (is_array($child)) {
+                $node[$key] = self::numbered($child, $from, $to);
+            }
+        }
+        if (($node['type'] ?? null) === 'field' && is_string($node['path'] ?? null) && str_starts_with($node['path'], $from)) {
+            $node['path'] = $to . substr($node['path'], strlen($from));
+        }
+
+        return $node;
+    }
+
+    /**
+     * The paper a document names (6.1, {@see PageSizes}), with its margins;
+     * A4 when it names none.
+     *
+     * @return array{widthMm: float, heightMm: float, margin: array{topMm: float, rightMm: float, bottomMm: float, leftMm: float}}
      */
     private static function pageSize(mixed $size): array
     {
-        return match ($size) {
-            'A5' => ['widthMm' => 148.0, 'heightMm' => 210.0],
-            'Letter' => ['widthMm' => 215.9, 'heightMm' => 279.4],
-            default => ['widthMm' => 210.0, 'heightMm' => 297.0],
-        };
+        $paper = PageSizes::resolve($size);
+        $m = $paper['marginMm'];
+
+        return [
+            'widthMm'  => $paper['widthMm'],
+            'heightMm' => $paper['heightMm'],
+            'margin'   => ['topMm' => $m, 'rightMm' => $m, 'bottomMm' => $m, 'leftMm' => $m],
+        ];
     }
 
     /**

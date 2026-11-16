@@ -53,7 +53,7 @@
 export type RouteFlowVerdict = 'approved' | 'rejected';
 
 /** What "this node approved" means. Mirrors core's `RouteQuorum`. */
-export type RouteFlowQuorum = 'all' | 'any' | 'majority';
+export type RouteFlowQuorum = 'all' | 'any' | 'majority' | 'first';
 
 /**
  * Whether a stage ASKS or TELLS. Mirrors core's `RouteSatisfaction`.
@@ -130,8 +130,42 @@ export interface RouteFlowStep {
    * Null uses the form's "Final document template".
    */
   finalTemplateId?: number | null;
+  /**
+   * WHIT-1016: values the person letting it through here fills in. Held for
+   * the reason {@link satisfiedBy} is: the server reads a missing list as
+   * none, so a model that dropped it would empty it on the next save.
+   */
+  inputs?: RouteFlowStepInput[];
+  /**
+   * WHIT-1018: the form's people questions (such as `supervisor`) whose
+   * answers this stage leaves out. Held for the same reason as {@link inputs}.
+   */
+  excludeNamedIn?: string[];
   canvasX: number;
   canvasY: number;
+}
+
+/** WHIT-1016: one value a stage asks for. Templates print it as `route.value.<key>`. */
+export interface RouteFlowStepInput {
+  key: string;
+  label: string;
+  labelAr: string | null;
+  required: boolean;
+  maxLength: number;
+  /**
+   * Merge map A3: a person in the workspace (the supervisor), or a line of text.
+   * WHIT-1163: or one of `options`, such as a decision.
+   */
+  type?: 'text' | 'person' | 'choice';
+  /** WHIT-1163: a choice's options, 2 to 12. */
+  options?: RouteFlowStepInputOption[];
+}
+
+/** WHIT-1163: one option of a choice a stage asks for. The value is stored; the label shows. */
+export interface RouteFlowStepInputOption {
+  value: string;
+  label: string;
+  labelAr: string | null;
 }
 
 /** One STORED transition, keyed by the verdict that takes it. */

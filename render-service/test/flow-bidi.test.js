@@ -48,6 +48,13 @@ describe('isolateForeignRuns in an RTL document', () => {
     expect(isolateForeignRuns('راتبًا مقداره JOD 1,000.000 شهريًا', 'rtl')).toContain('<bdi>JOD 1,000.000</bdi>');
   });
 
+  // Design 3.5.1 (CU.2): a symbol and a minus belong to the amount they lead.
+  test('keeps a currency symbol and a minus inside the isolate', () => {
+    expect(isolateForeignRuns('$203.00', 'rtl')).toBe('<bdi>$203.00</bdi>');
+    expect(isolateForeignRuns('المبلغ −$35.00 مستحق', 'rtl')).toContain('<bdi>−$35.00</bdi>');
+    expect(isolateForeignRuns('€312.00 مستحقة على INV-1042', 'rtl')).toBe('<bdi>€312.00</bdi> مستحقة على <bdi>INV-1042</bdi>');
+  });
+
   test('keeps a range together across its en dash', () => {
     expect(isolateForeignRuns('الفترة 1–31 Oct 2026 هنا', 'rtl')).toContain('<bdi>1–31 Oct 2026</bdi>');
   });

@@ -13,7 +13,8 @@ use Whity\Core\Convening\DecisionRecorder;
 use Whity\Core\Convening\DecisionRepository;
 use Whity\Core\Convening\InvitationRepository;
 use Whity\Core\Convening\InvitationStatus;
-use Whity\Core\Convening\LocalizedText;
+use Whity\Core\i18n\LocalizedText;
+use Whity\Core\i18n\LocalizedTextRejected;
 use Whity\Core\Convening\MeetingRepository;
 use Whity\Core\Convening\MeetingService;
 use Whity\Core\Convening\MeetingStatus;
@@ -172,14 +173,15 @@ final class MeetingsApiHandler
 
             $title = LocalizedText::normalize(
                 $body['title'] ?? null,
-                MeetingRepository::FALLBACK_LOCALE,
-                'title'
+                'title',
+                bareLanguage: MeetingRepository::FALLBACK_LOCALE,
+                required: true,
             );
 
             $meeting = $this->service->create($tenantId, $bodyId, $title, self::actorProfileId($request));
 
             return Response::json(['data' => $meeting], 201);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[MeetingsApiHandler] create failed: ' . $e->getMessage());
@@ -231,7 +233,7 @@ final class MeetingsApiHandler
                 // sitting had not been announced yet).
                 'notified' => $result['notified'],
             ]);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[MeetingsApiHandler] schedule failed: ' . $e->getMessage());
@@ -264,7 +266,7 @@ final class MeetingsApiHandler
                 'invited' => count($result['invited']),
                 'already_invited' => $result['already_invited'],
             ]);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[MeetingsApiHandler] invite failed: ' . $e->getMessage());
@@ -317,7 +319,7 @@ final class MeetingsApiHandler
             );
 
             return Response::json(['data' => $result['invitation']]);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[MeetingsApiHandler] respond failed: ' . $e->getMessage());
@@ -347,7 +349,7 @@ final class MeetingsApiHandler
             $meeting = $this->service->hold($tenantId, (int) ($params['id'] ?? 0), $heldAt);
 
             return Response::json(['data' => $meeting]);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[MeetingsApiHandler] hold failed: ' . $e->getMessage());
@@ -372,7 +374,7 @@ final class MeetingsApiHandler
             $meeting = $this->service->cancel($tenantId, (int) ($params['id'] ?? 0));
 
             return Response::json(['data' => $meeting]);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[MeetingsApiHandler] cancel failed: ' . $e->getMessage());
@@ -510,7 +512,7 @@ final class MeetingsApiHandler
                 'data' => $result['attendance'],
                 'counted' => self::counted($tenantId, $meetingId, $result['attendance']),
             ]);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[MeetingsApiHandler] recordAttendance failed: ' . $e->getMessage());
@@ -609,8 +611,9 @@ final class MeetingsApiHandler
             $body = JsonBody::parsed($request);
             $title = LocalizedText::normalize(
                 $body['title'] ?? null,
-                AgendaRepository::FALLBACK_LOCALE,
-                'title'
+                'title',
+                bareLanguage: AgendaRepository::FALLBACK_LOCALE,
+                required: true,
             );
 
             $documentId = self::intField($body, 'document_id');
@@ -632,7 +635,7 @@ final class MeetingsApiHandler
             );
 
             return Response::json(['data' => $this->agenda->find($tenantId, $itemId)], 201);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[MeetingsApiHandler] addAgendaItem failed: ' . $e->getMessage());
@@ -683,7 +686,7 @@ final class MeetingsApiHandler
             $this->agenda->reorder($tenantId, $meetingId, $ids);
 
             return Response::json(['data' => $this->agenda->listForMeeting($tenantId, $meetingId)]);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (\Exception $e) {
             error_log('[MeetingsApiHandler] reorderAgenda failed: ' . $e->getMessage());
@@ -713,7 +716,7 @@ final class MeetingsApiHandler
             $this->agenda->remove($tenantId, (int) $item['id']);
 
             return Response::json(['data' => ['deleted' => true]]);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             // 409: the request is well-formed and the refusal is about the state
             // of the resource (a decision was taken against this item).
             return Response::error($e->clientMessage, 409);
@@ -815,7 +818,7 @@ final class MeetingsApiHandler
                 // the first would make the second invisible on every screen.
                 'routing' => $result['routing'],
             ], 201);
-        } catch (ConveningRejectedException $e) {
+        } catch (ConveningRejectedException | LocalizedTextRejected $e) {
             return Response::error($e->clientMessage, 422);
         } catch (RoutingRejectedException $e) {
             // The engine's own words. See the method docblock.

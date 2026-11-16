@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api/client';
-import { apiClient } from '@/lib/api-client';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -13,7 +12,7 @@ import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@whity/ui/badge';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { IconAlertTriangle, IconBug, IconDeviceFloppy, IconInbox } from '@tabler/icons-react';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
@@ -127,7 +126,7 @@ function ErrorTrackingSettingsForm({
   }, []);
 
   const { data: status, refetch: refetchStatus } = useFetch<ErrorTrackingStatus>(async () => {
-    const res = await apiClient('/api/v1/settings/error-tracking/status');
+    const res = await apiFetch('/api/v1/settings/error-tracking/status');
     if (!res.ok) return { has_dsn: false };
     const body: unknown = await res.json();
     // The API wraps payloads in a { data: ... } envelope.
@@ -230,7 +229,7 @@ function ErrorTrackingSettingsForm({
   const handleSaveDsn = async () => {
     setSavingDsn(true);
     try {
-      const res = await apiClient('/api/v1/settings/error-tracking/dsn', {
+      const res = await apiFetch('/api/v1/settings/error-tracking/dsn', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         // An empty box clears the stored DSN (the backend accepts null).

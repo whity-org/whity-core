@@ -14,8 +14,7 @@ test.describe('Sidebar navigation (admin)', () => {
       // (both end in "Settings") don't collide under strict mode.
       await expect(adminPage.shell.navLink(section.label)).toBeVisible();
     }
-    await expect(adminPage.shell.logoutButton).toBeVisible();
-    await expect(adminPage.shell.sidebar.getByText('Logged in as')).toBeVisible();
+    await expect(adminPage.shell.accountMenuButton).toBeVisible();
   });
 
   test('Users section loads its page with heading and table', async ({ adminPage, page }) => {
@@ -55,13 +54,16 @@ test.describe('Sidebar navigation (admin)', () => {
 
   test("Tenants is not in a workspace admin's sidebar, and the URL says they have no access", async ({ adminPage, page }) => {
     await page.goto('/admin/tenants');
-    await expect(adminPage.shell.navLink('Tenants')).toHaveCount(0);
+    await expect(adminPage.shell.navLink('Workspaces')).toHaveCount(0);
     await expect(page.getByText('You don’t have access to workspaces')).toBeVisible();
     await expect(page.getByRole('table')).toHaveCount(0);
   });
 
   test('Settings General leads a workspace admin to their workspace record', async ({ adminPage, page }) => {
+    // Settings opens My settings first (WHIT-1081); General is in its sub-nav.
     await adminPage.shell.clickNav('Settings');
+    await page.waitForURL('**/settings/profile');
+    await page.getByTestId('settings-area-link-general').click();
     await page.waitForURL('**/admin/settings');
     await page.getByRole('link', { name: 'Open workspace record' }).click();
     await page.waitForURL(/\/admin\/tenants\/\d+$/);
@@ -73,10 +75,11 @@ test.describe('Sidebar navigation (admin)', () => {
     page,
   }) => {
     await adminPage.shell.clickNav('Settings');
-    await page.waitForURL('**/admin/settings');
+    await page.waitForURL('**/settings/profile');
     const area = page.getByTestId('settings-area-nav');
     await expect(area).toBeVisible();
-    await expect(area.getByText('Sign-in and security')).toBeVisible();
+    // The group heading, not the Security page's own link of the same name.
+    await expect(area.locator('[data-settings-group]', { hasText: /^Security$/ })).toBeVisible();
     // Tags keeps its own route, inside the same area (WHIT-806, owner decision D1).
     await area.getByTestId('settings-area-link-tags').click();
     await page.waitForURL('**/admin/tags');
@@ -86,12 +89,11 @@ test.describe('Sidebar navigation (admin)', () => {
 
   test('the user row opens the account page', async ({ adminPage, page }) => {
     await adminPage.shell.openAccountSettings();
-    await page.waitForURL('**/settings');
-    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
-    // The Account Information card became the editable Profile card (WC-64).
-    // The account page is in tabs (Profile, Sign-in and security, Sessions and devices, Preferences).
-    await expect(page.getByRole('tab', { name: 'Profile' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Sign-in and security' })).toBeVisible();
+    // Your own settings are pages in the one Settings area (WHIT-1081); on a computer it opens Profile.
+    await page.waitForURL('**/settings/profile');
+    await expect(page.getByRole('heading', { name: 'Profile', level: 1 })).toBeVisible();
+    await expect(page.getByTestId('settings-area-link-profile')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('settings-area-link-password')).toBeVisible();
   });
 
   test('Dashboard section loads the home page', async ({
@@ -109,21 +111,21 @@ test.describe('Sidebar navigation (admin)', () => {
 
   test('sidebar collapses and expands via the header toggle', async ({ adminPage }) => {
     const shell = adminPage.shell;
-    // Expanded by default: brand heading + "Logged in as" footer are visible.
+    // Expanded by default: brand heading + the person's name in the foot are visible.
     await expect(shell.brandHeading).toBeVisible();
-    await expect(shell.sidebar.getByText('Logged in as')).toBeVisible();
+    await expect(shell.accountName).toBeVisible();
 
     // Collapse: the "Whity" heading and the footer email block are hidden, but
     // the nav links remain reachable (icon-only mode).
     await shell.collapseToggle.click();
     await expect(shell.brandHeading).toBeHidden();
-    await expect(shell.sidebar.getByText('Logged in as')).toBeHidden();
+    await expect(shell.accountName).toBeHidden();
     await expect(shell.collapseToggle).toBeVisible();
 
     // Expand again: brand + footer return.
     await shell.collapseToggle.click();
     await expect(shell.brandHeading).toBeVisible();
-    await expect(shell.sidebar.getByText('Logged in as')).toBeVisible();
+    await expect(shell.accountName).toBeVisible();
   });
 
   test('footer shows "logged in as" the admin and the logout button works', async ({
@@ -142,7 +144,6 @@ test.describe('Sidebar navigation (admin)', () => {
 
     const shell = new AppShell(page);
     await shell.expectLoggedInAs(ADMIN.email);
-    await expect(shell.logoutButton).toBeVisible();
     await shell.logout();
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
@@ -174,7 +175,7 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(shell.navLink('Connected AI apps')).toBeVisible();
   });
 
-  test('the nav filter reaches a page sitting in a closed group', async ({
+  test('the one search reaches a page sitting in a closed group', async ({
     adminPage,
     page,
   }) => {
@@ -183,14 +184,13 @@ test.describe('Sidebar navigation (admin)', () => {
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
 
     await expect(shell.navLink('Connected AI apps')).toBeHidden();
+    // One search since WHIT-1082: the sidebar has no filter box of its own.
+    await expect(shell.navSearch).toHaveCount(0);
 
-    await shell.navSearch.fill('connected');
+    await page.keyboard.press('Control+k');
+    await page.keyboard.type('connected');
     // Reached without knowing which group holds it, and without opening it.
-    await expect(shell.navLink('Connected AI apps')).toBeVisible();
-    // A query narrows to matches, so a non-matching link leaves the DOM.
-    await expect(shell.navLink('Users')).toHaveCount(0);
-
-    await shell.navSearch.fill('');
-    await expect(shell.navLink('Users')).toBeVisible();
+    await page.getByRole('option', { name: /Connected AI apps/ }).click();
+    await page.waitForURL('**/admin/ai-principals');
   });
 });

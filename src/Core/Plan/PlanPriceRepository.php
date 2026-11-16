@@ -32,10 +32,12 @@ final class PlanPriceRepository
 {
     public const PERIOD_MONTH = 'month';
     public const PERIOD_YEAR = 'year';
+    /** Every six months (WHIT-1148): Whity for Salons sells month, six months and year. */
+    public const PERIOD_HALF_YEAR = 'half_year';
     /** A one-off charge: a perpetual licence, a setup fee. */
     public const PERIOD_ONCE = 'once';
 
-    public const PERIODS = [self::PERIOD_MONTH, self::PERIOD_YEAR, self::PERIOD_ONCE];
+    public const PERIODS = [self::PERIOD_MONTH, self::PERIOD_HALF_YEAR, self::PERIOD_YEAR, self::PERIOD_ONCE];
 
     public function __construct(private readonly PDO $db)
     {
@@ -204,9 +206,11 @@ final class PlanPriceRepository
     }
 
     /**
+     * Public so a whole catalogue file can be checked before any of it is written.
+     *
      * @throws PlanValidationException
      */
-    private static function assertValid(string $currency, int $unitAmount, string $billingPeriod): void
+    public static function assertValid(string $currency, int $unitAmount, string $billingPeriod): void
     {
         if (preg_match('/^[A-Z]{3}$/', $currency) !== 1) {
             throw new PlanValidationException('currency', "must be a three-letter ISO 4217 code, got '{$currency}'");

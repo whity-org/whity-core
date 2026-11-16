@@ -22,7 +22,7 @@
       var has = g[1].some(function (x) { return x[1] === active; });
       return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
   function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
   function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
   function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
@@ -36,8 +36,8 @@
     h('div', { style: { display: 'grid', gap: 16, marginTop: 20 } },
       h(W.Alert, { variant: 'warning', title: 'Approving removes their second step' }, 'Check it’s really them first, by phone or in person. You’ll type their email to confirm.'),
       h(W.Card, null, h('div', null,
-        req('Hala Mansour', 'hala@examplebakery.jo', 'Lost her phone and recovery codes', 'Today, 08:12', h(F, null, h(W.Button, { size: 'sm', variant: 'ghost' }, 'Reject'), h(W.Button, { size: 'sm', variant: 'outline' }, 'Approve…'))),
-        req('Karim Aziz', 'karim@examplebakery.jo', 'New phone; old one reset', 'Yesterday, 19:40', h(F, null, h(W.Button, { size: 'sm', variant: 'ghost' }, 'Reject'), h(W.Button, { size: 'sm', variant: 'outline' }, 'Approve…')))))))));
+        req('Ibrahim Mansour', 'ibrahim@examplebakery.jo', 'Lost his phone and recovery codes', 'Today, 08:12', h(F, null, h(W.Button, { size: 'sm', variant: 'ghost' }, 'Reject'), h(W.Button, { size: 'sm', variant: 'outline' }, 'Approve…'))),
+        req('Emad Nasser', 'emad@examplebakery.jo', 'New phone; old one reset', 'Yesterday, 19:40', h(F, null, h(W.Button, { size: 'sm', variant: 'ghost' }, 'Reject'), h(W.Button, { size: 'sm', variant: 'outline' }, 'Approve…')))))))));
 </script>
 </body>
 </html>

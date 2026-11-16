@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useMemo, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   Dialog,
@@ -69,7 +69,6 @@ export function CreateTenantModal({
   onOpenChange,
   onSuccess,
 }: CreateTenantModalProps) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,18 +94,16 @@ export function CreateTenantModal({
     try {
       setIsSubmitting(true);
 
-      const response = await apiClient('/api/v1/tenants', {
-        method: 'POST',
-        body: JSON.stringify({
+      const { response, error } = await api.POST('/api/v1/tenants', {
+        body: {
           name: data.name,
           slug: data.slug,
-        }),
+        },
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorData.message || t('tenants.create.error', 'Failed to create tenant')
+          (error as { message?: string } | undefined)?.message || t('tenants.create.error', 'Failed to create tenant')
         );
       }
 

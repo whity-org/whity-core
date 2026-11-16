@@ -53,7 +53,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useDirection } from '@/lib/direction-context';
@@ -77,12 +77,16 @@ import {
   resolveTransitions,
   type RouteFlowAudience,
   type RouteFlowGraph,
+  type RouteFlowStepInputOption,
   type RouteFlowOrientation,
   type RouteFlowQuorum,
   type RouteFlowStep,
+  type RouteFlowStepInput,
 } from '@whity/ui/route-flow/model';
 import { IconDeviceFloppy, IconFileCheck, IconPencil, IconPlus } from '@tabler/icons-react';
 import { useLeaveGuard } from '@whity/ui/save-bar';
+import { useViewportAtLeast } from '@whity/ui/screen-too-small';
+import { RouteReadOnly } from './route-read-only';
 import { routeSentence } from '@/lib/documents/route-sentence';
 import type { RoutingRule } from '@/components/documents/routing-wire';
 import { AudienceGroupPicker, type AudienceGroupPreview } from '@whity/ui/audience-group-picker';
@@ -146,7 +150,7 @@ const GROUP_KIND = 'group';
  */
 const NEW_STAGE_KIND_PREFERENCE = ['role', 'group', 'role_below_actor'];
 
-const QUORUMS: RouteFlowQuorum[] = ['all', 'any', 'majority'];
+const QUORUMS: RouteFlowQuorum[] = ['all', 'any', 'majority', 'first'];
 
 export function RouteFlowEditorScreen({
   templateId,
@@ -155,25 +159,29 @@ export function RouteFlowEditorScreen({
   templateId: number;
   canWrite: boolean;
 }) {
-  const { apiClient } = useAuth();
   const t = useTranslation('admin');
+  // Under 640px the route is read as sentences instead of a canvas (PwBuilders).
+  // Not measured yet counts as wide, as it does for every gate on this hook.
+  const phone = useViewportAtLeast(640) === false;
 
   const templateResult = useFetch(async () => {
-    const response = await apiClient(`/api/v1/document-route-templates/${templateId}`);
+    const { data, response } = await api.GET('/api/v1/document-route-templates/{id}', {
+      params: { path: { id: templateId } },
+    });
     if (!response.ok) {
       throw new Error(t('routeTemplates.error.loadOne', 'This route template could not be loaded'));
     }
-    const body = (await response.json()) as { data: RouteTemplateGraphWire };
+    const body = data as unknown as { data: RouteTemplateGraphWire };
     return body.data;
-  }, [apiClient, templateId]);
+  }, [templateId]);
 
   /** The kinds a stage may name, from the server's own registry. */
   const rulesResult = useFetch(async () => {
-    const response = await apiClient('/api/v1/routing-rules');
+    const { data, response } = await api.GET('/api/v1/routing-rules');
     if (!response.ok) return [] as RoutingRule[];
-    const body = await response.json();
+    const body = data as unknown as { data?: RoutingRule[] };
     return (body.data ?? []) as RoutingRule[];
-  }, [apiClient]);
+  }, []);
 
   /**
    * Roles and groups for the two core config shapes.
@@ -184,35 +192,49 @@ export function RouteFlowEditorScreen({
    * picker.
    */
   const rolesResult = useFetch(async () => {
-    const response = await apiClient('/api/v1/roles?per_page=100');
+    const { data, response } = await api.GET('/api/v1/roles', { params: { query: { per_page: 100 } } });
     if (!response.ok) return [] as RoleOption[];
-    const body = await response.json();
+    const body = data as unknown as { data?: RoleOption[] };
     return ((body.data ?? []) as RoleOption[]).map((r) => ({ id: r.id, name: r.name }));
-  }, [apiClient]);
+  }, []);
 
   const groupsResult = useFetch(async () => {
-    const response = await apiClient('/api/v1/user-groups?per_page=100');
+    const { data, response } = await api.GET('/api/v1/user-groups', { params: { query: { per_page: 100 } } });
     if (!response.ok) return [] as GroupOption[];
-    const body = await response.json();
+    const body = data as unknown as { data?: GroupOption[] };
     return ((body.data ?? []) as GroupOption[]).map((g) => ({ id: g.id, name: g.name }));
-  }, [apiClient]);
+  }, []);
 
   // WHIT-921: the published templates a final document stage may render with.
   // Soft on a 403 like the pickers above: the stage can still use the form's.
   const finalTemplatesResult = useFetch(async () => {
-    const response = await apiClient('/api/v1/document-sources?kind=template');
+    const { data, response } = await api.GET('/api/v1/document-sources', {
+      params: { query: { kind: 'template' } },
+    });
     if (!response.ok) return [] as FinalTemplateOption[];
-    const body = await response.json();
-    return ((body.data ?? []) as Array<{ id: number; title: string; published_version: number | null }>)
+    const body = data as unknown as { data?: Array<{ id: number; title: string; published_version: number | null }> };
+    return (body.data ?? [])
       .filter((row) => row.published_version !== null)
       .map((row) => ({ id: row.id, title: row.title }));
-  }, [apiClient]);
+  }, []);
 
   if (templateResult.error !== null) {
     return <p className="text-sm text-destructive">{templateResult.error}</p>;
   }
   if (templateResult.data === null) {
     return <p className="text-sm text-muted-foreground">{t('routeTemplates.loading', 'Loading…')}</p>;
+  }
+
+  if (phone) {
+    return (
+      <RouteReadOnly
+        name={templateResult.data.name}
+        graph={toFlowGraph(templateResult.data)}
+        rules={rulesResult.data ?? []}
+        roles={rolesResult.data ?? []}
+        groups={groupsResult.data ?? []}
+      />
+    );
   }
 
   // The editing body mounts only once the design has arrived, so its state can be
@@ -253,7 +275,6 @@ function RouteFlowBody({
   groups: GroupOption[];
   finalTemplates: FinalTemplateOption[];
 }) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const { dir } = useDirection();
   const t = useTranslation('admin');
@@ -307,7 +328,8 @@ function RouteFlowBody({
       inFlight.current.add(key);
       void (async () => {
         try {
-          const response = await apiClient(request.url, request.init);
+          // The preview address depends on the rule's kind (see `audiencePreviewRequest`).
+          const response = await apiFetch(request.url, request.init);
 
           if (!response.ok) {
             const body = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -337,7 +359,7 @@ function RouteFlowBody({
         }
       })();
     }
-  }, [apiClient, audienceKey, audiences, graph, t]);
+  }, [audienceKey, audiences, graph, t]);
 
   const audienceFor = useCallback(
     (step: RouteFlowStep): RouteFlowAudience | undefined => audiences[audienceKey(step)],
@@ -450,29 +472,27 @@ function RouteFlowBody({
     setSaving(true);
     try {
       if (name.trim() !== '' && name !== savedName) {
-        const renamed = await apiClient(`/api/v1/document-route-templates/${templateId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name.trim() }),
+        const { error: renameError, response: renamed } = await api.PATCH('/api/v1/document-route-templates/{id}', {
+          params: { path: { id: templateId } },
+          body: { name: name.trim() },
         });
         if (!renamed.ok) {
-          const body = (await renamed.json().catch(() => null)) as { error?: string } | null;
+          const body = (renameError ?? null) as { error?: string } | null;
           addToast(body?.error ?? t('routeTemplates.error.rename', 'The route could not be renamed'), 'error');
           return;
         }
         setSavedName(name);
       }
-      const response = await apiClient(`/api/v1/document-route-templates/${templateId}/graph`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(toGraphRequest(graph)),
+      const { data, error, response } = await api.PUT('/api/v1/document-route-templates/{id}/graph', {
+        params: { path: { id: templateId } },
+        body: toGraphRequest(graph),
       });
 
       if (!response.ok) {
         // The server's 422 names the stage and the reason ("Step 3: the 'group'
         // rule needs a 'group_id' ..."), which is exactly what an author needs
         // to act. Shown verbatim rather than replaced.
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        const body = (error ?? null) as { error?: string } | null;
         addToast(
           body?.error ?? t('routeTemplates.error.save', 'The flow could not be saved'),
           'error'
@@ -480,14 +500,14 @@ function RouteFlowBody({
         return;
       }
 
-      const body = (await response.json()) as { data: RouteTemplateGraphWire };
+      const body = data as unknown as { data: RouteTemplateGraphWire };
       setGraph(toFlowGraph(body.data));
       setDirty(false);
       addToast(t('routeTemplates.saved', 'Route saved'), 'success');
     } finally {
       setSaving(false);
     }
-  }, [addToast, apiClient, graph, name, savedName, t, templateId]);
+  }, [addToast, graph, name, savedName, t, templateId]);
 
   const selectedStep = useMemo(
     () => graph.steps.find((s) => s.position === selected) ?? null,
@@ -635,6 +655,7 @@ function RouteFlowBody({
             quorumAll: t('routeTemplates.quorum.all', 'all must approve'),
             quorumAny: t('routeTemplates.quorum.any', 'any one may approve'),
             quorumMajority: t('routeTemplates.quorum.majority', 'a majority must approve'),
+            quorumFirst: t('routeTemplates.quorum.first', 'the first answer decides'),
             tooManyNodes: t(
               'routeTemplates.canvas.tooMany',
               'This flow is larger than the canvas will draw. Showing the first stages only.'
@@ -799,6 +820,348 @@ function FinalStageInspector({
  * cannot fetch. The canvas reports which stage is selected; this decides what
  * that means.
  */
+/** WHIT-1016: the most values one stage may ask for; the server refuses more. */
+const MAX_STAGE_VALUES = 5;
+
+/**
+ * A key for a new value, from its English label: small letters, digits and _,
+ * starting with a letter, unique on this stage. Templates print it as
+ * `route.value.<key>`, so it never changes once made, even if the label does.
+ */
+export function stageValueKey(label: string, taken: readonly string[]): string {
+  const slug = label
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^[^a-z]+/, '')
+    .replace(/_+$/, '')
+    .slice(0, 32);
+  const base = slug === '' ? 'value' : slug;
+  if (!taken.includes(base)) return base;
+  for (let n = 2; ; n++) {
+    const key = `${base}_${n}`;
+    if (!taken.includes(key)) return key;
+  }
+}
+
+/**
+ * The values a stage asks the person letting it through to fill in
+ * (WHIT-1016), in English and Arabic. The key is made from the English label
+ * when the value is added and is not shown: templates offer the label.
+ */
+function StageValuesEditor({
+  inputs,
+  readOnly,
+  onChange,
+  t,
+}: {
+  inputs: RouteFlowStepInput[];
+  readOnly: boolean;
+  onChange: (inputs: RouteFlowStepInput[]) => void;
+  t: ReturnType<typeof useTranslation>;
+}) {
+  const [draft, setDraft] = useState('');
+  const update = (index: number, patch: Partial<RouteFlowStepInput>) =>
+    onChange(inputs.map((input, i) => (i === index ? { ...input, ...patch } : input)));
+  const add = () => {
+    const label = draft.trim();
+    if (label === '') return;
+    onChange([
+      ...inputs,
+      { key: stageValueKey(label, inputs.map((input) => input.key)), label, labelAr: null, required: true, maxLength: 100, type: 'text' },
+    ]);
+    setDraft('');
+  };
+
+  return (
+    <section className="space-y-2" aria-labelledby="stage-values-heading">
+      <h3 id="stage-values-heading" className="text-sm font-medium">
+        {t('routeTemplates.inspector.values', 'Values to fill in')}
+      </h3>
+      <p className="text-xs text-muted-foreground">
+        {t(
+          'routeTemplates.inspector.valuesHelp',
+          'The person approving here fills these in, such as a meeting number. Documents and reference numbers can print them.'
+        )}
+      </p>
+      {inputs.map((input, index) => (
+        <div key={input.key} className="space-y-2 rounded-control border border-border p-2">
+          <label className="block space-y-1">
+            <span className="text-xs font-medium">{t('routeTemplates.inspector.valueLabel', 'Name')}</span>
+            <Input
+              value={input.label}
+              maxLength={80}
+              disabled={readOnly}
+              onChange={(e) => update(index, { label: e.target.value })}
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-medium">{t('routeTemplates.inspector.valueLabelAr', 'Name in Arabic')}</span>
+            <Input
+              dir="rtl"
+              value={input.labelAr ?? ''}
+              maxLength={80}
+              disabled={readOnly}
+              onChange={(e) => update(index, { labelAr: e.target.value === '' ? null : e.target.value })}
+            />
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-medium">{t('routeTemplates.inspector.valueKind', 'What is filled in')}</span>
+            <Select
+              value={input.type ?? 'text'}
+              disabled={readOnly}
+              onValueChange={(kind) =>
+                update(index, {
+                  type: kind as 'text' | 'person' | 'choice',
+                  options: kind === 'choice' ? (input.options?.length ? input.options : defaultChoiceOptions(t)) : undefined,
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="text">{t('routeTemplates.inspector.valueKindText', 'A line of text')}</SelectItem>
+                <SelectItem value="person">{t('routeTemplates.inspector.valuePerson', 'A person in the workspace')}</SelectItem>
+                <SelectItem value="choice">{t('routeTemplates.inspector.valueKindChoice', 'One of a list')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          {input.type === 'choice' && (
+            <ChoiceOptionsEditor
+              options={input.options ?? []}
+              readOnly={readOnly}
+              onChange={(options) => update(index, { options })}
+              t={t}
+            />
+          )}
+          <div className="flex items-center justify-between gap-2">
+            <label className="flex items-center gap-2 text-sm">
+              <Switch
+                checked={input.required}
+                disabled={readOnly}
+                onCheckedChange={(checked) => update(index, { required: checked })}
+              />
+              {t('routeTemplates.inspector.valueRequired', 'Needed to approve')}
+            </label>
+            {!readOnly && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onChange(inputs.filter((_, i) => i !== index))}
+              >
+                {t('routeTemplates.inspector.valueRemove', 'Remove')}
+              </Button>
+            )}
+          </div>
+        </div>
+      ))}
+      {!readOnly && inputs.length < MAX_STAGE_VALUES && (
+        <div className="flex items-end gap-2">
+          <label className="block flex-1 space-y-1">
+            <span className="text-xs font-medium">{t('routeTemplates.inspector.valueNew', 'New value')}</span>
+            <Input
+              value={draft}
+              maxLength={80}
+              placeholder={t('routeTemplates.inspector.valueNewPlaceholder', 'For example: Meeting number')}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  add();
+                }
+              }}
+            />
+          </label>
+          <Button type="button" variant="outline" disabled={draft.trim() === ''} onClick={add}>
+            {t('routeTemplates.inspector.valueAdd', 'Add')}
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** WHIT-1163: a choice offers 2 to this many options; the server refuses more. */
+const MAX_CHOICE_OPTIONS = 12;
+
+/** A new choice starts as a decision a reviewer can edit. */
+function defaultChoiceOptions(t: ReturnType<typeof useTranslation>): RouteFlowStepInputOption[] {
+  return [
+    { value: 'approved', label: t('routeTemplates.inspector.choiceApproved', 'Approved'), labelAr: null },
+    { value: 'not_approved', label: t('routeTemplates.inspector.choiceNotApproved', 'Not approved'), labelAr: null },
+  ];
+}
+
+/**
+ * The options of a choice a stage asks for (WHIT-1163), in English and Arabic.
+ * The stored value is made from the English label when the option is added
+ * and is not shown, as for the stage's values themselves.
+ */
+function ChoiceOptionsEditor({
+  options,
+  readOnly,
+  onChange,
+  t,
+}: {
+  options: RouteFlowStepInputOption[];
+  readOnly: boolean;
+  onChange: (options: RouteFlowStepInputOption[]) => void;
+  t: ReturnType<typeof useTranslation>;
+}) {
+  const [draft, setDraft] = useState('');
+  const update = (index: number, patch: Partial<RouteFlowStepInputOption>) =>
+    onChange(options.map((option, i) => (i === index ? { ...option, ...patch } : option)));
+  const add = () => {
+    const label = draft.trim();
+    if (label === '') return;
+    onChange([...options, { value: stageValueKey(label, options.map((o) => o.value)), label, labelAr: null }]);
+    setDraft('');
+  };
+
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-xs font-medium">{t('routeTemplates.inspector.choiceOptions', 'Options')}</legend>
+      {options.map((option, index) => (
+        <div key={option.value} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
+          <Input
+            aria-label={t('routeTemplates.inspector.choiceOptionLabel', 'Option')}
+            value={option.label}
+            maxLength={80}
+            disabled={readOnly}
+            onChange={(e) => update(index, { label: e.target.value })}
+          />
+          <Input
+            dir="rtl"
+            aria-label={t('routeTemplates.inspector.choiceOptionLabelAr', 'Option in Arabic')}
+            value={option.labelAr ?? ''}
+            maxLength={80}
+            disabled={readOnly}
+            onChange={(e) => update(index, { labelAr: e.target.value === '' ? null : e.target.value })}
+          />
+          {!readOnly && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={options.length <= 2}
+              onClick={() => onChange(options.filter((_, i) => i !== index))}
+            >
+              {t('routeTemplates.inspector.valueRemove', 'Remove')}
+            </Button>
+          )}
+        </div>
+      ))}
+      {!readOnly && options.length < MAX_CHOICE_OPTIONS && (
+        <div className="flex items-end gap-2">
+          <Input
+            aria-label={t('routeTemplates.inspector.choiceNew', 'New option')}
+            value={draft}
+            maxLength={80}
+            placeholder={t('routeTemplates.inspector.choiceNewPlaceholder', 'For example: Conditionally approved')}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                add();
+              }
+            }}
+          />
+          <Button type="button" variant="outline" disabled={draft.trim() === ''} onClick={add}>
+            {t('routeTemplates.inspector.valueAdd', 'Add')}
+          </Button>
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+/** WHIT-1018: the most questions one stage may leave people out by; the server refuses more. */
+const MAX_STAGE_EXCLUSIONS = 10;
+
+/**
+ * The form's people questions whose answers a stage leaves out (WHIT-1018),
+ * such as `supervisor` and `co_supervisor`: those people are not asked, not
+ * counted in what counts as approved, and not printed among the approvals.
+ * Named by the question's key, which the form builder shows under Show
+ * technical details.
+ */
+function StageExclusionsEditor({
+  keys,
+  readOnly,
+  onChange,
+  t,
+}: {
+  keys: string[];
+  readOnly: boolean;
+  onChange: (keys: string[]) => void;
+  t: ReturnType<typeof useTranslation>;
+}) {
+  const [draft, setDraft] = useState('');
+  const key = draft.trim().toLowerCase();
+  const valid = /^[a-z][a-z0-9_]*$/.test(key) && !keys.includes(key);
+  const add = () => {
+    if (!valid) return;
+    onChange([...keys, key]);
+    setDraft('');
+  };
+
+  return (
+    <section className="space-y-2" aria-labelledby="stage-exclusions-heading">
+      <h3 id="stage-exclusions-heading" className="text-sm font-medium">
+        {t('routeTemplates.inspector.exclusions', 'Leave out people named on the form or at an earlier stage')}
+      </h3>
+      <p className="text-xs text-muted-foreground">
+        {t(
+          'routeTemplates.inspector.exclusionsHelp',
+          'People picked in these questions or stage values, such as the supervisor, are not asked here, are not counted towards approval and are not printed among the approvals.'
+        )}
+      </p>
+      {keys.length > 0 && (
+        <ul className="space-y-1">
+          {keys.map((item) => (
+            <li key={item} className="flex items-center justify-between gap-2 rounded-control border border-border px-2 py-1">
+              <span className="font-mono text-sm" dir="ltr">
+                {item}
+              </span>
+              {!readOnly && (
+                <Button type="button" variant="outline" size="sm" onClick={() => onChange(keys.filter((k) => k !== item))}>
+                  {t('routeTemplates.inspector.valueRemove', 'Remove')}
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {!readOnly && keys.length < MAX_STAGE_EXCLUSIONS && (
+        <div className="flex items-end gap-2">
+          <label className="block flex-1 space-y-1">
+            <span className="text-xs font-medium">{t('routeTemplates.inspector.exclusionNew', 'Question key')}</span>
+            <Input
+              dir="ltr"
+              className="font-mono"
+              value={draft}
+              maxLength={128}
+              placeholder="supervisor"
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  add();
+                }
+              }}
+            />
+          </label>
+          <Button type="button" variant="outline" disabled={!valid} onClick={add}>
+            {t('routeTemplates.inspector.valueAdd', 'Add')}
+          </Button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function StageInspector({
   step,
   graph,
@@ -1068,6 +1431,25 @@ function StageInspector({
         />
       </label>
 
+      {/* WHIT-1016: values the person letting it through fills in, such as a
+          committee meeting number. Nobody acts on a stage that only tells. */}
+      {/* WHIT-1018: a committee member who supervises the project does not review it. */}
+      <StageExclusionsEditor
+        keys={step.excludeNamedIn ?? []}
+        readOnly={readOnly}
+        onChange={(excludeNamedIn) => onChange({ excludeNamedIn })}
+        t={t}
+      />
+
+      {step.satisfiedBy !== 'delivery' && (
+        <StageValuesEditor
+          inputs={step.inputs ?? []}
+          readOnly={readOnly}
+          onChange={(inputs) => onChange({ inputs })}
+          t={t}
+        />
+      )}
+
       {/* Said once, under whichever switch is on, rather than as a warning that
           appears after a refusal. An author turning one on needs to know why the
           other went grey, and an author who has turned neither on needs neither
@@ -1119,7 +1501,9 @@ function StageInspector({
                     ? t('routeTemplates.quorum.all', 'all must approve')
                     : q === 'any'
                       ? t('routeTemplates.quorum.any', 'any one may approve')
-                      : t('routeTemplates.quorum.majority', 'a majority must approve')}
+                      : q === 'first'
+                        ? t('routeTemplates.quorum.first', 'the first answer decides')
+                        : t('routeTemplates.quorum.majority', 'a majority must approve')}
                 </SelectItem>
               ))}
             </SelectContent>

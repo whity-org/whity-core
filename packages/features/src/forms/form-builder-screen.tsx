@@ -37,8 +37,9 @@ import { FormSettingsTab, type FormSettings } from "./form-settings-tab"
 import { useStatusLabel } from "./forms-list-screen"
 import { QuestionPanel } from "./question-panel"
 import { ResponsesTab } from "./responses-tab"
-import { asMap, pickText, statusVariant } from "./text"
+import { asMap, statusVariant } from "./text"
 import type { DocumentFit, DocumentFitNeed, FieldDraft, FieldKind, FinalTemplateOption, FormRow, FormSectionDef, FormsScreenEnv } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 interface Loaded {
   form: FormRow
@@ -79,6 +80,7 @@ function settingsOf(
     description: asMap(form.description_i18n),
     submit_label: asMap(form.submit_label),
     reference_format: form.reference_format ?? "",
+    reference_assign: form.reference_assign === "approval" ? "approval" : "submit",
     sections,
   }
 }
@@ -247,6 +249,7 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
                 ? { kind: "image" }
                 : { kind: "pattern", style: settings.banner.style, seed: settings.banner.seed },
           reference_format: settings.reference_format.trim() === "" ? null : settings.reference_format.trim(),
+          reference_assign: settings.reference_assign,
           sections: settings.sections,
         },
         failed
@@ -533,10 +536,10 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
 
   const { form, kinds } = loaded
   const readOnly = !canManage
-  const title = pickText(settings.name, currentLanguage) || form.form_key
+  const title = localizedText(settings.name, currentLanguage) || form.form_key
   // The canvas shows the form as the person filling it in sees it.
-  const shownTitle = pickText(settings.title, currentLanguage) || title
-  const description = pickText(settings.description, currentLanguage)
+  const shownTitle = localizedText(settings.title, currentLanguage) || title
+  const description = localizedText(settings.description, currentLanguage)
   const selectedField = selected !== null ? fields[selected] : undefined
 
   const panel =
@@ -738,7 +741,7 @@ function FormBuilder({ env, formId, canManage }: { env: FormsScreenEnv; formId: 
                 {!readOnly && (
                   <MakeTemplateFromForm
                     disabled={publicBusy || dirty || fields.length === 0}
-                    defaultTitle={(language) => pickText(settings.name, language) || title}
+                    defaultTitle={(language) => localizedText(settings.name, language) || title}
                     onMake={makeTemplate}
                   />
                 )}

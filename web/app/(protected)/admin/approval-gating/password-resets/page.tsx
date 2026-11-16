@@ -2,18 +2,25 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useToast } from '@/lib/toast-context';
+import { api } from '@/lib/api/client';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { ApprovalGatingTabs } from '@/components/admin/approval-gating-tabs';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import { Pagination } from '@whity/ui/pagination';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
 import { useDateDisplay } from '@whity/features/datetime';
 import { IconCheck, IconInbox, IconX } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
+import {
+  ConfirmItsYouDialog,
+  isIdentityCheckFailure,
+  startIdentityCheck,
+  type IdentityCheck,
+} from '@/components/security/confirm-its-you-dialog';
 
 /**
  * Pending self-service password-reset requests
@@ -62,22 +69,25 @@ export default function PasswordResetApprovalsPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   // Approving is security-sensitive: type the email to confirm (tier 3).
   const [approving, setApproving] = useState<typeof items[number] | null>(null);
+  // AG.1: then "confirm it's you", whose code goes with the approval.
+  const [checking, setChecking] = useState<{ item: PendingPasswordReset; check: IdentityCheck } | null>(null);
+  const [codeError, setCodeError] = useState<string | null>(null);
   const dates = useDateDisplay();
 
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await fetch(`/api/v1/password-resets/pending?page=${page}&per_page=${PER_PAGE}`, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'include',
+      // The spec lists no query for this route; the server pages it.
+      const { data, response: res } = await api.GET('/api/v1/password-resets/pending', {
+        params: { query: { page, per_page: PER_PAGE } as never },
       });
       if (!res.ok) {
         setLoadError(true);
         setItems([]);
         return;
       }
-      const body = await res.json().catch(() => ({}));
+      const body = (data ?? {}) as { data?: unknown; pagination?: { total?: unknown } };
       const rows = Array.isArray(body?.data) ? (body.data as PendingPasswordReset[]) : [];
       setItems(rows);
       setTotal(typeof body?.pagination?.total === 'number' ? body.pagination.total : rows.length);
@@ -95,14 +105,37 @@ export default function PasswordResetApprovalsPage() {
     }
   }, [isCapabilitiesLoading, canApprove, load]);
 
-  const act = async (item: PendingPasswordReset, action: 'approve' | 'reject') => {
+  /** AG.1: find out the check, and have the code emailed when that is the check. */
+  const startCheck = async (item: PendingPasswordReset) => {
     setBusyId(item.id);
     try {
-      const res = await fetch(`/api/v1/password-resets/${item.id}/${action}`, {
-        method: 'POST',
-        headers: { 'X-Requested-With': 'XMLHttpRequest' },
-        credentials: 'include',
-      });
+      const started = await startIdentityCheck(() =>
+        api.POST('/api/v1/password-resets/identity-check', { body: { request_id: item.id } }),
+      );
+      if ('error' in started) {
+        addToast(started.error ?? t('twoStep.identity.failed', 'We could not start the check. Try again in a few minutes.'), 'error');
+        return;
+      }
+      setCodeError(null);
+      setChecking({ item, check: started.check });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const act = async (item: PendingPasswordReset, action: 'approve' | 'reject', code?: string) => {
+    setBusyId(item.id);
+    try {
+      const params = { params: { path: { id: item.id } } };
+      const { error, response: res } =
+        action === 'approve'
+          ? await api.POST('/api/v1/password-resets/{id}/approve', { ...params, body: { code: code ?? '' } })
+          : await api.POST('/api/v1/password-resets/{id}/reject', params);
+      if (action === 'approve' && !res.ok && isIdentityCheckFailure(error)) {
+        setCodeError(t('twoStep.identity.wrong', 'That code is not right or has expired.'));
+        return;
+      }
+      setChecking(null);
       if (!res.ok) {
         addToast(
           action === 'approve'
@@ -303,7 +336,17 @@ export default function PasswordResetApprovalsPage() {
         }}
         variant="default"
         onConfirm={async () => {
-          if (approving !== null) await act(approving, 'approve');
+          if (approving !== null) await startCheck(approving);
+        }}
+      />
+      <ConfirmItsYouDialog
+        check={checking?.check ?? null}
+        busy={checking !== null && busyId === checking.item.id}
+        error={codeError}
+        onCancel={() => setChecking(null)}
+        onClearError={() => setCodeError(null)}
+        onConfirm={(code) => {
+          if (checking !== null) void act(checking.item, 'approve', code);
         }}
       />
     </div>

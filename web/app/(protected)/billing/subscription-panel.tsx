@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { Badge } from '@whity/ui/badge';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -46,28 +46,30 @@ interface Receipt {
   currency: string;
   paid_at: string | null;
   issued_at: string | null;
+  /** WHIT-1153: recorded by the operator, paid in cash. */
+  source?: 'cash';
+  covers_until?: string;
 }
 
 export function SubscriptionPanel() {
-  const { apiClient } = useAuth();
   const t = useTranslation('admin');
   const dates = useDateDisplay();
 
   const { data: access, loading, refetch: refetchAccess } = useFetch(async () => {
-    const res = await apiClient('/api/v1/billing/return');
+    const { data: body, response: res } = await api.GET('/api/v1/billing/return');
     if (!res.ok) {
       return null;
     }
-    return (await res.json()).data as AccessState;
-  }, [apiClient]);
+    return (body as { data?: AccessState } | undefined)?.data as AccessState;
+  }, []);
 
   const { data: receipts } = useFetch(async () => {
-    const res = await apiClient('/api/v1/billing/receipts');
+    const { data: body, response: res } = await api.GET('/api/v1/billing/receipts');
     if (!res.ok) {
       return [] as Receipt[];
     }
-    return ((await res.json()).data ?? []) as Receipt[];
-  }, [apiClient]);
+    return ((body as { data?: Receipt[] } | undefined)?.data ?? []) as Receipt[];
+  }, []);
 
   // Until the answer is known, offer nothing. Rendering the "activate" block
   // first and withdrawing it a moment later would invite the exact double
@@ -140,8 +142,12 @@ export function SubscriptionPanel() {
         ) : (
           <ul className="divide-y rounded-lg border text-sm">
             {paid.map((receipt) => (
-              <li key={receipt.number} className="flex flex-wrap items-baseline justify-between gap-2 p-3">
-                <span className="font-medium">{receipt.number}</span>
+              <li key={`${receipt.source ?? 'provider'}-${receipt.number}`} className="flex flex-wrap items-baseline justify-between gap-2 p-3">
+                <span className="font-medium">
+                  {receipt.source === 'cash'
+                    ? t('billing.receipts.cash', 'Paid in cash · receipt {number}', { number: receipt.number })
+                    : receipt.number}
+                </span>
                 <span className="text-muted-foreground">
                   {dates.date(receipt.paid_at) ?? ''}
                 </span>

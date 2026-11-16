@@ -39,9 +39,13 @@
 
 import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Button } from '@whity/ui/button';
+import { Icon, type IconName } from '@whity/ui/icon';
+import { PublicShell } from '@/components/auth/public-shell';
+import { OutcomeIcon, type OutcomeTone } from '@/components/auth/public-outcome';
+import type { WorkspaceBrand } from '@/lib/branding-context';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
+import { api } from '@/lib/api/client';
 
 /** The wire shape of `GET /api/v1/document-verifications/{token}`. */
 type Verification = {
@@ -59,6 +63,8 @@ type Verification = {
   pages?: number;
   /** A refused code whose document was revised, at `described` only. */
   replaced_by?: { revision: string; issued_on: string | null };
+  /** Only beside a code that verified: the issuer's logo and colour (WHIT-1044). */
+  brand?: WorkspaceBrand | null;
 };
 
 /**
@@ -88,23 +94,23 @@ const STAGE_LABELS: Record<string, { key: string; text: string }> = {
  * The other two appear only when the tenant chose to disclose them.
  *
  * @i18n-keys documents
- *   verify.refused.unrecognised = This code is not recognised
- *   verify.refused.unrecognisedBody = We cannot confirm a document from this code. It may never have been issued here, or it may no longer be honoured.
+ *   verify.refused.unrecognised = We can’t find this document
+ *   verify.refused.unrecognisedBody = This code doesn’t match a document we can confirm. Check you scanned the code on the document, not one printed beside it.
  *   verify.refused.withdrawn = This code has been withdrawn
  *   verify.refused.withdrawnBody = The organisation has stopped standing behind the copy this code was printed on.
- *   verify.refused.superseded = This copy has been replaced
- *   verify.refused.supersededBody = A newer version of this document has been issued, so the copy you are holding is not the current one.
+ *   verify.refused.superseded = A newer version exists
+ *   verify.refused.supersededBody = This paper was genuine when it was issued, then replaced. Ask for the newer one.
  *   verify.refused.document_withdrawn = This document has been withdrawn
  *   verify.refused.document_withdrawnBody = The organisation that issued this document has withdrawn it and no longer stands behind it.
  */
 const REFUSAL_COPY: Record<string, { titleKey: string; title: string; bodyKey: string; body: string }> = {
   unrecognised: {
     titleKey: 'verify.refused.unrecognised',
-    title: 'This code is not recognised',
+    title: 'We can’t find this document',
     bodyKey: 'verify.refused.unrecognisedBody',
     body:
-      'We cannot confirm a document from this code. It may never have been issued here, ' +
-      'or it may no longer be honoured.',
+      'This code doesn’t match a document we can confirm. ' +
+      'Check you scanned the code on the document, not one printed beside it.',
   },
   withdrawn: {
     titleKey: 'verify.refused.withdrawn',
@@ -120,10 +126,9 @@ const REFUSAL_COPY: Record<string, { titleKey: string; title: string; bodyKey: s
   },
   superseded: {
     titleKey: 'verify.refused.superseded',
-    title: 'This copy has been replaced',
+    title: 'A newer version exists',
     bodyKey: 'verify.refused.supersededBody',
-    body:
-      'A newer version of this document has been issued, so the copy you are holding is not the current one.',
+    body: 'This paper was genuine when it was issued, then replaced. Ask for the newer one.',
   },
 };
 
@@ -154,10 +159,11 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
     // reader and a stranger, and sending a cookie would make the response
     // depend on who is asking on a surface whose whole design is that it does
     // not.
-    fetch(`/api/v1/document-verifications/${encodeURIComponent(token)}`, {
-      headers: { Accept: 'application/json' },
+    api.GET('/api/v1/document-verifications/{token}', {
+      params: { path: { token } },
+      credentials: 'omit',
     })
-      .then(async (response) => {
+      .then(({ data: verification, response }) => {
         if (cancelled) return;
         if (response.status === 429) {
           setPhase({ kind: 'throttled' });
@@ -167,7 +173,7 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
           setPhase({ kind: 'error' });
           return;
         }
-        const body = (await response.json()) as { data?: Verification };
+        const body = (verification ?? {}) as unknown as { data?: Verification };
         setPhase(body.data ? { kind: 'ready', data: body.data } : { kind: 'error' });
       })
       .catch(() => {
@@ -187,13 +193,10 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
     // 401/403 for one with no session at all, and every one of those outcomes
     // lands in the same silent branch. Failing quietly is correct here — the
     // absence of the button is not an error, it is the answer.
-    fetch(`/api/v1/documents/by-verification/${encodeURIComponent(token)}`, {
-      credentials: 'include',
-      headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-    })
-      .then(async (response) => {
+    api.GET('/api/v1/documents/by-verification/{token}', { params: { path: { token } } })
+      .then(({ data: record, response }) => {
         if (cancelled || !response.ok) return;
-        const body = (await response.json()) as { data?: { id?: number; document_withdrawn?: boolean } };
+        const body = (record ?? {}) as unknown as { data?: { id?: number; document_withdrawn?: boolean } };
         if (typeof body.data?.id === 'number') setRecordId(body.data.id);
         setRecordWithdrawn(body.data?.document_withdrawn === true);
       })
@@ -206,125 +209,171 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
     };
   }, [token]);
 
+  const look = outcomeLook(phase);
+  // The issuer's brand comes only beside a code that verified (WHIT-1044); every
+  // other answer wears the host's, so it says nothing about whose code it was.
+  const brand = phase.kind === 'ready' && phase.data.verified ? phase.data.brand ?? null : null;
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle data-testid="verify-title" dir="auto">{headline(t, phase)}</CardTitle>
-          <CardDescription data-testid="verify-body" dir="auto">{body(t, phase)}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {phase.kind === 'ready' && phase.data.verified && (
-            <dl className="space-y-3 text-sm">
-              <Fact label={t('verify.field.issuer', 'Issued by')} value={phase.data.issuer} />
-              {/*
-                @date-display-ignore: this page is NOT governed by
-                `ui.hide_dates`, and #1068 says so in as many words. That
-                setting is about what a tenant's own STAFF see on their screens;
-                the audience here is a stranger holding a printed sheet, for
-                whom "issued on" is doing real verification work that no staff
-                timestamp is doing. A verification page with no date is a
-                substantially weaker one.
+    <PublicShell brand={brand}>
+      <section
+        className="grid gap-4 rounded-card border border-border bg-card p-6 text-card-foreground"
+        aria-busy={phase.kind === 'loading' || undefined}
+      >
+        <p className="text-sm text-muted-foreground" dir="auto">
+          {t('verify.eyebrow', 'Document verification')}
+        </p>
+        <OutcomeIcon name={look.icon} tone={look.tone} />
+        <div className="grid gap-2">
+          <h1 className="text-xl font-semibold text-foreground" data-testid="verify-title" dir="auto">
+            {headline(t, phase)}
+          </h1>
+          <p className="text-muted-foreground" data-testid="verify-body" dir="auto">
+            {body(t, phase)}
+          </p>
+        </div>
 
-                Whether to show it stays this page's own decision, on its own
-                key: `documents.qr_public_detail`, whose `undated` level (added
-                by #1068 for exactly this) withholds `issued_on` server-side.
-                The value is ABSENT from the payload then, so `Fact` renders
-                nothing, and no client-side gate is involved at all.
+        {phase.kind === 'ready' && phase.data.verified && (
+          <dl className="grid gap-2 text-sm">
+            {/* The `described` level (#1627): enough to compare with the paper. */}
+            <Fact label={t('verify.field.kind', 'Document')} value={phase.data.kind} />
+            <Fact label={t('verify.field.issuer', 'Issued by')} value={phase.data.issuer} />
+            {/*
+              @date-display-ignore: this page is NOT governed by
+              `ui.hide_dates`, and #1068 says so in as many words. That
+              setting is about what a tenant's own STAFF see on their screens;
+              the audience here is a stranger holding a printed sheet, for
+              whom "issued on" is doing real verification work that no staff
+              timestamp is doing. A verification page with no date is a
+              substantially weaker one.
 
-                It is rendered verbatim because the SERVER already reduced it to
-                a date (`VerificationPresenter::dateOnly`) and deliberately did
-                not send a time. Re-parsing and re-localising it here would
-                reintroduce a time-of-day this endpoint exists not to disclose.
-              */}
-              <Fact label={t('verify.field.issuedOn', 'Issued on')} value={phase.data.issued_on} />
+              Whether to show it stays this page's own decision, on its own
+              key: `documents.qr_public_detail`, whose `undated` level (added
+              by #1068 for exactly this) withholds `issued_on` server-side.
+              The value is ABSENT from the payload then, so `Fact` renders
+              nothing, and no client-side gate is involved at all.
+
+              It is rendered verbatim because the SERVER already reduced it to
+              a date (`VerificationPresenter::dateOnly`) and deliberately did
+              not send a time. Re-parsing and re-localising it here would
+              reintroduce a time-of-day this endpoint exists not to disclose.
+            */}
+            <Fact label={t('verify.field.issuedOn', 'Issued on')} value={phase.data.issued_on} />
+            <Fact
+              label={t('verify.field.reference', 'Reference')}
+              value={phase.data.reference}
+              /* Latin-alphanumeric; bidi reordering would scramble it. */
+              monospaceLtr
+            />
+            <Fact label={t('verify.field.revision', 'Revision')} value={phase.data.revision} monospaceLtr />
+            <Fact
+              label={t('verify.field.pages', 'Pages')}
+              value={phase.data.pages !== undefined ? String(phase.data.pages) : undefined}
+              monospaceLtr
+            />
+            {phase.data.stage !== undefined && (
               <Fact
-                label={t('verify.field.reference', 'Reference')}
-                value={phase.data.reference}
-                /* Latin-alphanumeric; bidi reordering would scramble it. */
-                monospaceLtr
+                label={t('verify.field.stage', 'Current stage')}
+                value={stageLabel(t, phase.data.stage)}
               />
-              {/* The `described` level (#1627): enough to compare with the paper. */}
-              <Fact label={t('verify.field.kind', 'Document')} value={phase.data.kind} />
-              <Fact label={t('verify.field.revision', 'Revision')} value={phase.data.revision} monospaceLtr />
-              <Fact
-                label={t('verify.field.pages', 'Pages')}
-                value={phase.data.pages !== undefined ? String(phase.data.pages) : undefined}
-                monospaceLtr
-              />
-              {phase.data.stage !== undefined && (
-                <Fact
-                  label={t('verify.field.stage', 'Current stage')}
-                  value={stageLabel(t, phase.data.stage)}
-                />
+            )}
+          </dl>
+        )}
+
+        {/* @date-display-ignore: same as `issued_on` directly above — this is
+            the public verification surface, governed by
+            `documents.qr_public_detail` and not by `ui.hide_dates`, and the
+            server has already reduced the value to a date. */}
+        {phase.kind === 'ready' && !phase.data.verified && phase.data.revoked_on && (
+          <dl className="grid gap-2 text-sm">
+            <Fact label={t('verify.field.withdrawnOn', 'Withdrawn on')} value={phase.data.revoked_on} />
+          </dl>
+        )}
+
+        {/* Shown only at `described` (#1627). */}
+        {phase.kind === 'ready' && !phase.data.verified && phase.data.replaced_by && (
+          <div className="grid gap-3" data-testid="verify-replaced-by">
+            <p className="text-sm" dir="auto">
+              {t(
+                'verify.replacedByBody',
+                'Revision {revision} replaced it. Ask the organisation for that one.',
+                { revision: phase.data.replaced_by.revision }
               )}
-            </dl>
-          )}
-
-          {/* @date-display-ignore: same as `issued_on` directly above — this is
-              the public verification surface, governed by
-              `documents.qr_public_detail` and not by `ui.hide_dates`, and the
-              server has already reduced the value to a date. */}
-          {phase.kind === 'ready' && !phase.data.verified && phase.data.revoked_on && (
-            <dl className="space-y-3 text-sm">
-              <Fact label={t('verify.field.withdrawnOn', 'Withdrawn on')} value={phase.data.revoked_on} />
-            </dl>
-          )}
-
-          {/* Shown only at `described` (#1627). */}
-          {phase.kind === 'ready' && !phase.data.verified && phase.data.replaced_by && (
-            <div className="space-y-3" data-testid="verify-replaced-by">
-              <p className="text-sm" dir="auto">
-                {t(
-                  'verify.replacedByBody',
-                  'Revision {revision} replaced it. Ask the organisation for that one.',
-                  { revision: phase.data.replaced_by.revision }
-                )}
-              </p>
-              <dl className="space-y-3 text-sm">
-                <Fact
-                  label={t('verify.field.replacedBy', 'Replaced by revision')}
-                  value={phase.data.replaced_by.revision}
-                  monospaceLtr
-                />
-                {/* @date-display-ignore: the public verification surface, governed by
-                    `documents.qr_public_detail` and not by `ui.hide_dates`, as above; the
-                    server has already reduced the value to a date. */}
-                <Fact label={t('verify.field.replacedOn', 'Replaced on')} value={phase.data.replaced_by.issued_on} />
-              </dl>
-            </div>
-          )}
-
-          {recordId !== null &&
-            recordWithdrawn &&
-            phase.kind === 'ready' &&
-            phase.data.reason !== 'document_withdrawn' && (
-            <p className="text-sm" data-testid="verify-record-withdrawn" dir="auto">
-              {t('verify.recordWithdrawn', 'You can open this document, so you can also be told it has been withdrawn.')}
             </p>
-          )}
+            <dl className="grid gap-2 text-sm">
+              <Fact
+                label={t('verify.field.replacedBy', 'Replaced by revision')}
+                value={phase.data.replaced_by.revision}
+                monospaceLtr
+              />
+              {/* @date-display-ignore: the public verification surface, governed by
+                  `documents.qr_public_detail` and not by `ui.hide_dates`, as above; the
+                  server has already reduced the value to a date. */}
+              <Fact label={t('verify.field.replacedOn', 'Replaced on')} value={phase.data.replaced_by.issued_on} />
+            </dl>
+          </div>
+        )}
 
-          {recordId !== null && (
-            <Button asChild className="w-full" data-testid="verify-open-record">
-              <Link href={`/admin/document-library/${recordId}`}>
-                {t('verify.openRecord', 'Open the full record')}
-              </Link>
-            </Button>
-          )}
+        {recordId !== null &&
+          recordWithdrawn &&
+          phase.kind === 'ready' &&
+          phase.data.reason !== 'document_withdrawn' && (
+          <p className="text-sm" data-testid="verify-record-withdrawn" dir="auto">
+            {t('verify.recordWithdrawn', 'You can open this document, so you can also be told it has been withdrawn.')}
+          </p>
+        )}
 
-          <p className="text-xs text-muted-foreground" dir="auto">
+        {recordId !== null && (
+          <Button asChild variant="outline" className="w-full" data-testid="verify-open-record">
+            <Link href={`/admin/document-library/${recordId}`}>
+              {t('verify.openRecord', 'Open the full record')}
+            </Link>
+          </Button>
+        )}
+
+        {phase.kind === 'ready' && phase.data.verified && phase.data.issuer ? (
+          // What a confirmation proves, and what it doesn't (the card's info box).
+          <div className="flex gap-3 rounded-card bg-muted px-4 py-3 text-sm" data-testid="verify-proves">
+            <Icon name="info" className="mt-0.5 text-muted-foreground" />
+            <div className="grid gap-0.5">
+              <p className="font-medium text-foreground" dir="auto">
+                {t('verify.proves.title', 'What this proves')}
+              </p>
+              <p className="text-foreground" dir="auto">
+                {footer(t, phase)}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-center text-sm text-muted-foreground" dir="auto">
             {footer(t, phase)}
           </p>
-        </CardContent>
-      </Card>
-    </main>
+        )}
+      </section>
+    </PublicShell>
   );
+}
+
+/**
+ * One icon per answer (TplVerifyDocument note 2): genuine is the green seal,
+ * a newer version amber, withdrawn and not found grey, never red, so a reader
+ * isn't alarmed by a mistyped code. Checking is dashed: not yet.
+ */
+function outcomeLook(phase: Phase): { icon: IconName; tone: OutcomeTone } {
+  if (phase.kind === 'loading') return { icon: 'clock', tone: 'dash' };
+  if (phase.kind === 'throttled') return { icon: 'clock', tone: 'warn' };
+  if (phase.kind === 'error') return { icon: 'offline', tone: 'warn' };
+  if (phase.data.verified) return { icon: 'success', tone: 'ok' };
+  const reason = phase.data.reason ?? 'unrecognised';
+  if (reason === 'superseded' || phase.data.replaced_by) return { icon: 'sync', tone: 'warn' };
+  if (reason === 'withdrawn' || reason === 'document_withdrawn') return { icon: 'ban', tone: 'muted' };
+  return { icon: 'search', tone: 'muted' };
 }
 
 /**
  * One label/value pair, direction-agnostic.
  *
- * `text-start`/`text-end` rather than left/right so the whole row mirrors from
+ * `text-start` rather than left/right so the whole row mirrors from
  * `<html dir>` with no per-language branch. Absent values render nothing at all
  * rather than an empty row — a blank beside "Issued by" reads as a broken page
  * on the one surface that has to look trustworthy.
@@ -341,10 +390,10 @@ function Fact({
   if (value === undefined || value === null || value === '') return null;
 
   return (
-    <div className="flex items-baseline justify-between gap-4">
+    <div className="grid grid-cols-[minmax(6rem,auto)_1fr] items-baseline gap-4">
       <dt className="text-muted-foreground text-start" dir="auto">{label}</dt>
       <dd
-        className={`font-medium text-end ${monospaceLtr ? 'font-mono' : ''}`}
+        className={`text-foreground text-start ${monospaceLtr ? 'font-mono' : ''}`}
         dir={monospaceLtr ? 'ltr' : 'auto'}
       >
         {value}
@@ -420,11 +469,14 @@ function body(t: TranslateFn, phase: Phase): string {
     if (phase.data.issued_on === undefined || phase.data.issued_on === null) {
       return t(
         'verify.genuineBodyUndated',
-        'It was issued by the organisation named below.',
+        'It was issued by the organisation named below. Compare it with the paper in your hand.',
       );
     }
 
-    return t('verify.genuineBody', 'It was issued by the organisation named below, on the date shown.');
+    return t(
+      'verify.genuineBody',
+      'It was issued by the organisation named below, on the date shown. Compare it with the paper in your hand.'
+    );
   }
 
   const copy = REFUSAL_COPY[phase.data.reason ?? 'unrecognised'] ?? REFUSAL_COPY.unrecognised;

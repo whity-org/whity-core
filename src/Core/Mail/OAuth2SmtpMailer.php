@@ -13,7 +13,7 @@ use Whity\Core\Mail\OAuth\SmtpOAuthTokenManager;
  * still does all the talking; this supplies the token and, when the server refuses
  * one, refreshes and tries exactly once more.
  */
-final class OAuth2SmtpMailer implements Mailer
+final class OAuth2SmtpMailer implements Mailer, ThreadedMailer
 {
     /**
      * @param (Closure(SmtpConfig): SmtpConnection)|null $connector Test seam,
@@ -27,6 +27,11 @@ final class OAuth2SmtpMailer implements Mailer
     }
 
     public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
+    {
+        $this->sendThreaded(new OutgoingEmail($toEmail, $subject, $textBody, $htmlBody));
+    }
+
+    public function sendThreaded(OutgoingEmail $email): void
     {
         // WHIT-991: no mail from a proposal preview.
         \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Sending mail');
@@ -42,10 +47,10 @@ final class OAuth2SmtpMailer implements Mailer
 
         $token = $this->tokens->accessToken();
         try {
-            $this->sendWith($token, $toEmail, $subject, $textBody, $htmlBody);
+            $this->sendWith($token, $email);
         } catch (SmtpAuthRejectedException) {
             try {
-                $this->sendWith($this->tokens->accessToken($token), $toEmail, $subject, $textBody, $htmlBody);
+                $this->sendWith($this->tokens->accessToken($token), $email);
             } catch (SmtpAuthRejectedException $e) {
                 $this->tokens->recordSmtpRejected();
                 throw $e;
@@ -55,14 +60,8 @@ final class OAuth2SmtpMailer implements Mailer
         $this->tokens->recordConnected();
     }
 
-    private function sendWith(
-        #[\SensitiveParameter] string $token,
-        string $toEmail,
-        string $subject,
-        string $textBody,
-        ?string $htmlBody,
-    ): void {
-        (new SmtpMailer($this->config->withAccessToken($token), $this->connector))
-            ->send($toEmail, $subject, $textBody, $htmlBody);
+    private function sendWith(#[\SensitiveParameter] string $token, OutgoingEmail $email): void
+    {
+        (new SmtpMailer($this->config->withAccessToken($token), $this->connector))->sendThreaded($email);
     }
 }

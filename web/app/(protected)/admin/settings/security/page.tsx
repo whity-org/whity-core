@@ -12,7 +12,7 @@ import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@whity/ui/badge';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import {
   Select,
   SelectContent,
@@ -25,7 +25,7 @@ import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { useLocalizedUnits } from '@/hooks/useLocalizedUnits';
 import { useDateDisplay } from '@whity/features/datetime';
 import { SECURITY_MANAGE, errorMessage, type AddToast } from '../settings-shared';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 
 type TwoFactorPolicy = components['schemas']['TwoFactorPolicy'];
 type StatusEntry = components['schemas']['TwoFactorPolicyStatusEntry'];

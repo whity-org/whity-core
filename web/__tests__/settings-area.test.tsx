@@ -8,6 +8,7 @@
  */
 
 import React from 'react';
+import userEvent from '@testing-library/user-event';
 import { render, screen, waitFor, within } from '@testing-library/react';
 
 let mockPathname = '/admin/settings';
@@ -33,6 +34,16 @@ jest.mock('@/hooks/useCapabilities', () => ({
 const mockGet = jest.fn();
 jest.mock('@/lib/api/client', () => ({ api: { GET: (...args: unknown[]) => mockGet(...args) } }));
 
+jest.mock('@/lib/auth-context', () => ({
+  useAuth: () => ({
+    user: { tenant_id: 1, role: 'admin' },
+    memberships: [
+      { tenant_id: 1, tenant_name: 'Example Bakery', role: 'admin' },
+      { tenant_id: 2, tenant_name: 'Amman Coffee Co.', role: 'member' },
+    ],
+  }),
+}));
+
 let mockLanguage = 'en';
 jest.mock('@whity/features/i18n', () => ({
   ...jest.requireActual('@whity/features/i18n'),
@@ -40,6 +51,13 @@ jest.mock('@whity/features/i18n', () => ({
 }));
 
 import { SettingsArea } from '@/components/settings/settings-area';
+
+/** The workspace's own links, leaving out your own settings that always lead the list. */
+const workspaceHrefs = (nav: HTMLElement) =>
+  within(nav)
+    .getAllByRole('link')
+    .map((a) => a.getAttribute('href'))
+    .filter((href) => !href?.startsWith('/settings/'));
 
 function tabs(ids: string[]) {
   const href = (id: string) => (id === 'general' ? '/admin/settings' : `/admin/settings/${id}`);
@@ -77,8 +95,9 @@ describe('SettingsArea', () => {
     const nav = await screen.findByTestId('settings-area-nav');
     await waitFor(() => expect(within(nav).getByText('Workspace')).toBeInTheDocument());
     const headings = Array.from(nav.querySelectorAll('[data-settings-group]')).map((p) => p.textContent);
-    expect(headings).toEqual(['Workspace', 'Sign-in and security', 'Data']);
-    const links = within(nav).getAllByRole('link').map((a) => a.getAttribute('href'));
+    expect(headings).toEqual(['My settings', 'You in Example Bakery', 'Workspace', 'Security', 'Data']);
+    expect(nav.querySelector('[data-settings-section]')).toHaveTextContent('Workspace settings · Example Bakery');
+    const links = workspaceHrefs(nav);
     expect(links).toEqual([
       '/admin/settings',
       '/admin/settings/branding',
@@ -94,7 +113,7 @@ describe('SettingsArea', () => {
     const nav = await screen.findByTestId('settings-area-nav');
     await waitFor(() => expect(within(nav).getByText('Workspace')).toBeInTheDocument());
 
-    expect(within(nav).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual(['/admin/settings']);
+    expect(workspaceHrefs(nav)).toEqual(['/admin/settings']);
   });
 
   it('leaves out a group with nothing the person may open', async () => {
@@ -117,13 +136,13 @@ describe('SettingsArea', () => {
 });
 
 describe('SettingsArea devices', () => {
-  it('lists Licensed devices under Devices only for someone who may view them', async () => {
+  it('lists Licensed devices under Security only for someone who may view them', async () => {
     mockGet.mockResolvedValue(tabs(['general']));
     mockCaps = ['licensing:view'];
     render(<SettingsArea>page</SettingsArea>);
     const link = await screen.findByTestId('settings-area-link-devices');
     expect(link).toHaveAttribute('href', '/licensing');
-    expect(screen.getByText('Devices')).toBeInTheDocument();
+    expect(link.parentElement?.querySelector('[data-settings-group]')).toHaveTextContent('Security');
   });
 
   it('leaves the Devices group out without the permission', async () => {
@@ -131,5 +150,196 @@ describe('SettingsArea devices', () => {
     render(<SettingsArea>page</SettingsArea>);
     await screen.findByTestId('settings-area-link-general');
     expect(screen.queryByTestId('settings-area-link-devices')).toBeNull();
+  });
+});
+
+describe('SettingsArea on a phone (PwSettings)', () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it('draws the menu as its own page, marks the last opened page and filters by search', async () => {
+    window.localStorage.setItem('whity.settings.lastOpened', 'branding');
+    mockPathname = '/settings';
+    mockGet.mockResolvedValue(tabs(['general', 'branding', 'security']));
+    render(<SettingsArea>page</SettingsArea>);
+
+    const row = await screen.findByTestId('settings-menu-row-branding');
+    expect(row).toHaveAttribute('href', '/admin/settings/branding');
+    await waitFor(() => expect(within(row).getByText('Last opened')).toBeInTheDocument());
+    expect(within(screen.getByTestId('settings-menu-row-general')).queryByText('Last opened')).toBeNull();
+
+    const search = screen.getByTestId('settings-menu-search');
+    await userEvent.type(search, 'sec');
+    expect(screen.queryByTestId('settings-menu-row-branding')).toBeNull();
+    expect(screen.getByTestId('settings-menu-row-security')).toBeInTheDocument();
+  });
+
+  it('remembers the page you opened, and shows a back control with the path on a page', async () => {
+    mockPathname = '/admin/settings/branding';
+    mockGet.mockResolvedValue(tabs(['general', 'branding']));
+    render(<SettingsArea>page</SettingsArea>);
+
+    const crumb = await screen.findByTestId('settings-crumb');
+    expect(crumb).toHaveTextContent('SettingsWorkspace');
+    expect(within(screen.getByTestId('settings-back')).getByRole('link', { name: 'Settings' })).toHaveAttribute(
+      'href',
+      '/settings',
+    );
+    expect(window.localStorage.getItem('whity.settings.lastOpened')).toBe('branding');
+  });
+
+  it('a deeper page goes back to its list page and adds it to the path', async () => {
+    mockPathname = '/admin/settings/email-domains/7';
+    mockGet.mockResolvedValue(tabs(['general', 'email-domains']));
+    render(<SettingsArea>page</SettingsArea>);
+
+    const crumb = await screen.findByTestId('settings-crumb');
+    expect(crumb).toHaveTextContent('SettingsMessages and notificationsEmail-domains');
+    expect(within(screen.getByTestId('settings-back')).getByRole('link')).toHaveAttribute(
+      'href',
+      '/admin/settings/email-domains',
+    );
+  });
+
+  it('still works when storage is blocked', async () => {
+    const spy = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    mockPathname = '/admin/settings/branding';
+    mockGet.mockResolvedValue(tabs(['general', 'branding']));
+    render(<SettingsArea>page</SettingsArea>);
+    expect(await screen.findByTestId('settings-crumb')).toBeInTheDocument();
+    spy.mockRestore();
+  });
+});
+
+describe('SettingsArea: your own settings (WHIT-1081)', () => {
+  it('shows My settings and You in [workspace] to someone who can change nothing of the workspace', async () => {
+    mockGet.mockResolvedValue({ data: { data: [] } });
+    render(<SettingsArea>page</SettingsArea>);
+    const nav = await screen.findByTestId('settings-area-nav');
+    const headings = Array.from(nav.querySelectorAll('[data-settings-group]')).map((p) => p.textContent);
+    expect(headings).toEqual(['My settings', 'You in Example Bakery']);
+    expect(nav.querySelector('[data-settings-section]')).toBeNull();
+    expect(within(nav).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([
+      '/settings/profile',
+      '/settings/security',
+      '/settings/display',
+      '/settings/notifications',
+      '/settings/signed-in',
+      '/settings/role',
+    ]);
+  });
+
+  it('marks your page and puts it under its block in the path', async () => {
+    mockPathname = '/settings/notifications';
+    mockGet.mockResolvedValue(tabs(['general']));
+    render(<SettingsArea>page</SettingsArea>);
+    expect(await screen.findByTestId('settings-area-link-notifications')).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByTestId('settings-crumb')).toHaveTextContent('SettingsYou in Example Bakery');
+  });
+
+  it('keeps your Password and two-step apart from the workspace’s Security', async () => {
+    mockGet.mockResolvedValue(tabs(['security']));
+    render(<SettingsArea>page</SettingsArea>);
+    expect(await screen.findByTestId('settings-area-link-password')).toHaveAttribute('href', '/settings/security');
+    expect(screen.getByTestId('settings-area-link-security')).toHaveAttribute('href', '/admin/settings/security');
+  });
+
+  it('draws the phone menu with your settings first and says they follow you everywhere', async () => {
+    mockPathname = '/settings';
+    mockGet.mockResolvedValue(tabs(['general']));
+    render(<SettingsArea>page</SettingsArea>);
+    const menu = await screen.findByTestId('settings-menu');
+    expect(within(menu).getByTestId('settings-menu-row-notifications')).toHaveAttribute('href', '/settings/notifications');
+    expect(within(menu).getByText('All your workspaces')).toBeInTheDocument();
+    expect(within(menu).getByText('Workspace settings · Example Bakery')).toBeInTheDocument();
+  });
+});
+
+describe('SettingsArea: the workspace’s pages in one place (WHIT-1082)', () => {
+  it('links document themes, plan and billing, plugins, the logs and bookings by permission', async () => {
+    mockGet.mockResolvedValue(tabs(['general', 'branding', 'security', 'email-domains']));
+    mockCaps = ['documents:themes', 'calendar:manage'];
+    mockNavItems = [
+      { id: 'tenant-billing', href: '/billing', label: 'Billing' },
+      { id: 'plugins', href: '/admin/plugins', label: 'Plugins' },
+      { id: 'audit-logs', href: '/admin/audit-logs', label: 'Audit Logs' },
+      { id: 'notifications', href: '/admin/notifications', label: 'Notification Delivery' },
+    ];
+    render(<SettingsArea>page</SettingsArea>);
+    const nav = await screen.findByTestId('settings-area-nav');
+    await waitFor(() => expect(within(nav).getByText('Plan and billing')).toBeInTheDocument());
+    expect(workspaceHrefs(nav)).toEqual([
+      '/admin/settings',
+      '/admin/settings/branding',
+      '/admin/document-themes',
+      '/billing',
+      '/admin/plugins',
+      '/admin/settings/security',
+      '/admin/audit-logs',
+      '/admin/settings/email-domains',
+      '/admin/notifications',
+      '/calendar/settings',
+    ]);
+    const headings = Array.from(nav.querySelectorAll('[data-settings-group]')).map((p) => p.textContent);
+    expect(headings).toEqual(['My settings', 'You in Example Bakery', 'Workspace', 'Security', 'Messages and notifications', 'Data']);
+  });
+
+  it('leaves document themes out without the permission to change them', async () => {
+    mockGet.mockResolvedValue(tabs(['general']));
+    render(<SettingsArea>page</SettingsArea>);
+    await screen.findByTestId('settings-area-link-general');
+    expect(screen.queryByTestId('settings-area-link-document-themes')).toBeNull();
+  });
+
+  it('says on a workspace page that a change reaches everyone in it, and not on yours', async () => {
+    mockPathname = '/admin/settings/branding';
+    mockGet.mockResolvedValue(tabs(['general', 'branding']));
+    const { unmount } = render(<SettingsArea>page</SettingsArea>);
+    expect(await screen.findByTestId('workspace-scope')).toHaveTextContent('Workspace settings for Example Bakery');
+    unmount();
+
+    mockPathname = '/settings/profile';
+    render(<SettingsArea>page</SettingsArea>);
+    await screen.findByTestId('settings-area-link-profile');
+    expect(screen.queryByTestId('workspace-scope')).toBeNull();
+  });
+});
+
+describe('SettingsArea: the phone menu search reads the settings index (WHIT-1084)', () => {
+  it('finds a page by a word in either language, or by something on it', async () => {
+    mockPathname = '/settings';
+    mockGet.mockResolvedValue(tabs(['general', 'branding']));
+    render(<SettingsArea>page</SettingsArea>);
+    const search = await screen.findByTestId('settings-menu-search');
+
+    await userEvent.type(search, 'إشعارات');
+    expect(screen.getByTestId('settings-menu-row-notifications')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-menu-row-branding')).toBeNull();
+
+    await userEvent.clear(search);
+    await userEvent.type(search, 'logo');
+    expect(screen.getByTestId('settings-menu-row-branding')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-menu-row-notifications')).toBeNull();
+
+    // The workspace currency (CU.4) is on General, in either language.
+    for (const word of ['currency', 'عملة']) {
+      await userEvent.clear(search);
+      await userEvent.type(search, word);
+      expect(screen.getByTestId('settings-menu-row-general')).toBeInTheDocument();
+    }
+  });
+});
+
+describe('SettingsArea: the cards’ frame (TplSettings*)', () => {
+  it('puts "Settings › Page" above both columns, linking back to Settings', async () => {
+    mockPathname = '/admin/settings/branding';
+    mockGet.mockResolvedValue(tabs(['general', 'branding']));
+    render(<SettingsArea>page</SettingsArea>);
+    const crumb = await screen.findByTestId('settings-breadcrumb');
+    expect(crumb).toHaveTextContent('SettingsBranding');
+    expect(within(crumb).getByRole('link', { name: 'Settings' })).toHaveAttribute('href', '/settings');
+    // The sub-nav no longer carries its own "Settings" heading.
+    expect(within(screen.getByTestId('settings-area-nav')).queryByText('Settings', { selector: 'p' })).toBeNull();
   });
 });

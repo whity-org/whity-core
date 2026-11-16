@@ -2,20 +2,37 @@
  * Everything the tool says to a person. Nothing else in src/ holds user-facing
  * text, and test/messages.test.js enforces that.
  *
- * English only, as a deliberate exception to the rule that every user-facing
- * string has English and Arabic: Windows PowerShell 5.1's console garbles Arabic
- * and doesn't lay it out right to left, and that is a console this tool has to
- * work in. The install and update guide is in both languages instead. Decided by
- * the owner for 0.1.0 (WHIT-840). To add Arabic later, add a second catalogue
- * with these same keys and choose between them here.
- *
- * Keep this file plain ASCII, which that console prints correctly.
+ * Keep this file plain ASCII, which Windows PowerShell 5.1's console prints
+ * correctly. That console also garbles Arabic and doesn't lay it out right to
+ * left, so (WHIT-840) English and plain marks there. Where the console handles
+ * Unicode (Linux, macOS, Windows Terminal) the install speaks as the
+ * SiteInstallerTerminal card draws it (SU.7): check marks, and Arabic when the
+ * system language is Arabic, from messages-ar.js (WHIT-1044).
  */
-export const m = {
+import { ar } from './messages-ar.js';
+
+/** Whether this console prints Unicode: not the classic Windows console. */
+export function unicodeConsole(env = process.env, platform = process.platform) {
+  return platform !== 'win32' || Boolean(env.WT_SESSION) || env.TERM_PROGRAM === 'vscode';
+}
+
+/** Arabic when the system language is Arabic and the console can show it. */
+export function wantsArabic(env = process.env, platform = process.platform) {
+  const lang = env.LC_ALL || env.LC_MESSAGES || env.LANG || '';
+  return /^ar([_.-]|$)/i.test(lang) && unicodeConsole(env, platform);
+}
+
+/** The marks the card uses (check, cross, ellipsis, middle dot), or plain ones. */
+export const MARK = unicodeConsole()
+  ? { ok: '\u2713', no: '\u2717', warn: '!', doing: '\u2026', dot: '\u00b7' }
+  : { ok: 'ok', no: 'x', warn: '!', doing: '..', dot: '-' };
+
+const en = {
   help: () => `whity: install and update a self-hosted Whity on Docker.
 
 Usage:
   whity install [version]    Install Whity with Docker. Default: the latest release.
+                             On a terminal it asks for the web address and your email.
   whity update [version]     Back up, then update to a release. Default: the latest.
   whity --version            Print the version of this tool.
 
@@ -23,11 +40,17 @@ Options for install and update:
   --dir <path>               Install folder. Default: ./whity
 
 Options for install:
-  --url <url>                The address people will use. Default: http://localhost:<web port>
+  --domain <name>            The web address for Whity on this server, for example
+                             office.example.jo. The installer gets its certificate.
+  --email <address>          The first owner's email.
+  --port <port>              The HTTPS port with --domain, when 443 is taken. Default: 443
+  --verbose                  Show each Docker command's own output.
+  --url <url>                Instead of --domain: the address people will use,
+                             behind a proxy you run. Default: http://localhost:<web port>
   --web-port <port>          Port for the web app. Default: 3100
   --api-port <port>          Port for the API. Default: 8100
   --bind <address>           Address to publish ports on. Default: 127.0.0.1
-  --admin-email <email>      Administrator address. Default: system@whity.local
+  --admin-email <email>      Same as --email. Default: system@whity.local
 
 Options for update:
   --force                    Update even though an earlier update did not finish.
@@ -40,14 +63,15 @@ The server's own tool, bin/whity-cli, runs inside the containers. This tool call
 `,
 
   // Command line
-  error: (message) => `Error: ${message}`,
+  error: (message) => `${MARK.no} ${message}`,
   badArguments: (reason) => `${reason}\nRun "whity --help" for usage.`,
   planned: (command) => `"whity ${command}" is planned but is not in this version.`,
   unknownCommand: (command) => `Unknown command "${command}". Run "whity --help" for usage.`,
   unexpectedArgument: (argument) => `Unexpected argument "${argument}". Run "whity --help" for usage.`,
 
   // Docker
-  dockerMissing: () => 'Docker was not found. Install Docker (Docker Desktop on Windows and macOS), then run this again.',
+  dockerMissing: () => 'Docker isn\'t installed\n  Install it, then run this again. On a Linux server, with the official script:\n'
+    + '  curl -fsSL https://get.docker.com | sh\n  On Windows and macOS, install Docker Desktop.\n  Nothing was changed.',
   dockerStopped: (detail) => `Docker is installed but not running. Start it, then run this again.\n${detail}`,
   composeMissing: () => 'Docker Compose v2 was not found. Install the docker compose plugin, then run this again.',
   composeTooOld: (found) => `Docker Compose v2 or newer is needed. Found ${found}.`,
@@ -61,37 +85,63 @@ The server's own tool, bin/whity-cli, runs inside the containers. This tool call
   latestUnknown: (url) => `Could not find the latest release at ${url}. Check the connection, or name a version.`,
   downloadFailed: (url, reason) => `Could not download ${url}: ${reason}`,
 
-  // Install
+  // Install (SiteInstallerTerminal, SU.7)
+  header: () => `Whity Core installer  ${MARK.dot}  free and open source (AGPL-3.0)`,
+  done: (label, detail) => `${MARK.ok} ${label}${detail ? `   ${detail}` : ''}`,
+  doing: (label) => `${MARK.doing} ${label}`,
+  warning: (label, todo, command) => `${MARK.warn} ${label}\n  ${todo}${command ? `\n  ${command}` : ''}`,
+  checkedServer: () => 'Checked this server',
+  serverFacts: ({ os, cpus, memGb, diskGb }) => `${os} ${MARK.dot} ${cpus} CPUs ${MARK.dot} ${memGb} GB`
+    + (diskGb === null ? '' : ` ${MARK.dot} ${diskGb} GB free`),
+  dockerFound: () => 'Docker found',
+  askDomain: () => 'Web address for Whity',
+  askDomainExample: () => '(e.g. office.example.jo; leave empty to try it on this computer)',
+  askEmail: () => 'Your email (first owner)',
+  downloading: (version) => `Downloading Whity Core ${version.replace(/^v/, '')}`,
+  downloaded: (version) => `Downloaded Whity Core ${version.replace(/^v/, '')}`,
+  starting: () => 'Starting the database and the app',
+  started: () => 'Started the database and the app',
+  gettingCertificate: (domain) => `Getting a certificate for ${domain}`,
+  gotCertificate: (domain) => `Got a certificate for ${domain}`,
+  noCertificate: (domain) => `No certificate for ${domain} yet`,
+  noCertificateTodo: (domain, port) => `Whity is running, but Let's Encrypt couldn't reach this server at ${domain}. `
+    + `Check its A record points here and ports 80 and ${port} are open to the internet, then:`,
+  makingOwner: () => 'Making your owner account',
+  madeOwner: () => 'Made your owner account',
+  lowMemory: () => 'Less than 2 GB of memory',
+  lowMemoryTodo: () => 'Whity will run, but slowly. 4 GB is better.',
+  ready: () => 'Whity is ready.',
+  readyNoCertificate: () => 'Whity is running; it opens once the certificate is in.',
+  openAt: (url) => `  Open   ${url}`,
+  signInAs: (email, envPath) => `  Sign in as ${email} with the INITIAL_SYSTEM_ADMIN_PASSWORD in ${envPath}, and change it after you sign in.`,
+  keepEnv: () => '  Back up that .env file: it holds the keys your data is encrypted with.',
+  updateLater: () => '  Update later with: whity update',
+
   badPort: (flag) => `${flag} must be a port number.`,
   badUrl: (url) => `--url "${url}" is not a valid address.`,
+  badDomain: (domain) => `"${domain}" isn't a web address\n  Give a domain name like office.example.jo, without http:// or a path.\n  Nothing was changed.`,
+  badEmail: (email) => `"${email}" isn't an email address\n  Give the address the owner signs in with.\n  Nothing was changed.`,
+  domainUnresolved: (domain) => `${domain} doesn't point anywhere yet\n  Add an A record for ${domain} with this server's address `
+    + 'at your domain provider, wait a few minutes, then run this again.\n  Nothing was changed.',
+  domainAndUrl: () => 'Give --domain or --url, not both.',
   httpsNeeded: (url) => `Signing in needs HTTPS on any address other than localhost, so ${url} wouldn't work.\n`
-    + 'Put a reverse proxy with a certificate in front of Whity and pass --url https://your-address.',
-  alreadyInstalled: (dir) => `${dir} already holds an install. To move it to a newer release, run: whity update`,
-  portInUse: (port) => `Port ${port} is in use. Choose another with --web-port or --api-port.`,
+    + '  Give the domain instead and the installer gets the certificate: whity install --domain your-address',
+  alreadyInstalled: (dir) => `Whity is already installed in ${dir}\n  Update it instead:\n  whity update\n  Nothing was changed.`,
+  portInUse: (port) => `Port ${port} is in use\n  Stop the program using it, or choose another with --web-port or --api-port.\n  Nothing was changed.`,
+  serverPortInUse: (port) => (port === 80
+    ? 'Port 80 is in use\n  Let\'s Encrypt needs it to issue the certificate. Stop the program using it, then run this again.\n  Nothing was changed.'
+    : `Port ${port} is in use\n  Stop the program using it, or run the installer with another port, for example:\n  --port 8443\n  Nothing was changed.`),
   installContinuing: (version) => `  Continuing the unfinished install of ${version}`,
-  installStep1: () => '[1/6] Checking Docker',
-  installStep2: (dir) => `[2/6] Writing ${dir}`,
-  installStep3: (version) => `[3/6] Pulling ${version}`,
-  installStep4: () => '[4/6] Starting the database',
-  installStep5: () => '[5/6] Running migrations and seed',
-  installStep6: () => '[6/6] Starting Whity and checking it',
   labelPullOthers: () => 'Pulling the other images',
   labelStartDatabase: () => 'Starting the database',
   labelMigrations: () => 'Migrations',
   labelSeed: () => 'Seed',
   labelStartWhity: () => 'Starting Whity',
+  labelOwner: () => 'Finding the owner account',
   installStepFailed: (label, detail, envPath) => `${label} failed.\n${detail}\n`
     + `Fix the cause, then run the same "whity install" again to continue: it keeps ${envPath}.`,
   installChecksFailed: (reason, dir) => `${reason}\nSee what happened with: docker compose logs (in ${dir}).\n`
     + 'Then run the same "whity install" again to continue.',
-  installed: ({ version, url, email, envPath }) => `
-Whity ${version} is running.
-  Sign in at: ${url}/login
-  Email:      ${email}
-  Password:   the INITIAL_SYSTEM_ADMIN_PASSWORD value in ${envPath}
-
-Change that password after you sign in, and back up the .env file.
-It holds the keys your data is encrypted with.`,
 
   // Update
   noInstall: (dir) => `No install found in ${dir}. Use --dir to point at one, or run: whity install`,
@@ -158,3 +208,6 @@ Whity is now on ${to}.
   renderVersion: (reported, expected) => `The render service reports ${reported}, expected ${expected}`,
   renderSecretAdded: () => '      Added RENDER_SHARED_SECRET to .env, so documents can print (the render service had none)',
 };
+
+/** The catalogue in the reader's language; anything not translated stays English. */
+export const m = wantsArabic() ? { ...en, ...ar(MARK) } : en;

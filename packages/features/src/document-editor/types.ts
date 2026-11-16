@@ -1,3 +1,4 @@
+import type { EditorAgentChoice, EditorAgentRequest, NewAgentRequest } from '@whity/ui/editor/agents';
 import type {
   DecideAllFilter,
   Decision,
@@ -7,10 +8,10 @@ import type {
   RailSuggestion,
   RailThread,
 } from '@whity/ui/editor/collab';
-import type { Inline, LabelPrintSource, PublishBlocker, ResolvedDocumentTheme, WhityDocument } from '@whity/ui/editor/contract';
+import type { Inline, LabelPrintSource, PublishBlocker, ResolvedDocumentTheme, SavedBlock, WhityDocument } from '@whity/ui/editor/contract';
 import type { FieldGroup } from '@whity/ui/editor/fields';
 import type { BrandLogos, Letterhead, LetterheadParts } from '@whity/ui/editor/page-view';
-import type { EditorServices, FieldPreview } from '@whity/ui/editor/services';
+import type { EditorServices, FieldPreview, NewSavedBlock } from '@whity/ui/editor/services';
 
 /** A document as the server keeps it: the contract's document plus its draft version. */
 export interface LoadedDocument {
@@ -23,7 +24,19 @@ export interface LoadedDocument {
 
 /** What a save sends: the fields of the document the editor changes. */
 export type DraftPatch = Pick<WhityDocument, 'title' | 'blocks'> &
-  Partial<Pick<WhityDocument, 'lang' | 'defaultView' | 'fullWidth' | 'page' | 'labels' | 'ownFields'>>;
+  Partial<Pick<WhityDocument, 'lang' | 'defaultView' | 'fullWidth' | 'page' | 'labels' | 'ownFields' | 'theme'>>;
+
+/** A theme the document can pick (E.44, `TplDocThemes`). */
+export interface ThemeChoice {
+  ref: string;
+  scope: 'system' | 'tenant';
+  name: string;
+  nameAr: string;
+  /** Its own print colour, when it sets one. */
+  accent?: string;
+  /** The workspace default: documents with no theme of their own use it. */
+  isDefault: boolean;
+}
 
 export type SaveResult =
   /** `resolvedTheme`: the saved draft's theme, when the server returns the row. */
@@ -44,6 +57,8 @@ export interface DocumentEditorAdapter {
    * Without it, those blocks say what is missing instead of loading.
    */
   loadServices?(id: string): Promise<EditorServices>;
+  /** The themes a document may pick, the workspace default marked (E.44). Without it, no theme picker. */
+  listThemes?(): Promise<ThemeChoice[]>;
   /**
    * Templates (M4): the fields the record type offers and the tenant's
    * letterhead lines and logos; the document's theme picks among them (E.44). Without it, a template edits like any
@@ -97,6 +112,22 @@ export interface DocumentEditorAdapter {
   reopenThread?(id: string, threadId: string): Promise<RailThread>;
   /** People to @mention: workspace members who can read the document. Never called with an empty query. */
   searchPeople?(id: string, query: string): Promise<MentionPerson[]>;
+
+  /* M6: Ask an agent (EditorAgents). Without them the editor offers no agent. */
+
+  /** The agents this person uses, ending with "any of my agents" (`anyLabel`). */
+  agentChoices?(anyLabel: string): Promise<EditorAgentChoice[]>;
+  /** This person's requests on the document, newest first. */
+  agentRequests?(id: string): Promise<EditorAgentRequest[]>;
+  askAgent?(id: string, request: NewAgentRequest): Promise<EditorAgentRequest>;
+  stopAgentRequest?(requestId: string): Promise<EditorAgentRequest>;
+
+  /* M7: saved blocks (EditorCustomBlocks, E.21–E.24). Without them the editor offers none. */
+
+  /** This person's own saved blocks and the workspace library's. */
+  savedBlocks?(): Promise<SavedBlock[]>;
+  /** Saves blocks to the library; resolves to the saved block. Throws when refused. */
+  saveBlock?(block: NewSavedBlock): Promise<SavedBlock>;
 }
 
 export interface CollabSnapshot {

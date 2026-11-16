@@ -188,6 +188,7 @@ function EditorToolbar({
   sheet,
   onCreateField,
   onComment,
+  onAskAgent,
 }: {
   editor: Editor
   labels: EditorLabels
@@ -208,6 +209,8 @@ function EditorToolbar({
   onCreateField?: (label: string) => FieldDef
   /** M5: comment on the selection (⌥⌘M); offered with comment permission, editable or not. */
   onComment?: () => void
+  /** M6: open the Ask an agent sheet (EditorAgents). */
+  onAskAgent?: () => void
 }) {
   const s = useEditorState({
     editor,
@@ -316,6 +319,9 @@ function EditorToolbar({
           onMouseDown={(e) => e.preventDefault()}
           onClick={onComment}
         />
+      )}
+      {onAskAgent && (
+        <IconButton icon="robot" label={labels.agentAsk} size="sm" tooltip="bottom" onClick={onAskAgent} />
       )}
       <span className="min-w-2 flex-1" />
       {sheet}

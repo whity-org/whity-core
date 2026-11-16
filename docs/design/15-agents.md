@@ -9,7 +9,7 @@ Whity's promise is AI that sees and acts across a company while a person stays i
 3. **One at a time.** The approvals inbox is a queue (`ApprovalQueue`): "1 of 3 waiting · oldest first", the next cards stacked behind (7.5b).
 4. **Undo is an action, not an apology.** A 10-second toast with Undo, then Undo stays on the activity item for the tool's window with a meter (`UndoBar`, 7.5c). A confirm dialog is only for what can't be undone.
 5. **Scope is visible.** `ScopeGrant` shows each `resource:action` permission as Off, Ask first or Allowed. An agent never exceeds the person who granted it, and every change is logged.
-6. **Nothing sits on the plane until it has happened.** A proposal is a loose, dashed sheet; approving sets it down (solid, on the plane, 200 ms).
+6. **Nothing sits on the plane until it has happened.** A proposal is a loose, dashed sheet; approving sets it down (solid, on the plane): one item plays the `approve-set-down` Lottie (1.2 s, LT.4), bulk approval the 200 ms set-down in code.
 
 ## Proposal states
 
@@ -29,7 +29,7 @@ The command palette (⌘K) ends with an "Ask an agent" row: what was typed becom
 
 ## Words
 
-Agents are named by role (Billing assistant, HR assistant, Front desk), never human first names or "Whity AI". They don't say "I" and don't have feelings. Messages put the agent first, then who it acts for, then the action: "Billing assistant for Rana · Sent 12 payment reminders". Documents an agent sent say so in their footer.
+Agents are named by role (Billing assistant, HR assistant, Front desk), never human first names or "Whity AI". They don't say "I" and don't have feelings. Messages put the agent first, then who it acts for, then the action: "Billing assistant for Amro · Sent 12 payment reminders". Documents an agent sent say so in their footer.
 
 ## Where it shows
 

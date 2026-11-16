@@ -1,8 +1,10 @@
 import * as React from "react"
 
+import type { MotionMode } from "./lottie"
+
 /**
- * A person's display preferences (W.3, A.1, A.3): text size and Show technical
- * details. The app's provider stores them on the account; this is the half
+ * A person's display preferences (W.3, A.1, A.3, LT.4): text size, Show technical
+ * details and Animations. The app's provider stores them on the account; this is the half
  * components read. `document.documentElement.dataset.textSize` carries the size,
  * and the token CSS scales from it, so no component needs to know.
  */
@@ -11,9 +13,14 @@ export type TextSize = "standard" | "larger"
 /** The localStorage key, so the first paint can apply the size before React runs. */
 export const TEXT_SIZE_STORAGE_KEY = "whity-text-size"
 
+/** The localStorage key for Animations, applied as `<html data-motion>` before React runs. */
+export const MOTION_STORAGE_KEY = "whity-motion"
+
 export interface DisplayPreferences {
   textSize: TextSize
   showTechnicalDetails: boolean
+  /** Full (default), Calm or Off (LT.4). The device's reduce motion means Off on top. */
+  animations: MotionMode
 }
 
 export interface DisplayPreferencesValue extends DisplayPreferences {
@@ -23,6 +30,7 @@ export interface DisplayPreferencesValue extends DisplayPreferences {
 const DisplayPreferencesContext = React.createContext<DisplayPreferencesValue>({
   textSize: "standard",
   showTechnicalDetails: false,
+  animations: "full",
   update: () => {},
 })
 

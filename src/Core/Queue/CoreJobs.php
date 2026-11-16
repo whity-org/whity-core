@@ -47,7 +47,44 @@ final class CoreJobs
             // dispatcher enqueues it, never a public caller. It needs the
             // notification data layer + the transport registry (defaulting to the
             // built-in log transports so a fresh deployment never hard-fails).
-            $transports ??= CoreTransports::make($logger);
+            //
+            // E2: the `email` channel is delivered through core mail, the same
+            // sender and gate as the web app. The mailer is built on the first
+            // send, so a worker boot never reads mail settings.
+            $mailSettings = new \Whity\Core\Settings\SettingsService(
+                new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                new \Whity\Core\Settings\TenantSettingsRepository($pdo)
+            );
+            $coreSender = new \Whity\Core\Mail\BrandedEmailSender(
+                new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
+                    $mailSettings,
+                    new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+                    $logger ?? new \Psr\Log\NullLogger()
+                )),
+                new \Whity\Core\Mail\EmailLayout(),
+                $mailSettings,
+                $logger
+            );
+            $coreSender->useGate(new \Whity\Core\Mail\EmailGate($mailSettings, $pdo));
+            $coreSender->useBranding(new \Whity\Core\Branding\BrandingService(
+                $mailSettings,
+                entitlements: new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo))
+            ));
+            $transports ??= CoreTransports::make($logger, $coreSender, new \Whity\Core\Identity\ProfileEmailRepository($pdo));
+            // WHIT-1074: web push to the devices a person turned on, and the
+            // one digest push for a burst the rate limit held back.
+            if (!$transports->has(\Whity\Core\Notification\Push\PushTransport::CHANNEL)) {
+                $transports->register(\Whity\Core\Notification\Push\PushTransport::fromEnv($pdo, $logger, $_ENV));
+            }
+            $pushTransport = $transports->resolve(0, \Whity\Core\Notification\Push\PushTransport::CHANNEL);
+            $registry->register(
+                \Whity\Core\Notification\Push\PushDigestJob::NAME,
+                new \Whity\Core\Notification\Push\PushDigestJob(
+                    static fn (): ?\Whity\Core\Notification\Push\PushTransport => $pushTransport instanceof \Whity\Core\Notification\Push\PushTransport ? $pushTransport : null
+                ),
+                false
+            );
             $registry->register(
                 SendNotificationDeliveryJob::NAME,
                 new SendNotificationDeliveryJob(
@@ -90,10 +127,14 @@ final class CoreJobs
                         // alert actually go out?" is asked precisely when
                         // things are already going wrong, and the trail that
                         // answers it was the one with the hole.
-                        new \Whity\Core\Audit\AuditLogger($pdo, $logger)
+                        new \Whity\Core\Audit\AuditLogger($pdo, $logger),
+                        // E2: the person can turn these emails off like any other.
+                        $coreSender->gate()
                     ),
                     $logger,
-                    \Whity\Core\Http\FrontendUrls::fromEnv()->link(\Whity\Core\Http\FrontendUrls::ERROR_DETAILS)
+                    \Whity\Core\Http\FrontendUrls::fromEnv()->link(\Whity\Core\Http\FrontendUrls::ERROR_DETAILS),
+                    // At most NotifyErrorGroupJob::EMAILS_PER_HOUR alerts emailed an hour.
+                    new \Whity\Core\Store\DatabaseSharedStore($pdo)
                 ),
                 false
             );
@@ -102,6 +143,96 @@ final class CoreJobs
             // run in the background. Internal: the record write path enqueues
             // it, never a public caller.
             \Whity\Core\Plugin\Tenant\Automation\AutomationJobs::register($registry, $pdo, $transports, $logger);
+
+            // WHIT-942: one reminder per booking (ADR 0017). Internal: the
+            // booking service queues it, never a public caller. The mailer is
+            // built per send, as the web app's is, so a worker boot never
+            // reads mail settings.
+            $calendarSettings = new \Whity\Core\Settings\SettingsService(
+                new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                new \Whity\Core\Settings\TenantSettingsRepository($pdo)
+            );
+            $calendarLogger = $logger ?? new \Psr\Log\NullLogger();
+            $calendarQueue = new QueueService(new JobRepository($pdo));
+            $calendarBookings = \Whity\Core\Calendar\CalendarServices::bookingService(
+                $pdo,
+                $calendarSettings,
+                null,
+                // E2: the same sender as every core email: the workspace's brand and gate.
+                $coreSender,
+                \Whity\Core\Http\FrontendUrls::fromEnv(),
+                $calendarQueue,
+                $calendarLogger
+            );
+            // EM.1 daily summary: what agents did today, at 18:00 in each
+            // workspace's time zone. Internal: the scheduler queues it hourly.
+            $summarySender = new \Whity\Core\Mail\BrandedEmailSender(
+                new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
+                    $calendarSettings,
+                    new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+                    $calendarLogger
+                )),
+                new \Whity\Core\Mail\EmailLayout(),
+                $calendarSettings,
+                $calendarLogger
+            );
+            // E2: the same email gate as the web app (workspace, agent and person switches).
+            $summarySender->useGate(new \Whity\Core\Mail\EmailGate($calendarSettings, $pdo));
+            $summarySender->useBranding(new \Whity\Core\Branding\BrandingService(
+                $calendarSettings,
+                entitlements: new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo))
+            ));
+            $registry->register(
+                \Whity\Core\Notification\Jobs\AgentDailySummaryJob::NAME,
+                new \Whity\Core\Notification\Jobs\AgentDailySummaryJob(
+                    $pdo,
+                    $calendarSettings,
+                    new \Whity\Core\Agent\AgentStatsRepository($pdo),
+                    new \Whity\Core\Identity\ProfileEmailRepository($pdo),
+                    new \Whity\Core\Store\DatabaseSharedStore($pdo),
+                    $summarySender,
+                    \Whity\Core\Http\FrontendUrls::fromEnv()->base(),
+                ),
+                false
+            );
+            $registry->register(\Whity\Core\Calendar\BookingHoldExpiryJob::NAME, new \Whity\Core\Calendar\BookingHoldExpiryJob($calendarBookings), false);
+            // ADR 0018: reminders before events and meetings, through the same
+            // notices, preferences and push as every other notice.
+            $registry->register(
+                \Whity\Core\Calendar\EventReminderJob::NAME,
+                new \Whity\Core\Calendar\EventReminderJob(new \Whity\Core\Calendar\EventReminders(
+                    $pdo,
+                    new \Whity\Core\Calendar\CalendarRepository($pdo),
+                    $calendarQueue,
+                    new NotificationDispatcher(
+                        new NotificationRepository($pdo),
+                        $transports,
+                        $calendarQueue,
+                        null,
+                        $calendarLogger,
+                        new \Whity\Core\Notification\NotificationPreferenceResolver(new \Whity\Core\Notification\NotificationPreferenceRepository($pdo)),
+                    ),
+                    $calendarLogger,
+                )),
+                false
+            );
+            $registry->register(
+                \Whity\Core\Calendar\BookingReminderJob::NAME,
+                new \Whity\Core\Calendar\BookingReminderJob(
+                    \Whity\Core\Calendar\CalendarServices::bookingService(
+                        $pdo,
+                        $calendarSettings,
+                        null,
+                        $coreSender,
+                        \Whity\Core\Http\FrontendUrls::fromEnv(),
+                        $calendarQueue,
+                        $calendarLogger
+                    ),
+                    $calendarQueue
+                ),
+                false
+            );
 
             // #billing — the two scheduled runs. INTERNAL, both of them, and
             // registered without the submittable flag deliberately: one issues

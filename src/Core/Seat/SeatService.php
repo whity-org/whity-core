@@ -55,6 +55,19 @@ final class SeatService
     /** The system tenant is never seat-limited, as it is never payment-walled. */
     public const SYSTEM_TENANT_ID = 0;
 
+    /**
+     * WHO IS STAFF (WHIT-932). A seat is a person working in the workspace:
+     *
+     * - a CUSTOMER membership (`memberships.kind = 'customer'`, WHIT-915) is
+     *   somebody the workspace serves, counted by `customers.per_month`;
+     * - a SERVICE principal (`profiles.auth_method = 'service'`) is a fixture
+     *   nothing can sign in as;
+     * - an AI AGENT is never a member at all: it is an `agents` row acting for
+     *   a person through an `agent_assignments` grant, so it has no membership
+     *   to count. The business model sells agents separately from staff.
+     */
+    private const STAFF_ONLY = "m.kind = 'member' AND p.auth_method <> 'service'";
+
     public const MODE_OFF = 'off';
     public const MODE_WARN = 'warn';
     public const MODE_BLOCK = 'block';
@@ -118,8 +131,10 @@ final class SeatService
 
         $placeholders = implode(',', array_fill(0, count($statuses), '?'));
         $stmt = $this->db->prepare(
-            "SELECT COUNT(DISTINCT profile_id) FROM memberships
-              WHERE tenant_id = ? AND status IN ({$placeholders})"
+            "SELECT COUNT(DISTINCT m.profile_id) FROM memberships m
+               JOIN profiles p ON p.id = m.profile_id
+              WHERE m.tenant_id = ? AND m.status IN ({$placeholders})
+                AND " . self::STAFF_ONLY
         );
         $stmt->execute([$tenantId, ...$statuses]);
 
@@ -183,8 +198,10 @@ final class SeatService
 
         $placeholders = implode(',', array_fill(0, count($statuses), '?'));
         $stmt = $this->db->prepare(
-            "SELECT 1 FROM memberships
-              WHERE tenant_id = ? AND profile_id = ? AND status IN ({$placeholders})
+            "SELECT 1 FROM memberships m
+               JOIN profiles p ON p.id = m.profile_id
+              WHERE m.tenant_id = ? AND m.profile_id = ? AND m.status IN ({$placeholders})
+                AND " . self::STAFF_ONLY . "
               LIMIT 1"
         );
         $stmt->execute([$tenantId, $profileId, ...$statuses]);

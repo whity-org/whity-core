@@ -1,0 +1,70 @@
+<!-- @dsCard group="Mobile" height=954 width=1880 subtitle="M.41: the More tab, switching workspaces, your profile, and help" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Mobile more tab</title><style>html,body{height:100%;margin:0} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 22 }); }
+  var T0 = { home: 'Home', inbox: 'Inbox', create: 'Create', agents: 'Chat', agentsIcon: 'comment', more: 'More' };
+  function status() { return h('div', { className: 'wm-status', 'aria-hidden': 'true' }, h('span', null, '9:41'), h('i'), h('span', null, I('wifi', 16), I('battery', 18))); }
+  function tabbar(active, T, badges) { T = T || T0; badges = badges || { inbox: 3 };
+    function tab(k, icon) { return h('div', { key: k, className: 'wm-tab' + (active === k ? ' is-on' : '') }, I(icon, 24), T[k], badges[k] ? h('b', null, badges[k]) : null); }
+    return h('nav', { className: 'wm-tabbar', 'aria-label': 'Main' }, tab('home', 'dashboard'), tab('inbox', 'inbox'), h('button', { key: 'c', className: 'wm-create', 'aria-label': T.create }, I('plus', 28)), tab('agents', T.agentsIcon || 'robot'), tab('more', 'menu')); }
+  function bottom(o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.tabs === false ? null : tabbar(o.active, o.T, o.badges), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function phone(label, kids, o) { o = o || {}; return h('div', { className: 'wm-col' }, h('div', { className: 'wm-label' }, label), h('div', { className: 'wm-phone', dir: o.dir }, status(), kids, o.overlay || null)); }
+  function search(t, f) { return h('div', { className: 'wm-search' }, I('search', 20), h('span', null, t), f ? h('button', { type: 'button' }, I('filter', 16), f) : null); }
+  function stage(blue, tag, kids, keys) { var LOT = { 'YOUR BRAND, OUR PLATFORM': ['brand-sheet-platform', 'view'], 'AGENTS PROPOSE': ['agents-propose', 'view'], 'YOU DECIDE': ['approve-set-down', 'view'], 'IN THE APP': ['approve-set-down', 'view'], 'UPDATING · LOOPS': ['updating', 'loop'], 'ALL CAUGHT UP': ['all-caught-up', 'view'] }; var l = LOT[tag]; if (!l) return h('div', { className: 'wm-lottie' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, 'LOTTIE · ' + tag), kids, keys ? h('div', { className: 'wm-keys' }, keys.map(function (k, i) { return h('span', { key: i }, k); })) : null); return h('div', { className: 'wm-lottie has-file' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, l[0] + '.json'), h('div', { className: 'w-lottie', 'data-lottie': 'lottie/' + l[0] + '.json', 'data-play': l[1] }, h('div', { className: 'w-lottie__fallback' }, kids))); }
+  function at(cls, x, y, extra) { return h('div', { className: cls, style: Object.assign({ left: x, top: y }, extra || {}) }); }
+  function dots(n, on) { var a = []; for (var i = 0; i < n; i++) a.push(h('i', { key: i, className: i === on ? 'is-on' : '' })); return h('div', { className: 'wm-dots' }, a); }
+  function foot(kids) { return h('div', { className: 'wm-bottom' }, h('div', { className: 'wm-form', style: { borderTop: 0 } }, kids), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function q(title, sub, step, of) { return h(F, null, h('div', { className: 'wm-progress', 'aria-hidden': 'true' }, h('i', { style: { width: Math.round(step / of * 100) + '%' } })), h('div', { className: 'wm-q' }, h('h1', null, title), sub ? h('p', null, sub) : null)); }
+  function choice(t, sub, on, icon) { return h('div', { className: 'wm-choice' + (on ? ' is-on' : '') }, icon ? I(icon, 24) : null, h('span', null, t, sub ? h('small', null, sub) : null), h('i', { className: 'wm-radio' })); }
+  function navbar(t) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), h('span')); }
+
+  var SEED = 'amro@examplebakery.jo', HUE = W.brandHue('#0961bb');
+  function me(s) { return h(W.Avatar, { name: 'Amro Saleh', pattern: SEED, hue: HUE, size: s || 40 }); }
+  function pav(seed, name, s) { return h(W.Avatar, { name: name, pattern: seed, hue: HUE, size: s || 40 }); }
+  function nav(t, end) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), end || h('span')); }
+  function head(t, sub) { return h('div', { className: 'wm-head' }, h('h1', null, t), sub ? h('p', null, sub) : null); }
+  function gl(t) { return h('div', { className: 'wm-gl' }, t); }
+  function gf(t) { return h('div', { className: 'wm-gf' }, t); }
+  function grp() { return h('div', { className: 'wm-group' }, Array.prototype.slice.call(arguments)); }
+  function set(icon, t, v, o) { o = o || {};
+    var end = o.end !== undefined ? o.end : o.sw !== undefined ? h(W.Switch, { defaultChecked: o.sw, 'aria-label': t }) : I(o.ext ? 'external' : 'chevron-right', 18);
+    return h('div', { className: 'wm-set' + (o.danger ? ' is-danger' : '') + (o.link ? ' is-link' : '') }, icon ? h('span', { className: 'wm-set__ic' + (o.tone ? ' is-' + o.tone : '') }, typeof icon === 'string' ? I(icon, 20) : icon) : null,
+      h('span', { className: 'wm-set__t' }, t, o.sub ? h('small', null, o.sub) : null), v != null ? h('span', { className: 'wm-set__v' }, v) : null, end); }
+  function segs(a, on, cls) { return h('div', { className: 'wm-segs' + (cls ? ' ' + cls : ''), role: 'tablist' }, a.map(function (x, i) { return h('span', { key: i, role: 'tab', 'aria-selected': i === on, className: i === on ? 'is-on' : '' }, x[0], x[1] ? h('em', null, x[1]) : null); })); }
+  function chips(a, on) { return h('div', { className: 'wm-chips' }, a.map(function (x, i) { return h('span', { key: i, className: on.indexOf(i) > -1 ? 'is-on' : '' }, on.indexOf(i) > -1 ? I('check', 16) : null, x); })); }
+  function scroll() { return h('div', { className: 'wm-scroll' }, Array.prototype.slice.call(arguments)); }
+  function sheet(title, kids) { return h(F, null, h('div', { className: 'wm-scrim' }), h('div', { className: 'wm-sheet', role: 'dialog', 'aria-label': title }, h('div', { className: 'wm-grab' }), title ? h('h2', null, title) : null, kids, h('div', { className: 'wm-home-ind' }, h('i')))); }
+  function act() { return bottom({ tabs: false, action: h('div', { className: 'wm-actbar' }, Array.prototype.slice.call(arguments)) }); }
+  function searchrow(t) { return h('div', { className: 'wm-searchrow' }, search(t, 'Filter'), h('button', { 'aria-label': 'Invite people' }, I('plus', 24))); }
+  function li(ic, t, sub, end, agent) { return h('div', { className: 'wm-li' + (agent ? ' is-agent' : '') }, typeof ic === 'string' ? h('span', { className: 'wm-li__ic' }, I(ic, 20)) : ic, h('div', { style: { minWidth: 0 } }, h('b', null, t), h('small', null, sub)), h('div', { className: 'wm-li__end' }, end)); }
+  function ac(ic, tone, t, sub, extra) { return h('div', { className: 'wm-act' }, typeof ic === 'string' ? h('span', { className: 'wm-set__ic' + (tone ? ' is-' + tone : '') }, I(ic, 18)) : ic, h('div', null, t, h('small', null, sub), extra || null)); }
+  function badge(v, t) { return h(W.Badge, { variant: v }, t); }
+
+  var more = h(F, null, head('More'), scroll(
+    h('div', { className: 'wm-me-card' }, me(56), h('div', null, h('b', null, 'Amro Saleh'), h('small', null, 'Owner · Example Bakery')), I('chevron-right', 20)),
+    grp(set(h(W.TenantLogo, { name: 'Example Bakery', size: 28, showName: false }), 'Switch workspace', '2 workspaces')),
+    gl('My work'), grp(set('document', 'Documents', '2 to sign'), set('form', 'Forms and my requests'), set('approval', 'Decided by me')),
+    gl('Manage Example Bakery'), grp(set('users', 'People', '1 wants to join'), set('robot', 'Agents', '4'), set('billing', 'Billing'), set('audit', 'Activity and security'), set('settings', 'Workspace settings')),
+    gl('You'), grp(set('settings', 'Preferences'), set('shield', 'Sign-in and security', '3 of 4'))), bottom({ active: 'more' }));
+  function ws(name, color, sub, on) { return h('div', { className: 'wm-set' }, h(W.TenantLogo, { name: name, color: color, size: 36, showName: false }), h('span', { className: 'wm-set__t' }, name, h('small', null, sub)), on ? h('span', { style: { color: 'var(--primary)' } }, I('check', 22)) : I('chevron-right', 18)); }
+  var switcher = h(F, null, head('More'), h('div', { className: 'wm-body' }), sheet('Your workspaces', h(F, null,
+    grp(ws('Example Bakery', '#b74c05', 'Owner · app.whity.dev', true), ws('Amman Coffee Co.', '#1a7f5a', 'Member · office.example.jo')),
+    gf('Switching changes the whole app to that workspace’s look. Notifications always say which workspace they’re from.'),
+    grp(set('plus', 'Add a workspace', null, { tone: 'blue', sub: 'With your email, a QR code or an address' })))));
+  var profile = h(F, null, nav('Profile'), scroll(h('div', { className: 'wm-person' }, me(96), h('a', { className: 'wm-me', style: { padding: 0 } }, h('span', { style: { color: 'var(--primary)', fontSize: 16, fontWeight: 500, minHeight: 44, display: 'inline-flex', alignItems: 'center' } }, 'Change picture'))),
+    grp(set(null, 'Name', 'Amro Saleh'), set(null, 'Email', 'amro@examplebakery.jo'), set(null, 'Mobile', '+962 79 555 0142'), set(null, 'Job title', 'Owner')),
+    gl('Whity ID'), grp(set('world', 'Your Whity ID', '2 workspaces', { tone: 'blue' }), set('shield', 'Sign-in and security')),
+    grp(set('logout', 'Sign out of this phone', null, { danger: true, end: null }))), bottom({ active: 'more' }));
+  var help = h(F, null, nav('Help and about'), scroll(
+    grp(set('robot', 'Ask the help assistant', null, { tone: 'blue', sub: 'Answers about Whity, in plain words' }), set('play', 'Replay the tour'), set('help', 'How Whity works', null, { sub: 'The short story from the start' }), set('external', 'Help centre', null, { ext: true })),
+    gl('Contact'), grp(set(pav('emad.n@examplebakery.jo', 'Emad Nasser', 34), 'Your admin, Emad Nasser', null, { sub: 'Example Bakery' }), set('alert', 'Report a problem', null, { sub: 'Sends a screenshot and the app’s log' })),
+    gl('About'), grp(set(null, 'Version', '3.0.0 (412)', { end: null }), set(null, 'Installation', 'app.whity.dev', { end: null }), set(null, 'Privacy'), set(null, 'Terms'), set(null, 'Open-source licences'))), bottom({ active: 'more' }));
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wm-row' }, phone('More tab', more), phone('Switching workspace', switcher), phone('Profile', profile), phone('Help and about', help)));
+</script>
+</body>
+</html>

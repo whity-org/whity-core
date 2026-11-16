@@ -36,6 +36,29 @@ final class ToolsListHandler implements MethodHandler
         private readonly ?AuthoredToolRegistry $authoredTools = null,
     ) {}
 
+    /**
+     * Plugins switched off for a workspace (WHIT-1123) list no tools there.
+     * Null: every plugin's tools are listed, as before.
+     */
+    private ?\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $workspaceGate = null;
+
+    public function setWorkspaceGate(\Whity\Core\Plugin\Workspace\PluginWorkspaceGate $gate): void
+    {
+        $this->workspaceGate = $gate;
+    }
+
+    /** @param array<string, mixed> $tool */
+    private function offForWorkspace(array $tool, ?int $tenantId): bool
+    {
+        if ($this->workspaceGate === null) {
+            return false;
+        }
+        $meta = is_array($tool['_meta'] ?? null) ? $tool['_meta'] : [];
+        $toolset = $meta[ToolSurface::META_TOOLSET] ?? null;
+
+        return $this->workspaceGate->isToolsetOffForWorkspace(is_string($toolset) ? $toolset : null, $tenantId);
+    }
+
     /** @param array<string, mixed>|null $params */
     public function __invoke(?array $params, ?string $bearerToken): mixed
     {
@@ -75,6 +98,9 @@ final class ToolsListHandler implements MethodHandler
             if (!$this->toolDeriver->isExposed($name)) {
                 continue;
             }
+            if ($this->offForWorkspace($tool, $tenantId)) {
+                continue;
+            }
             $access = $accessMap[$name] ?? ['requiredRole' => null, 'requiredPermission' => null];
             if (self::inTokenToolsets($tool, $principal) && $this->callerCanUse($access, $principal, $tenantId)) {
                 $tool = self::withAgentMode($tool, $access, $principal);
@@ -99,6 +125,9 @@ final class ToolsListHandler implements MethodHandler
             $authoredAccess = $this->authoredTools->accessMap();
             foreach ($this->authoredTools->toolObjects() as $tool) {
                 $name   = (string) ($tool['name'] ?? '');
+                if ($this->offForWorkspace($tool, $tenantId)) {
+                    continue;
+                }
                 $access = $authoredAccess[$name] ?? ['requiredRole' => null, 'requiredPermission' => null];
                 if (self::inTokenToolsets($tool, $principal) && $this->callerCanUse($access, $principal, $tenantId)) {
                     $tool = self::withAgentMode($tool, $access, $principal);

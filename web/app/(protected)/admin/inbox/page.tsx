@@ -52,9 +52,15 @@
  * When the server aggregate lands, this page gains an "All" tab that calls the
  * same endpoint with no `source`. Every sourced call it already makes keeps
  * working, which is the property `MeInboxApiHandler` was shaped to preserve.
+ *
+ * THREE TABS (M.43 on the web too, merge map N2, owner 16 Nov 2026)
+ * ------------------------------------------------------------------
+ * Waiting for me is the list above, plus agents' proposals as one more source
+ * (they also stay on Approvals). Mentions and Updates are the person's notices
+ * ({@see InboxNotices}). There is no header bell: Updates is where notices live.
  */
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge } from '@whity/ui/badge';
 import { Avatar } from '@whity/ui/avatar';
@@ -66,8 +72,11 @@ import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
+import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
+import { InboxNotices } from '@/components/inbox/inbox-notices';
+import type { AgentProposal } from '@/components/agents/proposals';
 import {
   routingMeta,
   routingHref,
@@ -80,10 +89,65 @@ import {
 /** The registry key routing registers under (`InboxSourceRegistry::CORE_DOCUMENT_ROUTING`). */
 const DOCUMENT_ROUTING_SOURCE = 'document_routing';
 
+/** Agents' proposals, shown as one more source of Waiting for me (owner, 16 Nov 2026). */
+const PROPOSALS_SOURCE = 'agent_proposals';
+
+type InboxTab = 'waiting' | 'mentions' | 'updates';
+
 export default function InboxPage() {
   const t = useTranslation('documents');
+  const [tab, setTab] = useState<InboxTab>('waiting');
+
+  // The tabs' counts: Waiting for me from the waiting list, the other two from
+  // the unread notices of each kind.
+  const counts = useFetch<{ waiting: number; mentions: number; updates: number }>(async () => {
+    const [waiting, notices] = await Promise.all([
+      api.GET('/api/v1/me/waiting', { params: { query: { limit: 1 } as never } }).catch(() => null),
+      api.GET('/api/v1/me/notifications', { params: { query: { per_page: 1 } as never } }).catch(() => null),
+    ]);
+    const w = (waiting?.data ?? null) as { counts?: { total?: number } } | null;
+    const n = (notices?.data ?? null) as { unread?: { mentions?: number; updates?: number } } | null;
+    return { waiting: w?.counts?.total ?? 0, mentions: n?.unread?.mentions ?? 0, updates: n?.unread?.updates ?? 0 };
+  }, []);
+  const refreshCounts = useCallback(() => {
+    counts.refetch();
+    window.dispatchEvent(new Event(WAITING_CHANGED_EVENT));
+  }, [counts]);
+
+  const count = (n: number | undefined) =>
+    n !== undefined && n > 0 ? <span className="ms-1.5 text-xs text-muted-foreground tabular-nums">{n}</span> : null;
+
+  return (
+    <div>
+      <AdminHeader
+        title={t('inbox.title', 'Inbox')}
+        description={t('inbox.description', 'Work awaiting you, from every part of the platform that sends any.')}
+      />
+      <Tabs value={tab} onValueChange={(value) => setTab(value as InboxTab)} className="mb-4">
+        <TabsList variant="line" aria-label={t('inbox.tabs', 'Inbox')}>
+          <TabsTrigger value="waiting" data-testid="inbox-tab-waiting">
+            {t('inbox.tab.waiting', 'Waiting for me')}
+            {count(counts.data?.waiting)}
+          </TabsTrigger>
+          <TabsTrigger value="mentions" data-testid="inbox-tab-mentions">
+            {t('inbox.tab.mentions', 'Mentions')}
+            {count(counts.data?.mentions)}
+          </TabsTrigger>
+          <TabsTrigger value="updates" data-testid="inbox-tab-updates">
+            {t('inbox.tab.updates', 'Updates')}
+            {count(counts.data?.updates)}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+      {tab === 'waiting' ? <WaitingForMe /> : <InboxNotices tab={tab} onChanged={refreshCounts} />}
+    </div>
+  );
+}
+
+/** Waiting for me: every source of work, one source in view at a time. */
+function WaitingForMe() {
+  const t = useTranslation('documents');
   const dates = useDateDisplay();
-  const { apiClient } = useAuth();
   const router = useRouter();
 
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
@@ -91,15 +155,28 @@ export default function InboxPage() {
   const [page, setPage] = useState(1);
 
   const sources = useFetch<InboxSourcesResponse>(async () => {
-    const response = await apiClient('/api/v1/me/inbox/sources');
+    const { data, error, response } = await api.GET('/api/v1/me/inbox/sources');
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const body = (error ?? null) as { error?: string } | null;
       throw new Error(body?.error ?? t('inbox.error.sources', 'Your inbox sources could not be loaded.'));
     }
-    return (await response.json()) as InboxSourcesResponse;
-  }, [apiClient]);
+    return data as unknown as InboxSourcesResponse;
+  }, []);
 
-  const sourceList = useMemo<InboxSource[]>(() => sources.data?.data ?? [], [sources.data]);
+  const proposals = useFetch<AgentProposal[]>(async () => {
+    const { data, response } = await api.GET('/api/v1/me/agent-proposals', { params: { query: { status: 'waiting' } } });
+    if (!response.ok) return [];
+    const body = (data ?? null) as { data?: unknown } | null;
+    return Array.isArray(body?.data) ? (body.data as AgentProposal[]) : [];
+  }, []);
+  const waitingProposals = useMemo(() => proposals.data ?? [], [proposals.data]);
+
+  const sourceList = useMemo<InboxSource[]>(() => {
+    const registered = sources.data?.data ?? [];
+    return waitingProposals.length > 0
+      ? [...registered, { key: PROPOSALS_SOURCE, label: '', open_count: waitingProposals.length } as InboxSource]
+      : registered;
+  }, [sources.data, waitingProposals.length]);
 
   /**
    * Which source is in view. Derived, not defaulted in an effect: an explicit
@@ -113,19 +190,19 @@ export default function InboxPage() {
   }, [selectedSource, sourceList]);
 
   const items = useFetch<InboxListResponse | null>(async () => {
-    if (activeSource === null) return null;
+    if (activeSource === null || activeSource === PROPOSALS_SOURCE) return null;
 
-    const params = new URLSearchParams({ source: activeSource, page: String(page) });
-    if (!openOnly) params.set('open', '0');
-
-    const response = await apiClient(`/api/v1/me/inbox?${params.toString()}`);
+    const { data, error, response } = await api.GET('/api/v1/me/inbox', {
+      params: { query: { source: activeSource, page, // `0`, as before: the server reads 0 and false alike, and the wire stays the same.
+        ...(openOnly ? {} : { open: 0 as unknown as boolean }) } },
+    });
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const body = (error ?? null) as { error?: string } | null;
       // Verbatim: a 422 names the registered source keys, which makes it fixable.
       throw new Error(body?.error ?? t('inbox.error.list', 'Your inbox could not be loaded.'));
     }
-    return (await response.json()) as InboxListResponse;
-  }, [apiClient, activeSource, openOnly, page]);
+    return data as unknown as InboxListResponse;
+  }, [activeSource, openOnly, page]);
 
   const rows = items.data?.data ?? [];
   const pagination = items.data?.pagination ?? null;
@@ -139,7 +216,13 @@ export default function InboxPage() {
   const sourceLabel = (source: InboxSource): string =>
     source.key === DOCUMENT_ROUTING_SOURCE
       ? t('inbox.source.documentRouting', 'Documents awaiting you')
-      : source.label;
+      : source.key === 'messages'
+        ? t('inbox.source.messages', 'Conversations assigned to you')
+        : source.key === PROPOSALS_SOURCE
+          ? t('inbox.source.proposals', 'Agents asking you')
+          : source.key === 'chat_held_lines'
+            ? t('inbox.source.heldLines', 'Agents waiting in chats')
+            : source.label;
   const activeSourceLabel = sourceList.find((s) => s.key === activeSource);
 
   /**
@@ -228,17 +311,9 @@ export default function InboxPage() {
     ]),
   ];
 
-  const header = (
-    <AdminHeader
-      title={t('inbox.title', 'Inbox')}
-      description={t('inbox.description', 'Work awaiting you, from every part of the platform that sends any.')}
-    />
-  );
-
   if (sources.error !== null) {
     return (
       <div>
-        {header}
         <AreaError
           message={sources.error}
           retryLabel={t('inbox.tryAgain', 'Try again')}
@@ -250,8 +325,6 @@ export default function InboxPage() {
 
   return (
     <div>
-      {header}
-
       {/* Tabs per source, only when there is more than one. */}
       {sourceList.length > 1 && (
         <Tabs value={activeSource ?? undefined} onValueChange={selectSource} className="mb-4">
@@ -284,7 +357,30 @@ export default function InboxPage() {
         />
       </div>
 
-      {items.error !== null ? (
+      {activeSource === PROPOSALS_SOURCE ? (
+        <ul className="divide-y divide-border rounded-card border border-border bg-card" aria-label={t('inbox.source.proposals', 'Agents asking you')}>
+          {waitingProposals.map((proposal) => (
+            <li key={proposal.id}>
+              <button
+                type="button"
+                onClick={() => router.push('/admin/approvals')}
+                className="flex min-h-12 w-full items-center gap-3 px-4 py-3 text-start hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                data-testid={`inbox-proposal-${proposal.id}`}
+              >
+                <Avatar name={proposal.agent?.name ?? ''} kind="agent" size={28} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium text-foreground">{proposal.summary}</span>
+                  <span className="block truncate text-sm text-muted-foreground">{proposal.agent?.name ?? ''}</span>
+                </span>
+                <Badge variant="warning">{t('inbox.state.decision', 'Your decision')}</Badge>
+                {dates.dateTime(proposal.createdAt) !== null && (
+                  <span className="shrink-0 text-sm text-muted-foreground">{dates.dateTime(proposal.createdAt)}</span>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : items.error !== null ? (
         <AreaError
           message={items.error}
           retryLabel={t('inbox.tryAgain', 'Try again')}
@@ -307,10 +403,22 @@ export default function InboxPage() {
           isLoading={items.loading || sources.loading}
           ariaLabel={t('inbox.table.label', 'Inbox items')}
           onRowClick={(row) => {
+            // Messages (ADR 0016): a conversation assigned to the caller.
+            if (row.resource_type === 'conversation' && row.resource_id) {
+              router.push(`/chat?c=${encodeURIComponent(row.resource_id)}&k=customer`);
+              return;
+            }
+            // C3: an agent's line held for you opens its chat, where you decide it.
+            if (row.resource_type === 'chat' && row.resource_id) {
+              router.push(`/chat?c=${encodeURIComponent(row.resource_id)}`);
+              return;
+            }
             const meta = routingMeta(row);
             if (meta !== null) router.push(routingHref(meta));
           }}
           emptyState={{
+            moment: openOnly ? 'all-caught-up' : 'empty-documents',
+            once: openOnly ? 'inbox-open' : 'inbox-all',
             title: openOnly
               ? t('inbox.empty.open.title', 'Nothing is waiting for you')
               : t('inbox.empty.all.title', 'Nothing has reached you yet'),

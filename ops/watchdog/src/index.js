@@ -634,22 +634,31 @@ async function handleRequest(request, env) {
   // Unauthenticated and deliberately thin: it publishes no URL, no secret and
   // no detail beyond up/down, which is already visible to anyone who can load
   // the site itself.
+  //
+  // `status` is the one word the sites' footers read (section 29):
+  // "ok" | "degraded" | "down". Stale readings are "degraded", never "ok".
   if (request.method === 'GET' && url.pathname === '/status') {
     const cfg = config(env);
-    const out = { targets: {}, backup: null };
+    const out = { status: 'ok', targets: {}, backup: null };
 
     for (const target of cfg.targets) {
       const state = await readJson(env, `state:${target.name}`);
       out.targets[target.name] = state ? state.alertedStatus : 'unknown';
     }
 
+    const lastRun = await readJson(env, 'meta:last-run');
+    const stale = !lastRun?.at || Date.now() - lastRun.at > STALE_AFTER_MS;
+    const verdict = overallOf(Object.values(out.targets).map((status) => ({ status })), stale);
+    out.status = verdict === 'ok' ? 'ok' : verdict === 'down' ? 'down' : 'degraded';
+
     const beat = await readJson(env, 'beat:backup');
     out.backup = beat?.at ? { lastSuccessAgeSeconds: Math.round((Date.now() - beat.at) / 1000) } : null;
 
-    return Response.json(out);
+    // The websites read this from another origin, and it holds nothing private.
+    return Response.json(out, { headers: { 'access-control-allow-origin': '*', 'cache-control': 'no-store, max-age=0' } });
   }
 
-  // GET / — the public status page.
+  // GET / — the public status page, and /ar/ in Arabic.
   //
   // Served from the Worker, from KV, on a hostname that resolves through
   // Cloudflare's edge. It shares nothing with the systems it reports on: not
@@ -657,13 +666,28 @@ async function handleRequest(request, env) {
   // that already ships inside whity-core reads the same database that goes
   // down, which is why it showed nothing at all through a three-hour outage.
   if (request.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-    return renderStatusPage(env, config(env));
+    return renderStatusPage(env, config(env), 'en');
+  }
+  if (request.method === 'GET' && ['/ar', '/ar/', '/ar/index.html'].includes(url.pathname)) {
+    return renderStatusPage(env, config(env), 'ar');
   }
 
   return new Response('not found\n', { status: 404 });
 }
 
 // ── the public status page ──────────────────────────────────────────────────
+//
+// The SiteStatus design (WS.2, docs/design/sites/health.whity.dev): one plain
+// sentence on top, every part with its days of history, what is happening now,
+// in English at / and Arabic at /ar/.
+//
+// EVERYTHING IS INLINE. The page requests no stylesheet, font or image, from
+// whity.dev or from anywhere else: a status page that loads assets from the
+// system it reports on goes blank in exactly the outage it exists to explain.
+// The colours are the design tokens (docs/design/tokens.json) copied in; the
+// fonts are named in case a visitor already has them, and the fallbacks do the
+// real work. (Cloudflare injects its cookieless Web Analytics beacon at the
+// edge; nothing here waits on it.)
 
 const STALE_AFTER_MS = 15 * 60 * 1000;
 
@@ -671,44 +695,169 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }
 
-/** Human-facing labels, so the page never shows an internal key name. */
+/** Human-facing names, so the page never shows an internal key. */
 const LABELS = {
-  api: 'API',
-  database: 'Database',
-  queue: 'Background jobs',
-  scheduler: 'Scheduled tasks',
-  render: 'Document rendering',
-  web: 'Application',
-  site: 'Website',
-  docs: 'Documentation',
-  pay: 'Payments',
+  api: { en: 'API', ar: 'واجهة البرمجة' },
+  web: { en: 'The app', ar: 'التطبيق' },
+  site: { en: 'Website', ar: 'الموقع' },
+  docs: { en: 'Documentation', ar: 'التوثيق' },
+  pay: { en: 'Payments', ar: 'المدفوعات' },
+  id: { en: 'Whity ID', ar: 'Whity ID' },
+  database: { en: 'Database', ar: 'قاعدة البيانات' },
+  queue: { en: 'Background jobs', ar: 'المهام في الخلفية' },
+  scheduler: { en: 'Scheduled tasks', ar: 'المهام المجدولة' },
+  render: { en: 'Document rendering', ar: 'إخراج المستندات' },
 };
 
 /**
- * What each component IS, for a reader who does not know the architecture.
- * A status page is read by people who are not the operator — a customer
- * deciding whether to wait or escalate — and "pay: Down" means nothing to them
- * unless the page says what pay is.
+ * What each part IS, for a reader who does not know the architecture: a
+ * customer deciding whether to wait learns nothing from "pay: Down" unless the
+ * page says what pay is. A hostname where there is one, plain words otherwise.
  */
 const DESCRIPTIONS = {
-  api: 'app.whity.dev/api',
-  database: 'reported by the application',
-  queue: 'reported by the application',
-  scheduler: 'reported by the application',
-  render: 'reported by the application',
-  web: 'app.whity.dev',
-  site: 'whity.dev',
-  docs: 'docs.whity.dev',
-  pay: 'pay.whity.dev',
+  api: { en: 'app.whity.dev/api', ar: 'app.whity.dev/api' },
+  web: { en: 'app.whity.dev', ar: 'app.whity.dev' },
+  site: { en: 'whity.dev', ar: 'whity.dev' },
+  docs: { en: 'docs.whity.dev', ar: 'docs.whity.dev' },
+  pay: { en: 'pay.whity.dev', ar: 'pay.whity.dev' },
+  id: { en: 'id.whity.dev', ar: 'id.whity.dev' },
+  database: { en: 'Where your data is kept', ar: 'حيث تُحفظ بياناتك' },
+  queue: { en: 'Emails, imports and exports', ar: 'الرسائل والاستيراد والتصدير' },
+  scheduler: { en: 'Reminders, reports, routines', ar: 'التذكيرات والتقارير والروتين' },
+  render: { en: 'PDFs and receipts', ar: 'ملفات PDF والإيصالات' },
 };
 
-async function renderStatusPage(env, cfg) {
+/** Every visible string, in both languages. Numbers stay Western digits. */
+const TEXT = {
+  en: {
+    title: 'Whity status',
+    status: 'Status',
+    otherLang: 'العربية',
+    otherHref: '/ar/',
+    working: 'Working',
+    notWorking: 'Not working',
+    notChecked: 'Not checked yet',
+    forDuration: (d) => `for ${d}`,
+    okTitle: 'Everything is working',
+    okBody: (age) => `Checked ${age} ago.`,
+    staleTitle: 'Status unknown',
+    staleBody: (age) =>
+      age === null
+        ? 'No check has finished yet, so these readings are not current. Treat them as unknown.'
+        : `The last check finished ${age} ago, so these readings are not current. Treat them as unknown.`,
+    allDownTitle: 'Whity isn’t working',
+    allDownBody: 'None of its parts are answering. We post updates here.',
+    someDownTitle: (n, names) => (n === 1 ? `${names[0]} isn’t working` : `${n} parts of Whity aren’t working`),
+    someDownBody: (names, since) => `${list(names, 'en')} ${names.length === 1 ? 'has' : 'have'} been stopped since ${since}. Everything else works.`,
+    unknownTitle: 'Some parts haven’t been checked yet',
+    unknownBody: 'Everything checked so far works.',
+    uptime: (pct) => `${pct}% of checked days`,
+    noHistory: 'No history yet',
+    daysAgo: (wide, narrow) => `<span><span class="wide">${wide}</span><span class="narrow">${narrow}</span> days ago</span>`,
+    today: 'Today',
+    observed: (o, b) =>
+      o === 0 ? 'No history yet' : `${o} day${o === 1 ? '' : 's'} observed · ${b === 0 ? 'no failures' : `${b} with failures`}`,
+    barLabel: (summary, days) => `${summary} over the last ${days} days`,
+    segLabel: { up: 'no failures', down: 'failure recorded', none: 'not observed' },
+    backups: 'Backups',
+    backupsDetail: 'Every night',
+    backupOk: 'On time',
+    backupLate: 'Late',
+    backupNever: 'Never reported',
+    happening: 'What’s happening',
+    incTitle: (name) => `${name} isn’t working`,
+    incSince: (since, age) => `Since ${since} · checked ${age} ago`,
+    apart: 'This page runs apart from Whity, so it stays up when Whity doesn’t.',
+  },
+  ar: {
+    title: 'حالة Whity',
+    status: 'الحالة',
+    otherLang: 'English',
+    otherHref: '/',
+    working: 'يعمل',
+    notWorking: 'متوقف',
+    notChecked: 'لم يُفحص بعد',
+    forDuration: (d) => `منذ ${d}`,
+    okTitle: 'كل شيء يعمل',
+    okBody: (age) => `آخر فحص قبل ${age}.`,
+    staleTitle: 'الحالة غير معروفة',
+    staleBody: (age) =>
+      age === null
+        ? 'لم يكتمل أي فحص بعد، لذا هذه القراءات ليست حالية. اعتبرها غير معروفة.'
+        : `اكتمل آخر فحص قبل ${age}، لذا هذه القراءات ليست حالية. اعتبرها غير معروفة.`,
+    allDownTitle: 'Whity لا يعمل',
+    allDownBody: 'لا يستجيب أي من أجزائه. ننشر التحديثات هنا.',
+    someDownTitle: (n, names) =>
+      n === 1 ? `${names[0]} لا يعمل` : n === 2 ? 'جزءان من Whity لا يعملان' : n <= 10 ? `${n} أجزاء من Whity لا تعمل` : `${n} جزءاً من Whity لا تعمل`,
+    someDownBody: (names, since) => `${list(names, 'ar')} ${names.length === 1 ? 'متوقف' : 'متوقفة'} منذ ${since}. كل ما عدا ذلك يعمل.`,
+    unknownTitle: 'لم تُفحص بعض الأجزاء بعد',
+    unknownBody: 'كل ما فُحص حتى الآن يعمل.',
+    uptime: (pct) => `${pct}% من الأيام المفحوصة`,
+    noHistory: 'لا يوجد سجل بعد',
+    daysAgo: (wide, narrow) => `<span>قبل <span class="wide">${wide}</span><span class="narrow">${narrow}</span> يوماً</span>`,
+    today: 'اليوم',
+    observed: (o, b) => (o === 0 ? 'لا يوجد سجل بعد' : `${o} يوم مفحوص · ${b === 0 ? 'بلا أعطال' : `${b} مع أعطال`}`),
+    barLabel: (summary, days) => `${summary} خلال آخر ${days} يوماً`,
+    segLabel: { up: 'بلا أعطال', down: 'سُجّل عطل', none: 'لم يُفحص' },
+    backups: 'النسخ الاحتياطي',
+    backupsDetail: 'كل ليلة',
+    backupOk: 'في الموعد',
+    backupLate: 'متأخر',
+    backupNever: 'لم يُبلَّغ عنه قط',
+    happening: 'ما الذي يحدث',
+    incTitle: (name) => `${name} لا يعمل`,
+    incSince: (since, age) => `منذ ${since} · آخر فحص قبل ${age}`,
+    apart: 'هذه الصفحة تعمل بمعزل عن Whity، لذا تبقى متاحة حتى لو تعطل.',
+  },
+};
+
+function list(names, lang) {
+  if (names.length <= 1) return names.join('');
+  const and = lang === 'ar' ? ' و' : ' and ';
+  const sep = lang === 'ar' ? '، ' : ', ';
+  return names.slice(0, -1).join(sep) + and + names[names.length - 1];
+}
+
+/** "3h 30m" in English; the same figures with Arabic unit letters in Arabic. */
+function durationIn(lang, ms) {
+  const d = humanDuration(ms);
+  if (lang !== 'ar') return d;
+  return d.replace(/(\d+)d/g, '$1 ي').replace(/(\d+)h/g, '$1 س').replace(/(\d+)m/g, '$1 د').replace(/(\d+)s/g, '$1 ث');
+}
+
+/** A day in Amman time, with Western digits ("3 October", "3 تشرين الأول"). */
+function dateIn(lang, at, withTime = false) {
+  const opts = { day: 'numeric', month: 'long', timeZone: 'Asia/Amman' };
+  if (withTime) Object.assign(opts, { hour: '2-digit', minute: '2-digit', hour12: false });
+  try {
+    return new Intl.DateTimeFormat(lang === 'ar' ? 'ar-JO-u-nu-latn' : 'en-GB', opts).format(new Date(at));
+  } catch {
+    return new Date(at).toISOString().slice(0, withTime ? 16 : 10).replace('T', ' ');
+  }
+}
+
+/** The overall verdict, shared by the page and the /status JSON. */
+function overallOf(components, stale) {
+  const anyDown = components.some((c) => c.status === 'down');
+  const anyUnknown = components.some((c) => c.status === 'unknown');
+  const allDown = components.length > 0 && components.every((c) => c.status === 'down');
+  if (stale) return 'stale';
+  if (allDown) return 'down';
+  if (anyDown) return 'partial';
+  if (anyUnknown) return 'unknown';
+  return 'ok';
+}
+
+const LOGO = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 94.942 29.257" width="95" height="29" role="img" aria-label="Whity"><path style="fill:var(--logo-mark)" d="M5.0 7.0H7.0V5.0C7.0 2.790860891342163 8.790861129760742 1.0 11.0 1.0H19.0C21.209138870239258 1.0 23.0 2.790860891342163 23.0 5.0V13.0C23.0 15.209138870239258 21.209138870239258 17.0 19.0 17.0H17.0V19.0C17.0 21.209138870239258 15.209138870239258 23.0 13.0 23.0H5.0C2.790860891342163 23.0 1.0 21.209138870239258 1.0 19.0V11.0C1.0 8.790861129760742 2.790860891342163 7.0 5.0 7.0Z"/><path fill="#ffffff" d="M11.0 3.0H19.0C20.104570388793945 3.0 21.0 3.895430564880371 21.0 5.0V13.0C21.0 14.104569435119629 20.104570388793945 15.0 19.0 15.0H11.0C9.895430564880371 15.0 9.0 14.104569435119629 9.0 13.0V5.0C9.0 3.895430564880371 9.895430564880371 3.0 11.0 3.0Z"/><path fill="currentColor" d="M81.21 12.06L81.15 11.90L81.14 11.66L81.16 11.50L81.22 11.35L81.31 11.21L81.42 11.10L81.56 11.01L81.71 10.94L81.95 10.91L83.91 10.91L84.06 10.94L84.21 11.00L84.40 11.14L84.50 11.26L84.58 11.40L87.39 18.06L87.77 19.07L88.10 18.07L90.44 11.45L90.50 11.31L90.59 11.19L90.70 11.08L90.83 11.00L90.98 10.94L91.13 10.91L93.21 10.91L93.45 10.97L93.65 11.09L93.81 11.27L93.91 11.49L93.94 11.64L93.94 11.80L93.88 12.03L89.28 23.00L87.40 27.74L87.33 27.89L87.23 28.01L87.11 28.12L86.89 28.22L86.65 28.26L85.14 28.26L84.98 28.24L84.75 28.16L84.62 28.07L84.46 27.89L84.39 27.75L84.34 27.60L84.33 27.44L84.35 27.28L84.39 27.13L86.16 22.99ZM74.56 10.91L74.58 10.89L74.59 8.58L74.65 8.35L74.77 8.14L74.88 8.03L75.01 7.94L75.16 7.88L75.32 7.85L77.10 7.85L77.33 7.91L77.47 7.98L77.59 8.08L77.73 8.27L77.81 8.50L77.83 8.66L77.83 10.91L79.51 10.91L79.74 10.94L79.89 11.00L80.08 11.15L80.22 11.34L80.31 11.56L80.32 11.72L80.32 13.08L80.29 13.24L80.22 13.38L80.08 13.57L79.96 13.67L79.82 13.75L79.59 13.81L77.83 13.81L77.83 22.27L77.77 22.50L77.65 22.70L77.53 22.82L77.40 22.90L77.18 22.98L77.02 23.00L75.39 23.00L75.24 22.98L75.08 22.94L74.94 22.86L74.77 22.70L74.68 22.57L74.60 22.35L74.58 22.19L74.58 13.81L73.13 13.81L72.90 13.78L72.68 13.67L72.50 13.51L72.42 13.38L72.34 13.16L72.32 13.00L72.32 11.64L72.36 11.48L72.42 11.34L72.56 11.15L72.68 11.05L72.82 10.97L73.05 10.91ZM67.68 8.28L67.52 8.25L67.37 8.20L67.17 8.07L67.02 7.88L66.93 7.66L66.90 7.45L66.91 5.81L66.95 5.57L67.06 5.36L67.17 5.25L67.30 5.15L67.52 5.06L67.68 5.04L69.38 5.04L69.61 5.08L69.82 5.19L69.94 5.30L70.07 5.50L70.12 5.65L70.15 5.81L70.15 7.51L70.10 7.74L69.99 7.95L69.88 8.07L69.75 8.16L69.61 8.23L69.46 8.27ZM70.15 22.19L70.13 22.35L70.09 22.50L70.01 22.64L69.91 22.76L69.79 22.86L69.65 22.94L69.50 22.98L69.34 23.00L67.71 23.00L67.48 22.97L67.26 22.86L67.09 22.70L67.00 22.57L66.92 22.35L66.90 22.19L66.91 11.64L66.97 11.41L67.09 11.21L67.26 11.05L67.40 10.97L67.56 10.92L67.71 10.91L69.34 10.91L69.50 10.92L69.72 11.00L69.91 11.15L70.05 11.34L70.13 11.56L70.15 11.72ZM53.45 23.00L53.29 22.98L53.14 22.94L53.00 22.86L52.88 22.76L52.74 22.57L52.68 22.42L52.64 22.27L52.64 6.82L52.70 6.59L52.82 6.38L53.00 6.22L53.22 6.12L53.45 6.09L55.13 6.09L55.36 6.15L55.50 6.22L55.63 6.32L55.77 6.51L55.83 6.66L55.86 6.82L55.86 12.43L56.22 12.05L56.60 11.73L57.10 11.38L57.55 11.13L58.14 10.89L58.61 10.76L59.09 10.68L59.60 10.66L60.23 10.69L60.83 10.79L61.38 10.96L61.75 11.13L62.16 11.39L62.56 11.74L62.82 12.05L63.12 12.53L63.36 13.07L63.54 13.65L63.63 14.12L63.72 14.84L63.75 15.62L63.75 22.27L63.71 22.42L63.65 22.57L63.51 22.76L63.39 22.86L63.25 22.94L63.02 23.00L61.31 23.00L61.16 22.98L61.00 22.94L60.86 22.86L60.74 22.76L60.64 22.64L60.54 22.42L60.50 22.19L60.50 15.72L60.46 15.21L60.38 14.77L60.24 14.39L60.09 14.13L59.88 13.88L59.65 13.71L59.33 13.56L58.98 13.48L58.65 13.45L58.16 13.46L57.81 13.51L57.42 13.62L57.06 13.78L56.78 13.96L56.49 14.22L56.26 14.51L56.07 14.83L55.97 15.13L55.91 15.44L55.89 15.75L55.89 22.19L55.87 22.35L55.79 22.57L55.70 22.70L55.53 22.86L55.39 22.94L55.23 22.98L55.07 23.00ZM31.64 7.00L31.88 7.04L32.10 7.14L32.28 7.30L32.36 7.43L32.42 7.58L34.98 16.27L35.18 17.09L35.36 18.12L35.59 17.09L35.93 15.96L38.29 9.83L38.41 9.62L38.59 9.45L38.81 9.34L39.05 9.31L40.76 9.31L40.93 9.33L41.08 9.37L41.23 9.45L41.35 9.56L41.45 9.69L41.52 9.83L43.86 16.05L44.18 17.04L44.43 18.00L44.57 17.16L44.89 15.92L47.33 7.58L47.39 7.44L47.48 7.30L47.65 7.14L47.79 7.06L48.03 7.00L49.95 7.00L50.11 7.04L50.26 7.10L50.45 7.24L50.55 7.36L50.65 7.58L50.69 7.81L50.65 8.05L46.23 22.43L46.17 22.57L46.03 22.76L45.91 22.86L45.77 22.94L45.54 23.00L44.06 23.00L43.83 22.97L43.68 22.90L43.49 22.76L43.39 22.64L43.31 22.50L39.76 14.00L36.43 22.48L36.36 22.63L36.20 22.81L36.06 22.90L35.84 22.98L35.68 23.00L34.14 23.00L33.91 22.94L33.77 22.86L33.65 22.76L33.55 22.64L33.45 22.43L29.03 8.05L29.00 7.89L29.01 7.66L29.06 7.50L29.13 7.36L29.23 7.24L29.36 7.14L29.57 7.04L29.81 7.00Z"/></svg>`;
+
+async function renderStatusPage(env, cfg, lang = 'en') {
+  const L = TEXT[lang] || TEXT.en;
   const lastRun = await readJson(env, 'meta:last-run');
   const dataAge = lastRun?.at ? Date.now() - lastRun.at : null;
 
   // THE FIRST THING ESTABLISHED, BEFORE ANY COMPONENT IS REPORTED. If the
-  // checks stopped running, every "operational" below is a claim about the
-  // past dressed up as the present, so the page says so instead of reassuring.
+  // checks stopped running, every "working" below is a claim about the past
+  // dressed up as the present, so the page says so instead of reassuring.
   const stale = dataAge === null || dataAge > STALE_AFTER_MS;
 
   const components = [];
@@ -716,8 +865,8 @@ async function renderStatusPage(env, cfg) {
     const state = await readJson(env, `state:${target.name}`);
     const history = await readJson(env, `history:${target.name}`);
     components.push({
-      name: LABELS[target.name] || target.name,
-      detail: DESCRIPTIONS[target.name] || '',
+      name: LABELS[target.name]?.[lang] || target.name,
+      detail: DESCRIPTIONS[target.name]?.[lang] || '',
       status: state?.alertedStatus ?? 'unknown',
       downSince: state?.alertedStatus === 'down' ? state?.downSince ?? null : null,
       days: history?.days ?? {},
@@ -728,20 +877,24 @@ async function renderStatusPage(env, cfg) {
   const backupAge = beat?.at ? Date.now() - beat.at : null;
   const backupOk = backupAge !== null && backupAge <= cfg.backupMaxAgeHours * 3600 * 1000;
 
-  const anyDown = components.some((c) => c.status === 'down');
-  const anyUnknown = components.some((c) => c.status === 'unknown');
-  const allDown = components.length > 0 && components.every((c) => c.status === 'down');
+  // ONE PLAIN SENTENCE on top, and what it means underneath.
+  const verdict = overallOf(components, stale);
+  const down = components.filter((c) => c.status === 'down');
+  const firstDown = down.map((c) => c.downSince).filter(Boolean).sort((a, b) => a - b)[0] ?? Date.now();
+  const banner = {
+    stale: { kind: 'warn', title: L.staleTitle, body: L.staleBody(dataAge === null ? null : durationIn(lang, dataAge)) },
+    down: { kind: 'bad', title: L.allDownTitle, body: L.allDownBody },
+    partial: {
+      kind: 'warn',
+      title: L.someDownTitle(down.length, down.map((c) => c.name)),
+      body: L.someDownBody(down.map((c) => c.name), dateIn(lang, firstDown)),
+    },
+    unknown: { kind: 'warn', title: L.unknownTitle, body: L.unknownBody },
+    ok: { kind: 'ok', title: L.okTitle, body: L.okBody(durationIn(lang, dataAge ?? 0)) },
+  }[verdict];
 
-  let overall;
-  if (stale) overall = { kind: 'stale', text: 'Status unknown' };
-  else if (allDown) overall = { kind: 'down', text: 'Major outage' };
-  else if (anyDown) overall = { kind: 'down', text: 'Partial outage' };
-  else if (anyUnknown) overall = { kind: 'stale', text: 'Status incomplete' };
-  else overall = { kind: 'ok', text: 'All systems operational' };
-
-  const dot = (kind) => `<span class="dot ${kind}" aria-hidden="true"></span>`;
-  const kindOf = (s) => (s === 'up' ? 'ok' : s === 'down' ? 'down' : 'stale');
-  const wordOf = (s) => (s === 'up' ? 'Operational' : s === 'down' ? 'Down' : 'Unknown');
+  const stateOf = (s) =>
+    s === 'up' ? ['is-ok', L.working] : s === 'down' ? ['is-down', L.notWorking] : ['is-warn', L.notChecked];
 
   // How much of the record the narrow (phone) layout shows. Paired with the
   // `max-width: 560px` rule below — change both together or the caption stops
@@ -750,24 +903,22 @@ async function renderStatusPage(env, cfg) {
   const hiddenSegs = cfg.historyDays - narrowDays;
 
   /**
-   * The history bar: one segment per day, oldest on the left.
+   * The history bar: one segment per day, oldest first.
    *
    * THREE STATES, NOT TWO. A day with no recorded check is drawn as a GAP, not
-   * as green. The checks here do not run reliably, so an unobserved day is the
-   * absence of evidence rather than evidence of health — and colouring it green
-   * would be the same untruth as a status page reporting "operational" from
-   * readings it stopped collecting. Every other honest decision on this page
-   * falls apart if the bar quietly invents uptime.
+   * as green: an unobserved day is the absence of evidence rather than evidence
+   * of health, and colouring it green would be the same untruth as a status
+   * page reporting "working" from readings it stopped collecting.
+   *
+   * A phone cannot show 90 days (90 segments want ~358px and get 230-300px),
+   * so the narrow layout shows the most recent days and its caption counts
+   * only those. Every segment stays in the DOM, so a screen reader gets the
+   * whole record either way.
    */
-  const historyBar = (days) => {
+  const history = (days) => {
     const segs = [];
     let observed = 0;
     let bad = 0;
-    // A phone cannot show 90 days: 90 segments need ~358px and the bar gets
-    // roughly 230-300px there, so a third of the record was being clipped away
-    // silently — a bar that LOOKED complete while hiding the oldest month.
-    // The narrow layout shows the most recent NARROW_DAYS instead, and counts
-    // them separately so the caption under it describes what is actually drawn.
     let narrowObserved = 0;
     let narrowBad = 0;
 
@@ -781,260 +932,157 @@ async function renderStatusPage(env, cfg) {
         if (v) narrowObserved++;
         if (v === 'down') narrowBad++;
       }
-      const label = v === 'up' ? 'no failures' : v === 'down' ? 'failure recorded' : 'not observed';
-      segs.push(`<i class="seg ${cls}" title="${d} — ${label}"></i>`);
+      segs.push(`<i class="seg ${cls}" title="${d} · ${L.segLabel[v === 'up' ? 'up' : v === 'down' ? 'down' : 'none']}"></i>`);
     }
 
-    const phrase = (o, b) =>
-      o === 0
-        ? 'No history yet'
-        : `${o} day${o === 1 ? '' : 's'} observed · ${b === 0 ? 'no failures' : `${b} with failures`}`;
+    const summary = L.observed(observed, bad);
+    const narrowSummary = L.observed(narrowObserved, narrowBad);
+    const pct = observed === 0 ? null : ((observed - bad) / observed) * 100;
+    const uptime = pct === null ? L.noHistory : L.uptime(pct === 100 ? '100' : pct.toFixed(1));
 
-    const summary = phrase(observed, bad);
-    const narrowSummary = phrase(narrowObserved, narrowBad);
-
-    // The aria-label deliberately describes the FULL record rather than the
-    // narrow window: every segment is in the DOM at every width, only hidden
-    // visually, so a screen-reader user gets the whole picture either way.
-    return `<div class="bar" role="img" aria-label="${escapeHtml(summary)} over the last ${cfg.historyDays} days">${segs.join('')}</div>
-            <div class="barfoot">
-              <span><span class="wide">${cfg.historyDays}</span><span class="narrow">${narrowDays}</span> days ago</span>
-              <span class="sum"><span class="wide">${escapeHtml(summary)}</span><span class="narrow">${escapeHtml(narrowSummary)}</span></span>
-              <span>today</span>
-            </div>`;
+    return {
+      uptime,
+      bar: `<div class="s-bars" role="img" aria-label="${escapeHtml(L.barLabel(summary, cfg.historyDays))}">${segs.join('')}</div>
+        <div class="s-barlab">${L.daysAgo(cfg.historyDays, narrowDays)}<span class="sum"><span class="wide">${escapeHtml(summary)}</span><span class="narrow">${escapeHtml(narrowSummary)}</span></span><span>${L.today}</span></div>`,
+    };
   };
 
   const rows = components
+    .map((c) => {
+      const [cls, word] = stateOf(c.status);
+      const h = history(c.days);
+      const since = c.downSince ? ` <span class="since">${escapeHtml(L.forDuration(durationIn(lang, Date.now() - c.downSince)))}</span>` : '';
+      return `
+      <div>
+        <header>
+          <div><b>${escapeHtml(c.name)}</b>${c.detail ? `<small dir="auto">${escapeHtml(c.detail)}</small>` : ''}</div>
+          <div class="end"><span class="s-state ${cls}">${word}${since}</span><small dir="auto">${escapeHtml(h.uptime)}</small></div>
+        </header>
+        ${h.bar}
+      </div>`;
+    })
+    .join('');
+
+  const [bCls, bWord] = backupAge === null ? ['is-warn', L.backupNever] : backupOk ? ['is-ok', L.backupOk] : ['is-down', L.backupLate];
+  const backupRow = `
+      <div>
+        <header>
+          <div><b>${L.backups}</b><small>${L.backupsDetail}</small></div>
+          <div class="end"><span class="s-state ${bCls}">${bWord}</span></div>
+        </header>
+      </div>`;
+
+  const incidents = down
     .map(
-      (c) => `
-      <li class="row">
-        <div class="rowtop">
-          <span class="label">${escapeHtml(c.name)}${
-            c.detail ? `<span class="host">${escapeHtml(c.detail)}</span>` : ''
-          }</span>
-          <span class="state ${kindOf(c.status)}">${dot(kindOf(c.status))}${wordOf(c.status)}${
-            c.downSince ? ` <span class="since">for ${escapeHtml(humanDuration(Date.now() - c.downSince))}</span>` : ''
-          }</span>
-        </div>
-        ${historyBar(c.days)}
-      </li>`
+      (c) => `<div class="s-inc"><b>${escapeHtml(L.incTitle(c.name))}</b>${
+        c.downSince ? `<small>${escapeHtml(L.incSince(dateIn(lang, c.downSince, true), durationIn(lang, dataAge ?? 0)))}</small>` : ''
+      }</div>`
     )
     .join('');
 
-  const backupRow = `
-      <li class="row">
-        <div class="rowtop">
-          <span class="label">Backups<span class="host">dead-man's switch</span></span>
-          <span class="state ${backupAge === null ? 'stale' : backupOk ? 'ok' : 'down'}">
-            ${dot(backupAge === null ? 'stale' : backupOk ? 'ok' : 'down')}${
-              backupAge === null ? 'Never reported' : backupOk ? 'Healthy' : 'Overdue'
-            }
-          </span>
-        </div>
-      </li>`;
-
   const html = `<!doctype html>
-<html lang="en">
+<html lang="${lang}" dir="${lang === 'ar' ? 'rtl' : 'ltr'}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Whity Status</title>
+<title>${L.title}</title>
+<link rel="alternate" hreflang="${lang === 'ar' ? 'en' : 'ar'}" href="${L.otherHref}">
 <style>
-  /* Whity's palette, from packages/tokens — neutral "paper" greys with a blue
-     primary, and the same semantic green/red/amber the product uses.
-     EVERYTHING THIS PAGE REFERENCES IS INLINE, deliberately: it requests no
-     stylesheet, font or image, from whity.dev or from anywhere else. A status
-     page that loads assets from the system it reports on goes blank in exactly
-     the outage it exists to explain. The webfonts are named in case a visitor
-     already has them; the fallbacks do the real work.
-     (Cloudflare injects its Web Analytics beacon into HTML at the edge, so one
-     third-party script does end up on the page. It is not referenced here, it
-     is cookieless, and it cannot affect rendering — nothing above waits on it.) */
+  /* Tokens (docs/design/tokens.json): light, then dark by the system setting. */
   :root{
-    --bg:#eeeeee;              --bg:oklch(95% 0 0);
-    --card:#ffffff;            --card:oklch(100% 0 0);
-    --ink:#0a0a0a;             --ink:oklch(14.5% 0 0);
-    --soft:#737373;            --soft:oklch(55.6% 0 0);
-    --line:#e5e5e5;            --line:oklch(92.2% 0 0);
-    --accent:#3f63a6;          --accent:oklch(50% 0.16 255);
-    --ok:#2f7d4a;              --ok:oklch(48% 0.14 150);
-    --down:#b3261e;            --down:oklch(50% 0.19 27);
-    --stale:#7a5d12;           --stale:oklch(52% 0.11 75);
-    --grid:#e9ecf3;            --grid:color-mix(in oklch, var(--accent) 6%, transparent);
+    --background:oklch(0.95 0 0);--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);
+    --muted:oklch(0.97 0 0);--muted-foreground:oklch(0.52 0 0);--border:oklch(0.922 0 0);
+    --destructive:#cc2827;--success:#0a7e3a;--warning:#f2b036;
+    --success-text:#087736;--success-tint:#e0fae4;--warning-text:#9a5505;--warning-tint:#fef4df;
+    --destructive-tint:#fde8e7;--logo-mark:#0961bb;
+    --font-sans:'Noto Sans','Noto Sans Arabic',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    --font-arabic:'Noto Sans Arabic','Noto Sans',sans-serif;
     color-scheme:light;
   }
-  @media (prefers-color-scheme: dark){
-    :root{
-      --bg:#0a0a0a;            --bg:oklch(14.5% 0 0);
-      --card:#171717;          --card:oklch(20.5% 0 0);
-      --ink:#fafafa;           --ink:oklch(98.5% 0 0);
-      --soft:#a3a3a3;          --soft:oklch(70.8% 0 0);
-      --line:#2a2a2a;          --line:oklch(100% 0 0 / 12%);
-      --accent:#85a6e0;        --accent:oklch(70% 0.15 255);
-      --ok:#6fc28c;            --ok:oklch(72% 0.16 150);
-      --down:#e08a7a;          --down:oklch(70% 0.18 25);
-      --stale:#d8b45f;         --stale:oklch(80% 0.14 80);
-      --grid:#151a22;            --grid:color-mix(in oklch, var(--accent) 6%, transparent);
-      color-scheme:dark;
-    }
-  }
-  *{box-sizing:border-box}
-  /* The ground is the drawing and the cards are sheets resting on it — the same
-     relationship as the mark, at the lowest intensity the idea still reads at.
-     It is a background-image, so it costs no request: this page has to render
-     during the outage it is describing. */
-  body{margin:0;background:var(--bg);color:var(--ink);
-       background-image:linear-gradient(var(--grid) 1px,transparent 1px),
-                        linear-gradient(90deg,var(--grid) 1px,transparent 1px);
-       background-size:28px 28px;
-       font:16px/1.6 "Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-       -webkit-font-smoothing:antialiased}
-  .mono{font-family:"Geist Mono",ui-monospace,"Cascadia Code",Menlo,Consolas,monospace}
-  .wrap{max-width:720px;margin-inline:auto;padding:clamp(1.5rem,5vw,3.5rem) 1.25rem 3rem}
-
-  /* Masthead, matching whity.dev: the lettermark, the name, a mono eyebrow. */
-  .head{display:flex;align-items:center;gap:.6rem;margin:0 0 1.75rem}
-  .brand{display:inline-flex;align-items:center;gap:.55rem;font-weight:600;
-         font-size:1.05rem;letter-spacing:-.01em;color:var(--ink);text-decoration:none}
-  /* The mark is INLINE SVG, not a link to an icon file: this page loads no
-     asset from anywhere, which is the whole reason it can still be read during
-     the outage it is describing. It follows the page's own palette. */
-  .mark{width:1.6rem;height:1.6rem;flex:none;display:block;color:var(--ink)}
-  .mark svg{width:100%;height:100%;display:block}
-  .eyebrow{font-size:.72rem;font-weight:500;letter-spacing:.08em;text-transform:uppercase;
-           color:var(--soft);border:1px solid var(--line);border-radius:999px;padding:.1rem .55rem}
-
-  .banner{background:var(--card);border:1px solid var(--line);border-radius:.75rem;
-          padding:1.5rem 1.6rem;display:flex;align-items:center;gap:.9rem}
-  .banner strong{font-size:1.45rem;font-weight:600;line-height:1.15;letter-spacing:-.02em}
-  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
-  .dot.ok{background:var(--ok)} .dot.down{background:var(--down)} .dot.stale{background:var(--stale)}
-  .banner .dot{width:13px;height:13px}
-
-  ul{list-style:none;margin:1rem 0 0;padding:0;background:var(--card);
-     border:1px solid var(--line);border-radius:.75rem;overflow:hidden}
-  .row{padding:1.1rem 1.6rem 1.15rem;border-top:1px solid var(--line)}
-  .row:first-child{border-top:0}
-  .rowtop{display:flex;justify-content:space-between;align-items:baseline;gap:1rem;flex-wrap:wrap}
-  .label{font-weight:600;display:flex;flex-direction:column;gap:.1rem;letter-spacing:-.01em}
-  /* The hostname under each name: a reader who does not know the architecture
-     still learns what "Payments" actually refers to. */
-  .host{font-family:"Geist Mono",ui-monospace,Menlo,Consolas,monospace;
-        font-size:.72rem;font-weight:400;color:var(--soft);letter-spacing:0}
-
-  /* The status pill, in the shape whity.dev uses: a dot, a word, a hairline
-     ring in the status colour. */
-  .state{display:inline-flex;align-items:center;gap:.45rem;font-size:.8rem;font-weight:500;
-         color:var(--soft);border:1px solid var(--line);border-radius:999px;padding:.2rem .65rem;
-         white-space:nowrap}
-  .state.ok{color:var(--ok);border-color:var(--ok)}
-  .state.down{color:var(--down);border-color:var(--down)}
-  .state.stale{color:var(--stale);border-color:var(--stale)}
-  .since{color:var(--soft);font-weight:400}
-
-  /* One segment per day. flex lets 90 of them share the width at any size,
-     and min-width keeps them touchable rather than hairlines on a phone. */
-  .bar{display:flex;gap:2px;margin-top:.85rem;height:26px}
+  @media (prefers-color-scheme:dark){:root{
+    --background:oklch(0.145 0 0);--foreground:oklch(0.985 0 0);--card:oklch(0.205 0 0);
+    --muted:oklch(0.269 0 0);--muted-foreground:oklch(0.708 0 0);--border:oklch(1 0 0 / 0.1);
+    --destructive:#f66d67;--success:#5ac576;--warning:#f7b83d;
+    --success-text:#5ac576;--success-tint:#14361d;--warning-text:#f7b83d;--warning-tint:#432f07;
+    --destructive-tint:#3d1514;--logo-mark:#59a0f9;
+    color-scheme:dark;
+  }}
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);font-size:17px;line-height:1.6}
+  [dir="rtl"] body{font-family:var(--font-arabic)}
+  a{color:inherit;text-decoration:none}
+  h1,h2,p{margin:0}
+  .s-nav{position:sticky;top:0;z-index:10;background:var(--background);border-bottom:1px solid var(--border)}
+  .s-wrap{max-width:860px;margin:0 auto;padding:0 24px;display:flex;align-items:center;gap:16px;height:68px}
+  .s-logo{display:inline-flex;align-items:center;gap:10px;font-weight:600}
+  .s-logo svg{height:28px;width:auto;display:block}
+  .s-logo small{font-weight:500;color:var(--muted-foreground);font-size:15px;padding-inline-start:10px;border-inline-start:1px solid var(--border)}
+  .s-lang{margin-inline-start:auto;color:var(--muted-foreground);font-size:15px;min-height:48px;display:inline-flex;align-items:center;padding:0 6px}
+  .s-lang:hover{color:var(--foreground)}
+  .s-status{max-width:860px;margin:0 auto;padding:40px 24px 64px;display:grid;gap:22px}
+  .s-banner{border-radius:16px;padding:18px 20px;display:grid;gap:4px}
+  .s-banner.is-ok{background:var(--success-tint)}
+  .s-banner.is-warn{background:var(--warning-tint)}
+  .s-banner.is-bad{background:var(--destructive-tint)}
+  .s-banner h1{font-size:20px;font-weight:600;line-height:1.35}
+  .s-comp{border:1px solid var(--border);border-radius:16px;background:var(--card)}
+  .s-comp>div{padding:16px 18px;border-bottom:1px solid var(--border);display:grid;gap:10px}
+  .s-comp>div:last-child{border-bottom:0}
+  .s-comp header{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .s-comp header small{display:block;color:var(--muted-foreground);font-size:14.5px}
+  .s-comp header .end{text-align:end}
+  .s-comp header .end small{font-size:13px}
+  .s-state{font-size:14px;font-weight:600;display:inline-flex;gap:6px;align-items:center}
+  .s-state::before{content:"";width:10px;height:10px;border-radius:50%;background:currentColor;flex:none}
+  .s-state.is-ok{color:var(--success-text)}
+  .s-state.is-down{color:var(--destructive)}
+  .s-state.is-warn{color:var(--warning-text)}
+  .s-state .since{font-weight:400;color:var(--muted-foreground)}
+  .s-bars{display:flex;gap:2px;height:30px}
   .seg{flex:1 1 0;min-width:2px;border-radius:2px;display:block}
-  .seg.ok{background:var(--ok)}
-  .seg.down{background:var(--down)}
-  /* A day nobody looked at is NOT green. Deliberately inert and low-contrast,
-     so a gap reads as "no data" rather than as a result. */
-  .seg.gap{background:var(--line)}
-  .barfoot{display:flex;justify-content:space-between;gap:1rem;margin-top:.5rem;
-           font-size:.72rem;color:var(--soft);
-           font-family:"Geist Mono",ui-monospace,Menlo,Consolas,monospace}
-  .barfoot .sum{text-align:center}
-  /* Both captions are rendered; the media query picks which one is true for
-     the bar actually on screen. */
-  .barfoot .narrow{display:none}
-
-  .note{margin-top:1rem;padding:1rem 1.25rem;background:var(--card);
-        border:1px solid var(--line);border-radius:.75rem;font-size:.88rem;color:var(--soft)}
-  .note strong{color:var(--ink)}
-  .warn{border-color:var(--stale)}
-  footer{margin-top:1.75rem;font-size:.78rem;color:var(--soft);
-         display:flex;gap:1.25rem;flex-wrap:wrap;
-         font-family:"Geist Mono",ui-monospace,Menlo,Consolas,monospace}
-  footer a{color:var(--soft)}
-  footer a:hover{color:var(--ink)}
-  a{color:var(--accent)}
-
-  /* ── Narrow screens ──────────────────────────────────────────────────────
-     Measured, not guessed: at 320-414px the 90-segment bar wants 358px while
-     its container gets 227-321px, so the oldest ~25-33 days were being clipped
-     by the list's overflow:hidden — invisible, and indistinguishable from a full
-     record. Below 560px the page shows the most recent ${narrowDays} days and
-     says so, and the rows give back the horizontal padding the bar needs. */
+  .seg.ok{background:var(--success);opacity:.85}
+  .seg.down{background:var(--destructive)}
+  /* A day nobody looked at is NOT green: inert and low-contrast, "no data". */
+  .seg.gap{background:var(--muted)}
+  .s-barlab{display:flex;justify-content:space-between;gap:12px;font-size:14px;color:var(--muted-foreground)}
+  .s-barlab .sum{text-align:center}
+  .s-barlab .narrow{display:none}
+  .s-inc{border-inline-start:3px solid var(--destructive);padding-inline-start:14px;display:grid;gap:4px}
+  .s-inc small{color:var(--muted-foreground);font-size:15px}
+  h2{font-size:22px;font-weight:600}
+  .s-foot{font-size:15px;color:var(--muted-foreground);display:grid;gap:8px}
+  .s-foot nav{display:flex;flex-wrap:wrap;gap:4px 20px}
+  .s-foot a{text-decoration:underline;text-underline-offset:3px;min-height:32px;display:inline-flex;align-items:center}
+  .s-foot a:hover{color:var(--foreground)}
   @media (max-width:560px){
-    .wrap{padding-inline:.9rem}
-    .row{padding:1rem 1.05rem 1.1rem}
-    .banner{padding:1.2rem 1.05rem;gap:.7rem}
-    .banner strong{font-size:1.2rem}
-    .banner .dot{width:11px;height:11px}
-    .head{margin-bottom:1.25rem}
+    .s-wrap,.s-status{padding-inline:16px}
+    .s-logo small{display:none}
 ${hiddenSegs > 0 ? `    .seg:nth-child(-n+${hiddenSegs}){display:none}
-    .barfoot .wide{display:none}
-    .barfoot .narrow{display:inline}
-` : ''}    /* Fewer days over the same width means each one can be a real target
-       rather than a hairline. */
-    .bar{height:30px;gap:3px}
+    .s-barlab .wide{display:none}
+    .s-barlab .narrow{display:inline}
+` : ''}    .s-bars{gap:3px}
     .seg{min-width:4px;border-radius:3px}
-    .barfoot{gap:.6rem;font-size:.68rem}
-    .note{padding:.9rem 1.05rem;font-size:.85rem}
-    footer{gap:1rem;margin-top:1.5rem}
-    footer a{padding-block:.35rem}
-  }
-
-  /* Very narrow: the three-part caption stops fitting on one line, so the
-     summary moves under the range rather than squeezing it. */
-  @media (max-width:380px){
-    .barfoot{flex-wrap:wrap}
-    .barfoot .sum{order:3;flex-basis:100%;text-align:start}
+    .s-barlab{font-size:13px;flex-wrap:wrap}
+    .s-barlab .sum{order:3;flex-basis:100%;text-align:start}
   }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="head">
-    <a class="brand" href="https://whity.dev/">
-      <span class="mark" aria-hidden="true"><svg viewBox="0 0 32 32" fill="none">
-        <rect x="3.5" y="10.5" width="18" height="18" rx="4.25" fill="var(--accent)"/>
-        <rect x="11.25" y="3.25" width="17.5" height="17.5" rx="4.25" fill="var(--card)"
-              stroke="currentColor" stroke-width="2.5"/>
-      </svg></span>Whity
-    </a>
-    <span class="eyebrow mono">Status</span>
+<header class="s-nav"><div class="s-wrap">
+  <a class="s-logo" href="https://whity.dev">${LOGO}<small>${L.status}</small></a>
+  <a class="s-lang" href="${L.otherHref}" lang="${lang === 'ar' ? 'en' : 'ar'}">${L.otherLang}</a>
+</div></header>
+<main class="s-status">
+  <div class="s-banner is-${banner.kind}" role="status"><h1>${escapeHtml(banner.title)}</h1><p>${escapeHtml(banner.body)}</p></div>
+  <div class="s-comp">${rows}${backupRow}
   </div>
-  <h1 class="sr-only" style="position:absolute;left:-9999px">Whity status</h1>
-
-  <div class="banner">
-    ${dot(overall.kind)}<strong>${escapeHtml(overall.text)}</strong>
-  </div>
-
-  <ul>${rows}${backupRow}</ul>
-
-  ${
-    stale
-      ? `<div class="note warn"><strong>These readings are not current.</strong> The last completed check was
-         ${dataAge === null ? 'never' : escapeHtml(humanDuration(dataAge)) + ' ago'}, so the statuses above
-         describe the past rather than now. Treat them as unknown.</div>`
-      : `<div class="note">Checked ${escapeHtml(humanDuration(dataAge))} ago.</div>`
-  }
-
-  <div class="note">
-    This page is hosted independently of the systems it reports on &mdash; separate
-    infrastructure, separate database, separate network path. It stays up when they do not,
-    which is the only condition under which a status page is worth reading.
-  </div>
-
-  <footer>
-    <a href="https://whity.dev/">whity.dev</a>
-    <a href="https://docs.whity.dev/">docs</a>
-    <a href="/status">JSON</a>
+  ${incidents ? `<h2>${L.happening}</h2>${incidents}` : ''}
+  <footer class="s-foot">
+    <p>${L.apart}</p>
+    <nav><a href="https://whity.dev/">whity.dev</a><a href="https://docs.whity.dev/">docs.whity.dev</a><a href="/status" dir="ltr">JSON: health.whity.dev/status</a></nav>
   </footer>
-</div>
+</main>
 </body>
 </html>`;
 
@@ -1042,9 +1090,10 @@ ${hiddenSegs > 0 ? `    .seg:nth-child(-n+${hiddenSegs}){display:none}
     status: 200,
     headers: {
       'content-type': 'text/html; charset=utf-8',
-      // Never cache a status page. A cached "operational" outliving the outage
-      // it was captured before is the failure this exists to prevent.
+      // Never cache a status page. A cached "working" outliving the outage it
+      // was captured before is the failure this exists to prevent.
       'cache-control': 'no-store, max-age=0',
+      'content-language': lang,
     },
   });
 }
@@ -1132,4 +1181,4 @@ async function notify(env, text) {
 
 // Exported for the unit tests, which exercise the state machine directly
 // rather than through a live Worker.
-export const __test__ = { humanDuration, timingSafeEqual, config, probeOnce, checkTarget, runChecks, fetchComponents, componentProbe, checkHeartbeats, handleRequest, renderStatusPage, recordHistory, dayKey };
+export const __test__ = { humanDuration, timingSafeEqual, config, probeOnce, checkTarget, runChecks, fetchComponents, componentProbe, checkHeartbeats, handleRequest, renderStatusPage, recordHistory, dayKey, overallOf };

@@ -6,7 +6,8 @@ import { DocumentEditorScreen } from '@whity/features/document-editor';
 import { useTranslation } from '@whity/features/i18n';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useAuth } from '@/lib/auth-context';
-import { DOCUMENTS_COMMENT, DOCUMENTS_ISSUE, DOCUMENTS_SUGGEST, DOCUMENTS_WRITE } from '@/lib/capabilities';
+import { api } from '@/lib/api/client';
+import { DOCUMENTS_COMMENT, DOCUMENTS_ISSUE, DOCUMENTS_PUBLISH, DOCUMENTS_SUGGEST, DOCUMENTS_WRITE } from '@/lib/capabilities';
 import { issueHref } from '@/lib/documents/issue';
 import { documentSourcesAdapter } from '@/lib/documents/sources';
 
@@ -34,7 +35,7 @@ export default function DocumentSourcePage({
   const router = useRouter();
   const t = useTranslation('documents');
   const { hasPermission } = useCapabilities();
-  const { user, apiClient } = useAuth();
+  const { user } = useAuth();
   // Where Back goes and what the path says depends on what the document is: a
   // template belongs to Templates, a note or wiki page to Notes and wiki.
   const [kind, setKind] = useState<string | null>(null);
@@ -42,10 +43,10 @@ export default function DocumentSourcePage({
     let live = true;
     void (async () => {
       try {
-        const response = await apiClient(`/api/v1/document-sources/${id}`);
+        const { data: body, response } = await api.GET('/api/v1/document-sources/{id}', { params: { path: { id: Number(id) } } });
         if (!response.ok) return;
-        const body = (await response.json()) as { data?: { kind?: string } };
-        if (live) setKind(body.data?.kind ?? null);
+        const doc = body as { data?: { kind?: string } } | undefined;
+        if (live) setKind(doc?.data?.kind ?? null);
       } catch {
         // the path just keeps its default
       }
@@ -53,7 +54,7 @@ export default function DocumentSourcePage({
     return () => {
       live = false;
     };
-  }, [apiClient, id]);
+  }, [id]);
   const isTemplate = kind === 'template' || kind === 'label' || kind === 'letter' || kind === 'report';
   // Your own cards say "You"; the id matches the actor the server sends.
   const me = useMemo(() => (user ? { kind: 'person' as const, id: String(user.id), name: user.email } : undefined), [user]);
@@ -70,6 +71,8 @@ export default function DocumentSourcePage({
       canEdit={hasPermission(DOCUMENTS_WRITE)}
       canSuggest={hasPermission(DOCUMENTS_SUGGEST)}
       canComment={hasPermission(DOCUMENTS_COMMENT)}
+      // E.22: the workspace library is managed with documents:publish until documents:library:manage exists.
+      canManageLibrary={hasPermission(DOCUMENTS_PUBLISH)}
       me={me}
       onBack={() => (issuing ? router.push('/admin/document-library') : router.push(isTemplate ? '/admin/document-templates' : '/admin/document-sources'))}
       path={

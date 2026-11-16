@@ -1,4 +1,5 @@
 import { useTranslation } from '@whity/features/i18n';
+import type { MomentName } from '@whity/ui/lottie';
 import type { DocumentCollection } from './types';
 
 /**
@@ -55,6 +56,8 @@ export interface LibraryEmptyState {
   description: string;
   /** True only for the stale-page case, which the caller answers with a control. */
   pastTheEnd?: boolean;
+  /** The scene that goes with it (LT.4): `no-results` after a search, `empty-documents` for an empty folder. */
+  moment?: MomentName;
 }
 
 /**
@@ -122,6 +125,7 @@ export function libraryEmptyState(
         'organizer.empty.searchHelp',
         'The search looks at document titles only. Clear it to see everything the folder holds.'
       ),
+      moment: 'no-results',
     };
   }
 
@@ -149,6 +153,7 @@ export function libraryEmptyState(
         'organizer.empty.collectionHelp',
         "Use a document's menu to add it to this collection. Only you can see your collections."
       ),
+      moment: 'empty-documents',
     };
   }
 
@@ -171,5 +176,6 @@ export function libraryEmptyState(
       'organizer.empty.help',
       'This folder is a query over what documents record. Nothing matched it — no document is hidden from it.'
     ),
+    moment: 'empty-documents',
   };
 }

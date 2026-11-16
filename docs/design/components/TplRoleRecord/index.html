@@ -22,7 +22,7 @@
       var has = g[1].some(function (x) { return x[1] === active; });
       return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
   function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
   function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
   function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
@@ -38,14 +38,14 @@
       grp('Apps'), row('Stock', 'inventory:*', true, true, true, true, null), row('Transfers between branches', 'inventory:transfer', true, true, false, false, true, true), row('Deliveries', 'deliveries:*', true, true, true, false, null), row('Invoices', 'invoices:*', true, false, false, false, false)));
   ReactDOM.createRoot(document.getElementById('root')).render(shell('Roles', h(F, null,
     h(W.Breadcrumb, { items: [{ label: 'Roles' }, { label: 'Branch manager' }] }),
-    recHead({ icon: 'role', title: 'Branch manager', facts: [['users', '2 people'], ['permission', '26 of 61 permissions'], ['tenant', 'Limited to their own unit'], ['clock', 'Changed 3 Oct by Rana Haddad']], actions: h(W.Menu, { label: 'More', items: [{ icon: 'copy', label: 'Duplicate' }, { divider: true }, { icon: 'delete', label: 'Delete role', danger: true }] }) }),
+    recHead({ icon: 'role', title: 'Branch manager', facts: [['users', '2 people'], ['permission', '26 of 61 permissions'], ['tenant', 'Limited to their own unit'], ['clock', 'Changed 3 Oct by Amro Saleh']], actions: h(W.Menu, { label: 'More', items: [{ icon: 'copy', label: 'Duplicate' }, { divider: true }, { icon: 'delete', label: 'Delete role', danger: true }] }) }),
     h('div', { className: 'wy-rectabs' }, h(W.Tabs, { items: [{ value: 'o', label: 'Overview' }, { value: 'a', label: 'Access', count: 26 }, { value: 'h', label: 'History' }], defaultValue: 'a' })),
     h('div', { className: 'wy-recbody' },
       h(W.Card, { title: 'What this role can do', description: 'Ticks give the permission in the person’s own unit and the units below it.' }, h('div', { style: { display: 'grid', gap: 12 } },
         h('div', { className: 'wy-listbar', style: { margin: 0 } }, h(W.SearchField, { placeholder: 'Find a permission' }), h(W.Segmented, { label: 'Show', defaultValue: 'all', options: [{ value: 'all', label: 'All areas' }, { value: 'on', label: 'Only allowed' }] }), h('span', { className: 'wy-listbar__end' }, h(W.Switch, { label: 'Show technical details' }))), table)),
       h('div', { style: { display: 'grid', gap: 16 } },
-        h(W.Card, { title: 'Who holds this role' }, h('div', { style: { display: 'grid', gap: 10 } }, person('Dana Yousef', 'Abdoun'), person('Omar Khalil', 'Sweifieh, since today'), h('a', { href: '#', style: { color: 'var(--primary)', fontSize: 14 } }, 'Give this role to someone'))),
-        h(W.Card, { title: 'Agents', description: 'Agents of people with this role can use these permissions only as their own modes allow.' }, h('span', { className: 'wy-muted', style: { fontSize: 14 } }, '1 agent: Stock assistant (Dana)')))),
+        h(W.Card, { title: 'Who holds this role' }, h('div', { style: { display: 'grid', gap: 10 } }, person('Emad Nasser', 'Abdoun'), person('Ahmad Khalil', 'Sweifieh, since today'), h('a', { href: '#', style: { color: 'var(--primary)', fontSize: 14 } }, 'Give this role to someone'))),
+        h(W.Card, { title: 'Agents', description: 'Agents of people with this role can use these permissions only as their own modes allow.' }, h('span', { className: 'wy-muted', style: { fontSize: 14 } }, '1 agent: Stock assistant (Emad)')))),
     saveBar(h(F, null, h('b', null, '1 change'), ' · Transfers between branches: can now create and approve')))));
 </script>
 </body>

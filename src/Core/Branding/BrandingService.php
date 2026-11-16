@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Core\Branding;
 
+use Whity\Core\Entitlement\EntitlementRegistry;
+use Whity\Core\Entitlement\EntitlementService;
 use Whity\Storage\MimeTypes;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
@@ -24,7 +26,28 @@ final class BrandingService
         private readonly SettingsService $settings,
         private readonly ?StorageDriverInterface $storage = null,
         private readonly ?BrandingAssetValidator $validator = null,
+        // WHIT-932: whether the plan removes "Built on Whity". Null: it shows.
+        private readonly ?EntitlementService $entitlements = null,
     ) {
+    }
+
+    /**
+     * Whether this workspace's public pages show "Built on Whity".
+     *
+     * The system tenant (Whity's own layer) answers true: whether its pages
+     * carry the credit is the page's own choice, not a plan's.
+     */
+    public function showsBuiltOnWhity(int $tenantId): bool
+    {
+        if ($tenantId === 0 || $this->entitlements === null) {
+            return true;
+        }
+
+        try {
+            return !$this->entitlements->isGranted($tenantId, EntitlementRegistry::BRAND_REMOVE_BADGE);
+        } catch (\Throwable) {
+            return true;
+        }
     }
 
     /**
@@ -61,7 +84,47 @@ final class BrandingService
                 $this->settings->storedGlobals()[SettingsRegistry::APP_INSTALLABLE] ?? null,
                 $_ENV['PWA_ENABLED'] ?? getenv('PWA_ENABLED'),
             ),
+            builtOnWhity: $this->showsBuiltOnWhity($tenantId),
+            currency: self::currencyFrom($values[SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? ''),
         );
+    }
+
+    /** The workspace currency as an upper-case ISO code, or the registry default for anything else. */
+    private static function currencyFrom(string $value): string
+    {
+        $code = strtoupper(trim($value));
+
+        return preg_match('/^[A-Z]{3}$/', $code) === 1
+            ? $code
+            : (string) SettingsRegistry::defaultFor(SettingsRegistry::BILLING_DEFAULT_CURRENCY);
+    }
+
+    /**
+     * The brand a workspace's public pages show a visitor (WHIT-1014): the
+     * name, the logos, the main colour and the token sets derived from it.
+     * Public by nature (the same values the branding endpoint serves on the
+     * workspace's own host), and nothing else.
+     *
+     * The name is the workspace's own site name when it set one, else the
+     * workspace's name, never the instance's: a visitor booking a bakery on a
+     * shared host should read the bakery's name, not the operator's. Logos and
+     * the colour resolve as everywhere else (workspace, then global default).
+     *
+     * @return array{name: string, logo_wide_url: ?string, logo_square_url: ?string, main_color: ?string, theme: array{light: array<string, string>, dark: array<string, string>}|null}
+     */
+    public function forPublicPage(int $tenantId, string $workspaceName): array
+    {
+        $effective = $this->effective($tenantId);
+        $ownName = in_array(SettingsRegistry::SITE_NAME, $this->settings->overriddenKeys($tenantId), true)
+            && trim($effective->siteName) !== '';
+
+        return [
+            'name' => $ownName ? $effective->siteName : $workspaceName,
+            'logo_wide_url' => $effective->logoWideUrl,
+            'logo_square_url' => $effective->logoSquareUrl,
+            'main_color' => $effective->mainColor,
+            'theme' => $effective->theme,
+        ];
     }
 
     /**

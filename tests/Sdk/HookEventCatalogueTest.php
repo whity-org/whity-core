@@ -86,6 +86,7 @@ final class HookEventCatalogueTest extends TestCase
             "'role.creating'",
             "'tenant.creating'",
             'Events::DOCUMENT_ISSUING',
+            'Events::MEMBERSHIP_CUSTOMER_INVITING',
             'self::HOOK',
             'self::VERIFY_RESOURCE_HOOK',
         ], $read);

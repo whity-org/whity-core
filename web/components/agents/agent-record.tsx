@@ -21,6 +21,7 @@ import { Input } from '@whity/ui/input';
 import { SaveBar, ChangedField } from '@whity/ui/save-bar';
 import { ScopeGrant, type ScopeGrantMode } from '@whity/ui/scope-grant';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
+import { Switch } from '@whity/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { Textarea } from '@whity/ui/textarea';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -30,25 +31,18 @@ import { AgentStatusBadge } from '@/components/agents/agent-status';
 import { MayReadPicker } from '@/components/agents/may-read-picker';
 import { WorkspaceActivityPanel } from '@/components/agents/workspace-activity-panel';
 import { useFetch } from '@/hooks/useFetch';
-import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
-  localized,
-  refusal,
-  startOfToday,
-  templateGroups,
-  toolsetsFromSplits,
-  type AgentLanguage,
-  type AgentPersona,
-  type AgentTone,
-  type WorkspaceAgent,
+  refusalText, startOfToday, templateGroups, toolsetsFromSplits, type AgentLanguage, type AgentPersona, type AgentTone, type WorkspaceAgent
 } from './workspace-agents';
+import { localizedText } from '@whity/ui/localized-text';
 
 const NAME_MAX = 60;
 const ROLE_MAX = 200;
 const INSTRUCTIONS_MAX = 4000;
 
-type AgentDraft = AgentPersona & { mayRead: number[] };
+type AgentDraft = AgentPersona & { mayRead: number[]; notifyByEmail: boolean };
 
 const personaOf = (agent: WorkspaceAgent): AgentDraft => ({
   name: agent.name,
@@ -62,6 +56,7 @@ const personaOf = (agent: WorkspaceAgent): AgentDraft => ({
   toolsets: [...agent.toolsets],
   grant: { ...agent.grant },
   mayRead: agent.mayRead.map((source) => source.id),
+  notifyByEmail: agent.notifyByEmail ?? true,
 });
 
 const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
@@ -69,7 +64,6 @@ const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.str
 export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAgent; onChanged: () => void }) {
   const t = useTranslation('admin');
   const arabic = useFormattingLocale() === 'ar';
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
 
   const dates = useDateDisplay();
@@ -81,10 +75,10 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
   const [tab, setTab] = useState('overview');
 
   const splits = useFetch<{ toolsets: string[] }[]>(async () => {
-    const response = await apiClient('/api/v1/mcp/splits');
+    const response = await apiFetch('/api/v1/mcp/splits');
     if (!response.ok) return [];
     return ((await response.json()) as { data?: { toolsets: string[] }[] }).data ?? [];
-  }, [apiClient]);
+  }, []);
   const offered = toolsetsFromSplits(splits.data ?? [], draft.toolsets);
 
   const set = <K extends keyof AgentDraft>(key: K, value: AgentDraft[K]) => setDraft((current) => ({ ...current, [key]: value }));
@@ -95,6 +89,7 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
     changed('name', 'nameAr', 'role', 'roleAr') && t('agentRecord.changed.name', 'Name and job'),
     changed('instructions', 'instructionsAr', 'tone', 'language', 'toolsets', 'mayRead') && t('agentRecord.changed.instructions', 'Instructions'),
     changed('grant') && t('agentRecord.changed.grant', 'What it may do'),
+    changed('notifyByEmail') && t('agentRecord.changed.notifications', 'Notifications'),
   ].filter((name): name is string => typeof name === 'string');
   const dirty = sections.length > 0;
 
@@ -102,13 +97,12 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
     setSaving(true);
     setError(null);
     try {
-      const response = await apiClient(`/api/v1/agents/${initial.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(draft),
+      const { error: refused, response } = await api.PATCH('/api/v1/agents/{id}', {
+        params: { path: { id: initial.id } },
+        body: draft as never,
       });
       if (!response.ok) {
-        setError(await refusal(response, t('agents.error.save', 'This agent could not be saved. Try again.')));
+        setError(refusalText(refused, t('agents.error.save', 'This agent could not be saved. Try again.')));
         return;
       }
       setSaved(draft);
@@ -122,12 +116,15 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
   };
 
   const setArchived = async (archived: boolean) => {
-    const response = await apiClient(`/api/v1/agents/${initial.id}/${archived ? 'archive' : 'restore'}`, { method: 'POST' });
+    const params = { params: { path: { id: initial.id } } };
+    const { error, response } = archived
+      ? await api.POST('/api/v1/agents/{id}/archive', params)
+      : await api.POST('/api/v1/agents/{id}/restore', params);
     if (!response.ok) {
-      addToast(await refusal(response, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
+      addToast(refusalText(error, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
       return;
     }
-    const name = localized(saved.name, saved.nameAr, arabic);
+    const name = localizedText({ en: saved.name, ar: saved.nameAr }, arabic ? 'ar' : 'en');
     addToast(
       archived ? t('agents.archived', '{name} archived. Everyone using it has stopped.', { name }) : t('agents.restored', '{name} restored.', { name }),
       'success',
@@ -138,12 +135,15 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
   };
 
   const setPaused = async (paused: boolean) => {
-    const response = await apiClient(`/api/v1/agents/${initial.id}/${paused ? 'pause' : 'resume'}`, { method: 'POST' });
+    const params = { params: { path: { id: initial.id } } };
+    const { error, response } = paused
+      ? await api.POST('/api/v1/agents/{id}/pause', params)
+      : await api.POST('/api/v1/agents/{id}/resume', params);
     if (!response.ok) {
-      addToast(await refusal(response, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
+      addToast(refusalText(error, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
       return;
     }
-    const name = localized(saved.name, saved.nameAr, arabic);
+    const name = localizedText({ en: saved.name, ar: saved.nameAr }, arabic ? 'ar' : 'en');
     addToast(
       paused
         ? t('agents.paused', '{name} is paused. It can’t do anything until it is resumed.', { name })
@@ -155,7 +155,7 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
     onChanged();
   };
 
-  const displayName = localized(saved.name, saved.nameAr, arabic);
+  const displayName = localizedText({ en: saved.name, ar: saved.nameAr }, arabic ? 'ar' : 'en');
   const people = initial.worksFor.map((who) => who.name ?? t('agents.worksFor.unknown', 'Someone'));
   const since = dates.date(initial.createdAt);
   const changedOn = dates.date(initial.updatedAt);
@@ -259,13 +259,14 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
             {t('agentRecord.tab.scope', 'What it may do')}
             {grantCount > 0 && <span className="rounded-full bg-muted px-2 text-xs">{grantCount}</span>}
           </TabsTrigger>
+          <TabsTrigger value="notifications">{t('agentRecord.tab.notifications', 'Notifications')}</TabsTrigger>
           <TabsTrigger value="activity">{t('agentRecord.tab.activity', 'Activity')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-6 grid gap-4 md:grid-cols-[2fr_1fr]">
           <section className="space-y-3 rounded-card border border-border bg-card p-5">
             <h2 className="text-base font-semibold">{t('agentRecord.does', 'What it does')}</h2>
-            <p className="text-sm">{localized(saved.role, saved.roleAr, arabic) || t('agentRecord.does.empty', 'No description yet. Add one in Instructions.')}</p>
+            <p className="text-sm">{localizedText({ en: saved.role, ar: saved.roleAr }, arabic ? 'ar' : 'en') || t('agentRecord.does.empty', 'No description yet. Add one in Instructions.')}</p>
           </section>
           <section className="space-y-3 rounded-card border border-border bg-card p-5">
             <h2 className="text-base font-semibold">{t('agentRecord.onItsOwn', 'On its own')}</h2>
@@ -407,6 +408,26 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
               />
             </ChangedField>
           )}
+        </TabsContent>
+
+        <TabsContent value="notifications" className="mt-6 space-y-4">
+          <ChangedField changed={changed('notifyByEmail')}>
+            <div className="flex max-w-prose items-start gap-3">
+              <Switch
+                id="agent-notify-email"
+                checked={draft.notifyByEmail}
+                onCheckedChange={(checked) => set('notifyByEmail', checked)}
+              />
+              <div className="space-y-1">
+                <label htmlFor="agent-notify-email" className="text-sm font-medium">
+                  {t('agentRecord.notifications.email', 'Email the person it works for when something needs them')}
+                </label>
+                <p className="text-sm text-muted-foreground">
+                  {t('agentRecord.notifications.emailHelp', 'At most one email an hour, except sign-in approvals. The email only opens Whity: nothing is approved from it. Each person can still turn these off in My settings.')}
+                </p>
+              </div>
+            </div>
+          </ChangedField>
         </TabsContent>
 
         <TabsContent value="activity" className="mt-6">

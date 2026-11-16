@@ -22,6 +22,8 @@ class CliRunner
         'plugin'     => 'Whity\Cli\Commands\PluginsCommand',
         'tenant'     => 'Whity\Cli\Commands\TenantsCommand',
         'totp'       => 'Whity\Cli\Commands\TotpCommand',
+        // WHIT-1047: every stored secret onto the current key after a rotation.
+        'secrets'    => 'Whity\Cli\Commands\SecretsCommand',
         'queue:work' => 'Whity\Cli\Commands\QueueWorkCommand',
         'schedule:run' => 'Whity\Cli\Commands\ScheduleRunCommand',
         'scale:seed' => 'Whity\Cli\Commands\ScaleSeedCommand',
@@ -29,6 +31,7 @@ class CliRunner
         // WHIT-1001: can this deployment print documents, and if not, the fix.
         'render:check' => 'Whity\Cli\Commands\RenderCheckCommand',
         'payments:secret' => 'Whity\Cli\Commands\PaymentsCommand',
+        'billing:catalogue:apply' => 'Whity\Cli\Commands\BillingCatalogueCommand',
         'i18n:extract' => 'Whity\Cli\Commands\I18nCommand',
         'i18n:sync' => 'Whity\Cli\Commands\I18nCommand',
         'i18n:coverage' => 'Whity\Cli\Commands\I18nCommand',
@@ -242,10 +245,12 @@ class CliRunner
         echo "  plugin     Manage plugins (list, enable, disable, reload)\n";
         echo "  tenant     Manage tenants (list, create, update, delete)\n";
         echo "  totp       TOTP secret maintenance (reencrypt legacy secrets)\n";
+        echo "  secrets    Stored secret maintenance (reencrypt after a key rotation)\n";
         echo "  queue:work Run the durable async job worker loop\n";
         echo "  schedule:run Run the cron-tick scheduler (exactly-once per minute across workers)\n";
         echo "  scale:seed Bulk-insert a parameterized, deterministic large-scale multi-tenant dataset\n";
         echo "  health:watch Sample service health for the public /status page (runs outside the app)\n";
+        echo "  billing:catalogue:apply Add plans, prices and limits from a JSON file (never overwrites)\n";
         echo "  i18n:extract Rebuild the English translation catalogue from the t() calls in the source\n";
         echo "  i18n:sync    Seed catalogue keys missing from the translations table (never overwrites)\n";
         echo "  i18n:coverage Per-domain translated/missing counts for every committed language\n";

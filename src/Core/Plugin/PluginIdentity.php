@@ -66,4 +66,21 @@ final class PluginIdentity
 
         return $slug;
     }
+
+    /**
+     * The exact name this plugin was loaded under, for a grant an operator gave
+     * by name (two names can share a slug; a grant is for one of them).
+     *
+     * @throws \InvalidArgumentException for an object the loader did not load
+     */
+    public static function nameOf(PluginInterface $plugin): string
+    {
+        $slug = self::slugOf($plugin);
+        $name = self::$holders[$slug] ?? null;
+        if ($name === null) {
+            throw new \InvalidArgumentException('Only a loaded plugin can use this service. Pass the plugin itself: ->for($this).');
+        }
+
+        return $name;
+    }
 }

@@ -55,6 +55,9 @@ final class CsrfGuard
         '/api/v1/auth/logout',
         '/api/v1/auth/select-tenant',
         '/api/v1/auth/switch-tenant',
+        // WHIT-994: creates a workspace and mints a session from the
+        // workspace_setup cookie, which is not in AUTH_COOKIES.
+        '/api/v1/auth/sso/workspace',
     ];
 
     /**

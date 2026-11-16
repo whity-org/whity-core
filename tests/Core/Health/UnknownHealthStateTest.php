@@ -120,7 +120,7 @@ final class UnknownHealthStateTest extends TestCase
 
     public function testMissingTablesAreUnknownRatherThanOperational(): void
     {
-        // health_samples only: the jobs and scheduled_jobs tables do not exist,
+        // health_samples only: the jobs and app_settings tables do not exist,
         // which means migrations have not run — not that the queue is healthy.
         $pdo = $this->pdoWithSamples();
 
@@ -152,6 +152,7 @@ final class UnknownHealthStateTest extends TestCase
         $pdo = $this->pdoWithSamples();
         $pdo->exec('CREATE TABLE jobs (id INTEGER PRIMARY KEY, status TEXT, available_at TEXT)');
         $pdo->exec('CREATE TABLE scheduled_jobs (id INTEGER PRIMARY KEY, enabled INTEGER, last_run_at TEXT)');
+        $pdo->exec('CREATE TABLE app_settings (setting_key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT)');
 
         return $pdo;
     }

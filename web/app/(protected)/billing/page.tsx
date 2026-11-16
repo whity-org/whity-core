@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -25,6 +25,7 @@ import { useTranslation } from '@whity/features/i18n';
 import { formatMoney } from '@whity/ui/money/currency';
 import { navigateExternal } from '@/lib/external-navigate';
 import { SubscriptionPanel } from './subscription-panel';
+import { PlanLimits } from './plan-limits';
 
 /**
  * BILLING: what this tenant owes, and how to pay it.
@@ -147,28 +148,29 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'destructive' | '
 };
 
 export default function BillingPage() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
   const canPay = hasPermission(BILLING_PAY);
 
   const { data, loading, error, forbidden, refetch } = useFetch(async () => {
-    const res = await apiClient('/api/v1/billing/invoices');
+    const { data: body, response: res } = await api.GET('/api/v1/billing/invoices');
     throwUnlessOk(res, t('billing.invoices.error.load', 'Failed to load invoices'));
-    return ((await res.json()).data ?? []) as Invoice[];
-  }, [apiClient]);
+    return ((body as { data?: Invoice[] } | undefined)?.data ?? []) as Invoice[];
+  }, []);
 
   const [detail, setDetail] = useState<InvoiceDetail | null>(null);
   const [paying, setPaying] = useState<Invoice | null>(null);
 
   const openDetail = async (invoice: Invoice) => {
-    const res = await apiClient(`/api/v1/billing/invoices/${invoice.id}`);
+    const { data: body, response: res } = await api.GET('/api/v1/billing/invoices/{id}', {
+      params: { path: { id: invoice.id } },
+    });
     if (!res.ok) {
       addToast(t('billing.invoices.error.detail', 'Could not open that invoice'), 'error');
       return;
     }
-    setDetail((await res.json()).data as InvoiceDetail);
+    setDetail((body as { data?: InvoiceDetail } | undefined)?.data as InvoiceDetail);
   };
 
   const money = (minor: number, currency: string) => formatMoney(minor, currency);
@@ -252,6 +254,9 @@ export default function BillingPage() {
           no LOCAL invoice and the table below is empty for them by design. */}
       {!forbidden && <SubscriptionPanel />}
 
+      {/* WHIT-932: a limit passed is told here, never enforced by a lock. */}
+      {!forbidden && <PlanLimits />}
+
       {/* A LOAD FAILURE IS SAID OUT LOUD. An empty table and a failed request
           look identical, and "no invoices" is a far more comforting thing to
           read than "we could not fetch them" — so a customer who owes money
@@ -288,6 +293,8 @@ export default function BillingPage() {
         onRowClick={(row) => void openDetail(row)}
         emptyState={{
           title: t('billing.invoices.empty', 'No invoices yet'),
+          moment: 'empty-invoices',
+          once: 'billing-invoices',
           description: t(
             'billing.invoices.emptyDescription',
             'Invoices appear here once your subscription is billed.'
@@ -465,32 +472,31 @@ function PayInvoiceDialog({
   t: (key: string, fallback: string) => string;
   money: (minor: number, currency: string) => string;
 }) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const [instruction, setInstruction] = useState<Instruction | null>(null);
   const [busy, setBusy] = useState(false);
 
   const { data: methods, loading } = useFetch(async () => {
-    const res = await apiClient('/api/v1/billing/methods');
+    const { data: body, response: res } = await api.GET('/api/v1/billing/methods');
     if (!res.ok) {
       throw new Error(t('billing.pay.error.methods', 'Could not load payment methods'));
     }
-    return ((await res.json()).data ?? []) as PaymentMethod[];
-  }, [apiClient]);
+    return ((body as { data?: PaymentMethod[] } | undefined)?.data ?? []) as PaymentMethod[];
+  }, []);
 
   const start = async (provider: string) => {
     setBusy(true);
     try {
-      const res = await apiClient(`/api/v1/billing/invoices/${invoice.id}/pay`, {
-        method: 'POST',
-        body: JSON.stringify({ provider }),
+      const { data: body, response: res } = await api.POST('/api/v1/billing/invoices/{id}/pay', {
+        params: { path: { id: invoice.id } },
+        body: { provider } as never,
       });
       if (!res.ok) {
         addToast(t('billing.pay.error.start', 'The payment could not be started'), 'error');
         return;
       }
 
-      const next = (await res.json()).data as Instruction;
+      const next = (body as { data?: Instruction } | undefined)?.data as Instruction;
 
       // The one branch. A future card provider lands in the first case.
       if (next.kind === 'redirect' && next.redirect_url) {

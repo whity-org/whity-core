@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -12,15 +12,15 @@ import { Button } from '@whity/ui/button';
 import { Skeleton } from '@whity/ui/skeleton';
 import { IconBinaryTree2, IconList, IconPlus, IconRefresh } from '@tabler/icons-react';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
-import { localizedName } from '@/lib/localized-name';
 import { CreateOuModal } from './create-modal';
 import { EditOuModal } from './edit-modal';
 import { DeleteOuModal } from './delete-modal';
 import { OuTree } from './ou-tree';
-import { fetchAllPages } from '@/lib/api/fetch-all-pages';
+import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
 import { buildOuTree, findNode } from './ou-tree-util';
 import type { OuAction } from './ou-view';
 import type { OU } from './types';
+import { localizedText } from '@whity/ui/localized-text';
 
 // react-flow is heavy and touches browser-only APIs, so the graph view is
 // loaded on demand and never server-rendered (ssr:false). Keeping it behind a
@@ -35,7 +35,6 @@ type ViewMode = 'tree' | 'graph';
 const VIEW_STORAGE_KEY = 'wc:ous:view';
 
 export default function OUsPage() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const { hasPermission } = useCapabilities();
@@ -73,7 +72,9 @@ export default function OUsPage() {
     // missing renders as a leaf. Either way the tree looks complete and the
     // user concludes the unit was never created. So: walk to the end, and
     // refuse to draw anything if we could not.
-    const result = await fetchAllPages<OU>(apiClient, '/api/v1/ous');
+    const result = await fetchAllPagesTyped<OU>(
+      (query) => api.GET('/api/v1/ous', { params: { query } }) as never
+    );
     if (!result.complete) {
       throw new Error(
         result.total === null
@@ -86,7 +87,7 @@ export default function OUsPage() {
       );
     }
     return result.items;
-  }, [apiClient, t]);
+  }, [t]);
 
   // Every screen here shows a unit in the reader's language, falling back to
   // the original (#821). `name` becomes that display name; the edit form reads
@@ -96,7 +97,7 @@ export default function OUsPage() {
     () =>
       (data ?? []).map((ou) => ({
         ...ou,
-        name: localizedName(ou.names, language, ou.name_language, ou.name),
+        name: localizedText(ou.names, language, ou.name_language, ou.name),
       })),
     [data, language]
   );

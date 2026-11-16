@@ -35,6 +35,9 @@ export type AppInstall = {
   version: string;
 };
 
+/** This host's manifest in each language (relative: resolved against the manifest itself). */
+export const MANIFEST_URLS = { en: '/manifest.webmanifest', ar: '/manifest.webmanifest?lang=ar' } as const;
+
 /** The icons the icon route draws, and their pixel sizes. */
 export const APP_ICONS = {
   '180': { size: 180, maskable: false },
@@ -98,6 +101,15 @@ export function buildManifest(install: AppInstall, lang: 'en' | 'ar'): Record<st
     orientation: 'any',
     background_color: LAUNCH_BACKGROUND,
     theme_color: install.themeColor,
+    // WHIT-1155: lets the site ask the browser whether this app is installed
+    // (navigator.getInstalledRelatedApps, Chrome on Android). Both languages'
+    // manifests are listed: either may be the one that was installed. Never
+    // prefer them over the site itself.
+    related_applications: [
+      { platform: 'webapp', url: MANIFEST_URLS.en },
+      { platform: 'webapp', url: MANIFEST_URLS.ar },
+    ],
+    prefer_related_applications: false,
     icons: [
       icon('192', 'any'),
       icon('512', 'any'),
@@ -171,6 +183,76 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(staticFirst(req));
   }
   // Everything else, /api above all, goes straight to the network untouched.
+});
+
+// Web push (WHIT-1075). The message is the workspace's: its name in the
+// title, its icon, the person's language. Notifications only open the app
+// (M.44): no action buttons. Paths only, opened on this site.
+function localPath(p) {
+  return typeof p === 'string' && /^\\/(?![\\/\\\\])[^\\s\\\\]*$/.test(p) ? p : '/admin/inbox';
+}
+
+function sameSite(u) {
+  if (typeof u !== 'string' || u === '') return undefined;
+  try {
+    const url = new URL(u, self.location.origin);
+    return url.origin === self.location.origin ? url.href : undefined;
+  } catch (e) {
+    return undefined;
+  }
+}
+
+self.addEventListener('push', (event) => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch (e) { d = {}; }
+  const ar = d.lang === 'ar';
+  const title = typeof d.title === 'string' && d.title ? d.title : (ar ? CONFIG.name.ar : CONFIG.name.en);
+  event.waitUntil(self.registration.showNotification(title, {
+    body: typeof d.body === 'string' ? d.body : '',
+    tag: typeof d.tag === 'string' && d.tag ? d.tag : undefined,
+    lang: ar ? 'ar' : 'en',
+    dir: d.dir === 'rtl' ? 'rtl' : 'ltr',
+    icon: sameSite(d.icon) || '/app-icon/192',
+    badge: sameSite(d.badge),
+    timestamp: Date.now(),
+    data: { url: localPath(d.url) },
+  }));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL(localPath(event.notification.data && event.notification.data.url), self.location.origin).href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const w of windows) {
+      if (new URL(w.url).origin !== self.location.origin) continue;
+      const focused = await w.focus();
+      if (focused && 'navigate' in focused) {
+        try { await focused.navigate(target); return; } catch (e) { /* fall through to a new window */ }
+      } else if (focused) {
+        return;
+      }
+    }
+    await self.clients.openWindow(target);
+  })());
+});
+
+// The browser renewed the subscription: tell the server, under the same key.
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil((async () => {
+    const old = event.oldSubscription;
+    const sub = event.newSubscription || (old && old.options && old.options.applicationServerKey
+      ? await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: old.options.applicationServerKey })
+      : null);
+    if (!sub) return;
+    const json = sub.toJSON();
+    await fetch('/api/v1/me/push-subscriptions', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      body: JSON.stringify({ endpoint: json.endpoint, keys: json.keys }),
+    }).catch(() => undefined);
+  })());
 });
 
 async function staticFirst(req) {

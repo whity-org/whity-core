@@ -202,6 +202,36 @@ class CookieManager
     }
 
     /**
+     * Set the "no workspace yet" cookie (WHIT-994).
+     *
+     * Issued by the SSO callback when the operator's own provider signed in
+     * somebody who belongs to no workspace. It is NOT a session: it lets its
+     * holder read GET /api/auth/sso/workspace (which screen to show, the
+     * address they signed in with) and, when every gate still holds, POST it
+     * once to create their own workspace. Short-lived, HttpOnly, Path=/api.
+     *
+     * @param string $token     JWT of type 'workspace_setup'.
+     * @param int    $expiresIn Expiration in seconds (default 900).
+     */
+    public static function setWorkspaceSetupToken(string $token, int $expiresIn = 900): void
+    {
+        header('Set-Cookie: ' . self::buildCookieHeader('workspace_setup_token', $token, $expiresIn, '/api'), false);
+    }
+
+    /** Get the "no workspace yet" token from cookies, or null if absent. */
+    public static function getWorkspaceSetupToken(): ?string
+    {
+        $value = $_COOKIE['workspace_setup_token'] ?? null;
+        return is_string($value) ? $value : null;
+    }
+
+    /** Clear the "no workspace yet" cookie (same Path as the setter). */
+    public static function clearWorkspaceSetupToken(): void
+    {
+        header('Set-Cookie: ' . self::buildCookieHeader('workspace_setup_token', '', 0, '/api'), false);
+    }
+
+    /**
      * Set the SSO flow-state cookie (WC-ae16).
      *
      * A short-lived (default 10 min) signed JWT carrying the OIDC flow secrets

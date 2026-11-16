@@ -314,6 +314,22 @@ final class PluginManifest
     }
 
     /**
+     * Document blocks (SDK 1.103), as declared under `documents.blocks`, keyed
+     * by local name: blocks this plugin adds to the document editor, drawn
+     * by Whity's own renderer; see {@see DocumentBlockValidator}.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function documentBlocks(): array
+    {
+        $documents = $this->map('documents');
+        $blocks = $documents['blocks'] ?? [];
+
+        /** @var array<string, array<string, mixed>> */
+        return is_array($blocks) ? $blocks : [];
+    }
+
+    /**
      * Agent presets (SDK 1.61), as declared under `agentPresets`, keyed by local
      * name. The host addresses each as `<plugin toolset root>.<key>`.
      *

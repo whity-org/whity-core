@@ -290,6 +290,9 @@ final class SchemaFromMigrations
     /** Maintenance connection (to the `postgres` database), opened once. */
     private static ?PDO $pgAdmin = null;
 
+    /** `CREATE DATABASE` strategy clause for clones, decided once per process. */
+    private static ?string $pgCloneStrategy = null;
+
     /**
      * Clone databases created by this process, oldest first.
      *
@@ -349,9 +352,11 @@ final class SchemaFromMigrations
             self::pruneClones($admin);
 
             $clone = self::PG_CLONE_PREFIX . bin2hex(random_bytes(8));
+            // Shared: clones of one template may run side by side (ParaTest
+            // workers); only a template build or drop needs the server to itself.
             self::withTemplateLock($admin, static function () use ($admin, $clone, $template): void {
-                $admin->exec("CREATE DATABASE \"{$clone}\" TEMPLATE \"{$template}\"");
-            });
+                $admin->exec("CREATE DATABASE \"{$clone}\" TEMPLATE \"{$template}\"" . self::cloneStrategy($admin));
+            }, shared: true);
             self::$pgClones[] = $clone;
             self::registerCloneCleanup();
 
@@ -472,20 +477,68 @@ final class SchemaFromMigrations
      *
      * @var list<string>
      */
-    private const PG_TEMPLATE_ENV_INPUTS = [
+    public const PG_TEMPLATE_ENV_INPUTS = [
         'INITIAL_SYSTEM_ADMIN_PASSWORD',
         'INITIAL_ADMIN_PASSWORD',
         'INITIAL_USER_PASSWORD',
         'INITIAL_SUPERUSER_PASSWORD',
         'INITIAL_SYSTEM_ADMIN_EMAIL',
+        // Migration 238 reads these to decide whether rendering stays off.
+        'RENDER_SERVICE_URL',
+        'RENDER_SHARED_SECRET',
+        'COMPOSE_PROFILES',
     ];
 
-    /** Content hash of database/migrations, computed once per process. */
+    /** Content hash of every file the migrations read, computed once per process. */
     private static ?string $migrationsHash = null;
 
     /**
+     * Every file a migration run reads, sorted, as paths from the repository root.
+     *
+     * The migrations themselves; the translation catalogues migrations 121 and
+     * 124 seed from (database/i18n); and the source file of every Whity class a
+     * migration names, such as TranslationSync and CorePermissionDescriptions,
+     * which write rows of their own (WHIT-949). A change to any of them changes
+     * what a migration run produces, so it has to change the key: otherwise a
+     * PostgreSQL server keeps handing out a template built from the old copy.
+     *
+     * @return list<string>
+     */
+    public static function fingerprintFiles(): array
+    {
+        $root       = dirname(__DIR__, 2);
+        $migrations = glob($root . '/database/migrations/*.php') ?: [];
+
+        $files = $migrations;
+        $files = array_merge($files, glob($root . '/database/i18n/*.json') ?: []);
+        $files = array_merge($files, glob($root . '/database/i18n/*/*.json') ?: []);
+
+        foreach ($migrations as $migration) {
+            $code = (string) file_get_contents($migration);
+            if (preg_match_all('/\\\\?\bWhity\\\\([A-Za-z0-9_\\\\]+)/', $code, $m) === 0) {
+                continue;
+            }
+            foreach ($m[1] as $class) {
+                $file = $root . '/src/' . str_replace('\\', '/', $class) . '.php';
+                if (is_file($file)) {
+                    $files[] = $file;
+                }
+            }
+        }
+
+        $files = array_map(
+            static fn(string $file): string => substr(str_replace('\\', '/', $file), strlen(str_replace('\\', '/', $root)) + 1),
+            $files
+        );
+        $files = array_values(array_unique($files));
+        sort($files);
+
+        return $files;
+    }
+
+    /**
      * A stable fingerprint of everything the built schema depends on: the
-     * migration set, and the environment the migrations read.
+     * files a migration run reads, and the environment the migrations read.
      *
      * File CONTENTS, not mtimes: a fresh CI checkout rewrites every mtime but
      * must still hit the template another shard built moments earlier, while a
@@ -496,14 +549,12 @@ final class SchemaFromMigrations
     private static function migrationsFingerprint(): string
     {
         if (self::$migrationsHash === null) {
-            $dir   = dirname(__DIR__, 2) . '/database/migrations';
-            $files = glob($dir . '/*.php') ?: [];
-            sort($files);
+            $root = dirname(__DIR__, 2);
 
             $hash = hash_init('sha256');
-            foreach ($files as $file) {
-                hash_update($hash, basename($file));
-                hash_update_file($hash, $file);
+            foreach (self::fingerprintFiles() as $file) {
+                hash_update($hash, $file);
+                hash_update_file($hash, $root . '/' . $file);
             }
             self::$migrationsHash = hash_final($hash);
         }
@@ -514,32 +565,43 @@ final class SchemaFromMigrations
             $env .= $name . '=' . (is_string($value) ? $value : '') . "\n";
         }
 
-        return substr(hash('sha256', self::$migrationsHash . "\n" . $env), 0, 16);
+        // `<migrations>_<environment>`: the first half alone says which
+        // migration set a template was built from, which is what
+        // dropStaleTemplates() needs to tell a stale template from one another
+        // worker built for a different environment a moment ago.
+        return substr(self::$migrationsHash, 0, 12) . '_' . substr(hash('sha256', $env), 0, 8);
     }
 
     /**
-     * Serialise template creation/cloning across processes.
+     * Serialise template builds against each other and against clones.
      *
      * Two shards racing to build the same template would both run the whole
-     * migration set; worse, some Postgres versions reject a `CREATE DATABASE …
-     * TEMPLATE` that overlaps another copy of the same source.  A session-level
-     * advisory lock is the right tool: it is released automatically if the
-     * process dies, so a crashed build cannot wedge the next run.
+     * migration set, and a clone must never copy a template that is still being
+     * built or is being dropped.  A session-level advisory lock is the right
+     * tool: it is released automatically if the process dies, so a crashed
+     * build cannot wedge the next run.
+     *
+     * Clones take the lock SHARED: Postgres copies one source into several new
+     * databases at once (the source only has to have no connections), and
+     * under ParaTest an exclusive lock made every worker queue behind every
+     * other worker's clone. Measured on PostgreSQL 15, 4 workers x 20 clones:
+     * 19.0 s exclusive, 11.0 s shared (WHIT-934).
      *
      * @template T
      * @param callable(): T $work
      * @return T
      */
-    private static function withTemplateLock(PDO $admin, callable $work): mixed
+    private static function withTemplateLock(PDO $admin, callable $work, bool $shared = false): mixed
     {
-        // A fixed key: the lock guards "one template build / clone at a time on
-        // this server", not one per template name.
-        $admin->exec('SELECT pg_advisory_lock(4207310001)');
+        // A fixed key: the lock guards "one template build at a time on this
+        // server, and no clone during it", not one per template name.
+        $mode = $shared ? '_shared' : '';
+        $admin->exec("SELECT pg_advisory_lock{$mode}(4207310001)");
         try {
             return $work();
         } finally {
             try {
-                $admin->exec('SELECT pg_advisory_unlock(4207310001)');
+                $admin->exec("SELECT pg_advisory_unlock{$mode}(4207310001)");
             } catch (\Throwable) {
                 // session teardown releases it anyway
             }
@@ -547,6 +609,33 @@ final class SchemaFromMigrations
     }
 
     /** Maintenance connection to the `postgres` database, opened at most once. */
+    /**
+     * Postgres 15 copies a template block by block through the WAL by default,
+     * which costs the same with or without fsync. FILE_COPY copies the files
+     * and checkpoints instead, which is far slower on a durable server but much
+     * faster on one with fsync off, as CI's throwaway servers run (WHIT-934).
+     * Measured on PostgreSQL 15 with fsync off, 4 workers x 20 clones: 9.0 s
+     * WAL_LOG, 6.9 s FILE_COPY; with fsync on, FILE_COPY took 105.8 s.
+     */
+    private static function cloneStrategy(PDO $admin): string
+    {
+        if (self::$pgCloneStrategy === null) {
+            self::$pgCloneStrategy = '';
+            try {
+                $version = $admin->query('SHOW server_version_num');
+                $fsync   = $admin->query('SHOW fsync');
+                if ($version !== false && $fsync !== false
+                    && (int) $version->fetchColumn() >= 150000 && $fsync->fetchColumn() === 'off') {
+                    self::$pgCloneStrategy = ' STRATEGY FILE_COPY';
+                }
+            } catch (\Throwable) {
+                // keep the default strategy
+            }
+        }
+
+        return self::$pgCloneStrategy;
+    }
+
     private static function pgAdminConnection(string $adminDsn, string $user, string $password): PDO
     {
         return self::$pgAdmin ??= new PDO($adminDsn, $user, $password, [
@@ -609,6 +698,11 @@ final class SchemaFromMigrations
     {
         $keep = array_values(self::$pgTemplates);
         $keep[] = $justBuilt;
+        // Under ParaTest several processes share the server, each with its own
+        // $pgTemplates. A template for the CURRENT migration set may belong to
+        // another worker that varied an environment input and is about to
+        // clone it, so only templates of another migration set are stale.
+        $current = self::PG_TEMPLATE_PREFIX . substr((string) self::$migrationsHash, 0, 12) . '_';
 
         try {
             $stmt = $admin->prepare(
@@ -616,7 +710,7 @@ final class SchemaFromMigrations
             );
             $stmt->execute([':prefix' => self::PG_TEMPLATE_PREFIX . '%']);
             foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $candidate) {
-                if (!in_array((string) $candidate, $keep, true)) {
+                if (!in_array((string) $candidate, $keep, true) && !str_starts_with((string) $candidate, $current)) {
                     self::dropDatabase($admin, (string) $candidate);
                 }
             }
@@ -1121,7 +1215,38 @@ final class SchemaFromMigrations
                 // bare NOW() in DEFAULT clauses (not already translated)
                 $sql = preg_replace('/\bDEFAULT\s+NOW\s*\(\)/i', "DEFAULT (datetime('now'))", $sql) ?? $sql;
 
-                return $sql;
+                return self::stableNow($sql);
+            }
+
+            /**
+             * Every other NOW() becomes SQLite's own clock, which holds still
+             * for a whole statement (WHIT-949).
+             *
+             * PostgreSQL's NOW() is the time the transaction started, so
+             * `INSERT ... SELECT ..., NOW(), NOW()` always writes created_at
+             * equal to updated_at. The PHP function NOW() used to call read the
+             * clock once per call instead. When a second ticked over between
+             * the two calls, the row got an updated_at one second after its
+             * created_at, and migration 124 (which claims only rows with
+             * updated_at <= created_at) left its source_managed at 0. Under CI
+             * load that happened in about one SQLite migration run in thirty,
+             * so the template and a real run could disagree on one random row.
+             * SQLite reads datetime('now') once per statement step, the same
+             * clock `DEFAULT (datetime('now'))` above already uses, in UTC.
+             *
+             * Quoted strings are left alone: text that says NOW() is not a call.
+             */
+            public static function stableNow(string $sql): string
+            {
+                if (stripos($sql, 'now') === false) {
+                    return $sql;
+                }
+
+                return preg_replace_callback(
+                    "/'(?:[^']|'')*'|(?<![\\w.])NOW\\s*\\(\\s*\\)/i",
+                    static fn(array $m): string => $m[0][0] === "'" ? $m[0] : "datetime('now')",
+                    $sql
+                ) ?? $sql;
             }
 
             /**

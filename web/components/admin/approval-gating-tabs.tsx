@@ -40,27 +40,27 @@ interface ApprovalGatingTabsProps {
  * record as the runtime fallback.
  *
  * @i18n-keys admin
- *   approvalGating.tab.signup = Signup
- *   approvalGating.tab.passwordResets = Password reset
- *   approvalGating.tab.twoFactorRecovery = 2FA auth reset
+ *   approvalGating.tab.signup = Sign-ups
+ *   approvalGating.tab.passwordResets = Password resets
+ *   approvalGating.tab.twoFactorRecovery = Two-step resets
  */
 export const TABS: { id: ApprovalGatingTabId; key: string; label: string; href: string }[] = [
   {
     id: 'signup',
     key: 'approvalGating.tab.signup',
-    label: 'Signup',
+    label: 'Sign-ups',
     href: '/admin/registrations',
   },
   {
     id: 'password-resets',
     key: 'approvalGating.tab.passwordResets',
-    label: 'Password reset',
+    label: 'Password resets',
     href: '/admin/approval-gating/password-resets',
   },
   {
     id: 'two-factor-recovery',
     key: 'approvalGating.tab.twoFactorRecovery',
-    label: '2FA auth reset',
+    label: 'Two-step resets',
     href: '/admin/approval-gating/two-factor-recovery',
   },
 ];

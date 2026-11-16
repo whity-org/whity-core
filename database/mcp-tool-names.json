@@ -15,6 +15,22 @@
     "en": "Remove the default logo or brand image for all workspaces",
     "ar": "إزالة شعار أو صورة افتراضية لكل المساحات"
   },
+  "delete_api_calendar_bookings_id_check_in": {
+    "en": "Undo a check-in",
+    "ar": "إلغاء تسجيل الوصول"
+  },
+  "delete_api_calendar_events_id": {
+    "en": "Remove a calendar event",
+    "ar": "حذف حدث من التقويم"
+  },
+  "delete_api_calendar_staff_profileid_feed": {
+    "en": "Turn off someone's calendar feed",
+    "ar": "إيقاف رابط تقويم موظف"
+  },
+  "delete_api_calendar_time_off_id": {
+    "en": "Remove time off or extra hours",
+    "ar": "حذف إجازة أو ساعات إضافية"
+  },
   "delete_api_convening_bodies_id": {
     "en": "Delete a body that holds meetings",
     "ar": "حذف هيئة"
@@ -145,6 +161,10 @@
     "en": "Remove permissions from a role",
     "ar": "سحب صلاحيات من دور"
   },
+  "delete_api_saved_blocks_id": {
+    "en": "Delete a saved block",
+    "ar": "حذف كتلة محفوظة"
+  },
   "delete_api_storage_config": {
     "en": "Remove your storage setup and use the default",
     "ar": "إزالة إعداد التخزين والعودة للافتراضي"
@@ -177,6 +197,30 @@
   },
   "delete_api_users_id_memberships_membershipid": {
     "ar": "سحب دور إضافي من مستخدم"
+  },
+  "document_agent_request_update": {
+    "en": "Report how a document request is going",
+    "ar": "الإبلاغ عن سير طلب مستند"
+  },
+  "document_agent_requests_next": {
+    "en": "Pick up the next document request your person asked of you",
+    "ar": "استلام طلب المستند التالي الذي طلبه منك صاحبك"
+  },
+  "document_comment_reply": {
+    "en": "Reply in a comment thread on a document",
+    "ar": "الرد في سلسلة تعليقات على مستند"
+  },
+  "document_read": {
+    "en": "Read a document as blocks, with its open comments and suggestions",
+    "ar": "قراءة مستند كتلًا مع تعليقاته واقتراحاته المفتوحة"
+  },
+  "document_suggest_blocks": {
+    "en": "Suggest new blocks in a document",
+    "ar": "اقتراح كتل جديدة في مستند"
+  },
+  "document_suggest_rewrite": {
+    "en": "Suggest replacing text in a document",
+    "ar": "اقتراح استبدال نص في مستند"
   },
   "get_api_2fa_policies": {
     "en": "List your workspace's two-step sign-in rules",
@@ -223,6 +267,14 @@
     "en": "See the audit log of your workspace",
     "ar": "عرض سجل التدقيق"
   },
+  "get_api_away_periods": {
+    "en": "List who is away and who decides for them",
+    "ar": "عرض الغائبين ومن يقرر نيابةً عنهم"
+  },
+  "get_api_billing_cash_payments": {
+    "en": "List a workspace's cash payments",
+    "ar": "عرض الدفعات النقدية لمساحة عمل"
+  },
   "get_api_billing_invoices": {
     "en": "List your workspace's invoices",
     "ar": "عرض الفواتير"
@@ -230,6 +282,10 @@
   "get_api_billing_invoices_id": {
     "en": "See one invoice, its lines and its payments",
     "ar": "عرض فاتورة وبنودها ومدفوعاتها"
+  },
+  "get_api_billing_limits": {
+    "en": "See where your workspace stands against its plan's limits",
+    "ar": "عرض استخدام مساحة العمل مقارنة بحدود باقتها"
   },
   "get_api_billing_methods": {
     "en": "See which ways of paying are available",
@@ -246,6 +302,106 @@
   "get_api_billing_return": {
     "en": "Check the result of a payment",
     "ar": "التحقق من نتيجة عملية دفع"
+  },
+  "get_api_calendar_availability": {
+    "en": "Find free times for a service",
+    "ar": "البحث عن أوقات متاحة لخدمة"
+  },
+  "get_api_calendar_bookings": {
+    "en": "List bookings",
+    "ar": "عرض الحجوزات"
+  },
+  "get_api_calendar_bookings_id": {
+    "en": "Get a booking",
+    "ar": "عرض حجز"
+  },
+  "get_api_calendar_day_counts": {
+    "en": "Count bookings a day",
+    "ar": "عدّ الحجوزات في كل يوم"
+  },
+  "get_api_calendar_events": {
+    "en": "List calendar events",
+    "ar": "عرض أحداث التقويم"
+  },
+  "get_api_calendar_items": {
+    "en": "List everything on the calendar",
+    "ar": "عرض كل ما في التقويم"
+  },
+  "get_api_calendar_my_view": {
+    "en": "Read your own calendar choices",
+    "ar": "عرض اختياراتك في التقويم"
+  },
+  "get_api_calendar_rooms": {
+    "en": "List rooms",
+    "ar": "عرض الغرف"
+  },
+  "get_api_calendar_services": {
+    "en": "List services",
+    "ar": "عرض الخدمات"
+  },
+  "get_api_calendar_services_id": {
+    "en": "Get a service",
+    "ar": "عرض خدمة"
+  },
+  "get_api_calendar_settings": {
+    "en": "Read the calendar settings",
+    "ar": "عرض إعدادات التقويم"
+  },
+  "get_api_calendar_staff": {
+    "en": "List staff who have a calendar",
+    "ar": "عرض الموظفين الذين لديهم تقويم"
+  },
+  "get_api_calendar_staff_profileid_hours": {
+    "en": "Read someone's working hours",
+    "ar": "عرض ساعات عمل موظف"
+  },
+  "get_api_calendar_time_off": {
+    "en": "List time off and extra hours",
+    "ar": "عرض الإجازات والساعات الإضافية"
+  },
+  "get_api_calendar_today": {
+    "en": "Today at a glance",
+    "ar": "نظرة على اليوم"
+  },
+  "get_api_chat_chats": {
+    "en": "List the team chats you are in",
+    "ar": "عرض محادثات الفريق التي أنت فيها"
+  },
+  "get_api_chat_chats_id": {
+    "en": "Read a team chat and who is in it",
+    "ar": "قراءة محادثة فريق ومن فيها"
+  },
+  "get_api_chat_chats_id_messages": {
+    "en": "Read a team chat's messages",
+    "ar": "قراءة رسائل محادثة فريق"
+  },
+  "get_api_chat_directory": {
+    "en": "Find people and agents to mention",
+    "ar": "البحث عن أشخاص ووكلاء للإشارة إليهم"
+  },
+  "get_api_contacts": {
+    "en": "List customers and suppliers",
+    "ar": "عرض العملاء والموردين"
+  },
+  "get_api_contacts_id": {
+    "en": "Get a customer or supplier",
+    "ar": "عرض عميل أو مورد"
+  },
+  "get_api_contacts_id_activity": {
+    "en": "See what a customer did: bookings, chats, forms and join requests",
+    "ar": "عرض نشاط العميل: الحجوزات والمحادثات والنماذج وطلبات الانضمام"
+  },
+  "get_api_contacts_imports": {
+    "en": "List contact imports",
+    "ar": "عرض عمليات استيراد جهات الاتصال"
+  },
+  "get_api_contacts_imports_id": {
+    "en": "Get a contact import",
+    "ar": "عرض عملية استيراد"
+  },
+  "get_api_contacts_tags": {
+    "en": "List the tags on contacts",
+    "ar": "عرض وسوم جهات الاتصال"
   },
   "get_api_convening_bodies": {
     "en": "List the bodies that hold meetings",
@@ -274,6 +430,10 @@
   "get_api_document_background_issuing": {
     "en": "See which plugins can issue documents on their own",
     "ar": "عرض الإضافات التي تصدر مستندات من تلقاء نفسها"
+  },
+  "get_api_document_blocks": {
+    "en": "List the blocks plugins add to documents",
+    "ar": "عرض الكتل التي تضيفها الإضافات إلى المستندات"
   },
   "get_api_document_collections": {
     "en": "List your own document collections",
@@ -313,6 +473,10 @@
   "get_api_document_sources_id": {
     "en": "Open a document in the editor",
     "ar": "فتح مستند في المحرر"
+  },
+  "get_api_document_sources_id_agent_requests": {
+    "en": "Your agent requests on a document",
+    "ar": "طلباتك من الوكلاء على مستند"
   },
   "get_api_document_sources_id_changes": {
     "en": "See what changed in a document",
@@ -437,8 +601,9 @@
   "get_api_form_submissions_id": {
     "ar": "عرض إجابة نموذج وحقولها"
   },
-  "get_api_form_submissions_id_review": {
-    "ar": "عرض ما سجّله المكتب عن إجابة"
+  "get_api_form_submissions_id_printout": {
+    "en": "Print a form response in the automatic layout",
+    "ar": "طباعة ردّ على نموذج بالتخطيط التلقائي"
   },
   "get_api_forms": {
     "en": "List the forms in your workspace",
@@ -507,6 +672,10 @@
     "en": "See your notification preferences",
     "ar": "عرض تفضيلات إشعاراتك"
   },
+  "get_api_me_notification_summary": {
+    "en": "See your notifications in each of your workspaces",
+    "ar": "عرض إشعاراتك في كل مساحات عملك"
+  },
   "get_api_me_notifications": {
     "en": "See your notifications",
     "ar": "عرض إشعاراتك"
@@ -530,6 +699,22 @@
   },
   "get_api_meetings_id": {
     "ar": "عرض اجتماع وجدول أعماله وقراراته"
+  },
+  "get_api_messages_channels": {
+    "en": "See the channels messages can use",
+    "ar": "عرض قنوات الرسائل المتاحة"
+  },
+  "get_api_messages_conversations": {
+    "en": "List conversations with customers",
+    "ar": "عرض المحادثات مع العملاء"
+  },
+  "get_api_messages_conversations_id": {
+    "en": "Read a conversation",
+    "ar": "قراءة محادثة"
+  },
+  "get_api_messages_settings": {
+    "en": "See the web chat and inbound email settings",
+    "ar": "عرض إعدادات الدردشة والبريد الوارد"
   },
   "get_api_migrations": {
     "en": "See database updates and whether they have run",
@@ -640,6 +825,10 @@
     "en": "See a store plugin's licence",
     "ar": "عرض ترخيص إضافة من المتجر"
   },
+  "get_api_plugins_workspace_access": {
+    "en": "List who can use each installed plugin",
+    "ar": "عرض من يمكنه استخدام كل إضافة مثبتة"
+  },
   "get_api_profiles_id_relations": {
     "en": "See a user's person record and relationships",
     "ar": "عرض بيانات شخص وعلاقاته من حسابه"
@@ -681,6 +870,22 @@
   "get_api_routing_rules": {
     "en": "List the kinds of rule a route step can use",
     "ar": "عرض أنواع قواعد مسار المستندات"
+  },
+  "get_api_saved_blocks": {
+    "en": "List the saved blocks you can insert",
+    "ar": "عرض الكتل المحفوظة التي يمكنك إدراجها"
+  },
+  "get_api_saved_blocks_id": {
+    "en": "Show a saved block",
+    "ar": "عرض كتلة محفوظة"
+  },
+  "get_api_saved_blocks_id_usage": {
+    "en": "List the documents that use a saved block",
+    "ar": "عرض المستندات التي تستخدم كتلة محفوظة"
+  },
+  "get_api_saved_blocks_id_versions_version": {
+    "en": "Show an earlier version of a saved block",
+    "ar": "عرض إصدار سابق من كتلة محفوظة"
   },
   "get_api_search": {
     "en": "Search documents, forms, people and units you can see",
@@ -730,6 +935,10 @@
   "get_api_tenants": {
     "en": "List workspaces",
     "ar": "عرض مساحات العمل"
+  },
+  "get_api_tenants_id_addons": {
+    "en": "See a workspace's add-on packs",
+    "ar": "عرض الحزم الإضافية لمساحة عمل"
   },
   "get_api_tenants_id_entitlements": {
     "en": "See the limits and features of a workspace",
@@ -794,6 +1003,18 @@
     "en": "See the roles a user holds",
     "ar": "عرض أدوار مستخدم"
   },
+  "get_api_workspace_code_plugins": {
+    "en": "List the installed plugins this workspace can use",
+    "ar": "عرض الإضافات المثبتة التي يمكن لمساحة العمل استخدامها"
+  },
+  "get_api_workspace_code_plugins_plugin_history": {
+    "en": "See who turned a plugin on or off, and when",
+    "ar": "معرفة من شغّل الإضافة أو أوقفها ومتى"
+  },
+  "get_api_workspace_onboarding": {
+    "en": "List the guided setups of the plugins on in this workspace",
+    "ar": "عرض الإعداد الموجَّه للإضافات العاملة في مساحة العمل"
+  },
   "get_api_workspace_plugins": {
     "ar": "عرض إضافات مساحة العمل"
   },
@@ -826,9 +1047,29 @@
     "en": "Change an agent's instructions, tools or permissions",
     "ar": "تعديل تعليمات وكيل وأدواته وصلاحياته"
   },
+  "patch_api_calendar_events_id": {
+    "en": "Change a calendar event",
+    "ar": "تعديل حدث في التقويم"
+  },
+  "patch_api_calendar_rooms_id": {
+    "en": "Change a room",
+    "ar": "تعديل غرفة"
+  },
+  "patch_api_calendar_services_id": {
+    "en": "Change a service",
+    "ar": "تعديل خدمة"
+  },
+  "patch_api_contacts_id": {
+    "en": "Change a customer or supplier",
+    "ar": "تعديل عميل أو مورد"
+  },
   "patch_api_convening_bodies_id": {
     "en": "Rename a body, move it, retire it or bring it back",
     "ar": "تعديل هيئة أو إيقافها أو إعادتها"
+  },
+  "patch_api_custom_fields_id": {
+    "en": "Change a field",
+    "ar": "تعديل حقل"
   },
   "patch_api_document_collections_id": {
     "en": "Rename one of your document collections",
@@ -863,6 +1104,10 @@
     "en": "Change a language's name or switch it on or off",
     "ar": "تعديل اسم لغة أو تشغيلها وإيقافها"
   },
+  "patch_api_messages_conversations_id": {
+    "en": "Change a conversation's status or who it is assigned to",
+    "ar": "تغيير حالة المحادثة أو المسؤول عنها"
+  },
   "patch_api_ou_types_id": {
     "en": "Rename or reorder a unit type",
     "ar": "تغيير اسم نوع وحدة أو ترتيبه"
@@ -881,6 +1126,10 @@
   "patch_api_roles_id": {
     "en": "Update a role and, if given, replace its permissions",
     "ar": "تعديل دور وصلاحياته"
+  },
+  "patch_api_saved_blocks_id": {
+    "en": "Change a saved block",
+    "ar": "تعديل كتلة محفوظة"
   },
   "patch_api_settings": {
     "en": "Change your workspace settings",
@@ -927,16 +1176,24 @@
     "ar": "إلزام التحقق بخطوتين"
   },
   "post_api_2fa_recovery_force_reset": {
-    "en": "Turn off a user's two-step sign-in without a request",
-    "ar": "إلغاء التحقق بخطوتين لمستخدم مباشرة"
+    "en": "Start a two-step reset for a user, which a second admin then approves",
+    "ar": "بدء إعادة تعيين التحقق بخطوتين لمستخدم ليوافق عليها مسؤول ثانٍ"
   },
   "post_api_2fa_recovery_id_approve": {
     "en": "Approve recovery: turn off the user's two-step sign-in and send a password reset link",
     "ar": "الموافقة على استعادة التحقق بخطوتين"
   },
+  "post_api_2fa_recovery_id_checks": {
+    "en": "Record a check that a two-step reset is really from the person",
+    "ar": "تسجيل تحقق من أن طلب إعادة تعيين التحقق بخطوتين من صاحبه فعلاً"
+  },
   "post_api_2fa_recovery_id_reject": {
     "en": "Reject a two-step sign-in recovery request",
     "ar": "رفض طلب استعادة التحقق بخطوتين"
+  },
+  "post_api_2fa_recovery_identity_check": {
+    "en": "Start an admin's check that it's them before approving a two-step reset",
+    "ar": "بدء تحقق المسؤول من هويته قبل الموافقة على إعادة تعيين التحقق بخطوتين"
   },
   "post_api_affiliates": {
     "en": "Create an affiliate",
@@ -962,6 +1219,14 @@
   "post_api_agents_id_resume": {
     "ar": "استئناف عمل وكيل"
   },
+  "post_api_billing_cash_payments": {
+    "en": "Record a cash payment for a paid plugin plan",
+    "ar": "تسجيل دفعة نقدية لخطة إضافة مدفوعة"
+  },
+  "post_api_billing_cash_payments_id_void": {
+    "en": "Void a cash payment, saying why",
+    "ar": "إلغاء دفعة نقدية مع ذكر السبب"
+  },
   "post_api_billing_checkout": {
     "en": "Start a payment for your workspace",
     "ar": "بدء دفع لمساحة العمل"
@@ -985,6 +1250,94 @@
     "en": "Upload the default logo or brand image for all workspaces",
     "ar": "رفع شعار أو صورة افتراضية لكل المساحات"
   },
+  "post_api_calendar_bookings": {
+    "en": "Book a service for a customer",
+    "ar": "حجز خدمة لعميل"
+  },
+  "post_api_calendar_bookings_id_accept": {
+    "en": "Accept a booking request",
+    "ar": "قبول طلب حجز"
+  },
+  "post_api_calendar_bookings_id_cancel": {
+    "en": "Cancel a booking",
+    "ar": "إلغاء حجز"
+  },
+  "post_api_calendar_bookings_id_check_in": {
+    "en": "Check a customer in",
+    "ar": "تسجيل وصول عميل"
+  },
+  "post_api_calendar_bookings_id_move": {
+    "en": "Move a booking",
+    "ar": "تغيير موعد حجز"
+  },
+  "post_api_calendar_bookings_id_suggest": {
+    "en": "Suggest another time for a request",
+    "ar": "اقتراح موعد آخر لطلب"
+  },
+  "post_api_calendar_events": {
+    "en": "Add a calendar event",
+    "ar": "إضافة حدث إلى التقويم"
+  },
+  "post_api_calendar_events_id_answer": {
+    "en": "Answer an event invitation",
+    "ar": "الرد على دعوة إلى حدث"
+  },
+  "post_api_calendar_rooms": {
+    "en": "Add a room",
+    "ar": "إضافة غرفة"
+  },
+  "post_api_calendar_services": {
+    "en": "Add a service",
+    "ar": "إضافة خدمة"
+  },
+  "post_api_calendar_staff_profileid_feed": {
+    "en": "Turn on someone's calendar feed",
+    "ar": "تفعيل رابط تقويم موظف"
+  },
+  "post_api_calendar_time_off": {
+    "en": "Add time off or extra hours",
+    "ar": "إضافة إجازة أو ساعات إضافية"
+  },
+  "post_api_chat_chats_id_messages": {
+    "en": "Write in a team chat",
+    "ar": "الكتابة في محادثة فريق"
+  },
+  "post_api_chat_chats_id_proposals": {
+    "en": "Put your proposal in a team chat",
+    "ar": "وضع اقتراحك في محادثة فريق"
+  },
+  "post_api_chat_chats_id_read": {
+    "en": "Mark a team chat read",
+    "ar": "تعليم محادثة فريق كمقروءة"
+  },
+  "post_api_contacts": {
+    "en": "Add a customer or supplier",
+    "ar": "إضافة عميل أو مورد"
+  },
+  "post_api_contacts_id_archive": {
+    "en": "Archive a customer or supplier",
+    "ar": "أرشفة عميل أو مورد"
+  },
+  "post_api_contacts_id_restore": {
+    "en": "Restore an archived contact",
+    "ar": "استعادة جهة اتصال مؤرشفة"
+  },
+  "post_api_contacts_imports": {
+    "en": "Upload a spreadsheet of contacts",
+    "ar": "رفع جدول جهات اتصال"
+  },
+  "post_api_contacts_imports_id_check": {
+    "en": "Check what an import will do",
+    "ar": "التحقق مما سيفعله الاستيراد"
+  },
+  "post_api_contacts_imports_id_run": {
+    "en": "Run a contact import",
+    "ar": "تنفيذ استيراد جهات الاتصال"
+  },
+  "post_api_contacts_imports_id_undo": {
+    "en": "Undo a contact import",
+    "ar": "التراجع عن استيراد جهات الاتصال"
+  },
   "post_api_convening_bodies": {
     "en": "Set up a body that holds meetings",
     "ar": "تأسيس هيئة"
@@ -992,6 +1345,18 @@
   "post_api_convening_bodies_id_members": {
     "en": "Add a member to a body, or change their seat",
     "ar": "تعيين عضو في هيئة أو نقله"
+  },
+  "post_api_custom_fields": {
+    "en": "Add a field to a record type",
+    "ar": "إضافة حقل إلى نوع سجل"
+  },
+  "post_api_custom_fields_id_archive": {
+    "en": "Archive a field",
+    "ar": "أرشفة حقل"
+  },
+  "post_api_custom_fields_id_restore": {
+    "en": "Restore an archived field",
+    "ar": "استعادة حقل مؤرشف"
   },
   "post_api_data_types_type_bulk": {
     "en": "Trash, restore, retire or delete many records at once",
@@ -1013,6 +1378,10 @@
     "en": "Delegate some of your permissions to someone",
     "ar": "تفويض بعض صلاحياتك لشخص آخر"
   },
+  "post_api_document_agent_requests_rid_stop": {
+    "en": "Stop an agent request",
+    "ar": "إيقاف طلب من وكيل"
+  },
   "post_api_document_collections": {
     "en": "Create a document collection of your own",
     "ar": "إنشاء مجموعة مستندات خاصة بك"
@@ -1023,6 +1392,10 @@
   "post_api_document_sources": {
     "en": "Create a document in the editor",
     "ar": "إنشاء مستند في المحرر"
+  },
+  "post_api_document_sources_id_agent_requests": {
+    "en": "Ask an agent to work on a document",
+    "ar": "طلب العمل على مستند من وكيل"
   },
   "post_api_document_sources_id_comments": {
     "en": "Start a comment on a document",
@@ -1070,6 +1443,10 @@
   },
   "post_api_document_themes": {
     "ar": "إنشاء سمة مستندات"
+  },
+  "post_api_document_themes_form_printout_preview": {
+    "en": "Preview form printouts with unsaved theme options",
+    "ar": "معاينة مطبوعات النماذج بخيارات نسق غير محفوظة"
   },
   "post_api_document_themes_ref_archive": {
     "ar": "أرشفة سمة مستندات"
@@ -1125,9 +1502,6 @@
   "post_api_entity_tags": {
     "en": "Put a tag on an item",
     "ar": "وضع وسم على عنصر"
-  },
-  "post_api_form_submissions_id_review": {
-    "ar": "تسجيل قرار المكتب في إجابة"
   },
   "post_api_forms": {
     "en": "Create a new form",
@@ -1237,6 +1611,22 @@
     "en": "Set a meeting's date and place",
     "ar": "تحديد موعد اجتماع ومكانه"
   },
+  "post_api_messages_conversations": {
+    "en": "Write to someone in a new conversation",
+    "ar": "مراسلة شخص في محادثة جديدة"
+  },
+  "post_api_messages_conversations_id_notes": {
+    "en": "Add an internal note to a conversation",
+    "ar": "إضافة ملاحظة داخلية إلى محادثة"
+  },
+  "post_api_messages_conversations_id_replies": {
+    "en": "Reply to a customer",
+    "ar": "الرد على عميل"
+  },
+  "post_api_messages_id_cancel": {
+    "en": "Cancel a message that has not been sent yet",
+    "ar": "إلغاء رسالة لم تُرسل بعد"
+  },
   "post_api_ou_types": {
     "en": "Add a unit type, or adopt a built-in one",
     "ar": "إضافة نوع وحدة تنظيمية"
@@ -1336,6 +1726,10 @@
     "en": "Act on your item on a route",
     "ar": "اتخاذ إجراء على عنصرك في مسار"
   },
+  "post_api_saved_blocks": {
+    "en": "Save blocks as one saved block",
+    "ar": "حفظ كتل ككتلة محفوظة واحدة"
+  },
   "post_api_signup_requests_id_approve": {
     "en": "Let a waiting person join as a customer",
     "ar": "قبول انضمام شخص كعميل"
@@ -1397,6 +1791,18 @@
     "en": "Send a user a password reset link",
     "ar": "إرسال رابط إعادة تعيين كلمة المرور لمستخدم"
   },
+  "post_api_workspace_code_plugins_plugin_disable": {
+    "en": "Turn an installed plugin off for this workspace",
+    "ar": "إيقاف إضافة مثبتة لمساحة العمل"
+  },
+  "post_api_workspace_code_plugins_plugin_enable": {
+    "en": "Turn an installed plugin on for this workspace",
+    "ar": "تشغيل إضافة مثبتة لمساحة العمل"
+  },
+  "post_api_workspace_code_plugins_plugin_trial": {
+    "en": "Start this workspace's free trial of a paid plugin",
+    "ar": "بدء الفترة التجريبية المجانية لإضافة مدفوعة في مساحة العمل"
+  },
   "post_api_workspace_plugins": {
     "ar": "نشر إصدار من إضافة مساحة العمل"
   },
@@ -1415,6 +1821,22 @@
   "post_api_workspace_plugins_validate": {
     "en": "Check a workspace plugin's definition",
     "ar": "التحقق من تعريف إضافة"
+  },
+  "put_api_calendar_my_view": {
+    "en": "Change your own calendar choices",
+    "ar": "تغيير اختياراتك في التقويم"
+  },
+  "put_api_calendar_settings": {
+    "en": "Change the calendar settings",
+    "ar": "تغيير إعدادات التقويم"
+  },
+  "put_api_calendar_staff_profileid": {
+    "en": "Give someone a calendar or change online booking for them",
+    "ar": "إضافة تقويم لموظف أو تغيير الحجز عبر الإنترنت له"
+  },
+  "put_api_calendar_staff_profileid_hours": {
+    "en": "Change someone's working hours",
+    "ar": "تغيير ساعات عمل موظف"
   },
   "put_api_document_background_issuing_plugin": {
     "en": "Allow or stop a plugin issuing documents on its own",
@@ -1454,6 +1876,10 @@
   "put_api_meetings_id_attendance": {
     "ar": "تسجيل من حضر اجتماعًا"
   },
+  "put_api_messages_settings": {
+    "en": "Change the web chat and inbound email settings",
+    "ar": "تغيير إعدادات الدردشة والبريد الوارد"
+  },
   "put_api_notification_settings_channel": {
     "en": "Change how a notification channel sends messages",
     "ar": "تغيير إعدادات قناة إشعارات"
@@ -1466,6 +1892,10 @@
     "en": "Set what a plan includes",
     "ar": "تعيين ما تتضمنه باقة"
   },
+  "put_api_plugins_plugin_workspace_access": {
+    "en": "Choose who can use an installed plugin",
+    "ar": "اختيار من يمكنه استخدام إضافة مثبتة"
+  },
   "put_api_signup_settings": {
     "en": "Change your workspace's customer sign-up settings",
     "ar": "تغيير إعدادات تسجيل العملاء"
@@ -1474,6 +1904,10 @@
     "en": "Set or replace where your workspace stores files",
     "ar": "تعيين مكان تخزين الملفات أو استبداله"
   },
+  "put_api_tenants_id_addons": {
+    "en": "Set a workspace's add-on packs",
+    "ar": "تعديل الحزم الإضافية لمساحة عمل"
+  },
   "put_api_tenants_id_branding_host": {
     "en": "Set or clear a workspace's own web address",
     "ar": "تعيين عنوان ويب خاص بمساحة عمل أو مسحه"
@@ -1481,5 +1915,73 @@
   "put_api_tenants_id_subscription": {
     "en": "Set a workspace's subscription or apply a plan",
     "ar": "تعيين اشتراك مساحة عمل أو باقتها"
+  },
+  "taskaat_add_milestone": {
+    "en": "Add a milestone to a task",
+    "ar": "إضافة مرحلة إلى مهمة"
+  },
+  "taskaat_complete_milestone": {
+    "en": "Tick a task's milestone",
+    "ar": "تعليم مرحلة من مهمة كمنجزة"
+  },
+  "taskaat_complete_task": {
+    "en": "Mark a task done",
+    "ar": "تعليم مهمة كمنجزة"
+  },
+  "taskaat_create_kb_entry": {
+    "en": "Record a decision",
+    "ar": "تسجيل قرار"
+  },
+  "taskaat_create_task": {
+    "en": "Create a task in Taskaat",
+    "ar": "إنشاء مهمة في Taskaat"
+  },
+  "taskaat_get_project": {
+    "en": "Read a Taskaat board",
+    "ar": "قراءة لوحة في Taskaat"
+  },
+  "taskaat_get_task": {
+    "en": "Read a task in Taskaat",
+    "ar": "قراءة مهمة في Taskaat"
+  },
+  "taskaat_get_task_activity": {
+    "en": "See what happened on a task",
+    "ar": "عرض ما جرى على مهمة"
+  },
+  "taskaat_get_task_gate_history": {
+    "en": "See a task's review verdicts",
+    "ar": "عرض قرارات مراجعة مهمة"
+  },
+  "taskaat_list_kb_entries": {
+    "en": "List a board's decisions",
+    "ar": "عرض قرارات لوحة"
+  },
+  "taskaat_list_projects": {
+    "en": "List the Taskaat boards",
+    "ar": "عرض لوحات Taskaat"
+  },
+  "taskaat_list_tasks": {
+    "en": "List tasks in Taskaat",
+    "ar": "عرض المهام في Taskaat"
+  },
+  "taskaat_set_output_contract": {
+    "en": "Write a task's done-when check",
+    "ar": "كتابة شرط إنجاز مهمة"
+  },
+  "taskaat_store_artifact": {
+    "en": "Attach evidence to a task",
+    "ar": "إرفاق دليل بمهمة"
+  },
+  "taskaat_submit_task_review": {
+    "en": "Accept a task or send it back",
+    "ar": "قبول مهمة أو إعادتها"
+  },
+  "taskaat_uncomplete_task": {
+    "en": "Reopen a done task",
+    "ar": "إعادة فتح مهمة منجزة"
+  },
+  "taskaat_update_task": {
+    "en": "Change a task in Taskaat",
+    "ar": "تعديل مهمة في Taskaat"
   }
 }

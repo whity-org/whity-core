@@ -7,7 +7,7 @@ namespace Whity\Api;
 use Throwable;
 use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Agent\AgentProposalRepository;
-use Whity\Core\Inbox\InboxItem;
+use Whity\Sdk\Inbox\InboxItem;
 use Whity\Core\Inbox\InboxSourceRegistry;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -39,7 +39,8 @@ use Whity\Core\Tenant\TenantContext;
 final class MeWaitingApiHandler
 {
     private const DEFAULT_LIMIT = 6;
-    private const MAX_LIMIT = 50;
+    /** The Inbox's Waiting for me reads up to this many at once (merge map N2). */
+    private const MAX_LIMIT = 200;
 
     /** The name proposals go by in `unavailable`, beside the inbox source keys. */
     private const PROPOSALS_KEY = 'agent_proposals';

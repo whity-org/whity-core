@@ -1,6 +1,6 @@
 {
   "name": "@whity/api-client",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Typed client for the Whity API, generated from its OpenAPI spec.",
   "license": "MIT",
   "repository": {
@@ -26,7 +26,7 @@
     "openapi-fetch": "^0.17.0"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "openapi-typescript": "^7.13.0",
     "typescript": "^5"
   },

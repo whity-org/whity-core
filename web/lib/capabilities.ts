@@ -78,6 +78,10 @@ export const EMAIL_DOMAINS_MANAGE = 'email_domains:manage';
 export const PUBLIC_FORM_KEYS_MANAGE = 'public_form_keys:manage';
 // WHIT-915: a workspace's own customer sign-up — Settings, Sign-up.
 export const SIGNUP_MANAGE = 'signup:manage';
+// Messages (ADR 0016): read the inbox, reply and note, assign and set channels up.
+export const MESSAGES_READ = 'messages:read';
+export const MESSAGES_REPLY = 'messages:reply';
+export const MESSAGES_MANAGE = 'messages:manage';
 
 export const LICENSING_VIEW = 'licensing:view';
 export const LICENSING_MANAGE = 'licensing:manage';

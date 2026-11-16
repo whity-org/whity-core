@@ -48,6 +48,8 @@ export interface WorkspaceAgent extends AgentPersona {
   onItsOwn: AgentOnItsOwnCounts;
   /** A document this viewer can't read keeps its place, with no title. */
   mayRead: { id: number; title: string | null; kind: string | null; readable: boolean }[];
+  /** A12: the person it acts for hears by email when something waits for them. */
+  notifyByEmail?: boolean;
 }
 
 export interface AgentPreset extends AgentPersona {
@@ -86,12 +88,6 @@ export function startOfToday(now: Date = new Date()): string {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 }
 
-/** A text in the reader's language, or English when it has no Arabic. */
-export function localized(english: string | null, arabic: string | null, inArabic: boolean): string {
-  const translated = arabic?.trim();
-  return inArabic && translated ? translated : (english ?? '');
-}
-
 /** A read is a permission whose action is `read` or `view`, as `AgentDefinition` decides. */
 export function isReadPermission(permission: string): boolean {
   const action = permission.split(':').pop();
@@ -123,6 +119,12 @@ export function templateGroups(grant: Record<string, ScopeGrantMode>, writeHint:
 /** The server's reasons for refusing an agent, one per line when it lists them. */
 export async function refusal(response: Response, fallback: string): Promise<string> {
   const body = (await response.json().catch(() => null)) as { error?: string; errors?: string[] } | null;
+  return refusalText(body, fallback);
+}
+
+/** {@link refusal} for a body the typed client already parsed (its `error`). */
+export function refusalText(parsed: unknown, fallback: string): string {
+  const body = (parsed ?? null) as { error?: string; errors?: string[] } | null;
   if (body?.errors && body.errors.length > 0) return body.errors.join('\n');
   return body?.error ?? fallback;
 }

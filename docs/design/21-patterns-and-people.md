@@ -14,7 +14,7 @@ People appear as names with avatars, never as ids ("Role #3", "OU #5", a Tenant 
 
 ## Record pages
 
-A header with the icon or avatar, the name, a status badge, a line of key facts, and actions (outline, plus ⋯). Then tabs: **Overview**, **Access**, **History** (P.2). History is written in words ("Rana changed his unit from Sweifieh to Abdoun"), never event codes.
+A header with the icon or avatar, the name, a status badge, a line of key facts, and actions (outline, plus ⋯). Then tabs: **Overview**, **Access**, **History** (P.2). History is written in words ("Amro changed his unit from Sweifieh to Abdoun"), never event codes.
 
 Fields are edited where they are (P.3). A changed field gets the primary ring and a "Was …" note; a sticky save bar names the changes and offers Discard and **Save changes**, the page's one main button. Leaving with unsaved changes asks first.
 

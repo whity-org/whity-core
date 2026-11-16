@@ -147,7 +147,7 @@ import {
 import { IconArrowDown, IconArrowUp, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
 import { reachText } from './route-act-panel';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import type { DraftStep, IssueRouteResponse, RoutingRule } from './routing-wire';
 import {
@@ -276,7 +276,6 @@ export function RouteComposer({
   onCancel,
 }: RouteComposerProps) {
   const t = useTranslation('documents');
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
 
   const firstKind = rules.length > 0 ? rules[0].kind : '';
@@ -337,8 +336,10 @@ export function RouteComposer({
     async (id: number): Promise<void> => {
       setTemplateEntry({ status: 'loading', graph: null, error: null });
       try {
-        const response = await apiClient(`/api/v1/document-route-templates/${id}`);
-        const body = (await response.json().catch(() => null)) as
+        const { data: loaded, error: loadFailure, response } = await api.GET('/api/v1/document-route-templates/{id}', {
+          params: { path: { id } },
+        });
+        const body = ((response.ok ? loaded : loadFailure) ?? null) as
           | (RouteTemplateGraphResponse & { error?: string })
           | null;
         const data = body?.data;
@@ -364,7 +365,7 @@ export function RouteComposer({
         });
       }
     },
-    [apiClient, t]
+    [t]
   );
 
   /**
@@ -396,8 +397,10 @@ export function RouteComposer({
       };
 
       try {
-        const response = await apiClient(`/api/v1/user-groups/${groupId}/preview`);
-        const body = (await response.json().catch(() => null)) as
+        const { data: previewed, error: previewFailure, response } = await api.GET('/api/v1/user-groups/{id}/preview', {
+          params: { path: { id: groupId } },
+        });
+        const body = ((response.ok ? previewed : previewFailure) ?? null) as
           | {
               error?: string;
               data?: {
@@ -441,7 +444,7 @@ export function RouteComposer({
         fail(t('routing.compose.group.previewNetworkError', 'Who this group reaches could not be worked out.'));
       }
     },
-    [apiClient, t]
+    [t]
   );
 
   const rulesByKind = useMemo(() => {
@@ -526,14 +529,7 @@ export function RouteComposer({
       // own and have them recorded as though a template produced them. See the
       // file docblock.
       const applying = mode === 'template' && templateId !== null;
-      const response = await apiClient(
-        applying
-          ? `/api/v1/documents/${documentId}/routes/from-template`
-          : `/api/v1/documents/${documentId}/routes`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(
+      const payload =
             applying
               ? {
                   template_id: templateId,
@@ -561,12 +557,18 @@ export function RouteComposer({
                     // delivery stage into an ordinary one on save.
                     satisfied_by: step.satisfied_by,
                   })),
-                }
-          ),
-        }
-      );
+                };
+      const { data: issued, error: issueFailure, response } = applying
+        ? await api.POST('/api/v1/documents/{id}/routes/from-template', {
+            params: { path: { id: documentId } },
+            body: payload as never,
+          })
+        : await api.POST('/api/v1/documents/{id}/routes', {
+            params: { path: { id: documentId } },
+            body: payload as never,
+          });
 
-      const body = (await response.json().catch(() => null)) as
+      const body = ((response.ok ? issued : issueFailure) ?? null) as
         | (IssueRouteResponse & { error?: string })
         | null;
 
@@ -620,7 +622,10 @@ export function RouteComposer({
    * separate calls, not built from the value, so the key extractor can see all
    * three — a computed key is a key no translator ever receives.
    */
-  const quorumLabel = (quorum: 'all' | 'any' | 'majority'): string => {
+  const quorumLabel = (quorum: 'all' | 'any' | 'majority' | 'first'): string => {
+    if (quorum === 'first') {
+      return t('routing.compose.template.quorum.first', 'the first answer decides');
+    }
     if (quorum === 'any') {
       return t('routing.compose.template.quorum.any', 'any one approval carries it');
     }

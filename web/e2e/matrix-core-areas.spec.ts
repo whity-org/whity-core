@@ -71,7 +71,7 @@ test.describe('Core admin areas (role matrix)', () => {
       await expect(page.getByRole('button', { name: 'Create tenant' })).toHaveCount(0);
     }
     // systemTenantOnly — the link is filtered out server-side.
-    await expect(roleSession.shell.navLink('Tenants')).toHaveCount(0);
+    await expect(roleSession.shell.navLink('Workspaces')).toHaveCount(0);
   });
 
   test('Organizational Units page renders for admin; the nav link is hidden for user and delegate', async ({

@@ -8,14 +8,29 @@ namespace Whity\Core\Form;
  * "Show this question only if ..." — the rule on `form_fields.visible_when`
  * (migration 192), and the one reading of it the server trusts.
  *
- * THE SHAPE IS THE BLOCK VOCABULARY'S
- * ------------------------------------
+ * THE SHAPE STARTS FROM THE BLOCK VOCABULARY'S
+ * ---------------------------------------------
  * `{field, equals}` or `{field, in}`, the same two forms
  * {@see \Whity\Sdk\Frontend\Blocks\BlockContract}'s `visibleWhen` takes for a
  * sibling field, so an author and a client learn one rule. The block facet itself
  * could not do this job: it runs only in the browser, and it shows a block whose
  * field has no value yet. Here an unanswered question does not satisfy its
  * dependant, because an "if yes" question must stay away until somebody says yes.
+ *
+ * Two more forms (WHIT-1165):
+ *
+ * - `{field, notEquals}` ("is not"): asked when the controller IS ANSWERED with
+ *   something else. An unanswered controller hides it, for the same reason
+ *   `equals` does: "if not clinical, ..." is a follow-up to an answer, and before
+ *   any answer there is nothing to follow up. On a list answer it is asked when
+ *   none of the chosen values is the one named. A checkbox is always answered
+ *   (one nobody touched is unticked), so `notEquals: true` asks while it is clear.
+ * - `{field, answered: true}` ("is answered"): asked when the controller holds
+ *   any answer: text that is not blank, a number (0 included), a list with at
+ *   least one value, a repeating table with at least one row that says something,
+ *   a signed name, an uploaded file, or a TICKED checkbox. Because it compares
+ *   nothing, it is the one form a file, repeating or signature question may
+ *   control.
  *
  * WHY THE SERVER EVALUATES IT
  * ---------------------------
@@ -46,6 +61,9 @@ final class FieldCondition
     /** Bounds an `in` list: a rule is one question's condition, not a data set. */
     public const IN_MAX = 100;
 
+    /** The one key besides `field` a rule carries. */
+    private const OPERATORS = ['equals', 'notEquals', 'in', 'answered'];
+
     /**
      * Static helper only — never instantiated.
      */
@@ -57,9 +75,9 @@ final class FieldCondition
      * Normalize a rule from a request body. Null, or an absent rule, means always
      * shown.
      *
-     * @return array{field: string, equals: string|bool|int|float}|array{field: string, in: list<string>}|null
+     * @return array{field: string, equals: string|bool|int|float}|array{field: string, notEquals: string|bool|int|float}|array{field: string, in: list<string>}|array{field: string, answered: true}|null
      *
-     * @throws FormRejectedException When the rule is not one of the two shapes.
+     * @throws FormRejectedException When the rule is not one of the four shapes.
      */
     public static function parse(mixed $raw): ?array
     {
@@ -75,19 +93,32 @@ final class FieldCondition
             throw new FormRejectedException('visible_when.field must name a field on this form');
         }
 
-        $hasEquals = array_key_exists('equals', $raw);
-        $hasIn = array_key_exists('in', $raw);
-        if ($hasEquals === $hasIn) {
-            throw new FormRejectedException('visible_when needs exactly one of equals or in');
+        $operators = array_values(array_filter(
+            self::OPERATORS,
+            static fn (string $operator): bool => array_key_exists($operator, $raw),
+        ));
+        if (count($operators) !== 1) {
+            throw new FormRejectedException('visible_when needs exactly one of equals, notEquals, in or answered');
         }
+        $operator = $operators[0];
 
-        if ($hasEquals) {
-            $equals = $raw['equals'];
-            if ((!is_string($equals) || $equals === '') && !is_bool($equals) && !is_int($equals) && !is_float($equals)) {
-                throw new FormRejectedException('visible_when.equals must be text, a number, or true or false');
+        if ($operator === 'answered') {
+            if ($raw['answered'] !== true) {
+                throw new FormRejectedException('visible_when.answered must be true');
             }
 
-            return ['field' => $field, 'equals' => $equals];
+            return ['field' => $field, 'answered' => true];
+        }
+
+        if ($operator === 'equals' || $operator === 'notEquals') {
+            $value = $raw[$operator];
+            if ((!is_string($value) || $value === '') && !is_bool($value) && !is_int($value) && !is_float($value)) {
+                throw new FormRejectedException("visible_when.{$operator} must be text, a number, or true or false");
+            }
+
+            return $operator === 'equals'
+                ? ['field' => $field, 'equals' => $value]
+                : ['field' => $field, 'notEquals' => $value];
         }
 
         $in = $raw['in'];
@@ -107,8 +138,8 @@ final class FieldCondition
 
     /**
      * Refuse a field set in which a rule could not be evaluated: a controller that
-     * is missing, is the question itself, can hold no comparable answer, or sits
-     * on a cycle. Asked at write time, where it is a sentence an author can act on.
+     * is missing, is the question itself, can hold no comparable answer (unless
+     * the rule only asks whether it is answered), or sits on a cycle. Asked at write time, where it is a sentence an author can act on.
      *
      * @param list<array<string, mixed>> $fields The field set as it would be saved.
      *
@@ -119,14 +150,6 @@ final class FieldCondition
         $byKey = self::indexByKey($fields);
 
         foreach ($byKey as $key => $field) {
-            $audience = (string) ($field['audience'] ?? FormFieldRepository::AUDIENCE_APPLICANT);
-
-            // Nothing can upload against a review yet, so this would never have an
-            // answer, and if required would block every review.
-            if ($audience === FormFieldRepository::AUDIENCE_STAFF && (string) ($field['field_type'] ?? '') === FieldType::FILE) {
-                throw new FormRejectedException("Staff field '{$key}' cannot be a file question");
-            }
-
             $rule = $field['visible_when'] ?? null;
             if (!is_array($rule)) {
                 continue;
@@ -138,13 +161,12 @@ final class FieldCondition
             if (!isset($byKey[$controller])) {
                 throw new FormRejectedException("Field '{$key}' depends on '{$controller}', which is not on this form");
             }
-            // The two are answered at different times by different people, so one
-            // could never read the other's answer when it is decided.
-            if ((string) ($byKey[$controller]['audience'] ?? FormFieldRepository::AUDIENCE_APPLICANT) !== $audience) {
-                throw new FormRejectedException("Field '{$key}' depends on '{$controller}', which is answered by another audience");
-            }
             $controllerType = (string) ($byKey[$controller]['field_type'] ?? '');
-            if (in_array($controllerType, [FieldType::FILE, FieldType::REPEATING, FieldType::SIGNATURE], true)) {
+            // These hold no value a rule can compare with, but whether they hold one is fine.
+            if (
+                !array_key_exists('answered', $rule)
+                && in_array($controllerType, [FieldType::FILE, FieldType::REPEATING, FieldType::SIGNATURE], true)
+            ) {
                 throw new FormRejectedException("Field '{$key}' cannot depend on a {$controllerType} question");
             }
 
@@ -232,9 +254,13 @@ final class FieldCondition
             return $resolved[$key] = false;
         }
 
-        $answer = self::operands((string) ($byKey[$controller]['field_type'] ?? ''), $data[$controller] ?? null);
+        $type = (string) ($byKey[$controller]['field_type'] ?? '');
+        $raw = $data[$controller] ?? null;
+        if (array_key_exists('answered', $rule)) {
+            return $resolved[$key] = self::isAnswered($type, $raw);
+        }
 
-        return $resolved[$key] = self::matches($rule, $answer);
+        return $resolved[$key] = self::matches($rule, self::operands($type, $raw));
     }
 
     /**
@@ -245,6 +271,10 @@ final class FieldCondition
     {
         if (array_key_exists('equals', $rule)) {
             return in_array(self::operand($rule['equals']), $answer, true);
+        }
+        // Answered, and not with this: see the class docblock.
+        if (array_key_exists('notEquals', $rule)) {
+            return $answer !== [] && !in_array(self::operand($rule['notEquals']), $answer, true);
         }
 
         $in = is_array($rule['in'] ?? null) ? $rule['in'] : [];
@@ -283,6 +313,39 @@ final class FieldCondition
         $value = self::operand($raw);
 
         return $value === '' ? [] : [$value];
+    }
+
+    /**
+     * Whether a controller holds any answer, for `answered`. A checkbox counts
+     * only when ticked; anything else when it says something.
+     */
+    private static function isAnswered(string $type, mixed $raw): bool
+    {
+        if ($type === FieldType::CHECKBOX) {
+            return $raw === true || $raw === 1 || $raw === 'true' || $raw === '1';
+        }
+
+        return self::saysSomething($raw);
+    }
+
+    /**
+     * True, a number, text that is not blank, or a list or row holding one of
+     * those. Null and false say nothing, so a table row left blank (its unticked
+     * boxes included) is not a row, as {@see SubmissionValidator} drops it.
+     */
+    private static function saysSomething(mixed $value): bool
+    {
+        if (is_array($value)) {
+            foreach ($value as $one) {
+                if (self::saysSomething($one)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return $value === true || is_int($value) || is_float($value) || (is_string($value) && trim($value) !== '');
     }
 
     private static function operand(mixed $value): string

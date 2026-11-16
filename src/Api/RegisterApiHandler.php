@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use PDO;
-use Whity\Core\i18n\LocalizedTexts;
+use Whity\Core\Plan\DefaultPlanAssigner;
+use Whity\Core\i18n\LocalizedText;
 use Whity\Core\Identity\AccountActivationPolicy;
 use Whity\Core\Identity\EmailVerificationPolicy;
 use Whity\Core\Identity\EmailVerificationProvider;
@@ -212,7 +213,7 @@ final class RegisterApiHandler
                 $tenantId = $this->insertReturningId(
                     'INSERT INTO tenants (name, slug, name_language, created_at) VALUES (:name, :slug, :name_language, NOW())',
                     // The name is the original; Arabic letters mean an Arabic one (#821).
-                    [':name' => $tenantName, ':slug' => $slug, ':name_language' => LocalizedTexts::guessLanguage($tenantName)]
+                    [':name' => $tenantName, ':slug' => $slug, ':name_language' => LocalizedText::guessLanguage($tenantName)]
                 );
 
                 // 2. Global profile (bcrypt password; 2FA off; token epoch 0).
@@ -313,6 +314,11 @@ final class RegisterApiHandler
                 }
                 throw $e;
             }
+
+            // After the commit: applying a plan opens its own transaction, and a
+            // problem with it must not cost somebody their new account. A closed
+            // payment gate is a plan row already, so it stays closed.
+            DefaultPlanAssigner::forDatabase($this->db)->assign($tenantId);
 
             // Hand off to the verification provider AFTER commit (never inside the
             // transaction), and only when enforced. A delivery failure must not

@@ -1,0 +1,746 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Integration\Calendar;
+
+use DateTimeImmutable;
+use DateTimeZone;
+use PDO;
+use PHPUnit\Framework\TestCase;
+use Tests\Support\SchemaFromMigrations;
+use Whity\Core\Calendar\BookingRepository;
+use Whity\Core\Calendar\BookingService;
+use Whity\Core\Calendar\CalendarRejectedException;
+use Whity\Core\Calendar\CalendarRepository;
+use Whity\Core\Calendar\ExternalBusySource;
+use Whity\Core\Calendar\Interval;
+use Whity\Core\Calendar\ServiceRepository;
+use Whity\Core\Entitlement\EntitlementService;
+use Whity\Core\Entitlement\TenantEntitlementRepository;
+use Whity\Core\Settings\GlobalSettingsRepository;
+use Whity\Core\Settings\SettingsService;
+use Whity\Core\Settings\TenantSettingsRepository;
+use Whity\Core\Usage\CustomerUsage;
+
+/**
+ * Bookings against the real schema (WHIT-941, ADR 0017): the rules, tenant
+ * isolation, plan counting, and on Postgres the per-person lock that stops
+ * two requests booking the same time.
+ *
+ * Example Bakery (tenant 1) has two bakers, 11 and 12, working Sunday to
+ * Thursday 09:00-17:00 in Amman. Tenant 2 has its own baker, 21.
+ */
+final class BookingRealEngineTest extends TestCase
+{
+    private PDO $pdo;
+    private SettingsService $settings;
+    private BookingService $service;
+    private CalendarRepository $calendar;
+    private ServiceRepository $services;
+    private BookingRepository $bookings;
+    private int $cake;
+
+    /** Sunday 15 November 2026, 07:00 in Amman. */
+    private const NOW = '2026-11-15 04:00:00';
+
+    protected function setUp(): void
+    {
+        $this->pdo = SchemaFromMigrations::make(true);
+        $this->pdo->exec("INSERT INTO tenants (id, name, slug) VALUES (1, 'Example Bakery', 'example-bakery'), (2, 'Other Bakery', 'other-bakery')");
+        $this->pdo->exec("INSERT INTO roles (id, name, description, tenant_id, created_at) VALUES (901, 'staff', '', NULL, CURRENT_TIMESTAMP)");
+        foreach ([11 => 1, 12 => 1, 21 => 2] as $profile => $tenant) {
+            $this->person($profile);
+            $this->membership($profile, $tenant, 'member');
+        }
+        $this->person(31);
+        $this->membership(31, 1, 'customer');
+
+        $this->settings = new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo));
+        foreach ([1, 2] as $tenant) {
+            $this->settings->setTenant($tenant, 'timezone', 'Asia/Amman');
+            $this->settings->setTenant($tenant, 'calendar.min_notice_minutes', '60');
+            $this->settings->setTenant($tenant, 'calendar.slot_step_minutes', '30');
+        }
+
+        $this->service = $this->bookingService($this->pdo);
+        $this->cake = $this->services->insert(1, [
+            'name' => ['en' => 'Cake tasting', 'ar' => 'تذوق الكعك'], 'description' => [],
+            'duration_minutes' => 30, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 15,
+            'price_minor' => 12500, 'currency' => 'JOD', 'bookable_online' => true, 'active' => true, 'sort_order' => 0,
+        ]);
+        $this->services->replaceStaff(1, $this->cake, [11, 12]);
+        foreach ([11, 12] as $baker) {
+            $this->calendar->ensureStaff(1, $baker);
+            $this->calendar->replaceHours(1, $baker, array_map(
+                static fn (int $day): array => ['weekday' => $day, 'start_time' => '09:00', 'end_time' => '17:00'],
+                [7, 1, 2, 3, 4],
+            ));
+        }
+    }
+
+    private function bookingService(PDO $pdo): BookingService
+    {
+        $this->calendar = new CalendarRepository($pdo);
+        $this->services = new ServiceRepository($pdo);
+        $this->bookings = new BookingRepository($pdo);
+        $settings = new SettingsService(new GlobalSettingsRepository($pdo), new TenantSettingsRepository($pdo));
+
+        return new BookingService($pdo, $this->calendar, $this->services, $this->bookings, $settings, null, clock: static fn (): DateTimeImmutable => new DateTimeImmutable(self::NOW, new DateTimeZone('UTC')));
+    }
+
+    private static function at(string $iso): DateTimeImmutable
+    {
+        return Interval::fromApi($iso) ?? throw new \LogicException('bad instant ' . $iso);
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array{service_id: int, profile_id: ?int, starts_at: DateTimeImmutable, customer_profile_id: ?int, customer_name: string, customer_email: string, customer_phone: string, customer_note: string, source: string, created_by_profile_id: ?int, enforce_hours: bool, public: bool}
+     */
+    private function request(string $startsAt, ?int $profileId = null, array $overrides = []): array
+    {
+        /** @var array{service_id: int, profile_id: ?int, starts_at: DateTimeImmutable, customer_profile_id: ?int, customer_name: string, customer_email: string, customer_phone: string, customer_note: string, source: string, created_by_profile_id: ?int, enforce_hours: bool, public: bool} $request */
+        $request = $overrides + [
+            'service_id' => $this->cake,
+            'profile_id' => $profileId,
+            'starts_at' => self::at($startsAt),
+            'customer_profile_id' => null,
+            'customer_name' => 'Lina',
+            'customer_email' => 'lina@example.com',
+            'customer_phone' => '',
+            'customer_note' => '',
+            'source' => BookingRepository::SOURCE_PUBLIC,
+            'created_by_profile_id' => null,
+            'enforce_hours' => true,
+            'public' => true,
+        ];
+
+        return $request;
+    }
+
+    public function testAvailabilityIsWorkingHoursInTheWorkspaceZone(): void
+    {
+        $slots = $this->service->availability(1, $this->cake, 11, self::at('2026-11-15T00:00:00+03:00'), self::at('2026-11-16T00:00:00+03:00'));
+        // 09:00 Amman is 06:00Z; the last 30-minute slot starts at 16:30 (13:30Z).
+        self::assertSame('2026-11-15T06:00:00Z', $slots[0]['starts_at']);
+        self::assertSame('2026-11-15T13:30:00Z', $slots[count($slots) - 1]['starts_at']);
+        self::assertSame([11], $slots[0]['profile_ids']);
+
+        // Friday is not a working day.
+        self::assertSame([], $this->service->availability(1, $this->cake, null, self::at('2026-11-20T00:00:00+03:00'), self::at('2026-11-21T00:00:00+03:00')));
+    }
+
+    public function testFreeTimesStayOnTheGridWhenNoticeEndsMidSlot(): void
+    {
+        // 09:20:44 in Amman on a working Sunday, with an hour's notice: the
+        // first free time is 10:30, not 10:20:44.
+        $service = new BookingService(
+            $this->pdo,
+            $this->calendar,
+            $this->services,
+            $this->bookings,
+            new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo)),
+            null,
+            clock: static fn (): DateTimeImmutable => new DateTimeImmutable('2026-11-15 06:20:44', new DateTimeZone('UTC')),
+        );
+        $slots = $service->availability(1, $this->cake, 11, self::at('2026-11-15T00:00:00+03:00'), self::at('2026-11-16T00:00:00+03:00'));
+        self::assertSame('2026-11-15T07:30:00Z', $slots[0]['starts_at']);
+        foreach ($slots as $slot) {
+            self::assertMatchesRegularExpression('/T\d\d:(00|30):00Z$/', $slot['starts_at']);
+        }
+    }
+
+    public function testAnyoneFillsEachPersonThenRefusesWithTaken(): void
+    {
+        $first = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00'));
+        $second = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00'));
+        self::assertSame(11, $first['profile_id']);
+        self::assertSame(12, $second['profile_id']);
+        self::assertSame('2026-11-16T07:45:00Z', $first['blocks_until'], 'the 15-minute buffer after is held');
+
+        try {
+            $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00'));
+            self::fail('a third booking at a full time must be refused');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(409, $e->status);
+        }
+
+        // The buffer keeps 10:30 free but 10:15 is refused for the same baker,
+        // and staff are told why (design 3.5, CV.9).
+        $this->expectExceptionObject(CalendarRejectedException::notFree(CalendarRejectedException::PERSON_BUSY));
+        $this->service->book(1, $this->request('2026-11-16T10:15:00+03:00', 11, ['enforce_hours' => false, 'public' => false]));
+    }
+
+    public function testPublicKeepsToHoursAndWindowButTheDeskMayNot(): void
+    {
+        try {
+            $this->service->book(1, $this->request('2026-11-16T18:00:00+03:00', 11));
+            self::fail('outside working hours must be refused for a public booking');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(409, $e->status);
+        }
+        try {
+            $this->service->book(1, $this->request('2026-11-15T07:30:00+03:00', 11));
+            self::fail('inside the minimum notice must be refused');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(422, $e->status);
+        }
+        $desk = $this->service->book(1, $this->request('2026-11-16T18:00:00+03:00', 11, ['enforce_hours' => false, 'public' => false, 'source' => 'staff']));
+        self::assertSame('confirmed', $desk['status']);
+    }
+
+    public function testMoveAndCancelFreeTheOldTime(): void
+    {
+        $a = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11));
+        $b = $this->service->book(1, $this->request('2026-11-16T11:00:00+03:00', 11));
+
+        try {
+            $this->service->move(1, $b['id'], self::at('2026-11-16T10:00:00+03:00'), null, true);
+            self::fail('moving onto a booked time must be refused');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(409, $e->status);
+        }
+        // Moving a booking onto its own time (or overlapping itself) is fine.
+        $moved = $this->service->move(1, $a['id'], self::at('2026-11-16T10:15:00+03:00'), null, true);
+        self::assertSame('2026-11-16T07:15:00Z', $moved['starts_at']);
+
+        $this->service->cancel(1, $moved['id'], 'staff', 'Ill');
+        $again = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11));
+        self::assertSame(11, $again['profile_id']);
+    }
+
+    public function testBusyEventsAndExternalBusyBlockAndAFailingSourceFailsOpen(): void
+    {
+        $this->service->createEvent(1, 11, 'Oven service', '', new Interval(self::at('2026-11-16T09:00:00+03:00'), self::at('2026-11-16T12:00:00+03:00')), false, true, 11);
+        $slots = $this->service->availability(1, $this->cake, 11, self::at('2026-11-16T09:00:00+03:00'), self::at('2026-11-16T12:30:00+03:00'));
+        self::assertSame(['2026-11-16T09:00:00Z'], array_column($slots, 'starts_at'));
+
+        $this->service->addBusySource(new class implements ExternalBusySource {
+            public function busyTimes(int $tenantId, int $profileId, DateTimeImmutable $fromUtc, DateTimeImmutable $toUtc): array
+            {
+                return $profileId === 12
+                    ? [new Interval(new DateTimeImmutable('2026-11-16 06:00:00', new DateTimeZone('UTC')), new DateTimeImmutable('2026-11-16 14:00:00', new DateTimeZone('UTC')))]
+                    : [];
+            }
+        });
+        $this->service->addBusySource(new class implements ExternalBusySource {
+            public function busyTimes(int $tenantId, int $profileId, DateTimeImmutable $fromUtc, DateTimeImmutable $toUtc): array
+            {
+                throw new \RuntimeException('provider down');
+            }
+        });
+        self::assertSame([], $this->service->availability(1, $this->cake, 12, self::at('2026-11-16T00:00:00+03:00'), self::at('2026-11-17T00:00:00+03:00')));
+        self::assertNotSame([], $this->service->availability(1, $this->cake, 11, self::at('2026-11-16T12:00:00+03:00'), self::at('2026-11-17T00:00:00+03:00')));
+    }
+
+    public function testAnotherWorkspacesServiceAndStaffAreInvisible(): void
+    {
+        try {
+            $this->service->book(2, $this->request('2026-11-16T10:00:00+03:00'));
+            self::fail('tenant 2 must not see tenant 1\'s service');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(404, $e->status);
+        }
+
+        // Tenant 1 naming tenant 2's baker finds nobody to book.
+        $this->services->replaceStaff(1, $this->cake, [11, 12, 21]);
+        $this->expectException(CalendarRejectedException::class);
+        $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 21, ['enforce_hours' => false, 'public' => false]));
+    }
+
+    public function testConfirmedBookingsCountCustomersOncePerPersonAndNeverStaff(): void
+    {
+        $usage = new CustomerUsage($this->pdo, new EntitlementService(new TenantEntitlementRepository($this->pdo)), $this->settings);
+        $now = new DateTimeImmutable('2026-11-15 10:00:00', new DateTimeZone('UTC'));
+        foreach ([
+            $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11)),
+            $this->service->book(1, $this->request('2026-11-16T12:00:00+03:00', 11, ['customer_email' => 'LINA@example.com'])),
+            $this->service->book(1, $this->request('2026-11-16T13:00:00+03:00', 11, ['customer_profile_id' => 31])),
+            $this->service->book(1, $this->request('2026-11-16T14:00:00+03:00', 11, ['customer_profile_id' => 12])),
+        ] as $booking) {
+            $usage->onBookingConfirmed(['id' => $booking['id'], 'tenant_id' => 1]);
+        }
+        // Lina (twice, by email) and customer 31; baker 12 is staff.
+        self::assertSame(2, $usage->count(1, $now));
+    }
+
+    /** WHIT-1156: a walk-in gives only a phone; the same number twice is one customer, however it is written. */
+    public function testAPhoneOnlyBookingCountsOncePerNumber(): void
+    {
+        $usage = new CustomerUsage($this->pdo, new EntitlementService(new TenantEntitlementRepository($this->pdo)), $this->settings);
+        $now = new DateTimeImmutable('2026-11-15 10:00:00', new DateTimeZone('UTC'));
+        foreach ([
+            ['customer_email' => '', 'customer_phone' => '+962 79 000 0001', 'customer_name' => 'Ahmad Khalil'],
+            ['customer_email' => '', 'customer_phone' => '962790000001', 'customer_name' => 'Ahmad'],
+            ['customer_email' => '', 'customer_phone' => '0790000002', 'customer_name' => 'Emad Nasser'],
+            ['customer_email' => '', 'customer_phone' => '', 'customer_name' => 'No contact'],
+        ] as $i => $who) {
+            $booking = $this->service->book(1, $this->request(sprintf('2026-11-16T%02d:00:00+03:00', 10 + $i), 11, $who));
+            $usage->onBookingConfirmed(['id' => $booking['id'], 'tenant_id' => 1]);
+        }
+        // Ahmad once (two spellings of one number), Emad, and the booking with neither.
+        self::assertSame(3, $usage->count(1, $now));
+    }
+
+    public function testThePersonsLockSerialisesTwoConnections(): void
+    {
+        if ($this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'pgsql') {
+            self::markTestSkipped('The row lock is a Postgres behaviour; SQLite serialises writers by itself.');
+        }
+        $other = $this->secondConnection();
+        $otherService = $this->bookingService($other);
+
+        // Connection A holds baker 11's lock with a booking not yet committed.
+        $this->pdo->beginTransaction();
+        $this->calendar = new CalendarRepository($this->pdo);
+        $this->calendar->lockStaff(1, 11);
+
+        // Connection B, asking for the same person, waits rather than reading
+        // a stale calendar: with a short lock timeout it gives up instead.
+        $other->exec("SET lock_timeout = '300ms'");
+        try {
+            $otherService->book(1, $this->request('2026-11-16T10:00:00+03:00', 11));
+            self::fail('B must wait for A\'s lock');
+        } catch (\PDOException $e) {
+            self::assertStringContainsString('lock', strtolower($e->getMessage()));
+        }
+        // A different person is not held up.
+        $b = $otherService->book(1, $this->request('2026-11-16T10:00:00+03:00', 12));
+        self::assertSame(12, $b['profile_id']);
+
+        $this->pdo->rollBack();
+    }
+
+    public function testParallelRequestsForOneTimeMakeExactlyOneBooking(): void
+    {
+        if ($this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'pgsql') {
+            self::markTestSkipped('Needs separate Postgres connections.');
+        }
+        [$dsn, $user, $password, $schema] = $this->connectionParts();
+        $script = __DIR__ . '/fixtures/book-once.php';
+        $procs = [];
+        for ($i = 0; $i < 8; $i++) {
+            $procs[] = proc_open(
+                [PHP_BINARY, $script, $dsn, $user, $password, $schema, (string) $this->cake, self::NOW],
+                [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                $pipes[$i],
+            );
+        }
+        $outcomes = [];
+        foreach ($procs as $i => $proc) {
+            $outcomes[] = trim((string) stream_get_contents($pipes[$i][1])) . trim((string) stream_get_contents($pipes[$i][2]));
+            if (is_resource($proc)) {
+                proc_close($proc);
+            }
+        }
+        sort($outcomes);
+        self::assertSame(1, count(array_filter($outcomes, static fn (string $o): bool => $o === 'booked')), implode(' | ', $outcomes));
+        self::assertSame(7, count(array_filter($outcomes, static fn (string $o): bool => $o === 'taken')), implode(' | ', $outcomes));
+        self::assertSame(1, (int) $this->scalar("SELECT COUNT(*) FROM calendar_bookings WHERE tenant_id = 1 AND status = 'confirmed'"));
+    }
+
+    /** @return array<string, mixed> the cake service's values, as insert() and update() take them */
+    private function cakeValues(): array
+    {
+        return [
+            'name' => ['en' => 'Cake tasting', 'ar' => 'تذوق الكعك'], 'description' => [],
+            'duration_minutes' => 30, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 15,
+            'price_minor' => 12500, 'currency' => 'JOD', 'bookable_online' => true, 'active' => true, 'sort_order' => 0,
+        ];
+    }
+
+    public function testAServiceThatNeedsARoomTakesItFromEveryoneElse(): void
+    {
+        $rooms = new \Whity\Core\Calendar\RoomRepository($this->pdo);
+        $room = $rooms->insert(1, ['name' => ['en' => 'Tasting room'], 'unit_id' => null, 'active' => true, 'sort_order' => 0]);
+        $this->services->update(1, $this->cake, ['room_id' => $room] + $this->cakeValues());
+
+        $first = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11));
+        self::assertSame($room, $first['room_id']);
+
+        // Baker 12 is free at 10:00, but the room is not.
+        $slots = $this->service->availability(1, $this->cake, 12, self::at('2026-11-16T10:00:00+03:00'), self::at('2026-11-16T10:30:00+03:00'));
+        self::assertSame([], $slots);
+        try {
+            $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 12));
+            self::fail('The room was booked twice.');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(409, $e->status);
+        }
+
+        // Cancelling frees the room.
+        $this->service->cancel(1, (int) $first['id'], 'staff', '');
+        self::assertNotSame([], $this->service->availability(1, $this->cake, 12, self::at('2026-11-16T10:00:00+03:00'), self::at('2026-11-16T10:30:00+03:00')));
+    }
+
+    public function testAServiceThatNeedsApprovalSendsARequestStaffAcceptOrMove(): void
+    {
+        $this->services->update(1, $this->cake, ['needs_approval' => true] + $this->cakeValues());
+
+        $request = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11));
+        self::assertSame(BookingRepository::STATUS_REQUESTED, $request['status']);
+        // A request holds its time.
+        self::assertSame([], $this->service->availability(1, $this->cake, 11, self::at('2026-11-16T10:00:00+03:00'), self::at('2026-11-16T10:30:00+03:00')));
+        // Checking in a request is refused.
+        try {
+            $this->service->checkIn(1, (int) $request['id'], true);
+            self::fail('A request was checked in.');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(422, $e->status);
+        }
+
+        // Staff suggest 11:00; the customer takes it.
+        $suggested = $this->service->suggest(1, (int) $request['id'], self::at('2026-11-16T11:00:00+03:00'), null);
+        self::assertSame(BookingRepository::STATUS_REQUESTED, $suggested['status']);
+        self::assertNotNull($suggested['suggested_at']);
+        self::assertSame('2026-11-16T08:00:00Z', $suggested['starts_at']);
+        $booked = $this->service->acceptSuggestion(1, (int) $request['id']);
+        self::assertSame(BookingRepository::STATUS_CONFIRMED, $booked['status']);
+
+        // A desk booking is never a request.
+        $desk = $this->service->book(1, $this->request('2026-11-16T13:00:00+03:00', 11, ['public' => false, 'source' => BookingRepository::SOURCE_STAFF]));
+        self::assertSame(BookingRepository::STATUS_CONFIRMED, $desk['status']);
+        try {
+            $this->service->accept(1, (int) $desk['id']);
+            self::fail('A confirmed booking was accepted again.');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(422, $e->status);
+        }
+    }
+
+    public function testInstantBookingOffTurnsBookingPageBookingsIntoRequests(): void
+    {
+        $this->settings->setTenant(1, 'calendar.instant_booking', 'false');
+        $request = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11));
+        self::assertSame(BookingRepository::STATUS_REQUESTED, $request['status']);
+        $accepted = $this->service->accept(1, (int) $request['id']);
+        self::assertSame(BookingRepository::STATUS_CONFIRMED, $accepted['status']);
+    }
+
+    public function testCheckInAndTheTodayCounts(): void
+    {
+        $this->services->update(1, $this->cake, ['needs_approval' => false] + $this->cakeValues());
+        $booked = $this->service->book(1, $this->request('2026-11-15T10:00:00+03:00', 11));
+        $this->service->book(1, $this->request('2026-11-15T11:00:00+03:00', 11));
+        $this->settings->setTenant(1, 'calendar.instant_booking', 'false');
+        $this->service->book(1, $this->request('2026-11-17T11:00:00+03:00', 12));
+
+        $in = $this->service->checkIn(1, (int) $booked['id'], true);
+        self::assertNotNull($in['checked_in_at']);
+
+        $today = $this->service->today(1, null, null);
+        self::assertSame(['date' => '2026-11-15', 'booked' => 2, 'checked_in' => 1, 'requests' => 1, 'reminders_sent' => 0], $today);
+
+        $out = $this->service->checkIn(1, (int) $booked['id'], false);
+        self::assertNull($out['checked_in_at']);
+
+        // Another workspace sees none of it.
+        self::assertSame(['date' => '2026-11-15', 'booked' => 0, 'checked_in' => 0, 'requests' => 0, 'reminders_sent' => 0], $this->service->today(2, null, null));
+    }
+
+    public function testAReminderAlsoGoesByTextThroughMessagesOnEveryChannelThatIsOn(): void
+    {
+        // C4: a WhatsApp channel from a plugin, and an SMS one turned off.
+        $sent = [];
+        // A plain closure, so what each channel sends reaches $sent (an arrow fn would copy it).
+        $channel = static function (string $key, bool $on) use (&$sent): \Whity\Sdk\Messaging\MessageChannel {
+            return new class ($key, $on, static function (\Whity\Sdk\Messaging\OutboundMessage $m) use (&$sent, $key): void {
+            $sent[] = [$key, $m->to, $m->body];
+        }) implements \Whity\Sdk\Messaging\MessageChannel {
+            public function __construct(private readonly string $k, private readonly bool $on, private readonly \Closure $sink)
+            {
+            }
+
+            public function key(): string
+            {
+                return $this->k;
+            }
+
+            public function label(): array
+            {
+                return ['en' => $this->k, 'ar' => $this->k];
+            }
+
+            public function isEnabled(int $tenantId): bool
+            {
+                return $this->on;
+            }
+
+            public function capabilities(): \Whity\Sdk\Messaging\ChannelCapabilities
+            {
+                return new \Whity\Sdk\Messaging\ChannelCapabilities();
+            }
+
+            public function send(\Whity\Sdk\Messaging\OutboundMessage $message): \Whity\Sdk\Messaging\SendOutcome
+            {
+                ($this->sink)($message);
+
+                return \Whity\Sdk\Messaging\SendOutcome::sent();
+            }
+
+            public function receive(int $tenantId, string $rawBody, array $headers): array
+            {
+                return [];
+            }
+
+            public function templates(int $tenantId): array
+            {
+                return [];
+            }
+        };
+        };
+        $registry = new \Whity\Core\Messaging\MessageChannelRegistry();
+        $registry->register('acme', [$channel('whatsapp', true), $channel('sms', false)]);
+        $jobs = [];
+        $messaging = \Whity\Core\Messaging\CoreMessaging::build(
+            $this->pdo,
+            $registry,
+            new class implements \Whity\Core\Mail\ThreadedMailer {
+                public function sendThreaded(\Whity\Core\Mail\OutgoingEmail $email): void
+                {
+                }
+            },
+            new \Whity\Core\Security\EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'),
+            static function (string $name, array $payload, array $opts) use (&$jobs): int {
+                $jobs[] = $payload;
+
+                return count($jobs);
+            },
+        );
+        $this->service->setTextReminders(new \Whity\Core\Calendar\BookingTextReminders(static fn () => $messaging, $this->settings));
+
+        $booking = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11, ['customer_phone' => '+962 79 123 4567']));
+        $this->pdo->exec("UPDATE calendar_bookings SET reminder_due_at = '2026-11-15 03:00:00' WHERE id = " . (int) $booking['id']);
+        self::assertSame('sent', $this->service->sendReminder(1, (int) $booking['id'], (string) $booking['starts_at']));
+
+        foreach ($jobs as $job) {
+            $messaging->deliver(1, (int) $job['message_id']);
+        }
+        self::assertSame([['whatsapp', '+962 79 123 4567', 'Reminder: Cake tasting on Mon 16 Nov, 10:00 with p11.']], $sent, 'only the channel that is on');
+        $conversations = $this->scalar("SELECT COUNT(*) FROM conversations WHERE tenant_id = 1 AND channel = 'acme:whatsapp'");
+        self::assertSame(1, (int) $conversations, 'it lands in the customer\'s conversation');
+    }
+
+    public function testNoPhoneNoTextReminderAndTheEmailOneStillGoes(): void
+    {
+        $this->service->setTextReminders(new \Whity\Core\Calendar\BookingTextReminders(static fn () => throw new \LogicException('not asked without a phone'), $this->settings));
+
+        $booking = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11));
+        $this->pdo->exec("UPDATE calendar_bookings SET reminder_due_at = '2026-11-15 03:00:00' WHERE id = " . (int) $booking['id']);
+        self::assertSame('sent', $this->service->sendReminder(1, (int) $booking['id'], (string) $booking['starts_at']));
+    }
+
+    /**
+     * @param array<string, mixed> $overrides
+     * @return array{service_id: int, profile_id: ?int, starts_at: DateTimeImmutable, customer_profile_id: ?int, customer_name: string, customer_email: string, customer_phone: string, customer_note: string, source: string, created_by_profile_id: ?int, enforce_hours: bool, public: bool}
+     */
+    private function desk(string $startsAt, int $profileId, array $overrides = []): array
+    {
+        return $this->request($startsAt, $profileId, $overrides + ['enforce_hours' => false, 'public' => false, 'source' => BookingRepository::SOURCE_STAFF]);
+    }
+
+    /** @return \ArrayObject<int, string> what the customer was told, in order */
+    private function recordMessages(): \ArrayObject
+    {
+        $told = new \ArrayObject();
+        $this->service->setMessenger(new class ($told) implements \Whity\Core\Calendar\BookingMessenger {
+            /** @param \ArrayObject<int, string> $told */
+            public function __construct(private readonly \ArrayObject $told)
+            {
+            }
+
+            public function confirmed(int $tenantId, array $booking): void
+            {
+                $this->told->append('confirmed');
+            }
+
+            public function rescheduled(int $tenantId, array $booking): void
+            {
+                $this->told->append('rescheduled');
+            }
+
+            public function cancelled(int $tenantId, array $booking): void
+            {
+            }
+
+            public function remind(int $tenantId, array $booking): void
+            {
+            }
+
+            public function awaitingPayment(int $tenantId, array $booking): void
+            {
+            }
+
+            public function requested(int $tenantId, array $booking): void
+            {
+            }
+
+            public function suggested(int $tenantId, array $booking): void
+            {
+            }
+        });
+
+        return $told;
+    }
+
+    public function testABookingAlwaysLastsAsLongAsItsService(): void
+    {
+        // Owner, Q35.7: the length goes with the service and its price.
+        $booking = $this->service->book(1, $this->desk('2026-11-16T10:00:00+03:00', 11, ['duration_minutes' => 90]));
+        self::assertSame('2026-11-16T07:30:00Z', $booking['ends_at']);
+        $moved = $this->service->move(1, $booking['id'], self::at('2026-11-16T13:00:00+03:00'), null, false);
+        self::assertSame('2026-11-16T10:30:00Z', $moved['ends_at']);
+
+        // One booked before the service got longer keeps the time it was booked for.
+        $this->services->update(1, $this->cake, ['duration_minutes' => 45] + $this->cakeValues());
+        $again = $this->service->move(1, $booking['id'], self::at('2026-11-16T14:00:00+03:00'), null, false);
+        self::assertSame('2026-11-16T11:30:00Z', $again['ends_at']);
+    }
+
+    public function testThePublicPageBooksTheServicesLength(): void
+    {
+        $booking = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11, ['duration_minutes' => 240]));
+        self::assertSame('2026-11-16T07:30:00Z', $booking['ends_at']);
+    }
+
+    public function testUntickingEmailTheNewTimeTellsNobody(): void
+    {
+        $told = $this->recordMessages();
+        $booking = $this->service->book(1, $this->desk('2026-11-16T10:00:00+03:00', 11));
+        $this->service->move(1, $booking['id'], self::at('2026-11-16T11:00:00+03:00'), null, false, false);
+        $this->service->book(1, $this->desk('2026-11-16T14:00:00+03:00', 11, ['notify' => false]));
+        self::assertSame(['confirmed'], $told->getArrayCopy());
+
+        $this->service->move(1, $booking['id'], self::at('2026-11-16T12:00:00+03:00'), null, false);
+        self::assertSame(['confirmed', 'rescheduled'], $told->getArrayCopy());
+    }
+
+    public function testBookAnywayOverABusyPersonButNeverATakenRoomOrClosedHours(): void
+    {
+        $this->service->book(1, $this->desk('2026-11-16T10:00:00+03:00', 11));
+        try {
+            $this->service->book(1, $this->desk('2026-11-16T10:00:00+03:00', 11));
+            self::fail('a busy person must be refused first');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(409, $e->status);
+            self::assertSame(['reason' => CalendarRejectedException::PERSON_BUSY], $e->extra);
+        }
+        $anyway = $this->service->book(1, $this->desk('2026-11-16T10:00:00+03:00', 11, ['book_anyway' => true]));
+        self::assertSame('confirmed', $anyway['status']);
+
+        // Kept to the hours: Friday is closed, Book anyway or not.
+        try {
+            $this->service->move(1, $anyway['id'], self::at('2026-11-20T10:00:00+03:00'), null, false, true, true, true);
+            self::fail('closed hours must refuse');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(['reason' => CalendarRejectedException::CLOSED], $e->extra);
+        }
+
+        // A taken room refuses even with Book anyway.
+        $rooms = new \Whity\Core\Calendar\RoomRepository($this->pdo);
+        $room = $rooms->insert(1, ['name' => ['en' => 'Tasting room'], 'unit_id' => null, 'active' => true, 'sort_order' => 0]);
+        $this->services->update(1, $this->cake, ['room_id' => $room] + $this->cakeValues());
+        $this->service->book(1, $this->desk('2026-11-17T10:00:00+03:00', 11));
+        try {
+            $this->service->book(1, $this->desk('2026-11-17T10:00:00+03:00', 12, ['book_anyway' => true]));
+            self::fail('a taken room must refuse');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(['reason' => CalendarRejectedException::ROOM_TAKEN], $e->extra);
+        }
+    }
+
+    public function testAScheduledMeetingBlocksEveryoneInvitedWhoHasNotDeclined(): void
+    {
+        $this->pdo->exec("INSERT INTO convening_bodies (id, tenant_id, body_key, name) VALUES (501, 1, 'board', 'Board')");
+        // Monday 16 November, 10:00 in Amman (07:00Z).
+        $this->pdo->exec("INSERT INTO meetings (id, tenant_id, body_id, meeting_number, title, scheduled_at, status) VALUES (601, 1, 501, 1, 'Board meeting', '2026-11-16 07:00:00', 'scheduled')");
+        $this->pdo->exec("INSERT INTO meeting_invitations (tenant_id, meeting_id, profile_id, status) VALUES (1, 601, 11, 'accepted'), (1, 601, 12, 'declined')");
+        // ADR 0018: the meeting's time is a calendar event, so free/busy counts it.
+        (new \Whity\Core\Convening\MeetingCalendar($this->pdo))->sync(1, 601);
+
+        $free = fn (int $who): array => array_column($this->service->availability(1, $this->cake, $who, self::at('2026-11-16T10:00:00+03:00'), self::at('2026-11-16T11:00:00+03:00')), 'starts_at');
+        self::assertSame([], $free(11), 'the meeting blocks an hour for baker 11');
+        self::assertSame(['2026-11-16T07:00:00Z', '2026-11-16T07:30:00Z'], $free(12), 'baker 12 declined');
+
+        // Another workspace's calendar never sees it.
+        self::assertSame([], $this->calendar->busy(2, 11, self::at('2026-11-16T00:00:00+03:00'), self::at('2026-11-17T00:00:00+03:00'), self::at('2026-11-15T07:00:00+03:00')));
+    }
+
+    public function testDayCountsAreLocalDatesByPersonForLiveBookingsOnly(): void
+    {
+        $this->service->book(1, $this->desk('2026-11-16T10:00:00+03:00', 11));
+        $this->service->book(1, $this->desk('2026-11-16T12:00:00+03:00', 11));
+        // 01:00 on the 17th in Amman is still the 16th in UTC: counted on the 17th.
+        $this->service->book(1, $this->desk('2026-11-17T01:00:00+03:00', 12));
+        $gone = $this->service->book(1, $this->desk('2026-11-18T10:00:00+03:00', 12));
+        $this->service->cancel(1, (int) $gone['id'], 'staff', '');
+
+        $counts = $this->bookings->dayCounts(1, self::at('2026-11-01T00:00:00+03:00'), self::at('2026-12-01T00:00:00+03:00'), new DateTimeZone('Asia/Amman'));
+        self::assertSame([
+            ['date' => '2026-11-16', 'profile_id' => 11, 'room_id' => null, 'service_id' => $this->cake, 'count' => 2],
+            ['date' => '2026-11-17', 'profile_id' => 12, 'room_id' => null, 'service_id' => $this->cake, 'count' => 1],
+        ], $counts);
+        self::assertSame([], $this->bookings->dayCounts(2, self::at('2026-11-01T00:00:00+03:00'), self::at('2026-12-01T00:00:00+03:00'), new DateTimeZone('Asia/Amman')));
+    }
+
+    public function testViewChoicesAreEachPersonsOwnAndCleaned(): void
+    {
+        $prefs = new \Whity\Core\Calendar\ViewPreferences($this->pdo);
+        self::assertSame([], $prefs->get(1, 11));
+        $saved = $prefs->update(1, 11, ['view' => 'four_days', 'colour_by' => 'service', 'hidden_people' => [12, 12, 'x', -1], 'also_show' => ['time_off', 'nonsense'], 'secret' => 'dropped']);
+        self::assertSame(['view' => 'four_days', 'colour_by' => 'service', 'hidden_people' => [12], 'also_show' => ['time_off']], $saved);
+        self::assertSame($saved, $prefs->get(1, 11));
+        self::assertSame([], $prefs->get(1, 12), 'baker 12 keeps their own');
+        self::assertSame([], $prefs->get(2, 11), 'each workspace keeps its own');
+
+        $after = $prefs->update(1, 11, ['colour_by' => null, 'view' => 'fortnight', 'sidebar_open' => true]);
+        self::assertSame(['hidden_people' => [12], 'also_show' => ['time_off'], 'sidebar_open' => true], $after);
+    }
+
+    /** @return array{0: string, 1: string, 2: string, 3: string} */
+    private function connectionParts(): array
+    {
+        $base = (string) ($_ENV['PHPUNIT_PG_DSN'] ?? getenv('PHPUNIT_PG_DSN'));
+        $db = (string) $this->scalar('SELECT current_database()');
+        $schema = (string) $this->scalar('SELECT current_schema()');
+        $dsn = preg_replace('/dbname=[^;]+/', 'dbname=' . $db, $base) ?? $base;
+        $user = (string) ($_ENV['PHPUNIT_PG_USER'] ?? getenv('PHPUNIT_PG_USER') ?: 'whity');
+        $password = (string) ($_ENV['PHPUNIT_PG_PASSWORD'] ?? getenv('PHPUNIT_PG_PASSWORD') ?: 'whity_dev');
+
+        return [$dsn, $user, $password, $schema];
+    }
+
+    private function scalar(string $sql): mixed
+    {
+        $stmt = $this->pdo->query($sql);
+        self::assertNotFalse($stmt);
+
+        return $stmt->fetchColumn();
+    }
+
+    private function secondConnection(): PDO
+    {
+        [$dsn, $user, $password, $schema] = $this->connectionParts();
+        $pdo = new PDO($dsn, $user, $password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $pdo->exec('SET search_path TO ' . $schema . ', public');
+
+        return $pdo;
+    }
+
+    private function person(int $id): void
+    {
+        $this->pdo->exec(
+            "INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
+             VALUES ({$id}, 'p{$id}', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+        );
+    }
+
+    private function membership(int $profileId, int $tenantId, string $kind): void
+    {
+        $this->pdo->exec(
+            "INSERT INTO memberships (profile_id, tenant_id, role_id, status, kind, created_at)
+             VALUES ({$profileId}, {$tenantId}, 901, 'active', '{$kind}', CURRENT_TIMESTAMP)"
+        );
+    }
+}

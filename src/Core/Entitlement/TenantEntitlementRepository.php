@@ -82,6 +82,39 @@ final class TenantEntitlementRepository
     }
 
     /**
+     * The add-on packs this tenant holds, each with its bundle (WHIT-932).
+     *
+     * Read live, like the tier, so an edit to a pack reaches everybody holding
+     * it. Empty for a tenant with none, which is nearly every tenant.
+     *
+     * @return list<array{quantity: int, values: array<string, string>}>
+     */
+    public function addonBundlesFor(int $tenantId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT ta.plan_id, ta.quantity, pe.entitlement_key, pe.value
+               FROM tenant_plan_addons ta
+               JOIN plan_entitlements pe ON pe.plan_id = ta.plan_id
+              WHERE ta.tenant_id = :tenant_id
+              ORDER BY ta.plan_id'
+        );
+        $stmt->execute([':tenant_id' => $tenantId]);
+
+        /** @var array<int, array{quantity: int, values: array<string, string>}> $packs */
+        $packs = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $planId = (int) $row['plan_id'];
+            $packs[$planId] ??= ['quantity' => max(0, (int) $row['quantity']), 'values' => []];
+            $key = (string) ($row['entitlement_key'] ?? '');
+            if ($key !== '') {
+                $packs[$planId]['values'][$key] = (string) ($row['value'] ?? '');
+            }
+        }
+
+        return array_values($packs);
+    }
+
+    /**
      * All stored entitlement overrides for one tenant as a key => value map.
      * Keys absent here fall back to the registry default at the service layer.
      *

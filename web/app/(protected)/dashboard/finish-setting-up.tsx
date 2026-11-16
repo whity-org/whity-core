@@ -7,13 +7,15 @@
  * each opens are here.
  */
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@whity/ui/button';
 import { Card } from '@whity/ui/card';
 import { Icon } from '@whity/ui/icon';
+import { Lottie } from '@whity/ui/lottie';
 import type { IconName } from '@whity/ui/icon-map';
 import { useTranslation } from '@whity/features/i18n';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 
 interface SetupSteps {
@@ -22,19 +24,56 @@ interface SetupSteps {
   total: number;
 }
 
+/** Set while the checklist is unfinished, so its completion can be marked once. */
+const SETUP_PENDING_KEY = 'whity.setup.pending';
+
 export function FinishSettingUp() {
   const t = useTranslation('common');
-  const { apiClient } = useAuth();
 
   const setup = useFetch<SetupSteps | null>(async () => {
-    const response = await apiClient('/api/v1/me/setup-steps');
+    const { data: body, response } = await api.GET('/api/v1/me/setup-steps');
     // Not worth an error on the home: the card just doesn't appear.
     if (!response.ok) return null;
-    return ((await response.json()) as { data?: SetupSteps }).data ?? null;
-  }, [apiClient]);
+    return ((body as { data?: SetupSteps } | undefined)?.data) ?? null;
+  }, []);
 
   const data = setup.data;
-  if (data === null || data.total === 0 || data.done === data.total) return null;
+  const complete = data !== null && data.total > 0 && data.done === data.total;
+  const pending = data !== null && data.total > 0 && data.done < data.total;
+
+  // Company ready (LT.4, setup-done): shown once, on the first visit after the
+  // last step is done, and only to someone who saw the checklist unfinished on
+  // this device, so a workspace set up long ago gets no surprise.
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    try {
+      if (pending) localStorage.setItem(SETUP_PENDING_KEY, '1');
+      else if (complete && localStorage.getItem(SETUP_PENDING_KEY) === '1') {
+        localStorage.removeItem(SETUP_PENDING_KEY);
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- storage is only readable after mounting
+        setReady(true);
+      }
+    } catch {
+      // No storage, no celebration; the home works the same.
+    }
+  }, [pending, complete]);
+
+  if (ready) {
+    return (
+      <Card className="items-center gap-2 p-4 text-center" data-slot="setup-ready">
+        <Lottie name="setup-done" className="h-[135px] w-[200px]" />
+        <h2 className="text-lg font-semibold">{t('dashboard.setup.ready', 'Your workspace is ready')}</h2>
+        <p className="text-sm text-muted-foreground">
+          {t('dashboard.setup.readyHelp', 'Every step is done. You can change any of it in Settings.')}
+        </p>
+        <Button variant="outline" size="sm" onClick={() => setReady(false)}>
+          {t('dashboard.setup.readyDismiss', 'Close')}
+        </Button>
+      </Card>
+    );
+  }
+
+  if (data === null || !pending) return null;
 
   const words: Record<string, { icon: IconName; label: string; why: string; action: string; href: string }> = {
     branding: {

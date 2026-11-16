@@ -11,12 +11,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { FormHeader, type FormBannerValue } from '@whity/features/forms';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useDirection } from '@/lib/direction-context';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import { useTranslation } from '@whity/features/i18n';
 import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
-import { localized, type Answer, type LocalizedText, type ReferenceOption } from '@/components/forms/form-fields';
+import { type Answer, type LocalizedText, type ReferenceOption } from '@/components/forms/form-fields';
 import { FormFill, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
 import type { RefusalBody } from '@/components/forms/form-refusals';
+import { localizedText } from '@whity/ui/localized-text';
 
 /** A unit from `GET /api/ous`, reduced to what the `ou_ref` picker reads. */
 type UnitRow = UnitNames & { id: number; ou_type_key?: string | null };
@@ -54,9 +55,9 @@ export default function PreviewFormPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     let cancelled = false;
 
-    apiClient(`/api/v1/forms/${encodeURIComponent(id)}/preview`, { headers: { Accept: 'application/json' } })
-      .then(async (response) => {
-        const body = (await response.json().catch(() => ({}))) as { data?: PreviewForm };
+    api.GET('/api/v1/forms/{id}/preview', { params: { path: { id: Number(id) } } })
+      .then(({ data, error, response }) => {
+        const body = ((data ?? error ?? {}) as unknown) as { data?: PreviewForm };
         if (cancelled) return;
         if (!response.ok || !body.data) setFailed(true);
         else setRendered(body.data);
@@ -65,10 +66,10 @@ export default function PreviewFormPage({ params }: { params: Promise<{ id: stri
         if (!cancelled) setFailed(true);
       });
 
-    apiClient('/api/v1/ous', { headers: { Accept: 'application/json' } })
-      .then(async (response) => {
+    api.GET('/api/v1/ous')
+      .then(({ data, response }) => {
         if (!response.ok) return;
-        const body = (await response.json().catch(() => ({}))) as {
+        const body = (data ?? {}) as {
           data?: Array<Partial<UnitRow>>;
         };
         if (cancelled) return;
@@ -103,10 +104,10 @@ export default function PreviewFormPage({ params }: { params: Promise<{ id: stri
   }
 
   const title =
-    localized(rendered.form.title ?? null, preferArabic) || localized(rendered.form.name, preferArabic) || t('fill.untitled', 'Form');
+    localizedText(rendered.form.title ?? null, preferArabic ? 'ar' : 'en') || localizedText(rendered.form.name, preferArabic ? 'ar' : 'en') || t('fill.untitled', 'Form');
   const translatedDescription = Array.isArray(rendered.form.description_i18n) ? null : rendered.form.description_i18n;
-  const description = localized(translatedDescription, preferArabic) || rendered.form.description;
-  const submitLabel = localized(rendered.form.submit_label, preferArabic) || t('fill.send', 'Send');
+  const description = localizedText(translatedDescription, preferArabic ? 'ar' : 'en') || rendered.form.description;
+  const submitLabel = localizedText(rendered.form.submit_label, preferArabic ? 'ar' : 'en') || t('fill.send', 'Send');
 
   async function nothingIsSent(): Promise<RefusalBody | null> {
     return { error: t('preview.nothingSent', 'This is a preview. Nothing was sent.') };

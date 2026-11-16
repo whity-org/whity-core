@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useBranding } from '@/lib/branding-context';
 import { Button } from '@whity/ui/button';
@@ -13,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useRichTranslation, useTranslation } from '@whity/features/i18n';
 import { clearReferral, readReferralCode } from '@/lib/referral';
+import { continueSignupPlugin, rememberSignupPlugin, signupPluginFrom } from '@/lib/signup-plugin';
 
 /**
  * Self-service registration (WC-235). Provisions a NEW workspace (tenant) with
@@ -58,6 +60,8 @@ export default function RegisterPage() {
   // arriving through a colleague's link should be able to see that it took,
   // and a code that carries a discount is a promise they were made.
   const [referralCode, setReferralCode] = useState<string | null>(null);
+  // WHIT-1156: a sign-up link for a plugin, such as ?plugin=salons.
+  const [signupPlugin, setSignupPlugin] = useState<string | null>(null);
 
   // Match the login page's SSR-safe "enabled until mounted" timing so the
   // server markup matches hydration; focus the first field on mount. The flag
@@ -73,6 +77,11 @@ export default function RegisterPage() {
     void Promise.resolve().then(() => {
       setIsMounted(true);
       setReferralCode(readReferralCode());
+      const plugin = signupPluginFrom(window.location.search);
+      if (plugin !== null) {
+        rememberSignupPlugin(plugin);
+        setSignupPlugin(plugin);
+      }
     });
   }, []);
 
@@ -118,7 +127,8 @@ export default function RegisterPage() {
     setIsSubmitting(true);
     setRegisterError(null);
     try {
-      const response = await fetch('/api/v1/register', {
+      // Not in the OpenAPI spec, so it goes through apiFetch (same session rules).
+      const response = await apiFetch('/api/v1/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -179,20 +189,14 @@ export default function RegisterPage() {
         // Account + workspace created. Sign in with the same credentials — a
         // fresh owner has exactly one active membership, so login mints the
         // session directly.
-        const loginRes = await fetch('/api/v1/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-          body: JSON.stringify({ email, password }),
-          credentials: 'include',
+        const { response: loginRes } = await api.POST('/api/v1/login', {
+          body: { email, password } as never,
         });
 
         if (loginRes.ok) {
           await refreshAuth();
           addToast(t('register.toast.welcome', 'Welcome! Your workspace is ready.'), 'success');
-          router.push('/dashboard');
+          router.push((await continueSignupPlugin()) ?? '/dashboard');
         } else {
           // Account exists but auto-login did not complete (unexpected for a
           // fresh single-membership owner) — send them to the login page.
@@ -357,6 +361,15 @@ export default function RegisterPage() {
                   'Referred by <0>{code}</0>',
                   { code: referralCode },
                   [<span key="code" className="font-medium text-foreground" />]
+                )}
+              </p>
+            )}
+
+            {signupPlugin && (
+              <p className="text-sm text-muted-foreground" data-testid="registration-plugin">
+                {t(
+                  'register.plugin.trial',
+                  'Your workspace starts on the Free plan. Its free trial starts as soon as it is ready, and the guided setup opens.'
                 )}
               </p>
             )}

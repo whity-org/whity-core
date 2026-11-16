@@ -419,8 +419,8 @@ test('a healthy, freshly-checked deployment reads as operational', async () => {
 
   const { res, html } = await pageText(env);
   assert.equal(res.status, 200);
-  assert.match(html, /All systems operational/);
-  assert.match(html, /Healthy/);
+  assert.match(html, /Everything is working/);
+  assert.match(html, /On time/);
 });
 
 // A NEWLY ADDED TARGET MUST RECORD ITS FIRST HEALTHY OBSERVATION.
@@ -484,7 +484,7 @@ test('each component is named for a human and says which host it is', async () =
 
   for (const [label, host] of [
     ['API', 'app.whity.dev/api'],
-    ['Application', 'app.whity.dev'],
+    ['The app', 'app.whity.dev'],
     ['Website', 'whity.dev'],
     ['Documentation', 'docs.whity.dev'],
     ['Payments', 'pay.whity.dev'],
@@ -520,7 +520,7 @@ test('STALE DATA IS NEVER REPORTED AS OPERATIONAL', async () => {
   store.set('beat:backup', JSON.stringify({ at: Date.now() }));
 
   const { html } = await pageText(env);
-  assert.doesNotMatch(html, /All systems operational/, 'old readings must not be presented as current');
+  assert.doesNotMatch(html, /Everything is working/, 'old readings must not be presented as current');
   assert.match(html, /Status unknown/);
   assert.match(html, /not current/);
 });
@@ -528,11 +528,11 @@ test('STALE DATA IS NEVER REPORTED AS OPERATIONAL', async () => {
 test('a watchdog that has never run says so instead of showing green', async () => {
   const { env } = makeEnv();
   const { html } = await pageText(env);
-  assert.doesNotMatch(html, /All systems operational/);
+  assert.doesNotMatch(html, /Everything is working/);
   assert.match(html, /Status unknown/);
 });
 
-test('one component down is a partial outage; all down is a major one', async () => {
+test('one part down is named in one sentence; all down says Whity is not working', async () => {
   const twoTargets = { ...CFG, targets: [{ name: 'api', url: 'https://x.test/a' }, { name: 'web', url: 'https://x.test/b' }] };
 
   const partial = makeEnv();
@@ -540,7 +540,8 @@ test('one component down is a partial outage; all down is a major one', async ()
   partial.store.set('state:api', JSON.stringify({ alertedStatus: 'down', downSince: Date.now() - 600_000 }));
   partial.store.set('state:web', JSON.stringify({ alertedStatus: 'up' }));
   const p = await pageText(partial.env, twoTargets);
-  assert.match(p.html, /Partial outage/);
+  assert.match(p.html, /API isn’t working/);
+  assert.match(p.html, /Everything else works/);
   assert.match(p.html, /for 10m/, 'an outage without its duration is half an answer');
 
   const major = makeEnv();
@@ -548,7 +549,7 @@ test('one component down is a partial outage; all down is a major one', async ()
   major.store.set('state:api', JSON.stringify({ alertedStatus: 'down', downSince: Date.now() }));
   major.store.set('state:web', JSON.stringify({ alertedStatus: 'down', downSince: Date.now() }));
   const m = await pageText(major.env, twoTargets);
-  assert.match(m.html, /Major outage/);
+  assert.match(m.html, /Whity isn’t working/);
 });
 
 test('an overdue backup shows as overdue, not merely absent', async () => {
@@ -558,7 +559,7 @@ test('an overdue backup shows as overdue, not merely absent', async () => {
   store.set('beat:backup', JSON.stringify({ at: Date.now() - 40 * 3600 * 1000 }));
 
   const { html } = await pageText(env);
-  assert.match(html, /Overdue/);
+  assert.match(html, /Late/);
 });
 
 test('the page is never cached — a stale green outliving its outage is the bug', async () => {
@@ -908,4 +909,44 @@ test('durations read the way a person would say them', () => {
   assert.equal(humanDuration(3 * 3600 * 1000), '3h');
   assert.equal(humanDuration(3.5 * 3600 * 1000), '3h 30m');
   assert.equal(humanDuration(50 * 3600 * 1000), '2d 2h');
+});
+
+// ── SiteStatus in two languages, and the footer's one word ─────────────────
+
+test('the Arabic page is served at /ar/, right to left, with the same verdict', async () => {
+  const { env, store } = makeEnv();
+  store.set('meta:last-run', JSON.stringify({ at: Date.now() }));
+  store.set('state:api', JSON.stringify({ alertedStatus: 'down', downSince: Date.now() - 600_000 }));
+  env.PROBE_TARGETS = JSON.stringify([{ name: 'api', url: 'https://x.test/a' }]);
+
+  const res = await handleRequest(new Request('https://health.test/ar/'), env);
+  const html = await res.text();
+  assert.equal(res.status, 200);
+  assert.match(html, /<html lang="ar" dir="rtl">/);
+  assert.match(html, /واجهة البرمجة لا يعمل/, 'one plain sentence, in Arabic');
+  assert.match(html, /href="\/" lang="en">English</, 'links back to English');
+  assert.doesNotMatch(html, /[٠-٩]/, 'numbers stay Western digits');
+
+  const en = await (await handleRequest(new Request('https://health.test/'), env)).text();
+  assert.match(en, /<html lang="en" dir="ltr">/);
+  assert.match(en, /href="\/ar\/" lang="ar">العربية</);
+});
+
+test('/status carries the one word the website footers read', async () => {
+  const two = JSON.stringify([{ name: 'api', url: 'https://x.test/a' }, { name: 'web', url: 'https://x.test/b' }]);
+  const read = async (states, lastRun = Date.now()) => {
+    const { env, store } = makeEnv();
+    env.PROBE_TARGETS = two;
+    if (lastRun !== null) store.set('meta:last-run', JSON.stringify({ at: lastRun }));
+    for (const [k, v] of Object.entries(states)) store.set(`state:${k}`, JSON.stringify({ alertedStatus: v }));
+    const res = await handleRequest(new Request('https://health.test/status'), env);
+    assert.equal(res.headers.get('access-control-allow-origin'), '*');
+    return (await res.json()).status;
+  };
+
+  assert.equal(await read({ api: 'up', web: 'up' }), 'ok');
+  assert.equal(await read({ api: 'down', web: 'up' }), 'degraded');
+  assert.equal(await read({ api: 'down', web: 'down' }), 'down');
+  assert.equal(await read({ api: 'up', web: 'up' }, Date.now() - 3600 * 1000), 'degraded', 'old readings are never ok');
+  assert.equal(await read({ api: 'up', web: 'up' }, null), 'degraded', 'no run yet is never ok');
 });

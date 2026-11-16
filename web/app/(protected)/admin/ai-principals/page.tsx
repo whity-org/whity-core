@@ -12,11 +12,12 @@ import { Tabs, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { isReadPermission } from '@/components/agents/workspace-agents';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { MCP_TOKENS_MANAGE } from '@/lib/capabilities';
-import { fetchAllPages } from '@/lib/api/fetch-all-pages';
+import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { ConnectWizard } from './connect-wizard';
@@ -34,7 +35,7 @@ const NOT_NARROWING = ['tools:call', 'resources:read', 'prompts:read', 'grant:']
  * the app's own page (What it may do) holds the grant.
  */
 export default function AiPrincipalsPage() {
-  const { apiClient, user } = useAuth();
+  const { user } = useAuth();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
   const dates = useDateDisplay();
@@ -53,7 +54,7 @@ export default function AiPrincipalsPage() {
   // (#1102) when this table is wired for server-side paging.
   const { data, loading, error, refetch } = useFetch(async () => {
     if (view === 'mine') {
-      const response = await apiClient('/api/v1/mcp/tokens');
+      const response = await apiFetch('/api/v1/mcp/tokens');
       if (!response.ok) throw new Error(t('aiPrincipals.error.load', 'The connected apps could not be loaded.'));
       const body = (await response.json()) as { tokens?: OwnMcpTokenRow[] };
       return (body.tokens ?? []).map(
@@ -71,21 +72,23 @@ export default function AiPrincipalsPage() {
         }),
       );
     }
-    const response = await apiClient('/api/v1/admin/mcp/tokens?per_page=100');
+    const response = await apiFetch('/api/v1/admin/mcp/tokens?per_page=100');
     if (response.status === 403) throw new Error('forbidden');
     if (!response.ok) throw new Error(t('aiPrincipals.error.load', 'The connected apps could not be loaded.'));
     return ((await response.json()) as AiPrincipalListResponse).data ?? [];
-  }, [apiClient, view, user?.id]);
+  }, [view, user?.id]);
 
   // Names, never ids: the people the apps are for. Only the list of everyone's
   // shows them, and only someone who may read users can resolve them.
   const people = useFetch<Record<number, string>>(async () => {
     if (view !== 'everyone') return {};
-    const result = await fetchAllPages<{ id: number; name?: string; email?: string }>(apiClient, '/api/v1/users');
+    const result = await fetchAllPagesTyped<{ id: number; name?: string; email?: string }>((query) =>
+      api.GET('/api/v1/users', { params: { query } })
+    );
     const names: Record<number, string> = {};
     for (const person of result.items) names[person.id] = person.name || person.email || '';
     return names;
-  }, [apiClient, view]);
+  }, [view]);
 
   const principals = useMemo(() => data ?? [], [data]);
   const shown = useMemo(() => {
@@ -205,10 +208,18 @@ export default function AiPrincipalsPage() {
   };
 
   const connect = (
-    <Button onClick={() => setIsWizardOpen(true)}>
-      <Icon name="link" size={16} />
-      {t('aiPrincipals.header.connect', 'Connect an AI app')}
-    </Button>
+    <div className="flex flex-wrap items-center gap-2">
+      <Button variant="outline" asChild>
+        <Link href="/admin/ai-principals/new-agent-key">
+          <Icon name="robot" size={16} />
+          {t('aiPrincipals.header.agentKey', 'New key for an agent')}
+        </Link>
+      </Button>
+      <Button onClick={() => setIsWizardOpen(true)}>
+        <Icon name="link" size={16} />
+        {t('aiPrincipals.header.connect', 'Connect an AI app')}
+      </Button>
+    </div>
   );
 
   return (
@@ -246,6 +257,7 @@ export default function AiPrincipalsPage() {
       ) : principals.length === 0 ? (
         <EmptyFirstTime
           icon="link"
+          moment="spot-mcp"
           title={t('aiPrincipals.empty.title', 'No AI apps connected')}
           description={t('aiPrincipals.empty.description', 'Connect Claude, ChatGPT, Cursor or another app so it can work with your data, asking you first for changes.')}
         />

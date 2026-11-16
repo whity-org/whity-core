@@ -153,7 +153,7 @@ import {
 } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';
 import { ConfirmAction } from '@whity/ui/confirm-action';
-import { apiClient } from '@/lib/api-client';
+import { apiFetch } from '@/lib/api/client';
 import { Button } from '@whity/ui/button';
 import {
   Card,
@@ -169,8 +169,8 @@ import {
   TabsTrigger,
 } from '@whity/ui/tabs';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
-import { localizedName, type LocalizedNames } from '@/lib/localized-name';
 import { useDateDisplay } from '@whity/features/datetime';
+import { localizedText, type LocalizedText } from '@whity/ui/localized-text';
 
 /**
  * WC-227: the web renderer for `screen: 'blocks'` plugin features.
@@ -622,7 +622,7 @@ function StatRenderer({ block }: { block: StatBlock }) {
     <div className="rounded-lg bg-card p-4 ring-1 ring-foreground/10">
       <div className="text-xs text-muted-foreground">{block.label}</div>
       <div className="mt-1 flex items-center gap-1.5">
-        <span className="font-heading text-xl font-semibold">{value}</span>
+        <span className="font-heading text-xl font-semibold"><bdi>{value}</bdi></span>
         {TrendIcon !== null && block.trend && (
           <TrendIcon className={cn('size-4', TREND_TONE[block.trend])} aria-hidden />
         )}
@@ -735,7 +735,7 @@ function TableRenderer({ block }: { block: TableBlock }) {
             <tr key={rowIndex} className="border-b border-border last:border-0">
               {block.columns.map((column) => (
                 <td key={column.key} className="px-3 py-2 text-foreground">
-                  {row[column.key] ?? ''}
+                  <bdi>{row[column.key] ?? ''}</bdi>
                 </td>
               ))}
             </tr>
@@ -1481,6 +1481,12 @@ function InteractiveDataTable({
     id: col.key,
     accessorKey: col.key,
     header: col.label,
+    // Each value keeps its own direction (<bdi>): "-90.000 JOD" or "-3 box"
+    // in an Arabic table otherwise reads "JOD 90.000-", because a plugin
+    // sends formatted strings and the cell takes the page's direction.
+    // Amounts, codes and numbers stay left to right (CLAUDE.md); Arabic text
+    // in the same column still reads right to left.
+    cell: (row: Record<string, string>) => <bdi>{row[col.key] ?? ''}</bdi>,
     enableSorting: col.sortable === true,
     enableColumnFilter: col.filterable === true,
   }));
@@ -3359,7 +3365,7 @@ function SecretFieldRenderer({ block }: { block: SecretFieldBlock }) {
   }, []);
 
   React.useEffect(() => {
-    apiClient(block.endpoint)
+    apiFetch(block.endpoint)
       .then(applyResponse)
       .then((applied) => {
         if (!applied) setStatus((current) => (current === 'forbidden' ? current : 'error'));
@@ -3370,7 +3376,7 @@ function SecretFieldRenderer({ block }: { block: SecretFieldBlock }) {
   const save = async () => {
     setSaving(true);
     try {
-      const res = await apiClient(block.endpoint, {
+      const res = await apiFetch(block.endpoint, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value }),
@@ -3390,7 +3396,7 @@ function SecretFieldRenderer({ block }: { block: SecretFieldBlock }) {
 
   const remove = async () => {
     try {
-      const res = await apiClient(block.endpoint, { method: 'DELETE' });
+      const res = await apiFetch(block.endpoint, { method: 'DELETE' });
       if (await applyResponse(res)) {
         addToast(t('blocks.secretField.removed', 'Removed.'), 'success');
       } else {
@@ -3811,8 +3817,8 @@ function toOuRow(raw: Record<string, unknown>, language: string | null): OuRow |
   const parent = raw.parent_id;
   return {
     id,
-    name: localizedName(
-      typeof raw.names === 'object' ? (raw.names as LocalizedNames | null) : null,
+    name: localizedText(
+      typeof raw.names === 'object' ? (raw.names as LocalizedText | null) : null,
       language,
       typeof raw.name_language === 'string' ? raw.name_language : null,
       raw.name === undefined || raw.name === null ? String(id) : String(raw.name)

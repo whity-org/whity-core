@@ -6,9 +6,9 @@ Whity sounds like a senior engineer explaining a system to a business owner: pla
 
 - **Plain and direct.** Write to "you", use active verbs, and say what happens. "We" only on the website and in docs, never in the product.
 - **Buttons name the action**: "Issue invoice", "Approve", "Revoke credential", "Undo". Never "Submit", "OK", "Confirm" or "Proceed".
-- **Short and specific.** A fact beats a promise: "Last used today, 14:02", "12 overdue · JOD 4,860".
+- **Short and specific.** A fact beats a promise: "Last used today, 14:02", "12 overdue · $4,860".
 - **Sentence case** everywhere. No exclamation marks. No emoji in product or partner material.
-- **Numbers**: Western digits, JOD with 3 decimals (JOD 301.600), dates as 27 Oct 2026 (27/10/2026 where space is short), 24-hour times.
+- **Numbers**: Western digits, money in the workspace's currency with its own decimals (US dollars in designs: $301.60), dates as 27 Oct 2026 (27/10/2026 where space is short), 24-hour times.
 
 ## Arabic interface
 
@@ -16,7 +16,7 @@ Simple Modern Standard Arabic in short sentences, written and reviewed by a nati
 
 ## Agents
 
-- **Describe the action, not the agent**: the agent named by role, then who it acts for, then what it did or proposes. "Billing assistant for Rana · Sent 12 payment reminders."
+- **Describe the action, not the agent**: the agent named by role, then who it acts for, then what it did or proposes. "Billing assistant for Amro · Sent 12 payment reminders."
 - **Names by role**: Billing assistant, HR assistant, Front desk. No human first names, no "Whity AI".
 - **No "I", no feelings, no apologies.** A proposal title is an imperative with a count: "Send payment reminders to 12 customers".
 - **Documents an agent sent say so** in their footer, with the person it acted for.

@@ -2,7 +2,7 @@
 
 import { Fragment, useState } from 'react';
 import { toDecimalString } from '@whity/ui/money/currency';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useTranslation } from '@whity/features/i18n';
@@ -80,7 +80,6 @@ const FULL_RATE_BP = 10000;
 const MAX_COMMISSION_BP = 5000;
 
 export function Affiliates() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
 
@@ -97,12 +96,12 @@ export function Affiliates() {
   const [window, setWindow] = useState('12');
 
   const { data, loading, error, refetch } = useFetch(async () => {
-    const res = await apiClient('/api/v1/affiliates');
+    const { data: body, response: res } = await api.GET('/api/v1/affiliates');
     if (!res.ok) {
       throw new Error(t('affiliate.error.load', 'Failed to load the affiliate list'));
     }
-    return ((await res.json()).data ?? []) as Affiliate[];
-  }, [apiClient]);
+    return ((body as unknown as { data?: Affiliate[] } | undefined)?.data ?? []) as Affiliate[];
+  }, []);
 
   const reset = () => {
     setCode('');
@@ -115,25 +114,21 @@ export function Affiliates() {
   const create = async () => {
     setBusy(true);
     try {
-      const res = await apiClient('/api/v1/affiliates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const { error: failure, response: res } = await api.POST('/api/v1/affiliates', {
+        body: {
           code,
           name,
           commission_bp: Number(rate),
           window_months: Number(window),
           ...(email.trim() ? { email } : {}),
-        }),
+        },
       });
 
       if (!res.ok) {
         // THE SERVER'S OWN WORDS. It names which field and why — "codes are
         // matched without regard to case", "a rate is basis points" — and no
         // rewording here would be more accurate than that.
-        const body = (await res.json().catch(() => null)) as
-          | { error?: string; details?: Record<string, string> }
-          | null;
+        const body = (failure ?? null) as { error?: string; details?: Record<string, string> } | null;
         addToast(
           Object.values(body?.details ?? {})[0] ??
             body?.error ??
@@ -155,10 +150,9 @@ export function Affiliates() {
   const setActive = async (affiliate: Affiliate, active: boolean) => {
     setBusy(true);
     try {
-      const res = await apiClient(`/api/v1/affiliates/${affiliate.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: active }),
+      const { response: res } = await api.PATCH('/api/v1/affiliates/{id}', {
+        params: { path: { id: affiliate.id } },
+        body: { is_active: active },
       });
       addToast(
         res.ok
@@ -281,7 +275,7 @@ export function Affiliates() {
                         {expanded === a.id ? (
                           <IconChevronDown className="size-4" aria-hidden="true" />
                         ) : (
-                          <IconChevronRight className="size-4" aria-hidden="true" />
+                          <IconChevronRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
                         )}
                         {t('affiliate.payouts', 'Payouts')}
                       </Button>

@@ -17,6 +17,17 @@ const apiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient, user: { tenant_id: 1, id: 5 } }),
 }));
+const apiRefused = jest.fn();
+jest.mock('@/lib/api/client', () => ({
+  api: {
+    GET: (...a: unknown[]) => apiRefused(...a),
+    POST: (...a: unknown[]) => apiRefused(...a),
+    PUT: (...a: unknown[]) => apiRefused(...a),
+    PATCH: (...a: unknown[]) => apiRefused(...a),
+    DELETE: (...a: unknown[]) => apiRefused(...a),
+  },
+  apiFetch: (...a: unknown[]) => apiRefused(...a),
+}));
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast: jest.fn() }) }));
 jest.mock('@/hooks/useCapabilities', () => ({
   useCapabilities: () => ({ has: () => true, hasPermission: () => true, loading: false }),
@@ -41,6 +52,7 @@ function withTechnical(technical: boolean, ui: React.ReactElement) {
 beforeEach(() => {
   jest.clearAllMocks();
   apiClient.mockResolvedValue(refused);
+  apiRefused.mockResolvedValue({ data: undefined, error: { error: 'Forbidden' }, response: new Response(null, { status: 403 }) });
 });
 
 describe('NoAccess', () => {

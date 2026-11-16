@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth-context';
+import { apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { Button } from '@whity/ui/button';
 import { Badge } from '@whity/ui/badge';
@@ -51,7 +52,7 @@ interface Session {
 }
 
 export function SessionsSettings() {
-  const { apiClient, refreshAuth } = useAuth();
+  const { refreshAuth } = useAuth();
   const dates = useDateDisplay();
   const { addToast } = useToast();
   const t = useTranslation('auth');
@@ -64,7 +65,7 @@ export function SessionsSettings() {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await apiClient('/api/v1/me/sessions', { method: 'GET' });
+      const res = await apiFetch('/api/v1/me/sessions', { method: 'GET' });
       if (!res.ok) {
         setLoadError(true);
         setSessions([]);
@@ -78,7 +79,7 @@ export function SessionsSettings() {
     } finally {
       setLoading(false);
     }
-  }, [apiClient]);
+  }, []);
 
   useEffect(() => {
     // Deferred off the synchronous effect tick so load()'s setState does not run
@@ -89,7 +90,7 @@ export function SessionsSettings() {
   const revokeOne = async (session: Session) => {
     setBusy(true);
     try {
-      const res = await apiClient(`/api/v1/me/sessions/${session.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/v1/me/sessions/${session.id}`, { method: 'DELETE' });
       if (!res.ok && res.status !== 404) {
         addToast(
           t('sessions.revoke.errorWithStatus', 'Failed to sign out that session ({status}).', {
@@ -111,7 +112,7 @@ export function SessionsSettings() {
   const revokeAllOthers = async () => {
     setBusy(true);
     try {
-      const res = await apiClient('/api/v1/me/sessions', { method: 'DELETE' });
+      const res = await apiFetch('/api/v1/me/sessions', { method: 'DELETE' });
       if (!res.ok) {
         addToast(t('sessions.revokeOthers.error', 'Failed to sign out other sessions.'), 'error');
         return;
@@ -131,7 +132,7 @@ export function SessionsSettings() {
   const logoutEverywhere = async () => {
     setBusy(true);
     try {
-      const res = await apiClient('/api/v1/me/logout-others', { method: 'POST' });
+      const res = await apiFetch('/api/v1/me/logout-others', { method: 'POST' });
       if (!res.ok) {
         addToast(t('sessions.logoutEverywhere.error', 'Failed to sign out everywhere.'), 'error');
         return;

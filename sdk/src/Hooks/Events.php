@@ -171,8 +171,42 @@ final class Events
      * `role_name`, `via` (`open` or `approval`), `approved_by` (the approving
      * admin's profile id, or null). Ids only: read anything else under your
      * own permissions.
+     *
+     * Since SDK 1.105 it also fires when somebody accepts a customer's team
+     * invitation, with `via` `invitation`, `approved_by` null, and three more
+     * keys: `invitation_id`, `invited_by` (the inviting customer's profile id)
+     * and `annotations` (what listeners of {@see self::MEMBERSHIP_CUSTOMER_INVITING}
+     * attached, or an empty array). A plugin binds the newcomer here, for
+     * example to the inviter's clinic.
      */
     public const MEMBERSHIP_CUSTOMER_JOINED = 'membership.customer_joined';
+
+    /**
+     * A customer is about to invite a colleague into the workspace (SDK 1.105,
+     * #1872). Customers may invite only when an admin turned it on in Settings
+     * > Sign-up, only into their own role, and only as customers. Runs before
+     * anything is written.
+     *
+     * Payload: `tenant_id`, `inviter_profile_id`, `email` (lowercased),
+     * `role_id`, `annotations` (an empty array, or what earlier listeners set).
+     *
+     * A listener may:
+     * - refuse with {@see HookVetoException}: nothing is written or sent, and the
+     *   customer sees your `reason()` (409). Refuse only for reasons about the
+     *   inviter (not a clinic owner, say), never about the address: "already a
+     *   member" would tell a customer who is in the workspace;
+     * - return the payload with `annotations` set to a small JSON object (4 KB
+     *   at most; key it by your plugin's name). It is stored on the invitation
+     *   and handed back in {@see self::MEMBERSHIP_CUSTOMER_JOINED} when the
+     *   invitation is accepted. Core never reads it.
+     * Anything else a listener returns is ignored: the email, role and inviter
+     * can't be changed here.
+     *
+     * The hook runs even when the host then sends nothing (the address is
+     * already here, was turned away, or has an invitation someone else sent):
+     * the customer gets the same answer either way.
+     */
+    public const MEMBERSHIP_CUSTOMER_INVITING = 'membership.customer_inviting';
 
     // ---- documents (SDK 1.49; DOCUMENT-AUTOMATION.md) ----
     // Before a document is issued: a listener may veto with HookVetoException,
@@ -261,6 +295,32 @@ final class Events
     /** The person who sent a submission withdrew it. Payload: `id`, `form_id`, `tenant_id`, `actor_profile_id`. */
     public const SUBMISSION_WITHDRAWN = 'submission.withdrawn';
     public const SUBMISSION_WITHDRAWN_ASYNC = 'submission.withdrawn.async';
+
+    // ---- calendar and bookings (SDK 1.98, ADR 0017) ----
+    // Fired after the write commits; the return value is ignored, so a
+    // listener cannot refuse or change anything. Each has an `.async` twin on
+    // the event spine. Ids only: `id`, `tenant_id`, `profile_id` (the member
+    // of staff whose calendar it is), and for bookings `service_id` and
+    // `status`. A sync plugin writes outwards from these.
+    public const CALENDAR_EVENT_CREATED = 'calendar.event.created';
+    public const CALENDAR_EVENT_CREATED_ASYNC = 'calendar.event.created.async';
+    public const CALENDAR_EVENT_UPDATED = 'calendar.event.updated';
+    public const CALENDAR_EVENT_UPDATED_ASYNC = 'calendar.event.updated.async';
+    public const CALENDAR_EVENT_DELETED = 'calendar.event.deleted';
+    public const CALENDAR_EVENT_DELETED_ASYNC = 'calendar.event.deleted.async';
+    /** A booking was made: `status` is `confirmed`, or `pending_payment` while a payment step runs. */
+    public const BOOKING_CREATED = 'booking.created';
+    public const BOOKING_CREATED_ASYNC = 'booking.created.async';
+    /** A booking became confirmed: at once, or when its payment came in. */
+    public const BOOKING_CONFIRMED = 'booking.confirmed';
+    public const BOOKING_CONFIRMED_ASYNC = 'booking.confirmed.async';
+    public const BOOKING_RESCHEDULED = 'booking.rescheduled';
+    public const BOOKING_RESCHEDULED_ASYNC = 'booking.rescheduled.async';
+    public const BOOKING_CANCELLED = 'booking.cancelled';
+    public const BOOKING_CANCELLED_ASYNC = 'booking.cancelled.async';
+    /** A payment hold lapsed and the time is free again. */
+    public const BOOKING_EXPIRED = 'booking.expired';
+    public const BOOKING_EXPIRED_ASYNC = 'booking.expired.async';
 
     // ---- agents (SDK 1.75, WHIT-990) ----
     // A workspace's agent changed. Fired after the change is saved, and the

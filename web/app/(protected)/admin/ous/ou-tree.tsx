@@ -156,7 +156,7 @@ function OuTreeItem({
             }}
           >
             <IconChevronRight
-              className={cn('transition-transform', isExpanded && 'rotate-90')}
+              className={cn('transition-transform', isExpanded ? 'rotate-90' : 'rtl:-scale-x-100')}
             />
           </Button>
         ) : (

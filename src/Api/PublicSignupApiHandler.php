@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Core\Audit\AuditLogger;
+use Whity\Core\Branding\BrandingService;
 use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\PasswordPolicy;
 use Whity\Core\Plugin\PublicForm\BotCheck;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimitRule;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Signup\CustomerSignupMailer;
@@ -45,13 +48,6 @@ use Whity\Http\JsonBody;
  */
 final class PublicSignupApiHandler
 {
-    private const WINDOW_SECONDS = 3600;
-    private const IP_REQUEST_MAX = 10;
-    private const EMAIL_REQUEST_MAX = 3;
-    private const TENANT_REQUEST_MAX = 300;
-    private const IP_CONFIRM_MAX = 30;
-    private const IP_INFO_MAX = 120;
-
     private const SYSTEM_TENANT_ID = 0;
 
     private const NOT_OPEN = 'Sign-up is not open for this workspace';
@@ -69,7 +65,28 @@ final class PublicSignupApiHandler
         private readonly AuditLogger $audit,
         /** The sign-in providers a visitor may join with (WHIT-917); null lists none. */
         private readonly ?\Whity\Core\Signup\JoinProviders $joinProviders = null,
+        /** The workspace's logo and colour for the page (WHIT-1044); null sends none. */
+        private readonly ?BrandingService $branding = null,
     ) {
+    }
+
+    /**
+     * The workspace's public brand (WHIT-1044, as the booking page's WHIT-1014),
+     * or null without a branding service or when it cannot be read: the page
+     * then wears the host's brand, never an error.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function brandFor(int $tenantId, string $workspaceName): ?array
+    {
+        if ($this->branding === null) {
+            return null;
+        }
+        try {
+            return $this->branding->forPublicPage($tenantId, $workspaceName);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -91,7 +108,7 @@ final class PublicSignupApiHandler
     /** @param array<string, mixed> $params */
     public function info(Request $request, array $params = []): Response
     {
-        if (($limited = $this->limit('signup:info:ip:', ClientIp::fromRequest($request), self::IP_INFO_MAX)) !== null) {
+        if (($limited = $this->limit('signup:info:ip:', ClientIp::fromRequest($request), RateLimits::publicSignupInfoPerAddress())) !== null) {
             return $limited;
         }
 
@@ -112,6 +129,7 @@ final class PublicSignupApiHandler
             'email_signup' => $this->emailSignupReady(),
             'email_signup_reason' => $this->emailSignupReady() ? null : 'bot_check_unavailable',
             'providers' => $this->joinProviders(),
+            'brand' => $this->brandFor((int) $workspace['id'], (string) $workspace['name']),
         ]], 200);
     }
 
@@ -119,7 +137,7 @@ final class PublicSignupApiHandler
     public function request(Request $request, array $params = []): Response
     {
         $ip = ClientIp::fromRequest($request);
-        if (($limited = $this->limit('signup:request:ip:', $ip, self::IP_REQUEST_MAX)) !== null) {
+        if (($limited = $this->limit('signup:request:ip:', $ip, RateLimits::publicSignupRequestPerAddress())) !== null) {
             return $limited;
         }
 
@@ -129,7 +147,7 @@ final class PublicSignupApiHandler
         }
         $tenantId = $workspace['id'];
 
-        if (($limited = $this->limit('signup:request:tenant:', (string) $tenantId, self::TENANT_REQUEST_MAX)) !== null) {
+        if (($limited = $this->limit('signup:request:tenant:', (string) $tenantId, RateLimits::publicSignupRequestPerWorkspace())) !== null) {
             return $limited;
         }
 
@@ -174,10 +192,11 @@ final class PublicSignupApiHandler
         // the limit the answer is the same 202 and nothing is sent, so the
         // limit cannot be used to learn anything either.
         $emailKey = 'signup:request:email:' . $tenantId . ':' . hash('sha256', $email);
-        if ($this->store->count($emailKey) >= self::EMAIL_REQUEST_MAX) {
+        $emailRule = RateLimits::publicSignupRequestPerEmail();
+        if ($emailRule->blocked($this->store, $emailKey) !== null) {
             return $this->accepted();
         }
-        $this->store->increment($emailKey, self::WINDOW_SECONDS);
+        $emailRule->record($this->store, $emailKey);
 
         try {
             $token = $this->service->request($tenantId, $email, $name);
@@ -204,7 +223,7 @@ final class PublicSignupApiHandler
 
     public function preview(Request $request): Response
     {
-        if (($limited = $this->limit('signup:confirm:ip:', ClientIp::fromRequest($request), self::IP_CONFIRM_MAX)) !== null) {
+        if (($limited = $this->limit('signup:confirm:ip:', ClientIp::fromRequest($request), RateLimits::publicSignupConfirmPerAddress())) !== null) {
             return $limited;
         }
 
@@ -224,13 +243,14 @@ final class PublicSignupApiHandler
             'workspace_name' => $preview['workspace_name'],
             'email' => $preview['email'],
             'requires_password' => $preview['requires_password'],
+            'brand' => $this->brandFor((int) $preview['tenant_id'], (string) $preview['workspace_name']),
         ]], 200);
     }
 
     public function confirm(Request $request): Response
     {
         $ip = ClientIp::fromRequest($request);
-        if (($limited = $this->limit('signup:confirm:ip:', $ip, self::IP_CONFIRM_MAX)) !== null) {
+        if (($limited = $this->limit('signup:confirm:ip:', $ip, RateLimits::publicSignupConfirmPerAddress())) !== null) {
             return $limited;
         }
 
@@ -351,20 +371,13 @@ final class PublicSignupApiHandler
         return ['id' => $tenantId, 'name' => $name ?? $slug, 'slug' => $slug, 'settings' => $settings];
     }
 
-    private function limit(string $prefix, ?string $subject, int $max): ?Response
+    private function limit(string $prefix, ?string $subject, RateLimitRule $rule): ?Response
     {
         if ($subject === null || $subject === '') {
             return null;
         }
 
-        $key = $prefix . $subject;
-        if ($this->store->count($key) >= $max) {
-            return Response::error('Too many attempts. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) max($this->store->ttl($key), 1)]);
-        }
-        $this->store->increment($key, self::WINDOW_SECONDS);
-
-        return null;
+        return $rule->take($this->store, $prefix . $subject);
     }
 
     private function tokenFromQuery(Request $request): string

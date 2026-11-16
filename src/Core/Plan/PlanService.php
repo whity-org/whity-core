@@ -72,16 +72,17 @@ final class PlanService
         ?string $description = null,
         bool $isActive = true,
         int $sortOrder = 0,
+        bool $isAddon = false,
     ): int {
         $key = strtolower(trim($key));
-        $this->assertValidKey($key);
+        self::assertValidKey($key);
         $name = trim($name);
         if ($name === '') {
             throw new PlanValidationException('name', 'name is required');
         }
 
         try {
-            return $this->plans->createPlan($key, $name, $this->trimOrNull($description), $isActive, $sortOrder);
+            return $this->plans->createPlan($key, $name, $this->trimOrNull($description), $isActive, $sortOrder, $isAddon);
         } catch (\PDOException $e) {
             if (stripos($e->getMessage(), 'unique') !== false) {
                 throw new PlanValidationException('plan_key', "A plan with key '{$key}' already exists");
@@ -445,6 +446,11 @@ final class PlanService
         if ($this->plans->findById($planId) === null) {
             throw new PlanValidationException('plan_id', "Plan {$planId} not found");
         }
+        // An add-on put on as the tier REPLACED the tier and took away
+        // everything it granted. Packs go beside it (WHIT-932).
+        if ($this->plans->isAddon($planId)) {
+            throw new PlanValidationException('plan_id', 'This plan is an add-on. Add it beside the workspace\'s plan instead.');
+        }
 
         $this->db->beginTransaction();
         try {
@@ -466,6 +472,55 @@ final class PlanService
     }
 
     /**
+     * Set how many packs of an add-on a tenant holds (WHIT-932). Zero removes it.
+     *
+     * Packs stack onto the tier rather than replacing it, which is the whole
+     * difference from {@see applyToTenant()}: applying "10 extra staff" as a
+     * tier used to take away everything the tier granted.
+     *
+     * Lowering a quantity takes nothing from anybody already there: limits only
+     * warn, so a workspace over its new staff limit keeps every member.
+     *
+     * @throws PlanValidationException When the plan is unknown or not an add-on,
+     *         the quantity is negative, or the tenant is the system tenant.
+     */
+    public function setTenantAddon(int $tenantId, int $planId, int $quantity, ?int $assignedBy = null): void
+    {
+        if ($tenantId === self::SYSTEM_TENANT_ID) {
+            throw new PlanValidationException('tenant_id', 'The system tenant is implicitly unlimited and has no add-ons');
+        }
+        if ($this->plans->findById($planId) === null) {
+            throw new PlanValidationException('plan_id', "Plan {$planId} not found");
+        }
+        if (!$this->plans->isAddon($planId)) {
+            throw new PlanValidationException('plan_id', 'This plan is a tier, not an add-on. Put the workspace on it as its plan instead.');
+        }
+        if ($quantity < 0) {
+            throw new PlanValidationException('quantity', 'quantity must be zero or more.');
+        }
+        if ($quantity > 10000) {
+            throw new PlanValidationException('quantity', 'quantity must be 10000 or fewer.');
+        }
+
+        if ($quantity === 0) {
+            $this->plans->removeTenantAddon($tenantId, $planId);
+            return;
+        }
+
+        $this->plans->setTenantAddon($tenantId, $planId, $quantity, $assignedBy);
+    }
+
+    /**
+     * The add-on packs a tenant holds.
+     *
+     * @return list<array{plan_id: int, plan_key: string, name: string, quantity: int, assigned_by: int|null, assigned_at: string}>
+     */
+    public function listTenantAddons(int $tenantId): array
+    {
+        return $this->plans->listTenantAddons($tenantId);
+    }
+
+    /**
      * The tenant's current plan assignment enriched with the plan row, or null.
      *
      * @return array<string, mixed>|null
@@ -484,9 +539,12 @@ final class PlanService
     }
 
     /**
+     * Public so a catalogue file and the default-plan setting are held to the
+     * same rule as a plan created on the screen.
+     *
      * @throws PlanValidationException When the key is empty or malformed.
      */
-    private function assertValidKey(string $key): void
+    public static function assertValidKey(string $key): void
     {
         if ($key === '') {
             throw new PlanValidationException('plan_key', 'plan_key is required');
@@ -494,10 +552,13 @@ final class PlanService
         if (strlen($key) > 64) {
             throw new PlanValidationException('plan_key', 'plan_key must be 64 characters or fewer');
         }
-        if (preg_match('/^[a-z0-9][a-z0-9_-]*$/', $key) !== 1) {
+        // Dot-separated segments too: a paid plugin's add-on plans are
+        // `plugin.<slug>.<plan>` (`plugin.salons.monthly`), the key every
+        // add-on reader in core matches on (WHIT-1156).
+        if (preg_match('/^[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)*$/', $key) !== 1) {
             throw new PlanValidationException(
                 'plan_key',
-                'plan_key must be lowercase alphanumeric, starting with a letter or digit (hyphens/underscores allowed)'
+                'plan_key must be lowercase alphanumeric, starting with a letter or digit (hyphens/underscores allowed, and dots between parts, as in plugin.salons.monthly)'
             );
         }
     }

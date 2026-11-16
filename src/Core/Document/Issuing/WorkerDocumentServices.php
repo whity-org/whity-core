@@ -99,6 +99,10 @@ final class WorkerDocumentServices
         $fields->add(new CompanyFieldProvider($settings));
         $fields->add(new TodayFieldProvider());
         $fields->add(new \Whity\Core\Document\Fields\IssuedDocumentNumberFieldProvider());
+        $fields->add(new \Whity\Core\Document\Fields\RouteValueFieldProvider($pdo));
+        $fields->add(new \Whity\Core\Document\Fields\RouteApprovalFieldProvider($pdo));
+        // WHIT-954: contacts and their custom fields, as in public/index.php.
+        $fields->add(new \Whity\Core\Contacts\ContactFieldProvider($pdo));
         $fields->addTenantSource(static fn (int $tenantId): array => TenantRecordFieldProvider::forManifests(
             $liveManifests($tenantId),
             $records,
@@ -116,6 +120,8 @@ final class WorkerDocumentServices
         $issuing = WorkerDocumentIssuing::build($pdo, $settings, $hooks, $roleChecker, $resourceTypes, $fields, $embeds, $slots, $env, $storageRoot, $parts);
 
         \Whity\register_service(DocumentFieldRegistry::class, $fields);
+        // WHIT-1072: the form-decision email reads a final document's PDF through the same storage.
+        \Whity\register_service(WorkerDocumentParts::class, $parts);
         \Whity\register_service(TemplateSlotRegistry::class, $slots);
         // WHIT-921: the worker retries a route's final document while the render
         // service was down. Its issuing stack is built on the first attempt.

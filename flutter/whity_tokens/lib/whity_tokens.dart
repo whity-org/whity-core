@@ -3,3 +3,4 @@
 library whity_tokens;
 
 export 'src/generated/tokens.dart';
+export 'src/whity_brand.dart';

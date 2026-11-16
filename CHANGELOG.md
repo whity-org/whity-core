@@ -6,6 +6,930 @@ uses tag-based releases (see the `v*` tags in the repository).
 
 ## [Unreleased]
 
+## [0.2.29] - 2026-11-16
+
+### Added
+
+- **Saved blocks are stored on the server.** People can save several blocks as
+  one, as Synced (change it once and every document using it follows) or Copy,
+  keep it to themselves or share it with the workspace, rename it, change it and
+  delete it. Each change is kept as a version, so a published template keeps
+  printing the version it was published with until someone publishes it again,
+  and a synced block still used by documents can't be deleted by accident
+  (WHIT-728).
+- `GET /api/resource-role-grants` takes `profile_id` instead of `resource_id`. It lists the grants of one resource type made to that person by name, which are the records they stand at, so a plugin no longer has to ask record by record (#1074). Everyone-grants are left out. Anyone may list their own grants; listing another person's needs `roles:read`, and the answer is always limited to the caller's tenant. Every grant row now also carries `resource_id`.
+- **Pick a document's theme in the editor.** A "Theme" button in the editor's header lists the workspace's themes, the default first, and under "Only for this document" sets the print colour and letterhead logo for that document alone. Choosing the default stores no theme, so the document follows a later change of default. A theme the workspace no longer has gets an amber note with a way back to the default (`TplDocThemes`, WHIT-785).
+- **Two type options for document themes.** A theme can set the document title
+  in Noto Sans instead of Readex Pro (E.46), and turn on large print: an 11pt
+  body with headings scaled to match, in print and in the editor's page view
+  (E.47) (WHIT-786).
+- **Plans, prices and limits can be loaded from a file.** `whity-cli billing:catalogue:apply <file.json>` adds what the file lists and never changes anything already there, so running it twice is safe and edits made at `/admin/billing` stay. It checks the whole file first and writes nothing if any of it is wrong; `--check` does only that (WHIT-925).
+- **New workspaces can start on a plan.** Set `billing.default_plan` to a plan key and every new workspace, including self-registered and single sign-on ones, is put on it. It is empty by default, so nothing changes until an operator sets it (WHIT-925).
+- **Metered limits can warn instead of refuse.** `meters.enforcement` set to `warn` lets an action go ahead past its limit and counts it. It defaults to `block`, which is how metering has always worked (WHIT-925).
+- **Plans can limit customers per month.** `customers.per_month` counts the distinct people a workspace serves each calendar month, in its own time zone: someone outside its staff who sends one of its forms (once a month however many they send; each anonymous form counts once), or who joins as a customer through its sign-up. Passing it is recorded and shown, and nobody is turned away. Unlimited by default (WHIT-932).
+- **Plans can include brand features.** `brand.custom_domain` (own web address), `brand.remove_badge` (no "Built on Whity" on public pages), `brand.own_email_sender` and `brand.own_app`. Own sign-in stays `sso.tenant_idp`. "Built on Whity" now follows the plan; setting an own web address for a workspace whose plan does not include it is allowed and answers with a warning. The defaults keep what every install does today (WHIT-932).
+- **Agent work has a monthly allowance.** `agents.runs.per_month` counts each tool call an AI agent makes. Work past the allowance goes ahead and is counted as usage, whatever `meters.enforcement` says. Unlimited by default (WHIT-932).
+- **Add-on packs stack onto the plan.** `GET`/`PUT /api/v1/tenants/{id}/addons` sets how many packs of an add-on a workspace holds; each pack's numbers are added to the plan's and its features are granted. An add-on can no longer be applied as a workspace's plan, which used to replace the plan (WHIT-932).
+- **Workspaces can see their limits.** `GET /api/v1/billing/limits` (billing access) lists staff, customers this month, agent work and documents against the plan, and any brand feature in use that the plan does not include (WHIT-932).
+- **Billing shows the plan's limits.** Workspace admins see staff, customers this month, agent work and documents against their plan on Billing, with a warning when one has been passed that says nothing is locked or removed. A brand feature in use that the plan does not include, such as an own web address, is listed too (WHIT-933).
+- **Add-on packs can be given to a workspace.** The workspace record has an Add-on packs panel for operators to add a pack, change how many, or remove it. Packs appear as their own columns in the limits grid at `/admin/billing`, marked as add-on packs (WHIT-933).
+- **Plugins can add message channels and inbox sources (SDK 1.97).** A store plugin can add a channel such as WhatsApp or SMS to Messages through `MessageChannel`: it sends, reads its provider's webhook after checking the signature, reports delivery, and lists its templates, with no change to core. Plugins can also add their own items to the inbox through `InboxSource`, and `GET /api/me/inbox/merged` shows every source as one list: urgent items first, then the newest, paged so nothing is skipped or repeated (#881, WHIT-937).
+- **Messages: talk to customers by email and web chat (server).** Each workspace now has conversations with its customers, with a status (open, pending, closed), an assignee, internal notes and search. Replies go out by email with proper threading, and replies to them come back into the same conversation through a signed inbound webhook. Web chat works for visitors without an account and for signed-in customers, with rate limits, a hidden bot trap and the instance's bot check. Other parts of Whity send through the same path, so a booking reminder lands in the customer's conversation. New permissions `messages:read`, `messages:reply` and `messages:manage` go to the roles that can already change settings (WHIT-938).
+- **Agents can draft replies.** Replying is an ordinary agent tool: with Ask first it becomes a proposal a person approves, and with Allowed the reply waits five minutes before it is sent and can be cancelled meanwhile (WHIT-938).
+- **Outbound messages are counted.** Every message sent to a customer, on every channel, counts toward `messages.outbound.per_month`. It only warns and shows on Billing; nothing is ever held back (WHIT-938).
+- **Messages inbox.** Staff with access see Messages in the menu: every conversation with customers by email and web chat, filtered by status, by who it is assigned to, and by search. Open one to read it, reply, add an internal note only the team sees, assign it to yourself, or close it. A reply an agent wrote shows as "not sent yet" with a Cancel button until it goes. Works in English and Arabic, light and dark, on a phone and on a desktop (WHIT-939).
+- **Web chat for your customers.** Turn it on in Settings → Messages and share `/chat/{your workspace}`: visitors write without an account, and signed-in customers find Messages in their own menu. The same settings page sets the reply address for email and the secret your mail forwarder signs with (WHIT-939).
+- **Billing shows messages sent this month** when the plan has an allowance for them (WHIT-939).
+- **Calendar and bookings in core.** Staff calendars with events, services (duration, buffers, the staff who provide them and a price that is shown only), weekly working hours, time off and extra hours, and a booking window (minimum notice, how far ahead, slot step). Staff book, move and cancel bookings for customers; "anyone" takes whoever is free. Times are stored in UTC and working hours follow the workspace time zone, clock changes included. A per-person lock means two requests can never book the same time. New permissions `calendar:read`, `calendar:write` and `calendar:manage`, granted to the administrative role on upgrade; MCP tools to find free times and to book, move and cancel, where an agent's booking always waits for its person's approval. A confirmed booking counts its customer toward `customers.per_month` (WHIT-941).
+- **A public booking page for each workspace.** Once a workspace turns it on, customers pick a service, a person or anyone, and a free time, then give their name and email. The page is protected by per-address and per-workspace limits, a hidden field, a minimum time on the page, a cap of three open bookings per email, and the instance's bot check when one is set up (WHIT-942).
+- **Customers can move or cancel from their email.** Each booking's link works until the booking starts and stops working when it is moved or cancelled. Confirmation, move, cancellation and reminder emails go out in the workspace's language with times in its time zone, and the booking can be added to a calendar as an .ics file (WHIT-942).
+- **Calendar feeds.** Each person can turn on a private ICS address for their calendar app, and replace it if it leaks (WHIT-942).
+- **Plugins can take a payment before a booking is confirmed.** A store plugin such as Whity Pay offers one booking payment step: a booking that needs paying is held as "pending payment" for the workspace's hold time, the customer is sent to pay, and the plugin confirms or releases it. A hold nobody settles expires and frees the time. Core never takes card details (WHIT-943, SDK 1.98).
+- **Plugins can add busy times from outside calendars.** A sync plugin's busy times count when free times are listed and again just before a booking is saved; a provider that fails or is slow never stops bookings. Plugins can keep outside events on a person's calendar and hear when bookings and events change (WHIT-943, SDK 1.98).
+- **A calendar for the team, in the web app.** A new Calendar item in the sidebar opens the team's bookings and events by day, week or month, for everyone or one person, always on the workspace's clock, with the week starting on the workspace's first day and the weekend shaded. Staff make a booking by choosing a service, a person or anyone, and a free time; when that time was just taken they are told so and shown the times still free. A booking opens in a side panel to move or cancel it, with the reason the customer will see. People add, change and remove their own events. Managers add and change services (names in English and Arabic, length, time kept free before and after, price, who provides it, whether customers can book it online), set anyone's weekly hours and time off, and change the calendar settings. On a phone the calendar opens on one day and a week reads as a list of days. Dates and times on the calendar can now be shown in a named time zone, and Arabic dates use the Levantine month names (WHIT-944).
+- **Customers can book online, and change or cancel their own booking.** A workspace that turns on its booking page now has a page at `/book/<workspace>` where a customer, without an account, chooses a service, a person or anyone, a day and a free time, and gives a name and an email (a phone number and a note are optional). Times are on the workspace's clock and the page says which zone that is; a visitor whose device is in another zone also sees the time in theirs. When a time was just taken, the page says so, shows the times still free and keeps what was typed. After booking, the customer sees what they booked, can add it to their calendar, and has a link to change it; when a payment is needed, the page shows what is owed and takes them to pay. The link in the email opens `/booking/<link>`, where the customer can add the booking to a calendar, move it to another free time (the page then uses the new link, because the old one stops working) or cancel it after a clear warning. Both pages work in English and Arabic, light and dark, on a phone and on a desktop (WHIT-945).
+- **Booking confirmations carry the booking as a calendar file.** The confirmation and the email after a move attach `booking.ics`, so the customer adds it to their calendar in one tap; a move replaces the earlier entry instead of adding a second. Emails can now carry attachments in general (`OutgoingEmail::$attachments`, sent as multipart/mixed) (WHIT-947).
+- **Every green push to develop publishes images.** The app, web and render
+  images are built, scanned and smoke-tested the same way as a release, then
+  pushed as `develop-<sha>` and, once the smoke test passes, `develop`. A
+  deployment can now follow develop between releases and pin an exact commit,
+  which `/api/build` reports (WHIT-951).
+- **Contacts: customers and suppliers in one record, and importing them from a spreadsheet.** A contact is a customer, a supplier or both, with a contact person, email, mobile, phone, tax number, how they pay, address, notes and tags (core's tags, made on first use). A new contact whose email is the verified email of someone in the workspace is linked to that person; Messages and Calendar keep their own customers and join through the person. Import reads Excel (.xlsx) or CSV, finds the header row, suggests where each column goes by name (English and Arabic) and by content, tidies phone numbers (adding a country code you give), and shows what will be created, updated (matched by tax number, mobile, email or name) and skipped, with reasons, before anything changes; the skipped rows download as a CSV. An import can be undone for 24 hours. New permissions `contacts:read`, `contacts:write` and `contacts:import`, granted on upgrade by capability; MCP tools in a new Customers and suppliers toolset, where an agent can add a contact (undoable) and every other change is a proposal (WHIT-953).
+- **Your own fields on contacts.** A workspace adds fields to its contacts without code: short or long text, choose one, choose several, amount, date, yes or no, or a person, with a name in English and Arabic, choices, whether it shows in the list, whether it is required, and who can change it. A new field works at once: on the contact under `fields`, as a list filter (`field[preferred_branch]=Abdoun`), as a document merge field (`{{contact.preferred_branch}}`, with the contact's own details as merge fields too), and as a column an import can fill, with undo putting the old value back. New permission `fields:manage`, granted on upgrade by capability; MCP tools to add, change and archive fields. Record types are registered in core (`contact` today), and a plugin can register its own type in the same registry (WHIT-954).
+- **Contacts screens.** A Contacts page (Everyone, Customers, Suppliers, tag and field filters, search, the workspace's own fields as columns), a contact's page (WhatsApp, Call, Email, details, your fields, the person it is linked to, archive and restore), Import from Excel or CSV (match columns with Whity's suggestions, see what will happen before anything changes, import, undo for 24 hours), and Settings › Fields to add the workspace's own fields, in English and Arabic (WHIT-955).
+- **Design 3.3 tokens and the Whity favicon.** The spacing (`--space-*`), logo size
+  and mark-cut tokens are generated with the rest, Flutter clients get the
+  `WhityBrand` theme extension from `whity_tokens`, and the app shows the Whity
+  mark as its favicon when a workspace has not set its own (WHIT-956).
+- **Animations in Whity, and a setting for them.** Quiet moments now have a
+  small animation in the workspace's colours: the 404 and 500 pages, searches
+  with no results, waiting on an upload or another system, and approving one
+  proposal (on screens that opt in). Account › Preferences has Animations: Full,
+  Calm (pictures fade in at their end) or Off (still); a device set to reduce
+  motion always gets Off. The animation files load only when one is shown
+  (WHIT-957).
+- **Shared pieces for the new work screens.** People without a photo get a
+  small seeded Whity pattern instead of bare initials, the same on every device.
+  The kit also gains a board with a review gate, a day time grid for people and
+  rooms, a message thread where agents are clearly marked members, a row of
+  headline numbers, and a spreadsheet column matcher, for Tasks, Appointments,
+  Chat, Reports and Import (WHIT-958).
+- whity.dev reads its plans from Whity: `GET /api/public/plans` answers the website's plans (WS.5) from the active plans, their monthly prices and limits, plus a small marketing layer in the new **Plans on the website** setting (Arabic name, tagline, features shown, highlighted plan, button). Only plans the setting lists as visible are published, prices are in normal units, only plans the page can show are sent, and the answer is cached for five minutes.
+- The website's contact form is answered by Whity: `POST /api/public/contact` files each message in the Messages inbox of the workspace named in the new **Website contact form inbox** setting, as a website message: the address the visitor typed is shown as not checked, and is never linked to a customer or emailed from the inbox. It is limited per address (IPv6 per /64, and still limited when the proxy passes no address), drops anything that fills the hidden trap field, never sends the message back, and works without scripts (the page gets a redirect back). Both endpoints let `https://whity.dev` read them (`WHITY_SITE_ORIGINS` to change it).
+- **health.whity.dev looks like Whity, in English and Arabic.** The status page is restyled to the 3.3 design: one plain sentence on top that names what isn't working, every part with its days of history and plain words for what it is, and what's happening now. Arabic is at `/ar/`, right to left with Western digits. It still loads nothing from Whity, so it stays up when Whity doesn't, and still never shows an unchecked day or stale readings as working. `/status` now also answers one word, `ok`, `degraded` or `down`, for the websites' footers.
+- **Run Whity on your own machine in one line.** `install.sh`, published at `https://whity.dev/install.sh`, checks for Docker (and that it's running), Node.js 20 or newer and git, and stops with one plain line and no changes when one is missing; then clones Whity (`--dir`, `--version`), runs `make setup` (`--empty` leaves out the sample data), starts the web app and waits for http://localhost:3000, and prints a one-time password for `admin@whity.localhost`. It never asks for sudo.
+- **Connect a workspace to Taskaat.** Tasks and boards live in Taskaat (taskaat.dev). A workspace admin connects the workspace once with Taskaat's own sign-in; the tokens are kept encrypted per workspace and never shown. Agents then reach the workspace's Taskaat boards, tasks, done-when checks, evidence, reviews and decisions through Whity's MCP (the `taskaat_*` tools); reading never starts a task, and an agent's change is a proposal a person accepts. New permissions `tasks:read`, `tasks:write` and `tasks:manage`, granted on upgrade to the roles that hold `documents:read`, `settings:write` or `roles:write` (WHIT-962).
+- **Ordinary agent proposals can be approved together.** Each proposal now says how carefully it must be looked at: Ordinary (it can be undone and touches nothing sensitive), Check first (it can't be undone, or it publishes, issues or closes something) or Needs verifying (it changes people, roles, sign-in, security, plugins or billing, or deletes). `POST /api/me/agent-proposals/bulk-approve` approves only the Ordinary ones; each runs, is recorded and can be undone on its own, and the others come back to be opened one by one (WHIT-963).
+- **"I'm away".** A person can hand their decisions to someone in the workspace while they're away, from their own account (`GET`, `PUT` and `DELETE /api/me/away`): the day it starts, the day they're back, who decides for them, what goes to that person (approvals in flows, their agents' proposals, documents to sign) and a message for people who write to them. Coming back early ends it at once. `GET /api/away-periods` lists everyone's for the Delegations page (WHIT-965).
+- **Calendar rooms, branches, check-in and requests.** A service can need a
+  room, and booking it takes the room too, so two people can't use one room at
+  the same time. Staff and rooms belong to a branch, and bookings and the new
+  Today counts (booked, checked in, open requests, reminders sent) filter by
+  it. Staff check customers in. A service that needs approval, or a workspace
+  with instant booking off, turns a booking from the booking page into a
+  request that holds its time until staff accept it or suggest another time;
+  the customer takes a suggested time from their link. Reminders stay email in
+  core, and a plugin can add another reminder channel (WHIT-966).
+- **Plugins can message a workspace's customers.** A plugin such as Whity Pay can tell a customer about a payment through Messages: WhatsApp when the WhatsApp channel is installed and on, otherwise email. The message appears in the customer's conversation, marked as sent by the plugin (WHIT-967, SDK 1.99).
+- **New sign-in, two-step off and plan limit emails.** Signing in from a browser
+  the account hasn't used before sends "A new sign-in to your account", with an
+  "It wasn't me" button; turning off two-step sign-in sends a note recommending
+  turning it back on. Neither can be turned off. People who can choose a plan
+  hear when the workspace reaches 90% of a limit, and when it passes one on an
+  instance that warns, in words that say what will really happen. New
+  workspaces get "Your workspace is ready" with three first steps. All follow
+  the workspace's language, English or Arabic (WHIT-968).
+- **Agents tell you by email when something needs you.** When an agent proposes
+  something, the person it works for gets "This needs your approval" with the
+  proposal and one button that opens Whity: nothing is approved from the email.
+  At most one an hour per agent, except sign-in approvals, and each email says
+  how many more are waiting. An agent's page has a new Notifications tab to turn
+  these off. At 18:00 in the workspace's time zone, people whose agents did
+  something that day get a short summary of what was done and what waits for
+  them (WHIT-969).
+- **Ask an agent from a document, with your own AI app.** A request waits until
+  the agent you connected over MCP picks it up (`document_agent_requests_next`),
+  reads the document (`document_read`), and answers with suggestions and comment
+  replies (`document_suggest_blocks`, `document_suggest_rewrite`,
+  `document_comment_reply`). Nothing it does changes the draft until a person
+  accepts it, and each suggestion names the agent, the person it acts for and
+  the permission it used. It reports progress with
+  `document_agent_request_update`, which tells it to stop when you press Stop
+  (WHIT-970).
+- **Ask an agent and Rewrite in the editor.** The toolbar's agent button and
+  Rewrite in the selection bubble open a sheet to pick one of your agents and
+  say what to do; the request then shows in place as it runs, with Stop, and
+  its suggestions appear on the rail. With no agent connected, the sheet says
+  how to connect one (WHIT-971).
+- **An 80 mm receipt roll.** A document whose page size is `80mm` prints on an
+  80 mm roll with small margins, so a plugin's receipt can use core's printer
+  (WHIT-972).
+- **Team chat in core.** A Chat page for the team's own chats, people and agents together: group chats and direct chats between staff, or with one of your agents. An agent joins a chat working for a person in it, reads only from when it joined unless the person adding it chose the last 7 days or everything, never sees other chats, and has a mode per action (Off, Ask first, Allowed). A line in the chat says who added it, who it works for, what it can read and what it may do. An agent's line on Ask first waits for the person it works for; an agent's proposal shared in the chat can be approved only by the person it waits for. Mentions of people and agents, and chats linked to a board, a meeting or a record. Team chats live on the Messages tables and never appear in the customer inbox. Everyone who works in the workspace can use it, with no permission to grant; MCP tools (toolset Team chat) for agents to read and post (WHIT-973).
+- **Tasks page.** A new Tasks item in the sidebar shows whether the workspace is connected to Taskaat, connects it with Taskaat's own sign-in or disconnects it (for people who manage tasks), and opens Taskaat. The task list and board come next (WHIT-976).
+- **The calendar shows requests, today and branches.** Beside the calendar, a
+  Requests card lists customers' requests with Accept and Suggest another time,
+  and a Today card counts the bookings, check-ins, open requests and reminders
+  sent. Requests are dashed amber and checked-in bookings green; a booking is
+  checked in from its sheet. A new Rooms and branches page adds rooms and says
+  who works in which branch, and the calendar filters by branch. A service can
+  need a room or your OK, and instant booking can be turned off. On the
+  booking page such a service says Send request, and the customer takes a
+  suggested time from their link (WHIT-977).
+- **Plugins can email as the workspace.** SDK 1.100 adds `WorkspaceEmails`: a
+  plugin hands over what the email says (a heading, paragraphs, rows such as an
+  invoice's total and due date, one button) and core sends it in the
+  workspace's brand and language, in the same layout as core's own emails.
+  Front Office uses it for invoices, quotes, receipts and payment reminders
+  (WHIT-978).
+- **Tasks and Boards on Taskaat.** Tasks shows My tasks, Assigned by me, Agents' tasks and All, grouped by when they're due; a task opens with its done-when check, its evidence and the review gate (Accept as done, or Send back with a reason), and a task closed without passing evidence says "Done, unverified". Boards shows each Taskaat project as To do, Doing, Awaiting review and Done. New tasks can be given to yourself or to an agent, which then works for you. Everything is read and written in the workspace's Taskaat; nothing is copied into Whity (WHIT-981).
+- **Plugin screens in Arabic.** SDK 1.101 lets a plugin write any text in a
+  block screen (labels, titles, placeholders, empty states, confirmations) as
+  `{en, ar}`. Core shows it in the reader's language, falling back to the
+  other one, and the plugin's menu entry follows. Front Office's screens use
+  it (WHIT-984).
+- **Whity's own billing emails can come from a plugin the operator trusts.**
+  SDK 1.102 adds `BillingEmails`: a plugin sends Whity's receipt or a
+  payment-failed email about a workspace's plan to the people who can pay for
+  it, in this instance's brand and the workspace's language. Only a plugin
+  that declares it and that the operator lists under Settings › Plugin store
+  › Plugins that send billing emails can send them; nothing is allowed by
+  default, the button can only open the app, and a workspace gets at most
+  five a day (WHIT-985).
+- **Moments across the app.** Quiet moments in core screens now have their
+  small animation. When nothing is waiting, Approvals and the Inbox say "All
+  caught up". The first time you see empty documents, templates, people,
+  groups or billing invoices, they get their own picture once a session. The
+  first agent screen and your first visit to Branding get their first-run scene
+  once. Signing a document, finishing setup on the home, the locked screen,
+  uploading a plugin and waiting for an AI app to connect each have their
+  moment. Every one follows Account › Preferences › Animations and the device's
+  reduce motion setting, and the words always say what happened.
+- **Saved blocks in the editor.** Select blocks, open the block menu and
+  choose Save as block, Synced or Copy, for you or the workspace. They appear
+  in the / menu under Saved blocks; a synced block shows its name, how many
+  documents use it and Detach, and every save records which documents use it
+  (WHIT-988).
+- **Templates with a synced saved block can be published.** Drafts and
+  previews print the block as the library has it now, and publishing freezes
+  it, so a published template prints the same until someone publishes it again.
+  A deleted saved block blocks publishing (WHIT-990).
+- **A page for saved blocks.** Documents, Saved blocks lists your saved
+  blocks and the workspace library: rename them, change who can use them, see
+  where a synced block is used, edit the original or delete one (WHIT-991).
+- **Parts filled per document.** When editing a synced block's original,
+  mark text Filled per document; each document using the block fills its own
+  value, which it prints and keeps if the block is detached (WHIT-992).
+- **Plugins can add blocks to documents.** SDK 1.103 lets a plugin declare
+  document blocks: their fields, a view and an optional print view in Whity's
+  display blocks. Whity draws them with its own components, so a Verified
+  plugin's block looks built in while no plugin code runs in the app. Each
+  plugin has its own group in the / menu; a block without a print view is for
+  notes and wiki pages only, and a block whose plugin is off keeps its data,
+  says which plugin it needs, and blocks publishing (WHIT-993).
+- **Plugins can let a workspace's customers act on their own records.**
+  SDK 1.104 adds `PluginCustomerPermissionsInterface`: a plugin lists those of
+  its own permissions that reach only the caller's own records, such as a
+  clinic adding its own patients or uploading its own scans. Customers then
+  keep those permissions, and Settings › Sign-up can offer a role made of
+  them, which the workspace admin still chooses. Core and admin permissions,
+  another plugin's permissions and resources two plugins share never count,
+  and disabling or uninstalling the plugin withdraws them at once (#1872,
+  WHIT-995).
+- **Customers can invite their own team, when the workspace allows it.**
+  Settings › Sign-up has a new switch, off by default. With it on, a customer
+  can invite colleagues by email. They join with the inviter's own role, as
+  customers and never as staff. The answer never shows who is already in the
+  workspace, and a customer's invitation never replaces anyone else's. Each
+  customer can send 10 an hour, and every invitation is audited. SDK 1.105
+  adds `membership.customer_inviting`, so a plugin can refuse an invitation
+  or attach a note that comes back when it is accepted. Invitations are
+  emailed, so this needs the instance's mail set up (#1872, WHIT-996).
+- **A flow stage can ask the person approving it for a few values.** In the
+  flow editor, a stage gets "Values to fill in" (up to five, named in English
+  and Arabic, each needed to approve or optional), such as a committee meeting
+  number. The person approving fills them in on the route; a rejection, a
+  send-back or a note carries none. The values show on the route page with
+  who entered them, and a template prints them with the new "Entered during
+  review" fields (`route.value.<key>`) on the final document (WHIT-1016).
+- **A form's reference can be given on approval, and print an answer, a
+  review value and the academic year.** Under Settings, "When the reference
+  is given" can now be "When it is approved": the number is given when the
+  review flow finishes approved, before the final document is made, and a
+  submission that is not approved takes none. New parts: `{AY:9}` for the
+  academic year starting in September (2026-2027), `{ANSWER:question}` for an
+  answer, `{ANSWER:subject|human=IRB-AAU|animal=AUB-AAU}` to turn an answer
+  into text, and `{STEP:meeting_no}` for a value entered during review. Each
+  prefix, year or answer counts on its own, so `IRB-AAU 12/…` and
+  `AUB-AAU 3/…` keep separate running numbers; existing formats keep theirs.
+  Formats can be 160 characters long (WHIT-1017).
+- **Final documents can list who approved, and a stage can leave out people
+  named on the form.** Templates get "Approvals" fields: each approver's name,
+  the date, the stage and an approval mark, for every approval or for one
+  stage's. Put them in a table row and the row prints once per approval, so
+  an approval certificate lists the committee that approved it. In the flow
+  editor, "Leave out people named on the form" takes the form's people
+  questions (such as `supervisor` and `co_supervisor`): a committee member
+  picked there is not asked at that stage, is not counted towards approval,
+  and is not printed among the approvals (WHIT-1018).
+- **Document themes can say how form responses print.** A theme's new `form`
+  options choose the header, the office details, where the decision goes, the
+  section headings (styles A to F), stacked or two-column questions, long
+  answers, choices, Yes / No / N/A, empty and N/A answers, signatures,
+  approvals and the footer, plus up to three of the client's marks (ISO,
+  accreditation) for the footer; `letterhead.layout` can centre the
+  letterhead or print it in English and Arabic. Customising needs the new
+  `documents.form_printouts` entitlement (paid plans and trials); without it
+  forms print the standard layout with the workspace's logo, colour and marks.
+  The gate is read each time a printout is made, so a trial ending changes only
+  new printouts (design 3.4, FP.2-FP.10; WHIT-1020).
+- **Whity Render can print form responses as records and certificates.** New
+  flowing-mode blocks draw what design 3.4's form printouts need: the form's
+  title and byline, section headings in six styles (number, the Whity mark,
+  eyebrow, progress rail, tab, tinted plane), questions with every choice ticked
+  or not, Yes / No / N/A as a word or in three columns, "Not answered", a
+  section answered N/A collapsed to one line, long answers that say "continued"
+  when they run onto the next page with a word count, two-column questions,
+  signatures confirmed in Whity beside the drawn signature (or a dashed line),
+  the decision line and decision block with its QR, approvals as a list with a
+  "Not counted" line or as cards, and the office strip. The letterhead can be
+  centred or in English and Arabic either side of the logo, and the footer can
+  carry the client's marks and a small QR on every page. Documents that use
+  none of these print exactly as before (FP.1-FP.12; WHIT-1021, WHIT-1022).
+- **Any form response prints as a clean record, with no template.** When a
+  form's review flow ends with a final document and nothing names a template,
+  the response now prints in design 3.4's automatic layout instead of the
+  route refusing to start: the letterhead and title, the decision line with
+  the reference and dates, each section with its questions (every choice
+  ticked or not, Yes / No / N/A, "Not answered", sections answered N/A
+  collapsed to one line, long answers with a word count), signatures confirmed
+  in Whity, the office's answers under "For official use", and the decision
+  with its verification QR and the approvals. People a step left out because
+  the form names them as supervisors are listed as "Not counted". The layout
+  follows the workspace theme's Form printouts options on paid plans and
+  trials. Staff can open any response as it would print
+  (`GET /api/form-submissions/{id}/printout`), and the theme's Form printouts
+  tab gets a live preview (`POST /api/document-themes/form-printout-preview`).
+  Long-answer questions can set "Most words", and the workspace can store its
+  name and address in Arabic for a letterhead in English and Arabic
+  (FP.1-FP.10; WHIT-1023).
+- **The workspace document theme has a page, with a Form printouts tab.**
+  /admin/document-themes shows the theme every document and form
+  printout uses. Documents sets the print colour, letterhead, title face and
+  large print; Form printouts chooses every part of how form responses print
+  (header, decision, the six section heading styles, questions, answers,
+  signatures, approvals, footer) with a live preview of the latest response,
+  and takes up to three marks for the footer. Free workspaces see the
+  standard layout locked, with what paid plans add; a trial says how long it
+  has left. A workspace still on Whity's standard theme can make its own in
+  one step. `GET /api/document-themes/schema` now says in `form.allowed`
+  whether the workspace may customise its printouts (WHIT-1024).
+- **One Whity ID token verifier, in the plugin SDK (1.106).**
+  `Whity\Sdk\Auth\Jwt\IssuerTokenVerifier` checks a token from one issuer:
+  issuer, type, signature against the issuer's key set (cached, refetched for
+  a rotated key), expiry and audience, with nothing but PHP's openssl
+  extension. The host's MCP sign-in, service routes and single sign-on now use
+  it, and plugins and services can use the same check instead of their own
+  (WHIT-1026).
+- **A form's signature can be drawn on a touch screen.** Under the typed name,
+  a signature question now offers a pad to draw on with a finger, a pen or
+  the mouse. The drawing is optional and is kept with the answer; the form's
+  printout shows it beside "Confirmed in Whity", or a dashed line with "No
+  drawn signature" when none was drawn (design 3.4, FP.7; WHIT-1029).
+- **People who ask to join a workspace hear the decision.** Approving or
+  declining a sign-up request used to be recorded only; the person now gets
+  an email from the workspace: "You're in" with a Sign in button, or a short
+  note that it wasn't accepted, which invites a reply only when the workspace
+  has its own address set (WHIT-1033).
+- **People asked to sign, and people who send a form, hear it by email.** When
+  a route reaches a sign step, each signer gets "Please sign this" from the
+  workspace with a Read and sign button that opens their inbox (it replaces the
+  emailed routing notice for that step, so nobody gets two). A signed-in person
+  who sends a form gets "We received it" with the reference, when it was sent,
+  what happens next and a link to their submissions; they can turn it off in
+  Preferences › Notifications. Public submissions get no email (WHIT-1033).
+- **The person who sent a form hears the decision.** When a signed-in
+  person's form finishes its route, the workspace emails them the decision
+  with the reference and any conditions; an approval that makes a final
+  document carries its PDF with the QR code (up to 1 MiB, otherwise the button
+  opens their submissions). Public submissions get no email; the person can
+  turn it off in Preferences › Notifications (WHIT-1034).
+- **A key for an agent that runs on its own, made in four steps.** Connected AI apps has *New key for an agent* (the connect wizard links to it too): name it by its job, see that it acts for you and never for more, set what it may do to start, and copy the key, shown once, with *Done* waiting for "I've put the key somewhere safe". The starting grant comes from the new `GET /api/mcp/tokens/starting-grant`: reads you hold start Allowed, everything else Ask first, nothing without undo can be Allowed, and permissions you don't hold are shown but can't be given, with a note saying who can give them to you. Before, the web had no way to issue an agent credential at all (`TplAgentCredential`, WHIT-1040).
+- **Links to a workspace's public pages show a preview.** Sharing a booking page, a form, a join link or the sign-in page in a chat app now shows a 1200 × 630 card and a proper title and description: the workspace's colour and logo on its own pages, Whity's paper and lockup on Whity's. A shared document's link shows only who issued it, its reference and "private link", never its content, and is kept out of search engines. Arabic names and titles get an Arabic card (`SiteShareCards`, WHIT-1041).
+- **A Whity Builder publish or roll back reads as its impact plan on the approval card.** Each change is a row with its kind in words and an icon (Safe, Changes data with the records it touches, Deletes data in solid red), the version's tests sit under the changes with when they ran, and the footer says which version it can be rolled back to. Failed tests turn Approve off and offer "Ask Whity Builder to fix it", which declines with the failing tests named; a plan that stops showing data needs a tick before Approve turns on. The server holds both rules (`422 tests_failed`, `422 acknowledge_destructive` unless `acknowledgedDestructive: true`), keeps a decline's `reason` (migration 274, `decline_reason`) and gives it back to the agent as `declineReason` from `get_proposal`. The plan now carries its `kind`, the plugin's name in both languages, the failing tests by name and `ranAt`, and a roll back runs its version's tests too. Before, the card showed the manifest as text (`TplImpactPlan`, WHIT-1042).
+- **Team invites take a number per customer.** Settings › Sign-up gets "People per customer" under team invites: each customer can invite up to that many people (open, accepted and not-sent invitations take a place; withdrawn and expired ones free it), and one more is refused with 409 `invite_limit`. Empty means no limit, which is how every workspace stays until an admin sets one. A customer's own list now carries `limit` and `used` (`TplSettingsSignup`, SC.11, WHIT-1043).
+- **One command moves every stored secret onto a new key.** After rotating the instance key, `whity-cli secrets reencrypt` (with `--dry-run` to preview) re-encrypts sign-in provider secrets, storage, plugin, mail, push, payment and notification secrets where they are, and a test keeps the list complete.
+- **The web app on a phone has the phone's tab bar.** Under 640px wide, in the
+  browser and installed, the drawer gives way to Home, Inbox, Create, Chat and
+  More, with counts on Inbox and Chat. More lists everything the sidebar holds,
+  in the same groups, and keeps light or dark, language and signing out in
+  reach; Create opens a sheet with Ask an agent and the pages you can create
+  things on. The bar steps aside while the keyboard is open. 640-767px keeps
+  the drawer and 768-1023px the rail (WHIT-1064, PwNav).
+- **Lists on a phone work like the phone app's.** Under 640px every stacked
+  list gets a Sort button with one choice per line, Select with Cancel, the
+  count and Clear all / Choose all, and the bulk actions in a bar where the tab
+  bar was; search, Filter and the page's main button sit at the bottom, and
+  filters on show are chips you can remove. The Users list is the first to use
+  the filter sheet and the bottom main button (WHIT-1066, PwLists).
+- **Install the web app from a phone.** More now offers 'Install <workspace> on this phone' once, in the browser only: the browser's own prompt on Android, three steps on iPhone Safari; installed apps and desktop are unchanged.
+- **Routes and role permissions can be read on a phone.** Under 640px a route shows as numbered sentences (who does what, and where a rejection goes) and a role's permissions as one list per area with Allowed or Not allowed in words, each with an "Open on a computer" button that offers the link by email or copy. Editing stays on a computer, and desktop is unchanged.
+- **Ctrl+K takes commands after a slash.** Type `/` in the search box (Ctrl K
+  or ⌘K) to drive the app from the keyboard: `/new` starts a document, form,
+  booking, task or chat, `/go` opens any screen, `/invite` opens the invite
+  form filled in, `/switch` changes workspace, `/theme` and `/lang` change the
+  look and the language, and `/help` lists them all. Tab picks a command,
+  Enter runs it. Only the commands a person can use are listed; each one opens
+  the screen's own dialog, so nothing is created or sent without pressing its
+  button. Commands answer to their Arabic names, and the slash key works on
+  the Arabic keyboard too (WHIT-1069).
+- **Ctrl+K remembers, shows what is waiting, and asks agents.** Opened empty,
+  it lists what you opened and ran from it lately and your recent documents.
+  `/approve` lists what is waiting for you and opens it; it never approves or
+  declines. `/ask` hands your words to one of your agents: it opens your chat
+  with that agent with the words in the message box, unsent, and the agent
+  answers there with a proposal you approve. With an agent to ask, the last row
+  of every search becomes "Ask an agent" (WHIT-1070).
+- **Web push: each person's devices and the instance's push key.** A person can turn on browser notifications for a device: the browser's push subscription is stored per person, workspace and device (migration 276, `push_subscriptions`), only for the browsers' own push services, and listed back without its address. The instance makes its own VAPID key pair the first time it is needed and keeps the private key encrypted with the key ring, so a self-hosted Whity needs no account with any push provider. Nothing is sent yet; the push channel follows (WHIT-1073).
+- **Web push notifications.** A notification shown in Whity now also goes to every device the person turned push on for, in the workspace's name and the person's language, and opens the record when tapped. It passes the same gate as email: the workspace's push switch, then the person's choice for that kind; security notifications always go. A burst can't flood a phone: past 4 a minute or 30 an hour the rest are held and one "N more things are waiting" follows. Devices the push service reports gone are removed. Messages are encrypted to each device (RFC 8291) and signed with the instance's own key (RFC 8292): no push provider account, no new dependency (WHIT-1074).
+- **Turn on notifications for a device.** Home asks once, from a card that says what notifications are for and that there's never marketing; the browser's prompt follows the tap, never a page load, and on iPhone and iPad it appears only in the app added to the Home Screen (iOS 16.4 and later). Settings › Preferences has a Notifications card: this device on or off, your other devices, and which kinds come as a notification. The app's service worker shows each push in the workspace's name and the person's language and opens the record when tapped, only on this site. Signing out stops this browser getting anyone's notifications (WHIT-1075).
+- **Push notifications wear the workspace's brand.** Each push shows the workspace's own name in its title ("AAU IRB · Application waiting for pre-check"), its square logo as the icon (its initial on its colour when it has none), and its initial as the status-bar badge, which Android can only draw as a silhouette. docs/wiki/Web-Push.md says what Whity sets and what the operating system decides (colours, font, layout, sound, grouping), and how to self-host it (WHIT-1076).
+- **Chat messages arrive as push notifications, and everyone is asked to turn them on.** A new line in a team chat is pushed to the chat's other people who have a device on, but not to its author or to anyone looking at that chat in a focused window. A chat's pushes replace each other and count what's unread ("3 new messages in #Front desk"), mentions are their own kind, and both are on by default. Every signed-in person now sees the notifications ask after sign-in, worded around chat; "Not now" asks again after 14 days and "Don't ask again" or any browser answer ends it (WHIT-1077).
+- **Notifications shows your other workspaces too, read-only.** Choices and
+  push devices are kept per workspace, so someone in several workspaces
+  couldn't tell where they would hear from. Under your notifications for the
+  workspace you're in, each of your other workspaces now shows how many of
+  your devices have push on there, and whether email and push are on, off or
+  on for some kinds. To change one you switch to it. This comes from a new
+  self-scoped read, `GET /api/v1/me/notification-summary`, which only covers
+  your own active memberships (WHIT-1081).
+- **Search finds every setting by name, in English and Arabic.** People
+  look for a setting by the word they know, not by where it lives. Ctrl+K,
+  and the search field at the top of every phone screen, now have a
+  **Settings** group. It lists every settings page this person may open and
+  the main things on each (Text size, Light or dark, Two-step sign-in, Logo,
+  Brand colour, Push notifications on this device…). Each result shows where
+  it sits and who it applies to. Words work in either language whatever the
+  screen's language ("إشعارات", "notifications", "push" and "alerts" all
+  find Notifications), and Arabic letter forms are folded as in record
+  search. The phone settings menu's own search uses the same list, and
+  `/go` reaches every settings page. The Settings area shows as one place in
+  Go to instead of a few of its pages (WHIT-1084).
+- **Amounts in words in US dollars, euros, riyals and dirhams, not only dinars.** Invoices and documents can write a total as "Three hundred and one US dollars and sixty cents" in English and Arabic, and amounts can be written the way design 3.5.1 shows them ($312.00, JOD 312.000), so workspaces outside Jordan get the same printouts (WHIT-1086).
+- **A workspace can choose its currency in Settings.** The company details now include Currency (USD for a new workspace, the currency it already used for an older one), so new prices, services and documents start in it; amounts already saved keep their own currency (WHIT-1087).
+- **Chat messages can be answered, threaded, reacted to and pinned.** Reply
+  quotes the message you answer; Reply in thread opens a side conversation in
+  the right pane, and "Also send to the chat" posts it to both. Hover a message
+  (or move to it with the keyboard) for three quick reactions, more, Reply,
+  Reply in thread and ⋯: Pin, Copy, and Edit or Delete for your own messages.
+  "edited" shows on a changed message; deleting for everyone works for 2 days
+  and leaves "This message was deleted". Two ticks turn the main colour once
+  everyone has seen your message, and Seen by lists who. Typing shows under the
+  last message, an "n new" line marks where you stopped reading, @everyone
+  tells a whole group, and Search finds words or a person's messages in a chat
+  and opens them in place. Each person chooses bubbles or compact rows in My
+  settings › Language and display (design 3.5, UC.6–UC.12, WHIT-1094).
+- **Photos, files and voice messages in Chat.** The + beside the message box
+  adds photos and videos or a file, and files can also be pasted or dropped in.
+  Each shows its progress while it uploads; one that doesn't get through says
+  "Not sent" with Try again, and nothing is lost. Photos sent together show as
+  an album, a file shows its type, name and size with Download, and a chat's
+  photos and files are listed in its details. Voice is tap the microphone to
+  record and tap Send, with nothing to hold down; it plays in place with its
+  words under it, written down by the browser while recording where the
+  browser can. Files are up to 25 MB and their type is read from the file
+  itself (design 3.5, UC.10, WHIT-1095).
+- **Polls and Whity records inside chat messages.** The + beside the message
+  box now also adds a poll (2 to 10 answers, one or several to pick) whose
+  counts everyone sees change as people vote, and a Whity record, a booking or
+  a document, that shows its status as it is now (a booking cancelled since
+  says Cancelled) with a button to open it. Opening a record goes through its
+  own page, which shows each person what they may see (design 3.5, UC.5,
+  WHIT-1096).
+- **Bots, blocking and mute in Chat.** Settings › Chat (it was Messages) now
+  has bots the workspace sets: an away reply outside opening hours, a welcome
+  message for a customer's first message, and hand-over, which gives each new
+  conversation to the next person on a list. Bots follow these rules and
+  never decide anything; their messages are grey with a Bot tag. People who
+  manage customer messages can block a customer's number or address from the
+  chat's details: whatever they send afterwards is dropped, past messages stay,
+  and Settings › Chat lists everyone blocked with Unblock. Anyone can mute a
+  chat for themselves; @mentions still reach them. New chat can also start a
+  conversation with a customer by email (design 3.5, UC.4, UC.8, UC.12,
+  WHIT-1097).
+- **The calendar API can resize, move quietly, book over a busy person and remember each person's view.** Design 3.5's calendar edits on the grid: a create or move takes `duration_minutes` (dragging across a time, pulling the bottom edge), `notify` (untick "Email the new time"), `book_anyway` (the person is busy; never for agents, and a taken room or closed hours still refuse) and `within_hours`; a 409 now carries `reason` (`person_busy`, `room_taken`, `closed`) so the screen can say why. `GET`/`PUT /api/v1/calendar/my-view` keep each person's own view, Colour by and ticks per workspace. Scheduled meetings now block calendar time for everyone invited who has not declined, an hour from their start (issue #1933, WHIT-1098).
+- **The calendar has Month and Year views like the design.** Month shows up to three bookings a day as a coloured dot, the time and the service, then "n more" that opens the day, with leave and day-long events as bars; Year shades each day by how many bookings it has, with a legend, and a click opens that day. `GET /api/v1/calendar/day-counts` counts live bookings a day by person, room and service for up to a year (design 3.5, CV.7; WHIT-1101).
+- **Bookings can be made, moved and resized right on the calendar.** Design 3.5 (CV.8–CV.10): click an empty time for a slot as long as the service, or drag across the time you want, and a quick booking opens beside it (Booking, Event or Time off; More options opens the full form). Drag a booking to move it in 15-minute steps, across days too, or pull its bottom edge to change its length; the arrow keys do the same and Enter saves. A customer's booking asks first with "Email the new time" ticked, then offers Undo for 10 seconds; a busy person offers Book anyway; a taken room, closed hours or a time just taken put it back and say why (WHIT-1102).
+- **Chat sends customers booking times, forms and payment links, and forwards and turns messages into tasks.** In a customer chat, the + beside the reply box sends booking times from the workspace's booking page, a form to fill, or a payment link made in Whity Pay (shown only when Whity Pay is set up). The customer gets your words with the link; the team sees the block. Team messages can be forwarded to another chat, with their files, and turned into a Taskaat task that links back to the chat (design 3.5, UC.5, UC.9, UC.10).
+- **One calendar for everything with a time.** Events can now invite people,
+  hold a room and say where they happen. People invited are busy for an event
+  unless they decline, and a room held by an event can't be booked over it.
+  `GET /api/calendar/items` returns bookings and events in one list with one
+  shape and what you may do with each. Someone else's time off reads "Away" and
+  their synced events "Busy". Also show can add Meetings and Tasks due
+  (ADR 0018, WHIT-1109).
+- **A reminder 15 minutes before meetings and events.** The organiser and
+  everyone invited who hasn't declined get a notice, with push, before an event
+  or meeting starts. Turn it off under Notifications, or turn on email
+  reminders too. Time off and synced events never remind (ADR 0018, WHIT-1113).
+- **One way to invite people to anything on the calendar.** Inviting someone
+  to an event or a meeting sends them a notice (with push) and an email with a
+  calendar file. Their calendar app adds it, updates it when the time or place
+  changes, and removes it when it's cancelled. People who declined aren't told
+  about changes. The notification setting "Meeting invitations and changes"
+  covers every event (ADR 0018, WHIT-1113).
+- **Tasks due can show on the calendar.** With Tasks due ticked under Also
+  show, each open task due in view appears as an all-day item on its date and
+  opens the task. Due dates are read from Taskaat and never block time; if
+  Taskaat doesn't answer, the rest of the calendar still shows
+  (ADR 0018, WHIT-1114).
+- **Code plugins can be switched on per workspace.** The operator installs a plugin once and chooses who can use it: every workspace, only workspaces that turn it on, or only the operator. A workspace that hasn't turned a plugin on doesn't see its pages, menu items or home cards, and its routes answer as if they weren't there. Turning a plugin off keeps all its data, and turning it back on brings everything back. Every change records who made it and when. New installs from the store or by upload start off for every workspace. Plugins installed before this change stay on everywhere until the operator changes that (WHIT-1122).
+- **A plugin a workspace has turned off is gone from that workspace everywhere.** Its agent tools, prompts and resources are not listed and cannot be called. Its hook listeners don't run, and its queued and scheduled jobs complete without running. It sends no notifications. Its agent presets, booking payment step, busy times, reminder channels, inbox sources and message channels disappear there. Other workspaces and the operator's system workspace are not affected (WHIT-1123).
+- **Settings › Plugins has a switch for each plugin a workspace can use.** The page lists the plugins your platform installed for workspaces. Each shows whether it's on, who last turned it on or off and when, and a History of every change. Plugins the operator keeps on for everyone read "Always on". On the system workspace the same page has **Who can use each plugin**, where the operator picks every workspace, workspaces choose, or only the platform, and can make a paid plugin free for every workspace (WHIT-1124).
+- **Paid plugins: a workspace needs a plan, an add-on or a trial to use one.** A plugin can now say it is paid (SDK 1.107, `PluginAccessInterface`). A workspace can turn it on when its plan or an add-on includes it, during its one free trial, or when the operator made it free for every workspace. Otherwise turning it on answers "needs a purchase" and offers the trial. When the trial or the add-on ends, the plugin keeps working for 7 days, then turns read-only: its pages and reads still work, changes are refused, and its jobs, hooks and notifications pause. Nothing is deleted, and buying it again brings everything back. On a self-hosted installation, a paid plugin installed from the Whity store also needs the installation's store licence. Billing plugins grant and revoke a workspace's add-ons through the new `WorkspaceAddons` service, and plugins hear when a workspace turns them on or off (`PluginWorkspaceLifecycleInterface`) so they can set it up (WHIT-1125).
+- **Buy or try a paid plugin from Settings › Plugins.** A paid plugin a workspace can't use yet shows its monthly price, **Start 14-day trial** (once per workspace) and **Buy**, which opens the payment page for its add-on. A Free workspace can buy a paid plugin without a paid tier, and the same plugin can't be bought twice. Each paid plugin's row says where it stands: in trial until a date, included in the plan or bought, in its 7 days of grace, or read-only. A paid plugin's own screens show a banner while it is in grace or read-only, so the people using it know what is happening and who can fix it (WHIT-1127).
+- **Packs can set a workspace up.** SDK 1.108 adds `WorkspaceSetup`, which lets a plugin call a short list of core routes as the person who turned it on: calendar booking rules, services, staff and their hours, workspace settings, and forms. Each call has that person's permissions, and the same checks and audit as doing it by hand in the app. Industry packs such as Appointments use it to prepare a workspace in one step (WHIT-1129).
+- **A customer chat can choose the channel a reply goes by.** When a customer has written on more than one channel, "Send by" in the reply box lists them, with the one they last used first. Each message names the channel it came or went on, and booking times, forms and payment links follow the chosen channel too (design 3.5, UC.3).
+- **Agents waiting in chats show in the Inbox.** When an agent's chat
+  message needs your OK before it posts, it now also waits in Inbox › Waiting
+  for me, and opens the chat so you can approve or decline it there
+  (WHIT-1134).
+- **"Discuss in chat" opens one chat per board, meeting or record.** `POST /api/chat/chats/discuss` finds the group chat linked to it, or starts it named after it, and adds you if you are not in it, so everyone talking about the same record talks in one place.
+- **Discuss in chat.** A document, a form submission and a booking each have a Discuss in chat button that opens the group chat for that record, or starts it, and the chat shows the record as a block at its top with a link back. Meetings follow once they are in the calendar (WHIT-1137).
+- **While you are away, the person you named decides your route steps.** Your open approvals wait in their Waiting for me, they can read what they decide, and the trail says they acted for you. A signature still waits for you.
+- **A customer's contact shows everything they did here.** Bookings, web chats and requests to join now point at the customer's contact, found by email or mobile or made on the spot, and the contact page lists their bookings, chats, forms and requests.
+- **The audit log shows what agents did and the decisions made on routes.** Beside account and settings changes, the list now has each agent's actions (for whom it acted) and every approval, rejection, signature and send-back on a route, with who decided.
+- **A route step can be settled by its first answer.** Choose "the first answer decides" on a stage: the first approval lets it through and the first rejection stops it. Join requests use it by default, so whoever answers first decides, and anyone answering later is told who already did.
+- **The status page watches Whity ID.** health.whity.dev now probes id.whity.dev/health every two minutes and alerts like the other hosts, since Whity ID runs on its own host and database (WHIT-1146).
+- **Plugins can guide a workspace through its setup.** SDK 1.109 adds `PluginOnboardingInterface`. A plugin lists its setup steps, and core shows them as a stepper at `/admin/setup/{plugin}`. The stepper opens right after the plugin is turned on or its trial starts, starts at the first step not done yet, and can be reopened any time with **Set up** in Settings › Plugins. A plugin's setup can now also reach the workspace's people, staff invitations and branding.
+- **Turning a plugin on also turns on the plugins it depends on**, in that workspace. A plugin that another one needs can't be turned off first.
+- **Plans can be priced every 6 months**, beside monthly, yearly and one-off (WHIT-1148).
+- **Choose how often to pay for a plugin.** When a plugin is sold monthly, every 6 months and yearly, Settings › Plugins lists every price, and **Buy** asks which one. Whity for Salons, for example, costs JOD 15.000 a month, JOD 60.000 every 6 months or JOD 100.000 a year (WHIT-1149).
+- **Your booking link is easy to find and share.** Calendar settings and the calendar itself (the side panel, and the drawer on a phone) now show "Your booking link": the full address of the public booking page with Copy and Share. Share opens a ready-made message in English or Arabic (the workspace's language first) that can be edited, then sent with the phone's share sheet, WhatsApp, email or copy, with a QR code to print for the counter. When the booking page is off, a manager can turn it on from the card. Ctrl+K finds it as "Booking link" and "Share booking link" in both languages. `GET /api/calendar/settings` now includes `booking_page_url` (WHIT-1151).
+- **Plugins can be sold per seat.** A paid plugin can be priced per unit the workspace has: Whity for Salons, for example, is priced per chair. Settings › Plugins shows "3 chairs × JOD 15.000 = JOD 45.000 a month", and **Buy** checks out for that many. When the salon changes its number of chairs, the subscription follows, prorated by the payment provider. Stripe and Paddle sell a quantity; Polar sells it as seats of a seat-based price (Whity Pay 0.3.2) (SDK 1.110, WHIT-1152).
+- **Paying for a plugin in cash.** The operator can record a cash payment for a workspace's paid plugin plan from the Plans screen. The record holds:
+  - the plan and the number of chairs or seats;
+  - the amount and currency (JOD unless changed);
+  - the receipt number, an optional note and the date paid.
+
+  It covers the plugin like a subscription for the plan's period, starting on the date paid, or when the workspace's last cash payment ends if that is later. Then come the same 7 days of grace and read-only as an online subscription. A reminder email goes to the workspace's payers 7 days before the end: pay cash again, or switch to paying online. The payment shows in the workspace's payment history as "Paid in cash · receipt …". Recording and voiding are audited, and voiding needs a reason; nothing is deleted. It works for every paid plugin plan (WHIT-1153).
+- **A phone's browser offers the app.** After sign-in on a phone's browser (never inside the installed app, never on public pages), a sheet says the app is already installed and how to open it (home screen, or Chrome's Open in app), or offers to install it: the browser's Install on Android, the three steps on iPhone with a note that iPhone notifications come only to the installed app. "Not now" waits 7 days on that device and it shows at most once a visit. The manifest now lists itself under `related_applications` so Chrome on Android can say whether the app is installed (WHIT-1155).
+- **A sign-up link can start a plugin's trial.** `/register?plan=free&plugin=salons` creates a Free workspace, starts the plugin's free trial once the owner is signed in, and opens its guided setup: the link to share with salons. A booking with only a phone number, such as a salon walk-in, now counts as one customer per number each month, not one per booking.
+
+### Changed
+
+- **Documents › Document themes lists every theme.** Whity's standard and the workspace's own themes sit beside the editor, the workspace default marked; you can open any of them, make a new one from the default's settings, and make another one the default. The Documents tab previews a quote as you change it, says how the print colour reads on paper ("Reads on white (5.1:1)"), and notes how many published templates change at their next publish (`TplDocThemes`, WHIT-785).
+- **Staff seats count staff only.** `members.max` no longer counts customer memberships or service accounts. AI agents never took a seat and still do not (WHIT-932).
+- **The PostgreSQL test jobs run in parallel.** The Integration and Dialect shards now run under ParaTest, one seeded database per worker, and are split by recorded PostgreSQL test time instead of file count, so the slowest CI jobs finish sooner (WHIT-934).
+- **Stale test timings no longer fail CI.** When many test files have no recorded time, the shard planner now adds a warning to the run instead of the timings check failing every pull request (WHIT-934).
+- **The E2E shards finish sooner.** Each Playwright shard now starts the backend stack while it installs dependencies, and the shards are split by recorded test time instead of test count (WHIT-935).
+- CI: refreshed `scripts/ci-test-timings.json` from the latest develop run, so the shard-plan check passes again after the messages and calendar tests were added.
+- **PostgreSQL dialect tests run on every pull request.** The Dialect shards, which re-run the real-engine tests on PostgreSQL, now run on backend pull requests as well as in the merge queue, so a PostgreSQL-only failure shows up on the pull request (WHIT-950).
+- **Design system 3.3 is in `docs/design/`.** It adds the mobile app, work and
+  operations, the near-term pages, the finished websites, 15 emails and 31
+  animations, merged with the decisions the repository already had. `CLAUDE.md`
+  follows the 3.3 rules, the curated icon set grows to 156, and
+  `docs/design/IMPLEMENTATION-NOTES.md` maps every 3.3 milestone to the code
+  (WHIT-952).
+- **Emails have the 3.3 look.** Every email Whity sends now uses the design's
+  email layout: a white card with the workspace's initial on its colour, 17px
+  text, one main button, dark mode in mail apps that support it, and Arabic laid
+  out right to left. Invitations, password resets, email confirmation, two-step
+  recovery, customer sign-up, bookings and signing codes say why they were sent.
+  "Sent with Whity" is left out on plans with white-label (WHIT-959).
+- **Approvals, Approval gating and Delegations follow design 3.3.** Approvals has a List view beside One at a time: each proposal says its kind (Ordinary, Check first, Needs verifying), only Ordinary ones can be ticked and approved together, and the rest show Open. Two-step resets show the request (where it came from, the account, the last sign-in), the checks admins made, the two approvals and the one warning that there is no Undo; approving asks the admin to confirm it's them with a code. Delegations has "I'm away" beside the list, and away periods appear in the list in names (WHIT-963, WHIT-964, WHIT-965).
+- **Clearing someone's two-step now takes two admins.** The first admin's approval is recorded and changes nothing; a second, different admin's approval clears the two-step and sends the reset link. The person asking can never approve their own, and an admin who starts a reset for someone (`POST /api/2fa-recovery/force-reset`) gives the first approval, so a second admin still has to approve it. Each approval first asks the admin to confirm it's them with their authenticator code, or a code emailed to them (`POST /api/2fa-recovery/identity-check`). Admins can record the checks they made (`POST /api/2fa-recovery/{id}/checks`), and the queue shows where each request came from, when the person last signed in, the checks and the first approval (WHIT-964).
+- **Two-step resets are approved within one workspace.** Both admin approvals must be given in the same workspace, and the first one counts only while that admin is still an admin there; otherwise the next approval becomes the first. A request can be approved for a week from when the person confirmed it, or an admin started it. Checks and the first approval are shown only in the workspace they were made in. Pending first approvals from before this change need giving again (WHIT-983).
+- **Signing in with no workspace now leads somewhere.** Somebody the
+  installation's own sign-in provider (Whity ID on app.whity.dev) signs in, who
+  belongs to no workspace, used to see a "no active workspace" error, or, with
+  `auth.sso_self_provision_workspace` on, got a workspace named after them
+  without being asked. They now land on a new page, `/welcome`. With the setting
+  on, it invites them to create their workspace: its name (their own name to
+  start with), main language and main colour, then takes them straight into it
+  as its owner. With it off, it says plainly that they need an invitation and
+  which address they signed in with. Somebody already invited or waiting for
+  approval somewhere is told their place is waiting, and is never offered a
+  second workspace. The page holds only a 15-minute sign-in state, not a
+  session, and creating re-checks every condition on the server, so a
+  workspace's own sign-in provider is never offered the step and two clicks
+  make one workspace. A headless frontend can point the page elsewhere with
+  `SSO_NO_WORKSPACE_URL` and use `GET`/`POST /api/v1/auth/sso/workspace`.
+- **The sidebar looks like the 3.3 designs.** The Whity lockup sits at the top; the foot is one row with your avatar, name and role that opens a menu for account settings, language, light or dark and signing out, so the four stacked controls no longer push the pages out of view. Tasks, Boards and the calendar move into a Work group and Contacts into Operations, as the decision register places them, and Chat, Tasks and Contacts show their own icons instead of the dashboard's (WHIT-1003).
+- **Design system 3.4 is in `docs/design/`.** The brand team's answers to the
+  post-3.3 asks: the web app on a phone (`Pw*`), the screens and surfaces that
+  had no card, form printouts, and ten more emails. The implementation notes
+  add milestones A14, A15, P1 and E2 and close the design asks 3.4 answers; the
+  curated icons grow to 163 (WHIT-1019).
+- **Two-step sign-in secrets now use the shared key ring.** They follow the
+  same key id, current key and retired keys as the other stored secrets, so a
+  key rotation covers them too. Existing enrolments keep working with no
+  re-enrolment; each one moves to the current key on its next sign-in, or all
+  at once with `whity-cli totp reencrypt` (WHIT-1025).
+- **The five npm publish workflows share one set of steps.** Setup, install,
+  test, the Next.js import guard and the publish-if-new step live in one
+  composite action, so a fix to how packages publish is made once (WHIT-1027).
+- **Every email core sends now goes through one sender.** Booking, account,
+  invitation, recovery, signing-code, identity-check, sign-up and verification
+  emails used to draw their own email and call the mailer directly; they now
+  all go through `BrandedEmailSender`, which also carries a brand of the
+  email's own, attachments, Reply-To and threading. The emails themselves read
+  and look exactly as before (WHIT-1030).
+- **Booking emails follow the 3.4 design and keep the customer's calendar in
+  step.** Confirmed, moved, cancelled and reminder emails now come from the
+  workspace, in its brand, with the card's rows, one main button (add to my
+  calendar, book another time or directions) and a reply-to the workspace's
+  own address when it has one. The calendar file is now a REQUEST with one UID
+  for the booking's life and a sequence that every move and the cancel raise,
+  so a moved booking updates the same calendar entry; a cancelled booking now
+  sends a CANCEL that removes it (before, the file was PUBLISH and a cancel
+  sent none). Migration 273 adds the counter (WHIT-1032).
+- **Messages sent by email look like the workspace's other emails.** A reply
+  from Messages used to go out as plain text; it now goes as the 3.4
+  `message-reply` card: "Awss Haddad from Example Bakery replied:", the
+  message as a quote, and a line saying a reply comes back to the same
+  conversation, with the same threading headers and reply-to as before
+  (WHIT-1033).
+- **Customer sign-up settings live in the settings registry.** A workspace's sign-up mode, starting role, allowed email domains and whether customers may invite colleagues are now the `signup.*` workspace settings instead of their own table, so they are stored, defaulted and checked like every other setting. Migration 272 copies every workspace's saved values; nothing changes for admins or people signing up. The keys stay off the general settings API: only the Customer sign-up screen, which checks the starting role is safe for customers, changes them. The old table stays one release for rollback (WHIT-1035).
+- **Notification sender settings live in the settings registry.** Each workspace's sender for a notification channel (on or off, transport, from and reply-to, provider settings and the encrypted credentials) is now the `notifications.<channel>.<field>` family of workspace settings instead of its own table, so it is stored and checked like every other setting. Migration 275 copies every workspace's channels, credentials still encrypted; nothing changes for senders or for the notification-settings API, and a refused value is now a 422 instead of a 500. The old table stays one release for rollback (WHIT-1036).
+- **The Home checklist reads workspace settings through the settings repository.** It ran its own query on `tenant_settings`; one place now owns that table's SQL (`TenantSettingsRepository::valuesFor`), so the checklist follows any change to how settings are stored (WHIT-1037).
+- **Forms and calendar labels use the one bilingual text model.** Form names,
+  questions, help text, sections and calendar services and rooms are read and
+  written through `Whity\Core\i18n\LocalizedText`; the old
+  `Whity\Core\Form\LocalizedLabel` is gone. Labels keep their `{ar, en}`
+  shape and English-then-Arabic fallback (WHIT-1038).
+- **Convening bodies, meetings and agenda items use the one bilingual text
+  model.** Their names and titles go through `Whity\Core\i18n\LocalizedText`;
+  the old `Whity\Core\Convening\LocalizedText` is gone. The stored maps,
+  `display_name` and `display_title` keep their shape (WHIT-1038).
+- **The web app picks bilingual text by the same rule as the server.** One
+  helper, `localizedText()` in `@whity/ui/localized-text`, replaces
+  `pickText`, three `localized()` functions and `localizedName`: the reader's
+  language, then the original language, then English, then Arabic, then
+  anything written. An agent or tool with no English name now shows its
+  Arabic one instead of a blank (WHIT-1038).
+- **One bilingual text model in core.** Text people write in Arabic and
+  English now goes through one type, `Whity\Core\i18n\LocalizedText`, with one
+  documented fallback: the reader's language, then the text's original
+  language, then English, then Arabic, then anything written. Workspace and
+  unit names move to it first; forms and convening follow, so the three copies
+  with their different fallbacks stop disagreeing. Stored data and API output
+  keep their shape (WHIT-1038).
+- **Plan limits show as meters, and passing one says so across the app.** Billing draws a meter per limit with "7 of 5", what counts and when it starts again; a limit passed is amber with stripes and "2 over", and one at 80% says "Near" with a quiet note. People who can change the plan see a thin amber line across the app ("Everything keeps working and nothing is removed") with See plan and Hide for 7 days; members see nothing. Nothing is ever blocked (`TplPlanLimit`, BM.11, WHIT-1039).
+- **Approvals › Decided, the agent persona editor and the saved blocks library
+  follow their 3.4 cards.** Decided is now a list grouped by day with the
+  outcome, the agent, who decided and when, filters for outcome, agent and
+  when, and Export to CSV; Edit before approving checks each field as you type
+  and holds Approve with changes until it is valid. The persona editor is in
+  three cards (who it is, instructions side by side with a 4,000-character
+  count, how it writes and what it uses) with Save in the header. Saved blocks
+  filter by kind and who can use them, search by name, keep rename, sharing
+  and delete in each row's menu, and the side panel shows the block's text
+  with its per-document parts marked (WHIT-1044).
+- **The installer's output follows its 3.4 card.** `install.sh` now opens with
+  "Whity Core installer · free and open source (AGPL-3.0)", prints each check
+  and step as one ✓ line with its detail beside it, stops with ✗, one line on
+  what to do and "Nothing was changed", warns with ! when the machine has less
+  than 2 GB of memory, and ends with "Whity is ready." and where to open it.
+  It speaks Arabic when the system language is Arabic, keeps commands and
+  addresses in Latin, and `--verbose` shows each command's own output (WHIT-1044).
+- **Messages, Settings › Messages and the chat box match their 3.4 cards.** The
+  inbox puts the status tabs above the list, filters before search, rows with
+  where it came from and who has it, bubbles with who and when underneath, an
+  assign menu and Close conversation in the header, Edit on a held agent reply
+  and Try again on a failed one. Settings › Messages has separate Web chat
+  (with the chat link), Email and Incoming email cards, and says "Messages are
+  off" until something is set up. The public chat box wears the workspace's
+  logo and colour (the chat API now sends its brand), asks for name and email
+  with labels on the first message, and says plainly when the chat is closed,
+  ended or getting too many messages (WHIT-1044).
+- **Public pages match their 3.4 cards.** Welcome, join, verify, payment return
+  and the customer's booking link each give one answer with one icon and one
+  next step, in plain words and never "error". The join pages and a verified
+  document now wear the workspace's logo and colour (the sign-up and
+  verification APIs send `brand`, as the booking pages do); a refused document
+  code still says nothing about whose it was. The booking link leads with "Add
+  to my calendar", then Move it and Cancel it, and moving names the new time on
+  its button (WHIT-1044).
+- **Installing Whity is now `npm install -g @whity/cli`, then `whity install`, on your own server
+  with your own domain.** The owner chose the installer card's server install over the local one.
+  `whity install` asks for the web address and your email, checks the server first ("Nothing was
+  changed" when something is missing), downloads the latest release, starts it, puts Caddy in
+  front to get a Let's Encrypt certificate, makes your owner account and ends with the address and
+  `whity update`. It shows ✓ and ✗ marks, speaks Arabic when the system language is Arabic, and
+  `--verbose` shows the detail. `curl -fsSL https://whity.dev/install.sh | sh` still works: it now
+  checks for Node.js 20 and runs the same two lines (WHIT-1044).
+- **`whity install` and `whity update` no longer fail on Docker Compose 2.33 and newer.** They
+  waited on every service, and Compose refuses to wait on the workers, which turn their
+  healthcheck off, even though everything was running. They now start everything, then wait for
+  the services that have a healthcheck. `whity update` also works from inside the install folder
+  (WHIT-1044).
+- **Sign-in and the calendar follow their 3.4 cards.** On a computer the
+  sign-in page puts the brand side at the start and the form at the end, with
+  one sheet on the plane ("Check it's genuine." and Verify a document) and
+  "Forgot your password?" under Sign in. The calendar has Today and New booking
+  beside its title, the range between ‹ and › ("15 – 21 Nov 2026"), the
+  sections as underlined tabs with Bookings first, each day headed with its date
+  and how many bookings it has, blocks that read time and service over customer
+  and person, events in grey, and a red line at now (WHIT-1044).
+- **Settings › Sign-up and Public forms follow their 3.4 cards.** Sign-up puts
+  the starting role and the allowed domains side by side, with domains as chips
+  and the sign-up link with Copy under them; Team invites is its own card with
+  its switch; the queue shows each person with an avatar and how long they have
+  waited, Approve and Reject on each, and Approve all. Public forms lists keys
+  in a table (name and form, short key, allowed sites, status) with Edit and
+  Revoke under ⋯, issues a key in a dialog with the sites as chips, shows a new
+  key under an amber note with Copy key, and keeps a stored bot-check secret
+  behind Replace (WHIT-1044).
+- **Every web screen talks to the API through the one typed client.** The
+  legacy `web/lib/api-client.ts` and `useAuth().apiClient` are gone: screens
+  call `api` from `@/lib/api/client`, whose paths, parameters and answers are
+  typed from the OpenAPI spec, or `apiFetch` for the few routes the spec does
+  not describe yet and for plugin routes built at run time. Every call now gets
+  the same session refresh, payment wall and error reference (WHIT-1046).
+- **The web app's typed API client is the published `@whity/api-client`.** The
+  app kept its own 74,000-line copy of the API types beside the package's; it
+  now imports the package's, and `web/lib/api/client.ts` is a thin wrapper over
+  the package's `createApiClient` that adds the browser's rules: one shared
+  session refresh across tabs, signing out when a refresh is refused, the
+  payment wall sending a workspace to Billing, and the last server error's
+  reference for the error page. One drift check covers both (WHIT-1046).
+- **Messages settings are stored with every other setting.** Web chat on or off, its greeting and the inbound email address are workspace settings now, and the inbound email secret stays encrypted beside them; the separate table is gone.
+- **Leaving a saved block with unsaved changes asks in the app's own dialog.** It was the browser's plain confirm box, the last one left.
+- The desktop template no longer commits a copy of the plugin SDK. `npm run dev` and `npm run build` copy `sdk/src` into `php-host/sdk/src` first, so every SDK change lands once and the device can't fall behind. The vendored-SDK parity check is gone with it.
+- A release now versions the npm packages: release-prepare applies the pending changesets, and gives `@whity/api-client` a minor bump when core's API changed since the last release. Each package whose version is new on npm publishes when main moves.
+- **On a short window the sidebar's ends stay put.** The workspace switcher at
+  the top, and Settings with your account row at the bottom, no longer scroll
+  away: only the links between them scroll, with a soft fade at either end and
+  a line under the top once scrolled, and the page you are on is scrolled into
+  view. The account menu opens upward with Account settings, Language, Light or
+  Dark, and Sign out (WHIT-1065, WHIT-827, PwShortSidebar).
+- **On a phone, Settings is a menu page of its own.** The sideways row of groups is gone under 640px: Settings in More opens the grouped list as a page, the page you came from is marked "Last opened" (remembered per browser), and a settings page shows a back control with its path in small text, such as Settings > Email. From 640px up the two-column Settings area is unchanged (WHIT-1066, PwSettings).
+- **The editor fits a phone.** Under 640px the header is two lines (Back, title, Publish, then the mode and the save state), the mode switch and More tools are bottom sheets, and the formatting toolbar docks at the bottom above the on-screen keyboard instead of scrolling sideways (WHIT-1067).
+- **The document library and the calendar fit a phone.** On a phone the library opens its folders as a bottom sheet with the unit filter on top, shows collections as chips and says what a search found; the calendar lists a week as day cards, shows a month as counts with the chosen day under it, and reaches its sub-pages from one button that opens a sheet.
+- **Notifications settings are easy to find.** A Notifications row on the phone's More page, a Notifications item in the account menu and a Notifications entry in Ctrl+K all open Settings › Preferences scrolled to the Notifications card (`/settings?tab=preferences#notifications`); before, it was reached only through your name on More and below the display settings (WHIT-1078).
+- **Plain names for settings and pages, and one Arabic word for each thing.**
+  People couldn't tell which "Settings" was theirs, and the Arabic screens used
+  three words for an agent. Your own settings are now **My settings**
+  (إعداداتي), with tabs **Password and two-step**, **Where you're signed in** and
+  **Language and display**. The workspace's are **Workspace settings**, which
+  used to be called Website Settings. Approval Gating is **Sign-up approvals**,
+  Notification delivery is **Notification log** and Tenants is **Workspaces**.
+  In Arabic an agent is now always مساعد and a workspace is always مساحة العمل,
+  never مستأجر. Language and display now has Light or dark, and it says that
+  this choice is saved on this device only, while text size, technical details
+  and animations follow you to every device (WHIT-1080).
+- **Your own settings are in the one Settings area, and each says where it
+  applies.** People in more than one workspace couldn't tell what a change
+  reached, and members had no Settings entry at all. Settings is now in the
+  sidebar for everyone. It opens **My settings** (Profile, Password and
+  two-step, Language and display), which follow you into every workspace.
+  Below that is **You in [workspace]** (Notifications, Where you're signed in,
+  Your role), which belongs to the workspace you're in. Admins then see
+  **Workspace settings · [workspace]**. Every page shows a chip: All your
+  workspaces, the workspace's logo and name, or This device. Your role moved
+  off Profile onto its own page, which also lists your roles in your other
+  workspaces. On a phone the same menu opens from More. Old links
+  (`/settings?tab=…`, `/admin/settings/menu`) go to the new pages (WHIT-1081).
+- **Every workspace setting is in Settings, document themes have a link, and
+  the sidebar has fewer headings.** Workspace pages were split between
+  Settings and a sidebar group, and Document themes could only be reached by
+  typing its address. Workspace settings are now in five groups: **Workspace**
+  (General, Branding, Document themes, Plan and billing, Plugins),
+  **Security** (Security, Single sign-on, Sign-up, Licensed devices, Audit
+  log), **Messages and notifications** (Messages, Email domains, Notification
+  log), **Data** (Fields, Tags, Translations, Public forms, Bookings) and
+  **Advanced**. Each workspace page says that a change there applies to
+  everyone in the workspace. In the sidebar, Contacts moved into Work and the
+  Operations and Workspace headings are gone (the system tenant keeps
+  Platform). The sidebar's own "Search pages" box is gone too, because Ctrl+K
+  already finds every page (WHIT-1082).
+- **On a phone, every personal setting is two taps away and every row has a
+  label.** Turning on notifications took four taps and a scroll, starting with
+  an unlabelled name card. More now opens with **My settings**: your name
+  card (labelled Profile), Notifications, Language and display, Password and
+  two-step, and Where you're signed in. The two rows that belong to one
+  workspace name it underneath. The quick Dark mode and language switches are
+  still there. Below that come the workspace switcher, the sidebar's groups,
+  **Workspace settings** (for people who can change any, opening the settings
+  menu at the workspace's part) and Sign out. Links to notifications go
+  straight to its own page (WHIT-1083).
+- **The design reference is now 3.5.1, with US dollars as the default currency.** The design system in `docs/design` is updated so new screens and documents are built to write money as $312.00 (or JOD 312.000 for dinars), ahead of the code changes that follow (WHIT-1085).
+- **Searching settings for "currency" finds it.** Typing currency or عملة in the settings search opens General, where the workspace currency is set (WHIT-1087).
+- **New workspaces start in US dollars; existing workspaces keep their currency.** Design 3.5.1 makes US dollars the default (CU.1). Each workspace that existed before the upgrade is given the currency it was already using (dinars unless the install set another), so its prices, bookings and documents carry on unchanged. No stored amount is converted (WHIT-1087).
+- **Money is written the same way everywhere: $312.00, JOD 312.000.** Amounts use the currency's symbol where it has one and its code otherwise, with its own decimals and Western digits in English and Arabic (design 3.5.1, CU.2). New prices, promotions and calendar services start in the workspace's currency instead of dinars, and the money field's warning names the currency's decimals ("USD has 2 decimals (cents)") (WHIT-1088).
+- **Documents print amounts in the document's currency, with the amount in words to match.** A record's money field prints as $312.00 or JOD 312.000 with its words in English and Arabic for US dollars, euros, dinars, riyals and dirhams, and a new workspace's starter documents (invoice, receipt, payslip and the rest) carry sample amounts and "Total" labels in its own currency. Starters already in a workspace are left as they are (WHIT-1089).
+- **Sample data, examples and messages use US dollars.** The billing demo, the example plan catalogue, editor samples, agent instructions, SDK examples and the "such as USD" hints now match the 3.5.1 default (CU.1); demo figures kept their numbers in cents, so every demo invoice still adds up (WHIT-1090).
+- **The design 3.5 working plan is in the implementation notes.** It records where the new calendar (A16) and one chat (A17) start from, the server work they need, their order and size, the status of every milestone from what has merged, and the questions still open for the owner, so the lanes building 3.5 work from one picture (WHIT-1092).
+- **Chat and Messages are one place.** Customer conversations now sit in Chat
+  beside the team's chats, so there is one list to watch instead of two
+  (design 3.5, UC.1–UC.3). The list has tabs for All, Unread, Customers, Team,
+  Groups, and Agents and bots, and each person can pin chats to the top. A
+  customer who wrote last shows "Waiting 12 min". The conversation keeps
+  assign, close, Reply or Internal note and the channel it sends by, and the
+  customer's details open in a pane on the right, which opens over the
+  conversation on narrower screens. The sidebar has one Chat item, and old
+  links to Messages open the same conversation in Chat (WHIT-1093).
+- **Chat works like a phone app on a phone.** Under 640px Chat fills the
+  screen behind the Chat tab: the list, a conversation, its details and a
+  thread are each their own screen with Back, and the list's tabs scroll
+  sideways. Pressing and holding a message opens six reactions and its
+  actions (Reply, Reply in thread, Pin, Copy, and Edit or Delete for your own);
+  swiping a message sideways replies to it. Messages and the message box use
+  larger text, and the box grows to five lines before it scrolls. A poll, a
+  record or files without words no longer offer Edit, and bot messages name
+  their rule (Welcome, Away reply) beside the Bot tag (design 3.5, UC.13,
+  CH.3, WHIT-1099).
+- **The calendar on a computer looks and works like Google Calendar.** Design 3.5 (CV.1–CV.7): the sidebar starts as the rail on calendar screens and stays open for whoever opens it there; a left panel with New booking, a mini month, search, people and rooms as coloured checkboxes, Also show and the time zone; Today, ‹ ›, the range, Colour by (person, service or room, each person's own choice), Day, 4 days, Week and Month, and a gear for Services, Rooms and branches, Hours and time off and Settings instead of the tabs. Bookings are tinted in their colour with the name always written, overlapping ones cascade, leave shows as a striped bar, and a booking's details open beside it. Every choice is remembered for each person (WHIT-1100).
+- **The calendar on a phone is redesigned.** Design 3.5 (CV.11): Day, 3 days and Month with the chosen day's list; ☰ opens a drawer with the views, Colour by, People and Rooms; tapping a booking opens a sheet with Move, Call, Message and Cancel booking; "+ Booking" floats above the tab bar; tapping an empty time opens New booking with the time filled in; press and hold a booking half a second to move it, and letting go asks first, then offers Undo. 14px on the grid and 56px an hour; Arabic mirrored. The 3.3 grid, the day-by-person columns and the week list it replaces are removed (WHIT-1103).
+- **Gated approvals use one contract with a fresh identity check.** Approving a
+  password reset, a two-step reset, or an agent's Needs verifying proposal now
+  asks the approver to confirm it's them (an authenticator code, or a code sent
+  by email) in the same dialog, and the code is bound to that one approval.
+  Home opens a Needs verifying proposal on Approvals instead of approving it
+  inline (WHIT-1104).
+- **Gated approvals are made only by people.** Approving a password reset or
+  a two-step reset is no longer an action agents can take or propose; the
+  approver does it on its page after confirming it's them (WHIT-1105).
+- **Time off lives on the calendar.** Days off are now calendar events, so
+  they show on the calendar (as "Away" to colleagues) and block bookings like
+  any busy time; staff can still choose Book anyway. Extra working hours are
+  kept the same way and only widen the day. Existing entries are copied over
+  once, and the time-off screens work as before (ADR 0018, WHIT-1110).
+- **A booking always lasts as long as its service, and unticking "Email the new time" says what it means.** The owner's answers to Q35.7 and Q35.8: the length goes with the service and its price, so bookings can no longer be pulled longer or shorter on the calendar, and the API refuses a length of their own on create and move (change the service instead); team events can still be resized. "Email the new time" stays ticked by default; unticking it now shows a line that the customer's calendar won't update (WHIT-1111).
+- **Meetings are on the calendar.** A scheduled meeting is now a calendar
+  event: it shows on the calendar of everyone invited, blocks their time unless
+  they decline, and lasts an hour when only a start is set. Answering on the
+  calendar answers the invitation. Moving or cancelling still happens on the
+  meeting itself. Meetings already scheduled are put on the calendar once
+  (ADR 0018, WHIT-1112).
+- **Meetings live in the calendar.** Formal meetings are at Calendar › Meetings, in the Work group of the sidebar, with their bodies one tab over, and each meeting's page holds its agenda, attendance and decisions. The old Convening addresses under /admin/x/ still work and send you to the new pages. A meeting is one calendar, not a second place to look (WHIT-1115).
+- **One way to pick a free time.** Staff booking and moving a booking in the calendar now use the same week-and-times picker as the public booking page, so a time looks and works the same for everyone (WHIT-1051).
+- **The calendar shows everything with a time in one place.** Bookings, team events, meetings, time off and, when ticked, tasks due now come from one list (`/api/calendar/items`) and are drawn on the same grid on a computer and a phone. Also show gains Meetings (on) and Tasks due (off). An event's details show who organised it and each guest's answer, let an invited person answer Yes, No or Maybe, and a meeting's details open the meeting. Events can now invite other staff, take a room and say where (WHIT-1116).
+- **Notices split into the Inbox's tabs.** The notices list can now be asked
+  for Mentions (someone named you in a chat or a comment) or Updates
+  (everything else, leaving out what is already in Waiting for me), with an
+  unread count for each, ready for the Inbox's three tabs. The waiting list
+  can return the whole list at once. The handler behind
+  `/api/me/notifications` is now called NotificationsApiHandler, so "inbox"
+  means only the waiting list (#1934, WHIT-1117).
+- **The Inbox has three tabs: Waiting for me, Mentions, Updates.** Waiting for
+  me lists work from every source, now with agents asking you for a decision
+  as one more source (they're still on Approvals too). Mentions shows where
+  someone named you; Updates shows what happened to your work, grouped by day,
+  with Mark all as read. Opening a notice marks it read and takes you to it.
+  The Inbox count in the sidebar and on the phone now includes agents' requests
+  (WHIT-1118).
+- **Choose push and email for each kind of notice in one place.**
+  Notifications now lists each kind (chat, mentions, documents, meetings,
+  reminders, agents asking you) with a Push and an Email switch. Every sender
+  follows the same choices. Reminders by email start off; chat never comes by
+  email. Sign-in and security notices always come (WHIT-1119).
+- **Mentions reach the Inbox from chat too.** When someone mentions you in a
+  chat, it now lands in Inbox › Mentions as well as on your devices, even if
+  you have none set up. Chat and document comments share one way to name
+  people, so a mention reads the same everywhere (WHIT-1120).
+- **One conversation per customer, whatever channel they use.** A customer
+  who writes by email and then on WhatsApp (or the website chat) is one
+  conversation, matched by their contact's email or phone. Each message shows
+  the channel it came on. Replies go back where the customer last wrote, and
+  the team can choose another channel the customer has used. A conversation
+  closed within the last 30 days reopens when the customer writes again.
+  Existing conversations stay as they are (WHIT-1121).
+- **Booking reminders also go by text when a WhatsApp or SMS plugin is on.**
+  Beside the reminder email, each text channel a plugin adds sends the customer
+  a short reminder at their phone number, through Messages. It shows in the
+  customer's conversation and counts like any message (WHIT-1133).
+- **What the office records on a form is asked at a step of its route.** A step can ask for a person, such as the supervisor at pre-check, and a later step leaves that person out. The separate office review and its staff questions are gone; the printout's "For official use" shows what was entered on the route.
+- **Join requests wait on a route.** Everyone who can manage sign-ups finds a request in their Inbox and the first of them to answer decides, letting the person in or turning them away; a workspace can choose its own route under Customer sign-up, Who decides. Stand-ins decide while someone is away, and the trail records who decided.
+- **Link tokens are made one way.** Calendar feeds, manage links, emailed verification, reset, recovery and invitation links, form keys, QR codes and web chat now share one helper for making, hashing and checking their tokens; links made before keep working.
+- **People who sign in with Whity ID confirm gated approvals by signing in there again.** Approving a password reset, a two-step reset or an agent's "Needs verifying" proposal asked them for an emailed code; now, like signing a document, they sign in again at their identity provider (which may ask their phone "Is it you?") and approve within five minutes. The sign-in counts once, for that approval only. People with an authenticator app still use it (WHIT-1147).
+- **A paid plugin lifts the limits on its add-on plan while it is on.** Bought, paid in cash, on its free trial or in grace, the plugin's add-on plan limits apply as if the add-on were held: Whity for Salons removes the staff limit for as long as the salon has it. Invitations now check the plan's staff limit first, as `seats.enforcement` says: `block` refuses with a message pointing to a larger plan, `warn` sends the invitation and says so. Nobody is ever removed.
+- **E2E shards retry the backend stack once when Docker hits the hosted-runner cgroup fault.** That runner fault dropped PRs from the merge queue though nothing in them was wrong.
+- **Every limit on attempts answers the same way.** A request over a limit now always gets "Too many attempts. Try again in n minutes." with the time to wait, and every limit is declared in one list.
+- **Each file's details are kept once.** Form uploads, document files, finished documents and chat attachments now read their size, type and checksum from the workspace's file record, and their own copies are removed (migration 299). Nothing changes for people; existing files open as before.
+- **Every stored file is recorded in one place.** Form uploads, document files, finished documents and chat attachments are written the same way and each has one entry in the workspace's file record, so what a workspace holds, how big and since when is answered once.
+
+### Removed
+
+- **The form screens are drawn one way.** The builder, the forms list and My submissions are the app's own pages everywhere; the second, descriptor-built copy of each screen is gone.
+- **Old code paths with nothing left to serve are gone.** The old Document designer converter, the browser-only form draft fallback, a deprecated delegation alias, the unused environment mail fallback and the retired two-step encryption scheme are removed, and every remaining legacy path has its removal condition written down.
+- **The old time-off table is gone.** Time off and extra hours have lived in calendar events since migration 285; migration 293 drops `calendar_availability_exceptions`, which nothing read any more.
+
+### Fixed
+
+- **"Built on Whity" follows the plan.** Public pages, sign-in and public forms leave it off when the workspace's plan removes it (WHIT-933).
+- **The plans list says which plans are add-ons.** `GET /api/v1/plans` now returns `is_addon` and `provider`; the limits grid read both and never received them, so every add-on showed as a tier (WHIT-933).
+- **The role permission picker shows every permission again.** It read only the first 100, so once the catalogue grew past that the last ones (such as `users:*`) could no longer be granted from Roles. The permission tag on document templates had the same limit. Both now read the whole catalogue (WHIT-938).
+- **Free times stay on the hour grid.** When the minimum notice ended part-way through a slot, the booking page offered odd times such as 11:47; it now offers 12:00, 12:15 and so on (WHIT-947).
+- **A mistyped booking link says it is invalid.** It answered "Authentication required" before; now it gets the same "invalid or expired" answer as an old link (WHIT-947).
+- **Test databases match a real migration run.** On SQLite the tests' `NOW()`
+  read the clock on every call, so about one migration run in thirty under load
+  wrote a translation whose `updated_at` was a second after its `created_at`,
+  and migration 124 left that row unclaimed. The tests could then pass against
+  data no real install has. `NOW()` now holds still for a whole statement, as
+  on PostgreSQL. The cached test template is also keyed on the translation
+  catalogues, the source files of classes the migrations call, and the
+  rendering settings migration 238 reads (WHIT-949).
+- **Migration number 246 is recorded as never used.** New migrations from 250 onwards pass the schema check again.
+- **Two name-to-key helpers no longer use a slow regex.** Field keys in the document editor and MCP connection names are trimmed in linear time, so a very long name can no longer stall the page. The results are unchanged.
+- **Migration numbers 254, 255, 256 and 259 are recorded as never used.** Later migrations pass the schema check.
+- **A saved block's per-document parts keep their values when the block is edited.** Each part now has a stable key instead of its position, so reordering or rewording a synced block no longer moves a document's signer name or date onto the wrong part. Existing blocks and drafts are moved to keys once (migration 270); values stored the old way still fill the right part (WHIT-992, E.23a).
+- **A plugin screen whose data source filters its own route with a query string is no longer dropped.** The host compared the whole source, `?status=pending` included, with the plugin's routes, so Front Office's Stock and Reports screens never appeared; it now compares the path and keeps the query (WHIT-998).
+- **The app shell works on a phone.** The menu and close buttons are 44px, the
+  navigation drawer opens from the start edge up to 85% of the width over the
+  dimmed page and closes with Escape, pages get 16px gutters, the search drops
+  its keyboard hint, the installed app keeps clear of the notch and home bar,
+  and the Settings menu no longer makes every settings page scroll sideways.
+  On touch screens every button now has a 44px tap area without looking any
+  bigger (WHIT-999).
+- **Dialogs fit a phone.** Below 640px a dialog opens as a sheet docked to the
+  bottom of the screen, full width and never taller than the screen; a long
+  form scrolls inside it while its buttons stay in view at the foot, clear of
+  the home bar. Above 640px dialogs are unchanged, except that a dialog taller
+  than the window now scrolls instead of running off it (WHIT-1000).
+- **Tables read as lists on a phone.** Below 640px every data table shows each
+  row as a small card: the first column as its title, the others as label and
+  value lines under it, the row's menu beside the title. Nothing hides off to
+  the side any more. A table that only works as a grid can keep it with
+  `phoneLayout="scroll"` (WHIT-1001).
+- **Page headers and the save bar fit a phone.** A page's buttons move under
+  its title and wrap instead of squeezing the description or running off the
+  screen, long titles wrap, and the save bar docks to the bottom edge with
+  Discard and Save side by side under the thumb (WHIT-1002).
+- **Arabic screens no longer show English in the places the 0.2.29 check found.** The access-denied title on seventeen pages, the file picker's "Click to browse", the date picker's months and weekdays, plugin version badges, the status page's service names and the first-run setup's welcome now follow the interface language, and the Languages page no longer shows the server's English refusal to a workspace. Thirteen Arabic labels used Eastern Arabic digits; they now use Western digits like every other number, and a test keeps it that way (WHIT-1004).
+- **Route template arrows are labelled at 13px, and sortable table headers are in sentence case**, as the size floor and the decision register ask (WHIT-1004).
+- **Back and forward arrows point the right way in Arabic** on the first-run setup, the affiliates list and the organisation tree (WHIT-1004).
+- **Documents, the calendar and the editor work on a phone.** The document
+  library shows the list first, with its folders behind a Folders button; the
+  calendar's date has its own line instead of breaking inside a word; the
+  document editor puts its buttons on a second line, so the title stays
+  readable and Publish stays on screen; tab strips scroll instead of running off
+  the screen, and tabs are 44px tall on phones (WHIT-1005).
+- **The phone's keyboard no longer covers what you type into.** The page now
+  shrinks above the on-screen keyboard instead of sitting under it, so a
+  dialog's buttons, the save bar and the chat box stay in view while typing
+  (Chrome on Android; Safari on iPhone already scrolled to the field)
+  (WHIT-1006).
+- **A plugin screen's title and its sidebar entry are in Arabic for Arabic readers.** A plugin may write a screen's name as English and Arabic (SDK 1.101), but the host kept only the English when it loaded the plugin, so Front Office's Arabic screens sat under English titles and nav entries. The name is now kept as written and shown in each reader's language (WHIT-1007).
+- **Amounts and quantities in plugin tables keep their order in Arabic.** A plugin's table cell or figure such as "-90.000 JOD" showed as "JOD 90.000-" on an Arabic screen; each value now keeps its own direction, so amounts, codes and numbers read left to right while Arabic text beside them still reads right to left (WHIT-1008).
+- **The sidebar's footer is reachable on short windows.** With many links, or a window too short for the logo, workspace switcher, search and footer together, the language, light/dark and sign-out controls were cut off and couldn't be scrolled to. The sidebar now scrolls as a whole when it runs out of room, and the link list keeps a minimum height and scrolls on its own.
+- **Long titles end in "…" in lists on a phone.** A long document title in the
+  document library now stops with an ellipsis before the row's menu instead of
+  running under it, which happened most with English titles in an Arabic
+  workspace (WHIT-1010).
+- **Tasks, boards, forms and the calendar work better on a phone.** Task titles
+  in the task list take their own line instead of shrinking to a letter or two;
+  a board shows one column at a time with buttons to jump between columns, and
+  you swipe to move along; text typed in English in an Arabic form (or the other
+  way round) keeps its full stop and question mark at its end; the calendar's
+  sections are one row that scrolls sideways; and the closed menu on a phone no
+  longer catches the keyboard or a screen reader (WHIT-1011).
+- **The status watchdog no longer probes the retired pay.whity.dev.** The hostname was retired when Whity Pay became a plugin, and the live Worker had already stopped probing it. The repository's config still listed it, so the next deploy would have brought back a probe that always fails and alerts every few minutes.
+- **The scheduler reports healthy while it ticks, even with no jobs.** Every
+  `schedule:run` tick now records its own heartbeat, whether or not anything
+  was due, and the status page judges the scheduler by it: operational while
+  recent, down when stale, unknown only when it has never ticked. An install
+  with no scheduled jobs no longer shows the scheduler as unknown, which had
+  kept the public status page reading "degraded" (WHIT-1013).
+- **The booking page and the booking link show the workspace's own brand.**
+  Visitors saw Whity's default blue and logo on a shared address even when the
+  workspace had set its own colour and logo in Settings › Branding. The public
+  booking API now sends the workspace's public brand (name, logos, main colour
+  and the token sets derived from it), and both pages apply it the same way
+  the rest of the app does (WHIT-1014).
+- **A stage that leaves out people named on the form now also leaves out people the office named at review.** A public form can't ask the applicant to pick people, so a supervisor is often an office question answered at pre-check. Recusal used to miss those people, so they were still asked and counted.
+- **Notification emails are now sent.** The notification `email` channel used
+  to write a log line and report "sent", so `/admin/notifications` showed
+  email deliveries that never left. It now sends through core mail in the
+  workspace's brand: the two-step reminder, routing notices for workspaces that
+  chose email, error alerts to operators, and plugin notices that ask for
+  email. Every core email also asks one gate before it goes: the operator's
+  `mail.events.*` switch for account emails, the workspace's email channel, an
+  agent's own switch, and the person's Preferences › Notifications (one kind
+  or all email). Security emails can't be turned off by a workspace or a
+  person (WHIT-1031).
+- **An agent credential can't start with more than its issuer may grant.** `POST /api/mcp/tokens` with `agent: true` now checks each `grant:` entry the way the grant screen does: Ask first or Allowed on a permission the issuer doesn't hold, or Allowed where every operation asks, is refused (422, `grant_above_issuer`, naming the permission) and no key is issued. Off is always possible. Before, such entries were stored and only RBAC on each call held the agent back (`TplAgentCredential`, WHIT-1040).
+- **Error alerts can no longer flood operators' inboxes.** Since operator
+  error alerts started reaching email (WHIT-1031), each new or regressed error
+  group emailed every operator. At most five alerts are now emailed an hour;
+  any more still arrive in the in-app inbox, and the fifth email says so
+  (WHIT-1071).
+- **The form-decision email also goes when the final document is made on a
+  retry.** If the render service was down when a form's route finished, the
+  queue worker made the final document later and the person was never told the
+  decision. The worker now sends it too, with the PDF attached, and each route's
+  decision is emailed exactly once whichever process gets there first
+  (WHIT-1072).
+- **A workspace shows once in the picker, however many roles you hold in it.** Someone with two roles in one workspace saw that workspace twice when signing in, in the workspace switcher, in Ctrl+K and in the desktop app, and someone whose only workspace had two roles was asked to choose between copies of it. Sign-in, `/me` and the pending selection now return one entry per workspace with a `roles` list (`role` stays the primary one), and the pickers show every role on the one entry. Permissions in the workspace were already the combination of all your roles, and a staff role still outranks a customer one (WHIT-1079).
+- **The Settings frame matches the 3.4 settings cards.** "Settings › Page" now
+  sits above both columns, as on every TplSettings* card. The sub-nav is a
+  220px column with small uppercase group labels, and only the current page is
+  emphasised. Document themes no longer says "Documents ›", since it is a
+  workspace setting now (WHIT-1082).
+- **Approvals totals add up in the right currency.** Ticking several agent requests summed every amount as if it had three decimals, so a dollar total came out wrong; it now uses each currency's own decimals (WHIT-1088).
+- **A dollar amount no longer prints as "203.00$" on an Arabic document.** Whity Render now keeps a currency symbol and a minus sign inside the amount they lead, so right-to-left pages print $203.00 and −$35.00 (WHIT-1089).
+- **A paid plugin's add-on plans can be created.** Plan keys may now have dot-separated parts, as in `plugin.salons.monthly`: the key every add-on reader in core expects. Until now the Plans screen and the catalogue command refused such a key, so a plugin's prices could not be added at all.
+
 ## [0.2.28] - 2026-11-09
 
 ### Fixed

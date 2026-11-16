@@ -48,6 +48,14 @@ use Whity\Core\Store\SharedStoreInterface;
  * {@see \Whity\Core\Billing\External\EventLedger} uses. Without that, a customer
  * at their monthly limit would lose a day's allowance every time they were told
  * no, which is the bug that turns "you have 5 a day" into a lie.
+ *
+ * ── Refusing or warning ────────────────────────────────────────────────────
+ *
+ * `meters.enforcement` is `block` by default, so an install keeps the behaviour
+ * it has always had. On `warn`, an action past its limit is counted and goes
+ * ahead, and the decision says so. It is global-only for the reason
+ * {@see \Whity\Core\Seat\SeatService} gives: a workspace must not be able to
+ * switch off the limit it was sold.
  */
 final class MeterService
 {
@@ -70,6 +78,34 @@ final class MeterService
     ) {
     }
 
+    /** @var (\Closure(int, string, int, int, string, string): void)|null */
+    private ?\Closure $onThreshold = null;
+
+    /**
+     * Be told when a workspace comes close to a limit (90%) or passes it on an
+     * instance that warns (EM.1 `plan-limit`). Called once per window per stage:
+     * only by the action whose count crossed the line.
+     *
+     * @param \Closure(int $tenantId, string $key, int $used, int $limit, string $stage, string $resetsAt): void $listener
+     *        `$stage` is `near` or `passed`.
+     */
+    public function onThreshold(\Closure $listener): void
+    {
+        $this->onThreshold = $listener;
+    }
+
+    private function tellThreshold(int $tenantId, string $key, int $used, int $limit, string $stage, string $resetsAt): void
+    {
+        if ($this->onThreshold === null) {
+            return;
+        }
+        try {
+            ($this->onThreshold)($tenantId, $key, $used, $limit, $stage, $resetsAt);
+        } catch (\Throwable $e) {
+            error_log('[meter] threshold listener failed: ' . $e->getMessage());
+        }
+    }
+
     /**
      * Spend one unit of every metered limit named, or none of them.
      *
@@ -77,15 +113,41 @@ final class MeterService
      *                           consumes — e.g. the per-day and per-month
      *                           counters for the same resource.
      *
-     * @return MeterDecision Allowed, or refused naming the limit that refused.
+     * @return MeterDecision Allowed, warned or refused, naming the limit concerned.
      */
     public function consume(int $tenantId, array $keys, int $units = 1, ?DateTimeImmutable $now = null): MeterDecision
     {
+        return $this->spend($tenantId, $keys, $units, $now, false);
+    }
+
+    /**
+     * Count usage against an ALLOWANCE that never refuses (WHIT-932).
+     *
+     * For limits sold as "this much included, the rest is usage" — agent work
+     * is the first. The action always goes ahead; past the allowance the
+     * decision is warned and the count keeps going, so the overage is on record
+     * for whoever bills it. `meters.enforcement` is not consulted: a limit on
+     * {@see EntitlementRegistry::WARN_ONLY} is never a wall, on any instance.
+     *
+     * @param list<string> $keys
+     */
+    public function record(int $tenantId, array $keys, int $units = 1, ?DateTimeImmutable $now = null): MeterDecision
+    {
+        return $this->spend($tenantId, $keys, $units, $now, true);
+    }
+
+    /**
+     * @param list<string> $keys
+     */
+    private function spend(int $tenantId, array $keys, int $units, ?DateTimeImmutable $now, bool $neverRefuse): MeterDecision
+    {
         $now ??= new DateTimeImmutable();
+        $warnsOnly = $neverRefuse || $this->warnsOnly($tenantId);
         $effective = $this->entitlements->effective($tenantId);
 
         /** @var list<array{key: string, counter: string}> $taken */
         $taken = [];
+        $passed = null;
 
         foreach ($keys as $key) {
             $limit = $this->limitFor($effective, $key);
@@ -100,7 +162,10 @@ final class MeterService
                 continue;
             }
 
-            if ($limit === 0) {
+            // A WARN_ONLY limit never refuses, through whichever door it is spent.
+            $keyWarns = $warnsOnly || in_array($key, EntitlementRegistry::WARN_ONLY, true);
+
+            if ($limit === 0 && !$keyWarns) {
                 // Sold none of it. Refused without spending anything, and
                 // without a counter key that would never be read.
                 $this->giveBack($taken);
@@ -119,6 +184,25 @@ final class MeterService
 
             $taken[] = ['key' => $key, 'counter' => $counter, 'units' => $units];
 
+            // Close to the limit: the action that reached 90% says so, once.
+            $near = (int) ceil($limit * 0.9);
+            if ($limit > 1 && $count >= $near && $count - $units < $near && $count <= $limit) {
+                $this->tellThreshold($tenantId, $key, $count, $limit, 'near', $this->resetsAt($tenantId, $key, $now));
+            }
+
+            if ($count > $limit && $keyWarns) {
+                // Logged only on the action that crossed the line, so a
+                // workspace rendering all month past its limit is one entry
+                // per window and not one per document.
+                if ($count - $units <= $limit) {
+                    error_log(sprintf('[meter] tenant %d passed %s (limit %d)', $tenantId, $key, $limit));
+                    $this->tellThreshold($tenantId, $key, $count, $limit, 'passed', $this->resetsAt($tenantId, $key, $now));
+                }
+                $passed ??= MeterDecision::warned($key, $limit, $this->resetsAt($tenantId, $key, $now));
+
+                continue;
+            }
+
             if ($count > $limit) {
                 $this->giveBack($taken);
 
@@ -131,7 +215,7 @@ final class MeterService
             }
         }
 
-        return MeterDecision::allowed();
+        return $passed ?? MeterDecision::allowed();
     }
 
     /**
@@ -219,6 +303,17 @@ final class MeterService
                 $this->store->decrement($entry['counter']);
             }
         }
+    }
+
+    /**
+     * Whether this instance lets an action past its limit.
+     *
+     * Only `warn` does. A stored value nobody recognises keeps refusing, because
+     * this setting's job is to relax a limit and that has to be said on purpose.
+     */
+    private function warnsOnly(int $tenantId): bool
+    {
+        return ($this->settings->effective($tenantId)[SettingsRegistry::METERS_ENFORCEMENT] ?? 'block') === 'warn';
     }
 
     /**

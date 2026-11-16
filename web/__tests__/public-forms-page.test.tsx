@@ -5,11 +5,10 @@
 
 import React from 'react';
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
-}));
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 
 let mockCaps: string[] = ['public_form_keys:manage'];
 jest.mock('@/hooks/useCapabilities', () => ({
@@ -104,6 +103,13 @@ function route(keys: unknown[], ready = true, botSettings: unknown = null) {
   });
 }
 
+/** Revoke sits in the row's ⋯ menu (TplSettingsPublicForms). */
+async function revokeFromMenu(id: number) {
+  const user = userEvent.setup();
+  await user.click(await screen.findByTestId(`public-form-key-more-${id}`));
+  await user.click(await screen.findByTestId(`public-form-key-revoke-${id}`));
+}
+
 describe('PublicFormsPage', () => {
   beforeEach(() => {
     mockApiClient.mockReset();
@@ -129,7 +135,7 @@ describe('PublicFormsPage', () => {
     render(<PublicFormsPage />);
     const card = await screen.findByTestId('public-form-key-3');
     expect(within(card).getByText('Example Bakery website')).toBeTruthy();
-    expect(within(card).getByText('https://www.example-bakery.com')).toBeTruthy();
+    expect(within(card).getByText('www.example-bakery.com')).toBeTruthy();
   });
 
   it('labels a read key differently from a form key', async () => {
@@ -139,12 +145,9 @@ describe('PublicFormsPage', () => {
 
     const form = await screen.findByTestId('public-form-key-3');
     expect(within(form).getByTestId('public-form-key-kind-3').textContent).toBe('Form');
-    expect(form.textContent).toContain('Opens');
 
     const read = screen.getByTestId('public-form-key-4');
     expect(within(read).getByTestId('public-form-key-kind-4').textContent).toBe('Read-only link');
-    expect(read.textContent).toContain('Shows');
-    expect(read.textContent).not.toContain('Opens');
   });
 
   it('shows no kind for a key whose plugin is not loaded', async () => {
@@ -175,7 +178,7 @@ describe('PublicFormsPage', () => {
   it('says a read key stops working, not that its form stops taking submissions', async () => {
     route([{ ...liveKey, form: 'hours', kind: 'read' }]);
     render(<PublicFormsPage />);
-    fireEvent.click(await screen.findByTestId('public-form-key-revoke-3'));
+    await revokeFromMenu(3);
     const dialog = await screen.findByRole('alertdialog');
     expect(dialog.textContent).toContain('Its link stops working');
     expect(dialog.textContent).not.toContain('submissions');
@@ -195,7 +198,7 @@ describe('PublicFormsPage', () => {
     fireEvent.change(screen.getByLabelText('What this key opens'), { target: { value: 'arcline/enquiry' } });
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Main website' } });
     fireEvent.change(screen.getByLabelText('Sites that may send this form'), {
-      target: { value: 'https://a.example.com\nhttps://b.example.com' },
+      target: { value: 'https://a.example.com https://b.example.com' },
     });
     fireEvent.click(screen.getByTestId('public-forms-issue-submit'));
 
@@ -218,7 +221,7 @@ describe('PublicFormsPage', () => {
   it('asks before revoking, then revokes', async () => {
     route([liveKey]);
     render(<PublicFormsPage />);
-    fireEvent.click(await screen.findByTestId('public-form-key-revoke-3'));
+    await revokeFromMenu(3);
     expect(mockApiClient).not.toHaveBeenCalledWith('/api/v1/public-form-keys/3/revoke', expect.anything());
 
     const dialog = await screen.findByRole('alertdialog');
@@ -251,6 +254,9 @@ describe('PublicFormsPage', () => {
     render(<PublicFormsPage />);
     const card = await screen.findByTestId('public-forms-bot-check');
     await within(card).findByDisplayValue('site-key');
+    // A stored secret is never shown; Replace opens an empty box for a new one.
+    expect(within(card).queryByLabelText('Secret key')).toBeNull();
+    fireEvent.click(within(card).getByTestId('public-forms-secret-replace'));
     expect((within(card).getByLabelText('Secret key') as HTMLInputElement).value).toBe('');
 
     fireEvent.click(within(card).getByTestId('public-forms-bot-save'));

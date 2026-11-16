@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Core\Branding\BrandingService;
 use Whity\Core\Document\DocumentArtifactRepository;
 use Whity\Core\Document\DocumentRepository;
 use Whity\Core\Document\DocumentSourceRepository;
@@ -12,6 +13,7 @@ use Whity\Core\Document\Qr\DocumentQrService;
 use Whity\Core\Document\Qr\VerificationPresenter;
 use Whity\Core\Document\Routing\RouteEventRepository;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Settings\SettingsService;
@@ -71,19 +73,6 @@ use Whity\Core\Store\SharedStoreInterface;
  */
 final class DocumentVerificationApiHandler
 {
-    /**
-     * Throttle: fixed window, per-IP, shared with nothing else.
-     *
-     * 60 an hour is generous for the real use — a person scanning documents at a
-     * counter — and useless for enumeration: at that rate, working through a
-     * 2^256 namespace is not a threat model, it is a joke. The limit is defence
-     * in DEPTH behind the token's entropy, exactly as it is on the invitation
-     * accept endpoint, and its real job is bounding the write and read work one
-     * address can commission.
-     */
-    private const WINDOW_SECONDS = 3600;
-    private const IP_MAX = 60;
-
     public function __construct(
         private readonly DocumentQrService $qr,
         private readonly DocumentRepository $documents,
@@ -94,6 +83,10 @@ final class DocumentVerificationApiHandler
         // still answers, with no kind and no page count.
         private readonly ?DocumentSourceRepository $sources = null,
         private readonly ?DocumentArtifactRepository $artifacts = null,
+        // The issuer's logo and colour (WHIT-1044). Sent only beside a code that
+        // verified, which already names the issuer: a refused code must not
+        // reveal whose code it was.
+        private readonly ?BrandingService $branding = null,
     ) {
     }
 
@@ -201,8 +194,7 @@ final class DocumentVerificationApiHandler
 
         $described = $detail === VerificationPresenter::DETAIL_DESCRIBED;
 
-        return Response::json([
-            'data' => VerificationPresenter::verified(
+        $data = VerificationPresenter::verified(
                 $tokenRow,
                 $document,
                 $this->qr->reference((string) $tokenRow['token']),
@@ -212,8 +204,37 @@ final class DocumentVerificationApiHandler
                     : null,
                 $described ? $this->publicKind($document, $tenantId) : null,
                 $described ? $this->pages((int) $tokenRow['document_id'], $tenantId) : null,
-            ),
-        ], 200);
+        );
+        // Only where the answer already names the issuer, so the logo tells a
+        // reader nothing the page does not.
+        // Absent rather than null when there is none, so the key set stays the
+        // minimum the tests pin.
+        $issuer = (string) ($data['issuer'] ?? '');
+        $brand = $issuer !== '' ? $this->brandFor($tenantId, $issuer) : null;
+        if ($brand !== null) {
+            $data['brand'] = $brand;
+        }
+
+        return Response::json(['data' => $data], 200);
+    }
+
+    /**
+     * The issuer's public brand for the page (WHIT-1044), or null without a
+     * branding service or when it cannot be read: the page then wears the
+     * host's brand.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function brandFor(int $tenantId, string $issuer): ?array
+    {
+        if ($this->branding === null) {
+            return null;
+        }
+        try {
+            return $this->branding->forPublicPage($tenantId, $issuer);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -273,7 +294,13 @@ final class DocumentVerificationApiHandler
     }
 
     /**
-     * Per-IP ceiling, counted before the token is examined.
+     * Per-IP ceiling, counted before the token is examined
+     * ({@see \Whity\Core\RateLimit\RateLimits::documentVerificationPerAddress()}).
+     *
+     * 60 an hour is generous for the real use, a person scanning documents at a
+     * counter, and useless for enumeration against a 2^256 namespace. The limit
+     * is defence in depth behind the token's entropy; its real job is bounding
+     * the work one address can commission.
      *
      * Counted first so the boundary carries no information about whether a token
      * was real — the same discipline, and the same shared-store counter shape,
@@ -292,14 +319,6 @@ final class DocumentVerificationApiHandler
             return null;
         }
 
-        $key = 'docqr:verify:ip:' . $ip;
-        if ($this->store->count($key) >= self::IP_MAX) {
-            return Response::error('Too many attempts. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) max($this->store->ttl($key), 1)]);
-        }
-
-        $this->store->increment($key, self::WINDOW_SECONDS);
-
-        return null;
+        return RateLimits::documentVerificationPerAddress()->take($this->store, 'docqr:verify:ip:' . $ip);
     }
 }

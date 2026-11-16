@@ -74,6 +74,14 @@ class TwoFactorHandler
         $this->proofThrottle = $proofThrottle;
     }
 
+    /** EM.1 `two-step-off`: set at boot once mail is wired. */
+    private ?\Whity\Core\Mail\AccountSecurityMailer $securityMailer = null;
+
+    public function setSecurityMailer(\Whity\Core\Mail\AccountSecurityMailer $mailer): void
+    {
+        $this->securityMailer = $mailer;
+    }
+
     /**
      * Resolve the caller's access-token claims: cookie first (classic browser
      * flow), then `Authorization: Bearer` (#390) — same precedence as
@@ -537,6 +545,11 @@ class TwoFactorHandler
             $this->writeTwoFactorToProfile($profileId, null, false, 0);
 
             $this->audit('auth.2fa.disabled', $profileId);
+            // EM.1 `two-step-off`: a security email, never turned off.
+            try {
+                $this->securityMailer?->twoStepTurnedOff($profileId, (int) ($claims['tenant_id'] ?? 0));
+            } catch (\Throwable) {
+            }
 
             return Response::json([
                 'message' => 'Two-factor authentication disabled'

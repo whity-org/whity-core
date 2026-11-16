@@ -84,6 +84,19 @@ final class PluginLoaderDataBoundBlocksTest extends TestCase
                     ],
                 ]],
             ],
+            // A source that filters its own route with a query string. The
+            // route is still this plugin's, so the screen must be served.
+            [
+                'id' => 'x-filtered',
+                'label' => 'X Filtered',
+                'screen' => 'blocks',
+                'requiredPermission' => 'x:view',
+                'blocks' => [[
+                    'type' => 'dataTable',
+                    'source' => '/api/x/rows?status=pending',
+                    'columns' => [['key' => 'id', 'label' => 'ID']],
+                ]],
+            ],
             // WC-240: a `chart` block is data-bound the SAME way (a `source`
             // prop of kind `apiPath`) — it must go through the identical
             // ownership + versioning walk as dataTable/dataStat/dataList,
@@ -343,6 +356,20 @@ PHP);
             ['key' => 'id',   'label' => 'ID'],
             ['key' => 'name', 'label' => 'Name'],
         ], $node['columns']);
+    }
+
+    /**
+     * A source with a query string names the route before the `?`: the feature
+     * is served, the path is versioned and the query is kept for the renderer.
+     */
+    public function testOwnedSourceWithAQueryStringIsServedAndVersioned(): void
+    {
+        [$loader] = $this->loadDir(self::$ownedSourceDir, new Router('/v1'));
+
+        $byId = array_column($loader->getFrontendFeatures(), null, 'id');
+
+        $this->assertArrayHasKey('x-filtered', $byId, 'A filtered source on an owned route must be served');
+        $this->assertSame('/api/v1/x/rows?status=pending', $byId['x-filtered']['blocks'][0]['source']);
     }
 
     /**

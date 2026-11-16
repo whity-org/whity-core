@@ -454,6 +454,12 @@ final class CorePermissions
     // Workspace-controlled customer sign-up (WHIT-915, migration 222): the mode,
     // the starting role and the queue of people waiting to join.
     public const SIGNUP_MANAGE = 'signup:manage';
+    // MESSAGES (ADR 0016, migration 244). Read the workspace's conversations with
+    // customers; reply and write notes; assign, change status and set channels up.
+    // Customers never use these: their side checks ownership of the conversation.
+    public const MESSAGES_READ = 'messages:read';
+    public const MESSAGES_REPLY = 'messages:reply';
+    public const MESSAGES_MANAGE = 'messages:manage';
     // CONVENING (migrations 130/131). Deliberative BODIES that meet, minute a
     // numbered decision, and — where the agenda item carried a document — drive
     // that document's existing approval route with the decision.
@@ -473,6 +479,33 @@ final class CorePermissions
     public const CONVENING_READ = 'convening:read';
     public const CONVENING_MANAGE = 'convening:manage';
     public const CONVENING_DECIDE = 'convening:decide';
+
+    // CALENDAR (migrations 247 to 249, ADR 0017). Staff calendars, services,
+    // availability and bookings. Read and write go to every staff role (anchor
+    // documents:read); manage to the roles that run the workspace.
+    public const CALENDAR_READ = 'calendar:read';
+    public const CALENDAR_WRITE = 'calendar:write';
+    public const CALENDAR_MANAGE = 'calendar:manage';
+
+    // CONTACTS (migrations 261 and 262, design 3.3 A8). Customers and
+    // suppliers as one record, with tags and spreadsheet import. Read and
+    // write go to every staff role (anchor documents:read); import to the
+    // roles that run the workspace.
+    public const CONTACTS_READ = 'contacts:read';
+    public const CONTACTS_WRITE = 'contacts:write';
+    public const CONTACTS_IMPORT = 'contacts:import';
+    // TASKS on Taskaat (A10, T.3). Tasks and boards live in the workspace's
+    // Taskaat; these gate Whity's way into them. Read and write go to every
+    // staff role (anchor documents:read); manage (connecting the workspace to
+    // Taskaat) to the roles that run the workspace.
+    public const TASKS_READ = 'tasks:read';
+    public const TASKS_WRITE = 'tasks:write';
+    public const TASKS_MANAGE = 'tasks:manage';
+
+    // CUSTOM FIELDS (migrations 263 and 264, design 3.3 A9). Defining the
+    // workspace's own fields on its records; filling them in needs only the
+    // record's own permissions.
+    public const FIELDS_MANAGE = 'fields:manage';
 
     /**
      * Return the full list of core permission strings.
@@ -568,9 +601,22 @@ final class CorePermissions
             self::FORMS_REVIEW,
             self::PUBLIC_FORM_KEYS_MANAGE,
             self::SIGNUP_MANAGE,
+            self::MESSAGES_READ,
+            self::MESSAGES_REPLY,
+            self::MESSAGES_MANAGE,
             self::CONVENING_READ,
             self::CONVENING_MANAGE,
             self::CONVENING_DECIDE,
+            self::CALENDAR_READ,
+            self::CALENDAR_WRITE,
+            self::CALENDAR_MANAGE,
+            self::CONTACTS_READ,
+            self::CONTACTS_WRITE,
+            self::CONTACTS_IMPORT,
+            self::FIELDS_MANAGE,
+            self::TASKS_READ,
+            self::TASKS_WRITE,
+            self::TASKS_MANAGE,
         ];
     }
 }

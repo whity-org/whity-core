@@ -23,9 +23,24 @@ import userEvent from '@testing-library/user-event';
 // Module mocks
 // ---------------------------------------------------------------------------
 
+// The typed client is adapted onto a path router: the template and its path
+// params become the concrete URL, which the tests route by prefix.
 const apiClient = jest.fn();
-jest.mock('@/lib/auth-context', () => ({
-  useAuth: () => ({ apiClient: (...args: unknown[]) => apiClient(...args) }),
+async function viaRouter(template: string, options?: { params?: { path?: Record<string, unknown> } }) {
+  const path = template.replace(/\{(\w+)\}/g, (_m, k: string) => String(options?.params?.path?.[k]));
+  const res = (await apiClient(path)) as { ok: boolean; json: () => Promise<unknown> };
+  const body = await res.json();
+  return {
+    data: res.ok ? body : undefined,
+    error: res.ok ? undefined : body,
+    response: new Response(null, { status: res.ok ? 200 : 500 }),
+  };
+}
+jest.mock('@/lib/api/client', () => ({
+  api: {
+    GET: (...a: [string, never]) => viaRouter(...a),
+    POST: (...a: [string, never]) => viaRouter(...a),
+  },
 }));
 
 const addToast = jest.fn();

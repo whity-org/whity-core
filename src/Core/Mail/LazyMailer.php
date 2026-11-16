@@ -24,7 +24,7 @@ use Closure;
  * only ever surfaces a genuine transport error ({@see MailException}), which
  * callers already treat as non-fatal.
  */
-final class LazyMailer implements Mailer
+final class LazyMailer implements Mailer, ThreadedMailer
 {
     /** @var Closure(): Mailer */
     private Closure $factory;
@@ -42,5 +42,21 @@ final class LazyMailer implements Mailer
         // WHIT-991: no mail from a proposal preview.
         \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Sending mail');
         ($this->factory)()->send($toEmail, $subject, $textBody, $htmlBody);
+    }
+
+    /**
+     * Messages (ADR 0016). A transport that cannot carry the headers still
+     * sends the mail; only its threading is lost.
+     */
+    public function sendThreaded(OutgoingEmail $email): void
+    {
+        \Whity\Core\Sandbox\SideEffectGuard::assertAllowed('Sending mail');
+        $mailer = ($this->factory)();
+        if ($mailer instanceof ThreadedMailer) {
+            $mailer->sendThreaded($email);
+
+            return;
+        }
+        $mailer->send($email->to, $email->subject, $email->textBody, $email->htmlBody);
     }
 }

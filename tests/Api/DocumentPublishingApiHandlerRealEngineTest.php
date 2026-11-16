@@ -43,6 +43,7 @@ use Whity\Database\Database;
 use Whity\Sdk\Http\Response;
 use Whity\Storage\LocalStorageDriver;
 use Whity\Storage\StorageKey;
+use Whity\Core\Document\SavedBlock\SavedBlockRepository;
 
 /**
  * Real-engine tests for {@see DocumentPublishingApiHandler} (editor M4):
@@ -77,6 +78,8 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
     private SettingsService $settings;
     private DocumentSourceFileStore $files;
     private string $storageRoot;
+    private SavedBlockRepository $savedBlocks;
+    private \Whity\Core\Document\Blocks\DocumentBlockRegistry $pluginBlocks;
 
     protected function setUp(): void
     {
@@ -120,6 +123,12 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
             new DocumentIssuer($this->pdo, $documents, new DocumentArtifactRepository($this->pdo), new DocumentArtifactStore(new LocalStorageDriver($this->storageRoot))),
             $files,
             logo: new LetterheadLogo($this->settings, new LocalStorageDriver($this->storageRoot)),
+            savedBlocks: $this->savedBlocks = new SavedBlockRepository($this->pdo),
+            documentBlocks: $this->pluginBlocks = new \Whity\Core\Document\Blocks\DocumentBlockRegistry(
+                static fn (int $tenantId): array => [],
+                static fn (int $tenantId): array => [],
+                static fn (string $plugin): bool => false,
+            ),
         );
     }
 
@@ -226,17 +235,17 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
             ]],
         ]);
 
+        // E.19: blocks of a plugin that isn't here name the plugin, once.
         $blockers = $this->data($this->check(self::OWNER, $id));
         self::assertSame([
             ['kind' => 'unknown-field', 'path' => 'customer.vat'],
-            ['kind' => 'block-without-print-view', 'blockId' => 'p1'],
-            ['kind' => 'block-without-print-view', 'blockId' => 'p2'],
+            ['kind' => 'missing-plugin', 'plugin' => 'com.example.maps'],
         ], $blockers);
 
         // Calling Publish directly runs the same check.
         $res = $this->publish(self::OWNER, $id, '"1"');
         self::assertSame(409, $res->getStatusCode());
-        self::assertCount(3, json_decode($res->getBody(), true)['details']['blockers']);
+        self::assertCount(2, json_decode($res->getBody(), true)['details']['blockers']);
     }
 
     /**
@@ -245,6 +254,104 @@ final class DocumentPublishingApiHandlerRealEngineTest extends TestCase
      * sends, with its images inlined, against the same ceiling and measure
      * the render refuses on.
      */
+    /**
+     * Editor M7, E.38: a synced saved block prints as the library has it in a
+     * draft and its preview, and publishing freezes it into the version, so
+     * what the published template prints changes only when someone publishes
+     * again. A deleted one has nothing to print and blocks publishing.
+     */
+    public function testASyncedBlockPrintsAsTheLibraryHasItAndPublishingFreezesIt(): void
+    {
+        $bank = $this->savedBlocks->create(self::TENANT, [
+            'name' => 'Bank details', 'description' => null, 'mode' => 'synced', 'sharing' => 'workspace',
+            'owner_profile_id' => self::OWNER, 'blocks' => [['id' => 's1', 'type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'IBAN JO00 0001']]]],
+            'per_document_keys' => [],
+        ]);
+        $ref = ['id' => 'r1', 'type' => 'savedBlock', 'savedBlockId' => (string) $bank, 'version' => 1, 'overrides' => []];
+        $id = $this->template(self::OWNER, [$this->para('Please pay to:'), ['id' => 't1', 'type' => 'toggle', 'open' => true, 'summary' => [], 'children' => [$ref]]]);
+        $doc = $this->issue(self::OWNER, 'Payment reminder');
+
+        self::assertSame([], $this->data($this->check(self::OWNER, $id)), 'a synced block has a print view: its blocks');
+        self::assertSame(201, $this->publish(self::OWNER, $id, '"1"')->getStatusCode());
+        $v1 = $this->data($this->handler->version($this->request('GET', "/api/document-sources/{$id}/versions/1", self::OWNER), ['id' => (string) $id, 'version' => '1']));
+        self::assertStringContainsString('IBAN JO00 0001', (string) json_encode($v1['blocks']));
+        self::assertStringNotContainsString('savedBlock', (string) json_encode($v1['blocks']), 'the version keeps the blocks themselves');
+
+        // The original changes: the draft shows it at once, the published template doesn't.
+        self::assertSame(2, $this->savedBlocks->replaceBlocks($bank, self::TENANT, 1, [['id' => 's1', 'type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'IBAN JO99 0002']]]], []));
+        self::assertSame(200, $this->renderPdf(self::OWNER, $id, ['record' => 'document:' . $doc])->getStatusCode());
+        $published = (string) json_encode($this->render->flowCalls[0]);
+        self::assertStringContainsString('IBAN JO00 0001', $published);
+        self::assertStringNotContainsString('JO99', $published);
+        self::assertSame(200, $this->renderPdf(self::OWNER, $id, ['record' => 'document:' . $doc, 'draft' => true])->getStatusCode());
+        self::assertStringContainsString('IBAN JO99 0002', (string) json_encode($this->render->flowCalls[1]));
+
+        // Publishing again picks the change up.
+        self::assertSame(201, $this->publish(self::OWNER, $id, '"1"')->getStatusCode());
+        self::assertSame(200, $this->renderPdf(self::OWNER, $id, ['record' => 'document:' . $doc])->getStatusCode());
+        self::assertStringContainsString('IBAN JO99 0002', (string) json_encode($this->render->flowCalls[2]));
+
+        // Deleted from the library: nothing to print, so it blocks publishing.
+        self::assertTrue($this->savedBlocks->archive($bank, self::TENANT));
+        self::assertSame([['kind' => 'block-without-print-view', 'blockId' => 'r1']], $this->data($this->check(self::OWNER, $id)));
+    }
+
+    /**
+     * E.23: a part of a synced block marked "filled per document" prints the
+     * document's own text where the document filled it, and the original's
+     * where it didn't; the rest stays as the library has it.
+     */
+    public function testPerDocumentPartsPrintWhatTheDocumentFilled(): void
+    {
+        $pd = static fn (string $text): array => ['type' => 'text', 'text' => $text, 'marks' => [['type' => 'perDocument']]];
+        $sign = $this->savedBlocks->create(self::TENANT, [
+            'name' => 'Signature line', 'description' => null, 'mode' => 'synced', 'sharing' => 'workspace',
+            'owner_profile_id' => self::OWNER,
+            'blocks' => [['id' => 'a', 'type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'Signed by '], $pd('Amro Saleh'), ['type' => 'text', 'text' => ' on '], $pd('12 November')]]],
+            'per_document_keys' => ['a#0', 'a#1'],
+        ]);
+        $id = $this->template(self::OWNER, [
+            ['id' => 'r1', 'type' => 'savedBlock', 'savedBlockId' => (string) $sign, 'version' => 1, 'overrides' => ['a#0' => [['type' => 'text', 'text' => 'Awss Haddad']]]],
+        ]);
+        $doc = $this->issue(self::OWNER, 'Payment reminder');
+
+        self::assertSame(201, $this->publish(self::OWNER, $id, '"1"')->getStatusCode());
+        self::assertSame(200, $this->renderPdf(self::OWNER, $id, ['record' => 'document:' . $doc])->getStatusCode());
+        self::assertSame('Signed by Awss Haddad on 12 November', $this->render->flowCalls[0]['content'][1]['text']);
+    }
+
+    /**
+     * Editor M7, E.17-E.19: a plugin block prints from its print view as
+     * Whity's own blocks, frozen into the version at publish. A block whose
+     * plugin is off blocks publishing by the plugin's name; one without a
+     * print view blocks as a block with no print view.
+     */
+    public function testAPluginBlockPrintsFromItsPrintViewAndAnOffPluginBlocksPublishing(): void
+    {
+        $delivery = \Tests\Sdk\Manifest\DocumentBlockValidatorTest::delivery();
+        $notes = $delivery;
+        unset($notes['print'], $notes['allowedIn']);
+        $this->pluginBlocks->register('Shipping', ['en' => 'Shipping', 'ar' => 'Shipping'], ['delivery_status' => $delivery, 'notes_only' => $notes]);
+        $block = static fn (string $id, string $plugin, string $type): array => ['id' => $id, 'type' => 'plugin', 'plugin' => $plugin, 'blockType' => $type, 'schemaVersion' => 1, 'data' => ['order' => 'SO-2207', 'stage' => 'packed']];
+
+        $id = $this->template(self::OWNER, [$this->para('Your order:'), $block('d1', 'Shipping', 'delivery_status')]);
+        $doc = $this->issue(self::OWNER, 'Payment reminder');
+        self::assertSame([], $this->data($this->check(self::OWNER, $id)));
+        self::assertSame(201, $this->publish(self::OWNER, $id, '"1"')->getStatusCode());
+        $v1 = $this->data($this->handler->version($this->request('GET', "/api/document-sources/{$id}/versions/1", self::OWNER), ['id' => (string) $id, 'version' => '1']));
+        self::assertNotContains('plugin', array_column($v1['blocks'], 'type'), 'the version keeps what it prints');
+        self::assertSame(200, $this->renderPdf(self::OWNER, $id, ['record' => 'document:' . $doc])->getStatusCode());
+        $printed = (string) json_encode($this->render->flowCalls[0]);
+        self::assertStringContainsString('Order SO-2207', $printed);
+        self::assertStringContainsString('Packed', $printed, 'a select prints the label of its option');
+
+        $off = $this->template(self::OWNER, [$block('g1', 'DeliveryTracker', 'x'), $block('g2', 'DeliveryTracker', 'y'), $block('n1', 'Shipping', 'notes_only')]);
+        self::assertSame([
+            ['kind' => 'block-without-print-view', 'blockId' => 'n1'],
+            ['kind' => 'missing-plugin', 'plugin' => 'DeliveryTracker'],
+        ], $this->data($this->check(self::OWNER, $off)));
+    }
+
     public function testATemplateTooLargeToPrintIsBlockedFromPublishing(): void
     {
         $this->settings->setTenant(self::TENANT, SettingsRegistry::DOCUMENTS_FLOW_MAX_BYTES, '4096');

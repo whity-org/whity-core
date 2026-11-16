@@ -7,6 +7,7 @@ namespace Whity\Core\Document\Routing;
 use PDO;
 use PDOException;
 use Whity\Core\Db\DbBool;
+use Whity\Core\Delegation\AwayService;
 
 /**
  * Data-access for `document_route_recipients` (#947 item 3) — THE INBOX.
@@ -582,6 +583,18 @@ final class RouteRecipientRepository
      * for the reason every other list in this codebase records: a post-filtered
      * total is one the caller cannot reach.
      */
+    /** Merge map A2: a person's open step items, which a delegate decides while they are away. */
+    public function countOpenStepItems(int $tenantId, int $profileId): int
+    {
+        $stmt = $this->db->prepare(
+            'SELECT COUNT(*) FROM document_route_recipients
+              WHERE tenant_id = :tenant_id AND profile_id = :profile_id AND role = :role AND closed_by_event_id IS NULL'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId, ':role' => self::ROLE_STEP]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
     public function countForProfile(int $tenantId, int $profileId, bool $openOnly): int
     {
         if ($openOnly) {
@@ -622,7 +635,100 @@ final class RouteRecipientRepository
             ':profile_id' => $profileId,
         ]);
 
-        return $stmt->fetchColumn() !== false;
+        return $stmt->fetchColumn() !== false || $this->delegateReachesDocument($tenantId, $documentId, $profileId);
+    }
+
+    /**
+     * Merge map A2: a person deciding for someone who is away reads what they
+     * decide. They reach a document while someone they cover holds an open item
+     * on it, and keep reading it once they have acted on it for them.
+     */
+    private function delegateReachesDocument(int $tenantId, int $documentId, int $profileId): bool
+    {
+        $acted = $this->db->prepare(
+            'SELECT 1 FROM document_route_events
+              WHERE tenant_id = :tenant_id AND document_id = :document_id
+                AND actor_profile_id = :profile_id AND on_behalf_of_profile_id IS NOT NULL
+              LIMIT 1'
+        );
+        $acted->execute([':tenant_id' => $tenantId, ':document_id' => $documentId, ':profile_id' => $profileId]);
+        if ($acted->fetchColumn() !== false) {
+            return true;
+        }
+        $open = $this->db->prepare(
+            'SELECT 1 FROM document_route_recipients
+              WHERE tenant_id = :tenant_id AND document_id = :document_id AND profile_id = :away_id
+                AND role = :role AND closed_by_event_id IS NULL
+              LIMIT 1'
+        );
+        foreach ($this->coveredBy($tenantId, $profileId) as $awayId) {
+            $open->execute([':tenant_id' => $tenantId, ':document_id' => $documentId, ':away_id' => $awayId, ':role' => self::ROLE_STEP]);
+            if ($open->fetchColumn() !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Merge map A2: the subject-keyed twin of {@see delegateReachesDocument()}.
+     */
+    private function delegateReachesSubject(int $tenantId, string $subjectType, int $subjectId, int $profileId): bool
+    {
+        $acted = $this->db->prepare(
+            'SELECT 1 FROM document_route_events e
+               JOIN document_routes dr ON dr.id = e.route_id AND dr.tenant_id = :tenant_id
+              WHERE e.tenant_id = :tenant_id AND e.actor_profile_id = :profile_id AND e.on_behalf_of_profile_id IS NOT NULL
+                AND dr.subject_type = :subject_type AND dr.subject_id = :subject_id
+              LIMIT 1'
+        );
+        $acted->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId, ':subject_type' => $subjectType, ':subject_id' => $subjectId]);
+        if ($acted->fetchColumn() !== false) {
+            return true;
+        }
+        $open = $this->db->prepare(
+            'SELECT 1 FROM document_route_recipients r
+               JOIN document_routes dr ON dr.id = r.route_id AND dr.tenant_id = :tenant_id
+              WHERE r.tenant_id = :tenant_id AND r.profile_id = :away_id AND r.role = :role AND r.closed_by_event_id IS NULL
+                AND dr.subject_type = :subject_type AND dr.subject_id = :subject_id
+              LIMIT 1'
+        );
+        foreach ($this->coveredBy($tenantId, $profileId) as $awayId) {
+            $open->execute([':tenant_id' => $tenantId, ':away_id' => $awayId, ':role' => self::ROLE_STEP, ':subject_type' => $subjectType, ':subject_id' => $subjectId]);
+            if ($open->fetchColumn() !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Merge map A2: a workspace member's name, for "for Amro Saleh" on an item
+     * a delegate holds. Empty when they are not a member here.
+     */
+    public function memberName(int $tenantId, int $profileId): string
+    {
+        $stmt = $this->db->prepare(
+            'SELECT p.display_name FROM profiles p
+              WHERE p.id = :profile_id
+                AND EXISTS (SELECT 1 FROM memberships m WHERE m.profile_id = p.id AND m.tenant_id = :tenant_id)'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId]);
+        $name = $stmt->fetchColumn();
+
+        return is_string($name) ? $name : '';
+    }
+
+    /**
+     * Merge map A2: the people this person decides approvals for today.
+     *
+     * @return list<int>
+     */
+    public function coveredBy(int $tenantId, int $profileId): array
+    {
+        return (new AwayService($this->db))->coveredBy($tenantId, $profileId, AwayService::FLOWS);
     }
 
     /**
@@ -649,7 +755,7 @@ final class RouteRecipientRepository
             ':subject_id' => $subjectId,
         ]);
 
-        return $stmt->fetchColumn() !== false;
+        return $stmt->fetchColumn() !== false || $this->delegateReachesSubject($tenantId, $subjectType, $subjectId, $profileId);
     }
 
     /**
@@ -669,8 +775,17 @@ final class RouteRecipientRepository
             ':profile_id' => $profileId,
             ':role' => self::ROLE_STEP,
         ]);
+        if ($stmt->fetchColumn() !== false) {
+            return true;
+        }
+        // Merge map A2: someone deciding for a person who is away.
+        foreach ($this->coveredBy($tenantId, $profileId) as $awayId) {
+            if ($this->findOpenForProfile($tenantId, $routeId, $awayId) !== null) {
+                return true;
+            }
+        }
 
-        return $stmt->fetchColumn() !== false;
+        return false;
     }
 
     /**

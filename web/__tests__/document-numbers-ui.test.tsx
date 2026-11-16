@@ -2,6 +2,9 @@
  * Document numbers and states on screen, and the numbering setting (WHIT-905).
  */
 import { render, screen, waitFor } from '@testing-library/react';
+
+const mockApiClient = jest.fn();
+jest.mock('@/lib/api/client', () => jest.requireActual('./helpers/client-via-mock').clientVia(() => mockApiClient));
 import userEvent from '@testing-library/user-event';
 
 import { DocumentNumber, DocumentStateBadge } from '@/app/(protected)/admin/document-library/document-item';
@@ -94,16 +97,17 @@ describe('the format preview', () => {
 
 describe('the numbering dialog', () => {
   function setup(numbering: TemplateRow['numbering'] = null, ok = true) {
-    const apiClient = jest.fn(async () => ({
+    const apiClient = mockApiClient;
+    apiClient.mockReset();
+    apiClient.mockImplementation(async () => ({
       ok,
       json: async () => ({ error: 'numbering.pattern must contain {SEQ} exactly once' }),
-    })) as unknown as Parameters<typeof NumberingDialog>[0]['apiClient'];
+    }));
     const onSaved = jest.fn();
     render(
       <NumberingDialog
         row={{ ...template, numbering }}
         name="Invoice"
-        apiClient={apiClient}
         addToast={jest.fn()}
         onClose={jest.fn()}
         onSaved={onSaved}

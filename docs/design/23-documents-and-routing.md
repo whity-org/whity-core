@@ -20,6 +20,6 @@ Templates are listed with their kind and record type in words, their status (Dra
 
 ## Route templates and the flow editor
 
-Each route is described in a sentence ("Branch manager, then the owner over JOD 1,000, then Finance"). The flow editor draws it top to bottom (D.2): a start pill, stages as cards (who it reaches, decision or sent only, the rule, conditions), branches side by side under a decision with Approved and Rejected on their arrows, and end pills. The selected stage's settings are in an inspector beside it: name, who it goes to (with how many people it reaches today), what they do, what counts as approved, and Only when. Rename and **Save route** are in the header.
+Each route is described in a sentence ("Branch manager, then the owner over $1,000, then Finance"). The flow editor draws it top to bottom (D.2): a start pill, stages as cards (who it reaches, decision or sent only, the rule, conditions), branches side by side under a decision with Approved and Rejected on their arrows, and end pills. The selected stage's settings are in an inspector beside it: name, who it goes to (with how many people it reaches today), what they do, what counts as approved, and Only when. Rename and **Save route** are in the header.
 
 The 2.7 Arabic card is the routing tab (`TplDocRoutingAr`).

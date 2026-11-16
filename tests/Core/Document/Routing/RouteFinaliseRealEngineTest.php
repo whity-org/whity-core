@@ -24,6 +24,7 @@ use Whity\Core\Document\Qr\DocumentQrTokenRepository;
 use Whity\Core\Document\Render\FlowDocumentRenderer;
 use Whity\Core\Document\RouteTemplate\RouteTemplateGraph;
 use Whity\Core\Document\RouteTemplate\RouteTemplateRejectedException;
+use Whity\Core\Document\Fields\RouteValueFieldProvider;
 use Whity\Core\Document\RouteTemplate\RouteTemplateRepository;
 use Whity\Core\Document\Routing\DocumentRouter;
 use Whity\Core\Document\Routing\DocumentRouteSubject;
@@ -46,8 +47,10 @@ use Whity\Core\Document\Routing\RouteVerdict;
 use Whity\Core\Document\Routing\RoutingRejectedException;
 use Whity\Core\Document\Routing\RoutingRuleRegistry;
 use Whity\Core\Form\FormFieldRepository;
+use Whity\Core\Form\FormReferenceAssign;
 use Whity\Core\Form\FormRejectedException;
 use Whity\Core\Form\FormRepository;
+use Whity\Core\Form\FormSubmissionFieldProvider;
 use Whity\Core\Form\FormSubmissionRepository;
 use Whity\Core\Form\FormSubmissionRouteSubject;
 use Whity\Core\Form\FormTemplateDraft;
@@ -87,6 +90,9 @@ final class RouteFinaliseRealEngineTest extends TestCase
     private const TENANT = 1;
     private const APPLICANT = 10;
     private const CLERK = 11;
+    /** WHIT-1018: two more committee members; the second supervises the project. */
+    private const MEMBER = 12;
+    private const SUPERVISOR = 13;
 
     private PDO $pdo;
     private SettingsService $settings;
@@ -345,6 +351,308 @@ final class RouteFinaliseRealEngineTest extends TestCase
         self::assertContains('Vendor: Example Mill', EditorTemplateFixture::texts($this->render->flowCalls[0]));
     }
 
+    public function testAValueEnteredAtAStepPrintsOnTheFinalDocument(): void
+    {
+        // WHIT-1016: the clerk enters the committee meeting number while
+        // approving, and the approval letter prints it.
+        $id = $this->editor->sourceRepo->create(self::TENANT, [
+            'kind' => 'template',
+            'title' => 'Approval letter',
+            'lang' => 'en',
+            'default_view' => 'page',
+            'blocks' => [$this->editor->para('Meeting: ', $this->editor->field(RouteValueFieldProvider::path('meeting_no')))],
+            'scope' => 'tenant',
+            'created_by' => self::APPLICANT,
+        ]);
+        $this->editor->publish(self::TENANT, $id, self::APPLICANT);
+
+        $design = $this->clerkThenFinalise(null, [['key' => 'meeting_no', 'label' => 'Committee meeting number']]);
+        $provider = new RouteValueFieldProvider($this->pdo);
+        self::assertSame(
+            [['group' => 'Entered during review', 'items' => [[
+                'path' => 'route.value.meeting_no',
+                'label' => 'Committee meeting number',
+                'sample' => 'Committee meeting number',
+            ]]]],
+            $provider->groups(self::TENANT),
+            'the template picker offers what the designs ask for',
+        );
+        self::assertSame([], $provider->groups(2), 'and only in their own workspace');
+
+        $submission = $this->send($this->form($design, $id), ['supplier' => 'Example Mill']);
+        $route = $this->routeOf((int) $submission['id']);
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED, null, false, ['meeting_no' => '14']);
+
+        self::assertContains('Meeting: 14', EditorTemplateFixture::texts($this->render->flowCalls[0]));
+    }
+
+    public function testAReferenceGivenOnApprovalPrintsTheAnswerAndTheMeetingAndIsOnTheFinalDocument(): void
+    {
+        // WHIT-1017: the AAU IRB shape. The prefix follows an answer, the
+        // middle part is the meeting number the clerk enters while approving,
+        // and the year is the academic year starting in September.
+        $id = $this->editor->sourceRepo->create(self::TENANT, [
+            'kind' => 'template',
+            'title' => 'Approval certificate',
+            'lang' => 'en',
+            'default_view' => 'page',
+            'blocks' => [$this->editor->para('Approval No.: ', $this->editor->field(FormSubmissionFieldProvider::REFERENCE))],
+            'scope' => 'tenant',
+            'created_by' => self::APPLICANT,
+        ]);
+        $this->editor->publish(self::TENANT, $id, self::APPLICANT);
+
+        $formId = $this->form($this->clerkThenFinalise(null, [['key' => 'meeting_no', 'label' => 'Committee meeting number']]), $id);
+        $this->forms->update(self::TENANT, $formId, [
+            'reference_format' => '{ANSWER:supplier|Example Mill=MILL|*=OTHER} {SEQ}/{STEP:meeting_no}/{AY:9}',
+            'reference_assign' => FormReferenceAssign::APPROVAL,
+        ]);
+        self::assertSame(FormReferenceAssign::APPROVAL, $this->forms->find(self::TENANT, $formId)['reference_assign'] ?? null);
+
+        $first = $this->send($formId, ['supplier' => 'Example Mill']);
+        self::assertNull($first['reference'], 'nothing is given at submit');
+        $route = $this->routeOf((int) $first['id']);
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED, null, false, ['meeting_no' => '14']);
+
+        $year = (int) gmdate('Y') - ((int) gmdate('n') < 9 ? 1 : 0);
+        $expected = 'MILL 1/14/' . $year . '-' . ($year + 1);
+        self::assertSame($expected, $this->submissions->find(self::TENANT, (int) $first['id'])['reference'] ?? null);
+        self::assertContains('Approval No.: ' . $expected, EditorTemplateFixture::texts($this->render->flowCalls[0]));
+
+        // Another answer counts on its own; the same answer carries on.
+        $other = $this->send($formId, ['supplier' => 'Example Oven']);
+        $this->router->act(self::TENANT, self::CLERK, $this->routeOf((int) $other['id']), RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED, null, false, ['meeting_no' => '15']);
+        self::assertStringStartsWith('OTHER 1/15/', (string) ($this->submissions->find(self::TENANT, (int) $other['id'])['reference'] ?? ''));
+        $again = $this->send($formId, ['supplier' => 'Example Mill']);
+        $this->router->act(self::TENANT, self::CLERK, $this->routeOf((int) $again['id']), RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED, null, false, ['meeting_no' => '15']);
+        self::assertStringStartsWith('MILL 2/15/', (string) ($this->submissions->find(self::TENANT, (int) $again['id'])['reference'] ?? ''));
+
+        // A submission that is not approved takes no number.
+        $refused = $this->send($formId, ['supplier' => 'Example Mill']);
+        $this->router->act(self::TENANT, self::CLERK, $this->routeOf((int) $refused['id']), RouteAction::ACKNOWLEDGED, 'No.', RouteVerdict::REJECTED);
+        self::assertNull($this->submissions->find(self::TENANT, (int) $refused['id'])['reference'] ?? null);
+    }
+
+    public function testTheSupervisorIsLeftOutOfTheCommitteeAndTheApprovalsPrintARowEach(): void
+    {
+        // WHIT-1018: the committee is three people; the applicant names one of
+        // them as supervisor, so that one is never asked, never counted and
+        // never printed.
+        $cell = static fn (array ...$runs): array => $runs;
+        $text = static fn (string $t): array => ['type' => 'text', 'text' => $t];
+        $id = $this->editor->sourceRepo->create(self::TENANT, [
+            'kind' => 'template',
+            'title' => 'Approval certificate',
+            'lang' => 'en',
+            'default_view' => 'page',
+            'blocks' => [[
+                'id' => 't1',
+                'type' => 'table',
+                'headerRow' => true,
+                'rows' => [
+                    [$cell($text('Member')), $cell($text('Approved'))],
+                    [$cell($this->editor->field('route.approvals.*.name')), $cell($this->editor->field('route.approvals.*.mark'))],
+                    [$cell($text('Total')), $cell($this->editor->field('route.approvals.count'))],
+                ],
+            ]],
+            'scope' => 'tenant',
+            'created_by' => self::APPLICANT,
+        ]);
+        $this->editor->publish(self::TENANT, $id, self::APPLICANT);
+
+        $design = $this->routeTemplates->create(self::TENANT, 'Ethics review', null, null);
+        $this->routeTemplates->replaceGraph($design, self::TENANT, [
+            [
+                'position' => 1,
+                'rule_kind' => 'explicit',
+                'rule_config' => ['profile_ids' => [self::CLERK, self::MEMBER, self::SUPERVISOR]],
+                'label' => 'Ethics committee',
+                'decision' => true,
+                'decision_quorum' => 'all',
+                'satisfied_by' => 'act',
+                'exclude_named_in' => ['supervisor', 'co_supervisor'],
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+            [
+                'position' => 2,
+                'rule_kind' => RouteStepKind::FINALISE_RULE,
+                'rule_config' => [],
+                'label' => 'Certificate',
+                'decision' => false,
+                'decision_quorum' => null,
+                'satisfied_by' => 'act',
+                'allow_send_back' => false,
+                'kind' => RouteStepKind::FINALISE,
+                'final_template_id' => null,
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+        ], []);
+        self::assertSame(['supervisor', 'co_supervisor'], $this->routeTemplates->stepsFor($design, self::TENANT)[0]['exclude_named_in']);
+
+        $formId = $this->form($design, $id);
+        $this->fields->create(self::TENANT, $formId, 'supervisor', 'profile_ref', ['en' => 'Supervisor'], null, false, [], [], null, null, null);
+        $submission = $this->send($formId, ['supplier' => 'Example Mill', 'supervisor' => self::SUPERVISOR]);
+        $route = $this->routeOf((int) $submission['id']);
+
+        self::assertNull($this->open((int) $route['id'], self::SUPERVISOR), 'the supervisor is not asked');
+        self::assertNotNull($this->open((int) $route['id'], self::MEMBER));
+        self::assertSame(['supervisor', 'co_supervisor'], (new RouteStepRepository($this->pdo))->listForRoute((int) $route['id'], self::TENANT)[0]['exclude_named_in']);
+
+        $first = $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertNull($first['decided'], 'still waiting on the other member');
+        $second = $this->router->act(self::TENANT, self::MEMBER, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertSame('approved', $second['decided'], 'all who were asked approved; the supervisor does not count');
+
+        $table = null;
+        foreach ($this->render->flowCalls[0]['content'] ?? [] as $block) {
+            if (($block['type'] ?? null) === 'table') {
+                $table = $block;
+            }
+        }
+        self::assertNotNull($table);
+        $today = gmdate('Y-m-d');
+        self::assertSame(['Member', 'Approved'], $table['columns']);
+        self::assertSame([
+            ['Clerk Rana', 'Approved ' . $today],
+            ['Awss Haddad', 'Approved ' . $today],
+            ['Total', '2'],
+        ], $table['rows']);
+
+        // Design 3.4 (P1): the step records who it left out, for "Not counted".
+        $left = (new \Whity\Core\Document\Routing\RouteLeftOut($this->pdo))->forRoute(self::TENANT, (int) $route['id']);
+        self::assertSame([self::SUPERVISOR], array_column($left, 'profile_id'));
+        self::assertSame('supervisor', $left[0]['key']);
+    }
+
+    /**
+     * Design 3.4 (FP.1): a form whose route makes a final document with no
+     * template prints the response in the automatic layout, with the decision
+     * and the approvals, instead of failing for want of a template.
+     */
+    public function testAFormWithNoTemplatePrintsTheResponseInTheAutomaticLayout(): void
+    {
+        $formId = $this->form($this->clerkThenFinalise(null), null);
+        $submissionId = $this->approve($formId, ['supplier' => 'Example Mill']);
+
+        $fresh = $this->submissions->find(self::TENANT, $submissionId);
+        self::assertNotNull($fresh);
+        self::assertIsInt($fresh['document_id'], 'a document with no template');
+        $payload = $this->render->flowCalls[0];
+        $types = array_column($payload['content'], 'type');
+        self::assertContains('formTitle', $types);
+        self::assertContains('decisionLine', $types);
+        self::assertContains('decisionBlock', $types);
+        $answer = null;
+        foreach ($payload['content'] as $block) {
+            if (($block['type'] ?? null) === 'formQuestion' && str_contains((string) json_encode($block), 'Example Mill')) {
+                $answer = $block;
+            }
+            if (($block['type'] ?? null) === 'decisionBlock') {
+                self::assertSame('approved', $block['status']);
+            }
+            if (($block['type'] ?? null) === 'approvals') {
+                self::assertSame(['Clerk Rana'], array_column($block['rows'], 'name'));
+            }
+        }
+        self::assertNotNull($answer, 'the answer is on the page');
+        self::assertSame('Page {{page}} of {{pages}}', $payload['footer']['start'] === 'Page {{page}} of {{pages}}' ? $payload['footer']['start'] : substr($payload['footer']['start'], -strlen('Page {{page}} of {{pages}}')));
+    }
+
+    public function testASupervisorTheOfficeNamesAtPreCheckIsLeftOutOfTheCommittee(): void
+    {
+        // WHIT-1028: a public form cannot ask the applicant to pick people, so
+        // the supervisor is an office question the coordinator answers at
+        // pre-check. The committee, reached after that, leaves them out.
+        $cell = static fn (array ...$runs): array => $runs;
+        $text = static fn (string $t): array => ['type' => 'text', 'text' => $t];
+        $id = $this->editor->sourceRepo->create(self::TENANT, [
+            'kind' => 'template',
+            'title' => 'Approval certificate',
+            'lang' => 'en',
+            'default_view' => 'page',
+            'blocks' => [[
+                'id' => 't1',
+                'type' => 'table',
+                'headerRow' => true,
+                'rows' => [
+                    [$cell($text('Member')), $cell($text('Approved'))],
+                    [$cell($this->editor->field('route.step.2.approvals.*.name')), $cell($this->editor->field('route.step.2.approvals.*.mark'))],
+                ],
+            ]],
+            'scope' => 'tenant',
+            'created_by' => self::APPLICANT,
+        ]);
+        $this->editor->publish(self::TENANT, $id, self::APPLICANT);
+
+        $design = $this->routeTemplates->create(self::TENANT, 'Ethics review with pre-check', null, null);
+        $this->routeTemplates->replaceGraph($design, self::TENANT, [
+            [
+                'position' => 1,
+                'rule_kind' => 'explicit',
+                'rule_config' => ['profile_ids' => [self::CLERK]],
+                'label' => 'Pre-check',
+                'decision' => true,
+                'decision_quorum' => null,
+                'satisfied_by' => 'act',
+                // Merge map A3: the office names the supervisor at pre-check.
+                'inputs' => [['key' => 'supervisor', 'label' => 'Supervisor', 'type' => 'person', 'required' => false]],
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+            [
+                'position' => 2,
+                'rule_kind' => 'explicit',
+                'rule_config' => ['profile_ids' => [self::MEMBER, self::SUPERVISOR]],
+                'label' => 'Ethics committee',
+                'decision' => true,
+                'decision_quorum' => 'all',
+                'satisfied_by' => 'act',
+                'exclude_named_in' => ['supervisor', 'co_supervisor'],
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+            [
+                'position' => 3,
+                'rule_kind' => RouteStepKind::FINALISE_RULE,
+                'rule_config' => [],
+                'label' => 'Certificate',
+                'decision' => false,
+                'decision_quorum' => null,
+                'satisfied_by' => 'act',
+                'allow_send_back' => false,
+                'kind' => RouteStepKind::FINALISE,
+                'final_template_id' => null,
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+        ], []);
+
+        $formId = $this->form($design, $id);
+        $submission = $this->send($formId, ['supplier' => 'Example Mill']);
+        $route = $this->routeOf((int) $submission['id']);
+
+        // The coordinator records the supervisor at pre-check, then passes it on.
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED, values: ['supervisor' => (string) self::SUPERVISOR]);
+
+        $route = $this->routeOf((int) $submission['id']);
+        self::assertNull($this->open((int) $route['id'], self::SUPERVISOR), 'the supervisor the office named is not asked');
+        self::assertNotNull($this->open((int) $route['id'], self::MEMBER));
+
+        $decided = $this->router->act(self::TENANT, self::MEMBER, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertSame('approved', $decided['decided'], 'all who were asked approved; the supervisor does not count');
+
+        $table = null;
+        foreach ($this->render->flowCalls[0]['content'] ?? [] as $block) {
+            if (($block['type'] ?? null) === 'table') {
+                $table = $block;
+            }
+        }
+        self::assertNotNull($table);
+        self::assertSame([['Awss Haddad', 'Approved ' . gmdate('Y-m-d')]], $table['rows'], 'the supervisor is not on the certificate');
+    }
+
     public function testATemplateMadeFromTheFormIssuesACorrectDocumentFromARealSubmission(): void
     {
         $formId = $this->form($this->clerkThenFinalise(null), null);
@@ -420,6 +728,86 @@ final class RouteFinaliseRealEngineTest extends TestCase
         self::assertSame(1, $this->scalar('SELECT COUNT(*) FROM document_artifacts'));
     }
 
+    /**
+     * WHIT-1072: the render service is down when the route reaches its final
+     * document, so the first attempt makes nothing; the worker's retry makes
+     * it. The person who sent the form gets the decision exactly once, from
+     * the retry, with the final document's PDF attached.
+     */
+    public function testTheDecisionEmailGoesOnceWhenOnlyTheWorkersRetryMakesTheFinalDocument(): void
+    {
+        $this->pdo->exec(
+            'INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
+             VALUES (' . self::APPLICANT . ", 'applicant@example.test', true, true, CURRENT_TIMESTAMP)"
+        );
+        /** @var list<\Whity\Core\Mail\OutgoingEmail> $mails */
+        $mails = [];
+        $mailer = new class (function (\Whity\Core\Mail\OutgoingEmail $e) use (&$mails): void {
+            $mails[] = $e;
+        }) implements \Whity\Core\Mail\Mailer, \Whity\Core\Mail\ThreadedMailer {
+            public function __construct(private readonly \Closure $sink)
+            {
+            }
+
+            public function send(string $toEmail, string $subject, string $textBody, ?string $htmlBody = null): void
+            {
+                ($this->sink)(new \Whity\Core\Mail\OutgoingEmail($toEmail, $subject, $textBody, $htmlBody));
+            }
+
+            public function sendThreaded(\Whity\Core\Mail\OutgoingEmail $email): void
+            {
+                ($this->sink)($email);
+            }
+        };
+        // As both processes wire it: the request's and the worker's listener,
+        // each with its own sender, sharing one store.
+        $store = new \Whity\Core\Store\DatabaseSharedStore($this->pdo);
+        foreach ([0, 1] as $process) {
+            (new \Whity\Core\Form\FormDecisionEmail(
+                $this->pdo,
+                new \Whity\Core\Identity\ProfileEmailRepository($this->pdo),
+                new \Whity\Core\Mail\BrandedEmailSender($mailer, new \Whity\Core\Mail\EmailLayout(), $this->settings),
+                $this->settings,
+                'https://app.example.test',
+                $process === 0 ? $this->store : fn (): DocumentArtifactStore => $this->store,
+                $store,
+            ))->subscribe($this->hooks);
+        }
+
+        $formId = $this->form($this->clerkThenFinalise(null), $this->letter);
+        $submission = $this->send($formId, ['supplier' => 'Example Mill']);
+        $route = $this->routeOf((int) $submission['id']);
+
+        $this->render->throwOnRender = true;
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertCount(0, $mails, 'the route completed, but its final document is still to come');
+
+        $job = new FinaliseRouteJob(fn (): RouteFinaliser => $this->finaliser);
+        $this->render->throwOnRender = false;
+        self::assertSame(['outcome' => RouteFinaliser::DONE], $job->handle(['route_id' => (int) $route['id']]));
+
+        self::assertCount(1, $mails, 'two listeners, one email');
+        $mail = $mails[0];
+        self::assertSame('applicant@example.test', $mail->to);
+        self::assertStringStartsWith('Approved: ', $mail->subject);
+        self::assertCount(1, $mail->attachments, 'the final document, attached');
+        self::assertSame('approval.pdf', $mail->attachments[0]->filename);
+        $done = $this->finalisations->findForRoute(self::TENANT, (int) $route['id']);
+        self::assertNotNull($done);
+        $artifact = $this->artifacts->findLatestForDocument((int) $done['document_id'], self::TENANT);
+        self::assertNotNull($artifact);
+        self::assertLessThanOrEqual(1_048_576, (int) $artifact['byte_size']);
+        self::assertSame($this->store->get((string) $artifact['storage_key']), $mail->attachments[0]->content);
+
+        // Running the job again, or the event arriving again, sends nothing more.
+        $job->handle(['route_id' => (int) $route['id']]);
+        $this->hooks->dispatch(Events::DOCUMENT_FINALISED, [
+            'tenant_id' => self::TENANT, 'document_id' => (int) $done['document_id'], 'artifact_id' => (int) $artifact['id'],
+            'route_id' => (int) $route['id'], 'subject_type' => FormSubmissionRouteSubject::TYPE, 'subject_id' => (int) $submission['id'],
+        ]);
+        self::assertCount(1, $mails);
+    }
+
     public function testFinaliseIsRefusedWhenNotLastTwiceOrWithoutARenderService(): void
     {
         $document = $this->plainDocument();
@@ -454,6 +842,48 @@ final class RouteFinaliseRealEngineTest extends TestCase
         self::assertNull($stored[0]['kind']);
     }
 
+    /**
+     * Design 3.4 (P1): staff open a response as it would print, and the theme's
+     * Form printouts tab previews unsaved options; neither stores anything.
+     */
+    public function testTheResponseAndThemePreviewsRenderWithoutStoringAnything(): void
+    {
+        $printouts = new \Whity\Core\Form\Print\FormPrintoutService(
+            $this->pdo,
+            new \Whity\Core\Document\Print\SourceDocumentPrinter(new \Whity\Core\Document\Fields\DocumentFieldRegistry(), new \Whity\Core\Document\Embed\DocumentEmbedRegistry(), $this->settings),
+            null,
+            $this->settings,
+        );
+        $api = new \Whity\Api\FormPrintoutsApiHandler($this->pdo, $printouts, new FlowDocumentRenderer($this->settings, $this->render));
+
+            $none = $api->themePreview(new \Whity\Core\Request('POST', '/x', [], '{}'));
+            self::assertSame(404, $none->getStatusCode(), 'nothing to preview yet');
+
+            $formId = $this->form($this->clerkThenFinalise(null), null);
+            $submission = $this->send($formId, ['supplier' => 'Example Mill']);
+            $documents = $this->scalar('SELECT COUNT(*) FROM documents');
+
+            $response = $api->submission(new \Whity\Core\Request('GET', '/x?lang=ar'), ['id' => (string) $submission['id']]);
+            self::assertSame(200, $response->getStatusCode());
+            self::assertSame('application/pdf', array_change_key_case($response->getHeaders())['content-type'] ?? null);
+            $payload = $this->render->flowCalls[count($this->render->flowCalls) - 1];
+            self::assertSame('rtl', $payload['direction']);
+            $types = array_column($payload['content'], 'type');
+            self::assertContains('decisionLine', $types, 'waiting for a decision, on top');
+            self::assertNotContains('decisionBlock', $types, 'no full block before a decision');
+
+            $preview = $api->themePreview(new \Whity\Core\Request('POST', '/x', [], (string) json_encode(['form' => ['sectionStyle' => 'tab']])));
+            self::assertSame(200, $preview->getStatusCode());
+            $payload = $this->render->flowCalls[count($this->render->flowCalls) - 1];
+            $sections = array_values(array_filter($payload['content'], static fn (array $b): bool => $b['type'] === 'formSection'));
+            self::assertTrue($sections === [] || $sections[0]['style'] === 'tab', 'the unsaved option is used');
+
+            $bad = $api->themePreview(new \Whity\Core\Request('POST', '/x', [], (string) json_encode(['form' => ['sectionStyle' => 'G']])));
+            self::assertSame(422, $bad->getStatusCode());
+            self::assertSame(404, $api->submission(new \Whity\Core\Request('GET', '/x'), ['id' => '999999'])->getStatusCode());
+            self::assertSame($documents, $this->scalar('SELECT COUNT(*) FROM documents'), 'previews make no documents');
+    }
+
     public function testTheTemplateDefaultsToTheFormSettingAndIsRequiredSomewhere(): void
     {
         $other = $this->editor->published(self::TENANT, self::APPLICANT, 'Other letter', [
@@ -473,16 +903,12 @@ final class RouteFinaliseRealEngineTest extends TestCase
         self::assertSame($other, $this->finalisations->findForRoute(self::TENANT, (int) $route['id'])['template_id'] ?? null);
         self::assertContains('Other: B', EditorTemplateFixture::texts($this->render->flowCalls[1]));
 
-        // Neither names one: the submission is refused, and nothing is written.
+        // Neither names one: since design 3.4 the response prints in the
+        // automatic layout (FP.1), so the route starts.
         $formId = $this->form($this->clerkThenFinalise(null), null, 'third');
-        $before = $this->scalar('SELECT COUNT(*) FROM form_submissions');
-        try {
-            $this->send($formId, ['supplier' => 'C']);
-            self::fail('a route that could not make its final document must not start');
-        } catch (FormRejectedException $e) {
-            self::assertStringContainsString('no template is chosen', $e->clientMessage);
-        }
-        self::assertSame($before, $this->scalar('SELECT COUNT(*) FROM form_submissions'));
+        $route = $this->routeOf((int) $this->send($formId, ['supplier' => 'C'])['id']);
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertNull($this->finalisations->findForRoute(self::TENANT, (int) $route['id'])['template_id'] ?? null);
     }
 
     public function testAFormSubmissionsFinalDocumentFiresTheIssueEvents(): void
@@ -830,7 +1256,8 @@ final class RouteFinaliseRealEngineTest extends TestCase
     }
 
     /** Stage 1: the clerk decides. Stage 2: the final document, with this template or none. */
-    private function clerkThenFinalise(?int $templateId): int
+    /** @param list<array<string, mixed>> $clerkInputs */
+    private function clerkThenFinalise(?int $templateId, array $clerkInputs = []): int
     {
         $id = $this->routeTemplates->create(self::TENANT, 'Supplier approval ' . bin2hex(random_bytes(3)), null, null);
         $this->routeTemplates->replaceGraph($id, self::TENANT, [
@@ -842,6 +1269,7 @@ final class RouteFinaliseRealEngineTest extends TestCase
                 'decision' => true,
                 'decision_quorum' => null,
                 'satisfied_by' => 'act',
+                'inputs' => $clerkInputs,
                 'canvas_x' => 0,
                 'canvas_y' => 0,
             ],
@@ -882,7 +1310,7 @@ final class RouteFinaliseRealEngineTest extends TestCase
     {
         $form = $this->forms->find(self::TENANT, $formId);
         self::assertNotNull($form);
-        $fields = FormFieldRepository::applicantFields($this->fields->listForForm(self::TENANT, $formId));
+        $fields = $this->fields->listForForm(self::TENANT, $formId);
 
         return $this->issuer->submit(self::TENANT, self::APPLICANT, $form, $fields, $answers)['submission'];
     }
@@ -943,7 +1371,7 @@ final class RouteFinaliseRealEngineTest extends TestCase
             'INSERT INTO roles (id, name, description, tenant_id, created_at) VALUES
                 (100, ' . $quote('member') . ', ' . $quote('') . ', 1, ' . $now . ')'
         );
-        foreach ([[self::APPLICANT, 'Applicant Huda'], [self::CLERK, 'Clerk Rana']] as [$id, $name]) {
+        foreach ([[self::APPLICANT, 'Applicant Huda'], [self::CLERK, 'Clerk Rana'], [self::MEMBER, 'Awss Haddad'], [self::SUPERVISOR, 'Ahmad Khalil']] as [$id, $name]) {
             $pdo->exec(
                 'INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled,
                                        two_factor_backup_codes_version, token_epoch, created_at, updated_at)
@@ -979,5 +1407,11 @@ final class RouteFinaliseRealEngineTest extends TestCase
             static fn (array $f): array => $f[1],
             array_filter($this->fired, static fn (array $f): bool => $f[0] === $event)
         ));
+    }
+
+    /** @return array<string, mixed>|null */
+    private function open(int $routeId, int $profileId): ?array
+    {
+        return $this->recipients->findOpenForProfile(self::TENANT, $routeId, $profileId);
     }
 }

@@ -11,6 +11,8 @@ use Whity\Cli\Commands\ScheduleRunCommand;
 use Whity\Core\Queue\JobRepository;
 use Whity\Core\Queue\QueueService;
 use Whity\Core\Scheduler\ScheduledJobRepository;
+use Whity\Core\Scheduler\SchedulerHeartbeat;
+use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Core\Store\ArraySharedStore;
 
 /**
@@ -69,6 +71,31 @@ final class ScheduleRunCommandRealEngineTest extends TestCase
         self::assertNotNull($row);
         self::assertGreaterThan(gmdate('Y-m-d H:i:s'), (string) $row['next_run_at']);
         self::assertNotNull($row['last_run_at']);
+    }
+
+    public function testATickWithNothingDueStillRecordsTheHeartbeat(): void
+    {
+        // WHIT-1013: no schedules at all, yet the tick is alive and must say so.
+        $heartbeat = new SchedulerHeartbeat(new GlobalSettingsRepository($this->pdo));
+        $command = new ScheduleRunCommand(
+            $this->schedules,
+            new QueueService($this->jobs),
+            $this->store,
+            $this->jobs,
+            null,
+            static function (int $seconds): void {},
+            null,
+            null,
+            $heartbeat
+        );
+
+        self::assertNull($heartbeat->lastTick());
+        $before = time();
+        self::assertSame(0, $command->tick(300, 86400));
+
+        $last = $heartbeat->lastTick();
+        self::assertNotNull($last);
+        self::assertGreaterThanOrEqual($before, $last);
     }
 
     public function testExactlyOnceLockStopsASecondWorkerFromDoubleFiring(): void

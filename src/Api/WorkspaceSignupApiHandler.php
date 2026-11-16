@@ -52,6 +52,11 @@ final class WorkspaceSignupApiHandler
         private readonly AuditLogger $audit,
         private readonly ?BotCheck $bot = null,
         private readonly ?\Whity\Core\Signup\JoinProviders $joinProviders = null,
+        // E2 `EmailJoining`: the person hears the decision.
+        private readonly ?\Whity\Core\Signup\JoinDecisionMailer $joinMailer = null,
+        // Merge map A4: join requests are decided on their route.
+        private readonly ?\Whity\Core\Signup\CustomerSignupRoutes $routes = null,
+        private readonly ?\Whity\Core\Document\Routing\DocumentRouter $router = null,
     ) {
     }
 
@@ -131,8 +136,37 @@ final class WorkspaceSignupApiHandler
                 ]);
         }
 
+        // #1872: whether customers may invite their own team. Off by default.
+        $customerInvites = array_key_exists('customer_invites', $body) ? $body['customer_invites'] : $current['customer_invites'];
+        if (!is_bool($customerInvites)) {
+            return Response::error('Validation failed', 422, [
+                'customer_invites' => 'Choose on or off.',
+                'code' => 'customer_invites_invalid',
+            ]);
+        }
+
+        // WHIT-1043 (SC.11): how many people one customer may invite; 0 is no limit.
+        $perCustomer = array_key_exists('invites_per_customer', $body) ? $body['invites_per_customer'] : $current['invites_per_customer'];
+        if (!is_int($perCustomer) || $perCustomer < 0 || $perCustomer > 1000) {
+            return Response::error('Validation failed', 422, [
+                'invites_per_customer' => 'Enter a whole number from 0 to 1000 (0 is no limit).',
+                'code' => 'invites_per_customer_invalid',
+            ]);
+        }
+
+        // Merge map A4: the route template join requests travel on; null is
+        // the default one step for everyone who can manage sign-ups.
+        $routeTemplateId = array_key_exists('route_template_id', $body) ? $body['route_template_id'] : $current['route_template_id'];
+        if ($routeTemplateId !== null && (!is_int($routeTemplateId) || $routeTemplateId <= 0 || !$this->templateExists($tenantId, $routeTemplateId))) {
+            return Response::error('Validation failed', 422, [
+                'route_template_id' => 'Choose one of this workspace\'s route templates, or the default.',
+                'code' => 'route_template_invalid',
+            ]);
+        }
+
         try {
-            $this->settings->save($tenantId, $mode, $roleId, $domains, $ctx['userId']);
+            $this->settings->save($tenantId, $mode, $roleId, $domains, $ctx['userId'], $customerInvites, $perCustomer);
+            $this->settings->saveRouteTemplate($tenantId, $routeTemplateId);
         } catch (\Throwable $e) {
             error_log('[customer-signup] settings save failed: ' . $e->getMessage());
 
@@ -148,6 +182,9 @@ final class WorkspaceSignupApiHandler
                 'mode' => $mode,
                 'role_id' => $roleId,
                 'allowed_domains' => $domains,
+                'customer_invites' => $customerInvites,
+                'invites_per_customer' => $perCustomer,
+                'route_template_id' => $routeTemplateId,
                 'previous_mode' => $current['mode'],
             ],
         ]);
@@ -193,6 +230,80 @@ final class WorkspaceSignupApiHandler
 
     // ── internals ────────────────────────────────────────────────────────────
 
+    /**
+     * Merge map A4: answer the caller's step on the request's route.
+     *
+     * @param array{tenantId: int, userId: int} $ctx
+     * @param array<string, mixed> $route
+     */
+    private function decideOnRoute(array $ctx, int $id, array $route, bool $approve): Response
+    {
+        try {
+            $this->router?->act(
+                $ctx['tenantId'],
+                $ctx['userId'],
+                $route,
+                \Whity\Core\Document\Routing\RouteAction::ACKNOWLEDGED,
+                // A route with no document wants a reason with a rejection;
+                // the person asking never sees it.
+                $approve ? null : 'Turned away from Sign-up approvals.',
+                $approve ? \Whity\Core\Document\Routing\RouteVerdict::APPROVED : \Whity\Core\Document\Routing\RouteVerdict::REJECTED,
+            );
+        } catch (\Whity\Core\Document\Routing\RoutingRejectedException $e) {
+            return Response::error($e->clientMessage, 409, ['code' => 'route_refused']);
+        }
+
+        $status = $this->db->prepare('SELECT status FROM customer_signups WHERE id = :id AND tenant_id = :tid');
+        $status->execute([':id' => $id, ':tid' => $ctx['tenantId']]);
+        $now = (string) $status->fetchColumn();
+        if ($now === CustomerSignupService::STATUS_PENDING) {
+            // A route of the workspace's own with more to decide.
+            return Response::json(['data' => ['id' => $id, 'status' => $now, 'waiting_for_others' => true]], 202);
+        }
+        $membership = $this->db->prepare(
+            "SELECT id FROM memberships WHERE tenant_id = :tid AND profile_id = (SELECT profile_id FROM customer_signups WHERE id = :id AND tenant_id = :tid2) AND status = 'active' LIMIT 1"
+        );
+        $membership->execute([':tid' => $ctx['tenantId'], ':id' => $id, ':tid2' => $ctx['tenantId']]);
+        $membershipId = $membership->fetchColumn();
+
+        return $this->decided($ctx, $id, $approve, $approve && $membershipId !== false ? (int) $membershipId : null);
+    }
+
+    /** A request decided on its route: a polite 409 naming who answered, or null. */
+    private function alreadyDecided(int $tenantId, int $id): ?Response
+    {
+        if ($this->routes === null) {
+            return null;
+        }
+        $stmt = $this->db->prepare(
+            "SELECT s.status, p.display_name FROM customer_signups s
+               LEFT JOIN profiles p ON p.id = s.decided_by
+              WHERE s.id = :id AND s.tenant_id = :tid AND s.status IN ('approved', 'rejected')
+                AND EXISTS (SELECT 1 FROM document_routes r WHERE r.tenant_id = s.tenant_id AND r.subject_type = :type AND r.subject_id = s.id)"
+        );
+        $stmt->execute([':id' => $id, ':tid' => $tenantId, ':type' => \Whity\Core\Signup\CustomerSignupRouteSubject::TYPE]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+        $who = (string) ($row['display_name'] ?? '');
+        $what = $row['status'] === 'approved' ? 'let them in' : 'turned them away';
+
+        return Response::error(
+            $who !== '' ? "{$who} already {$what}, so nothing more is needed." : "Someone already {$what}, so nothing more is needed.",
+            409,
+            ['code' => 'already_decided', 'status' => (string) $row['status'], 'decided_by' => $who !== '' ? $who : null]
+        );
+    }
+
+    private function templateExists(int $tenantId, int $templateId): bool
+    {
+        $stmt = $this->db->prepare('SELECT 1 FROM document_route_templates WHERE id = :id AND tenant_id = :tid');
+        $stmt->execute([':id' => $templateId, ':tid' => $tenantId]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
     /** @param array<string, mixed> $params */
     private function decide(Request $request, array $params, bool $approve): Response
     {
@@ -204,6 +315,20 @@ final class WorkspaceSignupApiHandler
         $id = (int) ($params['id'] ?? 0);
         if ($id <= 0) {
             return Response::error('A valid request id is required', 422);
+        }
+
+        // Merge map A4: a request on a route is decided there, so the step,
+        // "I'm away" and the trail all hold. The route's final verdict approves
+        // or turns away the request ({@see CustomerSignupRouteSubject}).
+        $route = $this->routes?->openRoute($ctx['tenantId'], $id);
+        if ($route !== null && $this->router !== null) {
+            return $this->decideOnRoute($ctx, $id, $route, $approve);
+        }
+        // Answered on its route already (the first answer decides): say so
+        // rather than decide it again.
+        $already = $this->alreadyDecided($ctx['tenantId'], $id);
+        if ($already !== null) {
+            return $already;
         }
 
         try {
@@ -232,6 +357,31 @@ final class WorkspaceSignupApiHandler
         };
     }
 
+    /**
+     * E2: email the person who asked to join, from the workspace. Best-effort:
+     * the decision stands whether or not the email goes.
+     */
+    private function tellThePerson(int $tenantId, int $signupId, bool $approve): void
+    {
+        if ($this->joinMailer === null) {
+            return;
+        }
+        try {
+            $stmt = $this->db->prepare('SELECT email, display_name FROM customer_signups WHERE id = :id AND tenant_id = :tid');
+            $stmt->execute([':id' => $signupId, ':tid' => $tenantId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!is_array($row) || trim((string) $row['email']) === '') {
+                return;
+            }
+            $name = (string) ($row['display_name'] ?? '');
+            $approve
+                ? $this->joinMailer->approved($tenantId, (string) $row['email'], $name)
+                : $this->joinMailer->declined($tenantId, (string) $row['email'], $name);
+        } catch (\Throwable $e) {
+            error_log('[customer-signup] decision email failed: ' . $e->getMessage());
+        }
+    }
+
     /** @param array{tenantId: int, userId: int} $ctx */
     private function decided(array $ctx, int $id, bool $approve, ?int $membershipId): Response
     {
@@ -244,6 +394,7 @@ final class WorkspaceSignupApiHandler
             'target_id' => $id,
             'metadata' => ['membership_id' => $membershipId],
         ]);
+        $this->tellThePerson($ctx['tenantId'], $id, $approve);
 
         return Response::json(['data' => ['id' => $id, 'status' => $status]], 200);
     }
@@ -274,6 +425,12 @@ final class WorkspaceSignupApiHandler
             // are refused until an admin chooses again.
             'role_customer_safe' => $current['role_id'] === null ? null : $roleSafe,
             'allowed_domains' => $current['allowed_domains'],
+            // #1872: customers may invite colleagues into their own role.
+            'customer_invites' => $current['customer_invites'],
+            // WHIT-1043: 0 is no limit.
+            'invites_per_customer' => $current['invites_per_customer'],
+            // Merge map A4: null is the default one-step route.
+            'route_template_id' => $current['route_template_id'],
             'eligible_roles' => $roles,
             'pending_count' => $this->service->pendingCount($tenantId),
             'workspace_slug' => $slug,

@@ -118,6 +118,11 @@ final class RoutingNotifications
     public function __construct(
         private readonly NotificationDispatcher $notifications,
         private readonly SettingsService $settings,
+        /**
+         * E2: when set, {@see SignRequestEmail} emails people at a `sign` step,
+         * so their routing notice leaves `email` out (one email, not two).
+         */
+        private readonly ?\PDO $signRequestsEmailed = null,
     ) {
     }
 
@@ -196,12 +201,22 @@ final class RoutingNotifications
 
             $delivery = RouteSatisfaction::isDelivery($recipient['satisfied_by'] ?? null);
 
+            $recipientChannels = $channels;
+            if ($this->signRequestsEmailed !== null && isset($recipient['step_id'])
+                && SignRequestEmail::isSignStep($this->signRequestsEmailed, $tenantId, (int) $recipient['step_id'])) {
+                $recipientChannels = array_values(array_diff($channels, ['email']));
+                if ($recipientChannels === []) {
+                    // Not handed over empty: the dispatcher reads that as "the defaults".
+                    continue;
+                }
+            }
+
             $this->notifications->dispatch(
                 $tenantId,
                 (int) $recipient['profile_id'],
                 $delivery ? self::TYPE_DELIVERED : self::TYPE_AWAITING,
                 [
-                    'channels' => $channels,
+                    'channels' => $recipientChannels,
                     // Inline wording, which the tenant's own
                     // `notification_templates` row for this type overrides
                     // wholesale when it has one — the renderer already resolves

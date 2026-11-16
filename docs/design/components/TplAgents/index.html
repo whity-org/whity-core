@@ -22,7 +22,7 @@
       var has = g[1].some(function (x) { return x[1] === active; });
       return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
   function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
   function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
   function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
@@ -30,10 +30,10 @@
       h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
   function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
   var rows = [
-    { id: 1, n: 'Billing assistant', f: 'Rana Haddad', j: 'Reminders, receipts and credit notes', m: [['success', '6 allowed'], ['warning', '4 ask first']], a: 'Today, 09:12', st: ['success', 'Working'] },
-    { id: 2, n: 'Stock assistant', f: 'Dana Yousef', j: 'Stock counts and reorders', m: [['success', '3 allowed'], ['warning', '2 ask first']], a: 'Today, 08:40', st: ['success', 'Working'] },
-    { id: 3, n: 'Stock assistant', f: 'Omar Khalil', j: 'Stock counts at Sweifieh', m: [['warning', '5 ask first']], a: 'Yesterday', st: ['success', 'Working'] },
-    { id: 4, n: 'HR helper', f: 'Hala Mansour', j: 'Leave balances and letters', m: [['warning', '3 ask first']], a: '12 Oct', st: ['outline', 'Paused'] }];
+    { id: 1, n: 'Billing assistant', f: 'Amro Saleh', j: 'Reminders, receipts and credit notes', m: [['success', '6 allowed'], ['warning', '4 ask first']], a: 'Today, 09:12', st: ['success', 'Working'] },
+    { id: 2, n: 'Stock assistant', f: 'Emad Nasser', j: 'Stock counts and reorders', m: [['success', '3 allowed'], ['warning', '2 ask first']], a: 'Today, 08:40', st: ['success', 'Working'] },
+    { id: 3, n: 'Stock assistant', f: 'Ahmad Khalil', j: 'Stock counts at Sweifieh', m: [['warning', '5 ask first']], a: 'Yesterday', st: ['success', 'Working'] },
+    { id: 4, n: 'HR helper', f: 'Ibrahim Mansour', j: 'Leave balances and letters', m: [['warning', '3 ask first']], a: '12 Oct', st: ['outline', 'Paused'] }];
   ReactDOM.createRoot(document.getElementById('root')).render(shell('Agents', h(F, null,
     h(W.PageHeader, { title: 'Agents', description: 'Agents work for one person, never with more access than that person has. They ask first for anything you choose.', actions: h(W.Button, { icon: 'plus' }, 'New agent') }),
     h(W.Tabs, { items: [{ value: 'm', label: 'My agents', count: 1 }, { value: 'a', label: 'Everyone’s agents', count: 4 }], defaultValue: 'a' }),

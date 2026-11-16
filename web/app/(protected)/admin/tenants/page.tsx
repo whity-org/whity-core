@@ -6,6 +6,7 @@ import { LoadProblem } from '@/components/load-problem';
 import { throwUnlessOk } from '@/lib/forbidden';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { apiFetch } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { Badge } from '@whity/ui/badge';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -23,7 +24,6 @@ import {
 } from '@whity/ui/dropdown-menu';
 import { IconMenu2, IconPlus } from '@tabler/icons-react';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
-import { localizedName } from '@/lib/localized-name';
 import { useDateDisplay } from '@whity/features/datetime';
 import { CreateTenantModal } from './create-modal';
 import { DeleteTenantModal } from './delete-modal';
@@ -37,6 +37,7 @@ import { DeleteTenantModal } from './delete-modal';
  * null, and the delete dialog read the first of those straight into a sentence.
  */
 import type { Tenant } from './record-screen';
+import { localizedText } from '@whity/ui/localized-text';
 
 const SYSTEM_TENANT_ID = 0;
 
@@ -64,7 +65,7 @@ function TenantStatus({ status }: { status: Tenant['status'] }) {
 }
 
 export default function TenantsPage() {
-  const { apiClient, user } = useAuth();
+  const { user } = useAuth();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
   const currentLanguage = useLanguageCode();
@@ -94,11 +95,12 @@ export default function TenantsPage() {
   const { data, loading: isLoading, error, forbidden, refetch: fetchTenants } = useFetch(async () => {
     const params = new URLSearchParams({ per_page: '100' });
     if (searched !== '') params.set('q', searched);
-    const response = await apiClient(`/api/v1/tenants?${params.toString()}`);
+    // apiFetch: the spec declares no query parameters for this list (`per_page` and `q` are honoured).
+    const response = await apiFetch(`/api/v1/tenants?${params.toString()}`);
     throwUnlessOk(response, t('tenants.error.load', 'Failed to fetch tenants'));
     const data = await response.json();
     return (data.data ?? []) as Tenant[];
-  }, [apiClient, searched]);
+  }, [searched]);
 
   const tenants = data ?? [];
 
@@ -142,7 +144,7 @@ export default function TenantsPage() {
           className="text-start font-medium text-primary underline-offset-4 hover:underline"
         >
           {/* #821: the reader's language, else the original name. */}
-          {localizedName(tenant.names, currentLanguage, tenant.nameLanguage, tenant.name)}
+          {localizedText(tenant.names, currentLanguage, tenant.nameLanguage, tenant.name)}
         </button>
       ),
     },
@@ -221,7 +223,7 @@ export default function TenantsPage() {
   return (
     <div className="space-y-8">
       <AdminHeader
-        title={t('tenants.title', 'Tenants')}
+        title={t('tenants.title', 'Workspaces')}
         description={t('tenants.description', 'The workspaces on this installation.')}
         action={
           canCreate && !forbidden ? (

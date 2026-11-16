@@ -50,7 +50,8 @@ final class EmailLayoutTest extends TestCase
         self::assertStringContainsString('Link expires in 24 hours.', $r->html);
         self::assertStringContainsString('Acme Inc · sovereign software', $r->html);
         self::assertStringContainsString('mailto:help@acme.test', $r->html);
-        self::assertStringContainsString('&copy; ' . gmdate('Y') . ' Acme', $r->html);
+        self::assertStringContainsString('Sent with Whity', $r->html);
+        self::assertStringNotContainsString('font-weight:700', $r->html);
 
         // Text alternative conveys the same essentials.
         self::assertStringContainsString('Welcome to Acme', $r->text);
@@ -112,5 +113,55 @@ final class EmailLayoutTest extends TestCase
     {
         $b = new EmailBranding('', '#000000', '', '');
         self::assertSame('W', $b->initial());
+    }
+
+    public function testWhiteLabelLeavesOutSentWithWhity(): void
+    {
+        $b = new EmailBranding('Example Bakery', '#123ABC', '', '', whiteLabel: true);
+        $r = (new EmailLayout())->render(new EmailContent(heading: 'Hi'), $b);
+
+        self::assertStringNotContainsString('Sent with Whity', $r->html);
+        self::assertStringNotContainsString('Sent with Whity', $r->text);
+    }
+
+    public function testArabicIsRightToLeftWithItsOwnWords(): void
+    {
+        $r = (new EmailLayout())->render(
+            new EmailContent(heading: 'أكّد بريدك', code: '482913', language: 'ar'),
+            $this->branding(),
+        );
+
+        self::assertStringContainsString('dir="rtl"', $r->html);
+        self::assertStringContainsString('Noto Sans Arabic', $r->html);
+        self::assertStringContainsString('أُرسلت عبر Whity', $r->html);
+        // Codes stay left to right inside Arabic.
+        self::assertStringContainsString('dir="ltr">482913', $r->html);
+    }
+
+    public function testDrawsRowsChecklistProposalNoteAndDangerButton(): void
+    {
+        $r = (new EmailLayout())->render(
+            new EmailContent(
+                heading: 'A new sign-in to your account',
+                ctaLabel: "It wasn't me",
+                ctaUrl: 'https://acme.test/settings/security',
+                callout: 'Ignore this email.',
+                rows: [['When', '12 Nov, 18:02'], ['Device', 'Chrome on Windows']],
+                checklist: ['Invite your team'],
+                proposal: ['meta' => 'Billing assistant · for Amro Saleh', 'title' => 'Send 12 reminders', 'detail' => 'JOD 49.000'],
+                calloutLead: "Wasn't you?",
+                ctaTone: 'danger',
+                notice: "Security emails can't be turned off.",
+            ),
+            $this->branding(),
+        );
+
+        self::assertStringContainsString('Chrome on Windows', $r->html);
+        self::assertStringContainsString('Invite your team', $r->html);
+        self::assertStringContainsString('2px dashed #123ABC', $r->html);
+        self::assertStringContainsString('#b42318', $r->html);
+        self::assertStringContainsString('Wasn&#039;t you?', $r->html);
+        self::assertStringContainsString("Security emails can't be turned off.", $r->text);
+        self::assertStringContainsString('Device: Chrome on Windows', $r->text);
     }
 }

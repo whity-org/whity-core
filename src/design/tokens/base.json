@@ -334,6 +334,14 @@
     "form-max": "720px",
     "gutter": "24px"
   },
+  "logo": {
+    "description": "Logo sizes (brand guide section 3, handoff/web/tokens.css): the smallest each lockup may be drawn, the size below which the mark drops its cut, and the clear space around it as a share of the mark.",
+    "logo-min-mark": "16px",
+    "logo-min-horizontal": "20px",
+    "logo-min-stacked": "48px",
+    "mark-cut-switch": "24px",
+    "logo-clear-space": "25%"
+  },
   "motion": {
     "dur-fast": "120ms",
     "dur-base": "180ms",

@@ -3,7 +3,7 @@
  * mirrored as a TypeScript discriminated union — the desktop-local twin of
  * `web/lib/plugin-features.ts` (kept desktop-local for this pass, matching
  * that the web copy isn't shared into a package either). The host has
- * already validated the tree (`php-host/sdk/src/Frontend/Blocks/BlockValidator.php`
+ * already validated the tree (`sdk/src/Frontend/Blocks/BlockValidator.php`, copied into php-host
  * on the desktop side; `BlockValidator.php` server-side), but the renderer
  * revalidates defensively so a malformed node degrades to a placeholder
  * rather than crashing — see `block-renderer.tsx`.

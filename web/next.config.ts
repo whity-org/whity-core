@@ -119,6 +119,7 @@ const nextConfig: NextConfig = {
   // features actually live; react-table only re-exports them.
   transpilePackages: [
     "@whity/ui",
+    "@whity/api-client",
     "@tanstack/react-table",
     "@tanstack/table-core",
   ],
@@ -156,6 +157,17 @@ const nextConfig: NextConfig = {
   // Peer-dep singletons (react, radix, react-hook-form, …) are guaranteed by
   // npm workspaces hoisting them to the root node_modules, so the previous
   // turbopack.resolveAlias pins are no longer needed.
+  // Meetings moved into the calendar (WHIT-1115, ADR 0018). The old screens
+  // under /admin/x/ still turn up in bookmarks, notices and emails sent before
+  // the move; each lands on its new page and keeps its query string (Next
+  // appends the incoming query to a redirect's destination).
+  async redirects() {
+    return [
+      { source: "/admin/x/convening-meetings", destination: "/calendar/meetings", permanent: true },
+      { source: "/admin/x/convening-meeting/:id(\\d+)", destination: "/calendar/meetings/:id", permanent: true },
+      { source: "/admin/x/convening-bodies", destination: "/calendar/meetings/bodies", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

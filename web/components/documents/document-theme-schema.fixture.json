@@ -1,0 +1,443 @@
+{
+    "tokens": [
+        {
+            "key": "accent",
+            "type": "color",
+            "overridable": true,
+            "label": "Print colour",
+            "labelAr": "لون الطباعة",
+            "description": "The document's title and fields. Defaults to the workspace main colour, and is darkened if it can't be read on white.",
+            "descriptionAr": "عنوان المستند وحقوله. يأخذ افتراضيًا اللون الرئيسي لمساحة العمل، ويُغمَّق إن لم يكن مقروءًا على الأبيض."
+        },
+        {
+            "key": "accentOnDark",
+            "type": "color",
+            "overridable": false,
+            "label": "Print colour on dark",
+            "labelAr": "لون الطباعة على الداكن",
+            "description": "The title on screen in dark mode. Never printed. Derived from the print colour when not set.",
+            "descriptionAr": "العنوان على الشاشة في الوضع الداكن. لا يُطبع. يُشتق من لون الطباعة إن لم يُحدَّد."
+        },
+        {
+            "key": "accentUse",
+            "type": "enum",
+            "overridable": false,
+            "label": "Print colour on",
+            "labelAr": "لون الطباعة على",
+            "values": [
+                {
+                    "value": "title",
+                    "label": "The title only",
+                    "labelAr": "العنوان فقط"
+                },
+                {
+                    "value": "title-and-headings",
+                    "label": "The title and headings",
+                    "labelAr": "العنوان والعناوين الفرعية"
+                }
+            ]
+        },
+        {
+            "key": "titleFace",
+            "type": "enum",
+            "overridable": false,
+            "label": "Title face",
+            "labelAr": "خط العنوان",
+            "values": [
+                {
+                    "value": "readex",
+                    "label": "Readex Pro",
+                    "labelAr": "Readex Pro"
+                },
+                {
+                    "value": "noto",
+                    "label": "Noto Sans, like the text",
+                    "labelAr": "Noto Sans، مثل النص"
+                }
+            ]
+        },
+        {
+            "key": "largePrint",
+            "type": "boolean",
+            "overridable": false,
+            "label": "Large print",
+            "labelAr": "طباعة كبيرة",
+            "description": "Body text at 11pt in print, with headings scaled to match.",
+            "descriptionAr": "نص المتن بحجم 11 نقطة عند الطباعة، مع تكبير العناوين بالنسبة نفسها."
+        },
+        {
+            "key": "letterhead.logo",
+            "type": "enum",
+            "overridable": true,
+            "label": "Letterhead logo",
+            "labelAr": "شعار الترويسة",
+            "values": [
+                {
+                    "value": "wide",
+                    "label": "Wide logo",
+                    "labelAr": "الشعار العريض"
+                },
+                {
+                    "value": "square",
+                    "label": "Square logo",
+                    "labelAr": "الشعار المربع"
+                },
+                {
+                    "value": "none",
+                    "label": "No logo",
+                    "labelAr": "بلا شعار"
+                }
+            ]
+        },
+        {
+            "key": "letterhead.layout",
+            "type": "enum",
+            "overridable": true,
+            "label": "Letterhead layout",
+            "labelAr": "تخطيط الترويسة",
+            "values": [
+                {
+                    "value": "start",
+                    "label": "Logo and name at the start",
+                    "labelAr": "الشعار والاسم في البداية"
+                },
+                {
+                    "value": "centred",
+                    "label": "Centred",
+                    "labelAr": "في الوسط"
+                },
+                {
+                    "value": "bilingual",
+                    "label": "English and Arabic",
+                    "labelAr": "بالعربية والإنجليزية"
+                }
+            ]
+        },
+        {
+            "key": "letterhead.lines",
+            "type": "list",
+            "overridable": true,
+            "max": 4,
+            "label": "Letterhead lines",
+            "labelAr": "أسطر الترويسة",
+            "values": [
+                {
+                    "value": "address",
+                    "label": "Address",
+                    "labelAr": "العنوان"
+                },
+                {
+                    "value": "taxId",
+                    "label": "Tax number",
+                    "labelAr": "الرقم الضريبي"
+                },
+                {
+                    "value": "phone",
+                    "label": "Phone",
+                    "labelAr": "الهاتف"
+                },
+                {
+                    "value": "email",
+                    "label": "Email",
+                    "labelAr": "البريد الإلكتروني"
+                }
+            ]
+        }
+    ],
+    "form": {
+        "entitlement": "documents.form_printouts",
+        "options": [
+            {
+                "key": "form.header",
+                "type": "enum",
+                "overridable": false,
+                "standard": "letterhead",
+                "label": "Header",
+                "labelAr": "الترويسة",
+                "values": [
+                    {
+                        "value": "letterhead",
+                        "label": "Letterhead and title",
+                        "labelAr": "الترويسة والعنوان"
+                    },
+                    {
+                        "value": "centred",
+                        "label": "Centred",
+                        "labelAr": "في الوسط"
+                    },
+                    {
+                        "value": "bilingual",
+                        "label": "English and Arabic",
+                        "labelAr": "بالعربية والإنجليزية"
+                    }
+                ]
+            },
+            {
+                "key": "form.officeDetails",
+                "type": "enum",
+                "overridable": false,
+                "standard": "decisionLine",
+                "label": "Office details",
+                "labelAr": "بيانات المكتب",
+                "values": [
+                    {
+                        "value": "decisionLine",
+                        "label": "In the decision line",
+                        "labelAr": "في سطر القرار"
+                    },
+                    {
+                        "value": "strip",
+                        "label": "A separate strip",
+                        "labelAr": "شريط منفصل"
+                    }
+                ]
+            },
+            {
+                "key": "form.decision",
+                "type": "enum",
+                "overridable": false,
+                "standard": "topAndEnd",
+                "label": "Decision",
+                "labelAr": "القرار",
+                "values": [
+                    {
+                        "value": "topAndEnd",
+                        "label": "Top line and full block",
+                        "labelAr": "سطر في الأعلى وكتلة كاملة"
+                    },
+                    {
+                        "value": "top",
+                        "label": "Top only",
+                        "labelAr": "في الأعلى فقط"
+                    },
+                    {
+                        "value": "end",
+                        "label": "End only",
+                        "labelAr": "في النهاية فقط"
+                    }
+                ]
+            },
+            {
+                "key": "form.sectionStyle",
+                "type": "enum",
+                "overridable": false,
+                "standard": "mark",
+                "label": "Section headings",
+                "labelAr": "عناوين الأقسام",
+                "values": [
+                    {
+                        "value": "mark",
+                        "label": "B · Whity mark",
+                        "labelAr": "B · علامة Whity"
+                    },
+                    {
+                        "value": "number",
+                        "label": "A · Number",
+                        "labelAr": "A · رقم"
+                    },
+                    {
+                        "value": "eyebrow",
+                        "label": "C · Eyebrow",
+                        "labelAr": "C · سطر علوي"
+                    },
+                    {
+                        "value": "rail",
+                        "label": "D · Rail",
+                        "labelAr": "D · شريط تقدّم"
+                    },
+                    {
+                        "value": "tab",
+                        "label": "E · Tab",
+                        "labelAr": "E · لسان"
+                    },
+                    {
+                        "value": "plane",
+                        "label": "F · Plane",
+                        "labelAr": "F · مستوى"
+                    }
+                ]
+            },
+            {
+                "key": "form.questions",
+                "type": "enum",
+                "overridable": false,
+                "standard": "stacked",
+                "label": "Questions",
+                "labelAr": "الأسئلة",
+                "values": [
+                    {
+                        "value": "stacked",
+                        "label": "Stacked",
+                        "labelAr": "متتالية"
+                    },
+                    {
+                        "value": "twoColumns",
+                        "label": "Two columns",
+                        "labelAr": "عمودان"
+                    }
+                ]
+            },
+            {
+                "key": "form.longAnswers",
+                "type": "enum",
+                "overridable": false,
+                "standard": "countAndContinued",
+                "label": "Long answers",
+                "labelAr": "الإجابات الطويلة",
+                "values": [
+                    {
+                        "value": "countAndContinued",
+                        "label": "Word count and \"continued\"",
+                        "labelAr": "عدد الكلمات و«تابع»"
+                    },
+                    {
+                        "value": "plain",
+                        "label": "Plain",
+                        "labelAr": "بلا إضافات"
+                    }
+                ]
+            },
+            {
+                "key": "form.choices",
+                "type": "enum",
+                "overridable": false,
+                "standard": "allOptions",
+                "label": "Choices",
+                "labelAr": "الخيارات",
+                "values": [
+                    {
+                        "value": "allOptions",
+                        "label": "All options, chosen ticked",
+                        "labelAr": "كل الخيارات مع تعليم المختار"
+                    },
+                    {
+                        "value": "chosenOnly",
+                        "label": "Chosen only",
+                        "labelAr": "المختار فقط"
+                    }
+                ]
+            },
+            {
+                "key": "form.yesNo",
+                "type": "enum",
+                "overridable": false,
+                "standard": "word",
+                "label": "Yes / No / N/A",
+                "labelAr": "نعم / لا / لا ينطبق",
+                "values": [
+                    {
+                        "value": "word",
+                        "label": "A word with a mark",
+                        "labelAr": "كلمة مع علامة"
+                    },
+                    {
+                        "value": "threeColumns",
+                        "label": "Three columns",
+                        "labelAr": "ثلاثة أعمدة"
+                    }
+                ]
+            },
+            {
+                "key": "form.empty",
+                "type": "enum",
+                "overridable": false,
+                "standard": "collapseAndMark",
+                "label": "Empty and N/A",
+                "labelAr": "الفارغ وغير المنطبق",
+                "values": [
+                    {
+                        "value": "collapseAndMark",
+                        "label": "Collapse N/A, mark empty",
+                        "labelAr": "طيّ غير المنطبق وتعليم الفارغ"
+                    },
+                    {
+                        "value": "hide",
+                        "label": "Hide them",
+                        "labelAr": "إخفاؤها"
+                    },
+                    {
+                        "value": "printAll",
+                        "label": "Print everything",
+                        "labelAr": "طباعة كل شيء"
+                    }
+                ]
+            },
+            {
+                "key": "form.signatures",
+                "type": "enum",
+                "overridable": false,
+                "standard": "confirmedAndDrawn",
+                "label": "Signatures",
+                "labelAr": "التواقيع",
+                "values": [
+                    {
+                        "value": "confirmedAndDrawn",
+                        "label": "Confirmed and drawn",
+                        "labelAr": "مؤكَّد ومرسوم"
+                    },
+                    {
+                        "value": "confirmedOnly",
+                        "label": "Confirmed only",
+                        "labelAr": "مؤكَّد فقط"
+                    },
+                    {
+                        "value": "withPaperLines",
+                        "label": "Also a line to sign on paper",
+                        "labelAr": "مع سطر للتوقيع على الورق"
+                    }
+                ]
+            },
+            {
+                "key": "form.approvals",
+                "type": "enum",
+                "overridable": false,
+                "standard": "list",
+                "label": "Approvals",
+                "labelAr": "الموافقات",
+                "values": [
+                    {
+                        "value": "list",
+                        "label": "A list with decisions",
+                        "labelAr": "قائمة بالقرارات"
+                    },
+                    {
+                        "value": "cards",
+                        "label": "Signature cards",
+                        "labelAr": "بطاقات توقيع"
+                    }
+                ]
+            }
+        ],
+        "footer": [
+            {
+                "key": "reference",
+                "label": "Reference number",
+                "labelAr": "الرقم المرجعي",
+                "standard": true
+            },
+            {
+                "key": "pageCount",
+                "label": "Page x of y",
+                "labelAr": "الصفحة x من y",
+                "standard": true,
+                "fixed": true
+            },
+            {
+                "key": "marks",
+                "label": "Your marks (ISO, accreditation)",
+                "labelAr": "علاماتك (الأيزو، الاعتماد)",
+                "standard": true
+            },
+            {
+                "key": "qrEveryPage",
+                "label": "Small QR on every page",
+                "labelAr": "رمز QR صغير في كل صفحة",
+                "standard": false
+            }
+        ],
+        "marks": {
+            "max": 3,
+            "heightMm": 8
+        }
+    }
+}

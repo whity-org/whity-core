@@ -11,7 +11,7 @@ use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormSubmissionRepository;
 use Whity\Core\Form\FormUploadPolicy;
 use Whity\Core\Form\FormUploadRepository;
-use Whity\Core\Form\LocalizedLabel;
+use Whity\Core\i18n\LocalizedText;
 use Whity\Core\Form\SubmissionIssuer;
 use Whity\Core\Form\SubmissionProgress;
 use Whity\Core\Request;
@@ -116,7 +116,7 @@ final class FormSubmissionsApiHandler
                 $tenantId,
                 self::actorProfileId($request),
                 $form,
-                FormFieldRepository::applicantFields($this->fields->listForForm($tenantId, $formId)),
+                $this->fields->listForForm($tenantId, $formId),
                 $answers,
             );
 
@@ -251,7 +251,7 @@ final class FormSubmissionsApiHandler
 
             $formId = (int) $submission['form_id'];
             $form = $this->forms->find($tenantId, $formId);
-            $fields = FormFieldRepository::applicantFields($this->fields->listForForm($tenantId, $formId));
+            $fields = $this->fields->listForForm($tenantId, $formId);
             $asked = array_flip(array_map(static fn (array $field): string => (string) $field['field_key'], $fields));
             $data = array_intersect_key(is_array($submission['data'] ?? null) ? $submission['data'] : [], $asked);
             $files = self::publicFiles($this->filesOf($tenantId, (int) $submission['id'], $fields, $data));
@@ -316,9 +316,7 @@ final class FormSubmissionsApiHandler
                 return Response::error("'note' must be text of 4000 characters or fewer", 422);
             }
 
-            $fields = FormFieldRepository::applicantFields(
-                $this->fields->listForForm($tenantId, (int) $submission['form_id'])
-            );
+            $fields = $this->fields->listForForm($tenantId, (int) $submission['form_id']);
             $before = is_array($submission['data'] ?? null) ? $submission['data'] : [];
 
             /** @var array<string, mixed> $answers */
@@ -468,7 +466,7 @@ final class FormSubmissionsApiHandler
             }
             /** @var array<string, string> $name */
             $name = is_array($submission['form_name'] ?? null) ? $submission['form_name'] : [];
-            $title = LocalizedLabel::preferred($name);
+            $title = LocalizedText::resolve($name);
 
             return $this->finalFile->forRoute($tenantId, (int) $finalisation['route_id'], $title !== '' ? $title : 'final-document');
         } catch (\Exception $e) {
@@ -499,7 +497,7 @@ final class FormSubmissionsApiHandler
             if ($submission === null) {
                 return Response::error('File not found', 404);
             }
-            $fields = FormFieldRepository::applicantFields($this->fields->listForForm($tenantId, (int) $submission['form_id']));
+            $fields = $this->fields->listForForm($tenantId, (int) $submission['form_id']);
 
             return $this->sendFile($this->filesOf($tenantId, (int) $submission['id'], $fields, $submission['data'] ?? null), (int) ($params['fileId'] ?? 0));
         } catch (\Exception $e) {

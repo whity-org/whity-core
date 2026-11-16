@@ -10,7 +10,7 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
-import { useTranslation, type TranslateFn } from '@whity/features/i18n';
+import { useRichTranslation, useTranslation, type TranslateFn } from '@whity/features/i18n';
 import {
   IconAlertCircle,
   IconArrowLeft,
@@ -667,7 +667,7 @@ function OnboardingWizard() {
             className="gap-2"
             data-testid="onboarding-back"
           >
-            <IconArrowLeft className="h-4 w-4" />
+            <IconArrowLeft className="h-4 w-4 rtl:-scale-x-100" />
             {t('nav.back', 'Back')}
           </Button>
 
@@ -689,7 +689,7 @@ function OnboardingWizard() {
               data-testid="onboarding-next"
             >
               {isFirst ? t('nav.start', 'Get started') : t('nav.continue', 'Continue')}
-              <IconArrowRight className="h-4 w-4" />
+              <IconArrowRight className="h-4 w-4 rtl:-scale-x-100" />
             </Button>
           )}
         </div>
@@ -829,6 +829,7 @@ function StepGuide({ content }: { content: StepGuideContent }) {
 
 function WelcomeStep() {
   const t = useTranslation('onboarding');
+  const rt = useRichTranslation('onboarding');
 
   return (
     <div className="space-y-3 text-sm text-muted-foreground">
@@ -838,17 +839,17 @@ function WelcomeStep() {
           'This is a fresh instance. The next few steps set the defaults every tenant inherits — the instance name and support contact, whether people may sign themselves up, and how sign-in works.'
         )}
       </p>
-      {/*
-        NOT translated, deliberately: three phrases are emphasised with <span>
-        INSIDE the sentence, and `t()` returns a string — keeping them would mean
-        handing a translator five fragments in English word order. Needs the
-        emphasis lifted out of the sentence first.
-      */}
       <p>
-        We&rsquo;ll also connect <span className="font-medium text-foreground">email (SMTP)</span> and{' '}
-        <span className="font-medium text-foreground">file storage</span> — each step has a short guide
-        that points you to the details it needs. None of it is permanent: every setting stays editable
-        later from <span className="font-medium text-foreground">Global Settings</span>.
+        {rt(
+          'welcome.connect',
+          'We’ll also connect <0>email (SMTP)</0> and <1>file storage</1> — each step has a short guide that points you to the details it needs. None of it is permanent: every setting stays editable later from <2>Global Settings</2>.',
+          undefined,
+          [
+            <span key="smtp" className="font-medium text-foreground" />,
+            <span key="storage" className="font-medium text-foreground" />,
+            <span key="settings" className="font-medium text-foreground" />,
+          ]
+        )}
       </p>
     </div>
   );

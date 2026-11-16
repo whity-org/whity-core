@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use PDO;
 use Throwable;
 use Whity\Core\Audience\ActiveMemberFilter;
+use Whity\Core\Delegation\AwayService;
 use Whity\Core\Document\Numbering\DocumentNumbering;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Ou\PrimaryMembershipOu;
@@ -175,7 +176,21 @@ final class DocumentRouter
      */
     private ?array $expectedSignVersion = null;
 
+    /**
+     * Merge map A3: the people the act in progress names at its step, by key
+     * (the supervisor at pre-check). The next step's recusal is worked out
+     * before the act's values are stored, so it reads them from here.
+     *
+     * @var array<string, int>
+     */
+    private array $namingNow = [];
+
     private readonly RouteFinalisationRepository $finalisations;
+
+    private readonly RouteStepValueRepository $stepValues;
+
+    /** Merge map A2: who decides route items for a person while they are away. */
+    private readonly AwayService $away;
 
     public function __construct(
         private readonly PDO $db,
@@ -198,6 +213,8 @@ final class DocumentRouter
     ) {
         $this->numbering = new DocumentNumbering($db);
         $this->finalisations = new RouteFinalisationRepository($db);
+        $this->stepValues = new RouteStepValueRepository($db);
+        $this->away = new AwayService($db);
     }
 
     /**
@@ -345,6 +362,8 @@ final class DocumentRouter
                     $step['sign_capacity'],
                     $step['sign_on_behalf_of'],
                     $step['final_template_id'],
+                    inputs: $step['inputs'],
+                    excludeNamedIn: $step['exclude_named_in'],
                 );
             }
 
@@ -506,6 +525,9 @@ final class DocumentRouter
      * @param array<string, mixed> $route   A normalized `document_routes` row.
      * @param string|null          $verdict `approved` / `rejected` on a decision
      *        step, null everywhere else. {@see RouteVerdict}.
+     * @param array<string, string> $values WHIT-1016: what the step asks the
+     *        person letting it through to fill in ({@see RouteStepInputs}). Only an
+     *        approval, an acknowledgement or a forward carries values.
      *
      * @return array{event: array<string, mixed>, resolved: int, delivered: int, decided: ?string}
      *
@@ -523,11 +545,23 @@ final class DocumentRouter
         ?string $verdict = null,
         ?string $resumeFrom = null,
         bool $toAuthor = false,
+        array $values = [],
     ): array {
         $routeId = (int) $route['id'];
         [$documentId, $subjectType, $subjectId] = self::routeSubject($route);
+        $this->namingNow = [];
 
         $this->assertOpen($tenantId, $documentId, $subjectType, $subjectId);
+
+        // WHIT-1016: values go with letting the item through, never with
+        // stopping it, so the value a route holds is one entered on the way on.
+        $carriesValues = $verdict !== RouteVerdict::REJECTED
+            && in_array($action, [RouteAction::FORWARDED, RouteAction::ACKNOWLEDGED], true);
+        if ($values !== [] && !$carriesValues) {
+            throw RoutingRejectedException::because(
+                'Values are filled in when you approve or pass it on. Leave them out here.'
+            );
+        }
 
         if ($action === RouteAction::NOTED) {
             if ($verdict !== null) {
@@ -585,10 +619,35 @@ final class DocumentRouter
         }
 
         $recipient = $this->recipients->findOpenForProfile($tenantId, $routeId, $actorId);
+        // Merge map A2: with no item of their own here, the actor may hold one
+        // for someone who is away and named them to decide for them ("I'm
+        // away", approvals). Their answer counts as that person's on the step
+        // and the trail says whom they acted for.
+        $onBehalfOf = null;
         if ($recipient === null) {
+            $recipient = $this->coveredItem($tenantId, $routeId, $actorId);
+            $onBehalfOf = $recipient !== null ? (int) $recipient['profile_id'] : null;
+        }
+        if ($recipient === null) {
+            $decidedBy = $this->decidedByOther($tenantId, $routeId, $actorId);
+            if ($decidedBy !== null) {
+                // `first answer decides` (and any quorum met before you): your
+                // item closed when someone else's answer settled the step.
+                throw RoutingRejectedException::because(
+                    $decidedBy === ''
+                        ? 'This was already decided, so nothing more is needed from you.'
+                        : "This was already decided by {$decidedBy}, so nothing more is needed from you."
+                );
+            }
             throw RoutingRejectedException::because(
                 'You have no open item on this route. An item you have already acted on cannot be acted on '
                 . 'again — add a note instead, which appends to the trail without changing what happened.'
+            );
+        }
+        if ($onBehalfOf !== null && $signAct) {
+            // A signature is the signer's own. It waits for them.
+            throw RoutingRejectedException::because(
+                'Only the person it is for can sign this. It waits for them until they are back.'
             );
         }
         if ($recipient['role'] === RouteRecipientRepository::ROLE_AUTHOR) {
@@ -603,6 +662,28 @@ final class DocumentRouter
         }
 
         $this->assertActMatchesStep($step, $action, $verdict);
+
+        // WHIT-1016: checked before anything is written, like the plan below.
+        $entered = [];
+        if ($carriesValues) {
+            try {
+                $entered = RouteStepInputs::accept(RouteStepInputs::decode($step['inputs'] ?? []), $values);
+            } catch (InvalidArgumentException $e) {
+                throw RoutingRejectedException::because($e->getMessage());
+            }
+            // Merge map A3: a person named at a step is someone in this workspace.
+            foreach (RouteStepInputs::decode($step['inputs'] ?? []) as $input) {
+                if ($input['type'] === RouteStepInputs::TYPE_PERSON
+                    && isset($entered[$input['key']])
+                    && !$this->isActiveMember($tenantId, (int) $entered[$input['key']])
+                ) {
+                    throw RoutingRejectedException::because("Choose someone in this workspace for “{$input['label']}”.");
+                }
+                if ($input['type'] === RouteStepInputs::TYPE_PERSON && isset($entered[$input['key']])) {
+                    $this->namingNow[$input['key']] = (int) $entered[$input['key']];
+                }
+            }
+        }
 
         if ($signAct) {
             $verdict = $action === RouteAction::SIGNED ? RouteVerdict::APPROVED : RouteVerdict::REJECTED;
@@ -772,9 +853,15 @@ final class DocumentRouter
                 'to_author' => $toAuthor,
                 'subject_version' => $version['version'],
                 'content_hash' => $version['content_hash'],
+                'on_behalf_of_profile_id' => $onBehalfOf,
             ]);
 
             $this->recipients->close($tenantId, (int) $recipient['id'], $eventId);
+
+            // WHIT-1016: kept with the act that entered them, so the trail
+            // event names who entered each value and when.
+            $this->stepValues->record($tenantId, $routeId, (int) $step['id'], $eventId, $actorId, $entered);
+            $this->namingNow = [];
 
             if ($decided !== null) {
                 // The step is settled, so the people still holding it are being
@@ -852,6 +939,10 @@ final class DocumentRouter
 
             // In this transaction: the approval and the number it earned commit together.
             $number = $this->numberOnFinalApproval($tenantId, $documentId, $routeId);
+            // WHIT-1017: and what the subject itself earns, such as a reference.
+            $this->subjectOnFinalApproval($tenantId, $subjectType, $subjectId, $routeId);
+            // Merge map A4: and what it does when turned down.
+            $this->subjectOnFinalRejection($tenantId, $subjectType, $subjectId, $routeId);
 
             if ($ownTransaction) {
                 $this->db->commit();
@@ -1397,6 +1488,56 @@ final class DocumentRouter
         }
     }
 
+    private function isActiveMember(int $tenantId, int $profileId): bool
+    {
+        $stmt = $this->db->prepare(
+            "SELECT 1 FROM memberships WHERE tenant_id = :tenant_id AND profile_id = :profile_id AND status = 'active' LIMIT 1"
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * When the actor's newest item on this route was closed by someone else's
+     * decision: that person's name ('' when it can't be read). Null otherwise.
+     */
+    private function decidedByOther(int $tenantId, int $routeId, int $actorId): ?string
+    {
+        $stmt = $this->db->prepare(
+            'SELECT e.actor_profile_id, p.display_name
+               FROM document_route_recipients r
+               JOIN document_route_events e ON e.id = r.closed_by_event_id AND e.tenant_id = r.tenant_id
+               LEFT JOIN profiles p ON p.id = e.actor_profile_id
+              WHERE r.tenant_id = :tenant_id AND r.route_id = :route_id AND r.profile_id = :profile_id
+                AND e.verdict IS NOT NULL AND (e.actor_profile_id IS NULL OR e.actor_profile_id <> :actor)
+              ORDER BY r.id DESC LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':route_id' => $routeId, ':profile_id' => $actorId, ':actor' => $actorId]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        return is_array($row) ? (string) ($row['display_name'] ?? '') : null;
+    }
+
+    /**
+     * Merge map A2: an open step item on this route held by someone the actor
+     * decides approvals for today, or null. Items sent back to an author stay
+     * with the author.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function coveredItem(int $tenantId, int $routeId, int $actorId): ?array
+    {
+        foreach ($this->away->coveredBy($tenantId, $actorId, AwayService::FLOWS) as $awayId) {
+            $item = $this->recipients->findOpenForProfile($tenantId, $routeId, $awayId);
+            if ($item !== null && $item['role'] !== RouteRecipientRepository::ROLE_AUTHOR) {
+                return $item;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * For a caller that held its own transaction around an act: make the
      * route's final document now that it has committed. Does nothing when the
@@ -1414,8 +1555,9 @@ final class DocumentRouter
 
     /**
      * A finalise step that names no template takes its subject's default: a
-     * form's "Final document template", or a document's own template. Refused
-     * when there is none, or it is not a published template of this workspace,
+     * form's "Final document template", or a document's own template. A form
+     * with neither prints its response in the automatic layout (design 3.4).
+     * Otherwise refused when there is none, or it is not a published template of this workspace,
      * so a route never starts that could not make its final document.
      *
      * @param list<array<string, mixed>> $declared
@@ -1436,6 +1578,11 @@ final class DocumentRouter
                 );
             }
             $templateId = $step['final_template_id'] ?? $provider->finalTemplateId($tenantId, $subjectId);
+            if ($templateId === null && $subjectType === \Whity\Core\Form\FormSubmissionRouteSubject::TYPE) {
+                // Design 3.4 (FP.1): a form response prints in the automatic
+                // layout when nothing names a template.
+                continue;
+            }
             if ($templateId === null) {
                 throw RoutingRejectedException::because(
                     'This route ends with a final document, but no template is chosen for it. '
@@ -1475,6 +1622,37 @@ final class DocumentRouter
      * Null unless this call handed it out, so a replay or a second approver finishing
      * at the same moment announces nothing; {@see DocumentNumbering} makes it once.
      */
+    /**
+     * WHIT-1017: tell a subject that cares that its route finished approved
+     * (nothing left open, and the last verdict an approval), inside the act's
+     * transaction and before its final document is made.
+     */
+    private function subjectOnFinalApproval(int $tenantId, string $subjectType, int $subjectId, int $routeId): void
+    {
+        $provider = $this->subjects?->get($subjectType);
+        if (!$provider instanceof RouteSubjectApprovedInterface
+            || $this->recipients->hasOpenOnRoute($tenantId, $routeId)
+            || $this->events->latestVerdictOnRoute($routeId, $tenantId) !== RouteVerdict::APPROVED) {
+            return;
+        }
+        $provider->approved($tenantId, $subjectId, $routeId);
+    }
+
+    /**
+     * Merge map A4: tell a subject that cares that its route finished not
+     * approved (nothing left open, and the last verdict a rejection).
+     */
+    private function subjectOnFinalRejection(int $tenantId, string $subjectType, int $subjectId, int $routeId): void
+    {
+        $provider = $this->subjects?->get($subjectType);
+        if (!$provider instanceof RouteSubjectRejectedInterface
+            || $this->recipients->hasOpenOnRoute($tenantId, $routeId)
+            || $this->events->latestVerdictOnRoute($routeId, $tenantId) !== RouteVerdict::REJECTED) {
+            return;
+        }
+        $provider->rejected($tenantId, $subjectId, $routeId);
+    }
+
     private function numberOnFinalApproval(int $tenantId, ?int $documentId, int $routeId): ?string
     {
         // WHIT-920: a subject with no document has no number to wait for.
@@ -1784,6 +1962,16 @@ final class DocumentRouter
         }
 
         return $this->defaultQuorum($tenantId);
+    }
+
+    /**
+     * The values entered on a route so far (WHIT-1016): each key's latest.
+     *
+     * @return array<string, array{value: string, step_id: int, event_id: int, entered_by: ?int, entered_at: string}>
+     */
+    public function enteredValues(int $tenantId, int $routeId): array
+    {
+        return $this->stepValues->currentForRoute($tenantId, $routeId);
     }
 
     /**
@@ -2221,6 +2409,56 @@ final class DocumentRouter
     }
 
     /**
+     * WHIT-1018: leave out the people the subject names in the step's
+     * `exclude_named_in` questions (a project's supervisor, say). They are
+     * never written as recipients, so they are not asked, not counted in the
+     * quorum, and not printed among the approvals. Read from the subject as it
+     * is now, so a supervisor changed on resubmit is the one left out.
+     *
+     * @param array<string, mixed>    $step
+     * @param list<ResolvedRecipient> $resolved
+     * @return list<ResolvedRecipient>
+     */
+    private function withoutNamedPeople(int $tenantId, int $routeId, array $step, array $resolved): array
+    {
+        $keys = RouteStepExclusions::decode($step['exclude_named_in'] ?? null);
+        if ($keys === [] || $resolved === []) {
+            return $resolved;
+        }
+        $route = $this->routes->findById($routeId, $tenantId);
+        $provider = $route !== null ? $this->subjects?->get((string) ($route['subject_type'] ?? DocumentRouteSubject::TYPE)) : null;
+        if (!$provider instanceof RouteSubjectPeopleInterface) {
+            return $resolved;
+        }
+        $subjectId = (int) ($route['subject_id'] ?? $route['document_id'] ?? 0);
+        // Key by key, so the printout can say through which question (P1).
+        $named = [];
+        foreach ($keys as $key) {
+            foreach ($provider->peopleNamedIn($tenantId, $subjectId, [$key]) as $profileId) {
+                $named[$profileId] ??= $key;
+            }
+            // Merge map A3: named by the act that is opening this step.
+            if (isset($this->namingNow[$key])) {
+                $named[$this->namingNow[$key]] ??= $key;
+            }
+        }
+
+        $kept = [];
+        $left = [];
+        foreach ($resolved as $recipient) {
+            if (isset($named[$recipient->profileId])) {
+                $left[$recipient->profileId] = ['profile_id' => $recipient->profileId, 'key' => $named[$recipient->profileId]];
+                continue;
+            }
+            $kept[] = $recipient;
+        }
+        // Design 3.4 P1: who was left out, for the printed "Not counted" line.
+        (new RouteLeftOut($this->db))->record($tenantId, (int) $step['id'], array_values($left));
+
+        return $kept;
+    }
+
+    /**
      * Ask the step's registered rule who it reaches.
      *
      * A kind nothing registered fails LOUDLY and by name. Migration 112
@@ -2271,7 +2509,7 @@ final class DocumentRouter
         );
 
         try {
-            return $resolver->resolve($context);
+            return $this->withoutNamedPeople($tenantId, $routeId, $step, $resolver->resolve($context));
         } catch (InvalidArgumentException $e) {
             // The rule is telling the caller its config is unusable, in words
             // written for them. Same treatment as authoring-time validation.
@@ -2311,7 +2549,8 @@ final class DocumentRouter
      *                    decision: bool, decision_quorum: ?string, satisfied_by: string,
      *                    allow_send_back: bool, edges: array<string, int>, kind: ?string,
      *                    sign_capacity: ?string, sign_on_behalf_of: ?string,
-     *                    final_template_id: ?int}>
+     *                    final_template_id: ?int, inputs: list<array<string, mixed>>,
+     *                    exclude_named_in: list<string>}>
      */
     private function validateSteps(int $tenantId, array $steps): array
     {
@@ -2563,6 +2802,16 @@ final class DocumentRouter
                 ));
             }
 
+            // WHIT-1016: values the person acting here fills in before approving.
+            try {
+                $inputs = RouteStepInputs::parse($step['inputs'] ?? null);
+                RouteStepInputs::assertAllowed($inputs, $satisfiedBy, $isSign ? RouteStepKind::SIGN : null);
+                // WHIT-1018: people named in these questions are left out here.
+                $excludeNamedIn = RouteStepExclusions::parse($step['exclude_named_in'] ?? null);
+            } catch (InvalidArgumentException $e) {
+                throw RoutingRejectedException::because(sprintf('Step %d: %s', $position, $e->getMessage()));
+            }
+
             /** @var array<string, mixed> $config */
             $out[] = [
                 'rule_kind' => $kind,
@@ -2577,6 +2826,8 @@ final class DocumentRouter
                 'sign_capacity' => $signCapacity,
                 'sign_on_behalf_of' => $signOnBehalfOf,
                 'final_template_id' => null,
+                'inputs' => $inputs,
+                'exclude_named_in' => $excludeNamedIn,
             ];
         }
 
@@ -2606,7 +2857,8 @@ final class DocumentRouter
      * @return array{rule_kind: string, rule_config: array<string, mixed>, label: ?string,
      *               decision: bool, decision_quorum: ?string, satisfied_by: string,
      *               allow_send_back: bool, edges: array<string, int>, kind: ?string,
-     *               sign_capacity: ?string, sign_on_behalf_of: ?string, final_template_id: ?int}
+     *               sign_capacity: ?string, sign_on_behalf_of: ?string, final_template_id: ?int,
+     *               inputs: list<array<string, mixed>>, exclude_named_in: list<string>}
      *
      * @throws RoutingRejectedException
      */
@@ -2629,6 +2881,18 @@ final class DocumentRouter
             || ($step['on_approved'] ?? null) !== null || ($step['on_rejected'] ?? null) !== null) {
             throw RoutingRejectedException::because(sprintf(
                 'Step %d makes the final document. Nobody acts on it, so it is not a decision and leads nowhere.',
+                $position,
+            ));
+        }
+        if (($step['inputs'] ?? []) !== [] && ($step['inputs'] ?? null) !== null) {
+            throw RoutingRejectedException::because(sprintf(
+                'Step %d makes the final document. Nobody acts on it, so it cannot ask for values.',
+                $position,
+            ));
+        }
+        if (($step['exclude_named_in'] ?? []) !== [] && ($step['exclude_named_in'] ?? null) !== null) {
+            throw RoutingRejectedException::because(sprintf(
+                'Step %d makes the final document. It reaches nobody, so it has nobody to leave out.',
                 $position,
             ));
         }
@@ -2664,6 +2928,8 @@ final class DocumentRouter
             'sign_capacity' => null,
             'sign_on_behalf_of' => null,
             'final_template_id' => $templateId,
+            'inputs' => [],
+            'exclude_named_in' => [],
         ];
     }
 

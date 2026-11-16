@@ -48,6 +48,7 @@ final class TemplateIssuing
         'record_not_found' => 'The record wasn\'t found, or you can\'t see it',
         'field_conflict' => 'A value was given for something the record already says',
         'missing_fields' => 'Some required fields have no value',
+        'unprintable_block' => "The template has a plugin block that can't print here",
         'origin_key_conflict' => 'This origin key already names another document',
         'render_unavailable' => 'PDFs can\'t be made on this instance',
         'persist_unavailable' => 'PDFs can\'t be stored on this instance',
@@ -361,6 +362,10 @@ final class TemplateIssuing
                 $checks[] = $missing === []
                     ? $this->passed('fields', 'Every required field has a value')
                     : $this->failed('fields', 'Every required field has a value', new DocumentIssueRefused('missing_fields', 'Required fields have no value for this record', 422));
+                // Editor M7 (E.18, E.19): every block can be printed.
+                $checks[] = DocumentIssuing::unprintableBlocks(is_array($version['blocks'] ?? null) ? $version['blocks'] : []) === []
+                    ? $this->passed('blocks', 'Every block can be printed')
+                    : $this->failed('blocks', 'Every block can be printed', DocumentIssuing::unprintable());
             } catch (DocumentIssueRefused $e) {
                 $checks[] = $this->failed('values', 'The values given fit the template', $e);
             }

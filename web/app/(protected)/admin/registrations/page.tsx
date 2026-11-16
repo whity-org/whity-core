@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
+import { apiFetch } from '@/lib/api/client';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { ApprovalGatingTabs } from '@/components/admin/approval-gating-tabs';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import { Pagination } from '@whity/ui/pagination';
 import { IconCheck, IconInbox, IconX } from '@tabler/icons-react';
 import { ConfirmAction } from '@whity/ui/confirm-action';
@@ -27,7 +28,7 @@ import { useTranslation } from '@whity/features/i18n';
  * tenant's owner — so the page is gated on the system tenant (id 0) AND
  * registrations:approve, mirroring the backend (which returns 403 for any other
  * caller even if they hold the permission). The endpoints are untyped (not in
- * the generated OpenAPI client), so they are called via fetch with the CSRF
+ * the generated OpenAPI client), so they are called via apiFetch with the CSRF
  * header, matching the registration page.
  *
  * This is the "Signup" tab of the unified Approval Gating admin surface
@@ -83,7 +84,7 @@ export default function PendingRegistrationsPage() {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await fetch(`/api/v1/registrations/pending?page=${page}&per_page=${PER_PAGE}`, {
+      const res = await apiFetch(`/api/v1/registrations/pending?page=${page}&per_page=${PER_PAGE}`, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
       });
@@ -117,7 +118,7 @@ export default function PendingRegistrationsPage() {
   const act = async (item: PendingRegistration, action: 'approve' | 'reject') => {
     setBusyId(item.membership_id);
     try {
-      const res = await fetch(`/api/v1/registrations/${item.membership_id}/${action}`, {
+      const res = await apiFetch(`/api/v1/registrations/${item.membership_id}/${action}`, {
         method: 'POST',
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
@@ -196,7 +197,7 @@ export default function PendingRegistrationsPage() {
             <>
               {beforeLink}
               <Link href="/admin/settings" className="font-medium underline">
-                {t('registrations.accessDenied.link', 'Website Settings')}
+                {t('registrations.accessDenied.link', 'Workspace settings')}
               </Link>
               {afterLink}
             </>

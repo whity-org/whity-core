@@ -78,6 +78,16 @@ final class FormFieldConditionsApiRealEngineTest extends TestCase
         );
     }
 
+    private function createTable(string $key): void
+    {
+        $columns = [['key' => 'name', 'type' => 'text', 'label' => ['en' => 'Name']]];
+        $response = $this->handler->create(
+            $this->request('POST', self::body($key, FieldType::REPEATING, ['validation' => ['columns' => $columns]])),
+            ['id' => (string) $this->formId],
+        );
+        self::assertSame(201, $response->getStatusCode());
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -96,6 +106,29 @@ final class FormFieldConditionsApiRealEngineTest extends TestCase
 
         self::assertSame(201, $created->getStatusCode());
         self::assertSame(['field' => 'has_stock', 'equals' => true], self::data($created)['visible_when']);
+    }
+
+    public function testIsNotAndIsAnsweredAreStoredAndComeBack(): void
+    {
+        $this->create('kind', FieldType::TEXT);
+        $this->createTable('staff');
+
+        $notEquals = $this->create('why', FieldType::TEXT, ['field' => 'kind', 'notEquals' => 'flour']);
+        self::assertSame(201, $notEquals->getStatusCode());
+        self::assertSame(['field' => 'kind', 'notEquals' => 'flour'], self::data($notEquals)['visible_when']);
+
+        // A table holds no value to compare, but whether it has a row is a fair question.
+        $answered = $this->create('lead', FieldType::TEXT, ['field' => 'staff', 'answered' => true]);
+        self::assertSame(201, $answered->getStatusCode());
+        self::assertSame(['field' => 'staff', 'answered' => true], self::data($answered)['visible_when']);
+    }
+
+    public function testIsNotOnATableAndAnsweredFalseAreRefused(): void
+    {
+        $this->createTable('staff');
+
+        self::assertSame(422, $this->create('a', FieldType::TEXT, ['field' => 'staff', 'notEquals' => 'x'])->getStatusCode());
+        self::assertSame(422, $this->create('b', FieldType::TEXT, ['field' => 'staff', 'answered' => false])->getStatusCode());
     }
 
     public function testAFieldWithNoConditionReadsBackNull(): void

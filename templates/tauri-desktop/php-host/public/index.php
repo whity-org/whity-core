@@ -17,9 +17,13 @@ declare(strict_types=1);
 // exactly what vendor/autoload.php would, without requiring `composer
 // install` to have been run). Production's own app uses Composer; this
 // mirrors the same technique the plugin loader already needs anyway.
-spl_autoload_register(static function (string $class): void {
+// The SDK is copied beside the host by `npm run dev` / `npm run build`
+// (scripts/copy-sdk.mjs, WHIT-1054); run straight from a checkout, before any
+// copy, it is the repository's own sdk/src.
+$sdkDir = is_dir(__DIR__ . '/../sdk/src') ? __DIR__ . '/../sdk/src/' : __DIR__ . '/../../../../sdk/src/';
+spl_autoload_register(static function (string $class) use ($sdkDir): void {
     $map = [
-        'Whity\\Sdk\\' => __DIR__ . '/../sdk/src/',
+        'Whity\\Sdk\\' => $sdkDir,
         'Whity\\' => __DIR__ . '/../src/',
         'Composer\\Semver\\' => __DIR__ . '/../vendor/composer/semver/src/',
     ];

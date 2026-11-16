@@ -36,6 +36,32 @@ function whity_list_test_files(string $repoRoot, string $testsDir = 'tests'): ar
 }
 
 /**
+ * A `--files-from` list: one repo-relative path per line, as `find` or
+ * `grep -l` print them. Blank lines are skipped, `./` and backslashes are
+ * normalised, and the result is sorted and de-duplicated like
+ * whity_list_test_files(), so the partition check compares like with like.
+ *
+ * @return list<string>
+ */
+function whity_parse_file_list(string $text): array
+{
+    $files = [];
+    foreach (preg_split('/\R/', $text) ?: [] as $line) {
+        $path = str_replace('\\', '/', trim($line));
+        if (str_starts_with($path, './')) {
+            $path = substr($path, 2);
+        }
+        if ($path !== '') {
+            $files[$path] = true;
+        }
+    }
+    $files = array_keys($files);
+    sort($files, SORT_STRING);
+
+    return $files;
+}
+
+/**
  * Greedy longest-processing-time assignment: heaviest file first, each onto the
  * currently lightest shard. Files with no recorded timing are weighted at the
  * median of the known ones, so a new test file still lands somewhere sensible

@@ -1,0 +1,57 @@
+<!-- @dsCard group="Templates · Work" height=860 width=1440 subtitle="T.2: a board is a view of tasks: columns are statuses, with Awaiting review as the gate where agents’ evidence waits" -->
+<!doctype html>
+<html>
+<head><link rel="stylesheet" href="../../tokens.css"><link rel="stylesheet" href="../bundle.css"><script src="../../preview-runtime/react.production.min.js"></script><script src="../../preview-runtime/react-dom.production.min.js"></script><script src="../bundle.js"></script><script>(function(){var t=(location.hash.match(/theme=(dark|light)/)||[])[1]||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.setAttribute('data-theme',t);})();</script><style>body{margin:0;background:var(--background);color:var(--foreground);font-family:var(--font-sans);width:1440px;min-height:860px}</style><meta charset="utf-8"><title>Board</title><style>html,body{height:100%} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 16 }); }
+  var NAVL = {};
+  function L(s) { return NAVL[s] || s; }
+  /* The sidebar as built (inventory, 1 Nov 2026), in sentence case; only the current group is open (2.5). */
+  var GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['routing', 'Route templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function appNav(active, o) { o = o || {};
+    return GROUPS.filter(function (g) { return g[0] !== 'Platform' || o.operator; }).map(function (g) {
+      var has = g[1].some(function (x) { return x[1] === active; });
+      return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
+  var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
+  function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
+  function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
+      h('div', { style: { minWidth: 0 } }, h('h1', null, o.title, o.badges || null), h('div', { className: 'wy-rech__facts' }, (o.facts || []).map(function (f, i) { return h('span', { key: i }, f[0] ? I(f[0], 14) : null, f[1]); }))),
+      h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
+  function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
+  GROUPS = [
+    [null, [['dashboard', 'Dashboard'], ['inbox', 'Inbox', 2], ['comment', 'Chat', 5], ['approval', 'Approvals', 3], ['form', 'My submissions']]],
+    ['Work', [['list-todo', 'Tasks', 4], ['kanban', 'Boards'], ['meeting', 'Meetings'], ['appointment', 'Appointments'], ['inbox', 'Applications'], ['routing', 'Flows']]],
+    ['Operations', [['barcode', 'Inventory'], ['money', 'Money and expenses'], ['sync', 'Subscriptions']]],
+    ['People', [['users', 'Users'], ['users', 'User groups'], ['role', 'Roles'], ['tenant', 'Organisational units'], ['delegation', 'Delegations'], ['user', 'Family relations'], ['two-step', 'Approval gating']]],
+    ['AI', [['robot', 'Agents'], ['link', 'Connected AI apps'], ['tool', 'What AI can do']]],
+    ['Documents', [['document', 'Library'], ['template', 'Templates'], ['page', 'Notes and wiki'], ['form', 'Form builder'], ['list-todo', 'Forms']]],
+    ['Workspace', [['plugin', 'Plugins'], ['billing', 'Billing'], ['audit', 'Audit log'], ['settings', 'Settings']]],
+    ['Platform', [['tenant', 'Tenants'], ['money', 'Plans and pricing'], ['receipt', 'Promotions'], ['chart', 'System'], ['error', 'Errors'], ['notification', 'Notification delivery']]]];
+  function av(n, agent, s) { return h(W.Avatar, { name: n, kind: agent ? 'agent' : undefined, size: s || 24 }); }
+  function chip(t, c) { return h('span', { className: 'wk-chip' }, h('i', { style: { background: c } }), t); }
+  function prog(n, of) { var a = []; for (var i = 0; i < of; i++) a.push(h('i', { key: i, className: i < n ? 'is-on' : '' })); return h('span', { className: 'wk-prog', 'aria-label': n + ' of ' + of + ' checks met' }, a); }
+  function sync(t) { return h('div', { className: 'wk-sync' }, I('link', 12), t); }
+
+  function card(o) { return h('div', { className: 'wk-card' + (o.cls ? ' ' + o.cls : '') }, o.badge || null, h('b', null, o.t), h('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' } }, o.label ? chip(o.label, o.c || '#0961bb') : null, o.check ? prog(o.check[0], o.check[1]) : null), h('footer', null, o.due ? h(F, null, I('calendar', 12), o.due) : null, av(o.a, o.ag))); }
+  function col(t, n, kids, cls, ic) { return h('div', { className: 'wk-col' + (cls ? ' ' + cls : '') }, h('header', null, ic ? I(ic, 14) : null, t, h('span', null, n), I('more', 14)), kids, h('div', { className: 'wk-add' }, I('plus', 14), 'Add task')); }
+  var board = h('div', { className: 'wk-board' },
+    col('To do', 4, h(F, null, card({ t: 'Design the box sleeve', label: 'Design', c: '#9d2398', a: 'Ibrahim Mansour', due: '12 Nov' }), card({ t: 'Order 400 boxes', label: 'Supplies', c: '#1a7f5a', a: 'Stock assistant', ag: 1, check: [0, 2], due: '14 Nov' }), card({ t: 'Price list in Arabic and English', label: 'Sales', a: 'Awss Haddad', due: '15 Nov' }))),
+    col('Doing', 3, h(F, null, card({ cls: 'is-lifted', t: 'Tasting with 5 office customers', label: 'Sales', a: 'Emad Nasser', due: '11 Nov' }), card({ t: 'Maamoul trial batch', label: 'Kitchen', c: '#b74c05', a: 'Ahmad Khalil', check: [1, 3] }), card({ t: 'Write the WhatsApp announcement', label: 'Marketing', c: '#3a3a3a', a: 'Marketing assistant', ag: 1, check: [2, 3], badge: h(W.Badge, { variant: 'info' }, 'Working') }))),
+    col('Awaiting review', 2, h(F, null, card({ t: 'Supplier quotes for dates', label: 'Supplies', c: '#1a7f5a', a: 'Stock assistant', ag: 1, check: [3, 3], badge: h(W.Badge, { variant: 'warning', icon: 'evidence' }, 'Evidence ready') }), h('div', { className: 'wk-card is-ghost', 'aria-hidden': 'true' })), 'is-gate', 'flag'),
+    col('Done', 5, h(F, null, card({ t: 'Box size decided', label: 'Design', c: '#9d2398', a: 'Awss Haddad', badge: h(W.Badge, { variant: 'success' }, 'Verified') }), card({ t: 'Photos for the menu', label: 'Marketing', c: '#3a3a3a', a: 'Marketing assistant', ag: 1, badge: h(W.Badge, { variant: 'warning' }, 'Done, unverified') }), card({ t: 'Book the tasting room', label: 'Sales', a: 'Emad Nasser' }))));
+  ReactDOM.createRoot(document.getElementById('root')).render(shell('Boards', h(F, null, h(W.PageHeader, { breadcrumb: [{ label: 'Boards' }, { label: 'Ramadan boxes' }], title: 'Ramadan boxes', description: '9 people and 2 agents · a Taskaat project', actions: h(F, null, h(W.Segmented, { label: 'View', options: [{ value: 'b', label: 'Board', icon: 'kanban' }, { value: 'l', label: 'List', icon: 'list-bullet' }, { value: 'c', label: 'Calendar', icon: 'calendar' }], defaultValue: 'b' }), h(W.Button, { variant: 'outline', icon: 'settings' }, 'Board settings'), h(W.Button, { icon: 'plus' }, 'New task')) }),
+    h('div', { className: 'wk-bar' }, filter('Who', 'Anyone'), filter('Label', 'Any'), filter('Due', 'Any'), h('span', { className: 'wk-grow' }), sync('Synced with Taskaat · 1 min ago')), board)));
+</script>
+</body>
+</html>

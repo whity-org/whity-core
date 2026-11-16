@@ -19,14 +19,24 @@ namespace Whity\Core\Document\Theme;
  * - `letterhead.logo`: `wide`, `square` or `none` (6.2).
  * - `letterhead.lines`: which tenant lines print under the name, in order, up
  *   to four of `address`, `taxId`, `phone`, `email`.
+ * - `titleFace`: `readex` (Readex Pro 600, the default; 3.1, E.35) or `noto`
+ *   (Noto Sans 600, Noto Sans Arabic 600 in Arabic) for the title (E.46).
+ * - `largePrint`: an 11pt body in print, headings scaled by the same steps (E.47).
+ * - `letterhead.layout`: `start` (logo and name at the start, the default),
+ *   `centred`, or `bilingual` (English and Arabic either side of the logo; 3.4).
+ * - `form`: how form responses print (FP.2-FP.10, {@see FormPrintStyle}).
+ *   Anything but the standard layout needs a paid plan or a trial; the gate is
+ *   applied when a printout is made, never stored here.
  *
- * The title face and large print (E.46, E.47) come with M8. Pure and stateless.
+ * Pure and stateless.
  */
 final class DocumentThemeTokens
 {
     public const ACCENT_USES = ['title', 'title-and-headings'];
     public const LOGOS = ['wide', 'square', 'none'];
     public const LINES = ['address', 'taxId', 'phone', 'email'];
+    public const TITLE_FACES = ['readex', 'noto'];
+    public const LAYOUTS = ['start', 'centred', 'bilingual'];
 
     /** The keys a document may override on its own (3.3). */
     public const OVERRIDE_KEYS = ['accent', 'letterhead'];
@@ -35,6 +45,8 @@ final class DocumentThemeTokens
     public const STANDARD = [
         'accentUse'  => 'title',
         'letterhead' => ['logo' => 'wide', 'lines' => ['address', 'taxId']],
+        'titleFace'  => 'readex',
+        'largePrint' => false,
     ];
 
     private const COLOR = '/^#[0-9A-Fa-f]{6}$/';
@@ -51,7 +63,7 @@ final class DocumentThemeTokens
         if (!is_array($tokens) || ($tokens !== [] && array_is_list($tokens))) {
             return ['tokens' => 'Theme tokens must be an object.'];
         }
-        $allowed = $overridesOnly ? self::OVERRIDE_KEYS : ['accent', 'accentOnDark', 'accentUse', 'letterhead'];
+        $allowed = $overridesOnly ? self::OVERRIDE_KEYS : ['accent', 'accentOnDark', 'accentUse', 'letterhead', 'titleFace', 'largePrint', 'form'];
         $errors = [];
         foreach ($tokens as $key => $value) {
             $key = (string) $key;
@@ -66,6 +78,9 @@ final class DocumentThemeTokens
                     ? null : "{$key} must be a #rrggbb colour.",
                 'accentUse' => in_array($value, self::ACCENT_USES, true)
                     ? null : 'accentUse must be one of ' . implode(', ', self::ACCENT_USES) . '.',
+                'titleFace' => in_array($value, self::TITLE_FACES, true)
+                    ? null : 'titleFace must be one of ' . implode(', ', self::TITLE_FACES) . '.',
+                'largePrint' => is_bool($value) ? null : 'largePrint must be true or false.',
                 default => null,
             };
             if ($reason !== null) {
@@ -73,6 +88,9 @@ final class DocumentThemeTokens
             }
             if ($key === 'letterhead') {
                 $errors += self::letterheadErrors($value);
+            }
+            if ($key === 'form') {
+                $errors += FormPrintStyle::errors($value);
             }
         }
 
@@ -107,8 +125,8 @@ final class DocumentThemeTokens
     public static function merge(array $base, array $over): array
     {
         foreach ($over as $key => $value) {
-            if ($key === 'letterhead' && is_array($value) && is_array($base['letterhead'] ?? null)) {
-                $base['letterhead'] = array_replace($base['letterhead'], $value);
+            if (in_array($key, ['letterhead', 'form'], true) && is_array($value) && is_array($base[$key] ?? null)) {
+                $base[$key] = array_replace($base[$key], $value);
                 continue;
             }
             $base[$key] = $value;
@@ -149,12 +167,35 @@ final class DocumentThemeTokens
                     ],
                 ],
                 [
+                    'key' => 'titleFace', 'type' => 'enum', 'overridable' => false,
+                    'label' => 'Title face', 'labelAr' => 'خط العنوان',
+                    'values' => [
+                        ['value' => 'readex', 'label' => 'Readex Pro', 'labelAr' => 'Readex Pro'],
+                        ['value' => 'noto', 'label' => 'Noto Sans, like the text', 'labelAr' => 'Noto Sans، مثل النص'],
+                    ],
+                ],
+                [
+                    'key' => 'largePrint', 'type' => 'boolean', 'overridable' => false,
+                    'label' => 'Large print', 'labelAr' => 'طباعة كبيرة',
+                    'description' => 'Body text at 11pt in print, with headings scaled to match.',
+                    'descriptionAr' => 'نص المتن بحجم 11 نقطة عند الطباعة، مع تكبير العناوين بالنسبة نفسها.',
+                ],
+                [
                     'key' => 'letterhead.logo', 'type' => 'enum', 'overridable' => true,
                     'label' => 'Letterhead logo', 'labelAr' => 'شعار الترويسة',
                     'values' => [
                         ['value' => 'wide', 'label' => 'Wide logo', 'labelAr' => 'الشعار العريض'],
                         ['value' => 'square', 'label' => 'Square logo', 'labelAr' => 'الشعار المربع'],
                         ['value' => 'none', 'label' => 'No logo', 'labelAr' => 'بلا شعار'],
+                    ],
+                ],
+                [
+                    'key' => 'letterhead.layout', 'type' => 'enum', 'overridable' => true,
+                    'label' => 'Letterhead layout', 'labelAr' => 'تخطيط الترويسة',
+                    'values' => [
+                        ['value' => 'start', 'label' => 'Logo and name at the start', 'labelAr' => 'الشعار والاسم في البداية'],
+                        ['value' => 'centred', 'label' => 'Centred', 'labelAr' => 'في الوسط'],
+                        ['value' => 'bilingual', 'label' => 'English and Arabic', 'labelAr' => 'بالعربية والإنجليزية'],
                     ],
                 ],
                 [
@@ -168,6 +209,7 @@ final class DocumentThemeTokens
                     ],
                 ],
             ],
+            'form' => FormPrintStyle::schema(),
         ];
     }
 
@@ -175,7 +217,7 @@ final class DocumentThemeTokens
     private static function letterheadErrors(mixed $value): array
     {
         if (!is_array($value) || ($value !== [] && array_is_list($value))) {
-            return ['letterhead' => 'letterhead must be an object with logo and lines.'];
+            return ['letterhead' => 'letterhead must be an object with logo, lines and layout.'];
         }
         $errors = [];
         foreach ($value as $key => $item) {
@@ -183,6 +225,12 @@ final class DocumentThemeTokens
             if ($key === 'logo') {
                 if (!in_array($item, self::LOGOS, true)) {
                     $errors['letterhead.logo'] = 'letterhead.logo must be one of ' . implode(', ', self::LOGOS) . '.';
+                }
+                continue;
+            }
+            if ($key === 'layout') {
+                if (!in_array($item, self::LAYOUTS, true)) {
+                    $errors['letterhead.layout'] = 'letterhead.layout must be one of ' . implode(', ', self::LAYOUTS) . '.';
                 }
                 continue;
             }

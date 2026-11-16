@@ -56,6 +56,15 @@ final class PluginNavigationBridgeTest extends TestCase
         ], $item);
     }
 
+    public function testALocalizedLabelIsShownInTheReadersLanguage(): void
+    {
+        $feature = self::feature();
+        $feature['label'] = ['en' => 'Greetings', 'ar' => 'التحيات'];
+
+        $this->assertSame('التحيات', PluginNavigationBridge::toNavItem($feature, 'ar')['label']);
+        $this->assertSame('Greetings', PluginNavigationBridge::toNavItem($feature)['label']);
+    }
+
     public function testNullIconFallsBackToPuzzle(): void
     {
         $feature = self::feature();

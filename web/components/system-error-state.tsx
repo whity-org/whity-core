@@ -5,7 +5,7 @@ import { Button } from '@whity/ui/button';
 import { Icon } from '@whity/ui/icon';
 import { SystemState } from '@whity/ui/system-state';
 import { useTranslation } from '@whity/features/i18n';
-import { latestErrorReference } from '@/lib/api-client';
+import { latestErrorReference } from '@/lib/api/client';
 
 /**
  * The 500 page: nothing the person did caused it, nothing was lost, one thing
@@ -32,6 +32,7 @@ export function SystemErrorState({ digest: givenDigest, onRetry }: { digest?: st
   return (
     <SystemState
       icon="alert"
+      moment="went-wrong"
       code="500"
       title={t('system.error.title', 'Something went wrong on our side')}
       description={

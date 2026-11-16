@@ -8,7 +8,7 @@
  * is given.
  */
 
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 
 /**
  * The SP1 server-driven plugin-UI block set (WC-225/226/227), mirrored from the
@@ -1039,6 +1039,11 @@ export interface PluginFeature {
   id: string;
   /** Name of the plugin providing the feature (e.g. "HelloWorld"). */
   plugin: string;
+  /**
+   * WHIT-1127: present only when a paid plugin is in its grace period or
+   * read-only in this workspace, so its screens can say so.
+   */
+  pluginAccess?: { state: 'on' | 'read_only'; reason: string | null; graceUntil: string | null } | null;
   /** Human-readable label shown in headers and navigation. */
   label: string;
   /** Tabler icon kebab name (e.g. "message-circle"), or null for default. */
@@ -1206,13 +1211,12 @@ export async function fetchPluginFeatures(): Promise<PluginFeatureList> {
   const controller = new AbortController();
   const hangGuard = setTimeout(() => controller.abort(), 15_000);
   try {
-    const response = await apiClient('/api/v1/frontend/features', {
+    const { data: body, response } = await api.GET('/api/v1/frontend/features', {
       signal: controller.signal,
     });
     if (!response.ok) {
       return EMPTY_FEATURE_LIST;
     }
-    const body: unknown = await response.json();
     if (!isFeatureListResponse(body)) {
       return EMPTY_FEATURE_LIST;
     }

@@ -7,8 +7,10 @@ namespace Whity\Auth;
 use PDO;
 
 /**
- * One-off data migration: re-encrypt stored TOTP secrets from the legacy unauthenticated
- * AES-256-CBC scheme into the current authenticated-encryption format (WC-158).
+ * Data migration: re-encrypt stored TOTP secrets into the current key-ring format, under the
+ * current key. Covers the legacy unauthenticated AES-256-CBC scheme (WC-158), bare
+ * authenticated ciphertext written before TOTP used the key ring, and values under a key
+ * that a rotation has since retired.
  *
  * Idempotent and self-detecting: a row that already decrypts under the current scheme is
  * left untouched; a row that does not is treated as legacy ciphertext, decrypted with the
@@ -21,7 +23,6 @@ final class TotpSecretReencryptor
 {
     public function __construct(
         private readonly TotpService $totpService,
-        private readonly string $encryptionKey,
     ) {
     }
 
@@ -50,48 +51,25 @@ final class TotpSecretReencryptor
         foreach ($rows as $row) {
             $stored = (string) $row['two_factor_secret'];
 
-            // Already in the current authenticated format → decrypts cleanly → leave it.
+            // Decrypts under the key ring: leave it when it is already on the
+            // current key, otherwise move it there (a bare pre-key-ring value,
+            // or one written under a key that is now retired).
             try {
-                $this->totpService->decryptSecret($stored);
-                $skipped++;
+                $plaintext = $this->totpService->decryptSecret($stored);
+                if ($this->totpService->isOnCurrentKey($stored)) {
+                    $skipped++;
+                } else {
+                    $update->execute([$this->totpService->encryptSecret($plaintext), $row['id']]);
+                    $migrated++;
+                }
                 continue;
             } catch (\Throwable) {
-                // Not new-format; fall through to the legacy path.
-            }
-
-            $plaintext = $this->legacyDecrypt($stored);
-            if ($plaintext === null) {
+                // Not readable by the key ring: counted, and left exactly as it
+                // is, never destroyed.
                 $failed++;
-                continue;
             }
-
-            $update->execute([$this->totpService->encryptSecret($plaintext), $row['id']]);
-            $migrated++;
         }
 
         return ['migrated' => $migrated, 'skipped' => $skipped, 'failed' => $failed];
-    }
-
-    /**
-     * Decrypt a secret stored under the legacy unauthenticated AES-256-CBC scheme.
-     *
-     * @return string|null The plaintext secret, or null if the blob is not legacy ciphertext.
-     */
-    private function legacyDecrypt(string $encrypted): ?string
-    {
-        $algorithm = 'aes-256-cbc';
-        $key = hash('sha256', $this->encryptionKey, true);
-        $ivLength = (int) openssl_cipher_iv_length($algorithm);
-
-        $data = base64_decode($encrypted, true);
-        if ($data === false || strlen($data) <= $ivLength) {
-            return null;
-        }
-
-        $iv = substr($data, 0, $ivLength);
-        $ciphertext = substr($data, $ivLength);
-        $decrypted = openssl_decrypt($ciphertext, $algorithm, $key, OPENSSL_RAW_DATA, $iv);
-
-        return $decrypted === false ? null : $decrypted;
     }
 }

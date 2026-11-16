@@ -659,7 +659,7 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
      */
     private function applicantFields(): array
     {
-        return FormFieldRepository::applicantFields($this->fields->listForForm(self::TENANT, $this->formId));
+        return $this->fields->listForForm(self::TENANT, $this->formId);
     }
 
     /** @return array<string, mixed> */

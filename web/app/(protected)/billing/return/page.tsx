@@ -3,10 +3,9 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { apiFetch } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
-import { AdminHeader } from '@/components/admin/admin-header';
-import { Badge } from '@whity/ui/badge';
+import { PublicOutcome } from '@/components/auth/public-outcome';
 import { Button } from '@whity/ui/button';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
@@ -44,8 +43,14 @@ interface BillingReturn {
   checkout_status: string | null;
 }
 
+/**
+ * What the billing service calls a checkout that ended without a payment. Read
+ * for WORDING only (the server's own note on `checkout_status`): access is
+ * decided by `has_access` alone.
+ */
+const ENDED_UNPAID = new Set(['failed', 'declined', 'expired', 'canceled', 'cancelled']);
+
 function BillingReturnContent() {
-  const { apiClient } = useAuth();
   const t = useTranslation('admin');
   const dates = useDateDisplay();
   const searchParams = useSearchParams();
@@ -55,21 +60,37 @@ function BillingReturnContent() {
   const reference = searchParams.get('checkout') ?? '';
 
   const { data, loading, error } = useFetch(async () => {
+    // `checkout` is accepted by the server but missing from the spec, so this goes through apiFetch.
     const query = reference !== '' ? `?checkout=${encodeURIComponent(reference)}` : '';
-    const res = await apiClient(`/api/v1/billing/return${query}`);
+    const res = await apiFetch(`/api/v1/billing/return${query}`);
+    const body = res.ok ? ((await res.json().catch(() => undefined)) as unknown) : undefined;
     if (!res.ok) {
       throw new Error(
         t('billing.return.error.load', 'We could not confirm your payment just now.')
       );
     }
-    return (await res.json()).data as BillingReturn;
-  }, [apiClient, reference]);
+    return (body as { data?: BillingReturn } | undefined)?.data as BillingReturn;
+  }, [reference]);
 
+  const toBilling = (variant: 'default' | 'outline') => (
+    <Button asChild size="lg" variant={variant} className="w-full">
+      <Link href="/billing">{t('billing.return.toBilling', 'Go to billing')}</Link>
+    </Button>
+  );
+
+  // Checking is dashed (not yet) and says people can leave (TplPaymentReturn note 3).
   if (loading) {
     return (
-      <p className="text-muted-foreground">
-        {t('billing.return.checking', 'Checking your payment…')}
-      </p>
+      <PublicOutcome
+        testId="billing-return-checking"
+        icon="clock"
+        tone="dash"
+        title={t('billing.return.checking', 'Checking your payment…')}
+        description={t(
+          'billing.return.checking.detail',
+          'Confirming with the billing service. This takes a few seconds; you can leave this page.'
+        )}
+      />
     );
   }
 
@@ -79,18 +100,18 @@ function BillingReturnContent() {
   // rather than announcing a failure the payer did not have.
   if (error !== null || data === null) {
     return (
-      <div className="flex flex-col items-start gap-4">
-        <Badge variant="secondary">{t('billing.return.unknown', 'Not confirmed yet')}</Badge>
-        <p className="max-w-prose text-muted-foreground">
-          {t(
-            'billing.return.unknown.detail',
-            'Your payment may still have gone through. We could not reach the billing service to confirm it just now, and your account will update by itself shortly.'
-          )}
-        </p>
-        <Button asChild>
-          <Link href="/billing">{t('billing.return.toBilling', 'Go to billing')}</Link>
-        </Button>
-      </div>
+      <PublicOutcome
+        testId="billing-return-unknown"
+        icon="clock"
+        tone="warn"
+        title={t('billing.return.unknown', 'Not confirmed yet')}
+        description={t(
+          'billing.return.unknown.detail',
+          'Your payment may still have gone through. We could not reach the billing service to confirm it just now, and your account will update by itself shortly.'
+        )}
+      >
+        {toBilling('outline')}
+      </PublicOutcome>
     );
   }
 
@@ -98,13 +119,22 @@ function BillingReturnContent() {
     const renewalDate = dates.date(data.access_until);
 
     return (
-      <div className="flex flex-col items-start gap-4">
-        <Badge variant="success">{t('billing.return.active', 'Your subscription is active')}</Badge>
+      <PublicOutcome
+        testId="billing-return-active"
+        icon="success"
+        tone="ok"
+        title={t('billing.return.active', 'Your subscription is active')}
+        description={
+          data.plan !== null
+            ? t('billing.return.active.detail', 'Thanks. You’re on {plan} from today.', { plan: data.plan })
+            : t('billing.return.active.detailPlain', 'Thanks. Your payment went through.')
+        }
+      >
         <dl className="grid gap-2 text-sm">
           {data.plan !== null && (
-            <div className="flex gap-2">
+            <div className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-4">
               <dt className="text-muted-foreground">{t('billing.return.plan', 'Plan')}</dt>
-              <dd className="font-medium">{data.plan}</dd>
+              <dd className="text-foreground">{data.plan}</dd>
             </div>
           )}
           {/* FORMATTED IN THE READER'S RESOLVED LANGUAGE, not the browser's.
@@ -117,7 +147,7 @@ function BillingReturnContent() {
               no label, and the fallback would print the wire timestamp the
               formatter just declined to print. */}
           {renewalDate !== null && (
-            <div className="flex gap-2">
+            <div className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-4">
               <dt className="text-muted-foreground">
                 {/* `cancel_at_period_end` does NOT mean locked now: access is live
                     until this date, so the wording changes but nothing stops. */}
@@ -125,48 +155,59 @@ function BillingReturnContent() {
                   ? t('billing.return.endsOn', 'Your plan ends on')
                   : t('billing.return.renewsOn', 'Renews on')}
               </dt>
-              <dd className="font-medium">{renewalDate}</dd>
+              <dd className="text-foreground">{renewalDate}</dd>
             </div>
           )}
         </dl>
-        <Button asChild>
-          <Link href="/billing">{t('billing.return.toBilling', 'Go to billing')}</Link>
-        </Button>
-      </div>
+        {toBilling('default')}
+      </PublicOutcome>
     );
   }
 
   // No access. Said without blaming the payer for it: a card can be declined
   // after a 3-D Secure challenge is passed, and a push transfer can still be
   // settling, so "not active yet" is both kinder and more accurate than
-  // "payment failed".
-  return (
-    <div className="flex flex-col items-start gap-4">
-      <Badge variant="secondary">{t('billing.return.notActive', 'Not active yet')}</Badge>
-      <p className="max-w-prose text-muted-foreground">
-        {t(
-          'billing.return.notActive.detail',
-          'We have not been told your payment completed. If you have just paid, this can take a moment — your account will update by itself. If your card was declined, you can try again.'
+  // "payment failed" — unless the billing service itself said the checkout
+  // ended unpaid, and even then the words say what happens next, never "error".
+  if (data.checkout_status !== null && ENDED_UNPAID.has(data.checkout_status)) {
+    return (
+      <PublicOutcome
+        testId="billing-return-failed"
+        icon="card"
+        tone="muted"
+        title={t('billing.return.failed', 'The payment didn’t go through')}
+        description={t(
+          'billing.return.failed.detail',
+          'Nothing has changed on your plan. Try again, or use another card.'
         )}
-      </p>
-      <div className="flex gap-2">
-        <Button asChild>
-          <Link href="/billing">{t('billing.return.toBilling', 'Go to billing')}</Link>
+      >
+        <Button asChild size="lg" className="w-full">
+          <Link href="/billing">{t('billing.return.tryAgain', 'Try again')}</Link>
         </Button>
-      </div>
-    </div>
+      </PublicOutcome>
+    );
+  }
+
+  return (
+    <PublicOutcome
+      testId="billing-return-not-active"
+      icon="clock"
+      tone="warn"
+      title={t('billing.return.notActive', 'Not confirmed yet')}
+      description={t(
+        'billing.return.notActive.detail',
+        'Your payment hasn’t been confirmed yet, and nothing has changed on your plan. If you have just paid, this can take a moment; your account will update by itself.'
+      )}
+    >
+      {toBilling('outline')}
+    </PublicOutcome>
   );
 }
 
 export default function BillingReturnPage() {
-  const t = useTranslation('admin');
-
+  // One card, centred in the app, with one answer (TplPaymentReturn note 1).
   return (
-    <div className="space-y-6">
-      <AdminHeader
-        title={t('billing.return.title', 'Payment')}
-        description={t('billing.return.subtitle', 'Confirming your payment with the billing service.')}
-      />
+    <div className="mx-auto w-full max-w-md py-6">
       {/* useSearchParams needs a Suspense boundary to avoid opting the whole
           route into client-side rendering at build time. */}
       <Suspense fallback={null}>

@@ -32,9 +32,8 @@
 
 import { useCallback, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { apiClient } from '@/lib/api-client';
-import { api } from '@/lib/api/client';
-import type { components } from '@/lib/api/schema';
+import { api, apiFetch } from '@/lib/api/client';
+import type { components } from '@whity/api-client';
 import { fetchAllPages } from '@/lib/api/fetch-all-pages';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import {
@@ -55,14 +54,9 @@ import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
 import { LocalizedNameField } from '@/components/localized-name-field';
-import {
-  cleanNames,
-  localizedName,
-  sameNames,
-  type LocalizedNames,
-  type NameLanguage,
-} from '@/lib/localized-name';
 import { IconBuildingCommunity } from '@tabler/icons-react';
+import { AddonPacksPanel } from './addon-packs-panel';
+import { type BilingualLanguage, cleanLocalizedText, localizedText, type LocalizedText, sameLocalizedText } from '@whity/ui/localized-text';
 
 export type Tenant = components['schemas']['Tenant'];
 type Subscription = components['schemas']['Subscription'];
@@ -72,14 +66,14 @@ type Entitlements = components['schemas']['TenantEntitlementsResponse']['data'];
 interface TenantForm {
   id: number;
   /** The name in Arabic and English (#821). */
-  names: LocalizedNames;
+  names: LocalizedText;
   /** Which of them is the original, legal name. */
-  nameLanguage: NameLanguage;
+  nameLanguage: BilingualLanguage;
   slug: string;
 }
 
 /** The record's original language, as one the form offers. */
-function formLanguage(code: string | undefined): NameLanguage {
+function formLanguage(code: string | undefined): BilingualLanguage {
   return code === 'ar' ? 'ar' : 'en';
 }
 
@@ -203,7 +197,8 @@ export function TenantRecordScreen({
     async () => {
       // The whole list, walked to the end. `complete: false` is a LOAD failure,
       // never "not found" — see the file docblock.
-      const result = await fetchAllPages<Tenant>(apiClient, '/api/v1/tenants');
+      // apiFetch: the spec declares no pagination parameters for the tenants list.
+      const result = await fetchAllPages<Tenant>(apiFetch, '/api/v1/tenants');
       if (!result.complete) {
         throw new Error(
           t('tenants.record.error.partial', 'The workspace list could not be read in full.')
@@ -317,7 +312,7 @@ export function TenantRecordScreen({
   const isDirty =
     form !== null &&
     pristine !== null &&
-    (!sameNames(form.names, pristine.names) ||
+    (!sameLocalizedText(form.names, pristine.names) ||
       form.nameLanguage !== pristine.nameLanguage ||
       form.slug !== pristine.slug);
 
@@ -327,7 +322,7 @@ export function TenantRecordScreen({
     event.preventDefault();
     if (!current || !form || !access.editable) return;
 
-    const names = cleanNames(form.names);
+    const names = cleanLocalizedText(form.names);
     const nameLanguage = form.nameLanguage;
     const name = names[nameLanguage] ?? '';
     const slug = form.slug.trim();
@@ -355,11 +350,9 @@ export function TenantRecordScreen({
 
     try {
       setIsSaving(true);
-      const response = await apiClient(`/api/v1/tenants/${current.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(
-          leaveSlug ? { names, nameLanguage } : { names, nameLanguage, slug }
-        ),
+      const { response, error: errorBody } = await api.PATCH('/api/v1/tenants/{id}', {
+        params: { path: { id: current.id } },
+        body: leaveSlug ? { names, nameLanguage } : { names, nameLanguage, slug },
       });
       if (response.status === 409) {
         onNotify(
@@ -369,7 +362,7 @@ export function TenantRecordScreen({
         return;
       }
       if (!response.ok) {
-        const body: unknown = await response.json().catch(() => ({}));
+        const body: unknown = errorBody ?? {};
         const message =
           body !== null && typeof body === 'object' && 'error' in body
             ? String((body as { error: unknown }).error)
@@ -438,7 +431,7 @@ export function TenantRecordScreen({
   }
 
   const fields: TenantRecordFields = {
-    name: localizedName(current.names, currentLanguage, current.nameLanguage, current.name),
+    name: localizedText(current.names, currentLanguage, current.nameLanguage, current.name),
     slug: current.slug,
     userCount: current.userCount,
     createdAt: current.createdAt,
@@ -576,6 +569,7 @@ export function TenantRecordScreen({
       side={
         <>
           <BillingPanel subscription={subscription} />
+          <AddonPacksPanel tenantId={tenantId} />
           <EntitlementOverridesPanel entitlements={entitlements} />
         </>
       }

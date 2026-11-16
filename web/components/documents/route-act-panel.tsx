@@ -115,9 +115,11 @@ import { Button } from '@whity/ui/button';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';
 import { Textarea } from '@whity/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { IconCheck, IconX } from '@tabler/icons-react';
-import { useTranslation } from '@whity/features/i18n';
-import { useAuth } from '@/lib/auth-context';
+import { useLanguageDirection, useTranslation } from '@whity/features/i18n';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
   effectiveQuorum,
@@ -130,6 +132,8 @@ import {
   type RouteVerdictName,
 } from './routing-wire';
 import { SignPanel } from './sign-panel';
+import { RoutePersonValue } from './route-person-value';
+import { Lottie } from '@whity/ui/lottie';
 
 /**
  * The server's own ceiling on a note, from `DocumentRoutingApiHandler`.
@@ -204,10 +208,12 @@ export function RouteActPanel({
   actionsUrl,
 }: RouteActPanelProps) {
   const t = useTranslation('documents');
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
 
   const [note, setNote] = useState('');
+  /** WHIT-1016: what the viewer has typed into the values their step asks for, by key. */
+  const [values, setValues] = useState<Record<string, string>>({});
+  const dir = useLanguageDirection();
   const [busy, setBusy] = useState<string | null>(null);
   /**
    * The server's refusal, held on the panel rather than only toasted.
@@ -224,6 +230,8 @@ export function RouteActPanel({
    * A toast says it for four seconds; this says it until they navigate away.
    */
   const [outcome, setOutcome] = useState<DecisionOutcome | null>(null);
+  /** The viewer has just signed: the panel says so, with the signing moment (LT.4). */
+  const [justSigned, setJustSigned] = useState(false);
 
   /** The viewer's own OPEN item on this route, if they have one. */
   const myOpenItem = useMemo<RouteRecipient | null>(() => {
@@ -292,6 +300,9 @@ export function RouteActPanel({
    * so inferring it would render the final sign-off as an ordinary circulation.
    */
   const isDecision = myStep?.decision === true;
+
+  /** WHIT-1016: the values the viewer's step asks them to fill in before letting it through. */
+  const stepInputs = myStep?.inputs ?? [];
 
   /**
    * How many people this step was put to, in the viewer's own chain.
@@ -451,27 +462,43 @@ export function RouteActPanel({
     setOutcome(null);
     try {
       const trimmed = note.trim();
-      const response = await apiClient(
-        actionsUrl ?? `/api/v1/documents/${documentId}/routes/${route.id}/actions`,
-        {
+      const payload = {
+        action,
+        // Omitted rather than sent empty: the column is nullable and a
+        // zero-length note is a row in an append-only table that says
+        // nothing.
+        ...(trimmed === '' ? {} : { note: trimmed }),
+        // Likewise omitted on a circulation step, where the engine refuses a
+        // verdict outright rather than storing one nothing routes on.
+        ...(verdict === undefined ? {} : { verdict }),
+        // WHIT-1016: the step's values go only with letting it through;
+        // the engine refuses them on a rejection, a return or a note.
+        ...(stepInputs.length > 0 && carriesValues(action, verdict)
+          ? { values: Object.fromEntries(stepInputs.map((input) => [input.key, values[input.key] ?? ''])) }
+          : {}),
+      };
+
+      let ok: boolean;
+      let body: unknown;
+      if (actionsUrl === undefined) {
+        const result = await api.POST('/api/v1/documents/{id}/routes/{routeId}/actions', {
+          params: { path: { id: documentId, routeId: route.id } },
+          body: payload as never,
+        });
+        ok = result.response.ok;
+        body = (ok ? result.data : result.error) ?? null;
+      } else {
+        // A plugin hands this panel its own action route as a prop.
+        const response = await apiFetch(actionsUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action,
-            // Omitted rather than sent empty: the column is nullable and a
-            // zero-length note is a row in an append-only table that says
-            // nothing.
-            ...(trimmed === '' ? {} : { note: trimmed }),
-            // Likewise omitted on a circulation step, where the engine refuses a
-            // verdict outright rather than storing one nothing routes on.
-            ...(verdict === undefined ? {} : { verdict }),
-          }),
-        }
-      );
+          body: JSON.stringify(payload),
+        });
+        ok = response.ok;
+        body = await response.json().catch(() => null);
+      }
 
-      const body: unknown = await response.json().catch(() => null);
-
-      if (!response.ok) {
+      if (!ok) {
         // The server's own sentence, verbatim. Never re-keyed: the engine's
         // refusals are written for the person who hit them and name the thing to
         // do instead.
@@ -491,6 +518,7 @@ export function RouteActPanel({
       const counts = (body ?? {}) as { resolved?: number; delivered?: number };
 
       setNote('');
+      if (carriesValues(action, verdict)) setValues({});
       if (verdict !== undefined) {
         const settled: DecisionOutcome = {
           submitted: verdict,
@@ -536,7 +564,7 @@ export function RouteActPanel({
   // WHIT-922: a signing step is answered by signing or declining, with its own
   // panel. Nothing on this panel would be accepted there.
   if (myStep?.kind === 'sign') {
-    return <SignPanel documentId={documentId} route={route} onActed={onActed} />;
+    return <SignPanel documentId={documentId} route={route} onActed={onActed} onSigned={() => setJustSigned(true)} />;
   }
 
   return (
@@ -613,6 +641,14 @@ export function RouteActPanel({
         Ordering it above the controls is not cosmetics. What you just did, and
         what it concluded, outrank a list of things you may no longer do.
       */}
+      {justSigned && (
+        <div data-slot="route-act-signed" className="flex flex-col items-center gap-1 text-center">
+          <Lottie name="documents-sign" className="h-[100px] w-[150px]" />
+          <p className="text-sm text-foreground" role="status">
+            {t('signing.done', 'Signed. Your electronic signature is recorded with the audit trail.')}
+          </p>
+        </div>
+      )}
       {outcome !== null && (
         <Alert
           variant={
@@ -659,6 +695,11 @@ export function RouteActPanel({
                   'routing.act.quorum.any',
                   'One approval from any of them carries it, so yours may settle it on its own. A rejection decides nothing while anybody is still able to approve.'
                 )
+              : quorum === 'first'
+                ? t(
+                    'routing.act.quorum.first',
+                    'The first of them to answer decides, approve or reject. Once someone has answered, nothing more is needed from the others.'
+                  )
               : quorum === 'majority'
                 ? t(
                     'routing.act.quorum.majority',
@@ -678,6 +719,59 @@ export function RouteActPanel({
                 )}
           </p>
         </div>
+      )}
+
+      {stepInputs.length > 0 && (
+        <fieldset className="space-y-3" data-slot="route-act-values">
+          <legend className="text-sm font-medium text-foreground">
+            {isDecision
+              ? t('routing.act.values.decisionTitle', 'Fill in before you approve')
+              : t('routing.act.values.title', 'Fill in before you pass it on')}
+          </legend>
+          {stepInputs.map((input) => (
+            <div key={input.key} className="space-y-1">
+              <label htmlFor={`route-value-${route.id}-${input.key}`} className="block text-sm">
+                {(dir === 'rtl' && input.label_ar) || input.label}
+                {!input.required && (
+                  <span className="ms-1 text-muted-foreground">{t('routing.act.values.optional', '(optional)')}</span>
+                )}
+              </label>
+              {input.type === 'choice' ? (
+                // WHIT-1163: one of the stage's options, such as the decision.
+                <Select
+                  value={values[input.key] ?? ''}
+                  onValueChange={(value) => setValues((current) => ({ ...current, [input.key]: value }))}
+                >
+                  <SelectTrigger id={`route-value-${route.id}-${input.key}`} aria-required={input.required}>
+                    <SelectValue placeholder={t('routing.act.values.choose', 'Choose one')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(input.options ?? []).map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {(dir === 'rtl' && option.label_ar) || option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : input.type === 'person' ? (
+                <RoutePersonValue
+                  id={`route-value-${route.id}-${input.key}`}
+                  value={values[input.key] ?? ''}
+                  required={input.required}
+                  onChange={(value) => setValues((current) => ({ ...current, [input.key]: value }))}
+                />
+              ) : (
+                <Input
+                  id={`route-value-${route.id}-${input.key}`}
+                  value={values[input.key] ?? ''}
+                  maxLength={input.max_length}
+                  aria-required={input.required}
+                  onChange={(e) => setValues((current) => ({ ...current, [input.key]: e.target.value }))}
+                />
+              )}
+            </div>
+          ))}
+        </fieldset>
       )}
 
       <div>
@@ -977,4 +1071,12 @@ function VerdictButton({
       )}
     </div>
   );
+}
+
+/**
+ * WHIT-1016: whether an act carries the step's values. Only letting the item
+ * through does: approving, acknowledging or forwarding. Mirrors the engine.
+ */
+function carriesValues(action: RecipientActionName | 'noted', verdict: RouteVerdictName | undefined): boolean {
+  return (action === 'acknowledged' || action === 'forwarded') && verdict !== 'rejected';
 }

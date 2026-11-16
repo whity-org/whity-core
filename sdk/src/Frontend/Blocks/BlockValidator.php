@@ -180,7 +180,10 @@ final class BlockValidator
      */
     public static function validate(array $tree): array
     {
-        $errors = [];
+        // SDK 1.101: visible text may be {en, ar} ({@see BlockText}). It is
+        // judged here in English; the host serves the reader's language.
+        $errors = BlockText::problems($tree);
+        $tree = BlockText::resolve($tree, 'en');
         $count = 0;
         $formNames = [];
 

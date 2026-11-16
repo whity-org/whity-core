@@ -8,24 +8,32 @@ import { BubbleMenu } from "@tiptap/react/menus"
 import type { IconName } from "../icon"
 import { IconButton } from "../icon-button"
 import type { EditorLabels } from "./labels"
+import { mintPartKey } from "./saved-parts"
 
 /**
  * The selection bubble (EditorInline): after a short pause above a text
  * selection, bold, italic, underline, strikethrough, code · link, highlight.
- * · Comment (M5). Rewrite with an agent (M6) joins it later. Without edit
- * rights (Viewing) only Comment shows.
+ * · Comment (M5) · Rewrite with an agent (M6, EditorAgents): the agent's
+ * version arrives as a suggestion. Without edit rights (Viewing) only Comment
+ * and Rewrite show.
  */
 function SelectionBubble({
   editor,
   labels,
   onLink,
   onComment,
+  onRewrite,
+  perDocument,
 }: {
   editor: Editor
   labels: EditorLabels
   onLink: () => void
   /** M5: Comment on the selection; with it the bubble shows even where nothing can be edited. */
   onComment?: () => void
+  /** M6: ask an agent to rewrite the selection; its version comes back as a suggestion. */
+  onRewrite?: () => void
+  /** M7, E.23: editing a saved block's original, mark text as filled per document. */
+  perDocument?: boolean
 }) {
   const s = useEditorState({
     editor,
@@ -37,6 +45,7 @@ function SelectionBubble({
       code: e.isActive("code"),
       link: e.isActive("link"),
       highlight: e.isActive("highlight"),
+      perDocument: e.isActive("perDocument"),
       editable: e.isEditable,
     }),
   })
@@ -52,12 +61,17 @@ function SelectionBubble({
     />
   )
   const mark = (name: string) => () => editor.chain().focus().toggleMark(name).run()
+  // E.23a: marking mints the part's key once; unmarking deletes it, and marking again mints a new one.
+  const togglePart = () =>
+    s.perDocument
+      ? editor.chain().focus().unsetMark("perDocument").run()
+      : editor.chain().focus().setMark("perDocument", { key: mintPartKey() }).run()
   return (
     <BubbleMenu
       editor={editor}
       updateDelay={250}
       shouldShow={({ editor: e, state, from, to }) =>
-        (e.isEditable || !!onComment) && isTextSelection(state.selection) && from !== to && !e.isActive("codeBlock")
+        (e.isEditable || !!onComment || !!onRewrite) && isTextSelection(state.selection) && from !== to && !e.isActive("codeBlock")
       }
       options={{ placement: "top-start", offset: 8 }}
     >
@@ -77,12 +91,24 @@ function SelectionBubble({
             <span aria-hidden="true" className="mx-[3px] h-[18px] w-px bg-border" />
             {b("link", labels.link, s.link, onLink, "⌘K")}
             {b("highlight", labels.highlight, s.highlight, mark("highlight"))}
+            {perDocument && (
+              <>
+                <span aria-hidden="true" className="mx-[3px] h-[18px] w-px bg-border" />
+                {b("field", labels.perDocumentMark, s.perDocument, togglePart)}
+              </>
+            )}
           </>
         )}
         {onComment && (
           <>
             {s.editable && <span aria-hidden="true" className="mx-[3px] h-[18px] w-px bg-border" />}
             {b("comment-add", labels.comment, false, onComment, "⌥⌘M")}
+          </>
+        )}
+        {onRewrite && (
+          <>
+            {(s.editable || onComment) && <span aria-hidden="true" className="mx-[3px] h-[18px] w-px bg-border" />}
+            {b("robot", labels.agentRewrite, false, onRewrite)}
           </>
         )}
       </div>

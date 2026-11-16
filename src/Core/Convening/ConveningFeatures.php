@@ -213,16 +213,22 @@ final class ConveningFeatures
     public const MEETING_DETAIL = 'convening-meeting';
 
     /**
-     * The nav group these screens sit in.
+     * The nav group the meetings entry sits in.
      *
-     * `documents` rather than a group of its own: a convening body exists here to
-     * decide about documents, and a person looking for "where did my document get
-     * to" should find the committee that has it beside the document library
-     * rather than in a section they have to know exists. A subsystem that gives
-     * itself a nav group before it has three screens people use daily is a
-     * subsystem asserting its own importance in the sidebar.
+     * `work` (WHIT-1115, ADR 0018): a meeting is time on people's calendars, so
+     * it is found with the calendar and the work around it, not under Documents.
      */
-    public const NAV_GROUP = 'documents';
+    public const NAV_GROUP = 'work';
+
+    /**
+     * Where each screen now lives on the web. The descriptors above still back
+     * the SDK and the features endpoint, but the web app answers these with its
+     * own pages, and the old /admin/x/ addresses redirect (web/next.config.ts).
+     */
+    public const WEB_PATHS = [
+        self::MEETINGS => '/calendar/meetings',
+        self::BODIES => '/calendar/meetings/bodies',
+    ];
 
     /**
      * Every descriptor, with API paths resolved through the live router.
@@ -373,7 +379,7 @@ final class ConveningFeatures
                                 // `display_name` and not `name`: `name` is a
                                 // locale MAP, and a table cell can only render a
                                 // string. Both are on the wire — a localizing
-                                // client reads the map. See LocalizedText.
+                                // client reads the map. See Whity\Core\i18n\LocalizedText.
                                 [
                                     'key' => 'display_name',
                                     'label' => 'Name',
@@ -1303,10 +1309,15 @@ final class ConveningFeatures
         $items = [];
 
         foreach (self::all($router) as $feature) {
+            // One entry: the meetings. The bodies are a tab on that page, and one
+            // meeting's record is reached from the list, so neither is a menu entry.
+            if ($feature['id'] !== self::MEETINGS) {
+                continue;
+            }
             $items[] = [
                 'id' => (string) $feature['id'],
                 'label' => (string) $feature['label'],
-                'href' => '/admin/x/' . (string) $feature['id'],
+                'href' => self::WEB_PATHS[self::MEETINGS],
                 'icon' => (string) $feature['icon'],
                 'group' => (string) $feature['group'],
                 'order' => (int) $feature['order'],

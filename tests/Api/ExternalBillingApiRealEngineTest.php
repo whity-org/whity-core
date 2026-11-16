@@ -57,6 +57,8 @@ final class ExternalBillingApiRealEngineTest extends TestCase
     {
         RoleChecker::clearCache();
         $this->pdo = SchemaFromMigrations::make();
+        // This install sells in dinars; the default has been US dollars since 3.5.1.
+        $this->pdo->exec("INSERT INTO app_settings (setting_key, value) VALUES ('billing.default_currency', 'JOD')");
         $this->pdo->exec('PRAGMA foreign_keys = ON');
 
         $this->pdo->exec("INSERT OR IGNORE INTO tenants (id, name, slug) VALUES (0, 'system', 'system')");
@@ -508,6 +510,32 @@ final class ExternalBillingApiRealEngineTest extends TestCase
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame('price_DEV', $this->portal->lastPrice);
+    }
+
+    /**
+     * WHIT-1127: a paid plugin is its own product. A Free workspace, with no
+     * tier at all, may buy one; buying the same plugin twice is refused.
+     */
+    public function testAFreeWorkspaceCanBuyAPaidPluginOnceButNotTwice(): void
+    {
+        $this->pdo->exec("INSERT INTO plans (id, plan_key, name, is_active, is_addon, created_at, updated_at)
+                          VALUES (3, 'plugin.front-office.monthly', 'Front Office', true, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        $this->pdo->exec("INSERT INTO plan_prices (plan_id, currency, unit_amount, billing_period, is_per_seat, is_active, external_ref, created_at, updated_at)
+                          VALUES (3, 'JOD', 29000, 'month', false, true, 'price_FO', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+
+        $response = $this->handler->checkout(
+            $this->asTenant('POST', '/api/v1/billing/checkout', ['plan_key' => 'plugin.front-office.monthly'])
+        );
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('price_FO', $this->portal->lastPrice);
+
+        $this->pdo->exec("INSERT INTO tenant_plan_addons (tenant_id, plan_id, quantity, assigned_at) VALUES (1, 3, 1, CURRENT_TIMESTAMP)");
+        $this->portal->lastPrice = null;
+        $again = $this->handler->checkout(
+            $this->asTenant('POST', '/api/v1/billing/checkout', ['plan_key' => 'plugin.front-office.monthly'])
+        );
+        self::assertSame(409, $again->getStatusCode());
+        self::assertNull($this->portal->lastPrice);
     }
 
     /** The catalogue says which kind each plan is, or no screen can separate them. */

@@ -12,10 +12,12 @@ use Whity\Api\PublicSignupApiHandler;
 use Whity\Api\WorkspaceSignupApiHandler;
 use Whity\Auth\RoleChecker;
 use Whity\Core\Audit\AuditLogger;
+use Whity\Core\Branding\BrandingService;
 use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Http\HttpFetcher;
+use Whity\Core\Identity\CustomerGradePermissions;
 use Whity\Core\Identity\CustomerSafeRole;
 use Whity\Core\Mail\EmailLayout;
 use Whity\Core\Mail\Mailer;
@@ -58,6 +60,7 @@ final class CustomerSignupRealEngineTest extends TestCase
 
     private PDO $pdo;
     private PublicSignupApiHandler $public;
+    private SettingsService $settingsService;
     private WorkspaceSignupApiHandler $admin;
     private RoleChecker $roleChecker;
     private HookManager $hooks;
@@ -75,6 +78,7 @@ final class CustomerSignupRealEngineTest extends TestCase
 
     protected function setUp(): void
     {
+        CustomerGradePermissions::reset();
         RoleChecker::clearCache();
         TenantContext::reset();
 
@@ -119,10 +123,13 @@ final class CustomerSignupRealEngineTest extends TestCase
             $hostRepo,
             new HostResolver($hostRepo, 'whity.test'),
             $bot,
-            new CustomerSignupMailer($mailer, 'https://app.test/join/confirm', new EmailLayout(), $settingsService),
+            new CustomerSignupMailer(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $settingsService), 'https://app.test/join/confirm'),
             new DatabaseSharedStore($this->pdo),
-            $audit
+            $audit,
+            null,
+            new BrandingService($settingsService),
         );
+        $this->settingsService = $settingsService;
 
         $registry = new PermissionRegistry();
         $registry->registerCorePermissions();
@@ -135,12 +142,15 @@ final class CustomerSignupRealEngineTest extends TestCase
             $safe,
             $service,
             $audit,
-            $bot
+            $bot,
+            null,
+            new \Whity\Core\Signup\JoinDecisionMailer(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $settingsService), 'https://app.test/login'),
         );
     }
 
     protected function tearDown(): void
     {
+        CustomerGradePermissions::reset();
         RoleChecker::clearCache();
         TenantContext::reset();
         unset($_GET['token'], $_GET['status']);
@@ -160,6 +170,23 @@ final class CustomerSignupRealEngineTest extends TestCase
         self::assertSame(404, $this->request('tenant-a', 'someone@example.test')->getStatusCode());
         self::assertSame(0, (int) $this->scalar('SELECT COUNT(*) FROM customer_signups'));
         self::assertSame([], $this->sent);
+    }
+
+    /** WHIT-1044: both join pages wear the workspace's logo and colour, as the booking pages do. */
+    public function testTheJoinPagesSendTheWorkspaceBrand(): void
+    {
+        $this->configure(self::TENANT_A, self::ADMIN_A, 'open', $this->customerRole);
+        $this->settingsService->setTenant(self::TENANT_A, 'branding_main_color', '#b74c05');
+
+        $brand = $this->decode($this->info('tenant-a'))['data']['brand'];
+        self::assertSame(['name', 'logo_wide_url', 'logo_square_url', 'main_color', 'theme'], array_keys($brand), 'only public brand fields');
+        self::assertSame('tenant-a', $brand['name']);
+        self::assertSame('#b74c05', $brand['main_color']);
+        self::assertSame('#b74c05', $brand['theme']['light']['primary']);
+
+        self::assertSame(202, $this->request('tenant-a', 'branded@example.test', 'Branded Customer')->getStatusCode());
+        $preview = $this->decode($this->preview($this->tokenFromMail(0)))['data'];
+        self::assertSame('#b74c05', $preview['brand']['main_color'], 'the emailed link opens in the same brand');
     }
 
     public function testOpenModeJoinsAsACustomerOnceTheEmailIsConfirmed(): void
@@ -231,8 +258,17 @@ final class CustomerSignupRealEngineTest extends TestCase
 
         self::assertSame(403, $this->decide(self::TENANT_A, self::STAFF_A, $requestId, true)->getStatusCode());
 
+        $mailsBefore = count($this->sent);
         $approved = $this->decide(self::TENANT_A, self::ADMIN_A, $requestId, true);
         self::assertSame(200, $approved->getStatusCode(), $approved->getBody());
+
+        // E2 `join-approved`: the person hears it, from the workspace.
+        self::assertCount($mailsBefore + 1, $this->sent);
+        $mail = $this->sent[$mailsBefore];
+        self::assertSame('waiting@example.test', $mail['to']);
+        self::assertStringStartsWith("You're in: welcome to ", $mail['subject']);
+        self::assertStringContainsString('Hello Waiting Person, your request to join was approved.', $mail['body']);
+        self::assertStringContainsString('https://app.test/login', $mail['body']);
 
         $row = $this->membership(self::TENANT_A, 'waiting@example.test');
         self::assertSame('active', $row['status']);
@@ -261,7 +297,8 @@ final class CustomerSignupRealEngineTest extends TestCase
         // The same address asks again: the request looks like any other, the
         // link says no, and the queue stays empty.
         self::assertSame(202, $this->request('tenant-a', 'turned.away@example.test', 'Turned Away')->getStatusCode());
-        $again = $this->confirm($this->tokenFromMail(1), null);
+        // Mail 1 is the decline (E2); the new link is the latest one.
+        $again = $this->confirm($this->tokenFromMail(count($this->sent) - 1), null);
         self::assertSame(409, $again->getStatusCode());
         self::assertSame('refused', $this->decode($again)['details']['reason']);
         self::assertSame([], $this->decode($this->listRequests(self::TENANT_A, self::ADMIN_A))['data']);
@@ -337,6 +374,83 @@ final class CustomerSignupRealEngineTest extends TestCase
         // Staff in the same role keep it.
         self::assertFalse($this->roleChecker->isCustomerOnly(self::ADMIN_A, self::TENANT_A));
         self::assertTrue($this->roleChecker->hasPermissionForProfile(self::ADMIN_A, CorePermissions::ROLES_WRITE, self::TENANT_A));
+    }
+
+    // ==================== customer-grade plugin permissions (#1872) ====================
+
+    public function testACustomerKeepsPluginPermissionsThePluginDeclaresCustomerGrade(): void
+    {
+        CustomerGradePermissions::declare(
+            'Clinic\Plugin',
+            'clinic',
+            ['clinic_patient:read', 'clinic_patient:manage', 'clinic_scan:upload'],
+            ['clinic_patient:manage', 'clinic_scan:upload'],
+        );
+        $role = $this->makeTenantRole(self::TENANT_A, 'clinic owners', [
+            CorePermissions::FORMS_SUBMIT, 'clinic_patient:read', 'clinic_patient:manage', 'clinic_scan:upload',
+        ]);
+
+        // Settings > Sign-up offers it and accepts it.
+        $offered = array_column(CustomerSafeRole::make($this->pdo)->listForTenant(self::TENANT_A), 'id');
+        self::assertContains($role, $offered);
+        $this->configure(self::TENANT_A, self::ADMIN_A, 'open', $role);
+
+        $this->request('tenant-a', 'clinic@example.test', 'Example Clinic');
+        $this->confirm($this->tokenFromMail(0), 'a-long-enough-password');
+        $profileId = (int) $this->membership(self::TENANT_A, 'clinic@example.test')['profile_id'];
+
+        self::assertTrue($this->roleChecker->isCustomerOnly($profileId, self::TENANT_A));
+        $held = $this->roleChecker->getEffectivePermissionsForProfile($profileId, self::TENANT_A);
+        self::assertContains('clinic_patient:manage', $held);
+        self::assertContains('clinic_scan:upload', $held);
+
+        // The plugin is disabled or uninstalled: the permissions stop working
+        // for the customer, and the role is no longer offered or accepted.
+        CustomerGradePermissions::remove('Clinic\Plugin');
+        RoleChecker::clearCache();
+        $held = $this->roleChecker->getEffectivePermissionsForProfile($profileId, self::TENANT_A);
+        self::assertNotContains('clinic_patient:manage', $held);
+        self::assertNotContains('clinic_scan:upload', $held);
+        self::assertContains('clinic_patient:read', $held);
+        self::assertNotContains($role, array_column(CustomerSafeRole::make($this->pdo)->listForTenant(self::TENANT_A), 'id'));
+        self::assertFalse($this->decode($this->getSettings(self::TENANT_A, self::ADMIN_A))['data']['role_customer_safe']);
+    }
+
+    public function testCustomerGradeNeverCoversCoreOrAdminResourcesOrUndeclaredPermissions(): void
+    {
+        $refused = CustomerGradePermissions::declare(
+            'Shop\Plugin',
+            'shop',
+            ['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_order:manage', 'bakery_order:manage'],
+            ['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_order:manage', 'shop_item:delete', 'bakery_order:manage', 'bad slug', 'shop_order:*'],
+        );
+        self::assertSame(
+            ['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_item:delete', 'bakery_order:manage', 'bad slug', 'shop_order:*'],
+            $refused
+        );
+        foreach (['users:write', 'settings:manage', 'roles:assign', 'documents:approve', 'mcp:manage', 'shop_item:delete', 'bakery_order:manage'] as $p) {
+            self::assertTrue(CustomerSafeRole::isPrivilegedPermission($p), $p);
+        }
+        self::assertFalse(CustomerSafeRole::isPrivilegedPermission('shop_order:manage'));
+
+        // A customer given the admin role still gains nothing core from it.
+        $role = $this->makeTenantRole(self::TENANT_A, 'shoppers with users', [CorePermissions::USERS_WRITE, 'shop_order:manage']);
+        self::assertFalse(CustomerSafeRole::make($this->pdo)->isCustomerSafe($role, self::TENANT_A));
+    }
+
+    public function testAPluginCannotVouchForAResourceAnotherPluginAlsoDeclares(): void
+    {
+        CustomerGradePermissions::declare('Clinic\Plugin', 'clinic', ['clinic_case:review'], ['clinic_case:review']);
+        self::assertFalse(CustomerSafeRole::isPrivilegedPermission('clinic_case:review'));
+
+        // Another plugin declares a permission under the same resource: neither
+        // of them owns it alone, so the vouch no longer counts, whichever loaded first.
+        CustomerGradePermissions::declare('Other\Plugin', 'other', ['clinic_case:delete'], ['clinic_case:review']);
+        self::assertTrue(CustomerSafeRole::isPrivilegedPermission('clinic_case:review'));
+        self::assertTrue(CustomerSafeRole::isPrivilegedPermission('clinic_case:delete'));
+
+        CustomerGradePermissions::remove('Other\Plugin');
+        self::assertFalse(CustomerSafeRole::isPrivilegedPermission('clinic_case:review'));
     }
 
     // ==================== isolation ====================
@@ -485,7 +599,15 @@ final class CustomerSignupRealEngineTest extends TestCase
         $this->request('tenant-a', 'second.chance@example.test', 'Second Chance');
         $this->confirm($this->tokenFromMail(0), 'a-long-enough-password');
         $id = (int) $this->decode($this->listRequests(self::TENANT_A, self::ADMIN_A))['data'][0]['id'];
+        $mailsBefore = count($this->sent);
         $this->decide(self::TENANT_A, self::ADMIN_A, $id, false);
+
+        // E2 `join-declined`: told, without an invitation to reply (no workspace address set).
+        $mail = $this->sent[$mailsBefore];
+        self::assertSame('second.chance@example.test', $mail['to']);
+        self::assertStringStartsWith('About your request to join ', $mail['subject']);
+        self::assertStringContainsString("couldn't accept your request to join.", $mail['body']);
+        self::assertStringNotContainsString('reply to this email', $mail['body']);
 
         $rejected = $this->decode($this->admin->listRequests(
             $this->authed(self::TENANT_A, self::ADMIN_A, 'GET', '/api/signup/requests?status=rejected')

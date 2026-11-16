@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { EMAIL_DOMAINS_MANAGE } from '@/lib/capabilities';
@@ -14,7 +14,7 @@ import { FieldSelect } from '@/components/field-select';
 import { humanizeCode } from '@/lib/plain-words';
 import { Switch } from '@whity/ui/switch';
 import { Badge } from '@whity/ui/badge';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import {
   IconAlertCircle,
   IconCircleCheck,
@@ -50,16 +50,11 @@ interface Role {
   name: string;
 }
 
-/** Read the `{ error }` / `{ error, details }` envelope from a failed response. */
-async function readError(res: Response, fallback: string): Promise<string> {
-  try {
-    const body: unknown = await res.json();
-    if (body && typeof body === 'object' && 'error' in body) {
-      const value = (body as { error?: unknown }).error;
-      if (typeof value === 'string' && value !== '') return value;
-    }
-  } catch {
-    // no JSON body
+/** Read the `{ error }` / `{ error, details }` envelope from a failed response's parsed body. */
+function readError(body: unknown, fallback: string): string {
+  if (body && typeof body === 'object' && 'error' in body) {
+    const value = (body as { error?: unknown }).error;
+    if (typeof value === 'string' && value !== '') return value;
   }
   return fallback;
 }
@@ -89,24 +84,22 @@ export default function EmailDomainsPage() {
     error: loadError,
     refetch,
   } = useFetch<EmailDomain[]>(async () => {
-    const res = await apiClient('/api/v1/email-domains');
+    const { data: body, response: res, error } = await api.GET('/api/v1/email-domains');
     if (!res.ok) {
       throw new Error(
-        await readError(res, t('settings.emailDomains.loadFailed', 'Failed to load email domains'))
+        readError(error, t('settings.emailDomains.loadFailed', 'Failed to load email domains'))
       );
     }
-    const body: unknown = await res.json();
     return body && typeof body === 'object' && Array.isArray((body as { data?: unknown }).data)
       ? (body as { data: EmailDomain[] }).data
       : [];
   }, []);
 
   const { data: roles } = useFetch<Role[]>(async () => {
-    const res = await apiClient('/api/v1/roles?per_page=100');
+    const { data: body, response: res } = await api.GET('/api/v1/roles', { params: { query: { per_page: 100 } } });
     if (!res.ok) {
       return [];
     }
-    const body: unknown = await res.json();
     return body && typeof body === 'object' && Array.isArray((body as { data?: unknown }).data)
       ? (body as { data: Role[] }).data
       : [];
@@ -129,8 +122,10 @@ export default function EmailDomainsPage() {
   }
 
   const handleVerify = async (domain: EmailDomain) => {
-    const res = await apiClient(`/api/v1/email-domains/${domain.id}/verify`, { method: 'POST' });
-    const body: unknown = await res.json().catch(() => ({}));
+    const { response: res, data, error } = await api.POST('/api/v1/email-domains/{id}/verify', {
+      params: { path: { id: domain.id } },
+    });
+    const body: unknown = (res.ok ? data : error) ?? {};
     if (!res.ok) {
       // 422 still returns a body with the challenge instructions — refresh so
       // the card shows the (possibly regenerated) TXT record instead of just
@@ -149,10 +144,10 @@ export default function EmailDomainsPage() {
   };
 
   const handleDelete = async (id: number) => {
-    const res = await apiClient(`/api/v1/email-domains/${id}`, { method: 'DELETE' });
+    const { response: res, error } = await api.DELETE('/api/v1/email-domains/{id}', { params: { path: { id } } });
     if (!res.ok && res.status !== 204) {
       addToast(
-        await readError(res, t('settings.emailDomains.delete.failed', 'Failed to remove domain')),
+        readError(error, t('settings.emailDomains.delete.failed', 'Failed to remove domain')),
         'error'
       );
       return;
@@ -431,29 +426,26 @@ function DomainFormCard({
     try {
       // The domain name is identity: the PATCH route changes only the default
       // role and the auto-provision switch, so editing never sends it.
-      const res =
+      const { response: res, error } =
         editing === undefined
-          ? await apiClient('/api/v1/email-domains', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
+          ? await api.POST('/api/v1/email-domains', {
+              body: {
                 domain: domain.trim(),
                 default_role_id: defaultRoleId,
                 auto_provision: autoProvision,
-              }),
+              },
             })
-          : await apiClient(`/api/v1/email-domains/${editing.id}`, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
+          : await api.PATCH('/api/v1/email-domains/{id}', {
+              params: { path: { id: editing.id } },
+              body: {
                 default_role_id: defaultRoleId,
                 auto_provision: autoProvision,
-              }),
+              },
             });
       if (!res.ok) {
         addToast(
-          await readError(
-            res,
+          readError(
+            error,
             editing === undefined
               ? t('settings.emailDomains.form.saveFailed', 'Failed to register domain')
               : t('settings.emailDomains.form.updateFailed', 'Failed to update domain')

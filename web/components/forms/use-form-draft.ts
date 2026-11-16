@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { api } from '@/lib/api/client';
 import type { Answer } from '@/components/forms/form-fields';
 
 /** A pause after typing before the save, so each keystroke isn't a request. */
@@ -25,34 +25,7 @@ export interface LoadedDraft {
   step: number;
 }
 
-function legacyKey(id: string): string {
-  return `whity:form-draft:${id}`;
-}
-
-function readLegacy(id: string): Answers | null {
-  try {
-    const raw = window.localStorage.getItem(legacyKey(id));
-    if (raw === null) return null;
-    const parsed: unknown = JSON.parse(raw);
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-
-    return Object.keys(parsed).length > 0 ? (parsed as Answers) : null;
-  } catch {
-    // Private windows and browsers that block storage land here.
-    return null;
-  }
-}
-
-function dropLegacy(id: string): void {
-  try {
-    window.localStorage.removeItem(legacyKey(id));
-  } catch {
-    // Nothing to do.
-  }
-}
-
 export function useFormDraft(id: string) {
-  const address = `/api/v1/me/forms/${encodeURIComponent(id)}/draft`;
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -75,22 +48,17 @@ export function useFormDraft(id: string) {
 
       const run = (inFlight.current ?? Promise.resolve())
         .then(() =>
-          apiClient(address, {
-            method: 'PUT',
+          api.PUT('/api/v1/me/forms/{id}/draft', {
+            params: { path: { id: id as never } },
             keepalive,
-            headers: {
-              'Content-Type': 'application/json',
-              Accept: 'application/json',
-              'X-Requested-With': 'XMLHttpRequest',
-            },
-            body: JSON.stringify(body),
+            headers: { Accept: 'application/json' },
+            body: body as never,
           })
         )
-        .then((response) => {
+        .then(({ response }) => {
           setFailed(!response.ok);
           if (response.ok) {
             setSavedAt(new Date().toISOString());
-            dropLegacy(id);
           }
         })
         .catch(() => setFailed(true))
@@ -101,7 +69,7 @@ export function useFormDraft(id: string) {
 
       return run;
     },
-    [address, clearTimer, id]
+    [clearTimer, id]
   );
 
   // Leaving within the pause after typing still keeps what they typed.
@@ -110,12 +78,13 @@ export function useFormDraft(id: string) {
   /** What they had, or null when this is a fresh start. */
   const load = useCallback(async (): Promise<LoadedDraft | null> => {
     let server: { data?: unknown; step?: unknown } | null = null;
-    let reachable = false;
     try {
-      const response = await apiClient(address, { headers: { Accept: 'application/json' } });
-      reachable = response.ok;
+      const { data, response } = await api.GET('/api/v1/me/forms/{id}/draft', {
+        params: { path: { id: id as never } },
+        headers: { Accept: 'application/json' },
+      });
       if (response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { data?: { data?: unknown; step?: unknown } | null };
+        const body = (data ?? {}) as { data?: { data?: unknown; step?: unknown } | null };
         server = body.data ?? null;
       }
     } catch {
@@ -123,7 +92,6 @@ export function useFormDraft(id: string) {
     }
 
     if (server !== null) {
-      dropLegacy(id);
       const answers = server.data;
       const hasAnswers = answers !== null && typeof answers === 'object' && !Array.isArray(answers);
 
@@ -133,15 +101,8 @@ export function useFormDraft(id: string) {
       };
     }
 
-    const legacy = readLegacy(id);
-    if (legacy === null) return null;
-    if (reachable) {
-      waiting.current = { data: legacy, step: 0 };
-      void send();
-    }
-
-    return { answers: legacy, step: 0 };
-  }, [address, id, send]);
+    return null;
+  }, [id]);
 
   const schedule = useCallback(
     (data: Answers, step: number) => {
@@ -170,7 +131,6 @@ export function useFormDraft(id: string) {
   const forget = useCallback(() => {
     clearTimer();
     waiting.current = null;
-    dropLegacy(id);
     setSavedAt(null);
   }, [clearTimer, id]);
 
@@ -179,14 +139,15 @@ export function useFormDraft(id: string) {
     clearTimer();
     waiting.current = null;
     await inFlight.current;
-    dropLegacy(id);
     setSavedAt(null);
     setFailed(false);
-    await apiClient(address, {
-      method: 'DELETE',
-      headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-    }).catch(() => undefined);
-  }, [address, clearTimer, id]);
+    await api
+      .DELETE('/api/v1/me/forms/{id}/draft', {
+        params: { path: { id: id as never } },
+        headers: { Accept: 'application/json' },
+      })
+      .catch(() => undefined);
+  }, [clearTimer, id]);
 
   return { savedAt, failed, load, schedule, pause, resume, forget, discard };
 }

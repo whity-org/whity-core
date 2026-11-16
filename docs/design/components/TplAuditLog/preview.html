@@ -22,7 +22,7 @@
       var has = g[1].some(function (x) { return x[1] === active; });
       return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
   function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
   function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
   function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
@@ -35,12 +35,12 @@
     h('div', { className: 'wy-listbar' }, h(W.SearchField, { placeholder: 'Search what happened' }), filter('Who', null), filter('Agent', null), filter('Area', 'People', true), filter('When', 'Last 7 days', true), h('span', { className: 'wy-listbar__end' }, h(W.Switch, { label: 'Show technical details' }))),
     h(W.Card, null, h('div', { className: 'wy-day' },
       h('h3', null, 'Today, Monday 2 November'),
-      ev('10:31', h(F, null, h('b', null, 'Rana Haddad'), ' changed ', h('b', null, 'Omar Khalil'), '’s unit from Sweifieh to Abdoun.'), 'From Amman, on a Mac'),
-      ev('09:40', h(F, null, h(W.ActorChip, { kind: 'agent', name: 'Billing assistant', onBehalfOf: 'Rana' }), ' sent 4 receipts by WhatsApp.'), 'Allowed by its settings'),
-      ev('08:12', h(F, null, h('b', null, 'Hala Mansour'), ' asked to clear her two-step sign-in.'), 'Waiting in Approval gating', h(W.Button, { size: 'sm', variant: 'outline' }, 'Open')),
+      ev('10:31', h(F, null, h('b', null, 'Amro Saleh'), ' changed ', h('b', null, 'Ahmad Khalil'), '’s unit from Sweifieh to Abdoun.'), 'From Amman, on a Mac'),
+      ev('09:40', h(F, null, h(W.ActorChip, { kind: 'agent', name: 'Billing assistant', onBehalfOf: 'Amro' }), ' sent 4 receipts by WhatsApp.'), 'Allowed by its settings'),
+      ev('08:12', h(F, null, h('b', null, 'Ibrahim Mansour'), ' asked to clear his two-step sign-in.'), 'Waiting in Approval gating', h(W.Button, { size: 'sm', variant: 'outline' }, 'Open')),
       h('h3', null, 'Yesterday'),
-      ev('17:02', h(F, null, h('b', null, 'Rana Haddad'), ' gave ', h('b', null, 'Dana Yousef'), ' the right to approve purchase orders in Abdoun until 15 November.'), null),
-      ev('11:15', h(F, null, h('b', null, 'Rana Haddad'), ' turned on two-step sign-in for everyone, required from 9 November.'), null))))));
+      ev('17:02', h(F, null, h('b', null, 'Amro Saleh'), ' gave ', h('b', null, 'Emad Nasser'), ' the right to approve purchase orders in Abdoun until 15 November.'), null),
+      ev('11:15', h(F, null, h('b', null, 'Amro Saleh'), ' turned on two-step sign-in for everyone, required from 9 November.'), null))))));
 </script>
 </body>
 </html>

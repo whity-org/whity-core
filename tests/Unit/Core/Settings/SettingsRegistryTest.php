@@ -43,17 +43,18 @@ final class SettingsRegistryTest extends TestCase
              'billing.enforcement_default', 'billing.grace_days',
              'licensing.billing_basis',
              'seats.enforcement', 'seats.count_invited',
+             'meters.enforcement',
              // #billing: invoicing. Every one differs per deployment, which is
              // why none is a constant in the invoicing code. Tax defaults to
              // ZERO rather than to any country's rate — charging tax an
              // operator is not registered to collect is worse than not
              // charging it, and a default wrong for everyone outside one
              // jurisdiction ships unnoticed.
-             'billing.default_currency', 'billing.tax_rate_bp',
+             'billing.default_currency', 'billing.default_plan', 'billing.tax_rate_bp',
              'billing.tax_label', 'billing.tax_inclusive',
              'billing.payment_terms_days',
              'company.name', 'company.address',
-             'company.tax_id', 'company.phone', 'company.email',
+             'company.tax_id', 'company.phone', 'company.email', 'company.name_ar', 'company.address_ar',
              // Numbering is GLOBAL-ONLY: a per-tenant override would make the
              // (series, number) uniqueness index mean something a tenant admin
              // can change, which is how a sequence starts issuing duplicates.
@@ -70,7 +71,7 @@ final class SettingsRegistryTest extends TestCase
              // goes to somebody outside the company, so no tenant decides it.
              'affiliate.clawback_on_refund', 'affiliate.withholding_bp',
              'dunning.retry_schedule_days', 'dunning.lock_after_days',
-             'plugins.store_allowed_hosts', 'plugins.store_enabled', 'plugins.mcp_prompts_require_mark',
+             'plugins.store_allowed_hosts', 'plugins.store_enabled', 'plugins.mcp_prompts_require_mark', 'plugins.billing_email_senders',
              'documents.render_enabled', 'documents.theme', 'documents.theme_by_kind', 'documents.slot_bindings', 'documents.background_issuing', 'documents.render_max_rows',
              'documents.render_max_pages', 'documents.render_max_template_bytes',
              'documents.flow_max_blocks', 'documents.flow_max_table_rows',
@@ -120,7 +121,23 @@ final class SettingsRegistryTest extends TestCase
              'ui.hide_dates',
              // #1019: how many ids one label-resolution request may name.
              'labels.resolve_max_ids',
-             'app.installable'],
+             // WHIT-941: calendar and bookings (ADR 0017).
+             'calendar.booking_page_enabled',
+             'calendar.min_notice_minutes',
+             'calendar.max_advance_days',
+             'calendar.slot_step_minutes',
+             'calendar.reminder_hours_before',
+             'calendar.payment_hold_minutes',
+             'calendar.week_start',
+             'calendar.weekend_days',
+             'calendar.instant_booking',
+             'app.installable',
+             'website.plans',
+             'website.contact_workspace',
+             // WHIT-1035: customer sign-up, moved from workspace_signup_settings.
+             'signup.mode', 'signup.role_id', 'signup.allowed_domains', 'signup.customer_invites',
+             // WHIT-1043.
+             'signup.invites_per_customer', 'signup.route_template_id', 'messaging.webchat_enabled', 'messaging.webchat_greeting', 'messaging.inbound_email_address'],
             SettingsRegistry::keys()
         );
     }
@@ -285,7 +302,10 @@ final class SettingsRegistryTest extends TestCase
         // 42 since #1019: labels.resolve_max_ids, each workspace's own cap.
         // 43 since WHIT-920: forms.show_reviewer_names, each workspace's choice
         // of whether applicants see who reviewed their form.
-        self::assertCount(43, SettingsRegistry::tenantTextKeys());
+        // 51 since WHIT-941: eight calendar.* keys.
+        // 52 since WHIT-966: calendar.instant_booking.
+        // 54 since design 3.4 (P1): company.name_ar and company.address_ar.
+        self::assertCount(54, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -446,7 +466,14 @@ final class SettingsRegistryTest extends TestCase
         // 102 since #1733: app.installable, the instance's install switch.
         // 103 since WHIT-1014: plugins.mcp_prompts_require_mark.
         // 104 since WHIT-920: forms.show_reviewer_names.
-        self::assertCount(104, $describe);
+        // 106 since WHIT-925: meters.enforcement and billing.default_plan.
+        // 114 since WHIT-941: eight calendar.* keys.
+        // 117 since WHIT-960: website.plans and website.contact_workspace.
+        // 120 since design 3.4 (P1): company.name_ar and company.address_ar.
+        // 124 since WHIT-1035: the four signup.* keys; 125 since WHIT-1043.
+        // 126 since merge map A4: signup.route_template_id.
+        // 129 with migration 294's three messaging.* keys.
+        self::assertCount(129, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
@@ -709,5 +736,36 @@ final class SettingsRegistryTest extends TestCase
         self::assertNull(SettingsRegistry::validate('documents.render_max_template_bytes', (string) (20 * 1024 * 1024)));
         self::assertNotNull(SettingsRegistry::validate('documents.render_max_template_bytes', '1023'));
         self::assertNotNull(SettingsRegistry::validate('documents.render_max_template_bytes', (string) (20 * 1024 * 1024 + 1)));
+    }
+
+    public function testSignupKeysHaveTheirOwnScreenAndStayOffTheSettingsApi(): void
+    {
+        foreach (['signup.mode', 'signup.role_id', 'signup.allowed_domains', 'signup.customer_invites'] as $key) {
+            self::assertTrue(SettingsRegistry::isOwnScreen($key), $key);
+            self::assertNotContains($key, SettingsRegistry::textKeys(), $key);
+            self::assertNotContains($key, SettingsRegistry::tenantTextKeys(), $key);
+            self::assertFalse((new \Whity\Core\Settings\SettingsCatalog())->isAdminVisible($key), $key);
+        }
+        self::assertFalse(SettingsRegistry::isOwnScreen('company.name'));
+    }
+
+    public function testSignupValuesAreChecked(): void
+    {
+        self::assertSame('off', SettingsRegistry::defaultFor('signup.mode'));
+        self::assertSame('enum', SettingsRegistry::typeFor('signup.mode'));
+        self::assertSame('bool', SettingsRegistry::typeFor('signup.customer_invites'));
+        self::assertNull(SettingsRegistry::validate('signup.mode', 'approval'));
+        self::assertNotNull(SettingsRegistry::validate('signup.mode', 'closed'));
+        self::assertNull(SettingsRegistry::validate('signup.role_id', '0'));
+        self::assertNull(SettingsRegistry::validate('signup.role_id', '42'));
+        self::assertNotNull(SettingsRegistry::validate('signup.role_id', '-1'));
+        self::assertNotNull(SettingsRegistry::validate('signup.role_id', '07'));
+        self::assertNull(SettingsRegistry::validate('signup.allowed_domains', '[]'));
+        self::assertNull(SettingsRegistry::validate('signup.allowed_domains', '["example-bakery.com"]'));
+        self::assertNotNull(SettingsRegistry::validate('signup.allowed_domains', '["Example-Bakery.com"]'), 'stored normalised');
+        self::assertNotNull(SettingsRegistry::validate('signup.allowed_domains', '["10.0.0.1"]'));
+        self::assertNotNull(SettingsRegistry::validate('signup.allowed_domains', '{"a":"example.com"}'));
+        self::assertNull(SettingsRegistry::validate('signup.customer_invites', 'true'));
+        self::assertNotNull(SettingsRegistry::validate('signup.customer_invites', '1'));
     }
 }

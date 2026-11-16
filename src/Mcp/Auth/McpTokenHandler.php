@@ -16,6 +16,7 @@ use Whity\Core\RBAC\PermissionRegistry;
  *
  *   POST   /api/mcp/tokens          — issue a new MCP token
  *   GET    /api/mcp/tokens          — list active tokens for the current profile
+ *   GET    /api/mcp/tokens/starting-grant — what a new agent credential would start with (WHIT-1040)
  *   DELETE /api/mcp/tokens/{jti}    — revoke a token
  *   GET    /api/mcp/tokens/{jti}/grant — an agent credential's grant, explained (WHIT-832)
  *   PATCH  /api/mcp/tokens/{jti}/grant — change it: Off, Ask first or Allowed per permission
@@ -109,6 +110,19 @@ final class McpTokenHandler
             return Response::error('Unauthenticated', 401);
         }
         [$profileId, $tenantId] = $identity;
+
+        // WHIT-1040 (TplAgentCredential): the starting grant is held to the
+        // same rule as a later change (PATCH .../grant): each mode must be one
+        // the grant screen offers this person for that permission. So an agent
+        // is never issued Allowed or Ask first on a permission its issuer
+        // lacks, nor Allowed on something that can't be undone; Off is always
+        // possible. RBAC still checks every call either way.
+        if ($agent) {
+            $problems = $this->startingGrantProblems($scope, $profileId, $tenantId);
+            if ($problems !== []) {
+                return Response::error(implode('; ', $problems), 422, ['code' => 'grant_above_issuer']);
+            }
+        }
 
         $token = $this->mcpTokenService->issue($profileId, $tenantId, $name, $scope, principalKind: $agent ? AgentScopeGrant::AGENT_KIND : 'user');
         ['jti' => $jti, 'exp' => $exp] = $this->extractClaims($token);
@@ -206,6 +220,42 @@ final class McpTokenHandler
     }
 
     /**
+     * GET /api/mcp/tokens/starting-grant (WHIT-1040, TplAgentCredential)
+     *
+     * The grant screen's rows for an agent credential not issued yet, so the
+     * person sets its starting grant before the key exists: each permission
+     * they hold with the modes they may give (the default reads Allowed and
+     * asks first for everything else, and nothing without undo is Allowed),
+     * and the permissions an agent could use that they don't hold, which they
+     * can't give. POST /api/mcp/tokens checks the chosen modes the same way.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function startingGrant(Request $request, array $params = []): Response
+    {
+        $claims = $this->callerClaims($request);
+        if ($claims === null) {
+            return Response::error('Unauthenticated', 401);
+        }
+        $identity = $this->requireProfileIdentity($claims);
+        if ($identity === null) {
+            return Response::error('Unauthenticated', 401);
+        }
+        [$profileId, $tenantId] = $identity;
+
+        $operations = $this->operations();
+        $candidates = array_values(array_unique(array_column($operations, 'permission')));
+        sort($candidates);
+        $held = $this->held($candidates, $profileId, $tenantId);
+
+        return Response::json(['data' => [
+            'scope'       => McpScope::CAPABILITIES,
+            'permissions' => (new AgentGrantView($operations))->rows(McpScope::CAPABILITIES, $held),
+            'notHeld'     => array_values(array_diff($candidates, $held)),
+        ]], 200);
+    }
+
+    /**
      * PATCH /api/mcp/tokens/{jti}/grant (WHIT-832)
      *
      * Body: {"<permission>": "off" | "ask" | "allow" | "default", ...}. Each
@@ -265,6 +315,36 @@ final class McpTokenHandler
 
         $token['scope'] = $scope;
         return Response::json(['data' => $this->presentGrant($token, $profileId, $tenantId)], 200);
+    }
+
+    /**
+     * Why a new agent credential's `grant:` entries can't be issued, one line
+     * per permission, in the grant screen's words. Empty when every mode is
+     * one the screen offers.
+     *
+     * @param list<string> $scope
+     * @return list<string>
+     */
+    private function startingGrantProblems(array $scope, int $profileId, int $tenantId): array
+    {
+        $entries = AgentScopeGrant::fromScope($scope)->entries();
+        // Without a role checker nothing reads as held: issue as before and
+        // leave it to RBAC on every call, rather than refuse every grant.
+        if ($entries === [] || $this->roleChecker === null) {
+            return [];
+        }
+
+        $view     = new AgentGrantView($this->operations());
+        $held     = $this->held(array_keys($entries), $profileId, $tenantId);
+        $problems = [];
+        foreach ($entries as $permission => $mode) {
+            $choices = $view->choices((string) $permission, $scope, $held);
+            if (!in_array($mode, $choices['modes'], true)) {
+                $problems[] = "{$permission}: " . ($choices['withheld'][$mode]['message'] ?? 'not possible');
+            }
+        }
+
+        return $problems;
     }
 
     /**

@@ -2,7 +2,7 @@
 
 import * as React from "react"
 
-import type { Inline, RecordRef } from "./contract"
+import type { Inline, RecordRef, SavedBlock } from "./contract"
 import { EDITOR_LABELS, type EditorLabels } from "./labels"
 
 /** What a Record block shows (E.16): the record as the reader may see it. */
@@ -12,7 +12,7 @@ export interface RecordView {
   /** "INV-1042 · Example Clinic" */
   title: string
   subtitle?: string
-  /** A formatted amount, e.g. "JOD 301.600". */
+  /** A formatted amount, e.g. "$301.60". */
   amount?: string
   status?: { label: string; tone: "success" | "warning" | "destructive" | "info" | "secondary" }
   /** Where the record opens. */
@@ -53,7 +53,77 @@ export interface EditorServices {
   chartSources?: { key: string; label: string }[]
   /** What a Record block can point at, for its record picker. */
   recordTypes?: { key: string; label: string }[]
+  /**
+   * Saved blocks (E.21–E.24): this person's own and the workspace library's.
+   * Synced ones are drawn from here wherever a document uses them.
+   */
+  savedBlocks?: SavedBlock[]
+  /** Saves a selection as a block; without it the editor offers no Save as block. */
+  saveBlock?: (block: NewSavedBlock) => Promise<SavedBlock>
+  /** E.22: whether "Everyone in the workspace" is offered (people who manage the library). */
+  canShareSavedBlocks?: boolean
+  /** E.17–E.20: the blocks the workspace's plugins add. */
+  pluginBlocks?: PluginBlocks
+  /**
+   * Draws a plugin block's view (display blocks with its data already filled
+   * in) with Whity's own components. The editor never runs plugin code.
+   */
+  renderPluginView?: (view: unknown[]) => React.ReactNode
+  /** Switches a workspace plugin on, from the plugin-off placeholder (E.19). */
+  enablePlugin?: (plugin: string) => Promise<void>
+  /** The reader's language, for plugins' labels. */
+  language?: "en" | "ar"
 }
+
+/** Text in English and Arabic, as plugins declare it. */
+export type Localized = { en: string; ar: string }
+
+/** One field of a plugin block's Edit form (SDK 1.103). */
+export interface PluginBlockField {
+  key: string
+  label: Localized
+  type: "text" | "longText" | "number" | "date" | "select"
+  required?: boolean
+  options?: { value: string; label: Localized }[]
+}
+
+/**
+ * A block a plugin adds (E.17–E.20): a declaration Whity draws. `view` and
+ * `print` are display blocks of the screen vocabulary, naming fields as
+ * `{{data.key}}`; without `print`, notes and wiki pages only (E.18).
+ */
+export interface PluginBlockDefinition {
+  name: string
+  blockType: string
+  label: Localized
+  description?: Localized | null
+  icon: string
+  keywords: string[]
+  fields: PluginBlockField[]
+  view: unknown[]
+  print: unknown[] | null
+  allowedIn: string[]
+}
+
+export interface PluginBlockSource {
+  plugin: string
+  label: Localized
+  /** Whity's mark, from Whity's marks only (VERIFIED-PLUGINS-SECURITY.md). */
+  verified: boolean
+  firstParty: boolean
+  blocks: PluginBlockDefinition[]
+}
+
+/** The workspace's plugin blocks, and its plugins that are installed but off (E.19). */
+export interface PluginBlocks {
+  plugins: PluginBlockSource[]
+  off: { plugin: string; label: Localized }[]
+  /** Whether the person may switch a plugin on from the placeholder. */
+  canEnable: boolean
+}
+
+/** What Save as block sends: the contract's SavedBlock without what the library assigns. */
+export type NewSavedBlock = Pick<SavedBlock, "name" | "mode" | "sharing" | "blocks" | "perDocumentParts">
 
 /**
  * Preview with a record (E.12): each field's value for that record, by path.

@@ -5,8 +5,9 @@
   "description": "Boilerplate Tauri v2 desktop app consuming @whity/ui + @whity/features. Start here, then add crates for native capabilities (see src-tauri/src/commands/printer.rs for a worked example).",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "node scripts/copy-sdk.mjs && vite",
+    "build": "node scripts/copy-sdk.mjs && tsc && vite build",
+    "copy-sdk": "node scripts/copy-sdk.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "tauri": "tauri"
@@ -15,25 +16,25 @@
     "@whity/features": "file:../../packages/features",
     "@whity/tokens": "file:../../packages/tokens",
     "@whity/ui": "file:../../packages/ui",
-    "@hookform/resolvers": "^6.0.1",
-    "@tabler/icons-react": "^3.50.0",
+    "@hookform/resolvers": "^7.0.5",
+    "@tabler/icons-react": "^3.51.0",
     "@tauri-apps/api": "^2.12.4",
-    "@tauri-apps/plugin-opener": "^2.7.2",
+    "@tauri-apps/plugin-opener": "^2.7.3",
     "katex": "^0.19.1",
     "radix-ui": "^1.8.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-hook-form": "^7.91.0",
+    "react-hook-form": "^7.92.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.0",
+    "@tailwindcss/vite": "^4.3.4",
     "@tauri-apps/cli": "^2.12.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@vitejs/plugin-react": "^6.1.2",
+    "@vitejs/plugin-react": "^6.2.1",
     "tailwindcss": "^4.3.0",
     "typescript": "~5.8.3",
-    "vite": "^8.3.5"
+    "vite": "^8.3.8"
   }
 }

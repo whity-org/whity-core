@@ -13,7 +13,7 @@ import type {
  * Mirrors `RouteTemplatePresenter` (`src/Core/Document/RouteTemplate/RouteTemplatePresenter.php`)
  * field for field.
  *
- * Hand-written rather than taken from `@/lib/api/schema`, matching the
+ * Hand-written rather than taken from `@whity/api-client`, matching the
  * convention its nearest neighbours state (`routing-wire.ts`,
  * `document-library/types.ts`): the generated client is built from the DYNAMIC
  * `/api/openapi.json`, which describes whatever plugin routes a given install
@@ -66,8 +66,24 @@ export interface RouteTemplateStepWire {
   kind?: 'finalise' | null;
   /** WHIT-921: the template the final document stage renders with; null uses the form's. */
   final_template_id?: number | null;
+  /** WHIT-1016: values the person letting it through fills in. None when absent. */
+  inputs?: RouteTemplateStepInputWire[];
+  /** WHIT-1018: the form's people questions whose answers this stage leaves out. None when absent. */
+  exclude_named_in?: string[];
   canvas_x: number;
   canvas_y: number;
+}
+
+/** WHIT-1016: one value a stage asks for. */
+export interface RouteTemplateStepInputWire {
+  key: string;
+  label: string;
+  label_ar?: string | null;
+  required?: boolean;
+  max_length?: number;
+  type?: 'text' | 'person' | 'choice';
+  /** WHIT-1163: a choice's options. */
+  options?: { value: string; label: string; label_ar?: string | null }[];
 }
 
 export interface RouteTemplateEdgeWire {
@@ -113,6 +129,19 @@ export function toFlowGraph(wire: RouteTemplateGraphWire): RouteFlowGraph {
         // WHIT-921: carried, so a save keeps the final document stage as it is.
         kind: s.kind === 'finalise' ? 'finalise' : null,
         finalTemplateId: s.final_template_id ?? null,
+        // WHIT-1016: carried, so a save keeps what the stage asks for.
+        inputs: (s.inputs ?? []).map((input) => ({
+          key: input.key,
+          label: input.label,
+          labelAr: input.label_ar ?? null,
+          required: input.required !== false,
+          maxLength: input.max_length ?? 100,
+          type: input.type === 'person' || input.type === 'choice' ? input.type : 'text',
+          ...(input.type === 'choice'
+            ? { options: (input.options ?? []).map((o) => ({ value: o.value, label: o.label, labelAr: o.label_ar ?? null })) }
+            : {}),
+        })),
+        excludeNamedIn: s.exclude_named_in ?? [],
         canvasX: s.canvas_x,
         canvasY: s.canvas_y,
       })
@@ -151,6 +180,33 @@ export function toGraphRequest(graph: RouteFlowGraph): {
       allow_send_back: s.allowSendBack !== false,
       // WHIT-921: only the final document stage says what it is.
       ...(s.kind === 'finalise' ? { kind: 'finalise' as const, final_template_id: s.finalTemplateId ?? null } : {}),
+      // WHIT-1016: always sent, so a save never empties what a stage asks for
+      // (the server reads a missing list as none). A final document stage asks
+      // nobody anything.
+      inputs:
+        s.kind === 'finalise'
+          ? []
+          : (s.inputs ?? []).map((input) => ({
+              key: input.key,
+              label: input.label.trim(),
+              label_ar: input.labelAr?.trim() ? input.labelAr.trim() : null,
+              required: input.required,
+              max_length: input.maxLength,
+              // Only a person or a choice is said: a value with no type is text.
+              ...(input.type === 'person' ? { type: 'person' as const } : {}),
+              ...(input.type === 'choice'
+                ? {
+                    type: 'choice' as const,
+                    options: (input.options ?? []).map((o) => ({
+                      value: o.value,
+                      label: o.label.trim(),
+                      label_ar: o.labelAr?.trim() ? o.labelAr.trim() : null,
+                    })),
+                  }
+                : {}),
+            })),
+      // WHIT-1018: always sent, so a save never stops leaving people out.
+      exclude_named_in: s.kind === 'finalise' ? [] : (s.excludeNamedIn ?? []),
       canvas_x: s.canvasX,
       canvas_y: s.canvasY,
     })),

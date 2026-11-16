@@ -9,6 +9,8 @@ use Whity\Auth\RoleChecker;
 use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Identity\InvitationMailer;
 use Whity\Core\Identity\InvitationService;
+use Whity\Core\RateLimit\RateLimited;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -46,11 +48,6 @@ use Whity\Http\JsonBody;
  */
 final class InvitationsApiHandler
 {
-    /** Throttle: fixed window plus per-tenant and per-actor ceilings. */
-    private const WINDOW_SECONDS = 3600;
-    private const TENANT_MAX = 100;
-    private const ACTOR_MAX = 50;
-
     public function __construct(
         private readonly PDO $db,
         private readonly InvitationService $service,
@@ -60,6 +57,14 @@ final class InvitationsApiHandler
         private readonly SettingsService $settings,
         private readonly ?InvitationMailer $mailer = null,
     ) {}
+
+    /** @var \Whity\Core\Seat\SeatService|null WHIT-1156: the plan's staff limit, asked before each invitation */
+    private ?\Whity\Core\Seat\SeatService $seats = null;
+
+    public function useSeats(\Whity\Core\Seat\SeatService $seats): void
+    {
+        $this->seats = $seats;
+    }
 
     /**
      * GET /api/v1/invitations — the pending (and recently closed) invitations
@@ -110,6 +115,19 @@ final class InvitationsApiHandler
             return Response::error('That organizational unit does not exist in this tenant', 422);
         }
 
+        // WHIT-1156: the plan's staff limit (`members.max`), as `seats.enforcement`
+        // says: `block` refuses the next invitation, `warn` sends it and says so.
+        // Nobody already in the workspace is ever removed.
+        $seat = $this->seats?->decide($ctx['tenantId']);
+        if ($seat !== null && !$seat->allowed) {
+            return Response::error(
+                "Your workspace's plan includes {$seat->limit} staff, and all of them are taken. "
+                . 'To invite more people, move the workspace to a larger plan on Billing. Nobody already here is removed.',
+                409,
+                ['code' => 'seat_limit', 'limit' => $seat->limit, 'used' => $seat->used],
+            );
+        }
+
         $throttled = $this->throttle($ctx['tenantId'], $ctx['userId']);
         if ($throttled instanceof Response) {
             return $throttled;
@@ -138,7 +156,17 @@ final class InvitationsApiHandler
 
         $this->dispatchMail($email, $ctx['tenantId'], $result['token'], $ttlDays);
 
-        return Response::json(['data' => $this->rowFor($result['id'], $ctx['tenantId'])], 201);
+        $row = $this->rowFor($result['id'], $ctx['tenantId']);
+        if ($seat !== null && $seat->atLimit) {
+            $row['seats'] = [
+                'limit' => $seat->limit,
+                'used' => $seat->used + 1,
+                'message' => "Your workspace's plan includes {$seat->limit} staff, and this invitation goes past it. "
+                    . 'Move the workspace to a larger plan on Billing to stay within it.',
+            ];
+        }
+
+        return Response::json(['data' => $row], 201);
     }
 
     /**
@@ -271,17 +299,16 @@ final class InvitationsApiHandler
         $tenantKey = 'invite:issue:tenant:' . $tenantId;
         $actorKey = 'invite:issue:actor:' . $actorId;
 
-        if ($this->store->count($tenantKey) >= self::TENANT_MAX
-            || $this->store->count($actorKey) >= self::ACTOR_MAX
+        $tenantRule = RateLimits::invitationsPerWorkspace();
+        $actorRule = RateLimits::invitationsPerPerson();
+        if ($tenantRule->blocked($this->store, $tenantKey) !== null
+            || $actorRule->blocked($this->store, $actorKey) !== null
         ) {
-            $retryAfter = max($this->store->ttl($tenantKey), $this->store->ttl($actorKey), 1);
-
-            return Response::error('Too many invitations sent. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) $retryAfter]);
+            return RateLimited::response(max($this->store->ttl($tenantKey), $this->store->ttl($actorKey)));
         }
 
-        $this->store->increment($tenantKey, self::WINDOW_SECONDS);
-        $this->store->increment($actorKey, self::WINDOW_SECONDS);
+        $tenantRule->record($this->store, $tenantKey);
+        $actorRule->record($this->store, $actorKey);
 
         return null;
     }

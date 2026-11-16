@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -54,7 +54,6 @@ interface PurchasablePlan {
 export type PlanKind = 'tier' | 'addon';
 
 export function AvailablePlans({ kind }: { kind: PlanKind }) {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
@@ -63,15 +62,15 @@ export function AvailablePlans({ kind }: { kind: PlanKind }) {
   const canPay = hasPermission(BILLING_PAY);
 
   const { data, loading } = useFetch(async () => {
-    const res = await apiClient('/api/v1/billing/plans');
+    const { data: body, response: res } = await api.GET('/api/v1/billing/plans');
     if (!res.ok) {
       // Not shouted about. This block is an OFFER, and a deployment that sells
       // nothing answers here too; a red error where a price list would go would
       // be alarming and wrong on every self-hosted install.
       return [] as PurchasablePlan[];
     }
-    return ((await res.json()).data ?? []) as PurchasablePlan[];
-  }, [apiClient]);
+    return ((body as { data?: PurchasablePlan[] } | undefined)?.data ?? []) as PurchasablePlan[];
+  }, []);
 
   const wanted = kind === 'addon';
   const plans = (data ?? []).filter((p) => p.is_addon === wanted);
@@ -85,10 +84,8 @@ export function AvailablePlans({ kind }: { kind: PlanKind }) {
   const subscribe = async (planKey: string, billingPeriod: string) => {
     setStarting(planKey);
     try {
-      const res = await apiClient('/api/v1/billing/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan_key: planKey, billing_period: billingPeriod }),
+      const { data: body, response: res } = await api.POST('/api/v1/billing/checkout', {
+        body: { plan_key: planKey, billing_period: billingPeriod } as never,
       });
 
       if (!res.ok) {
@@ -99,7 +96,7 @@ export function AvailablePlans({ kind }: { kind: PlanKind }) {
         return;
       }
 
-      const url = (await res.json()).data?.url as string | undefined;
+      const url = (body as { data?: { url?: string } } | undefined)?.data?.url;
       if (url === undefined || url === '') {
         addToast(
           t('billing.plans.error.start', 'Could not start checkout. Please try again.'),
@@ -120,7 +117,9 @@ export function AvailablePlans({ kind }: { kind: PlanKind }) {
   const periodLabel = (plan: PurchasablePlan): string => {
     const per = plan.billing_period === 'year'
       ? t('billing.plans.perYear', 'per year')
-      : t('billing.plans.perMonth', 'per month');
+      : plan.billing_period === 'half_year'
+        ? t('billing.plans.perHalfYear', 'every 6 months')
+        : t('billing.plans.perMonth', 'per month');
 
     if (plan.is_per_seat) {
       return `${per} · ${t('billing.plans.perSeat', 'per seat')}`;

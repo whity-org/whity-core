@@ -47,7 +47,7 @@ export interface CommandPaletteItem {
    */
   disabled?: boolean
   /**
-   * Secondary words after the label, never matched against ("JOD 301.600 ·
+   * Secondary words after the label, never matched against ("$301.60 ·
    * overdue"): what tells two records with similar names apart.
    */
   hint?: string
@@ -58,6 +58,16 @@ export interface CommandPaletteItem {
   always?: boolean
   /** An agent row: dashed, because nothing has happened until a person approves. */
   agent?: boolean
+  /**
+   * Keep the palette open after `onSelect`: picking a command that still needs
+   * its details (`/go` then a screen) only changes the query.
+   */
+  keepOpen?: boolean
+  /**
+   * What Tab does on this row: complete it into the query (`/ne` becomes
+   * `/new `). Without it, Tab leaves the palette's own keys alone.
+   */
+  onComplete?: () => void
   onSelect: () => void
 }
 
@@ -76,7 +86,32 @@ export interface CommandPaletteProps {
    */
   onQueryChange?: (query: string) => void
   /** The keys row at the foot. Omit to hide it. */
-  footer?: { move: string; open: string; close: string }
+  footer?: { move: string; open: string; close: string; complete?: string }
+  /**
+   * The query, when the caller owns it (commands rewrite it: Tab completes
+   * `/ne` into `/new `). Omit to let the palette keep its own. A controlled
+   * caller resets it on open itself.
+   */
+  query?: string
+  /**
+   * False when the caller has already chosen what matches (command mode
+   * parses the query itself, so a substring test here would hide `/new
+   * document` behind the words after it).
+   */
+  filter?: boolean
+  /** A chip before the input naming the mode, e.g. "Commands". */
+  mode?: string
+  /**
+   * Read out after the list changes ("6 results"), so a screen-reader user
+   * hears that typing did something. Omit for silence.
+   */
+  countLabel?: (count: number) => string
+  /**
+   * Type a slash for the person when they press the slash KEY on an empty
+   * box, whatever their layout: on the Arabic layout that key types "ظ", and
+   * `/` is how commands start.
+   */
+  slashKey?: boolean
 }
 
 /** Case-insensitive subsequence-free substring match over label + keywords. */
@@ -99,13 +134,26 @@ export function CommandPalette({
   label = "Command palette",
   onQueryChange,
   footer,
+  query: controlledQuery,
+  filter = true,
+  mode,
+  countLabel,
+  slashKey = false,
 }: CommandPaletteProps) {
-  const [query, setQuery] = React.useState("")
+  const [ownQuery, setOwnQuery] = React.useState("")
+  const query = controlledQuery ?? ownQuery
+  const setQuery = (next: string) => {
+    if (controlledQuery === undefined) setOwnQuery(next)
+    onQueryChange?.(next)
+  }
   const [cursor, setCursor] = React.useState(0)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const listRef = React.useRef<HTMLDivElement>(null)
 
-  const shown = React.useMemo(() => items.filter((i) => matches(i, query)), [items, query])
+  const shown = React.useMemo(
+    () => (filter ? items.filter((i) => matches(i, query)) : items),
+    [items, query, filter]
+  )
 
   // The indices the cursor may land on. A disabled item is displayed but never
   // selected, so navigation skips it rather than stopping on something Enter
@@ -119,7 +167,7 @@ export function CommandPalette({
   // meaningless — it pointed into a different list.
   React.useEffect(() => {
     if (open) {
-      setQuery("")
+      setOwnQuery("")
       setCursor(0)
       // Focus after paint; the input does not exist until this renders.
       const id = requestAnimationFrame(() => inputRef.current?.focus())
@@ -172,8 +220,9 @@ export function CommandPalette({
     if (!item || item.disabled === true) return
     // Close FIRST. A command that opens a dialog of its own would otherwise
     // find this one still mounted and fighting it for focus.
-    onOpenChange(false)
+    if (item.keepOpen !== true) onOpenChange(false)
     item.onSelect()
+    if (item.keepOpen === true) inputRef.current?.focus()
   }
 
   const onKeyDown = (e: React.KeyboardEvent) => {
@@ -190,6 +239,34 @@ export function CommandPalette({
     if (e.key === "Enter") {
       e.preventDefault()
       run(shown[cursor])
+      return
+    }
+    if (e.key === "Tab" && !e.shiftKey) {
+      const item = shown[cursor]
+      if (item?.onComplete !== undefined && item.disabled !== true) {
+        e.preventDefault()
+        item.onComplete()
+        inputRef.current?.focus()
+      }
+      return
+    }
+    if (e.key === "Home" || e.key === "End") {
+      if (selectable.length === 0 || query !== "") return
+      e.preventDefault()
+      setCursor(e.key === "Home" ? selectable[0] : selectable[selectable.length - 1])
+      return
+    }
+    if (
+      slashKey &&
+      query === "" &&
+      e.code === "Slash" &&
+      e.key !== "/" &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey
+    ) {
+      e.preventDefault()
+      setQuery("/")
       return
     }
     if (e.key === "Escape") {
@@ -220,22 +297,34 @@ export function CommandPalette({
         onKeyDown={onKeyDown}
         data-testid="command-palette"
       >
+        <div className="flex items-center gap-2 border-b border-border px-4">
+        {mode !== undefined && (
+          <span
+            className="shrink-0 rounded-md bg-primary-tint px-2 py-0.5 text-xs font-medium text-primary-tint-foreground"
+            data-testid="command-palette-mode"
+          >
+            {mode}
+          </span>
+        )}
         <input
           ref={inputRef}
           value={query}
-          onChange={(e) => {
-            setQuery(e.target.value)
-            onQueryChange?.(e.target.value)
-          }}
+          onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
           aria-label={label}
           role="combobox"
           aria-expanded
           aria-controls="command-palette-list"
           aria-activedescendant={shown[cursor] ? `command-item-${shown[cursor].id}` : undefined}
-          className="w-full border-b border-border bg-transparent px-4 py-3.5 text-base outline-none placeholder:text-muted-foreground"
+          className="min-w-0 flex-1 bg-transparent py-3.5 text-base outline-none placeholder:text-muted-foreground"
           data-testid="command-palette-input"
         />
+        </div>
+        {countLabel !== undefined && (
+          <span className="sr-only" aria-live="polite" data-testid="command-palette-count">
+            {countLabel(selectable.length)}
+          </span>
+        )}
 
         <div
           ref={listRef}
@@ -297,6 +386,9 @@ export function CommandPalette({
           <div className="flex gap-4 border-t border-border px-4 py-2 text-[0.8125rem] text-muted-foreground">
             <span><kbd className="me-1 rounded border border-border px-1 font-mono text-xs">↑↓</kbd>{footer.move}</span>
             <span><kbd className="me-1 rounded border border-border px-1 font-mono text-xs">Enter</kbd>{footer.open}</span>
+            {footer.complete !== undefined && (
+              <span><kbd className="me-1 rounded border border-border px-1 font-mono text-xs">Tab</kbd>{footer.complete}</span>
+            )}
             <span><kbd className="me-1 rounded border border-border px-1 font-mono text-xs">Esc</kbd>{footer.close}</span>
           </div>
         )}

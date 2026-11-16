@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LoadProblem } from '@/components/load-problem';
 import { throwUnlessOk } from '@/lib/forbidden';
-import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
@@ -18,8 +18,8 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { undoWindowWords, type ProposalWords } from '@/components/agents/proposals';
-import { localized } from '@/components/agents/workspace-agents';
 import type { McpAgentAccess, McpListSize, McpTool, McpToolListResponse, McpToolVisibility } from './types';
+import { localizedText } from '@whity/ui/localized-text';
 
 /** The setting that holds the plugin tools this workspace lists directly (WHIT-754). */
 const ALWAYS_ON_SETTING = 'mcp.always_on_plugin_tools';
@@ -39,7 +39,6 @@ const ALL_AREAS = 'all';
  * the technical view (docs/design/MCP-TOOL-SURFACE.md §5.10, owner decision 5).
  */
 export default function McpToolsPage() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const t = useTranslation('admin');
   const language = useFormattingLocale();
@@ -51,18 +50,19 @@ export default function McpToolsPage() {
   const [area, setArea] = useState(ALL_AREAS);
 
   const { data, loading: isLoading, error, forbidden, refetch } = useFetch(async () => {
-    const response = await apiClient('/api/v1/admin/mcp/tools');
+    // apiFetch: the route is not in the OpenAPI spec yet.
+    const response = await apiFetch('/api/v1/admin/mcp/tools');
     throwUnlessOk(response, t('mcpTools.error.load', 'What AI can do could not be loaded.'));
     return (await response.json()) as McpToolListResponse;
-  }, [apiClient]);
+  }, []);
 
   const tools = useMemo(() => data?.data ?? [], [data]);
   const sizes = data?.sizes;
-  const nameOf = (tool: McpTool): string => localized(tool.plainName, tool.plainNameAr, arabic);
-  const areaOf = (tool: McpTool): string => localized(tool.area.title, tool.area.titleAr, arabic);
+  const nameOf = (tool: McpTool): string => localizedText({ en: tool.plainName, ar: tool.plainNameAr }, arabic ? 'ar' : 'en');
+  const areaOf = (tool: McpTool): string => localizedText({ en: tool.area.title, ar: tool.area.titleAr }, arabic ? 'ar' : 'en');
   const areas = useMemo(() => {
     const byId = new Map<string, string>();
-    for (const tool of tools) byId.set(tool.area.id, localized(tool.area.title, tool.area.titleAr, arabic));
+    for (const tool of tools) byId.set(tool.area.id, localizedText({ en: tool.area.title, ar: tool.area.titleAr }, arabic ? 'ar' : 'en'));
     return [...byId.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [tools, arabic]);
 
@@ -89,13 +89,11 @@ export default function McpToolsPage() {
     if (on) enabled.push(tool.name);
     setSaving(tool.name);
     try {
-      const response = await apiClient('/api/v1/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings: { [ALWAYS_ON_SETTING]: enabled.join(',') } }),
+      const { response, error } = await api.PATCH('/api/v1/settings', {
+        body: { settings: { [ALWAYS_ON_SETTING]: enabled.join(',') } },
       });
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { message?: string };
+        const body = (error ?? {}) as { message?: string };
         throw new Error(body.message ?? t('mcpTools.alwaysOn.saveFailed', 'Could not change how {name} is listed', { name: tool.name }));
       }
       addToast(

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 use PDOException;
 
@@ -33,11 +34,7 @@ final class FormFieldRepository
 {
     private const COLUMNS = 'id, tenant_id, form_id, field_key, field_type, label, help_text,
                              is_required, options, validation, prefill_source, section_key, position,
-                             visible_when, audience, created_at, updated_at';
-
-    /** Who answers a question (migration 194). */
-    public const AUDIENCE_APPLICANT = 'applicant';
-    public const AUDIENCE_STAFF = 'staff';
+                             visible_when, created_at, updated_at';
 
     /** Matches `VARCHAR(128)` in migration 127. */
     public const KEY_MAX = 128;
@@ -55,38 +52,6 @@ final class FormFieldRepository
 
     public function __construct(private readonly PDO $db)
     {
-    }
-
-    /**
-     * The questions an applicant is asked.
-     *
-     * The one filter every applicant surface goes through, so what a form shows and
-     * what a submission is checked against cannot differ. An answer sent for a staff
-     * question falls out as an unknown key and is dropped.
-     *
-     * @param list<array<string, mixed>> $fields
-     * @return list<array<string, mixed>>
-     */
-    public static function applicantFields(array $fields): array
-    {
-        return array_values(array_filter(
-            $fields,
-            static fn (array $field): bool => ($field['audience'] ?? self::AUDIENCE_APPLICANT) !== self::AUDIENCE_STAFF,
-        ));
-    }
-
-    /**
-     * The questions the office answers.
-     *
-     * @param list<array<string, mixed>> $fields
-     * @return list<array<string, mixed>>
-     */
-    public static function staffFields(array $fields): array
-    {
-        return array_values(array_filter(
-            $fields,
-            static fn (array $field): bool => ($field['audience'] ?? self::AUDIENCE_APPLICANT) === self::AUDIENCE_STAFF,
-        ));
     }
 
     /**
@@ -192,7 +157,6 @@ final class FormFieldRepository
                     $field['section_key'] === null ? null : (string) $field['section_key'],
                     $position,
                     /** @var array<string, mixed>|null */ $field['visible_when'] ?? null,
-                    (string) ($field['audience'] ?? self::AUDIENCE_APPLICANT),
                 );
             }
 
@@ -268,25 +232,24 @@ final class FormFieldRepository
         ?string $sectionKey,
         ?int $position,
         ?array $visibleWhen = null,
-        string $audience = self::AUDIENCE_APPLICANT,
     ): int {
         try {
             $stmt = $this->db->prepare(
                 'INSERT INTO form_fields
                      (tenant_id, form_id, field_key, field_type, label, help_text, is_required,
                       options, validation, prefill_source, section_key, position, visible_when,
-                      audience, created_at, updated_at)
+                      created_at, updated_at)
                  VALUES
                      (:tenant_id, :form_id, :field_key, :field_type, :label, :help_text, :is_required,
                       :options, :validation, :prefill_source, :section_key, :position, :visible_when,
-                      :audience, NOW(), NOW())'
+                      NOW(), NOW())'
             );
             $stmt->execute([
                 ':tenant_id' => $tenantId,
                 ':form_id' => $formId,
                 ':field_key' => $fieldKey,
                 ':field_type' => $fieldType,
-                ':label' => LocalizedLabel::encode($label),
+                ':label' => LocalizedText::encode($label),
                 ':help_text' => $helpText,
                 // Bound as an int rather than a PHP bool: PDO renders `false` as
                 // an empty string on some drivers, which PostgreSQL refuses for a
@@ -298,7 +261,6 @@ final class FormFieldRepository
                 ':section_key' => $sectionKey,
                 ':position' => $position ?? $this->nextPosition($tenantId, $formId),
                 ':visible_when' => $visibleWhen === null ? null : self::encodeJson($visibleWhen, '{}'),
-                ':audience' => $audience,
             ]);
         } catch (PDOException $e) {
             throw new FormRejectedException(
@@ -338,7 +300,6 @@ final class FormFieldRepository
             'prefill_source' => ':prefill_source',
             'section_key' => ':section_key',
             'position' => ':position',
-            'audience' => ':audience',
         ];
         foreach ($simple as $column => $placeholder) {
             if (array_key_exists($column, $changes)) {
@@ -351,7 +312,7 @@ final class FormFieldRepository
             /** @var array<string, string> $label */
             $label = $changes['label'];
             $sets[] = 'label = :label';
-            $params[':label'] = LocalizedLabel::encode($label);
+            $params[':label'] = LocalizedText::encode($label);
         }
         if (array_key_exists('is_required', $changes)) {
             $sets[] = 'is_required = :is_required';
@@ -428,7 +389,7 @@ final class FormFieldRepository
      */
     private static function encodeJson(array $value, string $fallback): string
     {
-        // JSON_UNESCAPED_UNICODE for the same reason LocalizedLabel gives: an
+        // JSON_UNESCAPED_UNICODE for the same reason LocalizedText::encode() gives: an
         // Arabic option label stored as escape sequences decodes back correctly
         // and stops being readable by whoever queries the column.
         //
@@ -455,12 +416,13 @@ final class FormFieldRepository
             'form_id' => (int) $row['form_id'],
             'field_key' => (string) $row['field_key'],
             'field_type' => $type,
-            'label' => LocalizedLabel::decode(isset($row['label']) ? (string) $row['label'] : null),
+            'label' => LocalizedText::decode(isset($row['label']) ? (string) $row['label'] : null, languages: LocalizedText::BILINGUAL),
             // The string stays the one existing clients read, and the map is the
-            // whole text: see {@see LocalizedLabel::preferred()}.
+            // whole text: see {@see LocalizedText::resolve()}.
             'help_text' => self::preferredOrNull($row['help_text'] ?? null),
-            'help_text_i18n' => LocalizedLabel::decode(
-                isset($row['help_text']) ? (string) $row['help_text'] : null
+            'help_text_i18n' => LocalizedText::decode(
+                isset($row['help_text']) ? (string) $row['help_text'] : null,
+                languages: LocalizedText::BILINGUAL,
             ) ?: new \stdClass(),
             // PostgreSQL hands a BOOLEAN back as the string 't'/'f' through PDO
             // on some driver builds and as a PHP bool on others; SQLite hands
@@ -488,7 +450,6 @@ final class FormFieldRepository
             'visible_when' => ($row['visible_when'] ?? null) === null
                 ? null
                 : self::decodeJsonMap($row['visible_when']),
-            'audience' => (string) ($row['audience'] ?? self::AUDIENCE_APPLICANT),
             'created_at' => (string) $row['created_at'],
             'updated_at' => (string) $row['updated_at'],
             // Derived from the type, so a renderer does not carry a second copy
@@ -523,7 +484,7 @@ final class FormFieldRepository
         if ($stored === null) {
             return null;
         }
-        $text = LocalizedLabel::preferred(LocalizedLabel::decode((string) $stored));
+        $text = LocalizedText::resolve(LocalizedText::decode((string) $stored, languages: LocalizedText::BILINGUAL));
 
         return $text === '' ? null : $text;
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
 use PDO;
 
 /**
@@ -293,10 +294,6 @@ final class FormSubmissionRepository
               WHERE tenant_id = :tenant_id AND id = :id
                 AND submitted_by_profile_id = :profile_id
                 AND withdrawn_at IS NULL
-                AND NOT EXISTS (
-                    SELECT 1 FROM form_submission_reviews r
-                     WHERE r.submission_id = form_submissions.id AND r.tenant_id = form_submissions.tenant_id
-                )
                 AND NOT (
                     EXISTS (
                         SELECT 1 FROM document_routes dr
@@ -442,8 +439,9 @@ final class FormSubmissionRepository
         // toward `sections` and DocumentRepository toward `variable_data`.
         if (array_key_exists('form_key', $row)) {
             $normalized['form_key'] = (string) $row['form_key'];
-            $normalized['form_name'] = LocalizedLabel::decode(
-                isset($row['form_name']) ? (string) $row['form_name'] : null
+            $normalized['form_name'] = LocalizedText::decode(
+                isset($row['form_name']) ? (string) $row['form_name'] : null,
+                languages: LocalizedText::BILINGUAL,
             );
         }
 

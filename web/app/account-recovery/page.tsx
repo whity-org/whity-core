@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useTranslation } from '@whity/features/i18n';
+import { api } from '@/lib/api/client';
 
 /**
  * "I lost my 2FA device" account-recovery entry point
@@ -59,14 +60,8 @@ function AccountRecoveryInner() {
     e.preventDefault();
     setConfirming(true);
     try {
-      const response = await fetch('/api/v1/auth/2fa-recovery/confirm', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ token, ...(reason.trim() !== '' ? { reason: reason.trim() } : {}) }),
-        credentials: 'include',
+      const { response } = await api.POST('/api/v1/auth/2fa-recovery/confirm', {
+        body: { token, ...(reason.trim() !== '' ? { reason: reason.trim() } : {}) } as never,
       });
 
       if (response.status === 200) {
@@ -99,14 +94,8 @@ function AccountRecoveryInner() {
 
     setRequestSubmitting(true);
     try {
-      const response = await fetch('/api/v1/auth/2fa-recovery/request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ email: trimmed }),
-        credentials: 'include',
+      const { response } = await api.POST('/api/v1/auth/2fa-recovery/request', {
+        body: { email: trimmed } as never,
       });
 
       if (response.status === 422) {

@@ -94,6 +94,18 @@ export interface AppSidebarProps {
   onCollapsedChange?: (collapsed: boolean) => void
   /** Controlled mobile open state. Uncontrolled if omitted. */
   mobileOpen?: boolean
+  /**
+   * Under 640px the host shows the phone tab bar (`PwNav`, `PhoneTabBar`)
+   * instead: the drawer and its open button leave the phone layout, and More
+   * lists the same groups. 640–767px keeps the drawer, 768–1023px the rail.
+   */
+  phoneTabBar?: boolean
+  /**
+   * Groups pinned at the foot, above `footer`, outside the scrolling list
+   * (`PwShortSidebar`, PW.10): on a short window Settings stays put with the
+   * account row while only the links between them scroll.
+   */
+  pinnedGroupIds?: readonly string[]
   onMobileOpenChange?: (open: boolean) => void
   /** Custom link component (e.g. Next.js <Link>) — defaults to a plain <a>. */
   linkComponent?: React.ElementType
@@ -161,6 +173,24 @@ export function useForcedRail(): boolean {
 }
 
 /** Case-insensitive substring match, tolerant of surrounding whitespace. */
+/**
+ * True below 768px, where the sidebar is an off-canvas drawer. A closed
+ * drawer is only moved off the screen, so it must also be made inert or its
+ * links stay in the tab order and in a screen reader's reading order.
+ */
+function usePhoneDrawer(): boolean {
+  const [phone, setPhone] = React.useState(false)
+  React.useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return
+    const query = window.matchMedia("(max-width: 767.98px)")
+    const update = () => setPhone(query.matches)
+    update()
+    query.addEventListener?.("change", update)
+    return () => query.removeEventListener?.("change", update)
+  }, [])
+  return phone
+}
+
 function matches(label: string, normalizedQuery: string): boolean {
   return label.toLocaleLowerCase().includes(normalizedQuery)
 }
@@ -174,6 +204,8 @@ export function AppSidebar({
   collapsed: collapsedProp,
   onCollapsedChange,
   mobileOpen: mobileOpenProp,
+  phoneTabBar = false,
+  pinnedGroupIds,
   onMobileOpenChange,
   linkComponent,
   collapsibleGroups = false,
@@ -203,10 +235,23 @@ export function AppSidebar({
 
   const [mobileOpenState, setMobileOpenState] = React.useState(false)
   const mobileOpen = mobileOpenProp ?? mobileOpenState
+  const phoneDrawer = usePhoneDrawer()
   const setMobileOpen = (next: boolean) => {
     setMobileOpenState(next)
     onMobileOpenChange?.(next)
   }
+
+  // The drawer is modal on a phone (a scrim covers the page), so Escape
+  // closes it like every other modal layer.
+  React.useEffect(() => {
+    if (!mobileOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileOpen(false)
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mobileOpen])
 
   const [queryState, setQueryState] = React.useState("")
   const query = searchValue ?? queryState
@@ -253,9 +298,15 @@ export function AppSidebar({
   // While a query is active the disclosure state is bypassed entirely: the
   // point of the box is to reach an item without knowing which group holds
   // it. Groups with no match drop out so the result list stays short.
+  const pinned = React.useMemo(
+    () => (searching ? [] : groups.filter((group) => pinnedGroupIds?.includes(group.id))),
+    [groups, pinnedGroupIds, searching]
+  )
   const rendered = React.useMemo(() => {
     if (!searching) {
-      return groups.map((group) => ({ group, items: group.items }))
+      return groups
+        .filter((group) => !pinnedGroupIds?.includes(group.id))
+        .map((group) => ({ group, items: group.items }))
     }
     return groups
       .map((group) => ({
@@ -263,7 +314,7 @@ export function AppSidebar({
         items: group.items.filter((item) => matches(item.label, normalizedQuery)),
       }))
       .filter((entry) => entry.items.length > 0)
-  }, [groups, searching, normalizedQuery])
+  }, [groups, searching, normalizedQuery, pinnedGroupIds])
 
   // A group is open when it cannot be closed (no header to click, or the
   // feature is off), when the icon rail hides the headers anyway, while a
@@ -275,11 +326,83 @@ export function AppSidebar({
     searching ||
     expanded.includes(group.id)
 
+  const renderItem = (item: AppSidebarNavItem) => {
+    const count = item.count && item.count > 0 ? item.count : 0
+    const countText = item.countLabel ?? String(count)
+    return (
+      <Link
+        key={item.id}
+        href={item.href}
+        aria-current={item.active ? "page" : undefined}
+        title={collapsed ? item.label : undefined}
+        aria-label={collapsed && count > 0 ? `${item.label}, ${countText}` : undefined}
+        className={cn(
+          "relative flex items-center gap-2.5 rounded-md px-2 py-[7px] text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:min-h-11",
+          item.active
+            ? "bg-sidebar-primary text-sidebar-primary-foreground"
+            : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+          collapsed && "mx-auto h-9 w-10 justify-center px-0 py-0"
+        )}
+      >
+        {item.icon && <span className="shrink-0 [&_svg]:size-5">{item.icon}</span>}
+        {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
+        {count > 0 && !collapsed && (
+          <span
+            data-slot="app-sidebar-count"
+            className="rounded-full bg-primary px-1.5 py-px text-xs leading-4 font-semibold text-primary-foreground tabular-nums"
+          >
+            <span aria-hidden="true">{count}</span>
+            <span className="sr-only">{countText}</span>
+          </span>
+        )}
+        {count > 0 && collapsed && (
+          <span
+            data-slot="app-sidebar-count-dot"
+            aria-hidden="true"
+            className="absolute end-2 top-[7px] size-[7px] rounded-full bg-primary ring-2 ring-sidebar"
+          />
+        )}
+      </Link>
+    )
+  }
+
+  // Only the links scroll (PwShortSidebar, PW.10, WHIT-827): the logo and
+  // switchers at the top and the pinned groups and footer at the bottom stay
+  // put on any window height. A soft fade at either end says there is more;
+  // once scrolled, a line appears under the top. The current page is scrolled
+  // into view when the page opens.
+  const navRef = React.useRef<HTMLElement>(null)
+  const [edges, setEdges] = React.useState({ top: true, bottom: true })
+  const measure = React.useCallback(() => {
+    const el = navRef.current
+    if (!el) return
+    const top = el.scrollTop <= 1
+    const bottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
+    setEdges((prev) => (prev.top === top && prev.bottom === bottom ? prev : { top, bottom }))
+  }, [])
+  const activeId = React.useMemo(
+    () => groups.flatMap((group) => group.items).find((item) => item.active)?.id,
+    [groups]
+  )
+  React.useEffect(() => {
+    const el = navRef.current
+    if (!el) return
+    el.querySelector<HTMLElement>('[aria-current="page"]')?.scrollIntoView?.({ block: "nearest" })
+    measure()
+    if (typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [activeId, measure, expanded, collapsed])
+
   const nav = (
+    <div className={cn("relative flex min-h-0 flex-1 flex-col", !edges.top && "border-t border-sidebar-border")}>
     <nav
+      ref={navRef}
+      onScroll={measure}
       data-slot="app-sidebar-nav"
       aria-label={navLabel}
-      className={cn("flex-1 space-y-3 overflow-x-hidden overflow-y-auto px-3 py-3", collapsed && "px-2")}
+      className={cn("min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3", collapsed && "px-2")}
     >
       {rendered.map(({ group, items }, index) => {
         const open = isGroupOpen(group)
@@ -301,7 +424,7 @@ export function AppSidebar({
                 aria-expanded={open}
                 aria-controls={bodyId}
                 onClick={() => toggleGroup(group.id)}
-                className="flex min-h-8 w-full items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex min-h-8 w-full items-center gap-1 rounded-md px-2 py-1 max-md:min-h-11 text-xs font-medium text-muted-foreground outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {open ? (
                   <IconChevronDown className="size-3 shrink-0" />
@@ -333,45 +456,7 @@ export function AppSidebar({
               broke. Either query by CSS or open the group first.
             */}
             <div id={bodyId} hidden={!open} className="grid gap-px">
-              {items.map((item) => {
-                const count = item.count && item.count > 0 ? item.count : 0
-                const countText = item.countLabel ?? String(count)
-                return (
-                  <Link
-                    key={item.id}
-                    href={item.href}
-                    aria-current={item.active ? "page" : undefined}
-                    title={collapsed ? item.label : undefined}
-                    aria-label={collapsed && count > 0 ? `${item.label}, ${countText}` : undefined}
-                    className={cn(
-                      "relative flex items-center gap-2.5 rounded-md px-2 py-[7px] text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      item.active
-                        ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                      collapsed && "mx-auto h-9 w-10 justify-center px-0 py-0"
-                    )}
-                  >
-                    {item.icon && <span className="shrink-0 [&_svg]:size-5">{item.icon}</span>}
-                    {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
-                    {count > 0 && !collapsed && (
-                      <span
-                        data-slot="app-sidebar-count"
-                        className="rounded-full bg-primary px-1.5 py-px text-xs leading-4 font-semibold text-primary-foreground tabular-nums"
-                      >
-                        <span aria-hidden="true">{count}</span>
-                        <span className="sr-only">{countText}</span>
-                      </span>
-                    )}
-                    {count > 0 && collapsed && (
-                      <span
-                        data-slot="app-sidebar-count-dot"
-                        aria-hidden="true"
-                        className="absolute end-2 top-[7px] size-[7px] rounded-full bg-primary ring-2 ring-sidebar"
-                      />
-                    )}
-                  </Link>
-                )
-              })}
+              {items.map(renderItem)}
             </div>
           </div>
         )
@@ -382,12 +467,25 @@ export function AppSidebar({
         </p>
       )}
     </nav>
+      {!edges.top && (
+        <div aria-hidden="true" data-slot="app-sidebar-fade-top" className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-sidebar to-transparent" />
+      )}
+      {!edges.bottom && (
+        <div aria-hidden="true" data-slot="app-sidebar-fade-bottom" className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-sidebar to-transparent" />
+      )}
+    </div>
+  )
+
+  const pinnedSection = pinned.length > 0 && (
+    <div data-slot="app-sidebar-pinned" className={cn("grid shrink-0 gap-px border-t border-sidebar-border px-3 py-2", collapsed && "px-2")}>
+      {pinned.flatMap((group) => group.items).map(renderItem)}
+    </div>
   )
 
   // Hidden in the icon rail: a 4rem-wide column has nowhere to put a text
   // field, and the collapse toggle is right there to widen it again.
   const search = searchable && !collapsed && (
-    <div className="px-2.5 pt-2.5">
+    <div className="shrink-0 px-2.5 pt-2.5">
       <div className="relative flex items-center">
         <IconSearch className="pointer-events-none absolute start-2 size-3.5 text-muted-foreground" />
         <input
@@ -400,7 +498,7 @@ export function AppSidebar({
           }}
           placeholder={searchPlaceholder}
           aria-label={searchPlaceholder}
-          className="h-8 w-full rounded-md border border-sidebar-border bg-background/50 ps-7 pe-7 text-xs/relaxed text-sidebar-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 [&::-webkit-search-cancel-button]:hidden"
+          className="h-8 w-full rounded-md border border-sidebar-border bg-background/50 ps-7 pe-7 max-md:h-11 max-md:text-sm text-xs/relaxed text-sidebar-foreground outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 [&::-webkit-search-cancel-button]:hidden"
         />
         {query !== "" && (
           <button
@@ -424,27 +522,32 @@ export function AppSidebar({
         type="button"
         aria-label={openNavLabel}
         onClick={() => setMobileOpen(true)}
-        className="fixed start-3 top-3 z-40 flex size-8 items-center justify-center rounded-md border border-border bg-card outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 md:hidden"
+        className={cn(
+          "fixed start-3 top-[calc(0.75rem+env(safe-area-inset-top))] z-40 flex size-11 items-center justify-center rounded-control-lg border border-border bg-card outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 md:hidden",
+          phoneTabBar && "max-sm:hidden"
+        )}
       >
-        <IconMenu2 className="size-4" />
+        <IconMenu2 className="size-5" />
       </button>
 
       {mobileOpen && (
         <div
           aria-hidden="true"
           onClick={() => setMobileOpen(false)}
-          className="fixed inset-0 z-40 bg-foreground/20 md:hidden"
+          className="fixed inset-0 z-40 bg-overlay md:hidden"
         />
       )}
 
       <aside
         data-slot="app-sidebar"
         data-collapsed={collapsed || undefined}
+        inert={phoneDrawer && !mobileOpen ? true : undefined}
         className={cn(
-          "fixed inset-y-0 start-0 z-50 flex h-screen w-60 -translate-x-full flex-col border-e border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-200 rtl:translate-x-full",
+          "fixed inset-y-0 start-0 z-50 flex h-dvh overflow-hidden w-[min(85vw,20rem)] -translate-x-full flex-col border-e border-sidebar-border bg-sidebar pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-sidebar-foreground transition-all duration-200 rtl:translate-x-full md:w-60 md:pt-0 md:pb-0",
           mobileOpen && "translate-x-0 rtl:translate-x-0",
-          "md:sticky md:top-0 md:z-auto md:h-screen md:shrink-0 md:translate-x-0 rtl:md:translate-x-0",
+          "md:sticky md:top-0 md:z-auto md:h-auto md:self-stretch md:shrink-0 md:translate-x-0 rtl:md:translate-x-0",
           collapsed && "md:w-14",
+          phoneTabBar && "max-sm:hidden",
           className
         )}
       >
@@ -452,13 +555,13 @@ export function AppSidebar({
           type="button"
           aria-label={closeNavLabel}
           onClick={() => setMobileOpen(false)}
-          className="absolute end-2 top-2.5 z-20 flex size-7 items-center justify-center rounded-md text-sidebar-foreground/70 outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring/30 md:hidden"
+          className="absolute end-2 top-[calc(0.5rem+env(safe-area-inset-top))] z-20 flex size-11 items-center justify-center rounded-control-lg text-sidebar-foreground/70 outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring/30 md:hidden"
         >
-          <IconX className="size-4" />
+          <IconX className="size-5" />
         </button>
 
         {(header || tenantSwitcher || teamSwitcher) && (
-          <div className={cn("flex flex-col gap-3 px-3 pt-4 pe-10 md:pe-3", collapsed && "items-center md:px-2")}>
+          <div className={cn("flex shrink-0 flex-col gap-3 px-3 pt-4 pe-14 md:pe-3", collapsed && "items-center md:px-2")}>
             {header && <div className="px-1.5 pt-0.5 pb-1.5">{header}</div>}
             {(tenantSwitcher || teamSwitcher) && (
               <div className="flex flex-col gap-1.5">
@@ -473,12 +576,14 @@ export function AppSidebar({
 
         {nav}
 
+        {pinnedSection}
+
         <button
           type="button"
           aria-label={collapsed ? expandAriaLabel : collapseAriaLabel}
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "hidden items-center justify-center gap-1.5 border-t border-sidebar-border px-3 py-2 text-xs text-muted-foreground outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring",
+            "hidden shrink-0 items-center justify-center gap-1.5 border-t border-sidebar-border px-3 py-2 text-xs text-muted-foreground outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring",
             !forcedRail && "md:flex"
           )}
         >
@@ -492,7 +597,7 @@ export function AppSidebar({
           )}
         </button>
 
-        {footer && <div className="border-t border-sidebar-border px-3 py-3">{footer}</div>}
+        {footer && <div className="shrink-0 border-t border-sidebar-border px-3 py-3">{footer}</div>}
       </aside>
     </>
   )

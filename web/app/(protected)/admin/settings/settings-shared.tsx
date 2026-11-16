@@ -19,7 +19,7 @@
  * without a frontend change.
  */
 import * as React from 'react';
-import type { components } from '@/lib/api/schema';
+import type { components } from '@whity/api-client';
 import type { useToast } from '@/lib/toast-context';
 import { Badge } from '@whity/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -117,6 +117,11 @@ export const COMPANY_SETTING_KEYS: readonly string[] = [
   'company.tax_id',
   'company.phone',
   'company.email',
+  'company.name_ar',
+  'company.address_ar',
+  // The workspace currency (CU.4): USD for a new workspace, the currency it
+  // already used for one made before design 3.5.1.
+  'billing.default_currency',
 ];
 
 /**
@@ -124,12 +129,15 @@ export const COMPANY_SETTING_KEYS: readonly string[] = [
  * number must not read backwards. A name or an address can be in either
  * language, so it follows its own text.
  */
-const COMPANY_INPUT_DIR: Readonly<Record<string, 'ltr' | 'auto'>> = {
+const COMPANY_INPUT_DIR: Readonly<Record<string, 'ltr' | 'rtl' | 'auto'>> = {
   'company.name': 'auto',
   'company.address': 'auto',
   'company.tax_id': 'ltr',
   'company.phone': 'ltr',
   'company.email': 'ltr',
+  'company.name_ar': 'rtl',
+  'company.address_ar': 'rtl',
+  'billing.default_currency': 'ltr',
 };
 
 /**
@@ -233,6 +241,21 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
     'company.email': {
       label: t('settings.meta.company.email.label', 'Email'),
       help: t('settings.meta.company.email.help', 'Printed on the letterhead when the document theme lists it.'),
+    },
+    'company.name_ar': {
+      label: t('settings.meta.company.name_ar.label', 'Company name in Arabic'),
+      help: t('settings.meta.company.name_ar.help', 'Printed beside the English name when a letterhead is in English and Arabic.'),
+    },
+    'company.address_ar': {
+      label: t('settings.meta.company.address_ar.label', 'Address in Arabic'),
+      help: t('settings.meta.company.address_ar.help', 'Printed under the Arabic name on a letterhead in English and Arabic.'),
+    },
+    'billing.default_currency': {
+      label: t('settings.meta.billing.default_currency.label', 'Currency'),
+      help: t(
+        'settings.meta.billing.default_currency.help',
+        'New prices, services and documents start in this currency, as a three-letter code such as USD or JOD. Amounts already saved keep their own currency.'
+      ),
     },
     site_name: {
       label: t('settings.meta.site_name.label', 'Site name'),
@@ -429,6 +452,20 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Let people add this site to their phone or computer as an app that opens in its own window and shows a page of its own when there is no connection. Off removes the option and uninstalls the app’s offline support from browsers the next time they open a page. Until this is saved here, the PWA_ENABLED setting of the server decides.'
       ),
     },
+    'website.plans': {
+      label: t('settings.meta.website.plans.label', 'Plans on the website'),
+      help: t(
+        'settings.meta.website.plans.help',
+        'How your website shows the plans, as JSON: for each plan to show, "visible": true, the Arabic name, a tagline, the features shown, the highlighted plan and the button. Plans not listed stay off the website. Prices, limits and order come from the plans themselves.'
+      ),
+    },
+    'website.contact_workspace': {
+      label: t('settings.meta.website.contact_workspace.label', 'Website contact form inbox'),
+      help: t(
+        'settings.meta.website.contact_workspace.help',
+        'The workspace whose Messages inbox receives the contact form on your website. Leave empty to turn the form off.'
+      ),
+    },
     'plugins.store_allowed_hosts': {
       label: t('settings.meta.plugins.store_allowed_hosts.label', 'Trusted plugin stores'),
       help: t(
@@ -441,6 +478,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
       help: t(
         'settings.meta.plugins.mcp_prompts_require_mark.help',
         'Offer AI agents the prompts of a server plugin only while the Whity store has marked its installed version Verified. Plugins added by hand or from another store have no mark, so their prompts stop while this is on. Tools are not affected.'
+      ),
+    },
+    'plugins.billing_email_senders': {
+      label: t('settings.meta.plugins.billing_email_senders.label', 'Plugins that send billing emails'),
+      help: t(
+        'settings.meta.plugins.billing_email_senders.help',
+        "The plugins that may send Whity's own billing emails, receipts and failed payments, to the people who pay for each workspace, in this instance's name. Plugin names exactly as the plugins page shows them, separated by commas, for example WhityPay. Leave this empty so no plugin can."
       ),
     },
     'plugins.store_enabled': {
@@ -529,7 +573,7 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'settings.section.pluginStore.description',
         'Which stores plugins can be installed from, and whether agents get prompts only from Verified plugins. The plugin marketplace switch is in Feature flags.'
       ),
-      keys: ['plugins.store_allowed_hosts', 'plugins.mcp_prompts_require_mark'],
+      keys: ['plugins.store_allowed_hosts', 'plugins.mcp_prompts_require_mark', 'plugins.billing_email_senders'],
     },
     {
       id: 'storage',

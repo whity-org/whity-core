@@ -40,7 +40,7 @@ class TotpSecretReencryptorTest extends TestCase
         return base64_encode($iv . (string) $enc);
     }
 
-    public function testMigratesLegacyRowsSkipsOthersAndIsIdempotent(): void
+    public function testARetiredSchemeRowIsLeftAloneOthersAreSkippedAndItIsIdempotent(): void
     {
         $pdo = $this->pdo();
         $totp = new TotpService(self::KEY);
@@ -51,21 +51,20 @@ class TotpSecretReencryptorTest extends TestCase
         $newBlob = $totp->encryptSecret($newPlain);
 
         $insert = $pdo->prepare('INSERT INTO profiles (id, two_factor_secret) VALUES (?, ?)');
-        $insert->execute([1, $legacyBlob]);   // legacy → must be migrated
+        $insert->execute([1, $legacyBlob]);   // the retired CBC scheme → unreadable, left alone
         $insert->execute([2, null]);          // no secret → not selected
         $insert->execute([3, $newBlob]);      // already new → skipped
 
-        $reencryptor = new TotpSecretReencryptor($totp, self::KEY);
+        $reencryptor = new TotpSecretReencryptor($totp);
         $stats = $reencryptor->reencrypt($pdo);
 
-        $this->assertSame(1, $stats['migrated']);
+        // WHIT-1053: the retired AES-256-CBC scheme is no longer read. Such a
+        // row is counted and kept as it is, never destroyed.
+        $this->assertSame(0, $stats['migrated']);
         $this->assertSame(1, $stats['skipped']);
-        $this->assertSame(0, $stats['failed']);
-
-        // User 1 is now stored in the new authenticated format and decrypts to the original.
+        $this->assertSame(1, $stats['failed']);
         $row1 = (string) $pdo->query('SELECT two_factor_secret FROM profiles WHERE id = 1')->fetchColumn();
-        $this->assertNotSame($legacyBlob, $row1);
-        $this->assertSame($legacyPlain, $totp->decryptSecret($row1));
+        $this->assertSame($legacyBlob, $row1);
 
         // User 3 (already migrated) is untouched.
         $row3 = (string) $pdo->query('SELECT two_factor_secret FROM profiles WHERE id = 3')->fetchColumn();
@@ -74,6 +73,25 @@ class TotpSecretReencryptorTest extends TestCase
         // Idempotent: a second run migrates nothing.
         $stats2 = $reencryptor->reencrypt($pdo);
         $this->assertSame(0, $stats2['migrated']);
-        $this->assertSame(2, $stats2['skipped']);
+        $this->assertSame(1, $stats2['skipped']);
+    }
+
+    public function testMovesRowsWrittenBeforeTheKeyRingOntoTheCurrentKey(): void
+    {
+        $pdo = $this->pdo();
+        $totp = new TotpService(self::KEY);
+        $plain = 'JBSWY3DPEHPK3PXP';
+        $bare = \Defuse\Crypto\Crypto::encryptWithPassword($plain, self::KEY);
+
+        $pdo->prepare('INSERT INTO profiles (id, two_factor_secret) VALUES (?, ?)')->execute([1, $bare]);
+
+        $stats = (new TotpSecretReencryptor($totp))->reencrypt($pdo);
+        $this->assertSame(['migrated' => 1, 'skipped' => 0, 'failed' => 0], $stats);
+
+        $select = $pdo->query('SELECT two_factor_secret FROM profiles WHERE id = 1');
+        $this->assertNotFalse($select);
+        $row = (string) $select->fetchColumn();
+        $this->assertTrue($totp->isOnCurrentKey($row));
+        $this->assertSame($plain, $totp->decryptSecret($row));
     }
 }

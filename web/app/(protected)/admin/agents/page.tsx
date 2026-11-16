@@ -18,11 +18,12 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { AgentPresetGallery } from '@/components/agents/agent-preset-gallery';
 import { AgentStatusBadge, OnItsOwn, WorksFor } from '@/components/agents/agent-status';
 import { AgentsTabs } from '@/components/agents/agents-tabs';
-import { localized, refusal, type WorkspaceAgent } from '@/components/agents/workspace-agents';
+import { refusal, type WorkspaceAgent } from '@/components/agents/workspace-agents';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { useFetch } from '@/hooks/useFetch';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
+import { localizedText } from '@whity/ui/localized-text';
 
 type Filter = 'all' | 'working' | 'paused' | 'archived';
 
@@ -38,7 +39,6 @@ export default function AgentsPage() {
   const t = useTranslation('admin');
   const arabic = useFormattingLocale() === 'ar';
   const router = useRouter();
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const [choosing, setChoosing] = useState(false);
   const [query, setQuery] = useState('');
@@ -47,18 +47,21 @@ export default function AgentsPage() {
   const dates = useDateDisplay();
 
   const agents = useFetch<WorkspaceAgent[]>(async () => {
-    const response = await apiClient('/api/v1/agents?archived=1');
+    const { data, response } = await api.GET('/api/v1/agents', { params: { query: { archived: '1' } } });
     throwUnlessOk(response, t('agents.error.load', 'The agents could not be loaded.'));
-    return ((await response.json()) as { data: WorkspaceAgent[] }).data;
-  }, [apiClient]);
+    return (data as unknown as { data: WorkspaceAgent[] }).data;
+  }, []);
 
   const setArchived = async (agent: WorkspaceAgent, archived: boolean) => {
-    const response = await apiClient(`/api/v1/agents/${agent.id}/${archived ? 'archive' : 'restore'}`, { method: 'POST' });
+    const params = { params: { path: { id: agent.id } } };
+    const { response, error } = archived
+      ? await api.POST('/api/v1/agents/{id}/archive', params)
+      : await api.POST('/api/v1/agents/{id}/restore', params);
     if (!response.ok) {
-      addToast(await refusal(response, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
+      addToast(await refusal(new Response(JSON.stringify(error ?? null)), t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
       return;
     }
-    const name = localized(agent.name, agent.nameAr, arabic);
+    const name = localizedText({ en: agent.name, ar: agent.nameAr }, arabic ? 'ar' : 'en');
     addToast(
       archived
         ? t('agents.archived', '{name} archived. Everyone using it has stopped.', { name })
@@ -71,12 +74,15 @@ export default function AgentsPage() {
   };
 
   const setPaused = async (agent: WorkspaceAgent, paused: boolean) => {
-    const response = await apiClient(`/api/v1/agents/${agent.id}/${paused ? 'pause' : 'resume'}`, { method: 'POST' });
+    const params = { params: { path: { id: agent.id } } };
+    const { response, error } = paused
+      ? await api.POST('/api/v1/agents/{id}/pause', params)
+      : await api.POST('/api/v1/agents/{id}/resume', params);
     if (!response.ok) {
-      addToast(await refusal(response, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
+      addToast(await refusal(new Response(JSON.stringify(error ?? null)), t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
       return;
     }
-    const name = localized(agent.name, agent.nameAr, arabic);
+    const name = localizedText({ en: agent.name, ar: agent.nameAr }, arabic ? 'ar' : 'en');
     addToast(
       paused
         ? t('agents.paused', '{name} is paused. It can’t do anything until it is resumed.', { name })
@@ -113,10 +119,10 @@ export default function AgentsPage() {
       enableSorting: true,
       cell: (agent: WorkspaceAgent) => (
         <span className="flex items-center gap-3">
-          <Avatar kind="agent" name={localized(agent.name, agent.nameAr, arabic)} size={36} />
+          <Avatar kind="agent" name={localizedText({ en: agent.name, ar: agent.nameAr }, arabic ? 'ar' : 'en')} size={36} />
           <span className="min-w-0">
-            <span className="block font-medium">{localized(agent.name, agent.nameAr, arabic)}</span>
-            <span className="block max-w-xs truncate text-sm text-muted-foreground">{localized(agent.role, agent.roleAr, arabic)}</span>
+            <span className="block font-medium">{localizedText({ en: agent.name, ar: agent.nameAr }, arabic ? 'ar' : 'en')}</span>
+            <span className="block max-w-xs truncate text-sm text-muted-foreground">{localizedText({ en: agent.role, ar: agent.roleAr }, arabic ? 'ar' : 'en')}</span>
           </span>
         </span>
       ),
@@ -176,6 +182,8 @@ export default function AgentsPage() {
       ) : empty ? (
         <EmptyFirstTime
           icon="robot"
+          moment="agents-propose"
+          onceEver="agents-first"
           title={t('agents.empty.title', 'No agents yet')}
           description={t('agents.empty.description', 'Start from a ready-made agent. It asks you before doing anything that matters.')}
         />

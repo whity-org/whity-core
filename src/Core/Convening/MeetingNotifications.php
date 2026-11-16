@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Convening;
 
+use Whity\Core\i18n\LocalizedText;
 use Throwable;
 use Whity\Core\Notification\NotificationDispatcher;
 
@@ -107,15 +108,15 @@ final class MeetingNotifications
 
         // ONE string out of a locale map, through the subsystem's single
         // implementation of that choice. A subject line has no viewer to ask.
-        $bodyName = LocalizedText::preferred(
+        $bodyName = LocalizedText::resolve(
             $body['name'] ?? null,
             ConveningBodyRepository::FALLBACK_LOCALE,
-            'A convening body'
+            fallback: 'A convening body',
         );
-        $title = LocalizedText::preferred(
+        $title = LocalizedText::resolve(
             $meeting['title'] ?? null,
             MeetingRepository::FALLBACK_LOCALE,
-            'A meeting'
+            fallback: 'A meeting',
         );
         $when = is_string($meeting['scheduled_at'] ?? null) ? (string) $meeting['scheduled_at'] : null;
         $where = is_string($meeting['location'] ?? null) ? (string) $meeting['location'] : null;

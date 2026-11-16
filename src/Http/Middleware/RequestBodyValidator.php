@@ -106,6 +106,32 @@ final class RequestBodyValidator
             && trim($body) === self::ONE_CLICK_UNSUBSCRIBE_BODY;
     }
 
+    /** Path of the website's contact form ({@see \Whity\Api\PublicContactApiHandler}). */
+    public const WEBSITE_CONTACT_PATH = '#^/api(/v1)?/public/contact$#D';
+
+    /** A form-encoded POST to the website's contact form. */
+    public static function isWebsiteContactForm(Request $request): bool
+    {
+        $mediaType = strtolower(trim(explode(';', (string) $request->getHeader('Content-Type'), 2)[0]));
+
+        return $mediaType === 'application/x-www-form-urlencoded'
+            && preg_match(self::WEBSITE_CONTACT_PATH, $request->getPath()) === 1;
+    }
+
+    /** @return array<string, string> Only top-level text fields; arrays are dropped. */
+    private static function flatForm(string $body): array
+    {
+        parse_str($body, $fields);
+        $out = [];
+        foreach ($fields as $name => $value) {
+            if (is_string($name) && is_string($value)) {
+                $out[$name] = $value;
+            }
+        }
+
+        return $out;
+    }
+
     /**
      * Validate the request-body envelope, rejecting violations with a generic 400.
      *
@@ -150,6 +176,14 @@ final class RequestBodyValidator
         //    allocates a decoded structure.
         if (strlen($body) > $this->maxBytes) {
             return $this->reject();
+        }
+
+        // The website's contact form posted with scripts off (section 29): a
+        // plain HTML form, so form-encoded. Only that one path, and only flat
+        // text fields reach the handler.
+        if (self::isWebsiteContactForm($request)) {
+            $request->setAttribute(JsonBody::ATTR_PARSED_BODY, self::flatForm($body));
+            return $next($request);
         }
 
         // Content-Type is deliberately NOT inspected — see the class docblock.

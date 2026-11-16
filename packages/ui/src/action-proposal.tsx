@@ -6,6 +6,7 @@ import { ActorChip } from "./actor-chip"
 import { Badge } from "./badge"
 import { Button } from "./button"
 import { Icon } from "./icon"
+import { Lottie } from "./lottie"
 import { TechnicalDetails } from "./display-preferences"
 import { cn } from "./utils"
 
@@ -86,6 +87,23 @@ export interface ActionProposalProps {
   onUndo?: () => void
   onAskAgain?: () => void
   labels?: ActionProposalLabels
+  /**
+   * More than rows of changes, under them: an impact plan with its tests and
+   * the tick a destructive one needs (TplImpactPlan).
+   */
+  children?: React.ReactNode
+  /** Approve stays off, such as until a tick is given or while tests fail. */
+  approveDisabled?: boolean
+  /** Other buttons beside Decline, such as "Ask Whity Builder to fix it". */
+  actions?: React.ReactNode
+  /** Replaces the undo line, such as "Can be rolled back to version 1.3". */
+  undoText?: string
+  /**
+   * Play `approve-set-down` above the card (LT.4): forwards on Approve, backwards
+   * on Undo. Only where one proposal is decided on its own; a list or bulk
+   * approval keeps the 200 ms set-down in code.
+   */
+  moment?: boolean
   className?: string
 }
 
@@ -133,6 +151,11 @@ function ActionProposal({
   onUndo,
   onAskAgain,
   labels,
+  children,
+  approveDisabled = false,
+  actions,
+  undoText: undoTextOverride,
+  moment = false,
   className,
 }: ActionProposalProps) {
   const L = { ...DEFAULT_LABELS, ...labels }
@@ -170,11 +193,11 @@ function ActionProposal({
     ),
   }[status]
 
-  const undoText = !reversible
+  const undoText = undoTextOverride ?? (!reversible
     ? L.irreversible
     : undoWindow
       ? L.reversibleFor.replace("{window}", undoWindow)
-      : L.reversible
+      : L.reversible)
 
   return (
     <article
@@ -193,6 +216,14 @@ function ActionProposal({
         className
       )}
     >
+      {moment && (status === "waiting" || status === "approved" || status === "undone") && (
+        <Lottie
+          name="approve-set-down"
+          play="manual"
+          approved={status === "approved"}
+          className="mx-auto h-[100px] w-[150px]"
+        />
+      )}
       <header className="flex flex-wrap items-center justify-between gap-2">
         <ActorChip kind="agent" name={agent} onBehalfOf={onBehalfOf} labels={{ for: L.for }} />
         {badge}
@@ -245,6 +276,7 @@ function ActionProposal({
           {showAll ? L.showLess : L.showAll.replace("{count}", String(changes.length))}
         </button>
       )}
+      {children}
       <footer className="flex flex-wrap items-center justify-between gap-3">
         <div className="grid min-w-0 gap-0.5 text-sm text-muted-foreground">
           {scope.length > 0 && (
@@ -271,6 +303,7 @@ function ActionProposal({
                 {L.decline}
               </Button>
             )}
+            {actions}
             {onEdit && (
               <Button variant="outline" size="sm" disabled={busy} onClick={onEdit}>
                 <Icon name="edit" size={16} />
@@ -278,7 +311,7 @@ function ActionProposal({
               </Button>
             )}
             {onApprove && (
-              <Button size="sm" disabled={busy} onClick={onApprove}>
+              <Button size="sm" disabled={busy || approveDisabled} onClick={onApprove}>
                 <Icon name="check" size={16} />
                 {L.approve}
               </Button>

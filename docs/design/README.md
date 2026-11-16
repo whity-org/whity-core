@@ -2,7 +2,7 @@ Whity is the platform a company's systems sit on: identity, permissions, documen
 
 The whole identity repeats one picture: **a blank sheet, on the platform beneath it.** The white sheet is the customer's surface, the blue platform is Whity, and the offset between them is the idea. Interfaces say the same thing: quiet white sheets on a grey ground, one main action sitting on its plane, and agent work that stays a loose, dashed sheet until a person sets it down.
 
-**Version 2.9 (2 November 2026).** The brand was rebuilt in nine stages, one decision at a time, and every decision is recorded in `00-decision-register.md`, the source of truth. This guideline, the tokens, the logo files, the components, the 13 document templates and the PDF are all drawn from it. 2.1 added the P2 components; 2.2 the design of the **document editor** (section 18) and the contract the Whity team builds it from; 2.3 the **plugin store** (section 19); 2.4 the **home** (section 20); 2.5 the **page patterns** and People screens (section 21); 2.6 **forms** (section 22); 2.7 **documents and routing** (section 23) and larger, plainer screens for people of every age; 2.8 **AI and agents** (section 24); 2.9 adds **workspace, billing and settings** (section 25), and with it every screen in the built app has a design. Versions 2.5 to 2.9 design every screen in the built app. Earlier versions are superseded.
+**Version 2.9 (2 November 2026).** The brand was rebuilt in nine stages, one decision at a time, and every decision is recorded in `00-decision-register.md`, the source of truth. This guideline, the tokens, the logo files, the components, the 13 document templates and the PDF are all drawn from it. 2.1 added the P2 components; 2.2 the design of the **document editor** (section 18) and the contract the Whity team builds it from; 2.3 the **plugin store** (section 19); 2.4 the **home** (section 20); 2.5 the **page patterns** and People screens (section 21); 2.6 **forms** (section 22); 2.7 **documents and routing** (section 23) and larger, plainer screens for people of every age; 2.8 **AI and agents** (section 24); 2.9 adds **workspace, billing and settings** (section 25), and with it every screen in the built app has a design. **3.0 (8 November 2026)** adds **Whity mobile** (section 26): the phone and tablet app, designed for one hand. **3.1 (8 November 2026)** adds **work and operations** (section 27): sixteen everyday areas on web and phone, with tasks on Taskaat and one chat for people and agents. **3.2 (8 November 2026)** adds the near-term pages from the roadmap (section 28) and the redesigned **websites** (section 29). Earlier versions are superseded.
 
 ## Principles
 
@@ -20,7 +20,7 @@ The whole identity repeats one picture: **a blank sheet, on the platform beneath
 - **Shape and space.** Controls 40px (32 small, 44 large) with corners ¼ of their height; cards 12px with a 1px border and no shadow; dialogs 16px; a 4px grid; 44px table rows; a 240px sidebar.
 - **Depth.** The plane, a hard 3px offset down-left, sits under the main button, approved agent work and a hovered clickable card. Floating layers (menus, toasts, dialogs) get the soft `shadow-float`.
 - **Focus.** A 2px ring in the main colour, offset 2px.
-- **Icons.** Tabler outline, 116 curated names (`Icon`), 16px beside text. Agents are the robot face.
+- **Icons.** Tabler outline, 156 curated names (`Icon`), 16px beside text. Agents are the robot face.
 - **Components.** `components/bundle.js` (`window.Whity`, React 18), styled by `bundle.css`, typed in `index.d.ts`. Section 17 lists them by group; each has a card with a live preview.
 - **Document editor.** Section 18 and the Document editor cards: a Notion-, Gutenberg- and Google Docs–inspired editor, designed here and built by the Whity team from `handoff/editor/`.
 - **Plugin store.** Section 19 and the Plugin store cards: the store, a plugin's page, the install dialog and the Installed tab (A41).
@@ -30,6 +30,10 @@ The whole identity repeats one picture: **a blank sheet, on the platform beneath
 - **Documents and routing.** Section 23: the library, a document's page and its routing, templates, and the flow editor.
 - **AI and agents.** Section 24: agents and their presets, an agent's page, connected AI apps, and what AI can do.
 - **Workspace and settings.** Section 25: Settings, your account, billing, the audit log, and the operators' Platform pages.
+- **Work and operations.** Section 27: tasks on Taskaat, boards, meetings, appointments, and the other everyday areas, on web and phone.
+- **Websites.** Section 29 and the Websites cards: whity.dev (companies first, a door for builders), brand, status, Whity ID and docs, in English and Arabic.
+- **Roadmap.** Section 28: the near-term work (low-hanging fruit) and the long-term plan toward a full ERP, inventory and project tool with low-code customization.
+- **Mobile.** Section 26 and the Mobile cards: the Flutter app for phones and tablets: 17px text, 48px targets, everything frequent under the thumb, themed by each installation.
 - **Documents.** `Doc` and `DocPages` lay out printed pages for Whity Render. Section 16 and the 15 document cards.
 - **Handoff.** Web CSS variables, TypeScript tokens, a Tailwind v4 theme, the Flutter brand extension, icons and logos in `handoff/` (section 12).
 

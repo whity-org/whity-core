@@ -8,8 +8,6 @@ use PDO;
 use RuntimeException;
 use Whity\Core\Document\DocumentSourceRepository;
 use Whity\Core\Document\DocumentSourceStarterSeeder;
-use Whity\Core\Document\Legacy\ConversionLabels;
-use Whity\Core\Document\Legacy\LegacyTemplateMigrator;
 use Whity\Database\Database;
 
 /**
@@ -19,11 +17,12 @@ use Whity\Database\Database;
  * 1. `documents` records the editor template (`document_source_id`) and the
  *    published version (`document_source_version`) it was issued from, so a
  *    correction re-renders that version.
- * 2. Every tenant's old templates are converted into editor templates
- *    (LegacyTemplateMigrator, the owner's call on 31 Oct), with saved blocks
- *    placed where they were used, and every tenant gets the editor's
- *    starters. If any template fails to convert, the migration stops before
- *    anything is dropped and names it.
+ * 2. Every tenant gets the editor's starters. The old templates were
+ *    converted into editor templates by this migration up to Whity 0.2.29
+ *    (LegacyTemplateMigrator, the owner's call on 31 Oct). Every install has
+ *    run it since, and a new install has no old templates, so the converter
+ *    is gone (WHIT-1053): a database that still has old templates is refused
+ *    with the way through, before anything is changed.
  * 3. A document issued from an old template points at its converted copy
  *    with no version: it keeps its PDFs, QR code and routes, can't be
  *    re-rendered, and its record page offers the copy to issue from.
@@ -54,25 +53,28 @@ class IssueDocumentsFromSourcesAndDropDesigner
             return;
         }
 
+        // Unscoped by design (migration): any workspace's old template counts.
+        $old = $pdo->query('SELECT COUNT(*) FROM document_templates');
+        $count = $old !== false ? (int) $old->fetchColumn() : 0;
+        if ($old !== false) {
+            // SQLite won't drop a table a statement still has open.
+            $old->closeCursor();
+        }
+        if ($count > 0) {
+            throw new RuntimeException(
+                'This database still has templates from the old Document designer. Upgrade to Whity 0.2.29 first, '
+                . 'which converts them into editor templates, then upgrade to this version.'
+            );
+        }
+
         $sources = new DocumentSourceRepository($pdo);
         $starters = new DocumentSourceStarterSeeder($sources);
-        $migrator = new LegacyTemplateMigrator($pdo, $sources, null, ConversionLabels::fromCatalogue(dirname(__DIR__) . '/i18n'));
 
         $tenants = $pdo->prepare('SELECT id FROM tenants WHERE id <> :system ORDER BY id');
         $tenants->execute([':system' => self::SYSTEM_TENANT_ID]);
-        $errors = [];
         foreach ($tenants->fetchAll(PDO::FETCH_COLUMN) as $tenantId) {
             // Strict: a starter that can't be written stops the upgrade (WHIT-803).
             $starters->seedForTenant((int) $tenantId, strict: true);
-            $summary = $migrator->migrateTenant((int) $tenantId);
-            foreach ($summary['errors'] as $error) {
-                $errors[] = "tenant {$tenantId}, {$error}";
-            }
-        }
-        if ($errors !== []) {
-            throw new RuntimeException(
-                'Some old document templates could not be converted, so the old designer was not removed: ' . implode('; ', $errors)
-            );
         }
 
         $db->exec(

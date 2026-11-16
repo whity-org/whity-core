@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { api } from '@/lib/api/client';
-import { apiClient } from '@/lib/api-client';
+import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -12,7 +11,7 @@ import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@whity/ui/badge';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import {
@@ -265,7 +264,7 @@ function EmailSettingsForm({
   }, []);
 
   const { data: status, refetch: refetchStatus } = useFetch<MailStatus>(async () => {
-    const res = await apiClient('/api/v1/settings/mail/status');
+    const res = await apiFetch('/api/v1/settings/mail/status');
     if (!res.ok) return NO_MAIL_STATUS;
     const body: unknown = await res.json();
     // The API wraps payloads in a { data: ... } envelope.
@@ -390,7 +389,7 @@ function EmailSettingsForm({
   const handleSavePassword = async () => {
     setSavingPassword(true);
     try {
-      const res = await apiClient('/api/v1/settings/mail/smtp-password', {
+      const res = await apiFetch('/api/v1/settings/mail/smtp-password', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: passwordInput }),
@@ -423,7 +422,7 @@ function EmailSettingsForm({
   const putOAuthCredentials = async (body: Record<string, string | null>, successMessage: string) => {
     setSavingOAuth(true);
     try {
-      const res = await apiClient('/api/v1/settings/mail/oauth-credentials', {
+      const res = await apiFetch('/api/v1/settings/mail/oauth-credentials', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -478,7 +477,7 @@ function EmailSettingsForm({
     }
     setTesting(true);
     try {
-      const res = await apiClient('/api/v1/settings/mail/test', {
+      const res = await apiFetch('/api/v1/settings/mail/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ to: testTo.trim() }),

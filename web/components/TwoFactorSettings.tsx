@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import React, { useCallback, useState, useEffect } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { Button } from '@whity/ui/button';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Input } from '@/components/ui/input';
@@ -82,12 +82,33 @@ function settingsErrorText(t: TranslateFn, error: SettingsError): string {
   }
 }
 
+/** What the setup wizard reads from an answer: the JSON body, or `{}` when there was none. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type WizardBody = Record<string, any>;
+interface WizardOutcome {
+  ok: boolean;
+  body: WizardBody;
+}
+
+async function bearerCall(path: string, token: string, init: RequestInit): Promise<WizardOutcome> {
+  const response = await fetch(path, {
+    ...init,
+    headers: {
+      ...(init.headers ?? {}),
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const body = (await response.json().catch(() => ({}))) as WizardBody;
+  return { ok: response.ok, body };
+}
+
 interface TwoFactorSetupWizardProps {
   onComplete: (codes: string[]) => void;
   onCancel: () => void;
   /**
    * Bearer token to authenticate setup()/confirm() with INSTEAD of the normal
-   * session (via apiClient). Used by the login-time mandatory-enrollment flow
+   * session (via the typed client). Used by the login-time mandatory-enrollment flow
    * (WC-525), where the caller holds a narrowly-scoped `two_factor_enrollment`
    * token (see TokenValidator::validateTwoFactorEnrollmentToken) rather than a
    * full session — there is no session to attach cookies/headers from yet.
@@ -96,7 +117,6 @@ interface TwoFactorSetupWizardProps {
 }
 
 export const TwoFactorSetupWizard: React.FC<TwoFactorSetupWizardProps> = ({ onComplete, onCancel, bearerToken }) => {
-  const { apiClient } = useAuth();
   const t = useTranslation('auth');
   const [step, setStep] = useState<'setup' | 'verify'>('setup');
   const [secret, setSecret] = useState<string>('');
@@ -105,36 +125,51 @@ export const TwoFactorSetupWizard: React.FC<TwoFactorSetupWizardProps> = ({ onCo
   const [error, setError] = useState<WizardError>({ kind: 'none' });
   const [loading, setLoading] = useState<boolean>(false);
 
-  const doFetch = useCallback((path: string, init?: RequestInit) => {
+  // The enrollment token is not a session: that call deliberately stays outside
+  // the session client (no cookies, no refresh) and carries the bearer instead.
+  const callSetup = useCallback(async (): Promise<WizardOutcome> => {
     if (bearerToken) {
-      return fetch(path, {
-        ...init,
-        headers: {
-          ...(init?.headers ?? {}),
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${bearerToken}`,
-        },
+      return bearerCall('/api/v1/auth/2fa/setup', bearerToken, {
+        method: 'POST',
       });
     }
-    return apiClient(path, init);
-  }, [apiClient, bearerToken]);
+    const { data, error, response } = await api.POST('/api/v1/auth/2fa/setup');
+    return { ok: response.ok, body: ((response.ok ? data : error) ?? {}) as WizardBody };
+  }, [bearerToken]);
+
+  const callConfirm = useCallback(
+    async (payload: { code: string; secret: string }): Promise<WizardOutcome> => {
+      if (bearerToken) {
+        return bearerCall('/api/v1/auth/2fa/confirm', bearerToken, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+      }
+      const { data, error, response } = await api.POST('/api/v1/auth/2fa/confirm', {
+        body: payload as never,
+      });
+      return { ok: response.ok, body: ((response.ok ? data : error) ?? {}) as WizardBody };
+    },
+    [bearerToken]
+  );
 
   useEffect(() => {
     const fetchSetup = async () => {
       try {
-        const response = await doFetch('/api/v1/auth/2fa/setup', {
-          method: 'POST',
-        });
+        const outcome = await callSetup();
 
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
+        if (!outcome.ok) {
+          const errorData = outcome.body;
           setError(
             errorData.message ? { kind: 'backend', text: errorData.message } : { kind: 'setup' }
           );
           return;
         }
 
-        const data = await response.json();
+        const data = outcome.body;
         setSecret(data.secret);
         setQrCodeUrl(data.qrCodeUrl);
       } catch {
@@ -143,7 +178,7 @@ export const TwoFactorSetupWizard: React.FC<TwoFactorSetupWizardProps> = ({ onCo
     };
 
     fetchSetup();
-  }, [doFetch]);
+  }, [callSetup]);
 
   const handleVerify = async () => {
     if (!code.trim()) {
@@ -155,16 +190,10 @@ export const TwoFactorSetupWizard: React.FC<TwoFactorSetupWizardProps> = ({ onCo
     setError({ kind: 'none' });
 
     try {
-      const response = await doFetch('/api/v1/auth/2fa/confirm', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ code, secret }),
-      });
+      const outcome = await callConfirm({ code, secret });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+      if (!outcome.ok) {
+        const errorData = outcome.body;
         setError(
           errorData.message ? { kind: 'backend', text: errorData.message } : { kind: 'verify' }
         );
@@ -172,7 +201,7 @@ export const TwoFactorSetupWizard: React.FC<TwoFactorSetupWizardProps> = ({ onCo
         return;
       }
 
-      const data = await response.json();
+      const data = outcome.body;
       onComplete(data.backup_codes);
     } catch {
       setError({ kind: 'verify' });
@@ -297,8 +326,8 @@ type TwoFactorProof = { code: string } | { password: string };
 type ProofRefusal = 'required' | 'invalid' | 'throttled' | 'failed';
 
 /** Read the server's refusal into the words the dialog shows. */
-async function proofRefusalOf(response: Response): Promise<ProofRefusal> {
-  const body = await response.json().catch(() => ({}));
+function proofRefusalOf(error: unknown): ProofRefusal {
+  const body = error as { details?: { reason?: string } } | undefined;
   switch (body?.details?.reason) {
     case 'proof_required':
       return 'required';
@@ -450,7 +479,6 @@ const TwoFactorProofDialog: React.FC<TwoFactorProofDialogProps> = ({
 };
 
 export const TwoFactorSettings: React.FC = () => {
-  const { apiClient } = useAuth();
   const t = useTranslation('auth');
   const [enabled, setEnabled] = useState<boolean>(false);
   const [backupCodesAvailable, setBackupCodesAvailable] = useState<number>(0);
@@ -466,19 +494,17 @@ export const TwoFactorSettings: React.FC = () => {
     setError({ kind: 'none' });
 
     try {
-      const response = await apiClient('/api/v1/auth/2fa/status', {
-        method: 'GET',
-      });
+      const { data: statusData, error: statusError, response } = await api.GET('/api/v1/auth/2fa/status');
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorData = (statusError ?? {}) as { message?: string };
         setError(
           errorData.message ? { kind: 'backend', text: errorData.message } : { kind: 'status' }
         );
         return;
       }
 
-      const data: TwoFactorStatus = await response.json();
+      const data = statusData as unknown as TwoFactorStatus;
       setEnabled(data.enabled);
       setBackupCodesAvailable(data.backup_codes_available);
       setPasswordAvailable(data.password_available);
@@ -487,24 +513,23 @@ export const TwoFactorSettings: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [apiClient]);
+  }, []);
 
-  const sendProof = (path: string, proof: TwoFactorProof) =>
-    apiClient(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(proof),
-    });
+  const sendProof = (
+    path: '/api/v1/auth/2fa/disable' | '/api/v1/auth/2fa/regenerate-codes',
+    proof: TwoFactorProof
+  ) =>
+    api.POST(path, { body: proof as never });
 
   const handleDisable = async (proof: TwoFactorProof): Promise<ProofRefusal | null> => {
     setError({ kind: 'none' });
     setStatusMessage('');
 
     try {
-      const response = await sendProof('/api/v1/auth/2fa/disable', proof);
+      const { error, response } = await sendProof('/api/v1/auth/2fa/disable', proof);
 
       if (!response.ok) {
-        return await proofRefusalOf(response);
+        return proofRefusalOf(error);
       }
 
       setProofFor(null);
@@ -524,13 +549,13 @@ export const TwoFactorSettings: React.FC = () => {
     setStatusMessage('');
 
     try {
-      const response = await sendProof('/api/v1/auth/2fa/regenerate-codes', proof);
+      const { data: codesData, error, response } = await sendProof('/api/v1/auth/2fa/regenerate-codes', proof);
 
       if (!response.ok) {
-        return await proofRefusalOf(response);
+        return proofRefusalOf(error);
       }
 
-      const data = await response.json();
+      const data = (codesData ?? {}) as { backup_codes: string[] };
 
       // Auto-download backup codes
       const text = data.backup_codes.join('\n');

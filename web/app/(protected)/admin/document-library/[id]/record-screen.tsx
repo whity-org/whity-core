@@ -18,7 +18,7 @@
  * BLOCK WRAPPER (`DocumentViewerRenderer`, which reads `documentIdFrom` out of
  * the master-detail context) is block-shaped. The component under it takes
  * `{documentId, pinnedArtifactId, emptyText}` — plain props, no block, no
- * manifest — and fetches core's own routes through web's `apiClient`. So the
+ * manifest — and fetches core's own routes through web's typed `api` client. So the
  * seam already existed and the honest thing was to use it rather than to move a
  * 750-line file for the pleasure of moving it.
  *
@@ -91,6 +91,7 @@ import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
 import { Button } from '@whity/ui/button';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
+import { api, apiFetch } from '@/lib/api/client';
 import { labelRequestKey, resolveLabels } from '@/lib/api/resolve-labels';
 import { DocumentViewer } from '@/components/plugin/blocks/document-viewer';
 
@@ -319,7 +320,7 @@ export interface DocumentRecordScreenProps {
 }
 
 export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScreenProps) {
-  const { apiClient, user } = useAuth();
+  const { user } = useAuth();
   const t = useTranslation('documents');
   const dates = useDateDisplay();
   const [trailPage, setTrailPage] = useState(FIRST_PAGE);
@@ -355,14 +356,16 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
   // of the two it is and must not claim to.
   const loaded = useRecordResource<DocumentRecord | 'not-found'>(
     async () => {
-      const response = await apiClient(`/api/v1/documents/${documentId}`);
+      const { data, response } = await api.GET('/api/v1/documents/{id}', {
+        params: { path: { id: documentId } },
+      });
       if (response.status === 404) {
         return 'not-found';
       }
       if (!response.ok) {
         throw new Error(t('record.error.load', 'Failed to load this document'));
       }
-      const body = (await response.json()) as { data?: DocumentRecord };
+      const body = data as unknown as { data?: DocumentRecord };
       if (body.data === undefined) {
         throw new Error(t('record.error.load', 'Failed to load this document'));
       }
@@ -421,16 +424,16 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
         // section prints the server's sentence and nothing tries to draw a list.
         return 'forbidden';
       }
-      const response = await apiClient(
-        `/api/v1/documents/${documentId}/trail?page=${trailPage}`
-      );
+      const { data, response } = await api.GET('/api/v1/documents/{id}/trail', {
+        params: { path: { id: documentId }, query: { page: trailPage } },
+      });
       if (response.status === 403 || response.status === 404) {
         return 'forbidden';
       }
       if (!response.ok) {
         throw new Error(t('record.error.trail', "Failed to load this document's history"));
       }
-      return (await response.json()) as TrailPage;
+      return data as unknown as TrailPage;
     },
     [documentId, trailPage, trailWorthFetching],
     t('record.error.trail', "Failed to load this document's history")
@@ -442,14 +445,16 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
       if (!recipientsVisible) {
         return 'forbidden';
       }
-      const response = await apiClient(`/api/v1/documents/${documentId}/recipients`);
+      const { data, response } = await api.GET('/api/v1/documents/{id}/recipients', {
+        params: { path: { id: documentId } },
+      });
       if (response.status === 403 || response.status === 404) {
         return 'forbidden';
       }
       if (!response.ok) {
         throw new Error(t('record.error.recipients', 'Failed to load who has this document'));
       }
-      const body = (await response.json()) as { data?: RouteRecipient[] };
+      const body = data as unknown as { data?: RouteRecipient[] };
       return body.data ?? [];
     },
     [documentId, recipientsVisible, routingVersion],
@@ -487,11 +492,13 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
   const people = useRecordResource<Map<number, string>>(
     async () => {
       // The people on THIS record (S5), so naming them needs no directory.
-      const response = await apiClient(`/api/v1/documents/${documentId}/people`);
+      const { data, response } = await api.GET('/api/v1/documents/{id}/people', {
+        params: { path: { id: documentId } },
+      });
       if (!response.ok) {
         throw new Error(t('record.error.directory', 'Failed to load names'));
       }
-      const body = (await response.json()) as { data?: Record<string, string> };
+      const body = data as unknown as { data?: Record<string, string> };
       const names = new Map<number, string>();
       for (const [id, name] of Object.entries(body.data ?? {})) {
         names.set(Number(id), name);
@@ -506,7 +513,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
   // without the people above being read again.
   const units = useRecordResource<{ names: Map<number, string>; available: boolean }>(
     async () => {
-      const labels = await resolveLabels(apiClient, 'documents', { ous: unitIds });
+      const labels = await resolveLabels(apiFetch, 'documents', { ous: unitIds });
       return { names: labels.ous, available: labels.available };
     },
     [unitIdsKey],
@@ -724,7 +731,6 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
       // about nothing on screen. The panel renders it when it has somebody to
       // number, and the copy still lives in one place.
       directoryNotice={namesFailed ? <DirectoryNotice kind="people" t={t} /> : undefined}
-      apiClient={apiClient}
     />
   );
 
@@ -768,7 +774,7 @@ export function DocumentRecordScreen({ documentId, onBack }: DocumentRecordScree
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Tabs value={tab} onValueChange={setTab}>
-          <TabsList className="overflow-visible" aria-label={t('record.tabs.label', 'Sections of this document')}>
+          <TabsList className="overflow-visible max-sm:overflow-x-auto" aria-label={t('record.tabs.label', 'Sections of this document')}>
             <TabsTrigger value="document">{t('record.tabs.document', 'Document')}</TabsTrigger>
             <TabsTrigger value="routing">{t('record.tabs.routing', 'Routing')}</TabsTrigger>
             <TabsTrigger value="history">{t('record.tabs.history', 'History')}</TabsTrigger>

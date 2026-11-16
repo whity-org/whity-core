@@ -49,11 +49,11 @@
  */
 
 import { useCallback, useState } from 'react';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { fetchAllPages } from '@/lib/api/fetch-all-pages';
+import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
 import { GROUPS_WRITE } from '@/lib/capabilities';
 import { AdminHeader } from '@/components/admin/admin-header';
 import {
@@ -129,7 +129,6 @@ interface DraftPreview {
   sample: { profile_id: number; display_name: string | null }[];
 }
 
-type ApiClient = ReturnType<typeof useAuth>['apiClient'];
 type AddToast = ReturnType<typeof useToast>['addToast'];
 
 interface GroupUsage {
@@ -139,7 +138,6 @@ interface GroupUsage {
 }
 
 export default function UserGroupsPage() {
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
@@ -169,13 +167,16 @@ export default function UserGroupsPage() {
   const queryString = dataTableQueryString(query.request);
 
   const groups = useFetch(async () => {
-    const response = await apiClient(`/api/v1/user-groups?${queryString}`);
+    // The table's query arrives as a query string; the typed client wants it as an object.
+    const { data, response } = await api.GET('/api/v1/user-groups', {
+      params: { query: Object.fromEntries(new URLSearchParams(queryString)) as never },
+    });
     if (!response.ok) {
       throw new Error(
         t('userGroups.error.load', 'The user groups could not be loaded.')
       );
     }
-    const body = (await response.json()) as {
+    const body = data as unknown as {
       data: UserGroup[];
       pagination?: { total: number; totalPages: number };
     };
@@ -185,38 +186,36 @@ export default function UserGroupsPage() {
       total: body.pagination?.total ?? items.length,
       totalPages: body.pagination?.totalPages ?? 1,
     };
-  }, [apiClient, queryString]);
+  }, [t, queryString]);
 
   // The Now and Used in columns, for the rows on screen. Asked for apart from the list
   // because a count resolves the rule; a failure leaves the two columns blank.
   const groupIds = (groups.data?.items ?? []).map((group) => group.id).join(',');
   const usage = useFetch(async () => {
     if (groupIds === '') return new Map<number, GroupUsage>();
-    const response = await apiClient(`/api/v1/user-groups/usage?ids=${groupIds}`);
+    const { data, response } = await api.GET('/api/v1/user-groups/usage', { params: { query: { ids: groupIds } } });
     if (!response.ok) return new Map<number, GroupUsage>();
-    const body = (await response.json()) as { data?: GroupUsage[] };
+    const body = data as unknown as { data?: GroupUsage[] };
     return new Map((body.data ?? []).map((entry) => [entry.id, entry]));
-  }, [apiClient, groupIds]);
+  }, [groupIds]);
 
   /** What a group's definition may name. NOT the route-step list — see the docblock. */
   const rules = useFetch(async () => {
-    const response = await apiClient('/api/v1/group-rules');
+    const { data, response } = await api.GET('/api/v1/group-rules');
     if (!response.ok) {
       throw new Error(t('userGroups.error.rules', 'The rule kinds could not be loaded.'));
     }
-    const body = (await response.json()) as { data: GroupRule[] };
-    return body.data;
-  }, [apiClient]);
+    return (data as unknown as { data: GroupRule[] }).data;
+  }, [t]);
 
   const roles = useFetch(async () => {
-    const all = await fetchAllPages<RoleOption>(apiClient, '/api/v1/roles');
+    const all = await fetchAllPagesTyped<RoleOption>((query) => api.GET('/api/v1/roles', { params: { query } }));
     return { items: all.items, complete: all.complete };
-  }, [apiClient]);
+  }, []);
 
   const people = useFetch(async () => {
-    const all = await fetchAllPages<{ id: number; name: string; email?: string | null }>(
-      apiClient,
-      '/api/v1/users'
+    const all = await fetchAllPagesTyped<{ id: number; name: string; email?: string | null }>((query) =>
+      api.GET('/api/v1/users', { params: { query } })
     );
     return {
       items: all.items.map((person) => ({
@@ -226,7 +225,7 @@ export default function UserGroupsPage() {
       })),
       complete: all.complete,
     };
-  }, [apiClient]);
+  }, []);
 
   const [editing, setEditing] = useState<UserGroup | 'new' | null>(null);
   const [deleting, setDeleting] = useState<UserGroup | null>(null);
@@ -371,6 +370,8 @@ export default function UserGroupsPage() {
                   }),
                 }
               : {
+                  moment: 'empty-people',
+                  once: 'user-groups',
                   title: t('userGroups.empty.title', 'No groups yet'),
                   description: t(
                     'userGroups.empty.description',
@@ -395,7 +396,6 @@ export default function UserGroupsPage() {
           rolesComplete={roles.data?.complete ?? false}
           people={people.data?.items ?? []}
           peopleComplete={people.data?.complete ?? false}
-          apiClient={apiClient}
           addToast={addToast}
           onClose={() => setEditing(null)}
           onSaved={() => {
@@ -408,7 +408,6 @@ export default function UserGroupsPage() {
       {deleting !== null && (
         <DeleteUserGroupDialog
           group={deleting}
-          apiClient={apiClient}
           addToast={addToast}
           onClose={() => setDeleting(null)}
           onDeleted={() => {
@@ -440,7 +439,6 @@ function UserGroupDialog({
   rolesComplete,
   people,
   peopleComplete,
-  apiClient,
   addToast,
   onClose,
   onSaved,
@@ -451,7 +449,6 @@ function UserGroupDialog({
   rolesComplete: boolean;
   people: AudiencePersonOption[];
   peopleComplete: boolean;
-  apiClient: ApiClient;
   addToast: AddToast;
   onClose: () => void;
   onSaved: () => void;
@@ -482,12 +479,10 @@ function UserGroupDialog({
     setPreviewing(true);
     setPreviewError(null);
     try {
-      const response = await apiClient('/api/v1/user-groups/preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rule_kind: kind, rule_config: config }),
+      const { data: parsed, error, response } = await api.POST('/api/v1/user-groups/preview', {
+        body: { rule_kind: kind, rule_config: config },
       });
-      const body = (await response.json().catch(() => null)) as
+      const body = ((response.ok ? parsed : error) ?? null) as
         | { error?: string; data?: DraftPreview }
         | null;
       const data = body?.data;
@@ -514,20 +509,17 @@ function UserGroupDialog({
     setSubmitting(true);
     setRefusal(null);
     try {
-      const response = await apiClient(
-        group === null ? '/api/v1/user-groups' : `/api/v1/user-groups/${group.id}`,
-        {
-          method: group === null ? 'POST' : 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: name.trim(),
-            description: description.trim() === '' ? null : description.trim(),
-            rule_kind: kind,
-            rule_config: config,
-          }),
-        }
-      );
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const payload = {
+        name: name.trim(),
+        description: description.trim() === '' ? null : description.trim(),
+        rule_kind: kind,
+        rule_config: config,
+      };
+      const { response, error } =
+        group === null
+          ? await api.POST('/api/v1/user-groups', { body: payload })
+          : await api.PATCH('/api/v1/user-groups/{id}', { params: { path: { id: group.id } }, body: payload });
+      const body = (error ?? null) as { error?: string } | null;
       if (!response.ok) {
         // Verbatim: the server's 409 names the group that already has the name,
         // and its 422 quotes whichever resolver refused the definition.
@@ -883,13 +875,11 @@ function UserGroupDialog({
  */
 function DeleteUserGroupDialog({
   group,
-  apiClient,
   addToast,
   onClose,
   onDeleted,
 }: {
   group: UserGroup;
-  apiClient: ApiClient;
   addToast: AddToast;
   onClose: () => void;
   onDeleted: () => void;
@@ -900,7 +890,7 @@ function DeleteUserGroupDialog({
   const confirm = async (): Promise<void> => {
     setSubmitting(true);
     try {
-      const response = await apiClient(`/api/v1/user-groups/${group.id}`, { method: 'DELETE' });
+      const { response } = await api.DELETE('/api/v1/user-groups/{id}', { params: { path: { id: group.id } } });
       if (!response.ok) {
         throw new Error('Delete failed');
       }

@@ -139,7 +139,67 @@ final class QueueWorkCommand implements CliCommand
                 $this->logger,
                 $jobPlugin,
             );
-            $loaded->loader = PluginJobs::register($registry, null, $this->logger, $hookManager, $auditLogger, $documentRegistries);
+            // Messages (ADR 0016): the worker hands queued messages to their
+            // channels. Core's email and web chat are built here; a plugin's
+            // channel joins the same registry as the plugins load below.
+            $messageChannels = new \Whity\Core\Messaging\MessageChannelRegistry();
+            \Whity\register_service(\Whity\Core\Messaging\MessageChannelRegistry::class, $messageChannels);
+            $workerSecrets = \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV);
+            $workerSettings = new \Whity\Core\Settings\SettingsService(
+                new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                new \Whity\Core\Settings\TenantSettingsRepository($pdo)
+            );
+            $workerLogger = $this->logger;
+            $workerMailer = new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
+                $workerSettings,
+                new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                $workerSecrets,
+                $workerLogger
+            ));
+            // E2: the customer's email is the workspace's HTML card, in its brand.
+            $workerSender = new \Whity\Core\Mail\BrandedEmailSender($workerMailer, new \Whity\Core\Mail\EmailLayout(), $workerSettings, $workerLogger);
+            $workerSender->useGate(new \Whity\Core\Mail\EmailGate($workerSettings, $pdo));
+            $workerSender->useBranding(new \Whity\Core\Branding\BrandingService(
+                $workerSettings,
+                entitlements: new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo))
+            ));
+            // WHIT-1072: a final document this worker's retry makes (FinaliseRouteJob)
+            // announces document.finalised here, so the form-decision email goes from
+            // here too. The shared store keeps it to one email per route and decision,
+            // whichever process gets there first. Storage is built on first use.
+            (new \Whity\Core\Form\FormDecisionEmail(
+                $pdo,
+                new \Whity\Core\Identity\ProfileEmailRepository($pdo),
+                $workerSender,
+                $workerSettings,
+                \Whity\Core\Http\FrontendUrls::fromEnv()->base(),
+                static function (): ?\Whity\Core\Document\DocumentArtifactStore {
+                    $parts = \Whity\app(\Whity\Core\Document\Issuing\WorkerDocumentParts::class);
+
+                    return $parts instanceof \Whity\Core\Document\Issuing\WorkerDocumentParts
+                        ? new \Whity\Core\Document\DocumentArtifactStore($parts->storage())
+                        : null;
+                },
+                new \Whity\Core\Store\DatabaseSharedStore($pdo),
+            ))->subscribe($hookManager);
+            $messaging = \Whity\Core\Messaging\CoreMessaging::build(
+                $pdo,
+                $messageChannels,
+                $workerMailer,
+                $workerSecrets,
+                static fn (string $name, array $payload, array $opts): ?int => (new \Whity\Core\Queue\QueueService($repo))->dispatch($name, $payload, $opts),
+                null,
+                (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
+                $workerSender,
+            );
+            \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messaging);
+            \Whity\register_service(\Whity\Sdk\Messaging\CustomerMessages::class, new \Whity\Core\Messaging\HostCustomerMessages(static fn (): \Whity\Core\Messaging\MessagingService => $messaging));
+            $registry->register(
+                \Whity\Core\Messaging\Jobs\DeliverMessageJob::NAME,
+                new \Whity\Core\Messaging\Jobs\DeliverMessageJob(static fn (): \Whity\Core\Messaging\MessagingService => $messaging),
+                false
+            );
+            $loaded->loader = PluginJobs::register($registry, null, $this->logger, $hookManager, $auditLogger, $documentRegistries, $messageChannels);
             // WHIT-997 (SDK 1.83): runs the bulk issues Documents::issueMany() queued. Internal.
             $registry->register(
                 \Whity\Core\Document\Issuing\IssueBatchJob::NAME,
@@ -169,6 +229,36 @@ final class QueueWorkCommand implements CliCommand
                 new \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob($pdo, static fn (): ?\Whity\Core\PluginLoader => $loaded->loader, $auditLogger, $this->logger),
                 false
             );
+            // WHIT-1153: reminders before a cash payment's cover ends. Internal.
+            $cashRecipients = new \Whity\Core\Mail\WorkspaceRecipients(
+                $pdo,
+                new \Whity\Auth\RoleChecker(\Whity\Database\Database::withFactory(static fn (): \PDO => $pdo), new \Whity\Core\RBAC\PermissionRegistry()),
+            );
+            $registry->register(
+                \Whity\Core\Billing\Cash\CashRemindersJob::NAME,
+                new \Whity\Core\Billing\Cash\CashRemindersJob(
+                    new \Whity\Core\Billing\Cash\CashPayments($pdo),
+                    static function (int $tenantId, string $subject, \Whity\Core\Mail\EmailContent $content) use ($cashRecipients, $workerSender): int {
+                        $sent = 0;
+                        foreach ($cashRecipients->holding($tenantId, \Whity\Core\RBAC\CorePermissions::BILLING_PAY) as $address) {
+                            // Whity's own email: the instance's brand (tenant 0).
+                            $sent += $workerSender->send(0, $address, $subject, $content) ? 1 : 0;
+                        }
+
+                        return $sent;
+                    },
+                    static fn (int $tenantId): string => $workerSender->language($tenantId),
+                    static function (string $planKey) use ($pdo): string {
+                        $stmt = $pdo->prepare('SELECT name FROM plans WHERE plan_key = :k');
+                        $stmt->execute([':k' => $planKey]);
+                        $name = $stmt->fetchColumn();
+
+                        return is_string($name) && $name !== '' ? $name : $planKey;
+                    },
+                    rtrim(\Whity\Core\Http\FrontendUrls::fromEnv()->base(), '/') . '/billing',
+                ),
+                false
+            );
             // WHIT-1014: the Whity store's Verified marks for code plugins. Internal.
             $registry->register(
                 \Whity\Core\Queue\Jobs\RefreshStoreMarksJob::NAME,
@@ -179,7 +269,22 @@ final class QueueWorkCommand implements CliCommand
                 )),
                 false
             );
-            $runner ??= new JobRunner($repo, $registry, $this->logger);
+            if ($runner === null) {
+                $runner = new JobRunner($repo, $registry, $this->logger);
+                // WHIT-1123: a plugin's jobs don't run where it is off.
+                $activation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($pdo);
+                // WHIT-1125: and pause while a paid plugin is read-only there.
+                $activation->usePaidAccess(static fn (): array => $loaded->loader?->getPaidAccess() ?? []);
+                $entitlements = new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo));
+                $activation->useEntitlements(static function (int $tenantId, string $key) use ($entitlements): bool {
+                    try {
+                        return $entitlements->isGranted($tenantId, $key);
+                    } catch (\Throwable) {
+                        return false;
+                    }
+                });
+                $runner->setWorkspaceActivation($activation);
+            }
         }
         $this->repo = $repo;
         $this->runner = $runner;

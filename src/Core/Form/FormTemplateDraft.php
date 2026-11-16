@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\i18n\LocalizedText;
+
 /**
  * The document content a form's answers print in: a whole template made from
  * the form, or the lines added to a template that has no place for a question.
@@ -43,7 +45,7 @@ final class FormTemplateDraft
 
         // In the order people answer them, keeping a section's questions together.
         $sections = [];
-        foreach (FormFieldRepository::applicantFields($fields) as $field) {
+        foreach ($fields as $field) {
             $sections[(string) ($field['section_key'] ?? '')][] = $field;
         }
         foreach ($sections as $sectionKey => $questions) {
@@ -103,7 +105,7 @@ final class FormTemplateDraft
     {
         $text = trim($map[$lang] ?? '');
 
-        return $text !== '' ? $text : LocalizedLabel::preferred($map);
+        return $text !== '' ? $text : LocalizedText::resolve($map);
     }
 
     /**

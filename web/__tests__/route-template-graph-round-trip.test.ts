@@ -36,6 +36,8 @@ describe('the route-template graph round trip', () => {
     decision_quorum: null,
     satisfied_by: 'act',
     allow_send_back: true,
+    inputs: [],
+    exclude_named_in: [],
     canvas_x: 120,
     canvas_y: 40,
     ...overrides,
@@ -63,6 +65,11 @@ describe('the route-template graph round trip', () => {
         decision_quorum: 'majority',
         satisfied_by: 'act',
         allow_send_back: false,
+        inputs: [
+          { key: 'meeting_no', label: 'Committee meeting number', label_ar: 'رقم جلسة اللجنة', required: true, max_length: 20 },
+          { key: 'file_no', label: 'File number', label_ar: null, required: false, max_length: 100 },
+        ],
+        exclude_named_in: ['supervisor', 'co_supervisor'],
         canvas_x: 400,
         canvas_y: 220,
       }),
@@ -113,6 +120,55 @@ describe('the route-template graph round trip', () => {
 
     expect(flow.steps[0].satisfiedBy).toBe('act');
     expect(toGraphRequest(flow).steps[0].satisfied_by).toBe('act');
+  });
+
+  it('keeps what a stage asks the approver to fill in (WHIT-1016)', () => {
+    // The server reads a missing list as none, so a save that dropped it
+    // would quietly stop asking for the committee meeting number.
+    const asked = [{ key: 'meeting_no', label: 'Meeting number', label_ar: null, required: true, max_length: 100 }];
+    const saved = toGraphRequest(toFlowGraph(graph([step({ inputs: asked })])));
+
+    expect(saved.steps[0].inputs).toEqual(asked);
+  });
+
+  it('keeps a choice and its options, and a person, through a save (WHIT-1163)', () => {
+    const asked = [
+      {
+        key: 'irb_decision',
+        label: 'IRB decision',
+        label_ar: null,
+        required: true,
+        max_length: 100,
+        type: 'choice' as const,
+        options: [
+          { value: 'approved', label: 'Approved', label_ar: 'تمت الموافقة' },
+          { value: 'conditional', label: 'Conditionally approved', label_ar: null },
+        ],
+      },
+      { key: 'supervisor', label: 'Supervisor', label_ar: null, required: false, max_length: 100, type: 'person' as const },
+    ];
+    const saved = toGraphRequest(toFlowGraph(graph([step({ inputs: asked })])));
+
+    expect(saved.steps[0].inputs).toEqual(asked);
+  });
+
+  it('reads a stage from a server that predates values as one asking for none, and says so on save', () => {
+    const legacy = step();
+    delete (legacy as Partial<RouteTemplateStepWire>).inputs;
+
+    const flow = toFlowGraph(graph([legacy]));
+
+    expect(flow.steps[0].inputs).toEqual([]);
+    expect(toGraphRequest(flow).steps[0].inputs).toEqual([]);
+  });
+
+  it('keeps who a stage leaves out, and reads a server that sends none as nobody (WHIT-1018)', () => {
+    const saved = toGraphRequest(toFlowGraph(graph([step({ exclude_named_in: ['supervisor'] })])));
+    expect(saved.steps[0].exclude_named_in).toEqual(['supervisor']);
+
+    const legacy = step();
+    delete (legacy as Partial<RouteTemplateStepWire>).exclude_named_in;
+    expect(toGraphRequest(toFlowGraph(graph([legacy]))).steps[0].exclude_named_in).toEqual([]);
   });
 
   it('does not send back the two facts the tenant owns', () => {

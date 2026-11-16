@@ -260,16 +260,15 @@ template's own development surfaced (a migration using `SERIAL`, a route
 requiring a permission the plugin never declared, a hook that throws) before
 it ships, not after.
 
-**`php-host/sdk/src` is a vendored copy of the repo's `sdk/src`, and must stay
-byte-identical to it.** A device has no network and no Composer, so the contract
-types a plugin `implements` have to already be on disk beside the host — hence
-the copy. It is re-vendored by hand, which is exactly how it fell three SDK
-releases behind in #849 while the reference plugin adopted two interfaces the
-device had never heard of. `scripts/ci-vendored-sdk-parity.php` is now the gate:
-it compares the two trees and boots every in-tree plugin against this one, and
-it runs in `automated-tests.yml`, `release.yml`, and the desktop release
-workflow. Change `sdk/src` and this copy in the SAME commit — the guard tells
-you how if you forget.
+**`php-host/sdk/src` is copied from the repo's `sdk/src`, not committed.** A
+device has no network and no Composer, so the contract types a plugin
+`implements` have to be on disk beside the host. `npm run dev` and `npm run
+build` (and so `tauri dev` / `tauri build`) run `scripts/copy-sdk.mjs` first,
+which replaces `php-host/sdk/src` with a fresh copy; `npm run copy-sdk` does it
+on its own. The copy used to be committed and re-vendored by hand, which is how
+it fell three SDK releases behind in #849 (WHIT-1054 removed it). Run straight
+from a checkout before any copy, `php-host/public/index.php` loads the SDK from
+`sdk/src` itself. Build the desktop app from a whity-core checkout.
 
 **Setup**: `scripts/setup-php-runtime.ps1` (Windows — downloads the pinned,
 checksum-verified FrankenPHP release) / `scripts/setup-php-runtime-linux.sh`

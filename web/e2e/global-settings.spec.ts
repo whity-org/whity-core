@@ -183,7 +183,7 @@ test.describe('Sign-up governance — regular-tenant admin is denied (WC-235)', 
 
   test('is shown Access Denied on the Sign-up page and is not seeded a form', async ({ page }) => {
     await page.goto('/admin/settings/signup');
-    await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Access denied' })).toBeVisible();
     await expect(page.getByTestId('signup-settings-save')).toHaveCount(0);
     await expect(page.getByTestId('settings-section-signup')).toHaveCount(0);
   });

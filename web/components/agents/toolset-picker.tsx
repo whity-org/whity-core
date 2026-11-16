@@ -4,8 +4,9 @@ import { Checkbox } from '@whity/ui/checkbox';
 import { TechnicalDetails } from '@whity/ui/display-preferences';
 import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { useFetch } from '@/hooks/useFetch';
-import { useAuth } from '@/lib/auth-context';
-import { localized, toolsetLabel } from './workspace-agents';
+import { api } from '@/lib/api/client';
+import { toolsetLabel } from './workspace-agents';
+import { localizedText } from '@whity/ui/localized-text';
 
 /**
  * "What it works with": the areas an agent may use, by name; the toolset id
@@ -22,14 +23,13 @@ export function ToolsetPicker({
 }) {
   const t = useTranslation('admin');
   const arabic = useFormattingLocale() === 'ar';
-  const { apiClient } = useAuth();
   const names = useFetch<{ id: string; title: string; titleAr: string | null }[]>(async () => {
-    const response = await apiClient('/api/v1/me/agent-toolsets');
-    return response.ok ? ((await response.json()) as { data: { id: string; title: string; titleAr: string | null }[] }).data : [];
-  }, [apiClient]);
+    const { data, response } = await api.GET('/api/v1/me/agent-toolsets');
+    return response.ok ? (data as unknown as { data: { id: string; title: string; titleAr: string | null }[] }).data : [];
+  }, []);
   const nameOf = (id: string): string => {
     const known = names.data?.find((toolset) => toolset.id === id);
-    return known !== undefined ? localized(known.title, known.titleAr, arabic) : toolsetLabel(id);
+    return known !== undefined ? localizedText({ en: known.title, ar: known.titleAr }, arabic ? 'ar' : 'en') : toolsetLabel(id);
   };
 
   return (

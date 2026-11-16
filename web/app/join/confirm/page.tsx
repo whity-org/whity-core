@@ -18,6 +18,9 @@ import { Button } from '@whity/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTranslation } from '@whity/features/i18n';
 import { PublicShell } from '@/components/auth/public-shell';
+import { PublicOutcome } from '@/components/auth/public-outcome';
+import type { WorkspaceBrand } from '@/lib/branding-context';
+import { api } from '@/lib/api/client';
 
 type Phase = 'loading' | 'form' | 'joined' | 'pending' | 'already' | 'refused' | 'closed' | 'invalid';
 
@@ -25,6 +28,8 @@ interface Preview {
   workspaceName: string;
   email: string;
   requiresPassword: boolean;
+  /** The workspace's logo and colour (WHIT-1044); null wears the host's. */
+  brand: WorkspaceBrand | null;
 }
 
 function ConfirmInner() {
@@ -45,20 +50,21 @@ function ConfirmInner() {
 
     void (async () => {
       try {
-        const res = await fetch(`/api/v1/public/signup/confirm?token=${encodeURIComponent(token)}`, {
-          headers: { Accept: 'application/json' },
+        const { data: previewBody, response: res } = await api.GET('/api/v1/public/signup/confirm', {
+          params: { query: { token } },
         });
         if (!res.ok) {
           setPhase('invalid');
           return;
         }
-        const body = (await res.json()) as {
-          data: { workspace_name: string; email: string; requires_password: boolean };
+        const body = (previewBody as unknown) as {
+          data: { workspace_name: string; email: string; requires_password: boolean; brand?: WorkspaceBrand | null };
         };
         setPreview({
           workspaceName: body.data.workspace_name,
           email: body.data.email,
           requiresPassword: body.data.requires_password === true,
+          brand: body.data.brand ?? null,
         });
         setPhase('form');
       } catch {
@@ -85,21 +91,19 @@ function ConfirmInner() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/v1/public/signup/confirm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-        body: JSON.stringify(preview.requiresPassword ? { token, password } : { token }),
+      const { data: joinBody, error: refusal, response: res } = await api.POST('/api/v1/public/signup/confirm', {
+        body: (preview.requiresPassword ? { token, password } : { token }) as never,
       });
 
       if (res.status === 200) {
-        const body = (await res.json()) as { data: { status: string } };
+        const body = (joinBody as unknown) as { data: { status: string } };
         setPhase(
           body.data.status === 'joined' ? 'joined' : body.data.status === 'pending_approval' ? 'pending' : 'already'
         );
         return;
       }
       if (res.status === 409) {
-        const body = (await res.json().catch(() => ({}))) as { details?: { reason?: string } };
+        const body = ((refusal ?? {}) as unknown) as { details?: { reason?: string } };
         setPhase(body.details?.reason === 'closed' ? 'closed' : 'refused');
         return;
       }
@@ -120,90 +124,109 @@ function ConfirmInner() {
   };
 
   const workspace = preview?.workspaceName ?? '';
-
-  const outcome = (testId: string, title: string, text: string, tone: 'default' | 'destructive' = 'default') => (
-    <Card className="border-t-4 border-t-primary" data-testid={testId}>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <Alert variant={tone}>
-          <AlertDescription>{text}</AlertDescription>
-        </Alert>
-        <Button asChild variant={tone === 'destructive' ? 'outline' : 'default'} className="w-full">
-          <Link href="/login">{t('joinConfirm.continue', 'Continue to sign in')}</Link>
-        </Button>
-      </CardContent>
-    </Card>
+  const shell = (children: React.ReactNode) => <PublicShell brand={preview?.brand ?? null}>{children}</PublicShell>;
+  const signIn = (label: string) => (
+    <Button asChild size="lg" className="w-full">
+      <Link href="/login">{label}</Link>
+    </Button>
   );
 
   if (phase === 'loading') {
-    return (
-      <Card>
-        <CardContent className="py-10 text-center text-sm text-muted-foreground">
-          {t('joinConfirm.loading', 'Checking your link…')}
-        </CardContent>
-      </Card>
-    );
+    return shell(<LoadingCard text={t('joinConfirm.loading', 'Checking your link…')} />);
   }
 
   if (phase === 'joined') {
-    return outcome(
-      'join-confirm-joined',
-      t('joinConfirm.joined.title', 'You’ve joined {workspace}', { workspace }),
-      t('joinConfirm.joined.text', 'Your email is confirmed. Sign in to start.')
+    return shell(
+      <PublicOutcome
+        testId="join-confirm-joined"
+        icon="success"
+        tone="ok"
+        title={t('joinConfirm.joined.title', 'You’ve joined {workspace}', { workspace })}
+        description={t('joinConfirm.joined.text', 'Your account is ready.')}
+      >
+        {signIn(t('joinConfirm.open', 'Open {workspace}', { workspace }))}
+      </PublicOutcome>
     );
   }
   if (phase === 'pending') {
-    return outcome(
-      'join-confirm-pending',
-      t('joinConfirm.pending.title', 'Waiting for approval'),
-      t(
-        'joinConfirm.pending.text',
-        'Your email is confirmed. {workspace} will review your request, and you can sign in once it’s approved.',
-        { workspace }
-      )
+    return shell(
+      <PublicOutcome
+        testId="join-confirm-pending"
+        icon="clock"
+        tone="dash"
+        title={t('joinConfirm.pending.title', 'Waiting for approval')}
+        description={t('join.sso.pending', '{workspace} approves each new customer. We’ll email you when you’re in.', { workspace })}
+      />
     );
   }
   if (phase === 'already') {
-    return outcome(
-      'join-confirm-already',
-      t('joinConfirm.already.title', 'You already have access'),
-      t('joinConfirm.already.text', 'This account already belongs to {workspace}. Sign in to continue.', { workspace })
+    return shell(
+      <PublicOutcome
+        testId="join-confirm-already"
+        icon="user"
+        title={t('joinConfirm.already.title', 'You’re already a member')}
+        description={t('joinConfirm.already.text', '{email} already belongs to {workspace}.', {
+          email: preview?.email ?? '',
+          workspace,
+        })}
+      >
+        {signIn(t('joinConfirm.signIn', 'Sign in'))}
+      </PublicOutcome>
     );
   }
-  if (phase === 'refused' || phase === 'closed') {
-    return outcome(
-      'join-confirm-refused',
-      t('joinConfirm.refused.title', 'You can’t join with this link'),
-      phase === 'closed'
-        ? t('joinConfirm.closed.text', '{workspace} isn’t taking sign-ups right now.', { workspace })
-        : t(
-            'joinConfirm.refused.text',
-            'This account can’t join {workspace} by signing up. Contact the workspace if you think this is wrong.',
-            { workspace }
-          ),
-      'destructive'
+  if (phase === 'closed') {
+    return shell(
+      <PublicOutcome
+        testId="join-confirm-refused"
+        icon="lock"
+        tone="warn"
+        title={t('join.closed.title', 'This workspace isn’t taking sign-ups')}
+        description={t('joinConfirm.closed.text', 'Ask {workspace} to invite you, or check the link you were given.', { workspace })}
+      />
+    );
+  }
+  if (phase === 'refused') {
+    return shell(
+      <PublicOutcome
+        testId="join-confirm-refused"
+        icon="ban"
+        tone="warn"
+        title={t('joinConfirm.refused.title', 'You can’t join {workspace}', { workspace })}
+        description={t(
+          'joinConfirm.refused.text',
+          'Your request was declined or your access is paused. Contact {workspace} if you think this is wrong.',
+          { workspace }
+        )}
+      />
     );
   }
   if (phase === 'invalid' || preview === null) {
-    return outcome(
-      'join-confirm-invalid',
-      t('joinConfirm.invalid.title', 'This link doesn’t work'),
-      t(
-        'joinConfirm.invalid.text',
-        'The link is invalid, has expired or has already been used. Sign up again to get a new one.'
-      ),
-      'destructive'
+    return shell(
+      <PublicOutcome
+        testId="join-confirm-invalid"
+        icon="alert"
+        tone="warn"
+        title={t('joinConfirm.invalid.title', 'This link has expired or was used')}
+        description={t(
+          'joinConfirm.invalid.text',
+          'Links work once, for 24 hours. Sign up again on the workspace’s page to get a new one.'
+        )}
+      />
     );
   }
 
-  return (
-    <Card className="border-t-4 border-t-primary">
+  return shell(
+    <Card size="lg" className="text-base">
       <CardHeader>
-        <CardTitle>{t('joinConfirm.title', 'Finish joining {workspace}', { workspace })}</CardTitle>
-        <CardDescription>
-          {t('joinConfirm.as', 'Signing up as')} <span dir="ltr">{preview.email}</span>
+        <CardTitle className="text-2xl font-semibold">{t('joinConfirm.title', 'Finish joining')}</CardTitle>
+        <CardDescription className="text-base">
+          {preview.requiresPassword ? (
+            t('joinConfirm.choosePassword', 'Choose a password for {email}.', { email: preview.email })
+          ) : (
+            <>
+              {t('joinConfirm.as', 'Signing up as')} <span dir="ltr">{preview.email}</span>
+            </>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -218,16 +241,20 @@ function ConfirmInner() {
             <>
               <div className="space-y-1.5">
                 <label htmlFor="join-password" className="text-sm font-medium text-foreground">
-                  {t('joinConfirm.password.label', 'Choose a password')}
+                  {t('joinConfirm.password.label', 'Password')}
                 </label>
                 <Input
                   id="join-password"
                   type="password"
                   autoComplete="new-password"
+                  aria-describedby="join-password-hint"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   disabled={submitting}
                 />
+                <p id="join-password-hint" className="text-sm text-muted-foreground">
+                  {t('joinConfirm.password.hint', 'At least 8 characters.')}
+                </p>
               </div>
               <div className="space-y-1.5">
                 <label htmlFor="join-password-confirm" className="text-sm font-medium text-foreground">
@@ -253,11 +280,19 @@ function ConfirmInner() {
             </p>
           )}
 
-          <Button type="submit" className="w-full" loading={submitting} data-testid="join-confirm-submit">
-            {t('joinConfirm.submit', 'Confirm and join')}
+          <Button type="submit" size="lg" className="w-full" loading={submitting} data-testid="join-confirm-submit">
+            {t('joinConfirm.submit', 'Join {workspace}', { workspace })}
           </Button>
         </form>
       </CardContent>
+    </Card>
+  );
+}
+
+function LoadingCard({ text }: { text: string }) {
+  return (
+    <Card>
+      <CardContent className="py-10 text-center text-sm text-muted-foreground">{text}</CardContent>
     </Card>
   );
 }
@@ -266,18 +301,14 @@ export default function JoinConfirmPage() {
   const t = useTranslation('auth');
 
   return (
-    <PublicShell>
-      <Suspense
-        fallback={
-          <Card>
-            <CardContent className="py-10 text-center text-sm text-muted-foreground">
-              {t('joinConfirm.loading', 'Checking your link…')}
-            </CardContent>
-          </Card>
-        }
-      >
-        <ConfirmInner />
-      </Suspense>
-    </PublicShell>
+    <Suspense
+      fallback={
+        <PublicShell>
+          <LoadingCard text={t('joinConfirm.loading', 'Checking your link…')} />
+        </PublicShell>
+      }
+    >
+      <ConfirmInner />
+    </Suspense>
   );
 }

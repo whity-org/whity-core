@@ -65,6 +65,8 @@ export interface ViewRailProps {
    * whole rail exists to refuse.
    */
   createDisabledReason?: string | null;
+  /** Phone sheet: 44px rows and no fixed width. */
+  roomy?: boolean;
 }
 
 /**
@@ -241,6 +243,7 @@ export function ViewRail({
   onSelectCollection,
   onCreateCollection,
   createDisabledReason = null,
+  roomy = false,
 }: ViewRailProps) {
   const t = useTranslation('documents');
 
@@ -295,7 +298,7 @@ export function ViewRail({
     <nav
       data-testid="document-rail"
       aria-label={t('organizer.rail.label', 'Document folders')}
-      className="w-64 shrink-0 space-y-6"
+      className={roomy ? 'w-full space-y-4' : 'w-full shrink-0 space-y-6 md:w-64'}
     >
       {sections.map((group) => {
         const groupViews = views.filter((v) => v.group === group.key && !isTemplate(v));
@@ -316,6 +319,7 @@ export function ViewRail({
                 label={viewLabel(t, view)}
                 title={view.description}
                 icon={view.key === 'starred' ? <IconStar size={14} aria-hidden /> : undefined}
+                roomy={roomy}
                 selected={selectedViewKey === view.key && selectedCollectionId === null}
                 disabled={!view.available}
                 reason={viewReason(t, view.unavailable_reason)}
@@ -333,6 +337,7 @@ export function ViewRail({
                     <RailButton
                       key={collection.id}
                       label={collection.name}
+                      roomy={roomy}
                       badge={collection.item_count}
                       selected={selectedCollectionId === collection.id}
                       onClick={() => onSelectCollection(collection.id)}
@@ -341,7 +346,7 @@ export function ViewRail({
 
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size={roomy ? 'lg' : 'sm'}
                   className="w-full justify-start"
                   disabled={createDisabledReason !== null}
                   title={createDisabledReason ?? undefined}
@@ -416,6 +421,7 @@ function RailButton({
   selected,
   disabled,
   reason,
+  roomy,
   onClick,
 }: {
   label: string;
@@ -425,6 +431,7 @@ function RailButton({
   selected?: boolean;
   disabled?: boolean;
   reason?: string | null;
+  roomy?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -437,6 +444,7 @@ function RailButton({
         aria-current={selected ? 'page' : undefined}
         className={[
           'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm transition-colors',
+          roomy ? 'min-h-11' : '',
           selected ? 'bg-accent font-medium text-accent-foreground' : 'text-foreground',
           disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-accent/60',
         ].join(' ')}

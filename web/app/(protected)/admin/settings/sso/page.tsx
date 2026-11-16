@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { apiClient } from '@/lib/api-client';
 import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -13,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { FieldSelect } from '@/components/field-select';
 import { Switch } from '@whity/ui/switch';
 import { Badge } from '@whity/ui/badge';
-import { AccessDenied } from '@whity/ui/access-denied';
+import { AccessDenied } from '@/components/ui/access-denied';
 import {
   IconAlertCircle,
   IconCopy,
@@ -111,16 +110,11 @@ function formForEdit(p: IdentityProvider): ProviderForm {
   };
 }
 
-/** Read the `{ error }` / `{ error, details }` envelope from a failed response. */
-async function readError(res: Response, fallback: string): Promise<string> {
-  try {
-    const body: unknown = await res.json();
-    if (body && typeof body === 'object' && 'error' in body) {
-      const value = (body as { error?: unknown }).error;
-      if (typeof value === 'string' && value !== '') return value;
-    }
-  } catch {
-    // no JSON body
+/** Read the `{ error }` / `{ error, details }` envelope from a failed response's parsed body. */
+function readError(body: unknown, fallback: string): string {
+  if (body && typeof body === 'object' && 'error' in body) {
+    const value = (body as { error?: unknown }).error;
+    if (typeof value === 'string' && value !== '') return value;
   }
   return fallback;
 }
@@ -159,13 +153,12 @@ export default function SsoProvidersPage() {
     error: loadError,
     refetch,
   } = useFetch<IdentityProvider[]>(async () => {
-    const res = await apiClient('/api/v1/identity-providers');
+    const { data: body, response: res, error } = await api.GET('/api/v1/identity-providers');
     if (!res.ok) {
       throw new Error(
-        await readError(res, t('settings.sso.error.load', 'Failed to load identity providers'))
+        readError(error, t('settings.sso.error.load', 'Failed to load identity providers'))
       );
     }
-    const body: unknown = await res.json();
     return body && typeof body === 'object' && Array.isArray((body as { data?: unknown }).data)
       ? ((body as { data: IdentityProvider[] }).data)
       : [];
@@ -205,10 +198,12 @@ export default function SsoProvidersPage() {
   };
 
   const handleDelete = async (id: number) => {
-    const res = await apiClient(`/api/v1/identity-providers/${id}`, { method: 'DELETE' });
+    const { response: res, error } = await api.DELETE('/api/v1/identity-providers/{id}', {
+      params: { path: { id } },
+    });
     if (!res.ok && res.status !== 204) {
       addToast(
-        await readError(res, t('settings.sso.error.delete', 'Failed to delete provider')),
+        readError(error, t('settings.sso.error.delete', 'Failed to delete provider')),
         'error'
       );
       return;
@@ -605,20 +600,15 @@ function ProviderFormCard({
 
     setSaving(true);
     try {
-      const res = editing
-        ? await apiClient(`/api/v1/identity-providers/${editing.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
+      const { response: res, error } = editing
+        ? await api.PATCH('/api/v1/identity-providers/{id}', {
+            params: { path: { id: editing.id } },
+            body,
           })
-        : await apiClient('/api/v1/identity-providers', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          });
+        : await api.POST('/api/v1/identity-providers', { body: body as never });
       if (!res.ok) {
         addToast(
-          await readError(res, t('settings.sso.form.error.save', 'Failed to save provider')),
+          readError(error, t('settings.sso.form.error.save', 'Failed to save provider')),
           'error'
         );
         return;

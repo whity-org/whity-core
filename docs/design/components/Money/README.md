@@ -1,5 +1,5 @@
 # Money
 
-An amount with its currency code, in tabular figures. JOD always shows 3 decimals (the dinar has 1,000 fils); other currencies default to 2.
+An amount in the workspace's currency, in tabular figures. US dollars (the default in designs) show the symbol and 2 decimals: $312.00. Currencies without a symbol show their code and their own decimals: JOD 312.000, SAR 312.00.
 
-**Props:** `amount`, `currency` (ISO code, default JOD), `decimals`. Negative amounts are `destructive`. Western digits in every language. Hand-written from `packages/ui/src/money`.
+**Props:** `amount`, `currency` (ISO code, default USD; symbol and decimals come from `Whity.currencies`), `decimals`. Negative amounts are `destructive`. Western digits in every language. Hand-written from `packages/ui/src/money`.

@@ -11,63 +11,104 @@
     { "field_key": "interview_guide", "field_type": "text", "visible_when": { "field": "methods", "equals": "interview" } },
     { "field_key": "survey_or_panel", "field_type": "text", "visible_when": { "field": "methods", "in": ["survey", "panel"] } },
     { "field_key": "moved_up", "field_type": "text", "visible_when": { "field": "last_answer", "equals": "yes" } },
-    { "field_key": "last_answer", "field_type": "select", "visible_when": null }
+    { "field_key": "last_answer", "field_type": "select", "visible_when": null },
+    { "field_key": "not_clinical_note", "field_type": "text", "visible_when": { "field": "study_kind", "notEquals": "clinical" } },
+    { "field_key": "no_interview_note", "field_type": "text", "visible_when": { "field": "methods", "notEquals": "interview" } },
+    { "field_key": "minors_unticked_note", "field_type": "text", "visible_when": { "field": "has_minors", "notEquals": true } },
+    { "field_key": "kind_given", "field_type": "text", "visible_when": { "field": "study_kind", "answered": true } },
+    { "field_key": "methods_given", "field_type": "text", "visible_when": { "field": "methods", "answered": true } },
+    { "field_key": "minors_ticked_note", "field_type": "text", "visible_when": { "field": "has_minors", "answered": true } },
+    { "field_key": "count_given", "field_type": "text", "visible_when": { "field": "minor_count", "answered": true } },
+    { "field_key": "staff", "field_type": "repeating", "visible_when": null },
+    { "field_key": "staff_note", "field_type": "text", "visible_when": { "field": "staff", "answered": true } },
+    { "field_key": "signed", "field_type": "signature", "visible_when": null },
+    { "field_key": "signed_note", "field_type": "text", "visible_when": { "field": "signed", "answered": true } }
   ],
   "cases": [
     {
       "name": "nothing answered: an unticked box says no, and nothing else matches",
       "data": {},
-      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up", "not_clinical_note", "no_interview_note", "kind_given", "methods_given", "minors_ticked_note", "count_given", "staff_note", "signed_note"]
     },
     {
       "name": "ticked, in every spelling a client sends",
       "data": { "has_minors": true },
-      "hidden": ["no_minors_note", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+      "hidden": ["no_minors_note", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up", "not_clinical_note", "no_interview_note", "minors_unticked_note", "kind_given", "methods_given", "count_given", "staff_note", "signed_note"]
     },
     {
       "name": "ticked as the string 1",
       "data": { "has_minors": "1" },
-      "hidden": ["no_minors_note", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+      "hidden": ["no_minors_note", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up", "not_clinical_note", "no_interview_note", "minors_unticked_note", "kind_given", "methods_given", "count_given", "staff_note", "signed_note"]
     },
     {
       "name": "unticked as the string 0",
       "data": { "has_minors": "0" },
-      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up", "not_clinical_note", "no_interview_note", "kind_given", "methods_given", "minors_ticked_note", "count_given", "staff_note", "signed_note"]
     },
     {
       "name": "a number typed as text matches a numeric rule, down a chain",
       "data": { "has_minors": true, "minor_count": "3" },
-      "hidden": ["no_minors_note", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+      "hidden": ["no_minors_note", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up", "not_clinical_note", "no_interview_note", "minors_unticked_note", "kind_given", "methods_given", "staff_note", "signed_note"]
     },
     {
       "name": "a hidden controller's stale answer does not count",
       "data": { "has_minors": false, "minor_count": "3" },
-      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up", "not_clinical_note", "no_interview_note", "kind_given", "methods_given", "minors_ticked_note", "count_given", "staff_note", "signed_note"]
     },
     {
       "name": "one choice against equals and in",
       "data": { "study_kind": "clinical" },
-      "hidden": ["minor_count", "parent_consent", "interview_guide", "survey_or_panel", "moved_up"]
+      "hidden": ["minor_count", "parent_consent", "interview_guide", "survey_or_panel", "moved_up", "not_clinical_note", "no_interview_note", "methods_given", "minors_ticked_note", "count_given", "staff_note", "signed_note"]
     },
     {
       "name": "a choice only the in list holds",
       "data": { "study_kind": "field" },
-      "hidden": ["minor_count", "parent_consent", "drug_name", "interview_guide", "survey_or_panel", "moved_up"]
+      "hidden": ["minor_count", "parent_consent", "drug_name", "interview_guide", "survey_or_panel", "moved_up", "no_interview_note", "methods_given", "minors_ticked_note", "count_given", "staff_note", "signed_note"]
     },
     {
       "name": "several choices match when any one does",
       "data": { "methods": ["interview", "panel"] },
-      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "moved_up"]
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "moved_up", "not_clinical_note", "no_interview_note", "kind_given", "minors_ticked_note", "count_given", "staff_note", "signed_note"]
     },
     {
       "name": "an empty list matches nothing",
       "data": { "methods": [] },
-      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up"]
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up", "not_clinical_note", "no_interview_note", "kind_given", "methods_given", "minors_ticked_note", "count_given", "staff_note", "signed_note"]
     },
     {
       "name": "a controller later in the form still decides",
       "data": { "last_answer": "yes" },
-      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel"]
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "not_clinical_note", "no_interview_note", "kind_given", "methods_given", "minors_ticked_note", "count_given", "staff_note", "signed_note"]
+    },
+    {
+      "name": "is not: a different choice, and a list without that value, are asked",
+      "data": { "study_kind": "survey", "methods": ["survey"] },
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "moved_up", "minors_ticked_note", "count_given", "staff_note", "signed_note"]
+    },
+    {
+      "name": "is not and is answered: blank text is no answer",
+      "data": { "study_kind": "  " },
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up", "not_clinical_note", "no_interview_note", "kind_given", "methods_given", "minors_ticked_note", "count_given", "staff_note", "signed_note"]
+    },
+    {
+      "name": "is answered: a zero is an answer",
+      "data": { "has_minors": true, "minor_count": 0 },
+      "hidden": ["no_minors_note", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up", "not_clinical_note", "no_interview_note", "minors_unticked_note", "kind_given", "methods_given", "staff_note", "signed_note"]
+    },
+    {
+      "name": "is answered: a table with one row",
+      "data": { "staff": [{ "name": "Amro Saleh", "lead": false }] },
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up", "not_clinical_note", "no_interview_note", "kind_given", "methods_given", "minors_ticked_note", "count_given", "signed_note"]
+    },
+    {
+      "name": "is answered: blank rows and a blank signature are no answer",
+      "data": { "staff": [{ "name": " ", "lead": false }], "signed": { "name": "" } },
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up", "not_clinical_note", "no_interview_note", "kind_given", "methods_given", "minors_ticked_note", "count_given", "staff_note", "signed_note"]
+    },
+    {
+      "name": "is answered: a signed name",
+      "data": { "signed": { "name": "Awss Haddad" } },
+      "hidden": ["minor_count", "parent_consent", "drug_name", "site_note", "interview_guide", "survey_or_panel", "moved_up", "not_clinical_note", "no_interview_note", "kind_given", "methods_given", "minors_ticked_note", "count_given", "staff_note"]
     }
   ]
 }

@@ -261,6 +261,22 @@ final class MeterServiceRealEngineTest extends TestCase
     // ── Reading without spending ────────────────────────────────────────────
 
     /** Rendering a progress bar must not cost the customer a unit. */
+    /** EM.1 plan-limit: told once at 90%, never again in the same window. */
+    public function testItSaysOnceWhenTheWorkspaceComesCloseToALimit(): void
+    {
+        $this->allow(self::PER_DAY, 10);
+        $heard = [];
+        $this->meters->onThreshold(static function (int $t, string $k, int $used, int $limit, string $stage) use (&$heard): void {
+            $heard[] = [$stage, $used, $limit];
+        });
+
+        for ($i = 0; $i < 10; $i++) {
+            $this->meters->consume(self::TENANT, [self::PER_DAY], now: $this->at('2026-09-13 09:00'));
+        }
+
+        self::assertSame([['near', 9, 10]], $heard);
+    }
+
     public function testPeekDoesNotConsume(): void
     {
         $this->allow(self::PER_DAY, 5);
@@ -313,6 +329,75 @@ final class MeterServiceRealEngineTest extends TestCase
     private function at(string $utc): DateTimeImmutable
     {
         return new DateTimeImmutable($utc . ' UTC');
+    }
+
+    // ── Warning instead of refusing ─────────────────────────────────────────
+
+    public function testBlockIsTheDefaultAndGlobalOnly(): void
+    {
+        self::assertSame('block', SettingsRegistry::defaultFor(SettingsRegistry::METERS_ENFORCEMENT));
+        self::assertTrue(SettingsRegistry::isGlobalOnly(SettingsRegistry::METERS_ENFORCEMENT));
+    }
+
+    public function testWarnModeDoesNotRefuseAndNamesTheLimitPassed(): void
+    {
+        $this->warnMode();
+        $this->allow(self::PER_DAY, 1);
+        $now = $this->at('2026-09-13 09:00');
+
+        $first = $this->meters->consume(self::TENANT, [self::PER_DAY], now: $now);
+        $second = $this->meters->consume(self::TENANT, [self::PER_DAY], now: $now);
+
+        self::assertTrue($first->allowed);
+        self::assertFalse($first->warned);
+        self::assertTrue($second->allowed);
+        self::assertTrue($second->warned);
+        self::assertSame(self::PER_DAY, $second->key);
+        self::assertSame(1, $second->limit);
+        self::assertNotNull($second->resetsAt);
+    }
+
+    /** Past the limit is counted, so the number shown afterwards is the truth. */
+    public function testWarnModeCountsWhatWentPastTheLimit(): void
+    {
+        $this->warnMode();
+        $this->allow(self::PER_DAY, 1);
+        $now = $this->at('2026-09-13 09:00');
+
+        for ($i = 0; $i < 3; $i++) {
+            $this->meters->consume(self::TENANT, [self::PER_DAY], now: $now);
+        }
+
+        $peek = $this->meters->peek(self::TENANT, [self::PER_DAY], $now);
+        self::assertSame(3, $peek[self::PER_DAY]['used']);
+        self::assertSame(0, $peek[self::PER_DAY]['remaining']);
+    }
+
+    public function testWarnModeDoesNotRefuseALimitOfZero(): void
+    {
+        $this->warnMode();
+        $this->allow(self::PER_DAY, 0);
+
+        $decision = $this->meters->consume(self::TENANT, [self::PER_DAY], now: $this->at('2026-09-13 09:00'));
+
+        self::assertTrue($decision->allowed);
+        self::assertTrue($decision->warned);
+    }
+
+    public function testAnUnrecognisedStoredValueKeepsRefusing(): void
+    {
+        (new GlobalSettingsRepository($this->pdo))->set(SettingsRegistry::METERS_ENFORCEMENT, 'nonsense');
+        $this->allow(self::PER_DAY, 1);
+        $now = $this->at('2026-09-13 09:00');
+
+        $this->meters->consume(self::TENANT, [self::PER_DAY], now: $now);
+
+        self::assertFalse($this->meters->consume(self::TENANT, [self::PER_DAY], now: $now)->allowed);
+    }
+
+    private function warnMode(): void
+    {
+        (new GlobalSettingsRepository($this->pdo))->set(SettingsRegistry::METERS_ENFORCEMENT, 'warn');
     }
 
     private function allow(string $key, int $limit, int $tenantId = self::TENANT): void

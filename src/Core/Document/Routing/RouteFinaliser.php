@@ -9,6 +9,7 @@ use Throwable;
 use Whity\Core\Document\DocumentRepository;
 use Whity\Core\Document\DocumentSourceRepository;
 use Whity\Core\Document\Fields\DocumentFieldRegistry;
+use Whity\Core\Document\Fields\RouteValueFieldProvider;
 use Whity\Core\Document\Issuing\ActingAs;
 use Whity\Core\Document\Issuing\DocumentIssuing;
 use Whity\Core\Document\Issuing\DocumentOriginKeyConflictException;
@@ -88,11 +89,17 @@ final class RouteFinaliser implements RouteFinaliseService
 
     private readonly DocumentNumbering $numbering;
 
+    private readonly RouteStepValueRepository $stepValues;
+
+    private readonly RouteApprovals $approvals;
+
     /** @var DocumentIssuing|\Closure(): DocumentIssuing */
     private DocumentIssuing|\Closure $issuing;
 
     /** @var \Closure(int): bool */
     private \Closure $renderAvailable;
+
+    private PDO $db;
 
     /**
      * @param DocumentIssuing|\Closure(): DocumentIssuing $issuing built on first
@@ -118,9 +125,12 @@ final class RouteFinaliser implements RouteFinaliseService
         private readonly ?HookManager $hooks = null,
         private readonly PrintLabels $labels = new PrintLabels(),
     ) {
+        $this->db = $db;
         $this->issuing = $issuing;
         $this->renderAvailable = $renderAvailable;
         $this->numbering = new DocumentNumbering($db);
+        $this->stepValues = new RouteStepValueRepository($db);
+        $this->approvals = new RouteApprovals($db);
     }
 
     /**
@@ -265,6 +275,11 @@ final class RouteFinaliser implements RouteFinaliseService
         $existing = $existingDocumentId !== null ? $this->documents->findById($existingDocumentId, $tenantId) : null;
 
         $templateId = $row['template_id'] ?? $provider->finalTemplateId($tenantId, $subjectId);
+        if ($templateId === null && $subjectType === \Whity\Core\Form\FormSubmissionRouteSubject::TYPE) {
+            // Design 3.4 (FP.1): a form with no final document template prints
+            // its response in the automatic layout.
+            return $this->attemptPrintout($tenantId, $row, $provider, $subjectId, $existingDocumentId);
+        }
         $source = is_int($templateId) ? $this->sources->findById($templateId, $tenantId) : null;
         if ($source === null) {
             return [self::FAILED, self::REASON_TEMPLATE_MISSING, $existingDocumentId, null];
@@ -284,6 +299,13 @@ final class RouteFinaliser implements RouteFinaliseService
 
         $approved = $this->approvedVersion($tenantId, $row);
         $values = $this->sharedValues($tenantId)
+            + $this->routeValues($tenantId, (int) $row['route_id'])
+            // WHIT-1018: who approved, a table row each.
+            + $this->approvals->values(
+                $tenantId,
+                (int) $row['route_id'],
+                ($source['lang'] ?? 'en') === 'ar' ? 'تمت الموافقة' : 'Approved',
+            )
             + $provider->finalValues($tenantId, $subjectId, $approved, (string) ($source['lang'] ?? 'en'), $templateVersion);
         $actor = ActingAs::engine($tenantId);
 
@@ -327,6 +349,66 @@ final class RouteFinaliser implements RouteFinaliseService
             'limit' => [self::FAILED, self::REASON_LIMIT, $existingDocumentId, null],
             'disabled', 'persist_disabled' => [self::FAILED, self::REASON_PDFS_OFF, $existingDocumentId, null],
             default => [self::FAILED, self::REASON_RENDER_REFUSED, $existingDocumentId, null],
+        };
+    }
+
+    /**
+     * The automatic printout of a form response (design 3.4, P1): a document
+     * with no template, its PDF laid out from the form's sections and questions
+     * with the approved answers, the decision, the approvals and the
+     * verification code.
+     *
+     * @param array<string, mixed> $row
+     * @return array{0: string, 1: string, 2: ?int, 3: ?int}
+     */
+    private function attemptPrintout(int $tenantId, array $row, RouteSubjectFinaliseInterface&RouteSubjectProviderInterface $provider, int $subjectId, ?int $documentId): array
+    {
+        if (!$this->isAvailable($tenantId)) {
+            return [self::FAILED, self::REASON_PDFS_OFF, $documentId, null];
+        }
+        $issuing = $this->issuing();
+        $routeId = (int) $row['route_id'];
+        $approved = $this->approvedVersion($tenantId, $row);
+        $data = is_array($approved['data'] ?? null) ? $approved['data'] : [];
+        $answers = is_array($data['values'] ?? null) ? $data['values'] : null;
+        $actor = ActingAs::engine($tenantId);
+
+        if ($documentId === null) {
+            $route = $this->routes->findById($routeId, $tenantId);
+            $raised = $issuing->raiseBuilt($tenantId, null, (string) ($route['title'] ?? $provider->title($tenantId, $subjectId)), 'route-finalise:' . $routeId);
+            $documentId = (int) $raised['document']['id'];
+            $provider->attachDocument($tenantId, $subjectId, $documentId);
+        }
+        $document = $this->documents->findById($documentId, $tenantId);
+        if ($document === null) {
+            return [self::FAILED, self::REASON_NO_SUBJECT, null, null];
+        }
+        $footnote = $approved['version'] > 0 ? $this->labels->madeFrom($approved['version'], $approved['content_hash']) : '';
+        $printouts = $issuing->formPrintouts($this->db);
+
+        [$outcome, $artifact] = $issuing->renderBuiltPayload($actor, $document, static function (?\Whity\Core\Document\Qr\DocumentQrStamp $stamp) use ($printouts, $tenantId, $subjectId, $answers, $routeId, $footnote): ?array {
+            $payload = $printouts->payload($tenantId, $subjectId, [
+                'answers' => $answers,
+                'routeId' => $routeId,
+                'approved' => true,
+                'verify' => $stamp !== null ? ['url' => $stamp->url, 'reference' => $stamp->reference] : null,
+            ]);
+            if ($payload !== null && $footnote !== '') {
+                // WHIT-921: which version a final document was made from.
+                $payload['content'][] = ['type' => 'paragraph', 'text' => $footnote];
+            }
+
+            return $payload;
+        });
+        if ($artifact !== null) {
+            return [self::DONE, '', $documentId, (int) $artifact['id']];
+        }
+
+        return match ($outcome['reason']) {
+            'unavailable', 'storage_unavailable' => [self::WAITING, self::REASON_RENDER_UNAVAILABLE, $documentId, null],
+            'limit' => [self::FAILED, self::REASON_LIMIT, $documentId, null],
+            'disabled', 'persist_disabled' => [self::FAILED, self::REASON_PDFS_OFF, $documentId, null],
+            default => [self::FAILED, self::REASON_RENDER_REFUSED, $documentId, null],
         };
     }
 
@@ -415,6 +497,29 @@ final class RouteFinaliser implements RouteFinaliseService
         $resolved = $this->fields->resolve($tenantId, 0, static fn (string $permission): bool => false, null, null);
 
         return $resolved['values'] ?? [];
+    }
+
+    /**
+     * WHIT-1016: the values people entered at this route's steps, as
+     * `route.value.<key>`.
+     *
+     * @return array<string, string|null>
+     */
+    private function routeValues(int $tenantId, int $routeId): array
+    {
+        // A choice prints its option's label, not the value it is stored as.
+        $inputs = [];
+        foreach ((new RouteStepRepository($this->db))->listForRoute($routeId, $tenantId) as $step) {
+            foreach (RouteStepInputs::decode($step['inputs'] ?? []) as $input) {
+                $inputs[$input['key']] = $input;
+            }
+        }
+        $out = [];
+        foreach ($this->stepValues->valuesForRoute($tenantId, $routeId) as $key => $value) {
+            $out[RouteValueFieldProvider::path($key)] = isset($inputs[$key]) ? RouteStepInputs::display($inputs[$key], $value) : $value;
+        }
+
+        return $out;
     }
 
     /**

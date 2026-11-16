@@ -57,6 +57,7 @@ final class CoreNavigationRegistrationTest extends TestCase
      */
     private const KNOWN_GROUPS = [
         'overview',
+        'work',
         'people',
         'ai',
         'documents',

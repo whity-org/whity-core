@@ -445,30 +445,63 @@ final class DocumentCollab
     }
 
     /**
-     * Agent principals' names (their credential's name), by principal id.
+     * Agent principals' names, by principal id: a workspace agent's name for
+     * `agent:<assignment id>` (editor M6), else the credential's name.
      *
      * @param list<string> $ids
      * @return array<string, string>
      */
-    private function agentNames(int $tenantId, array $ids): array
+    public function agentNames(int $tenantId, array $ids): array
     {
         $ids = array_values(array_unique($ids));
         if ($ids === []) {
             return [];
+        }
+        $out = [];
+        $assignments = [];
+        foreach ($ids as $id) {
+            $assignment = \Whity\Core\Agent\AgentAssignmentRepository::idFromPrincipal($id);
+            if ($assignment !== null) {
+                $assignments[$assignment] = $id;
+            }
+        }
+        if ($assignments !== []) {
+            [$in, $params] = self::inList(array_keys($assignments));
+            $stmt = $this->db->prepare(
+                'SELECT aa.id, a.name FROM agent_assignments aa
+                   JOIN agents a ON a.id = aa.agent_id AND a.tenant_id = aa.tenant_id
+                  WHERE aa.tenant_id = :tenant_id AND aa.id IN (' . $in . ')'
+            );
+            $stmt->execute($params + [':tenant_id' => $tenantId]);
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                if (is_array($row) && isset($assignments[(int) $row['id']])) {
+                    $out[$assignments[(int) $row['id']]] = (string) $row['name'];
+                }
+            }
         }
         [$in, $params] = self::inList($ids);
         $stmt = $this->db->prepare(
             'SELECT jti, name FROM mcp_tokens WHERE tenant_id = :tenant_id AND jti IN (' . $in . ')'
         );
         $stmt->execute($params + [':tenant_id' => $tenantId]);
-        $out = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             if (is_array($row)) {
-                $out[(string) $row['jti']] = (string) $row['name'];
+                $out[(string) $row['jti']] ??= (string) $row['name'];
             }
         }
 
         return $out;
+    }
+
+    /**
+     * Profiles' display names, by id, for presenting a request or a message.
+     *
+     * @param list<int> $ids
+     * @return array<int, string>
+     */
+    public function namesOf(array $ids): array
+    {
+        return $this->personNames($ids);
     }
 
     /**

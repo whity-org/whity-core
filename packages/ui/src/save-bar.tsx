@@ -30,15 +30,19 @@ function SaveBar({ dirty, summary, discardLabel, saveLabel, saving = false, onDi
       role="region"
       aria-live="polite"
       className={cn(
+        // On a phone the bar docks to the bottom edge across the full width
+        // (M.4: the main action sits in a bar at the bottom, under the thumb),
+        // the summary takes its own line and the two buttons share the next.
         "sticky bottom-4 z-[5] mt-5 flex flex-wrap items-center gap-3 rounded-card border border-border bg-popover py-2.5 ps-4 pe-3 text-sm text-popover-foreground shadow-float",
+        "max-sm:-mx-4 max-sm:bottom-0 max-sm:rounded-none max-sm:border-x-0 max-sm:border-b-0 max-sm:px-4 max-sm:py-3",
         className
       )}
     >
-      <span className="min-w-0 flex-1">{summary}</span>
-      <Button type="button" variant="outline" onClick={onDiscard} disabled={saving}>
+      <span className="min-w-0 flex-1 max-sm:basis-full">{summary}</span>
+      <Button type="button" variant="outline" onClick={onDiscard} disabled={saving} className="max-sm:flex-1">
         {discardLabel}
       </Button>
-      <Button type="button" loading={saving} onClick={onSave}>
+      <Button type="button" loading={saving} onClick={onSave} className="max-sm:flex-[2]">
         {saveLabel}
       </Button>
     </div>

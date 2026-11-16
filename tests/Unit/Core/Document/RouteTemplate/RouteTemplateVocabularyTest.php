@@ -85,10 +85,11 @@ final class RouteTemplateVocabularyTest extends TestCase
             . 'no reader can interpret.'
         );
 
+        $this->checkValues($sql, 'decision_quorum');
         self::assertSame(
             RouteQuorum::all(),
-            $this->checkValues($sql, 'decision_quorum'),
-            'The template steps CHECK and RouteQuorum::all() disagree.'
+            self::widenedQuorums(),
+            'The template steps CHECK (migration 120, widened by 295) and RouteQuorum::all() disagree.'
         );
     }
 
@@ -126,8 +127,9 @@ final class RouteTemplateVocabularyTest extends TestCase
             . 'interpret.'
         );
 
+        $this->checkValues($engine, 'decision_quorum');
         self::assertSame(
-            $this->checkValues($engine, 'decision_quorum'),
+            self::widenedQuorums(),
             RouteQuorum::all(),
             'The engine steps CHECK and RouteQuorum::all() disagree. A quorum the engine cannot count is an '
             . 'approval rule that silently falls back to something else.'
@@ -221,6 +223,18 @@ final class RouteTemplateVocabularyTest extends TestCase
         }
 
         return null;
+    }
+
+    /**
+     * The quorum list both CHECKs carry since migration 295 widened them.
+     *
+     * @return list<string>
+     */
+    private static function widenedQuorums(): array
+    {
+        require_once dirname(__DIR__, 5) . '/database/migrations/295_first_answer_decides.php';
+
+        return \Database\Migrations\FirstAnswerDecides::QUORUMS;
     }
 
     /**

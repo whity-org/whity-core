@@ -22,7 +22,7 @@
       var has = g[1].some(function (x) { return x[1] === active; });
       return { label: g[0] ? L(g[0]) : undefined, collapsed: g[0] ? !has : undefined, items: g[1].map(function (x) { return { icon: x[0], label: L(x[1]), active: x[1] === active, count: x[2] }; }) }; }); }
   var topBar = h(F, null, h(W.IconButton, { icon: 'notification', label: 'Notifications' }), h(W.IconButton, { icon: 'help', label: 'Help' }));
-  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Rana Haddad', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
+  function shell(active, kids, o) { o = o || {}; return h(W.AppShell, { tenant: o.tenant || 'Example Bakery', user: o.user || 'Amro Saleh', role: o.role || 'Owner', nav: appNav(active, o), topActions: topBar, searchLabel: o.search, dir: o.dir }, kids); }
   function person(name, sub, o) { o = o || {}; return h('div', { className: 'wy-person' }, h(W.Avatar, { name: name, size: o.size || 28, kind: o.kind }), h('div', { style: { minWidth: 0 } }, h('b', null, name), sub ? h('small', null, sub) : null)); }
   function filter(label, value, set) { return h('button', { type: 'button', className: 'wy-filter' + (set ? ' is-set' : '') }, label, value ? h('b', null, value) : null, I('chevron-down', 12)); }
   function recHead(o) { return h('div', { className: 'wy-rech' }, o.avatar || h('span', { className: 'wy-rech__ic', 'aria-hidden': 'true' }, I(o.icon || 'document', 26)),
@@ -30,13 +30,13 @@
       h('div', { className: 'wy-rech__acts' }, o.actions || null)); }
   function saveBar(text, L2) { L2 = L2 || {}; return h('div', { className: 'wy-savebar', role: 'region', 'aria-label': L2.label || 'Unsaved changes' }, I('edit'), h('span', null, text), h(W.Button, { variant: 'ghost' }, L2.discard || 'Discard'), h(W.Button, null, L2.save || 'Save changes')); }
   var PPL = [
-    { id: 1, n: 'Rana Haddad', e: 'rana@examplebakery.jo', role: 'Owner', unit: 'Head office', tfa: true, last: 'Now', st: 'active' },
-    { id: 2, n: 'Dana Yousef', e: 'dana@examplebakery.jo', role: 'Branch manager', unit: 'Abdoun', tfa: true, last: '12 min ago', st: 'active' },
-    { id: 3, n: 'Lina Saad', e: 'lina@examplebakery.jo', role: 'Accountant', unit: 'Finance', tfa: true, last: '1 h ago', st: 'active' },
-    { id: 4, n: 'Omar Khalil', e: 'omar@examplebakery.jo', role: 'Staff', unit: 'Sweifieh', tfa: false, last: 'Yesterday', st: 'active' },
-    { id: 5, n: 'Sami Nasser', e: 'sami@examplebakery.jo', role: 'Staff', unit: 'Abdoun', tfa: false, last: '3 days ago', st: 'active' },
-    { id: 6, n: 'Hala Mansour', e: 'hala@examplebakery.jo', role: 'HR', unit: 'Head office', tfa: true, last: '2 h ago', st: 'active' },
-    { id: 7, n: 'Karim Aziz', e: 'karim@examplebakery.jo', role: 'Driver', unit: 'Sweifieh', tfa: false, last: '14 Oct', st: 'off' }];
+    { id: 1, n: 'Amro Saleh', e: 'amro@examplebakery.jo', role: 'Owner', unit: 'Head office', tfa: true, last: 'Now', st: 'active' },
+    { id: 2, n: 'Emad Yousef', e: 'emad.yousef@examplebakery.jo', role: 'Branch manager', unit: 'Abdoun', tfa: true, last: '12 min ago', st: 'active' },
+    { id: 3, n: 'Awss Haddad', e: 'awss@examplebakery.jo', role: 'Accountant', unit: 'Finance', tfa: true, last: '1 h ago', st: 'active' },
+    { id: 4, n: 'Ahmad Khalil', e: 'ahmad@examplebakery.jo', role: 'Staff', unit: 'Sweifieh', tfa: false, last: 'Yesterday', st: 'active' },
+    { id: 5, n: 'Emad Nasser', e: 'emad@examplebakery.jo', role: 'Staff', unit: 'Abdoun', tfa: false, last: '3 days ago', st: 'active' },
+    { id: 6, n: 'Ibrahim Mansour', e: 'ibrahim@examplebakery.jo', role: 'HR', unit: 'Head office', tfa: true, last: '2 h ago', st: 'active' },
+    { id: 7, n: 'Ibrahim Aziz', e: 'ibrahim.aziz@examplebakery.jo', role: 'Driver', unit: 'Sweifieh', tfa: false, last: '14 Oct', st: 'off' }];
 
   ReactDOM.createRoot(document.getElementById('root')).render(shell('Users', h(F, null,
     h(W.PageHeader, { title: 'Users', description: 'The people in Example Bakery and what they can do.', actions: h(F, null, h(W.Menu, { label: 'More', items: [{ icon: 'plus', label: 'Add without inviting', hint: 'Set a password for them' }, { icon: 'download', label: 'Export to CSV' }] }), h(W.Button, { icon: 'mail' }, 'Invite people')) }),

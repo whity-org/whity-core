@@ -96,6 +96,8 @@ export function DocumentGrid({
       <EmptyState
         title={emptyState.title}
         description={emptyState.description}
+        moment={emptyState.moment}
+        once={emptyState.moment === 'empty-documents' ? 'document-library' : undefined}
         action={
           emptyState.pastTheEnd ? (
             <Button variant="outline" size="sm" onClick={() => onPageChange(1)}>

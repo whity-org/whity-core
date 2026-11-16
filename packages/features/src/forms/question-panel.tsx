@@ -13,10 +13,11 @@ import { Switch } from "@whity/ui/switch"
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
 import { ChoiceSelect } from "./choice-select"
-import { blankOption, canControl, CHOICE_KINDS, controllersFor, optionValueFrom } from "./builder-model"
+import { blankOption, canControl, CHOICE_KINDS, conditionOperator, controllersFor, optionValueFrom } from "./builder-model"
 import { useKindLabel } from "./kind-labels"
-import { asMap, pickText } from "./text"
-import type { FieldColumn, FieldDraft, FieldKind, FieldValidation, FormSectionDef } from "./types"
+import { asMap } from "./text"
+import type { ConditionOperator, FieldColumn, FieldDraft, FieldKind, FieldValidation, FormSectionDef } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 const NO_SECTION = "__none__"
 const ALWAYS = "__always__"
@@ -78,12 +79,15 @@ export function QuestionPanel({
   const validation = rules(field)
   const controllers = controllersFor(fields, index)
   const controller = controllers.find((c) => c.field_key === field.visible_when?.field) ?? null
+  const operator: ConditionOperator = field.visible_when === null ? "equals" : conditionOperator(field.visible_when)
   const answerValue =
-    field.visible_when === null
+    field.visible_when === null || field.visible_when.answered === true
       ? ""
       : field.visible_when.equals !== undefined
         ? String(field.visible_when.equals)
-        : (field.visible_when.in ?? [])[0] ?? ""
+        : field.visible_when.notEquals !== undefined
+          ? String(field.visible_when.notEquals)
+          : (field.visible_when.in ?? [])[0] ?? ""
 
   function setRules(patch: Partial<FieldValidation>) {
     const merged: FieldValidation = { ...validation, ...patch }
@@ -107,14 +111,28 @@ export function QuestionPanel({
     setRules({ columns })
   }
 
-  function setCondition(controllerKey: string | null, answer: string) {
+  function setCondition(controllerKey: string | null, nextOperator: ConditionOperator, answer: string) {
     if (controllerKey === null) {
       onChange({ ...field, visible_when: null })
       return
     }
     const source = controllers.find((c) => c.field_key === controllerKey)
-    const value: string | boolean = source?.field_type === "checkbox" ? answer !== "false" : answer
-    onChange({ ...field, visible_when: { field: controllerKey, equals: value } })
+    // A question with no list of answers can only be asked whether it is answered.
+    if (nextOperator === "answered" || source === undefined || !canControl(source)) {
+      onChange({ ...field, visible_when: { field: controllerKey, answered: true } })
+      return
+    }
+    const value: string | boolean = source.field_type === "checkbox" ? answer !== "false" : answer
+    onChange({
+      ...field,
+      visible_when:
+        nextOperator === "notEquals" ? { field: controllerKey, notEquals: value } : { field: controllerKey, equals: value },
+    })
+  }
+
+  /** The first answer a new comparing rule starts from. */
+  function firstAnswer(source: FieldDraft | undefined): string {
+    return source?.field_type === "checkbox" ? "true" : (source?.options[0]?.value ?? "")
   }
 
   const answerChoices =
@@ -125,7 +143,7 @@ export function QuestionPanel({
             { value: "true", label: t("builder.panel.yes", "Yes") },
             { value: "false", label: t("builder.panel.no", "No") },
           ]
-        : controller.options.map((o) => ({ value: o.value, label: pickText(o.label, currentLanguage) || o.value }))
+        : controller.options.map((o) => ({ value: o.value, label: localizedText(o.label, currentLanguage) || o.value }))
 
   return (
     <div className="space-y-5" aria-label={t("builder.panel.title", "Question settings")} role="group">
@@ -254,6 +272,19 @@ export function QuestionPanel({
             disabled={readOnly}
             value={validation.maxLength ?? ""}
             onChange={(e) => setRules({ maxLength: e.target.value === "" ? undefined : Number(e.target.value) })}
+          />
+        </Row>
+      )}
+
+      {field.field_type === "textarea" && (
+        <Row id="q-words" label={t("builder.panel.maxWords", "Most words")} hint={t("builder.panel.maxWords.hint", "Printed under the answer as \"142 of 300 words\". Leave empty for no limit.")}>
+          <Input
+            id="q-words"
+            type="number"
+            min={1}
+            disabled={readOnly}
+            value={validation.maxWords ?? ""}
+            onChange={(e) => setRules({ maxWords: e.target.value === "" ? undefined : Number(e.target.value) })}
           />
         </Row>
       )}
@@ -397,7 +428,7 @@ export function QuestionPanel({
         label={t("builder.panel.show", "Show this question")}
         hint={
           controllers.length === 0
-            ? t("builder.panel.show.none", "A rule can use an earlier choose-one, choose-several or checkbox question.")
+            ? t("builder.panel.show.none", "A rule can use an earlier question.")
             : undefined
         }
       >
@@ -410,37 +441,76 @@ export function QuestionPanel({
             ...controllers.map((c) => ({
               value: c.field_key,
               label: t("builder.panel.show.onlyIf", "Only if: {question}", {
-                question: pickText(c.label, currentLanguage) || c.field_key,
+                question: localizedText(c.label, currentLanguage) || c.field_key,
               }),
             })),
           ]}
           onChange={(next) => {
-            if (next === ALWAYS) return setCondition(null, "")
+            if (next === ALWAYS) return setCondition(null, "equals", "")
             const source = controllers.find((c) => c.field_key === next)
-            const first = source?.field_type === "checkbox" ? "true" : (source?.options[0]?.value ?? "")
-            setCondition(next, first)
+            setCondition(next, source !== undefined && canControl(source) ? "equals" : "answered", firstAnswer(source))
           }}
         />
       </Row>
 
-      {controller !== null && canControl(controller) && (
-        <Row id="q-answer" label={t("builder.panel.show.answer", "Is answered")}>
+      {controller !== null && (
+        <Row id="q-operator" label={t("builder.panel.show.operator", "Condition")}>
+          <ChoiceSelect
+            id="q-operator"
+            value={canControl(controller) ? operator : "answered"}
+            disabled={readOnly || !canControl(controller)}
+            options={[
+              ...(canControl(controller)
+                ? [
+                    { value: "equals", label: t("builder.panel.show.op.equals", "is") },
+                    { value: "notEquals", label: t("builder.panel.show.op.notEquals", "is not") },
+                  ]
+                : []),
+              { value: "answered", label: t("builder.panel.show.op.answered", "is answered") },
+            ]}
+            onChange={(next) => {
+              const nextOperator: ConditionOperator = next === "notEquals" ? "notEquals" : next === "answered" ? "answered" : "equals"
+              setCondition(controller.field_key, nextOperator, answerValue === "" ? firstAnswer(controller) : answerValue)
+            }}
+          />
+        </Row>
+      )}
+
+      {controller !== null && canControl(controller) && operator !== "answered" && (
+        <Row id="q-answer" label={t("builder.panel.show.answer", "Answer")}>
           <ChoiceSelect
             id="q-answer"
             value={answerValue}
             disabled={readOnly}
             options={answerChoices}
-            onChange={(next) => setCondition(controller.field_key, next)}
+            onChange={(next) => setCondition(controller.field_key, operator, next)}
           />
         </Row>
       )}
 
       {field.visible_when !== null && controller !== null && (
         <p className="rounded-control bg-muted p-3 text-xs text-muted-foreground">
-          {t("builder.panel.show.sentence", "This question is shown only when “{question}” is answered {answer}.", {
-            question: pickText(controller.label, currentLanguage) || controller.field_key,
-            answer: answerChoices.find((c) => c.value === answerValue)?.label ?? answerValue,
-          })}
+          {operator === "answered"
+            ? controller.field_type === "checkbox"
+              ? t("builder.panel.show.sentence.ticked", "This question is shown only when “{question}” is ticked.", {
+                  question: localizedText(controller.label, currentLanguage) || controller.field_key,
+                })
+              : t("builder.panel.show.sentence.answered", "This question is shown only when “{question}” has an answer.", {
+                  question: localizedText(controller.label, currentLanguage) || controller.field_key,
+                })
+            : operator === "notEquals"
+              ? t(
+                  "builder.panel.show.sentence.notEquals",
+                  "This question is shown only when “{question}” is answered with anything but {answer}.",
+                  {
+                    question: localizedText(controller.label, currentLanguage) || controller.field_key,
+                    answer: answerChoices.find((c) => c.value === answerValue)?.label ?? answerValue,
+                  }
+                )
+              : t("builder.panel.show.sentence", "This question is shown only when “{question}” is answered {answer}.", {
+                  question: localizedText(controller.label, currentLanguage) || controller.field_key,
+                  answer: answerChoices.find((c) => c.value === answerValue)?.label ?? answerValue,
+                })}
         </p>
       )}
 
@@ -457,7 +527,7 @@ export function QuestionPanel({
               { value: NO_SECTION, label: t("builder.panel.section.none", "No section") },
               ...sections.map((s, i) => ({
                 value: s.key,
-                label: pickText(s.title, currentLanguage) || t("builder.section.untitled", "Section {number}", { number: i + 1 }),
+                label: localizedText(s.title, currentLanguage) || t("builder.section.untitled", "Section {number}", { number: i + 1 }),
               })),
             ]}
             onChange={(next) => onChange({ ...field, section_key: next === NO_SECTION ? null : next })}

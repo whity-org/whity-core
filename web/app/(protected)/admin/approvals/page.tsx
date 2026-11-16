@@ -13,15 +13,15 @@
  * operation as their delegate after the server checks everything again.
  * Nothing moves on until the server has answered, so a card never claims a
  * decision that did not land.
+ *
+ * AQ.1 (`TplApprovalsList`): a List view beside One at a time lets Ordinary
+ * (tier-1) proposals be approved together; the rest open on their own.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@whity/ui/tabs';
-import { Button } from '@whity/ui/button';
 import { Card } from '@whity/ui/card';
-import { Icon } from '@whity/ui/icon';
-import { ActionProposal, type ActionProposalLabels } from '@whity/ui/action-proposal';
+import type { ActionProposalLabels } from '@whity/ui/action-proposal';
 import { ApprovalQueue, type ApprovalQueueItem } from '@whity/ui/approval-queue';
 import { AgentActivity } from '@whity/ui/agent-activity';
 import { UndoBar, type UndoBarLabels } from '@whity/ui/undo-bar';
@@ -31,7 +31,7 @@ import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
-import { useAuth } from '@/lib/auth-context';
+import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 import {
@@ -39,6 +39,7 @@ import {
   agentName,
   isToday,
   newestFirst,
+  impactPlanOf,
   oldestFirst,
   proposalActivity,
   proposalChanges,
@@ -48,7 +49,18 @@ import {
   type AgentProposal,
   type ProposalWords,
 } from '@/components/agents/proposals';
+import { ViewToggle } from '@whity/ui/view-toggle';
+import { useImpactPlanCard } from '@/components/agents/impact-plan';
 import { EditProposalDialog } from './edit-proposal-dialog';
+import { ApprovalsList } from './approvals-list';
+import { DecidedList } from './decided-list';
+import { useAuth } from '@/lib/auth-context';
+import {
+  ConfirmItsYouDialog,
+  isIdentityCheckFailure,
+  startProposalIdentityCheck,
+  type IdentityCheck,
+} from '@/components/security/confirm-its-you-dialog';
 
 export default function ApprovalsPage() {
   const t = useTranslation('admin');
@@ -57,13 +69,27 @@ export default function ApprovalsPage() {
   // Times through the shared date display: local, and nothing at all when the
   // workspace hides dates.
   const clock = (value: string): string => dates.time(value) ?? '';
-  const { apiClient } = useAuth();
   const { addToast } = useToast();
+  const { user } = useAuth();
   const [tab, setTab] = useState('waiting');
   const [currentId, setCurrentId] = useState<string | undefined>(undefined);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [editing, setEditing] = useState<AgentProposal | null>(null);
   const [undoingId, setUndoingId] = useState<number | null>(null);
+  // One at a time stays the default (AQ.1).
+  const [view, setView] = useState<'one' | 'list'>('one');
+  const [bulkBusy, setBulkBusy] = useState(false);
+  // WHIT-1042: destructive impact plans the person ticked, by proposal id.
+  const [acknowledged, setAcknowledged] = useState<ReadonlySet<number>>(() => new Set());
+  // AG.1: a Needs verifying proposal is approved only after "confirm it's you".
+  const [gated, setGated] = useState<{
+    proposal: AgentProposal;
+    args?: Record<string, unknown>;
+    extra: { acknowledgedDestructive?: boolean; reason?: string };
+    check: IdentityCheck;
+  } | null>(null);
+  const [gateError, setGateError] = useState<string | null>(null);
+  const impactPlanCard = useImpactPlanCard();
 
   // The undo meters count down without a request: the window's end is known.
   const [now, setNow] = useState(() => Date.now());
@@ -73,22 +99,22 @@ export default function ApprovalsPage() {
   }, []);
 
   const proposals = useFetch<AgentProposal[]>(async () => {
-    const response = await apiClient('/api/v1/me/agent-proposals');
+    const { data, response } = await api.GET('/api/v1/me/agent-proposals');
     if (!response.ok) {
       throw new Error(t('approvals.error.list', 'Your approvals could not be loaded.'));
     }
-    const body = (await response.json()) as { data?: AgentProposal[] };
+    const body = data as unknown as { data?: AgentProposal[] };
     return body.data ?? [];
-  }, [apiClient]);
+  }, []);
 
   // What agents did, Allowed calls included (WHIT-812). A failed read leaves the
   // timeline to the proposals rather than failing the page.
   const actions = useFetch<AgentAction[]>(async () => {
-    const response = await apiClient('/api/v1/me/agent-actions');
+    const { data, response } = await api.GET('/api/v1/me/agent-actions');
     if (!response.ok) return [];
-    const body = (await response.json()) as { data?: AgentAction[] };
+    const body = data as unknown as { data?: AgentAction[] };
     return body.data ?? [];
-  }, [apiClient]);
+  }, []);
 
   const all = useMemo(() => proposals.data ?? [], [proposals.data]);
   const waiting = useMemo(() => oldestFirst(all.filter((p) => p.status === 'waiting')), [all]);
@@ -144,12 +170,12 @@ export default function ApprovalsPage() {
   const undo = async (action: AgentAction) => {
     setUndoingId(action.id);
     try {
-      const response = await apiClient(`/api/v1/me/agent-actions/${action.id}/undo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
+      const { data, error, response } = await api.POST('/api/v1/me/agent-actions/{id}/undo', {
+        params: { path: { id: action.id } },
+        // The spec lists no body here; the server has always been sent an empty one.
+        body: {} as never,
       });
-      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      const body = (data ?? error ?? null) as { error?: string } | null;
       if (!response.ok) {
         addToast(body?.error ?? t('approvals.error.undo', 'That could not be undone.'), 'error', 8000);
       } else {
@@ -184,6 +210,20 @@ export default function ApprovalsPage() {
     busy: action !== null && undoingId === action.id,
     onUndo: canUndo && action !== null ? () => void undo(action) : undefined,
     labels,
+    // WHIT-1042: decided, a Whity Builder publish or roll back still reads as its plan.
+    ...(() => {
+      const plan = impactPlanOf(proposal);
+      return plan
+        ? impactPlanCard(plan, {
+            acknowledged: false,
+            onAcknowledge: () => undefined,
+            onAskToFix: () => undefined,
+            busy: false,
+            agent: agentName(proposal, words),
+            waiting: false,
+          })
+        : {};
+    })(),
     };
   };
 
@@ -194,17 +234,37 @@ export default function ApprovalsPage() {
     setCurrentId(next ? String(next.id) : undefined);
   };
 
-  const decide = async (proposal: AgentProposal, verdict: 'approve' | 'decline', args?: Record<string, unknown>) => {
+  const decide = async (
+    proposal: AgentProposal,
+    verdict: 'approve' | 'decline',
+    args?: Record<string, unknown>,
+    extra: { acknowledgedDestructive?: boolean; reason?: string; code?: string } = {},
+  ) => {
     setBusyId(proposal.id);
     try {
-      const response = await apiClient(`/api/v1/me/agent-proposals/${proposal.id}/${verdict}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(args ? { arguments: args } : {}),
-      });
-      const body = (await response.json().catch(() => null)) as
+      if (verdict === 'approve' && proposal.tier === 3 && extra.code === undefined) {
+        const started = await startProposalIdentityCheck(proposal.id);
+        if ('error' in started) {
+          addToast(started.error ?? t('twoStep.identity.failed', 'We could not start the check. Try again in a few minutes.'), 'error', 6000);
+          return;
+        }
+        setGateError(null);
+        setGated({ proposal, args, extra, check: started.check });
+        return;
+      }
+      const path = { params: { path: { id: proposal.id } }, body: { ...(args ? { arguments: args } : {}), ...extra } as never };
+      const { data, error, response } =
+        verdict === 'approve'
+          ? await api.POST('/api/v1/me/agent-proposals/{id}/approve', path)
+          : await api.POST('/api/v1/me/agent-proposals/{id}/decline', path);
+      const body = ((data ?? error ?? null) as unknown) as
         | { data?: AgentProposal | null; error?: string }
         | null;
+      if (!response.ok && extra.code !== undefined && isIdentityCheckFailure(error)) {
+        setGateError(t('twoStep.identity.wrong', 'That code is not right or has expired.'));
+        return;
+      }
+      setGated(null);
       if (!response.ok) {
         addToast(
           body?.error ?? t('approvals.error.decide', 'That decision could not be saved. Try again.'),
@@ -248,14 +308,112 @@ export default function ApprovalsPage() {
     }
   };
 
-  const queueItems: ApprovalQueueItem[] = waiting.map((proposal) => ({
-    id: String(proposal.id),
-    ...cardProps(proposal),
-    busy: busyId === proposal.id,
-    onApprove: () => void decide(proposal, 'approve'),
-    onDecline: () => void decide(proposal, 'decline'),
-    onEdit: () => setEditing(proposal),
-  }));
+  /** AQ.1: Ordinary proposals together; the server approves only tier 1 and says what it refused. */
+  const approveTogether = async (chosen: AgentProposal[]) => {
+    setBulkBusy(true);
+    try {
+      const { data, error, response } = await api.POST('/api/v1/me/agent-proposals/bulk-approve', {
+        body: { ids: chosen.map((p) => p.id) },
+      });
+      const body = ((data ?? error ?? null) as unknown) as
+        | { data?: { approved: AgentProposal[]; refused: { id: number; reason: string }[] }; error?: string }
+        | null;
+      if (!response.ok || !body?.data) {
+        addToast(body?.error ?? t('approvals.error.decide', 'That decision could not be saved. Try again.'), 'error', 6000);
+        return;
+      }
+      const { approved, refused } = body.data;
+      const failed = approved.filter((p) => (p.result as { isError?: boolean } | null)?.isError);
+      const ran = approved.length - failed.length;
+      if (ran > 0) {
+        addToast(
+          t('approvals.toast.approvedN', 'Approved {count}. Each can be undone on its own in Decided.').replace('{count}', String(ran)),
+          'success',
+          10000,
+          { label: t('approvals.toast.seeDecided', 'See them'), onClick: () => setTab('decided') },
+        );
+      }
+      if (failed.length > 0) {
+        addToast(
+          t('approvals.toast.approvedNotRun', '{count} approved but did not run. Decided says why.').replace('{count}', String(failed.length)),
+          'error',
+          8000,
+          { label: t('approvals.toast.seeDecided', 'See them'), onClick: () => setTab('decided') },
+        );
+      }
+      if (refused.length > 0) {
+        addToast(
+          t('approvals.toast.someLeft', '{count} did not go through and are still here to open one by one.').replace('{count}', String(refused.length)),
+          'error',
+          8000,
+        );
+      }
+      proposals.refetch();
+      actions.refetch();
+      window.dispatchEvent(new Event(WAITING_CHANGED_EVENT));
+    } catch {
+      addToast(t('approvals.error.decide', 'That decision could not be saved. Try again.'), 'error', 6000);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const declineTogether = async (chosen: AgentProposal[]) => {
+    setBulkBusy(true);
+    let declined = 0;
+    try {
+      for (const proposal of chosen) {
+        const { response } = await api.POST('/api/v1/me/agent-proposals/{id}/decline', {
+          params: { path: { id: proposal.id } },
+          body: {} as never,
+        });
+        if (response.ok) declined += 1;
+      }
+      addToast(t('approvals.toast.declinedN', 'Declined {count}.').replace('{count}', String(declined)), 'info');
+      if (declined < chosen.length) {
+        addToast(t('approvals.error.decide', 'That decision could not be saved. Try again.'), 'error', 6000);
+      }
+    } finally {
+      proposals.refetch();
+      actions.refetch();
+      window.dispatchEvent(new Event(WAITING_CHANGED_EVENT));
+      setBulkBusy(false);
+    }
+  };
+
+  const openOnItsOwn = (proposal: AgentProposal) => {
+    setCurrentId(String(proposal.id));
+    setView('one');
+  };
+
+  const queueItems: ApprovalQueueItem[] = waiting.map((proposal) => {
+    const plan = impactPlanOf(proposal);
+    const ticked = acknowledged.has(proposal.id);
+    return {
+      id: String(proposal.id),
+      ...cardProps(proposal),
+      busy: busyId === proposal.id,
+      onApprove: () => void decide(proposal, 'approve', undefined, plan && ticked ? { acknowledgedDestructive: true } : {}),
+      onDecline: () => void decide(proposal, 'decline'),
+      onEdit: () => setEditing(proposal),
+      // WHIT-1042: a Whity Builder publish or roll back reads as its impact plan.
+      ...(plan
+        ? impactPlanCard(plan, {
+            acknowledged: ticked,
+            onAcknowledge: (value) =>
+              setAcknowledged((current) => {
+                const next = new Set(current);
+                if (value) next.add(proposal.id);
+                else next.delete(proposal.id);
+                return next;
+              }),
+            onAskToFix: (reason) => void decide(proposal, 'decline', undefined, { reason }),
+            busy: busyId === proposal.id,
+            agent: agentName(proposal, words),
+          })
+        : {}),
+    };
+  });
 
   // Derived each render: a few dozen rows at most (the list is capped at 50).
   const actionExtra = (action: AgentAction) => {
@@ -284,14 +442,18 @@ export default function ApprovalsPage() {
     <div>
       <AdminHeader
         title={t('approvals.title', 'Approvals')}
-        description={t('approvals.description', 'Agents ask here before they do anything you set to “Ask first”.')}
+        description={t('approvals.description.askFirst', 'Agents ask here before they do anything you set to “Ask first”.')}
         action={
-          <Button variant="outline" asChild>
-            <Link href="/admin/ai-principals">
-              <Icon name="scope" size={16} />
-              {t('approvals.scopes', 'Agent scopes')}
-            </Link>
-          </Button>
+          <ViewToggle<'one' | 'list'>
+            label={t('approvals.view', 'How to review')}
+            value={view}
+            onChange={setView}
+            showLabels
+            options={[
+              { value: 'one', label: t('approvals.view.one', 'One at a time') },
+              { value: 'list', label: t('approvals.view.list', 'List') },
+            ]}
+          />
         }
       />
 
@@ -320,6 +482,16 @@ export default function ApprovalsPage() {
                 label={t('approvals.loading', 'Loading…')}
                 headers={[t('approvals.loading.agent', 'Agent'), t('approvals.loading.request', 'Request')]}
                 rows={3}
+              />
+            ) : view === 'list' ? (
+              <ApprovalsList
+                proposals={waiting}
+                words={words}
+                onOpen={openOnItsOwn}
+                onApproveTogether={approveTogether}
+                onDeclineTogether={declineTogether}
+                busy={bulkBusy}
+                now={now}
               />
             ) : (
               <div className="grid gap-6 lg:grid-cols-[minmax(0,560px)_minmax(0,1fr)]">
@@ -366,11 +538,14 @@ export default function ApprovalsPage() {
                 description={t('approvals.decided.emptyDescription', 'Proposals you approve or decline stay here.')}
               />
             ) : (
-              <div className="grid max-w-[560px] gap-4">
-                {decided.map((proposal) => (
-                  <ActionProposal key={proposal.id} {...cardProps(proposal)} />
-                ))}
-              </div>
+              <DecidedList
+                proposals={decided}
+                words={words}
+                me={user?.display_name || t('approvals.decided.you', 'You')}
+                now={now}
+                undoingId={undoingId}
+                onUndo={(action) => void undo(action)}
+              />
             )}
           </TabsContent>
 
@@ -400,11 +575,22 @@ export default function ApprovalsPage() {
       {editing && (
         <EditProposalDialog
           proposal={editing}
+          agent={agentName(editing, words)}
           busy={busyId === editing.id}
           onCancel={() => setEditing(null)}
           onApprove={(args) => void decide(editing, 'approve', args)}
         />
       )}
+      <ConfirmItsYouDialog
+        check={gated?.check ?? null}
+        busy={gated !== null && busyId === gated.proposal.id}
+        error={gateError}
+        onCancel={() => setGated(null)}
+        onClearError={() => setGateError(null)}
+        onConfirm={(code) => {
+          if (gated !== null) void decide(gated.proposal, 'approve', gated.args, { ...gated.extra, code });
+        }}
+      />
     </div>
   );
 }

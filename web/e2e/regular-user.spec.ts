@@ -34,7 +34,7 @@ test.describe('Regular user (non-admin)', () => {
       'Users',
       'Roles',
       'Organizational Units',
-      'Tenants',
+      'Workspaces',
       'Delegations',
       'Audit Logs',
       'Family Relations',
@@ -47,12 +47,14 @@ test.describe('Regular user (non-admin)', () => {
     // The home is everyone's (H.1), so its link is always there.
     await expect(userPage.shell.navLink('Dashboard')).toBeVisible();
 
-    // The workspace Settings area is gated, so a plain user has no Settings
-    // entry; their own account is always reachable from the user row.
-    await expect(userPage.shell.navLink('Settings')).toHaveCount(0);
+    // Settings is everyone's since WHIT-1081: a plain user's opens their own
+    // settings, and the workspace's groups stay out of its sub-nav. Their
+    // account is also reachable from the user row.
+    await expect(userPage.shell.navLink('Settings')).toHaveCount(1);
+    await userPage.shell.openAccountMenu();
     await expect(userPage.shell.accountLink).toBeVisible();
     await expect(userPage.shell.logoutButton).toBeVisible();
-    await expect(userPage.shell.sidebar.getByText('Logged in as')).toBeVisible();
+    await page.keyboard.press('Escape');
   });
 
   test('an admin data page reached by direct URL degrades safely (data-layer 403)', async ({
@@ -90,8 +92,8 @@ test.describe('Regular user (non-admin)', () => {
 
   test('settings page is accessible and shows the user role', async ({ userPage, page }) => {
     await userPage.shell.openAccountSettings();
-    await page.waitForURL('**/settings');
-    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
+    await page.waitForURL('**/settings/profile');
+    await expect(page.getByRole('heading', { name: 'Profile', level: 1 })).toBeVisible();
     await expect(page.getByText(REGULAR_USER.email).first()).toBeVisible();
   });
 
@@ -104,9 +106,10 @@ test.describe('Regular user (non-admin)', () => {
     // and cancel it (no confirm) so the user's account is never actually
     // enrolled, keeping user@example.com a plain-login account for other specs.
     await userPage.shell.openAccountSettings();
-    await page.waitForURL('**/settings');
-    // Two-step sign-in lives in the account page's Sign-in and security tab.
-    await page.getByRole('tab', { name: 'Sign-in and security' }).click();
+    await page.waitForURL('**/settings/profile');
+    // Two-step sign-in is its own page in My settings (WHIT-1081).
+    await page.getByTestId('settings-area-link-password').click();
+    await page.waitForURL('**/settings/security');
 
     const enable = page.getByRole('button', { name: 'Enable 2FA' });
     await expect(enable).toBeVisible();

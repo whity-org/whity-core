@@ -7,9 +7,6 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
 const mockApiClient = jest.fn();
-jest.mock('@/lib/api-client', () => ({
-  apiClient: (...args: unknown[]) => mockApiClient(...args),
-}));
 
 let mockGlobal: Record<string, string> = {};
 jest.mock('@/lib/api/client', () => ({
@@ -17,6 +14,7 @@ jest.mock('@/lib/api/client', () => ({
     GET: async () => ({ data: { data: { global: mockGlobal, registry: [] } } }),
     PATCH: async () => ({ data: {} }),
   },
+  apiFetch: (...args: unknown[]) => mockApiClient(...args),
 }));
 
 jest.mock('@/hooks/useCapabilities', () => ({

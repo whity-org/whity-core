@@ -2,6 +2,7 @@ import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import { IconInbox, IconAlertTriangle } from "@tabler/icons-react"
 
+import { Lottie, type MomentName } from "./lottie"
 import { cn } from "./utils"
 
 /**
@@ -40,6 +41,16 @@ export interface EmptyStateProps
   description?: string
   /** Slot for a retry/create/etc. control — typically a <Button>. */
   action?: React.ReactNode
+  /**
+   * A Lottie moment in place of the icon (LT.4): `empty-*` the first time a list
+   * is empty, `no-results` after a search, `all-caught-up` when nothing waits.
+   * One scene at most on a screen; the icon shows until it is ready.
+   */
+  moment?: MomentName
+  /** Play the moment once a session under this key (empty lists), then show it still. */
+  once?: string
+  /** Play the moment once ever on this device (first-run scenes such as `agents-propose`). */
+  onceEver?: string
 }
 
 function EmptyState({
@@ -49,6 +60,9 @@ function EmptyState({
   title,
   description,
   action,
+  moment,
+  once,
+  onceEver,
   ...props
 }: EmptyStateProps) {
   const resolvedVariant = variant ?? "empty"
@@ -65,13 +79,25 @@ function EmptyState({
       className={cn(emptyStateVariants({ variant }), className)}
       {...props}
     >
-      <div
-        data-slot="empty-state-icon"
-        aria-hidden="true"
-        className="text-muted-foreground [&>svg]:size-8 [&>svg]:stroke-1"
-      >
-        {icon ?? defaultIcon}
-      </div>
+      {moment ? (
+        <Lottie
+          name={moment}
+          once={once}
+          onceEver={onceEver}
+          className="h-[120px] w-[160px]"
+          fallback={
+            <span className="text-muted-foreground [&>svg]:size-8 [&>svg]:stroke-1">{icon ?? defaultIcon}</span>
+          }
+        />
+      ) : (
+        <div
+          data-slot="empty-state-icon"
+          aria-hidden="true"
+          className="text-muted-foreground [&>svg]:size-8 [&>svg]:stroke-1"
+        >
+          {icon ?? defaultIcon}
+        </div>
+      )}
       <div data-slot="empty-state-title" className="text-sm font-medium text-foreground">
         {title}
       </div>

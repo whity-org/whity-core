@@ -27,6 +27,10 @@ use Whity\Core\Document\Render\FlowDocumentRenderer;
 use Whity\Core\Document\Render\RenderServiceUnavailableException;
 use Whity\Core\Document\Theme\DocumentThemeRepository;
 use Whity\Core\Entitlement\MeterService;
+use Whity\Core\Document\Blocks\DocumentBlockRegistry;
+use Whity\Core\Document\Blocks\PluginBlockPrinter;
+use Whity\Core\Document\SavedBlock\SavedBlockExpander;
+use Whity\Core\Document\SavedBlock\SavedBlockRepository;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\RBAC\ScopedPermissionSet;
 use Whity\Core\Request;
@@ -69,6 +73,8 @@ final class DocumentPublishingApiHandler
 
     private ?DocumentIssuing $issuing;
 
+    private ?SavedBlockExpander $savedBlocks;
+
     public function __construct(
         private readonly DocumentSourcesApiHandler $sources,
         private readonly DocumentSourceVersionRepository $versions,
@@ -90,10 +96,19 @@ final class DocumentPublishingApiHandler
         private readonly ?DocumentCollab $collab = null,
         // The workspace's own name for a letterhead with none set (WHIT-999).
         ?WorkspaceName $workspace = null,
+        // Synced saved blocks (editor M7, E.38): drafts print the library's
+        // current blocks; publishing freezes them into the version.
+        ?SavedBlockRepository $savedBlocks = null,
+        // Plugin blocks (editor M7, E.17-E.19): printed from their print views,
+        // and a plugin that is off blocks publishing.
+        ?DocumentBlockRegistry $documentBlocks = null,
     ) {
+        $this->savedBlocks = $savedBlocks !== null
+            ? new SavedBlockExpander($savedBlocks, $documentBlocks !== null ? new PluginBlockPrinter($documentBlocks) : null)
+            : null;
         $this->print = new SourceDocumentPrinter($fields, $embeds, $settings, $files, $printLabels, $logo, $themes, $workspace);
         $this->issuing = $issuing ?? ($issuer !== null
-            ? new DocumentIssuing($this->print, $versions, $issuer, $settings, $renderer, $qr, $meters)
+            ? new DocumentIssuing($this->print, $versions, $issuer, $settings, $renderer, $qr, $meters, savedBlocks: $this->savedBlocks)
             : null);
     }
 
@@ -184,7 +199,7 @@ final class DocumentPublishingApiHandler
         // never resolves again, so a theme changed later reaches it only when
         // a person publishes it again.
         $theme = $this->print->theme($tenantId, $row['theme'] ?? null, (string) $row['kind']);
-        $version = $this->versions->publish((int) $row['id'], $tenantId, $base, $callerId, $theme);
+        $version = $this->versions->publish((int) $row['id'], $tenantId, $base, $callerId, $theme, $this->freeze($tenantId, (string) ($row['lang'] ?? 'en')));
         if ($version === null) {
             return Response::error('The document changed since it was checked', 409);
         }
@@ -205,7 +220,7 @@ final class DocumentPublishingApiHandler
         }
         $theme = $this->print->theme($tenantId, $row['theme'] ?? null, (string) $row['kind']);
 
-        return $this->versions->publish((int) $row['id'], $tenantId, (int) $row['draft_version'], $callerId, $theme);
+        return $this->versions->publish((int) $row['id'], $tenantId, (int) $row['draft_version'], $callerId, $theme, $this->freeze($tenantId, (string) ($row['lang'] ?? 'en')));
     }
 
     /** @param array<string, string> $params */
@@ -312,7 +327,7 @@ final class DocumentPublishingApiHandler
 
         $version = null;
         if ($draft) {
-            $doc = ['title' => (string) $row['title'], 'page' => $row['page'], 'blocks' => $row['blocks'], 'version' => null];
+            $doc = ['title' => (string) $row['title'], 'page' => $row['page'], 'blocks' => $this->current($tenantId, $row['blocks'], (string) ($row['lang'] ?? 'en')), 'version' => null];
         } else {
             $published = $row['published_version'] !== null
                 ? $this->versions->find((int) $row['id'], $tenantId, (int) $row['published_version'])
@@ -456,7 +471,7 @@ final class DocumentPublishingApiHandler
 
         $body = JsonBody::parsed($request);
         if (($body['draft'] ?? false) === true) {
-            $doc = ['page' => $row['page'], 'blocks' => $row['blocks'], 'own_fields' => $row['own_fields'] ?? []];
+            $doc = ['page' => $row['page'], 'blocks' => $this->current($tenantId, $row['blocks'], (string) ($row['lang'] ?? 'en')), 'own_fields' => $row['own_fields'] ?? []];
             $theme = $this->print->theme($tenantId, $row['theme'] ?? null, (string) $row['kind']);
         } else {
             $published = $row['published_version'] !== null
@@ -577,16 +592,61 @@ final class DocumentPublishingApiHandler
     }
 
     /**
+     * A draft's blocks with its synced saved blocks as the library has them now (E.38).
+     *
+     * @return list<mixed>
+     */
+    private function current(int $tenantId, mixed $blocks, string $lang = 'en'): array
+    {
+        $blocks = is_array($blocks) ? array_values($blocks) : [];
+
+        return $this->savedBlocks?->expand($tenantId, $blocks, $lang) ?? $blocks;
+    }
+
+    /**
+     * What publishing keeps: the synced saved blocks frozen as they are now,
+     * so the version prints the same until it is published again (E.38).
+     *
+     * @return (callable(list<mixed>): list<mixed>)|null
+     */
+    private function freeze(int $tenantId, string $lang): ?callable
+    {
+        $expander = $this->savedBlocks;
+
+        return $expander !== null ? static fn (array $blocks): array => $expander->expand($tenantId, $blocks, $lang) : null;
+    }
+
+    /**
      * @param array<string, mixed> $row
      * @return list<array<string, mixed>>
      */
     private function blockers(int $tenantId, int $callerId, array $row): array
     {
+        // Checked as it would publish: synced saved blocks as their blocks (E.38).
+        $blocks = $this->current($tenantId, $row['blocks'] ?? [], (string) ($row['lang'] ?? 'en'));
+        $row['blocks'] = $blocks;
         $type = $row['record_type'] !== null ? (string) $row['record_type'] : null;
         $blockers = DocumentPublishCheck::blockers(
-            is_array($row['blocks'] ?? null) ? array_values($row['blocks']) : [],
+            $blocks,
             $this->fields->paths($tenantId, $type) + self::ownPaths($row['own_fields'] ?? []),
         );
+        // E.19: a block whose plugin is off or gone names its plugin, once,
+        // rather than reading as a block with no print view.
+        $missing = $this->savedBlocks?->missingPlugins($tenantId, $blocks) ?? [];
+        if ($missing !== []) {
+            $named = [];
+            $blockers = array_values(array_filter($blockers, static function (array $b) use ($missing, &$named): bool {
+                if ($b['kind'] !== 'block-without-print-view' || !isset($missing[$b['blockId']])) {
+                    return true;
+                }
+                $named[$missing[$b['blockId']]] = true;
+
+                return false;
+            }));
+            foreach (array_keys($named) as $plugin) {
+                $blockers[] = ['kind' => 'missing-plugin', 'plugin' => (string) $plugin];
+            }
+        }
 
         // E.37: a template isn't published while suggestions on it are open;
         // someone who can edit accepts or rejects them first.

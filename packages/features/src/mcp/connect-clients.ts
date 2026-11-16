@@ -165,19 +165,31 @@ export function mcpEndpoint(endpoint: string, options: { allTools?: boolean } = 
   return `${base}${separator}tools=full${hash !== '' ? `#${hash}` : ''}`
 }
 
+/** Strips one character from both ends in linear time (a `^c+|c+$` regex can backtrack). */
+function trimChar(value: string, char: string): string {
+  let start = 0
+  let end = value.length
+  while (start < end && value[start] === char) start++
+  while (end > start && value[end - 1] === char) end--
+  return value.slice(start, end)
+}
+
 /**
  * The server key an app stores the connection under: lowercase letters, digits
  * and dashes, which every client accepts as a JSON key, a TOML table name and a
  * bare command-line argument.
  */
 export function mcpServerName(name: string): string {
-  const slug = name
-    .toLowerCase()
-    .normalize('NFKD')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 48)
-    .replace(/-+$/g, '')
+  const slug = trimChar(
+    trimChar(
+      name
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[^a-z0-9]+/g, '-'),
+      '-',
+    ).slice(0, 48),
+    '-',
+  )
   return slug === '' ? 'whity' : slug
 }
 

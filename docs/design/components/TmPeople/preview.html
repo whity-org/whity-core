@@ -1,0 +1,63 @@
+<!-- @dsCard group="Mobile" height=954 width=1880 subtitle="M.40: managing people on the go: the list, a person, people asking to join, and inviting" -->
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Mobile people</title><style>html,body{height:100%;margin:0} #root{min-height:100%} </style></head>
+<body>
+<div id="root"></div>
+<script>
+  var W = window.Whity, h = React.createElement, F = React.Fragment;
+  function I(n, s) { return h(W.Icon, { name: n, size: s || 22 }); }
+  var T0 = { home: 'Home', inbox: 'Inbox', create: 'Create', agents: 'Chat', agentsIcon: 'comment', more: 'More' };
+  function status() { return h('div', { className: 'wm-status', 'aria-hidden': 'true' }, h('span', null, '9:41'), h('i'), h('span', null, I('wifi', 16), I('battery', 18))); }
+  function tabbar(active, T, badges) { T = T || T0; badges = badges || { inbox: 3 };
+    function tab(k, icon) { return h('div', { key: k, className: 'wm-tab' + (active === k ? ' is-on' : '') }, I(icon, 24), T[k], badges[k] ? h('b', null, badges[k]) : null); }
+    return h('nav', { className: 'wm-tabbar', 'aria-label': 'Main' }, tab('home', 'dashboard'), tab('inbox', 'inbox'), h('button', { key: 'c', className: 'wm-create', 'aria-label': T.create }, I('plus', 28)), tab('agents', T.agentsIcon || 'robot'), tab('more', 'menu')); }
+  function bottom(o) { o = o || {}; return h('div', { className: 'wm-bottom' }, o.action || null, o.search || null, o.tabs === false ? null : tabbar(o.active, o.T, o.badges), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function phone(label, kids, o) { o = o || {}; return h('div', { className: 'wm-col' }, h('div', { className: 'wm-label' }, label), h('div', { className: 'wm-phone', dir: o.dir }, status(), kids, o.overlay || null)); }
+  function search(t, f) { return h('div', { className: 'wm-search' }, I('search', 20), h('span', null, t), f ? h('button', { type: 'button' }, I('filter', 16), f) : null); }
+  function stage(blue, tag, kids, keys) { var LOT = { 'YOUR BRAND, OUR PLATFORM': ['brand-sheet-platform', 'view'], 'AGENTS PROPOSE': ['agents-propose', 'view'], 'YOU DECIDE': ['approve-set-down', 'view'], 'IN THE APP': ['approve-set-down', 'view'], 'UPDATING · LOOPS': ['updating', 'loop'], 'ALL CAUGHT UP': ['all-caught-up', 'view'] }; var l = LOT[tag]; if (!l) return h('div', { className: 'wm-lottie' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, 'LOTTIE · ' + tag), kids, keys ? h('div', { className: 'wm-keys' }, keys.map(function (k, i) { return h('span', { key: i }, k); })) : null); return h('div', { className: 'wm-lottie has-file' + (blue ? ' is-blue' : ''), role: 'img', 'aria-label': tag }, h('span', { className: 'wm-lottag' }, l[0] + '.json'), h('div', { className: 'w-lottie', 'data-lottie': 'lottie/' + l[0] + '.json', 'data-play': l[1] }, h('div', { className: 'w-lottie__fallback' }, kids))); }
+  function at(cls, x, y, extra) { return h('div', { className: cls, style: Object.assign({ left: x, top: y }, extra || {}) }); }
+  function dots(n, on) { var a = []; for (var i = 0; i < n; i++) a.push(h('i', { key: i, className: i === on ? 'is-on' : '' })); return h('div', { className: 'wm-dots' }, a); }
+  function foot(kids) { return h('div', { className: 'wm-bottom' }, h('div', { className: 'wm-form', style: { borderTop: 0 } }, kids), h('div', { className: 'wm-home-ind' }, h('i'))); }
+  function q(title, sub, step, of) { return h(F, null, h('div', { className: 'wm-progress', 'aria-hidden': 'true' }, h('i', { style: { width: Math.round(step / of * 100) + '%' } })), h('div', { className: 'wm-q' }, h('h1', null, title), sub ? h('p', null, sub) : null)); }
+  function choice(t, sub, on, icon) { return h('div', { className: 'wm-choice' + (on ? ' is-on' : '') }, icon ? I(icon, 24) : null, h('span', null, t, sub ? h('small', null, sub) : null), h('i', { className: 'wm-radio' })); }
+  function navbar(t) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), h('span')); }
+
+  var SEED = 'amro@examplebakery.jo', HUE = W.brandHue('#0961bb');
+  function me(s) { return h(W.Avatar, { name: 'Amro Saleh', pattern: SEED, hue: HUE, size: s || 40 }); }
+  function pav(seed, name, s) { return h(W.Avatar, { name: name, pattern: seed, hue: HUE, size: s || 40 }); }
+  function nav(t, end) { return h('div', { className: 'wm-nav' }, h('button', { 'aria-label': 'Back' }, I('chevron-left', 26)), h('b', null, t || ''), end || h('span')); }
+  function head(t, sub) { return h('div', { className: 'wm-head' }, h('h1', null, t), sub ? h('p', null, sub) : null); }
+  function gl(t) { return h('div', { className: 'wm-gl' }, t); }
+  function gf(t) { return h('div', { className: 'wm-gf' }, t); }
+  function grp() { return h('div', { className: 'wm-group' }, Array.prototype.slice.call(arguments)); }
+  function set(icon, t, v, o) { o = o || {};
+    var end = o.end !== undefined ? o.end : o.sw !== undefined ? h(W.Switch, { defaultChecked: o.sw, 'aria-label': t }) : I(o.ext ? 'external' : 'chevron-right', 18);
+    return h('div', { className: 'wm-set' + (o.danger ? ' is-danger' : '') + (o.link ? ' is-link' : '') }, icon ? h('span', { className: 'wm-set__ic' + (o.tone ? ' is-' + o.tone : '') }, typeof icon === 'string' ? I(icon, 20) : icon) : null,
+      h('span', { className: 'wm-set__t' }, t, o.sub ? h('small', null, o.sub) : null), v != null ? h('span', { className: 'wm-set__v' }, v) : null, end); }
+  function segs(a, on, cls) { return h('div', { className: 'wm-segs' + (cls ? ' ' + cls : ''), role: 'tablist' }, a.map(function (x, i) { return h('span', { key: i, role: 'tab', 'aria-selected': i === on, className: i === on ? 'is-on' : '' }, x[0], x[1] ? h('em', null, x[1]) : null); })); }
+  function chips(a, on) { return h('div', { className: 'wm-chips' }, a.map(function (x, i) { return h('span', { key: i, className: on.indexOf(i) > -1 ? 'is-on' : '' }, on.indexOf(i) > -1 ? I('check', 16) : null, x); })); }
+  function scroll() { return h('div', { className: 'wm-scroll' }, Array.prototype.slice.call(arguments)); }
+  function sheet(title, kids) { return h(F, null, h('div', { className: 'wm-scrim' }), h('div', { className: 'wm-sheet', role: 'dialog', 'aria-label': title }, h('div', { className: 'wm-grab' }), title ? h('h2', null, title) : null, kids, h('div', { className: 'wm-home-ind' }, h('i')))); }
+  function act() { return bottom({ tabs: false, action: h('div', { className: 'wm-actbar' }, Array.prototype.slice.call(arguments)) }); }
+  function searchrow(t) { return h('div', { className: 'wm-searchrow' }, search(t, 'Filter'), h('button', { 'aria-label': 'Invite people' }, I('plus', 24))); }
+  function li(ic, t, sub, end, agent) { return h('div', { className: 'wm-li' + (agent ? ' is-agent' : '') }, typeof ic === 'string' ? h('span', { className: 'wm-li__ic' }, I(ic, 20)) : ic, h('div', { style: { minWidth: 0 } }, h('b', null, t), h('small', null, sub)), h('div', { className: 'wm-li__end' }, end)); }
+  function ac(ic, tone, t, sub, extra) { return h('div', { className: 'wm-act' }, typeof ic === 'string' ? h('span', { className: 'wm-set__ic' + (tone ? ' is-' + tone : '') }, I(ic, 18)) : ic, h('div', null, t, h('small', null, sub), extra || null)); }
+  function badge(v, t) { return h(W.Badge, { variant: v }, t); }
+
+  function prow(seed, name, sub, end) { return h('div', { className: 'wm-li' }, pav(seed, name, 40), h('div', { style: { minWidth: 0 } }, h('b', null, name), h('small', null, sub)), h('div', { className: 'wm-li__end' }, end || null)); }
+  function plist() { return h('div', { className: 'wm-list' }, prow(SEED, 'Amro Saleh', 'Owner', 'You'), prow('emad.n@examplebakery.jo', 'Emad Nasser', 'Manager'), prow('ahmad.k@examplebakery.jo', 'Ahmad Khalil', 'Purchasing'), prow('awss.haddad@examplebakery.jo', 'Awss Haddad', 'Front of house', badge('warning', 'No two-step')), prow('ibrahim@examplebakery.jo', 'Ibrahim Mansour', 'Baker'), prow('emad@examplebakery.jo', 'Emad Shami', 'Baker, paused', badge('secondary', 'Paused'))); }
+  var people = h(F, null, head('People', '14 people · Example Bakery'), segs([['Everyone', 14], ['Want to join', 2], ['Invited', 3]], 0), scroll(plist()), bottom({ active: 'more', search: searchrow('Search people') }));
+  var person = h(F, null, nav('', h('button', { 'aria-label': 'More' }, I('more', 22))), scroll(h('div', { className: 'wm-person' }, pav('awss.haddad@examplebakery.jo', 'Awss Haddad', 80), h('b', null, 'Awss Haddad'), h('small', null, 'Front of house · since March'), h('div', { className: 'wm-quick' }, h('span', null, h('i', null, I('phone', 22)), 'Call'), h('span', null, h('i', null, I('whatsapp', 22)), 'WhatsApp'), h('span', null, h('i', null, I('mail', 22)), 'Email'))),
+    grp(set(null, 'Role', 'Front of house'), set(null, 'Groups', 'Shop floor'), set(null, 'Unit', 'Abdoun branch'), set(null, 'Two-step sign-in', 'Off', { end: h(W.Button, { variant: 'outline', size: 'sm' }, 'Remind') })),
+    grp(set('pause', 'Pause access', null, { sub: 'Signs his out now. Nothing is deleted.' }), set('two-step', 'Reset two-step sign-in', null, { end: I('lock', 18) }), set('logout', 'Remove from Example Bakery', null, { danger: true, tone: 'red', end: I('lock', 18) })),
+    h('a', { className: 'wm-cap', style: { color: 'var(--primary)', textAlign: 'center' } }, 'Permissions in detail, on the web')), bottom({ active: 'more' }));
+  function join(seed, name, how, email) { return h('div', { className: 'wm-check', style: { gap: 10 } }, h('div', { className: 'wm-check__top' }, pav(seed, name, 48), h('div', null, h('b', null, name), h('small', null, how))), h('div', { className: 'wm-cap' }, email),
+    h('div', { className: 'wm-sel' }, h('span', null, h('small', null, 'Joins as'), 'Member'), I('chevron-down', 18)), h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 10 } }, h(W.Button, { variant: 'outline' }, 'Decline'), h(W.Button, { icon: 'check' }, 'Let in'))); }
+  var joining = h(F, null, head('People', '14 people · Example Bakery'), segs([['Everyone', 14], ['Want to join', 2], ['Invited', 3]], 1), scroll(join('ahmad.khalil@mail.jo', 'Ahmad Odeh', 'From your sign-up link · 1 hour ago', 'ahmad.khalil@mail.jo'), join('ibrahim.m@mail.jo', 'Ibrahim Tamimi', 'Asked with a code · yesterday', 'ibrahim.m@mail.jo')), bottom({ active: 'more', search: searchrow('Search people') }));
+  var invite = h(F, null, head('People', '14 people · Example Bakery'), h('div', { className: 'wm-body' }), sheet('Invite people', h(F, null, h(W.Input, { label: 'Email or mobile number', defaultValue: 'sara.k@mail.jo', dir: 'ltr' }), gl('Their role'), chips(['Member', 'Front of house', 'Baker', 'Purchasing', 'Manager'], [1]),
+    h(W.Button, { icon: 'send' }, 'Send invitation'), h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 } }, h(W.Button, { variant: 'outline', icon: 'link' }, 'Share a link'), h(W.Button, { variant: 'outline', icon: 'qr' }, 'Show a QR')))));
+  ReactDOM.createRoot(document.getElementById('root')).render(h('div', { className: 'wm-row' }, phone('People', people), phone('A person', person), phone('Asking to join', joining), phone('Inviting', invite)));
+</script>
+</body>
+</html>

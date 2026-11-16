@@ -877,3 +877,41 @@ html[dir='rtl'] body {
 html[dir='rtl'] .flow-heading {
   line-height: 1.5;
 }
+
+/* E.46: a theme may set the title in the body face, Noto Sans 600 (Noto Sans
+ * Arabic 600 in Arabic), instead of Readex Pro. Only the display face moves;
+ * the weight stays 600. */
+.flow-title-body-face {
+  --flow-display: var(--flow-font);
+}
+
+/* E.47: large print. The body is 11pt, and the title and headings scale by the
+ * same step as the body (11 / 9.5): 25.5, 16, 14 and 12pt. Tables follow. The
+ * small labels and running heads keep their size. Arabic stays at 100% of the
+ * Latin size (3.7a), so nothing here depends on the direction. */
+body.flow-large-print {
+  font-size: 11pt;
+}
+
+.flow-large-print .flow-heading-1,
+.flow-large-print .flow-letterhead-title {
+  font-size: 25.5pt;
+}
+
+.flow-large-print .flow-heading-2 {
+  font-size: 16pt;
+}
+
+.flow-large-print .flow-heading-3 {
+  font-size: 14pt;
+}
+
+.flow-large-print .flow-heading-4,
+.flow-large-print .flow-heading-5,
+.flow-large-print .flow-heading-6 {
+  font-size: 12pt;
+}
+
+.flow-large-print .flow-table table {
+  font-size: 10.5pt;
+}

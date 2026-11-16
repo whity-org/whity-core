@@ -11,10 +11,37 @@ const mockApiClient = jest.fn();
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({ apiClient: mockApiClient, user: { id: 7, tenant_id: 1 }, memberships: [] }),
 }));
+// The typed client is adapted onto a URL router: the template, its path params
+// and its query become the concrete URL the tests route by.
+async function viaRouter(
+  method: string,
+  template: string,
+  options?: { params?: { path?: Record<string, unknown>; query?: Record<string, unknown> }; body?: unknown }
+) {
+  let url = template.replace(/\{(\w+)\}/g, (_m, k: string) => String(options?.params?.path?.[k]));
+  const query = Object.entries(options?.params?.query ?? {}).map(([k, v]) => `${k}=${v}`).join('&');
+  if (query !== '') url += `?${query}`;
+  const res = (await (method === 'GET' ? mockApiClient(url) : mockApiClient(url, { method, body: JSON.stringify(options?.body) }))) as { ok: boolean; status: number; json: () => Promise<unknown> };
+  const body = await res.json();
+  return {
+    data: res.ok ? body : undefined,
+    error: res.ok ? undefined : body,
+    response: new Response(null, { status: res.status ?? (res.ok ? 200 : 500) }),
+  };
+}
+jest.mock('@/lib/api/client', () => ({
+  api: {
+    GET: (...a: [string, never]) => viaRouter('GET', ...a),
+    POST: (...a: [string, never]) => viaRouter('POST', ...a),
+    PUT: (...a: [string, never]) => viaRouter('PUT', ...a),
+  },
+  apiFetch: (...a: unknown[]) => mockApiClient(...a),
+}));
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));
 jest.mock('@/lib/capabilities-context', () => ({ useCapabilitiesContext: () => ({ has: () => true }) }));
-jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+const mockPush = jest.fn();
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }));
 jest.mock('next/link', () => ({
   __esModule: true,
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
@@ -97,6 +124,16 @@ describe('WaitingForYou', () => {
     await waitFor(() =>
       expect(mockApiClient).toHaveBeenCalledWith('/api/v1/me/agent-proposals/1/approve', expect.objectContaining({ method: 'POST' })),
     );
+  });
+
+  it('opens a Needs verifying proposal on Approvals instead of approving it here (AG.1)', async () => {
+    serve([{ key: 'proposal:1', kind: 'proposal', at: '2026-11-01 09:00:00', proposal: { ...proposal(1, '2026-11-01 09:00:00'), tier: 3 } }]);
+    render(<WaitingForYou />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Open' }));
+    expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument();
+    expect(mockPush).toHaveBeenCalledWith('/admin/approvals');
+    expect(mockApiClient).not.toHaveBeenCalledWith('/api/v1/me/agent-proposals/1/approve', expect.anything());
   });
 
   it('does not say nothing is waiting when a source failed', async () => {
