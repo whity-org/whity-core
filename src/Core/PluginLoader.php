@@ -2041,7 +2041,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                 continue;
             }
             foreach ($descriptors as $descriptor) {
-                $refused = is_array($descriptor) // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                $refused = is_array($descriptor) // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                     ? $registry->register($descriptor, $plugin->getName())
                     : 'getMcpResources() returned a non-array descriptor';
                 if ($refused !== null) {
@@ -2107,7 +2107,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             }
 
             foreach ($descriptors as $descriptor) {
-                if (!is_array($descriptor)) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                if (!is_array($descriptor)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                     $this->logWarning("[Plugin:{$pluginKey}] getMcpTools() returned a non-array descriptor — skipped.");
                     continue;
                 }
@@ -2540,7 +2540,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // Migrations cannot be queried without a PDO, so report what is declared.
         $declaredMigrations = [];
         foreach ($plugin->getMigrations() as $fqcn) {
-            if (is_string($fqcn)) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+            if (is_string($fqcn)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                 $short = substr((string) strrchr('\\' . $fqcn, '\\'), 1);
                 $declaredMigrations[] = 'plugin:' . $plugin->getName() . ':' . $short;
             }
@@ -3433,7 +3433,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                 ? $this->permissionRegistry->getBySource($plugin->getName())
                 : $plugin->getPermissions();
             foreach ($source as $permission) {
-                if (is_string($permission)) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                if (is_string($permission)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                     $declared[] = $permission;
                 }
             }
@@ -3447,7 +3447,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         try {
             if ($plugin instanceof \Whity\Sdk\PluginCustomerPermissionsInterface) {
                 foreach ($plugin->getCustomerPermissions() as $slug) {
-                    if (!is_string($slug)) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                    if (!is_string($slug)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                         continue;
                     }
                     if (($this->claimedPermissions[$slug] ?? null) !== $pluginKey) {
@@ -3659,7 +3659,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             $requiredPermission = $route['requiredPermission'] ?? null;
             if (
                 $requiredPermission !== null
-                && (!is_string($requiredPermission) || preg_match(self::PERMISSION_PATTERN, $requiredPermission) !== 1) // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                && (!is_string($requiredPermission) || preg_match(self::PERMISSION_PATTERN, $requiredPermission) !== 1) // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
             ) {
                 $this->logWarning(
                     "Plugin {$pluginKey} route {$method} {$path} declares an invalid requiredPermission; "
@@ -3736,7 +3736,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                 }
             }
 
-            if (is_callable($handler)) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+            if (is_callable($handler)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                 // The optional 'schema' key (WC-166) carries the route's typed
                 // OpenAPI declaration through to the router/generator.
                 $schema = isset($route['schema']) && is_array($route['schema']) ? $route['schema'] : null;
@@ -4184,7 +4184,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         //     and the registry are untouched.
         try {
             foreach ($plugin->getPermissions() as $permission) {
-                if (is_string($permission) && !isset($this->claimedPermissions[$permission])) { // @phpstan-ignore function.alreadyNarrowedType, function.alreadyNarrowedType, function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                if (is_string($permission) && !isset($this->claimedPermissions[$permission])) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
                     $this->claimedPermissions[$permission] = $pluginKey;
                 }
             }
