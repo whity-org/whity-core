@@ -51,12 +51,18 @@ final class FieldType
 
     /**
      * What a repeating question's column may be: the kinds a table cell can draw
-     * and check on its own. No files or pickers in a cell, because neither has a
-     * single value a row can hold on its own, and no table inside a table.
+     * and check on its own. No files or unit pickers in a cell, and no table
+     * inside a table.
+     *
+     * A PERSON is allowed (WHIT-1162): one profile id is a single value a row can
+     * hold, and a list of people (students, co-researchers) is exactly what a
+     * table is for. A person cell is checked like a top-level `profile_ref`
+     * answer, in the caller's tenant, and a step's `exclude_named_in` naming the
+     * table leaves everyone in its person cells out.
      *
      * @var list<string>
      */
-    public const COLUMN_KINDS = [self::TEXT, self::TEXTAREA, self::NUMBER, self::DATE, self::SELECT, self::CHECKBOX];
+    public const COLUMN_KINDS = [self::TEXT, self::TEXTAREA, self::NUMBER, self::DATE, self::SELECT, self::CHECKBOX, self::PROFILE_REF];
 
     /**
      * The kinds whose choices the AUTHOR writes down, and which therefore
@@ -148,5 +154,92 @@ final class FieldType
     public static function isReference(string $type): bool
     {
         return $type === self::PROFILE_REF || $type === self::OU_REF;
+    }
+
+    /**
+     * A repeating question's columns, as `{key, type}` pairs, whichever shape its
+     * `validation` arrives in (an array, or the `\stdClass` an empty rule set is
+     * read as). Any other kind of question has none.
+     *
+     * @param array<string, mixed> $field
+     * @return list<array{key: string, type: string}>
+     */
+    public static function columnsOf(array $field): array
+    {
+        if (($field['field_type'] ?? null) !== self::REPEATING) {
+            return [];
+        }
+        $rules = $field['validation'] ?? null;
+        if ($rules instanceof \stdClass) {
+            $rules = get_object_vars($rules);
+        }
+        $columns = is_array($rules) && is_array($rules['columns'] ?? null) ? $rules['columns'] : [];
+
+        $out = [];
+        foreach ($columns as $column) {
+            if (is_array($column) && is_string($column['key'] ?? null) && $column['key'] !== '') {
+                $out[] = ['key' => $column['key'], 'type' => is_string($column['type'] ?? null) ? $column['type'] : self::TEXT];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Whether a question's answer holds a reference anywhere: it is a reference
+     * itself, or it is a table with a reference column.
+     *
+     * @param array<string, mixed> $field
+     */
+    public static function holdsReference(array $field): bool
+    {
+        if (self::isReference((string) ($field['field_type'] ?? ''))) {
+            return true;
+        }
+        foreach (self::columnsOf($field) as $column) {
+            if (self::isReference($column['type'])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The profile ids a question's answer names: a `profile_ref` answer, or the
+     * person cells of a table's rows (WHIT-1162). Each once, in the order given.
+     *
+     * @param array<string, mixed> $field
+     * @return list<int>
+     */
+    public static function peopleIn(array $field, mixed $answer): array
+    {
+        $ids = [];
+        $add = static function (mixed $value) use (&$ids): void {
+            if (is_int($value) && $value > 0) {
+                $ids[$value] = $value;
+            } elseif (is_string($value) && ctype_digit($value) && (int) $value > 0) {
+                $ids[(int) $value] = (int) $value;
+            }
+        };
+
+        $type = (string) ($field['field_type'] ?? '');
+        if ($type === self::PROFILE_REF) {
+            foreach (is_array($answer) ? $answer : [$answer] as $value) {
+                $add($value);
+            }
+        } elseif ($type === self::REPEATING && is_array($answer)) {
+            $people = array_column(array_filter(self::columnsOf($field), static fn (array $c): bool => $c['type'] === self::PROFILE_REF), 'key');
+            foreach ($answer as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                foreach ($people as $key) {
+                    $add($row[$key] ?? null);
+                }
+            }
+        }
+
+        return array_values($ids);
     }
 }

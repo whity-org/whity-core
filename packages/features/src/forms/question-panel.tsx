@@ -21,7 +21,8 @@ import { localizedText } from "@whity/ui/localized-text"
 
 const NO_SECTION = "__none__"
 const ALWAYS = "__always__"
-const COLUMN_KINDS: FieldKind[] = ["text", "textarea", "number", "date", "select", "checkbox"]
+// WHIT-1162: a person column, such as the students on a research form.
+const COLUMN_KINDS: FieldKind[] = ["text", "textarea", "number", "date", "select", "checkbox", "profile_ref"]
 
 function Row({ id, label, hint, children }: { id?: string; label: string; hint?: string; children: ReactNode }) {
   return (

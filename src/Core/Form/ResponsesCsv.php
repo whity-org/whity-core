@@ -18,7 +18,9 @@ namespace Whity\Core\Form;
  * WHAT IS IN IT. The applicant's answers, as the record of what they said. Staff
  * answers are not: they have their own permission, and an export is easily passed on.
  * A file answer says how many are attached rather than giving the storage key, which
- * means nothing to a reader and shouldn't leave the system.
+ * means nothing to a reader and shouldn't leave the system. A person, asked
+ * directly or in a table's person column (WHIT-1162), is written as their name
+ * when the caller can look names up, not as the profile id.
  *
  * Stateless — worker-safe.
  */
@@ -97,8 +99,9 @@ final class ResponsesCsv
      *
      * @param list<array<string, mixed>> $fields Applicant fields, in order.
      * @param iterable<array<string, mixed>> $rows Normalized submissions.
+     * @param (callable(int): ?string)|null $names A person's display name by profile id.
      */
-    public static function build(array $fields, iterable $rows, string $language): string
+    public static function build(array $fields, iterable $rows, string $language, ?callable $names = null): string
     {
         $stream = fopen('php://temp', 'r+');
         if ($stream === false) {
@@ -122,7 +125,7 @@ final class ResponsesCsv
                 self::safeText(self::word((string) ($row['state'] ?? ''), $language)),
             ];
             foreach ($fields as $field) {
-                $line[] = self::cell($field, $answers[(string) $field['field_key']] ?? null, $language);
+                $line[] = self::cell($field, $answers[(string) $field['field_key']] ?? null, $language, $names);
             }
             self::write($stream, $line);
         }
@@ -193,10 +196,11 @@ final class ResponsesCsv
 
     /**
      * @param array<string, mixed> $field
+     * @param (callable(int): ?string)|null $names
      */
-    private static function cell(array $field, mixed $answer, string $language): string
+    private static function cell(array $field, mixed $answer, string $language, ?callable $names): string
     {
-        return self::answerText($field, $answer, $language, true);
+        return self::answerText($field, $answer, $language, true, $names);
     }
 
     /**
@@ -205,20 +209,25 @@ final class ResponsesCsv
      * no guard against spreadsheet formulas.
      *
      * @param array<string, mixed> $field
+     * @param (callable(int): ?string)|null $names A person's display name by profile id.
      */
-    public static function printed(array $field, mixed $answer, string $language): string
+    public static function printed(array $field, mixed $answer, string $language, ?callable $names = null): string
     {
-        return self::answerText($field, $answer, $language, false);
+        return self::answerText($field, $answer, $language, false, $names);
     }
 
     /**
      * @param array<string, mixed> $field
+     * @param (callable(int): ?string)|null $names
      */
-    private static function answerText(array $field, mixed $answer, string $language, bool $safe): string
+    private static function answerText(array $field, mixed $answer, string $language, bool $safe, ?callable $names = null): string
     {
         $guard = static fn (string $text): string => $safe ? self::safeText($text) : $text;
         if ($answer === null) {
             return '';
+        }
+        if ($names !== null && ($field['field_type'] ?? null) === FieldType::PROFILE_REF) {
+            return $guard(self::personText($answer, $names));
         }
         // Typed by the validator, so it can't be a formula. Only a number question's
         // answer takes this path, because text answers are always strings.
@@ -241,7 +250,7 @@ final class ResponsesCsv
         }
         if ($type === FieldType::REPEATING && is_array($answer)) {
             return $guard(implode(' | ', array_map(
-                static fn (mixed $row): string => self::rowText($field, $row, $language),
+                static fn (mixed $row): string => self::rowText($field, $row, $language, $names),
                 $answer,
             )));
         }
@@ -272,9 +281,27 @@ final class ResponsesCsv
     }
 
     /**
-     * @param array<string, mixed> $field
+     * A person by name, or a dash when there is no name to give (a removed
+     * profile): people are never written as ids.
+     *
+     * @param callable(int): ?string $names
      */
-    private static function rowText(array $field, mixed $row, string $language): string
+    private static function personText(mixed $value, callable $names): string
+    {
+        if (is_int($value) || (is_string($value) && ctype_digit($value))) {
+            $name = $names((int) $value);
+
+            return $name !== null && $name !== '' ? $name : '—';
+        }
+
+        return is_scalar($value) ? (string) $value : '';
+    }
+
+    /**
+     * @param array<string, mixed> $field
+     * @param (callable(int): ?string)|null $names
+     */
+    private static function rowText(array $field, mixed $row, string $language, ?callable $names = null): string
     {
         if (!is_array($row)) {
             return '';
@@ -288,7 +315,11 @@ final class ResponsesCsv
                 continue;
             }
             $value = $row[(string) $column['key']];
-            $text = is_bool($value) ? ($value ? 'Yes' : 'No') : (is_scalar($value) ? (string) $value : '');
+            $text = match (true) {
+                is_bool($value) => $value ? 'Yes' : 'No',
+                $names !== null && ($column['type'] ?? null) === FieldType::PROFILE_REF => self::personText($value, $names),
+                default => is_scalar($value) ? (string) $value : '',
+            };
             $parts[] = (self::localized($column['label'] ?? null, $language) ?: (string) $column['key']) . ': ' . $text;
         }
 

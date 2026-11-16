@@ -349,6 +349,8 @@ export function FormField({
                 value={row[column.key]}
                 preferArabic={preferArabic}
                 onChange={(cell) => onCell({ ...row, [column.key]: cell })}
+                // WHIT-1162: a person column draws the same picker as a person question.
+                references={references}
               />
             ))
           }
@@ -445,7 +447,8 @@ export function FormField({
         // report can group by.
         <ChoiceSelect
           id={id}
-          value={typeof value === 'string' ? value : ''}
+          // A saved answer comes back from the server as a number.
+          value={typeof value === 'string' || typeof value === 'number' ? String(value) : ''}
           onChange={onChange}
           options={(references?.[field.field_type] ?? [])
             // A department picker offers departments. Filtering here rather

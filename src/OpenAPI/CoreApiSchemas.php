@@ -9471,7 +9471,7 @@ final class CoreApiSchemas
             ],
             'FormFieldColumn' => self::object([
                 'key' => self::str(),
-                'type' => ['type' => 'string', 'enum' => ['text', 'textarea', 'number', 'date', 'select', 'checkbox']],
+                'type' => ['type' => 'string', 'enum' => ['text', 'textarea', 'number', 'date', 'select', 'checkbox', 'profile_ref'], 'description' => 'What the cell holds. profile_ref is a person, checked against the workspace like a person question.'],
                 'label' => self::localizedText(),
                 'required' => self::bool(),
                 'options' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormFieldOption')],

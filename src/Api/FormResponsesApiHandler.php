@@ -149,7 +149,7 @@ final class FormResponsesApiHandler
             $fields = $this->fields->listForForm($tenantId, $formId);
 
             $rows = iterator_to_array($this->rows($tenantId, $formId), false);
-            $csv = ResponsesCsv::build($fields, $rows, $language);
+            $csv = ResponsesCsv::build($fields, $rows, $language, $this->submissions->profileNames());
 
             $actor = $request->user;
             $this->audit?->record('forms.responses_exported', [

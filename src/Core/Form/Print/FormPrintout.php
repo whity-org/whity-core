@@ -628,6 +628,11 @@ final class FormPrintout
             $cells = [];
             foreach ($columns as $c) {
                 $v = is_array($c) ? ($row[(string) ($c['key'] ?? '')] ?? null) : null;
+                // WHIT-1162: a person column prints the person's name, never the id.
+                if (is_array($c) && ($c['type'] ?? null) === FieldType::PROFILE_REF && (is_int($v) || (is_string($v) && ctype_digit($v)))) {
+                    $cells[] = mb_substr(($this->names)('profile', (int) $v) ?? '—', 0, 500);
+                    continue;
+                }
                 $cells[] = is_bool($v) ? $t->get($v ? 'yes' : 'no') : (is_scalar($v) ? mb_substr((string) $v, 0, 500) : '');
             }
             $out[] = $cells;
