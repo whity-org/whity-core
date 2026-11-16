@@ -23,9 +23,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
-import { meetingErrorText, meetingsApi, type ConveningBody, type ConveningBodyMember } from '@/lib/meetings/api';
+import { meetingErrorText, meetingsApi } from '@/lib/meetings/api';
 import { Avatar } from '@whity/ui/avatar';
 import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
@@ -34,9 +33,7 @@ import { Icon } from '@whity/ui/icon';
 import { EmptyFirstTime } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
 import { useTranslation } from '@whity/features/i18n';
-import { MeetingsNav, useMeetingAccess, usePeopleNames } from './meetings-shared';
-
-type BodyWithMembers = ConveningBody & { members: ConveningBodyMember[] };
+import { MeetingsNav, rolesOf, useBodiesWithMembers, useMeetingAccess, usePeopleNames } from './meetings-shared';
 
 export function BodiesScreen() {
   const t = useTranslation('meetings');
@@ -44,17 +41,11 @@ export function BodiesScreen() {
   const [creating, setCreating] = useState(false);
   const { nameOf } = usePeopleNames();
 
-  const bodies = useFetch<BodyWithMembers[]>(async () => {
-    const list = await meetingsApi.bodies();
-    return Promise.all(list.map((body) => meetingsApi.body(body.id)));
-  }, []);
+  const bodies = useBodiesWithMembers();
 
   if (!access.loading && !access.canRead) {
     return <NoAccess area={t('bodies.area', 'meeting bodies')} permission="convening:read" />;
   }
-
-  const roleOf = (body: BodyWithMembers, role: ConveningBodyMember['member_role']) =>
-    body.members.filter((m) => m.left_at === null && m.member_role === role).map((m) => nameOf(m.profile_id));
 
   return (
     <div className="space-y-4">
@@ -99,8 +90,8 @@ export function BodiesScreen() {
         <div className="grid gap-4 md:grid-cols-2">
           {bodies.data.map((body) => {
             const active = body.members.filter((m) => m.left_at === null);
-            const chair = roleOf(body, 'chair');
-            const secretary = roleOf(body, 'secretary');
+            const chair = rolesOf(body, 'chair', nameOf);
+            const secretary = rolesOf(body, 'secretary', nameOf);
             return (
               <Card key={body.id} data-testid={`body-${body.id}`}>
                 <CardHeader>

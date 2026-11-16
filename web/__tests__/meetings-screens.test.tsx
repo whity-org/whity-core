@@ -37,6 +37,7 @@ function api(extra: (url: string) => Promise<unknown> | null = () => null) {
     const custom = extra(url);
     if (custom !== null) return custom;
     if (url.startsWith('/api/v1/meetings')) return respond(200, { data: [upcoming, past] });
+    if (url.startsWith('/api/v1/convening-bodies/')) return respond(200, { data: { ...body, members: [] } });
     if (url.startsWith('/api/v1/convening-bodies')) return respond(200, { data: [body] });
     if (url.startsWith('/api/v1/calendar/staff')) return respond(200, { data: [] });
     return respond(404, {});

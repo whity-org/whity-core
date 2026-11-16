@@ -15,8 +15,41 @@ import { useTranslation } from '@whity/features/i18n';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { calendarApi } from '@/lib/calendar/api';
-import { CONVENING_DECIDE, CONVENING_MANAGE, CONVENING_READ, type MeetingStatus } from '@/lib/meetings/api';
+import {
+  CONVENING_DECIDE,
+  CONVENING_MANAGE,
+  CONVENING_READ,
+  meetingsApi,
+  type ConveningBody,
+  type ConveningBodyMember,
+  type MeetingStatus,
+} from '@/lib/meetings/api';
 import { cn } from '@/lib/utils';
+
+/**
+ * A meeting's time as the workspace wrote it. The server keeps `2026-11-25 10:00:00`
+ * with no zone: it is the wall-clock time in the workspace, so it is read apart
+ * rather than converted into the reader's zone (which would move 10:00 to 13:00).
+ */
+export function wallClock(value: string | null | undefined): { date: string; time: string } | null {
+  const match = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/.exec(value ?? '');
+  return match ? { date: match[1], time: match[2] } : null;
+}
+
+export type BodyWithMembers = ConveningBody & { members: ConveningBodyMember[] };
+
+/** Every body with its members, for the chair, secretary and size shown on a body. */
+export function useBodiesWithMembers() {
+  return useFetch<BodyWithMembers[]>(async () => {
+    const list = await meetingsApi.bodies();
+    return Promise.all(list.map((body) => meetingsApi.body(body.id)));
+  }, []);
+}
+
+/** `chair`/`secretary` names of a body, from its current members. */
+export function rolesOf(body: BodyWithMembers, role: ConveningBodyMember['member_role'], nameOf: (id: number) => string) {
+  return body.members.filter((m) => m.left_at === null && m.member_role === role).map((m) => nameOf(m.profile_id));
+}
 
 export interface MeetingAccess {
   loading: boolean;

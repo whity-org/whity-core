@@ -47,7 +47,7 @@ import { Skeleton } from '@whity/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
-import { MeetingStatusBadge, MeetingsNav, useMeetingAccess, usePeopleNames } from './meetings-shared';
+import { MeetingStatusBadge, MeetingsNav, useMeetingAccess, usePeopleNames, wallClock } from './meetings-shared';
 
 type Confirming = 'hold' | 'cancel' | null;
 
@@ -67,6 +67,7 @@ export function MeetingScreen({ id }: { id: number }) {
   }
 
   const data = meeting.data;
+  const when = wallClock(data?.scheduled_at);
   const open = data !== null && (data.status === 'draft' || data.status === 'scheduled');
 
   const run = async (action: () => Promise<unknown>, fallback: string) => {
@@ -85,8 +86,12 @@ export function MeetingScreen({ id }: { id: number }) {
   return (
     <div className="space-y-4">
       <AdminHeader
-        title={data?.display_title ?? t('record.title', 'Meeting')}
-        description={data?.body?.display_name}
+        title={
+          data
+            ? `${data.body?.display_name ?? data.display_title} · ${t('record.number', 'Meeting {n}', { n: data.meeting_number })}`
+            : t('record.title', 'Meeting')
+        }
+        description={data?.display_title}
         action={
           data !== null && access.canManage && open ? (
             <>
@@ -135,33 +140,44 @@ export function MeetingScreen({ id }: { id: number }) {
         />
       ) : (
         <>
-          <dl className="grid gap-x-8 gap-y-2 rounded-card border border-border bg-card p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-            <Fact label={t('fact.status', 'Status')}>
-              <MeetingStatusBadge status={data.status} />
-            </Fact>
-            <Fact label={t('fact.when', 'When')}>
-              {data.scheduled_at ? (dates.dateTime(data.scheduled_at) ?? '—') : t('fact.notSet', 'Not set yet')}
-            </Fact>
-            <Fact label={t('fact.where', 'Where')}>{data.location ?? '—'}</Fact>
-            <Fact label={t('fact.number', 'Meeting number')}>
-              <span className="tabular-nums" dir="ltr">
-                {data.meeting_number}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground" data-testid="meeting-facts">
+            <MeetingStatusBadge status={data.status} />
+            <span className="inline-flex items-center gap-1.5">
+              <Icon name="calendar" size={16} />
+              {when === null ? (
+                t('fact.notSet', 'Not set yet')
+              ) : (
+                <>
+                  {dates.calendarLabel(when.date, 'fullDate') ?? when.date}
+                  {' · '}
+                  <span className="font-mono tabular-nums" dir="ltr">
+                    {when.time}
+                  </span>
+                </>
+              )}
+            </span>
+            {data.location && (
+              <span className="inline-flex items-center gap-1.5">
+                <Icon name="tenant" size={16} />
+                {data.location}
               </span>
-            </Fact>
-          </dl>
-          {data.scheduled_at && (
-            <p className="text-sm text-muted-foreground">
+            )}
+            {when !== null && (
               <Link href="/calendar" className="underline underline-offset-2">
                 {t('fact.onCalendar', 'See it on the calendar')}
               </Link>
-            </p>
-          )}
+            )}
+          </div>
 
           <Tabs defaultValue="agenda">
             <TabsList>
-              <TabsTrigger value="agenda">{t('tab.agenda', 'Agenda')}</TabsTrigger>
+              <TabsTrigger value="agenda">
+                {t('tab.agenda', 'Agenda')} <Count n={data.agenda.length} />
+              </TabsTrigger>
               <TabsTrigger value="attendance">{t('tab.attendance', 'Attendance')}</TabsTrigger>
-              <TabsTrigger value="decisions">{t('tab.decisions', 'Decisions')}</TabsTrigger>
+              <TabsTrigger value="decisions">
+                {t('tab.decisions', 'Decisions')} <Count n={data.decisions.length} />
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="agenda" className="pt-4">
               <AgendaTab meeting={data} canManage={access.canManage} canDecide={access.canDecide} onChanged={meeting.refetch} />
@@ -223,12 +239,11 @@ export function MeetingScreen({ id }: { id: number }) {
   );
 }
 
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 text-foreground">{children}</dd>
-    </div>
+function Count({ n }: { n: number }) {
+  return n === 0 ? null : (
+    <span className="ms-1 rounded-full bg-muted px-1.5 text-xs tabular-nums" dir="ltr">
+      {n}
+    </span>
   );
 }
 

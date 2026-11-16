@@ -38,14 +38,23 @@ import { Skeleton } from '@whity/ui/skeleton';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
 import { cn } from '@/lib/utils';
-import { MeetingStatusBadge, MeetingsNav, useMeetingAccess } from './meetings-shared';
+import {
+  MeetingStatusBadge,
+  MeetingsNav,
+  rolesOf,
+  useBodiesWithMembers,
+  useMeetingAccess,
+  usePeopleNames,
+  wallClock,
+  type BodyWithMembers,
+} from './meetings-shared';
 
 type Tab = 'upcoming' | 'past';
 const ALL = 'all';
 
 /** The date part of `2026-11-04 10:00:00` (or ISO), or null when there is no time yet. */
 function dayOf(meeting: Meeting): string | null {
-  return meeting.scheduled_at === null ? null : meeting.scheduled_at.slice(0, 10);
+  return wallClock(meeting.scheduled_at)?.date ?? null;
 }
 
 function isPast(meeting: Meeting): boolean {
@@ -60,16 +69,16 @@ export function MeetingsScreen() {
   const [creating, setCreating] = useState(false);
 
   const meetings = useFetch(() => meetingsApi.list(), []);
-  const bodies = useFetch(() => meetingsApi.bodies(), []);
+  const bodies = useBodiesWithMembers();
 
   if (!access.loading && !access.canRead) {
     return <NoAccess area={t('area', 'meetings')} permission="convening:read" />;
   }
 
   const bodyList = bodies.data ?? [];
-  const rows = (meetings.data ?? []).filter(
-    (m) => (bodyId === ALL || m.body_id === Number(bodyId)) && isPast(m) === (tab === 'past')
-  );
+  const inBody = (meetings.data ?? []).filter((m) => bodyId === ALL || m.body_id === Number(bodyId));
+  const counts = { upcoming: inBody.filter((m) => !isPast(m)).length, past: inBody.filter(isPast).length };
+  const rows = inBody.filter((m) => isPast(m) === (tab === 'past'));
 
   return (
     <div className="space-y-4">
@@ -81,10 +90,18 @@ export function MeetingsScreen() {
         )}
         action={
           access.canManage ? (
-            <Button onClick={() => setCreating(true)} data-testid="meetings-new" disabled={bodyList.length === 0}>
-              <Icon name="plus" />
-              {t('new', 'New meeting')}
-            </Button>
+            <>
+              <Button asChild variant="outline">
+                <Link href="/calendar/meetings/bodies">
+                  <Icon name="users" />
+                  {t('bodies.new', 'New body')}
+                </Link>
+              </Button>
+              <Button onClick={() => setCreating(true)} data-testid="meetings-new" disabled={bodyList.length === 0}>
+                <Icon name="plus" />
+                {t('new', 'New meeting')}
+              </Button>
+            </>
           ) : undefined
         }
       />
@@ -113,6 +130,9 @@ export function MeetingsScreen() {
                     data-testid={`meetings-tab-${id}`}
                   >
                     {id === 'upcoming' ? t('tab.upcoming', 'Upcoming') : t('tab.past', 'Past')}
+                    <span className="tabular-nums opacity-80" dir="ltr">
+                      {counts[id]}
+                    </span>
                   </Button>
                 ))}
               </div>
@@ -198,12 +218,12 @@ function MeetingDays({ rows, bodies, descending }: { rows: Meeting[]; bodies: Co
                   href={`/calendar/meetings/${meeting.id}`}
                   data-testid={`meeting-${meeting.id}`}
                   className={cn(
-                    'flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 border-s-4 border-s-info px-4 py-3 outline-none hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+                    'flex min-h-12 flex-wrap items-center gap-x-3 gap-y-1 border-s-4 border-s-primary px-4 py-3 outline-none hover:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
                     meeting.status === 'cancelled' && 'opacity-70'
                   )}
                 >
-                  <span className="w-14 shrink-0 text-sm tabular-nums text-muted-foreground" dir="ltr">
-                    {meeting.scheduled_at ? (dates.time(meeting.scheduled_at) ?? '') : '—'}
+                  <span className="w-14 shrink-0 font-mono text-sm tabular-nums text-foreground" dir="ltr">
+                    {wallClock(meeting.scheduled_at)?.time ?? '—'}
                   </span>
                   <span className="min-w-0 flex-1 basis-40">
                     <span className="block truncate text-sm font-medium text-foreground">{meeting.display_title}</span>
@@ -223,8 +243,9 @@ function MeetingDays({ rows, bodies, descending }: { rows: Meeting[]; bodies: Co
   );
 }
 
-function BodiesCard({ bodies, loading }: { bodies: ConveningBody[]; loading: boolean }) {
+function BodiesCard({ bodies, loading }: { bodies: BodyWithMembers[]; loading: boolean }) {
   const t = useTranslation('meetings');
+  const { nameOf } = usePeopleNames();
   return (
     <Card data-testid="meetings-bodies-card">
       <CardHeader>
@@ -239,9 +260,21 @@ function BodiesCard({ bodies, loading }: { bodies: ConveningBody[]; loading: boo
         ) : (
           <ul className="divide-y divide-divider">
             {bodies.map((body) => (
-              <li key={body.id} className="flex min-h-12 items-center gap-2 py-2">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{body.display_name}</span>
-                {!body.is_active && <Badge variant="outline">{t('bodies.off', 'Off')}</Badge>}
+              <li key={body.id} className="min-h-12 space-y-0.5 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{body.display_name}</span>
+                  {!body.is_active && <Badge variant="outline">{t('bodies.off', 'Off')}</Badge>}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {[
+                    rolesOf(body, 'chair', nameOf)[0] && t('bodies.chairIs', 'Chair {name}', { name: rolesOf(body, 'chair', nameOf)[0] }),
+                    rolesOf(body, 'secretary', nameOf)[0] &&
+                      t('bodies.secretaryIs', 'secretary {name}', { name: rolesOf(body, 'secretary', nameOf)[0] }),
+                    t('bodies.memberCount', '{n} members', { n: body.members.filter((m) => m.left_at === null).length }),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
               </li>
             ))}
           </ul>
