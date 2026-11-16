@@ -34,7 +34,6 @@ final class ChatAttachmentsRealEngineTest extends TestCase
     private ChatService $chat;
     private string $root;
     private int $group = 0;
-    private int $other = 0;
 
     protected function setUp(): void
     {
@@ -44,7 +43,8 @@ final class ChatAttachmentsRealEngineTest extends TestCase
         mkdir($this->root);
         $this->chat = new ChatService(new ChatRepository($this->pdo), null, null, new ChatAttachments($this->pdo, new LocalStorageDriver($this->root)));
         $this->group = (int) $this->chat->createGroup(self::A, ChatViewer::person(self::AMRO), 'Abdali team', [self::AWSS], null);
-        $this->other = (int) $this->chat->createGroup(self::A, ChatViewer::person(self::EMAD), 'Payroll', [], null);
+        // Emad has a chat of his own; Amro's files never reach it.
+        $this->chat->createGroup(self::A, ChatViewer::person(self::EMAD), 'Payroll', [], null);
     }
 
     protected function tearDown(): void
@@ -136,7 +136,9 @@ final class ChatAttachmentsRealEngineTest extends TestCase
         $deleted = $this->chat->delete(self::A, $amro, $sent['id']);
         self::assertSame([], $deleted['attachments']);
         $this->refused(fn () => $this->chat->file(self::A, $amro, $photo['id']), 404);
-        self::assertSame(0, (int) $this->pdo->query('SELECT COUNT(*) FROM chat_attachments')->fetchColumn());
+        $count = $this->pdo->prepare('SELECT COUNT(*) FROM chat_attachments');
+        $count->execute();
+        self::assertSame(0, (int) $count->fetchColumn());
     }
 
     public function testAnAgentSendsNoFiles(): void
