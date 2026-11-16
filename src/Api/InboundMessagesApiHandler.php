@@ -8,6 +8,7 @@ use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Messaging\MessagingException;
 use Whity\Core\Messaging\MessagingService;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
@@ -30,8 +31,6 @@ final class InboundMessagesApiHandler
     private const SYSTEM_TENANT_ID = 0;
     private const MAX_BODY_BYTES = 10 * 1024 * 1024;
     private const MAX_ITEMS = 100;
-    private const WINDOW = 60;
-    private const PER_IP = 120;
 
     public function __construct(
         private readonly MessagingService $messaging,
@@ -45,11 +44,10 @@ final class InboundMessagesApiHandler
     {
         $ip = ClientIp::fromRequest($request);
         if ($ip !== null) {
-            $key = 'inbound:ip:' . $ip;
-            if ($this->store->count($key) >= self::PER_IP) {
-                return Response::error('Too many requests', 429)->withHeaders(['Retry-After' => (string) max($this->store->ttl($key), 1)]);
+            $limited = RateLimits::inboundMessagesPerAddress()->take($this->store, 'inbound:ip:' . $ip);
+            if ($limited !== null) {
+                return $limited;
             }
-            $this->store->increment($key, self::WINDOW);
         }
 
         $accepted = Response::json(['data' => ['accepted' => true]], 202);

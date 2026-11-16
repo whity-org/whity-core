@@ -9,6 +9,8 @@ use Whity\Core\Plugin\PublicForm\BotCheck;
 use Whity\Core\Plugin\PublicForm\PublicFormKeyRepository;
 use Whity\Core\Plugin\PublicForm\PublicFormOrigins;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimitRule;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request as CoreRequest;
 use Whity\Core\Router;
 use Whity\Core\Store\SharedStoreInterface;
@@ -71,6 +73,11 @@ use Whity\Sdk\Http\Response;
  */
 final class PublicFormGate
 {
+    /*
+     * The limits themselves are in RateLimits (pluginForm*, pluginRead*). These
+     * constants say the same numbers for the tests that fill a bucket;
+     * RateLimitedTest checks they agree.
+     */
     public const WINDOW_SECONDS = 3600;
 
     /** Per IP, per form, an hour. The same reasoning as core's public form submit. */
@@ -134,7 +141,7 @@ final class PublicFormGate
         $ip = ClientIp::fromRequest($request);
 
         // 2. Per IP, before anything about the key is known.
-        if (($limited = $this->charge('pluginform:ip:' . $form['plugin'] . ':' . $form['form'] . ':' . ($ip ?? 'unknown'), self::IP_MAX)) !== null) {
+        if (($limited = $this->charge('pluginform:ip:' . $form['plugin'] . ':' . $form['form'] . ':' . ($ip ?? 'unknown'), RateLimits::pluginFormPerAddress())) !== null) {
             return $limited;
         }
 
@@ -169,7 +176,7 @@ final class PublicFormGate
             // 7. The ceiling across addresses.
             $tenantId = (int) $row['tenant_id'];
             $ceilingKey = 'pluginform:form:' . $tenantId . ':' . $form['plugin'] . ':' . $form['form'];
-            if (($limited = $this->charge($ceilingKey, self::FORM_MAX)) !== null) {
+            if (($limited = $this->charge($ceilingKey, RateLimits::pluginFormPerForm())) !== null) {
                 return $limited->withHeaders($cors);
             }
 
@@ -221,7 +228,7 @@ final class PublicFormGate
         $request = self::anonymous($request);
         $ip = ClientIp::fromRequest($request);
 
-        if (($limited = $this->charge('pluginread:ip:' . $read['plugin'] . ':' . $read['form'] . ':' . ($ip ?? 'unknown'), self::READ_ROUTE_IP_MAX)) !== null) {
+        if (($limited = $this->charge('pluginread:ip:' . $read['plugin'] . ':' . $read['form'] . ':' . ($ip ?? 'unknown'), RateLimits::pluginReadPerAddress())) !== null) {
             return $limited;
         }
 
@@ -241,7 +248,7 @@ final class PublicFormGate
             }
 
             $tenantId = (int) $row['tenant_id'];
-            if (($limited = $this->charge('pluginread:read:' . $tenantId . ':' . $read['plugin'] . ':' . $read['form'], self::READ_ROUTE_MAX)) !== null) {
+            if (($limited = $this->charge('pluginread:read:' . $tenantId . ':' . $read['plugin'] . ':' . $read['form'], RateLimits::pluginReadPerRead())) !== null) {
                 return $limited->withHeaders($cors);
             }
         } catch (\Throwable $e) {
@@ -279,7 +286,7 @@ final class PublicFormGate
         }
 
         $ip = ClientIp::fromRequest($request);
-        if (($limited = $this->charge('pluginform:read:ip:' . ($ip ?? 'unknown'), self::READ_IP_MAX)) !== null) {
+        if (($limited = $this->charge('pluginform:read:ip:' . ($ip ?? 'unknown'), RateLimits::pluginFormReadPerAddress())) !== null) {
             return $limited;
         }
 
@@ -323,16 +330,14 @@ final class PublicFormGate
      * One fixed-window count, charged atomically and given back when over, so the
      * limit is a hard ceiling even with workers racing for the last place.
      */
-    private function charge(string $key, int $max): ?Response
+    private function charge(string $key, RateLimitRule $rule): ?Response
     {
-        if ($this->store->increment($key, self::WINDOW_SECONDS) > $max) {
+        $limited = $rule->hit($this->store, $key);
+        if ($limited !== null) {
             $this->store->decrement($key);
-
-            return Response::error('Too many attempts. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) max($this->store->ttl($key), 1)]);
         }
 
-        return null;
+        return $limited;
     }
 
     private static function notFound(): Response

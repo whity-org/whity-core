@@ -10,6 +10,7 @@ use Whity\Core\Db\DbBool;
 use Whity\Core\Identity\EmailVerificationProvider;
 use Whity\Core\Identity\ProfileEmailRepository;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
@@ -45,10 +46,6 @@ final class MeEmailsApiHandler
     private const MAX_EMAILS_PER_PROFILE = 10;
 
     private const MAX_EMAIL_LENGTH = 255;
-
-    /** Resend throttle: fixed window + per-row ceiling (caller is authenticated, so no per-IP limiter needed). */
-    private const RESEND_WINDOW_SECONDS = 3600;
-    private const RESEND_MAX = 5;
 
     public function __construct(
         private readonly TokenValidator $tokenValidator,
@@ -143,13 +140,10 @@ final class MeEmailsApiHandler
             return Response::error('This email address is already verified', 400);
         }
 
-        $rateKey = 'me-emails:resend:' . $row['id'];
-        if ($this->store->count($rateKey) >= self::RESEND_MAX) {
-            $retryAfter = max($this->store->ttl($rateKey), 1);
-            return Response::error('Too many resend requests. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) $retryAfter]);
+        $limited = RateLimits::meEmailsResend()->take($this->store, 'me-emails:resend:' . $row['id']);
+        if ($limited !== null) {
+            return $limited;
         }
-        $this->store->increment($rateKey, self::RESEND_WINDOW_SECONDS);
 
         try {
             $this->verificationProvider->sendVerification($profileId, (string) $row['email']);

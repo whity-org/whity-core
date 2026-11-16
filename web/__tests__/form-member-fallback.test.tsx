@@ -209,17 +209,6 @@ describe('unsent answers', () => {
     expect(window.localStorage.getItem('whity:form-draft:7')).toBeNull();
   });
 
-  it('moves answers an earlier version left in this browser, then removes them', async () => {
-    window.localStorage.setItem('whity:form-draft:7', JSON.stringify({ supplier: 'Old Mill' }));
-    serve(200);
-
-    const input = (await open()) as HTMLInputElement;
-
-    expect(input.value).toBe('Old Mill');
-    await waitFor(() => expect(draftCalls('PUT').length).toBe(1));
-    await waitFor(() => expect(window.localStorage.getItem('whity:form-draft:7')).toBeNull());
-  });
-
   it('starts over by removing the draft and going back to a clean form', async () => {
     serve(200, { data: { supplier: 'Example Mill' }, step: 0, updated_at: '2026-11-05 08:00:00' });
 

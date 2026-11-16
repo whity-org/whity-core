@@ -20,6 +20,8 @@ use Whity\Core\Calendar\ServiceRepository;
 use Whity\Core\i18n\LocalizedText;
 use Whity\Core\Plugin\PublicForm\BotCheck;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimitRule;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
@@ -55,14 +57,6 @@ use Whity\Http\JsonBody;
  */
 final class PublicBookingApiHandler
 {
-    private const HOUR = 3600;
-    private const DAY = 86400;
-    private const IP_INFO_MAX = 120;
-    private const IP_SLOTS_MAX = 240;
-    private const IP_BOOK_MAX = 10;
-    private const IP_MANAGE_MAX = 60;
-    private const IP_FEED_MAX = 120;
-    private const WORKSPACE_DAY_MAX = 200;
     private const OPEN_PER_EMAIL_MAX = 3;
     private const MIN_FILL_MS = 3000;
     private const MAX_RANGE_DAYS = 14;
@@ -91,7 +85,7 @@ final class PublicBookingApiHandler
     /** @param array<string, string> $params */
     public function page(Request $request, array $params): Response
     {
-        return $this->guard($request, 'cal:info:', self::IP_INFO_MAX, function () use ($request, $params): Response {
+        return $this->guard($request, 'cal:info:', RateLimits::publicBookingInfoPerAddress(), function () use ($request, $params): Response {
             $workspace = $this->workspace($request, $params) ?? throw CalendarRejectedException::notFound('Booking page');
             $tenantId = $workspace['id'];
             $settings = $this->booking->settingsFor($tenantId);
@@ -134,7 +128,7 @@ final class PublicBookingApiHandler
     /** @param array<string, string> $params */
     public function slots(Request $request, array $params): Response
     {
-        return $this->guard($request, 'cal:slots:', self::IP_SLOTS_MAX, function () use ($request, $params): Response {
+        return $this->guard($request, 'cal:slots:', RateLimits::publicBookingSlotsPerAddress(), function () use ($request, $params): Response {
             $workspace = $this->workspace($request, $params) ?? throw CalendarRejectedException::notFound('Booking page');
             $q = self::query($request);
             $serviceId = self::intOrNull($q['service_id'] ?? null) ?? throw new CalendarRejectedException('service_id is required', 422);
@@ -154,7 +148,7 @@ final class PublicBookingApiHandler
     /** @param array<string, string> $params */
     public function book(Request $request, array $params): Response
     {
-        return $this->guard($request, 'cal:book:', self::IP_BOOK_MAX, function () use ($request, $params): Response {
+        return $this->guard($request, 'cal:book:', RateLimits::publicBookingBookPerAddress(), function () use ($request, $params): Response {
             $workspace = $this->workspace($request, $params) ?? throw CalendarRejectedException::notFound('Booking page');
             $tenantId = $workspace['id'];
             $body = JsonBody::parsed($request);
@@ -166,7 +160,8 @@ final class PublicBookingApiHandler
                 return Response::error('We could not take this booking. Please try again.', 422);
             }
 
-            $limited = $this->count('cal:ws-day:' . $tenantId, self::WORKSPACE_DAY_MAX);
+            // Checked here, counted only once a booking is made.
+            $limited = RateLimits::publicBookingPerWorkspaceDay()->blocked($this->store, 'cal:ws-day:' . $tenantId);
             if ($limited !== null) {
                 return $limited;
             }
@@ -216,7 +211,7 @@ final class PublicBookingApiHandler
                 'enforce_hours' => true,
                 'public' => true,
             ]);
-            $this->store->increment('cal:ws-day:' . $tenantId, self::DAY);
+            RateLimits::publicBookingPerWorkspaceDay()->record($this->store, 'cal:ws-day:' . $tenantId);
 
             // With a payment step (SDK 1.98) the booking is held and the page
             // sends the customer to `payment.url`; they come back to the manage page.
@@ -326,7 +321,7 @@ final class PublicBookingApiHandler
     /** @param array<string, string> $params */
     public function feed(Request $request, array $params): Response
     {
-        return $this->guard($request, 'cal:feed:', self::IP_FEED_MAX, function () use ($params): Response {
+        return $this->guard($request, 'cal:feed:', RateLimits::publicBookingFeedPerAddress(), function () use ($params): Response {
             $token = preg_replace('/\.ics$/', '', (string) ($params['token'] ?? '')) ?? '';
             $owner = $this->feed->find($token) ?? throw CalendarRejectedException::notFound('Calendar');
             [$tenantId, $profileId] = $owner;
@@ -378,7 +373,7 @@ final class PublicBookingApiHandler
      */
     private function withLink(Request $request, array $params, callable $work): Response
     {
-        return $this->guard($request, 'cal:manage:', self::IP_MANAGE_MAX, function () use ($params, $work): Response {
+        return $this->guard($request, 'cal:manage:', RateLimits::publicBookingManagePerAddress(), function () use ($params, $work): Response {
             $found = $this->links->find((string) ($params['token'] ?? ''), $this->booking->now());
             if ($found === null) {
                 return Response::error(self::LINK_INVALID, 404);
@@ -390,16 +385,15 @@ final class PublicBookingApiHandler
     }
 
     /** @param callable(): Response $work */
-    private function guard(Request $request, string $prefix, int $max, callable $work): Response
+    private function guard(Request $request, string $prefix, RateLimitRule $rule, callable $work): Response
     {
         try {
             $ip = ClientIp::fromRequest($request);
             if ($ip !== null && $ip !== '') {
-                $limited = $this->count($prefix . $ip, $max);
+                $limited = $rule->take($this->store, $prefix . $ip);
                 if ($limited !== null) {
                     return $limited;
                 }
-                $this->store->increment($prefix . $ip, self::HOUR);
             }
 
             return $work();
@@ -413,16 +407,6 @@ final class PublicBookingApiHandler
 
             return Response::error('Something went wrong. Please try again.', 500);
         }
-    }
-
-    private function count(string $key, int $max): ?Response
-    {
-        if ($this->store->count($key) >= $max) {
-            return Response::error('Too many attempts. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) max($this->store->ttl($key), 1)]);
-        }
-
-        return null;
     }
 
     /**
