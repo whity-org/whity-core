@@ -461,6 +461,7 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
             selectedKey={selected?.key ?? null}
             onSelect={openItem}
             canDrag={edits.canDrag}
+            canResize={edits.canResize}
             onCreate={access.canWrite ? (slot) => {
               setSelected(null);
               edits.onCreate(slot);
