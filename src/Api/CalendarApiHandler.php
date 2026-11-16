@@ -649,6 +649,7 @@ final class CalendarApiHandler
     {
         return $this->run($request, 'events', function (int $tenantId, int $actor) use ($request, $params): Response {
             $existing = $this->calendar->findEvent($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Event');
+            self::assertNotAMeeting($existing);
             $this->assertOwnOrManage($tenantId, $actor, (int) $existing['profile_id']);
             $body = JsonBody::parsed($request);
             [$title, $notes, $when, $allDay, $busy] = $this->eventValues($body + [
@@ -671,6 +672,7 @@ final class CalendarApiHandler
     {
         return $this->run($request, 'events', function (int $tenantId, int $actor) use ($params): Response {
             $existing = $this->calendar->findEvent($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Event');
+            self::assertNotAMeeting($existing);
             $this->assertOwnOrManage($tenantId, $actor, (int) $existing['profile_id']);
             $this->booking->cancelEvent($tenantId, (int) $existing['id']);
 
@@ -702,6 +704,19 @@ final class CalendarApiHandler
     }
 
     // ── helpers ─────────────────────────────────────────────────────────
+
+    /**
+     * A formal meeting is changed on the meeting (its date, place and guests
+     * are the meeting's record, ADR 0018), never through the events API.
+     *
+     * @param array<string, mixed> $event
+     */
+    private static function assertNotAMeeting(array $event): void
+    {
+        if (($event['kind'] ?? null) === CalendarRepository::KIND_MEETING) {
+            throw new CalendarRejectedException('This is a meeting. Change its date, place or guests on the meeting itself.', 409, ['code' => 'meeting']);
+        }
+    }
 
     /**
      * Where an event happens, from `room_id` and `location` (ADR 0018). Null

@@ -40,6 +40,8 @@ final class MeetingService
         private readonly InvitationRepository $invitations,
         private readonly MeetingNotifications $notifications,
         private readonly AttendanceRepository $attendance,
+        // ADR 0018: the meeting's time, place and guests on the calendar.
+        private readonly ?MeetingCalendar $calendar = null,
     ) {
     }
 
@@ -109,6 +111,7 @@ final class MeetingService
         $wasScheduled = (string) $meeting['status'] === MeetingStatus::SCHEDULED;
 
         $this->meetings->schedule($tenantId, $meetingId, $scheduledAt, $location);
+        $this->calendar?->sync($tenantId, $meetingId);
 
         $updated = $this->requireMeeting($tenantId, $meetingId);
         $notified = 0;
@@ -181,6 +184,7 @@ final class MeetingService
 
         $profileIds = array_map(static fn (array $m): int => (int) $m['profile_id'], $members);
         $newlyInvited = $this->invitations->invite($tenantId, $meetingId, $profileIds);
+        $this->calendar?->sync($tenantId, $meetingId);
 
         // AFTER the write, and only to the people who are hearing about it for
         // the first time. See the class docblock.
@@ -215,6 +219,8 @@ final class MeetingService
                 'You have no invitation to this meeting to answer.'
             );
         }
+
+        $this->calendar?->sync($tenantId, $meetingId);
 
         $invitation = $this->invitations->findForProfile($tenantId, $meetingId, $profileId);
         if ($invitation === null) {
@@ -343,6 +349,7 @@ final class MeetingService
         }
 
         $this->meetings->cancel($tenantId, $meetingId);
+        $this->calendar?->sync($tenantId, $meetingId);
 
         return $this->requireMeeting($tenantId, $meetingId);
     }

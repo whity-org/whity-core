@@ -142,8 +142,9 @@ final class CalendarItems
             $private => self::BUSY,
             default => (string) $e['title'],
         };
-        // A synced event changes in the calendar it came from, never here.
-        $changeable = $kind !== CalendarRepository::KIND_EXTERNAL && ($mine || $viewerManages);
+        // A synced event changes in the calendar it came from, and a meeting on
+        // the meeting itself; neither moves here.
+        $changeable = !in_array($kind, [CalendarRepository::KIND_EXTERNAL, CalendarRepository::KIND_MEETING], true) && ($mine || $viewerManages);
 
         return [
             'id' => $kind . ':' . $e['id'],

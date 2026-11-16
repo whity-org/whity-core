@@ -19048,6 +19048,7 @@ final class CoreApiSchemas
                 'responses' => [
                     200 => self::jsonResponse('The event', SchemaBuilder::ref('CalendarEventResponse')),
                     404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('A formal meeting: change it on the meeting (code meeting)'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('DELETE', '/api/calendar/events/{id:\d+}', 'calendar:write', [
@@ -19056,6 +19057,7 @@ final class CoreApiSchemas
                 'responses' => [
                     200 => self::jsonResponse('Removed', self::dataEnvelope(self::object(['id' => self::int(), 'deleted' => self::bool()], ['id', 'deleted']))),
                     404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('A formal meeting: cancel it on the meeting (code meeting)'),
                 ] + self::authErrors(),
             ]),
         ];

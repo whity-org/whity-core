@@ -5212,7 +5212,9 @@ $meetingService = new \Whity\Core\Convening\MeetingService(
     $meetingRepository,
     $meetingInvitationRepository,
     new \Whity\Core\Convening\MeetingNotifications($notificationDispatcher),
-    $meetingAttendanceRepository
+    $meetingAttendanceRepository,
+    // ADR 0018: a meeting's time, place and guests live on a calendar event.
+    new \Whity\Core\Convening\MeetingCalendar($db->getPdo())
 );
 
 $decisionRecorder = new \Whity\Core\Convening\DecisionRecorder(

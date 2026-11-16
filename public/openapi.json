@@ -8994,6 +8994,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "A formal meeting: cancel it on the meeting (code meeting)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "Internal server error",
                         "content": {
@@ -9090,6 +9100,16 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "A formal meeting: change it on the meeting (code meeting)",
                         "content": {
                             "application/json": {
                                 "schema": {

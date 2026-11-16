@@ -300,7 +300,7 @@ final class CalendarRepository
               WHERE e.tenant_id = :tenant_id
                 AND e.starts_at < :to AND e.ends_at > :from
                 AND e.busy = :busy AND e.status = 'confirmed'
-                AND (e.profile_id = :profile_id OR EXISTS (
+                AND ((e.profile_id = :profile_id AND e.kind <> 'meeting') OR EXISTS (
                       SELECT 1 FROM calendar_event_people p
                        WHERE p.event_id = e.id AND p.tenant_id = e.tenant_id
                          AND p.profile_id = :profile_id AND p.response <> 'declined'))"
@@ -514,8 +514,26 @@ final class CalendarRepository
             ':event_id' => $eventId,
             ':profile_id' => $profileId,
         ]);
+        if ($stmt->rowCount() === 0) {
+            return false;
+        }
 
-        return $stmt->rowCount() > 0;
+        // A formal meeting's invitation is the record (ADR 0018): the answer
+        // given on the calendar is the answer to the invitation.
+        $this->db->prepare(
+            'UPDATE meeting_invitations SET status = :status, responded_at = :now
+              WHERE tenant_id = :tenant_id AND profile_id = :profile_id
+                AND meeting_id = (SELECT meeting_id FROM calendar_events WHERE tenant_id = :tenant_id2 AND id = :event_id)'
+        )->execute([
+            ':status' => $response,
+            ':now' => Interval::toDb(new DateTimeImmutable()),
+            ':tenant_id' => $tenantId,
+            ':tenant_id2' => $tenantId,
+            ':profile_id' => $profileId,
+            ':event_id' => $eventId,
+        ]);
+
+        return true;
     }
 
     /**

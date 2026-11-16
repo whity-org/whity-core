@@ -27038,6 +27038,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description A formal meeting: cancel it on the meeting (code meeting) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Internal server error */
             500: {
                 headers: {
@@ -27111,6 +27120,15 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A formal meeting: change it on the meeting (code meeting) */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

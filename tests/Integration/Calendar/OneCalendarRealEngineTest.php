@@ -252,6 +252,74 @@ final class OneCalendarRealEngineTest extends TestCase
         self::assertSame([], $this->free(11), 'the copied time off blocks');
     }
 
+    public function testAScheduledMeetingIsACalendarEventForEveryoneInvited(): void
+    {
+        $meeting = $this->meeting(created: 13, invited: [11 => 'accepted', 12 => 'invited']);
+        $eventId = (new \Whity\Core\Convening\MeetingCalendar($this->pdo))->sync(1, $meeting);
+        self::assertNotNull($eventId);
+
+        $event = $this->calendar->findEvent(1, $eventId);
+        self::assertSame('meeting', $event['kind'] ?? null);
+        self::assertSame('Board meeting', $event['title'] ?? null);
+        self::assertSame('2026-11-16T08:00:00Z', $event['ends_at'] ?? null, '60 minutes when only a start is set');
+        self::assertSame('Meeting room 2', $event['location'] ?? null);
+        self::assertSame([[11, 'accepted'], [12, 'invited']], array_map(static fn (array $p): array => [$p['profile_id'], $p['response']], $event['people'] ?? []));
+
+        self::assertSame([], $this->free(11), 'invited and coming');
+        self::assertSame([], $this->free(12), 'invited, no answer yet');
+        self::assertSame(['meeting:' . $eventId], array_column($this->items(viewer: 12, people: [12]), 'id'));
+        self::assertFalse($this->items(viewer: 13)[0]['can']['move'], 'a meeting moves on the meeting');
+    }
+
+    public function testAnAnswerOnTheCalendarIsTheAnswerToTheInvitation(): void
+    {
+        $meeting = $this->meeting(created: 13, invited: [11 => 'invited']);
+        $eventId = (int) (new \Whity\Core\Convening\MeetingCalendar($this->pdo))->sync(1, $meeting);
+
+        self::assertTrue($this->calendar->answerEvent(1, $eventId, 11, 'declined'));
+
+        $status = $this->pdo->query("SELECT status FROM meeting_invitations WHERE meeting_id = {$meeting} AND profile_id = 11");
+        self::assertNotFalse($status);
+        self::assertSame('declined', $status->fetchColumn());
+        self::assertSame(['2026-11-16T07:00:00Z', '2026-11-16T07:30:00Z'], $this->free(11));
+    }
+
+    public function testRescheduledAndCancelledMeetingsKeepOneEvent(): void
+    {
+        $meeting = $this->meeting(created: 13, invited: [11 => 'accepted']);
+        $sync = new \Whity\Core\Convening\MeetingCalendar($this->pdo);
+        $first = $sync->sync(1, $meeting);
+
+        $this->pdo->exec("UPDATE meetings SET scheduled_at = '2026-11-17 07:00:00' WHERE id = {$meeting}");
+        self::assertSame($first, $sync->sync(1, $meeting));
+        self::assertSame('2026-11-17T07:00:00Z', $this->calendar->findEvent(1, (int) $first)['starts_at'] ?? null);
+
+        $this->pdo->exec("UPDATE meetings SET status = 'cancelled' WHERE id = {$meeting}");
+        $sync->sync(1, $meeting);
+        self::assertSame('cancelled', $this->calendar->findEvent(1, (int) $first)['status'] ?? null);
+        $count = $this->pdo->query('SELECT COUNT(*) FROM calendar_events WHERE meeting_id = ' . $meeting);
+        self::assertNotFalse($count);
+        self::assertSame(1, (int) $count->fetchColumn());
+    }
+
+    public function testExistingMeetingsArePutOnTheCalendarOnce(): void
+    {
+        $scheduled = $this->meeting(created: null, invited: [11 => 'accepted', 12 => 'declined'], chair: 12);
+        $this->pdo->exec("INSERT INTO meetings (id, tenant_id, body_id, meeting_number, title, status) VALUES (899, 1, 501, 9, 'Draft', 'draft')");
+
+        $db = \Whity\Database\Database::withFactory(fn (): PDO => $this->pdo, 86400, 86400);
+        $db->forceConnect();
+        require_once dirname(__DIR__, 3) . '/database/migrations/286_schedule_meetings_as_calendar_events.php';
+        \Database\Migrations\ScheduleMeetingsAsCalendarEvents::up($db);
+        \Database\Migrations\ScheduleMeetingsAsCalendarEvents::up($db);
+
+        $rows = $this->pdo->query('SELECT meeting_id, profile_id FROM calendar_events WHERE meeting_id IS NOT NULL');
+        self::assertNotFalse($rows);
+        self::assertSame([[(string) $scheduled, '12']], array_map(static fn (array $r): array => [(string) $r['meeting_id'], (string) $r['profile_id']], $rows->fetchAll(PDO::FETCH_ASSOC)), 'one event, organised by the chair; the draft has none');
+        self::assertSame([], $this->free(11));
+        self::assertSame(['2026-11-16T07:00:00Z', '2026-11-16T07:30:00Z'], $this->free(12), 'the chair declined, so is free');
+    }
+
     public function testAnotherWorkspaceSeesNothing(): void
     {
         $this->event(13, 'Menu tasting', '2026-11-16T10:00:00+03:00', '2026-11-16T11:00:00+03:00', people: [11]);
@@ -268,6 +336,30 @@ final class OneCalendarRealEngineTest extends TestCase
     private function event(int $organiser, string $title, string $from, string $to, array $people = []): int
     {
         return (int) $this->service->createEvent(1, $organiser, $title, '', $this->when($from, $to), false, true, $organiser, people: $people)['event']['id'];
+    }
+
+    /**
+     * A board meeting, Monday 16 November 10:00 in Amman (07:00Z), in meeting
+     * room 2, with these invitations.
+     *
+     * @param array<int, string> $invited profile id => answer
+     */
+    private function meeting(?int $created, array $invited, ?int $chair = null): int
+    {
+        $this->pdo->exec("INSERT INTO convening_bodies (id, tenant_id, body_key, name) VALUES (501, 1, 'board', 'Board')");
+        if ($chair !== null) {
+            $this->pdo->exec("INSERT INTO convening_body_members (tenant_id, body_id, profile_id, member_role) VALUES (1, 501, {$chair}, 'chair')");
+        }
+        $by = $created ?? 'NULL';
+        $this->pdo->exec(
+            "INSERT INTO meetings (id, tenant_id, body_id, meeting_number, title, scheduled_at, location, status, created_by_profile_id)
+             VALUES (601, 1, 501, 1, '{\"en\":\"Board meeting\",\"ar\":\"اجتماع المجلس\"}', '2026-11-16 07:00:00', 'Meeting room 2', 'scheduled', {$by})"
+        );
+        foreach ($invited as $profile => $status) {
+            $this->pdo->exec("INSERT INTO meeting_invitations (tenant_id, meeting_id, profile_id, status) VALUES (1, 601, {$profile}, '{$status}')");
+        }
+
+        return 601;
     }
 
     private function book(int $profileId, string $startsAt): int
