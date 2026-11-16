@@ -10,6 +10,7 @@ use Whity\Core\Plugin\PublicForm\BotCheck;
 use Whity\Core\Plugin\PublicForm\PublicFormKeyRepository;
 use Whity\Core\Plugin\PublicForm\PublicFormOrigins;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -204,11 +205,11 @@ final class PublicFormKeysApiHandler
     {
         $ip = ClientIp::fromRequest($request);
         $bucket = 'pluginform:read:ip:' . ($ip ?? 'unknown');
-        if ($this->store->increment($bucket, PublicFormGate::WINDOW_SECONDS) > PublicFormGate::READ_IP_MAX) {
+        $limited = RateLimits::pluginFormReadPerAddress()->hit($this->store, $bucket);
+        if ($limited !== null) {
             $this->store->decrement($bucket);
 
-            return Response::error('Too many attempts. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) max($this->store->ttl($bucket), 1)]);
+            return $limited;
         }
 
         try {

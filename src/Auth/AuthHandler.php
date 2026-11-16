@@ -8,6 +8,7 @@ use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Identity\AuthMethod;
 use Whity\Core\PasswordPolicy;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimited;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Settings\SettingsRegistry;
@@ -265,7 +266,7 @@ class AuthHandler
         // WC-0abcc29f: check IP throttle before touching the DB — a heavily
         // throttled IP must not learn whether an email is registered.
         if ($this->loginThrottle !== null && $this->loginThrottle->isThrottled(null, $ip)) {
-            return Response::error('Too many attempts', 429);
+            return RateLimited::response(60);
         }
 
         // ── Step 1: resolve profile from the globally-unique verified email ────
@@ -330,7 +331,7 @@ class AuthHandler
 
         // WC-0abcc29f: throttle check keyed on the profile id.
         if ($this->loginThrottle !== null && $this->loginThrottle->isThrottled($profileId, null)) {
-            return Response::error('Too many attempts', 429);
+            return RateLimited::response(60);
         }
 
         // ── Step 2: load the profile and verify credentials ──────────────────
@@ -1997,7 +1998,7 @@ class AuthHandler
 
         // WC-0abcc29f: check IP throttle before touching the token.
         if ($this->loginThrottle !== null && $this->loginThrottle->isThrottled(null, $ip)) {
-            return Response::error('Too many attempts', 429);
+            return RateLimited::response(60);
         }
 
         $tokenMode = self::isTokenMode($request);
@@ -2191,7 +2192,7 @@ class AuthHandler
 
         // Throttle by IP before touching the credential (mirrors handleRefresh).
         if ($this->loginThrottle !== null && $this->loginThrottle->isThrottled(null, $ip)) {
-            return Response::error('Too many attempts', 429);
+            return RateLimited::response(60);
         }
 
         // Resolve the device credential: Authorization: Bearer, else body field.
@@ -2417,7 +2418,7 @@ class AuthHandler
 
         $ip = $this->clientIp($request);
         if ($this->loginThrottle !== null && $this->loginThrottle->isThrottled($throttleId, $ip)) {
-            return Response::error('Too many attempts', 429);
+            return RateLimited::response(60);
         }
 
         // Parse request body to get 2FA code (envelope validated upstream, WC-189).

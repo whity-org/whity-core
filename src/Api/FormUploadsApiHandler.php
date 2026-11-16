@@ -11,6 +11,7 @@ use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormStatus;
 use Whity\Core\Form\FormUploadPolicy;
 use Whity\Core\Form\FormUploadStore;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
@@ -80,22 +81,6 @@ use Whity\Storage\StorageException;
  */
 final class FormUploadsApiHandler
 {
-    /**
-     * Per-caller ceiling, per hour.
-     *
-     * Not sized against abuse of the FORM — a signed-in member is a known person
-     * — but against the storage bill one credential can run up before anybody
-     * notices, whether through malice or a client stuck in a retry loop. Twenty
-     * uploads an hour is far past honest use of a form with one or two
-     * attachments; at the 10 MiB ceiling it bounds one caller to 200 MiB an hour.
-     *
-     * Same fixed-window construction as {@see PublicFormsApiHandler}'s throttles,
-     * deliberately: two rate limiters with two shapes is two behaviours to keep
-     * correct.
-     */
-    private const WINDOW_SECONDS = 3600;
-    private const UPLOAD_MAX_PER_ACTOR = 20;
-
     public function __construct(
         private readonly FormRepository $forms,
         private readonly FormFieldRepository $fields,
@@ -210,7 +195,12 @@ final class FormUploadsApiHandler
 
     /**
      * One fixed-window counter per caller, checked then incremented — the same
-     * construction as every other throttle in this subsystem.
+     * construction as every other throttle in this subsystem
+     * ({@see \Whity\Core\RateLimit\RateLimits::formUploadsPerPerson()}).
+     *
+     * Sized against the storage bill one credential can run up before anybody
+     * notices, not against abuse of the form: twenty uploads an hour at the
+     * 10 MiB ceiling bounds one caller to 200 MiB an hour.
      *
      * A caller with no profile (a service principal) is bucketed on the TENANT
      * instead of being let through unbounded. Failing open on the one caller
@@ -222,13 +212,7 @@ final class FormUploadsApiHandler
             ? 'formupload:profile:' . $actorProfileId
             : 'formupload:tenant:' . $tenantId;
 
-        if ($this->rateStore->count($bucket) >= self::UPLOAD_MAX_PER_ACTOR) {
-            return Response::error('Too many uploads. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) max($this->rateStore->ttl($bucket), 1)]);
-        }
-        $this->rateStore->increment($bucket, self::WINDOW_SECONDS);
-
-        return null;
+        return RateLimits::formUploadsPerPerson()->take($this->rateStore, $bucket);
     }
 
     private static function actorProfileId(Request $request): ?int

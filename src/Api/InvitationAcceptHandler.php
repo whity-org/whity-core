@@ -8,6 +8,7 @@ use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Identity\InvitationService;
 use Whity\Core\PasswordPolicy;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
@@ -42,10 +43,6 @@ use Whity\Http\JsonBody;
  */
 final class InvitationAcceptHandler
 {
-    /** Throttle: fixed window, per-IP. Defence in depth behind a 256-bit token. */
-    private const WINDOW_SECONDS = 3600;
-    private const IP_MAX = 30;
-
     private const SYSTEM_TENANT_ID = 0;
 
     /**
@@ -205,15 +202,7 @@ final class InvitationAcceptHandler
             return null;
         }
 
-        $key = 'invite:accept:ip:' . $ip;
-        if ($this->store->count($key) >= self::IP_MAX) {
-            return Response::error('Too many attempts. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) max($this->store->ttl($key), 1)]);
-        }
-
-        $this->store->increment($key, self::WINDOW_SECONDS);
-
-        return null;
+        return RateLimits::invitationAcceptPerAddress()->take($this->store, 'invite:accept:ip:' . $ip);
     }
 
     /**
