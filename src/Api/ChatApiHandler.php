@@ -86,9 +86,12 @@ final class ChatApiHandler
             if ($this->messaging->conversations()->find($t, $conversation) === null) {
                 return Response::error('Chat not found', 404);
             }
-            $built = $this->customerBlocks->build($t, JsonBody::parsed($request));
+            $body = JsonBody::parsed($request);
+            $built = $this->customerBlocks->build($t, $body);
+            // UC.3: by the channel "Send by" chose, else where the customer last wrote.
+            $sendBy = is_string($body['channel'] ?? null) && $body['channel'] !== '' ? $body['channel'] : null;
             try {
-                $message = $this->messaging->reply($t, $conversation, $v->profileId, $built['text'], false, 'staff.reply', ['block' => $built['block']]);
+                $message = $this->messaging->reply($t, $conversation, $v->profileId, $built['text'], false, 'staff.reply', ['block' => $built['block']], $sendBy);
             } catch (MessagingException $e) {
                 // Its plain sentence, written for people; the detail stays in the log.
                 error_log('[ChatApiHandler] customer block not sent: ' . $e->getMessage());

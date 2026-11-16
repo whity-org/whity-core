@@ -128,6 +128,7 @@
         "customer.openContact": "فتح جهة الاتصال",
         "customer.replyTo": "ردّ على {name} عبر {channel}",
         "customer.sendBy": "الإرسال عبر {channel}",
+        "customer.sendByPick": "الإرسال عبر",
         "customer.since": "عميل منذ {date}",
         "customer.subject": "الموضوع",
         "customer.visitor": "زائر الموقع",

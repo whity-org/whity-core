@@ -12166,6 +12166,8 @@ export interface components {
             amount?: string;
             currency?: string;
             description?: string;
+            /** @description Send by this channel (one from the conversation's send_by). Default: where the customer last wrote. */
+            channel?: string;
         };
         ChatDetailResponse: {
             data: components["schemas"]["Chat"] & {

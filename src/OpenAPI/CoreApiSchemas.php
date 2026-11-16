@@ -7212,6 +7212,7 @@ final class CoreApiSchemas
                 'amount' => self::str(),
                 'currency' => self::str(),
                 'description' => self::str(),
+                'channel' => self::str() + ['description' => 'Send by this channel (one from the conversation\'s send_by). Default: where the customer last wrote.'],
             ], ['type']),
             'ChatMuteRequest' => self::object([
                 'muted' => self::bool() + ['description' => 'False unmutes; true by default.'],
