@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Messaging;
 
 use PDO;
-use Whity\Core\Db\DbBool;
+use Whity\Core\Settings\SettingsRegistry;
 
 /**
  * When a signed-in customer sees "Messages" in their menu (ADR 0016 §5): they
@@ -28,10 +28,9 @@ final class MessagesNavConditions
             return false;
         }
 
-        $settings = $this->db->prepare('SELECT webchat_enabled FROM messaging_settings WHERE tenant_id = :tid');
-        $settings->execute([':tid' => $tenantId]);
-        $enabled = $settings->fetchColumn();
-        if ($enabled !== false && DbBool::of($enabled)) {
+        $settings = $this->db->prepare('SELECT value FROM tenant_settings WHERE tenant_id = :tid AND setting_key = :key');
+        $settings->execute([':tid' => $tenantId, ':key' => SettingsRegistry::MESSAGING_WEBCHAT_ENABLED]);
+        if ($settings->fetchColumn() === 'true') {
             return true;
         }
 
