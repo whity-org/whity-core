@@ -2166,6 +2166,7 @@
         "plugins.paid.prices": "For this workspace: {prices}",
         "plugins.paid.readOnly": "Read-only: you can see everything, but not change it, until you buy it again. Nothing was deleted.",
         "plugins.paid.readOnlyBadge": "Read-only",
+        "plugins.paid.seats": "{count} {units} × {each} = {total}",
         "plugins.paid.startTrial": "Start {days}-day trial",
         "plugins.paid.trialError": "The trial could not be started. Try again.",
         "plugins.paid.trialStarted": "Your {days}-day trial of {name} has started.",

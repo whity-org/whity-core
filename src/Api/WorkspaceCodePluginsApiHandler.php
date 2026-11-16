@@ -55,6 +55,13 @@ final class WorkspaceCodePluginsApiHandler
     ) {
     }
 
+    private ?\Whity\Core\Plugin\Workspace\PluginSeats $seats = null;
+
+    public function useSeats(\Whity\Core\Plugin\Workspace\PluginSeats $seats): void
+    {
+        $this->seats = $seats;
+    }
+
     /**
      * GET /api/workspace/onboarding: the guided setups (SDK 1.109) of the
      * plugins on in this workspace that the caller may run, in their language.
@@ -144,6 +151,8 @@ final class WorkspaceCodePluginsApiHandler
                     // WHIT-1148: it has a guided setup, and what it needs here.
                     'onboarding' => in_array($name, $onboarding, true),
                     'dependsOn' => $this->loader->workspaceDependenciesOf($name),
+                    // SDK 1.110: sold per seat, and how many this workspace has.
+                    'seats' => $this->seats?->of($name, $tenantId),
                 ];
             }
 
