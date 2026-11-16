@@ -9300,7 +9300,7 @@
                         "name": "kinds",
                         "in": "query",
                         "required": false,
-                        "description": "Which kinds, comma-separated: booking, event, meeting, time_off, external. All when omitted.",
+                        "description": "Which kinds, comma-separated: booking, event, meeting, time_off, external, task_due. All but task_due when omitted; tasks due come from Taskaat only when named, and only with tasks:read.",
                         "schema": {
                             "type": "string"
                         }
@@ -9337,10 +9337,18 @@
                                             "items": {
                                                 "$ref": "#/components/schemas/CalendarItem"
                                             }
+                                        },
+                                        "unavailable": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "description": "Kinds that could not be read just now (task_due when Taskaat did not answer); everything else is complete."
                                         }
                                     },
                                     "required": [
-                                        "data"
+                                        "data",
+                                        "unavailable"
                                     ]
                                 }
                             }
@@ -43796,7 +43804,17 @@
                 "tags": [
                     "notifications"
                 ],
+                "description": "The Inbox's Mentions and Updates tabs (M.43): `tab=mentions` is someone naming you in a chat or a comment; `tab=updates` is every other notice except those whose item is already in Waiting for me (GET /api/me/waiting). Without a tab, every notice. `unread` counts each tab.",
                 "parameters": [
+                    {
+                        "name": "tab",
+                        "in": "query",
+                        "required": false,
+                        "description": "mentions or updates; every notice when omitted",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "name": "unread",
                         "in": "query",
@@ -44860,7 +44878,7 @@
                         "name": "limit",
                         "in": "query",
                         "required": false,
-                        "description": "How many rows (default 6, max 50)",
+                        "description": "How many rows (default 6, max 200: the Inbox reads the whole list)",
                         "schema": {
                             "type": "integer"
                         }
@@ -77518,7 +77536,8 @@
                             "event",
                             "meeting",
                             "time_off",
-                            "external"
+                            "external",
+                            "task_due"
                         ]
                     },
                     "title": {
@@ -77599,6 +77618,30 @@
                                 "type": "null"
                             }
                         ]
+                    },
+                    "task": {
+                        "oneOf": [
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "short_id": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                },
+                                "required": [
+                                    "id",
+                                    "short_id"
+                                ]
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "The Taskaat task, for kind task_due."
                     },
                     "can": {
                         "type": "object",
@@ -83170,10 +83213,34 @@
                     },
                     "mentions": {
                         "type": "array",
+                        "maxItems": 50,
                         "items": {
-                            "type": "integer"
+                            "oneOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "person",
+                                                "agent",
+                                                "everyone"
+                                            ]
+                                        },
+                                        "id": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "type"
+                                    ]
+                                }
+                            ]
                         },
-                        "description": "Profile ids @mentioned; members who can read the document are told in-app"
+                        "description": "The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox \u203a Mentions and a push"
                     }
                 },
                 "required": [
@@ -83276,10 +83343,34 @@
                     },
                     "mentions": {
                         "type": "array",
+                        "maxItems": 50,
                         "items": {
-                            "type": "integer"
+                            "oneOf": [
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "person",
+                                                "agent",
+                                                "everyone"
+                                            ]
+                                        },
+                                        "id": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "required": [
+                                        "type"
+                                    ]
+                                }
+                            ]
                         },
-                        "description": "Profile ids @mentioned; members who can read the document are told in-app"
+                        "description": "The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox \u203a Mentions and a push"
                     }
                 },
                 "required": [
@@ -93890,12 +93981,28 @@
                     },
                     "unread_count": {
                         "type": "integer"
+                    },
+                    "unread": {
+                        "type": "object",
+                        "properties": {
+                            "mentions": {
+                                "type": "integer"
+                            },
+                            "updates": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "mentions",
+                            "updates"
+                        ]
                     }
                 },
                 "required": [
                     "data",
                     "pagination",
-                    "unread_count"
+                    "unread_count",
+                    "unread"
                 ]
             },
             "NotificationMetrics": {

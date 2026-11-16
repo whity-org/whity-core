@@ -8,18 +8,18 @@ use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\RecipientProfiles;
 use Tests\Support\SchemaFromMigrations;
-use Whity\Api\InboxApiHandler;
+use Whity\Api\NotificationsApiHandler;
 use Whity\Auth\TokenValidator;
 use Whity\Core\Notification\NotificationRepository;
 use Whity\Core\Request;
 
 /**
- * Real-engine tests for {@see InboxApiHandler}: the self-scoped inbox surface
+ * Real-engine tests for {@see NotificationsApiHandler}: the self-scoped inbox surface
  * over a migration-built schema, with a mocked TokenValidator supplying the
  * caller's claims. Proves the list envelope + unread count, unread filtering,
  * mark-read (owned 204 / foreign 404), mark-all-read, and the 401 fail-closed.
  */
-final class InboxApiHandlerRealEngineTest extends TestCase
+final class NotificationsApiHandlerRealEngineTest extends TestCase
 {
     private const TENANT_A = 1;
     private const CALLER = 101;
@@ -44,15 +44,15 @@ final class InboxApiHandlerRealEngineTest extends TestCase
      *
      * @param array<string, mixed>|null $claims
      */
-    private function handler(?array $claims): InboxApiHandler
+    private function handler(?array $claims): NotificationsApiHandler
     {
         $tv = $this->createMock(TokenValidator::class);
         $tv->method('validateAccessToken')->willReturn($claims);
 
-        return new InboxApiHandler($tv, $this->repo);
+        return new NotificationsApiHandler($tv, $this->repo);
     }
 
-    private function authed(): InboxApiHandler
+    private function authed(): NotificationsApiHandler
     {
         return $this->handler(['profile_id' => self::CALLER, 'active_tenant_id' => self::TENANT_A]);
     }
@@ -76,6 +76,33 @@ final class InboxApiHandlerRealEngineTest extends TestCase
         self::assertArrayNotHasKey('tenant_id', $body['data'][0]);
         self::assertArrayNotHasKey('recipient_profile_id', $body['data'][0]);
         self::assertFalse($body['data'][0]['read']);
+    }
+
+    public function testTheInboxTabsSplitMentionsFromUpdatesAndLeaveOutWhatIsWaiting(): void
+    {
+        $this->repo->create(self::TENANT_A, self::CALLER, 'chat.mention', ['subject' => 'Awss mentioned you']);
+        $this->repo->create(self::TENANT_A, self::CALLER, 'document.comment.mention', ['subject' => 'In a comment']);
+        $this->repo->create(self::TENANT_A, self::CALLER, 'document.routing.delivered', ['subject' => 'A document was sent to you']);
+        $this->repo->create(self::TENANT_A, self::CALLER, 'document.routing.awaiting', ['subject' => 'Already in Waiting for me']);
+        $this->repo->create(self::TENANT_A, self::CALLER, 'agent.needs_approval', ['subject' => 'Also waiting']);
+
+        $tab = function (string $name): array {
+            $body = json_decode($this->authed()->list(new Request('GET', '/api/me/notifications?tab=' . $name))->getBody(), true);
+            self::assertIsArray($body);
+
+            return $body;
+        };
+
+        $mentions = $tab('mentions');
+        self::assertSame(['In a comment', 'Awss mentioned you'], array_column($mentions['data'], 'subject'));
+        self::assertSame(2, $mentions['pagination']['total']);
+        self::assertSame(['mentions' => 2, 'updates' => 1], $mentions['unread']);
+
+        self::assertSame(['A document was sent to you'], array_column($tab('updates')['data'], 'subject'));
+        self::assertSame(5, $mentions['unread_count'], 'the whole unread count is unchanged');
+
+        $bad = $this->authed()->list(new Request('GET', '/api/me/notifications?tab=everything'));
+        self::assertSame(422, $bad->getStatusCode());
     }
 
     public function testUnauthenticatedReturns401(): void

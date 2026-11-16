@@ -3233,8 +3233,10 @@ final class CoreApiSchemas
                 'requiredPermission' => null,
                 'schema' => [
                     'summary' => 'List the caller\'s in-app notifications (newest first, paginated) + unread count',
+                    'description' => 'The Inbox\'s Mentions and Updates tabs (M.43): `tab=mentions` is someone naming you in a chat or a comment; `tab=updates` is every other notice except those whose item is already in Waiting for me (GET /api/me/waiting). Without a tab, every notice. `unread` counts each tab.',
                     'tags' => ['notifications'],
                     'parameters' => [
+                        self::queryParam('tab', 'string', 'mentions or updates; every notice when omitted'),
                         self::queryParam('unread', 'boolean', 'Restrict to unread notifications when truthy'),
                         self::queryParam('page', 'integer', '1-indexed page (default 1)'),
                         self::queryParam('per_page', 'integer', 'Page size (default 25, max 100)'),
@@ -8476,11 +8478,11 @@ final class CoreApiSchemas
                 'anchor_block_id' => self::str() + ['description' => 'The id of the block the commented text is in'],
                 'quote' => self::str() + ['description' => 'The commented text, at most 2000 characters'],
                 'body' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The first message as the contract Inline[] (text, field, break, math), not empty'],
-                'mentions' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Profile ids @mentioned; members who can read the document are told in-app'],
+                'mentions' => ['type' => 'array', 'maxItems' => 50, 'items' => ['oneOf' => [['type' => 'integer'], self::object(['type' => self::str() + ['enum' => ['person', 'agent', 'everyone']], 'id' => self::int()], ['type'])]], 'description' => 'The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox › Mentions and a push'],
             ], ['anchor_block_id', 'quote', 'body']),
             'DocumentCommentMessageCreateRequest' => self::object([
                 'body' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true], 'description' => 'The reply as the contract Inline[] (text, field, break, math), not empty'],
-                'mentions' => ['type' => 'array', 'items' => ['type' => 'integer'], 'description' => 'Profile ids @mentioned; members who can read the document are told in-app'],
+                'mentions' => ['type' => 'array', 'maxItems' => 50, 'items' => ['oneOf' => [['type' => 'integer'], self::object(['type' => self::str() + ['enum' => ['person', 'agent', 'everyone']], 'id' => self::int()], ['type'])]], 'description' => 'The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox › Mentions and a push'],
             ], ['body']),
             'DocumentMentionablePerson' => self::object([
                 'kind' => ['type' => 'string', 'enum' => ['person'], 'description' => 'Always person'],
@@ -10764,7 +10766,7 @@ final class CoreApiSchemas
             ], ['response']),
             'CalendarItem' => self::object([
                 'id' => self::str() + ['description' => 'The kind and the record: "booking:7", "event:12", "time_off:5".'],
-                'kind' => self::str() + ['enum' => ['booking', 'event', 'meeting', 'time_off', 'external']],
+                'kind' => self::str() + ['enum' => ['booking', 'event', 'meeting', 'time_off', 'external', 'task_due']],
                 'title' => self::str() + ['description' => 'What it is. Someone else\'s time off reads "Away" and their synced events "Busy".'],
                 'starts_at' => self::str(),
                 'ends_at' => self::str(),
@@ -10782,6 +10784,10 @@ final class CoreApiSchemas
                     'meeting_id' => self::int(true),
                     'external_ref' => self::str(true),
                 ], ['id', 'notes', 'meeting_id', 'external_ref']), ['type' => 'null']]],
+                'task' => ['oneOf' => [self::object([
+                    'id' => self::str(),
+                    'short_id' => self::str(true),
+                ], ['id', 'short_id']), ['type' => 'null']], 'description' => 'The Taskaat task, for kind task_due.'],
                 'can' => self::object([
                     'open' => self::bool(),
                     'move' => self::bool(),
@@ -11119,7 +11125,11 @@ final class CoreApiSchemas
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationEntry')],
                 'pagination' => SchemaBuilder::ref('Pagination'),
                 'unread_count' => self::int(),
-            ], ['data', 'pagination', 'unread_count']),
+                'unread' => self::object([
+                    'mentions' => self::int(),
+                    'updates' => self::int(),
+                ], ['mentions', 'updates']),
+            ], ['data', 'pagination', 'unread_count', 'unread']),
             'UnreadCountResponse' => self::object([
                 'unread_count' => self::int(),
             ], ['unread_count']),
@@ -16156,7 +16166,7 @@ final class CoreApiSchemas
                         . '`unavailable` and the rest is still served. There are no pages: the rest is on Inbox and Approvals.',
                     'tags' => ['inbox'],
                     'parameters' => [
-                        self::queryParam('limit', 'integer', 'How many rows (default 6, max 50)'),
+                        self::queryParam('limit', 'integer', 'How many rows (default 6, max 200: the Inbox reads the whole list)'),
                     ],
                     'responses' => [
                         200 => self::jsonResponse('The oldest rows and the totals', 'WaitingListResponse'),
@@ -19012,12 +19022,15 @@ final class CoreApiSchemas
                 'tags' => ['calendar'],
                 'parameters' => array_merge($range, [
                     self::queryParam('people', 'string', 'Whose calendars, as comma-separated profile ids (people invited count). All when omitted.'),
-                    self::queryParam('kinds', 'string', 'Which kinds, comma-separated: booking, event, meeting, time_off, external. All when omitted.'),
+                    self::queryParam('kinds', 'string', 'Which kinds, comma-separated: booking, event, meeting, time_off, external, task_due. All but task_due when omitted; tasks due come from Taskaat only when named, and only with tasks:read.'),
                     self::queryParam('cancelled', 'string', '1 to include cancelled bookings.'),
                     self::queryParam('unit_id', 'integer', 'Only bookings in this branch.'),
                 ]),
                 'responses' => [
-                    200 => self::jsonResponse('The items, oldest start first', self::listEnvelope('CalendarItem')),
+                    200 => self::jsonResponse('The items, oldest start first', self::object([
+                        'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarItem')],
+                        'unavailable' => ['type' => 'array', 'items' => self::str(), 'description' => 'Kinds that could not be read just now (task_due when Taskaat did not answer); everything else is complete.'],
+                    ], ['data', 'unavailable'])),
                     422 => self::errorResponse('A bad range, id list or kind'),
                 ] + self::authErrors(),
             ]),

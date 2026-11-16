@@ -6486,7 +6486,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List the caller's in-app notifications (newest first, paginated) + unread count */
+        /**
+         * List the caller's in-app notifications (newest first, paginated) + unread count
+         * @description The Inbox's Mentions and Updates tabs (M.43): `tab=mentions` is someone naming you in a chat or a comment; `tab=updates` is every other notice except those whose item is already in Waiting for me (GET /api/me/waiting). Without a tab, every notice. `unread` counts each tab.
+         */
         get: operations["get_api_v1_me_notifications"];
         put?: never;
         post?: never;
@@ -11758,7 +11761,7 @@ export interface components {
             /** @description The kind and the record: "booking:7", "event:12", "time_off:5". */
             id: string;
             /** @enum {string} */
-            kind: "booking" | "event" | "meeting" | "time_off" | "external";
+            kind: "booking" | "event" | "meeting" | "time_off" | "external" | "task_due";
             /** @description What it is. Someone else's time off reads "Away" and their synced events "Busy". */
             title: string;
             starts_at: string;
@@ -11778,6 +11781,11 @@ export interface components {
                 notes: string;
                 meeting_id: number | null;
                 external_ref: string | null;
+            } | null;
+            /** @description The Taskaat task, for kind task_due. */
+            task?: {
+                id: string;
+                short_id: string | null;
             } | null;
             can: {
                 open: boolean;
@@ -13343,8 +13351,12 @@ export interface components {
             body: {
                 [key: string]: unknown;
             }[];
-            /** @description Profile ids @mentioned; members who can read the document are told in-app */
-            mentions?: number[];
+            /** @description The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox › Mentions and a push */
+            mentions?: (number | {
+                /** @enum {string} */
+                type: "person" | "agent" | "everyone";
+                id?: number;
+            })[];
         };
         DocumentCommentMessageResponse: {
             data: components["schemas"]["DocumentCommentMessage"];
@@ -13376,8 +13388,12 @@ export interface components {
             body: {
                 [key: string]: unknown;
             }[];
-            /** @description Profile ids @mentioned; members who can read the document are told in-app */
-            mentions?: number[];
+            /** @description The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox › Mentions and a push */
+            mentions?: (number | {
+                /** @enum {string} */
+                type: "person" | "agent" | "everyone";
+                id?: number;
+            })[];
         };
         DocumentCommentThreadListResponse: {
             data: components["schemas"]["DocumentCommentThread"][];
@@ -16538,6 +16554,10 @@ export interface components {
             data: components["schemas"]["NotificationEntry"][];
             pagination: components["schemas"]["Pagination"];
             unread_count: number;
+            unread: {
+                mentions: number;
+                updates: number;
+            };
         };
         NotificationMetrics: {
             total: number;
@@ -27252,7 +27272,7 @@ export interface operations {
                 to: string;
                 /** @description Whose calendars, as comma-separated profile ids (people invited count). All when omitted. */
                 people?: string;
-                /** @description Which kinds, comma-separated: booking, event, meeting, time_off, external. All when omitted. */
+                /** @description Which kinds, comma-separated: booking, event, meeting, time_off, external, task_due. All but task_due when omitted; tasks due come from Taskaat only when named, and only with tasks:read. */
                 kinds?: string;
                 /** @description 1 to include cancelled bookings. */
                 cancelled?: string;
@@ -27273,6 +27293,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["CalendarItem"][];
+                        /** @description Kinds that could not be read just now (task_due when Taskaat did not answer); everything else is complete. */
+                        unavailable: string[];
                     };
                 };
             };
@@ -54207,6 +54229,8 @@ export interface operations {
     get_api_v1_me_notifications: {
         parameters: {
             query?: {
+                /** @description mentions or updates; every notice when omitted */
+                tab?: string;
                 /** @description Restrict to unread notifications when truthy */
                 unread?: boolean;
                 /** @description 1-indexed page (default 1) */
@@ -55134,7 +55158,7 @@ export interface operations {
     get_api_v1_me_waiting: {
         parameters: {
             query?: {
-                /** @description How many rows (default 6, max 50) */
+                /** @description How many rows (default 6, max 200: the Inbox reads the whole list) */
                 limit?: number;
             };
             header?: never;

@@ -51,7 +51,7 @@ use Whity\Sdk\Inbox\InboxSource;
  *
  * WHY THE NOTIFICATION INBOX IS NOT A SOURCE
  * ------------------------------------------
- * `/api/me/notifications` ({@see \Whity\Api\InboxApiHandler}) is not folded in
+ * `/api/me/notifications` ({@see \Whity\Api\NotificationsApiHandler}) is not folded in
  * here, and that is a judgement rather than an omission. A notification is
  * something you READ — subject, body, `read_at`. An inbox item is something
  * that is WAITING FOR YOU TO ACT. #881's aggregate answers "what needs me
