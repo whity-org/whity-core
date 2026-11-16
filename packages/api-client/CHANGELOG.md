@@ -1,5 +1,11 @@
 # @whity/api-client
 
+## 0.3.0
+
+### Minor Changes
+
+- The typed client follows core's API as of 0.2.29.
+
 ## 0.2.0
 
 ### Minor Changes

@@ -1,1 +1,0 @@
-- **Migration number 246 is recorded as never used.** New migrations from 250 onwards pass the schema check again.
