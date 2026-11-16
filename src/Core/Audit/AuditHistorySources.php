@@ -78,6 +78,7 @@ final class AuditHistorySources
         $out = [];
         if ($scope['agents']) {
             [$where, $params] = $this->where($tenantId, $query, 'a', 'a.on_behalf_of_profile_id', 'a.agent_principal_id');
+            // @tenant-guard-ignore: tenant_id predicate is in $where for every workspace; the system tenant (id 0) reads every workspace's history by design, as the audit log does
             $stmt = $this->db->prepare(
                 "SELECT a.id, a.tenant_id, a.agent_principal_id, a.on_behalf_of_profile_id, a.tool, a.summary, a.status, a.created_at
                    FROM agent_actions a{$where}
@@ -155,6 +156,7 @@ final class AuditHistorySources
         $total = 0;
         if ($scope['agents']) {
             [$where, $params] = $this->where($tenantId, $query, 'a', 'a.on_behalf_of_profile_id', 'a.agent_principal_id');
+            // @tenant-guard-ignore: tenant_id predicate is in $where for every workspace; the system tenant (id 0) reads every workspace's history by design, as the audit log does
             $stmt = $this->db->prepare("SELECT COUNT(*) FROM agent_actions a{$where}");
             $stmt->execute($params);
             $total += (int) $stmt->fetchColumn();
@@ -162,6 +164,7 @@ final class AuditHistorySources
         if ($scope['routes']) {
             [$where, $params] = $this->where($tenantId, $query, 'e', 'e.actor_profile_id', null);
             $where .= ($where === '' ? ' WHERE ' : ' AND ') . "(e.verdict IS NOT NULL OR e.action IN ('signed', 'declined', 'sent_back'))";
+            // @tenant-guard-ignore: tenant_id predicate is in $where for every workspace; the system tenant (id 0) reads every workspace's history by design, as the audit log does
             $stmt = $this->db->prepare("SELECT COUNT(*) FROM document_route_events e{$where}");
             $stmt->execute($params);
             $total += (int) $stmt->fetchColumn();
