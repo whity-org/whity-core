@@ -123,7 +123,6 @@ final class TenantOwnedTables
         // ignores that read the tenant from the row they find.
         'calendar_staff' => '247_create_calendar.php',
         'calendar_working_hours' => '247_create_calendar.php',
-        'calendar_availability_exceptions' => '247_create_calendar.php',
         'calendar_events' => '247_create_calendar.php',
         'calendar_services' => '248_create_calendar_bookings.php',
         'calendar_service_staff' => '248_create_calendar_bookings.php',
@@ -151,7 +150,6 @@ final class TenantOwnedTables
         'messages' => '243_create_conversations_and_messages.php',
         'conversation_contacts' => '289_one_conversation_per_customer.php',
         'webchat_visitors' => '245_create_webchat_and_messaging_settings.php',
-        'messaging_settings' => '245_create_webchat_and_messaging_settings.php',
         // Team chat (CH.1, CH.2): a team chat and its people and agents.
         'chats' => '253_create_team_chat.php',
         'chat_members' => '253_create_team_chat.php',

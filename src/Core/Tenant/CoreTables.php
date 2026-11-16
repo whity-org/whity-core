@@ -59,7 +59,6 @@ final class CoreTables
         'audit_log' => '016_create_audit_log.php',
         'away_periods' => '251_add_two_admin_resets_and_away.php',
         'backup_codes' => '007_add_two_factor_support.php',
-        'calendar_availability_exceptions' => '247_create_calendar.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',
         'calendar_events' => '247_create_calendar.php',
         'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
@@ -213,7 +212,6 @@ final class CoreTables
         'messages' => '243_create_conversations_and_messages.php',
         'conversation_contacts' => '289_one_conversation_per_customer.php',
         'webchat_visitors' => '245_create_webchat_and_messaging_settings.php',
-        'messaging_settings' => '245_create_webchat_and_messaging_settings.php',
         'chats' => '253_create_team_chat.php',
         'chat_members' => '253_create_team_chat.php',
         // One chat (UC.1): each person's pins and read marks on any conversation.

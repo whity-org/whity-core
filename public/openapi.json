@@ -12262,6 +12262,118 @@
                 }
             }
         },
+        "/api/v1/chat/chats/discuss": {
+            "post": {
+                "operationId": "post_api_v1_chat_chats_discuss",
+                "summary": "Open the chat about a board, a meeting or a record, starting it if new",
+                "tags": [
+                    "chat"
+                ],
+                "description": "One group chat per linked board, meeting or record, named after it. You join it if you are not in it yet. 201 when the chat was started, 200 when it was already there; `created` says the same.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ChatDiscussRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The chat it already had",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatDiscussResponse"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "The chat, just started",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatDiscussResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The link is not a board, a meeting or a record with an id and a name",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/chat/chats/{id}": {
             "get": {
                 "operationId": "get_api_v1_chat_chats_id",
@@ -74558,6 +74670,16 @@
                             }
                         }
                     },
+                    "402": {
+                        "description": "A paid plugin needs a plan that includes it, a purchase or a trial; details.reason is needs_purchase",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
                     "403": {
                         "description": "Insufficient permissions",
                         "content": {
@@ -74686,6 +74808,112 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/workspace/code-plugins/{plugin}/trial": {
+            "post": {
+                "operationId": "post_api_v1_workspace_code_plugins_plugin_trial",
+                "summary": "Start this workspace's free trial of a paid plugin",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Once per workspace and plugin. Turns the plugin on until the trial ends; then 7 days of grace, then read-only unless it was bought.",
+                "parameters": [
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "description": "The installed plugin's name, as it gives it (FrontOffice).",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The trial started",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspaceCodePluginTrialResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not a plugin this workspace can use",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Already had its trial, or the plugin offers none",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -78286,6 +78514,11 @@
             "CalendarSettings": {
                 "type": "object",
                 "properties": {
+                    "booking_page_url": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only."
+                    },
                     "time_zone": {
                         "type": "string",
                         "description": "The workspace time zone (IANA)."
@@ -79419,6 +79652,67 @@
                         "required": [
                             "people",
                             "agents"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "ChatDiscussRequest": {
+                "type": "object",
+                "properties": {
+                    "link": {
+                        "$ref": "#/components/schemas/ChatLink"
+                    }
+                },
+                "required": [
+                    "link"
+                ]
+            },
+            "ChatDiscussResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/Chat"
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "members": {
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#/components/schemas/ChatMember"
+                                        }
+                                    },
+                                    "messages": {
+                                        "type": "array",
+                                        "items": {
+                                            "$ref": "#/components/schemas/ChatMessage"
+                                        }
+                                    },
+                                    "has_earlier": {
+                                        "type": "boolean"
+                                    },
+                                    "my_member_id": {
+                                        "type": "integer"
+                                    },
+                                    "last_read_message_id": {
+                                        "type": "integer"
+                                    },
+                                    "created": {
+                                        "type": "boolean",
+                                        "description": "True when this call started the chat."
+                                    }
+                                },
+                                "required": [
+                                    "members",
+                                    "messages",
+                                    "created"
+                                ]
+                            }
                         ]
                     }
                 },
@@ -90093,6 +90387,27 @@
                     "plugin": {
                         "type": "string"
                     },
+                    "pluginAccess": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "state": {
+                                "type": "string",
+                                "enum": [
+                                    "on",
+                                    "read_only"
+                                ]
+                            },
+                            "reason": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "graceUntil": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        }
+                    },
                     "label": {
                         "type": "string"
                     },
@@ -90735,10 +91050,19 @@
                                 "type": "string",
                                 "enum": [
                                     "totp",
-                                    "email_code"
+                                    "email_code",
+                                    "fresh_sign_in"
                                 ]
                             },
                             "email_hint": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "provider_key": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "purpose": {
                                 "type": "string",
                                 "nullable": true
                             }
@@ -106864,6 +107188,55 @@
                                 "type": "string"
                             }
                         }
+                    },
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "on",
+                            "read_only",
+                            "off"
+                        ],
+                        "description": "read_only: a paid plugin whose access ended; reads work, writes are refused"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "free_for_all",
+                            "entitled",
+                            "trial",
+                            "grace",
+                            "lapsed",
+                            "installation_unlicensed",
+                            "installation_grace",
+                            null
+                        ]
+                    },
+                    "graceUntil": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "trialEndsAt": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "paid": {
+                        "type": "boolean"
+                    },
+                    "product": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "What the workspace buys, plugin.<slug>"
+                    },
+                    "trialDays": {
+                        "type": "integer"
+                    },
+                    "trialAvailable": {
+                        "type": "boolean"
+                    },
+                    "mayTurnOn": {
+                        "type": "boolean",
+                        "description": "Free, included in the plan or an add-on, free for every workspace, or in a trial"
                     }
                 },
                 "required": [
@@ -106871,7 +107244,11 @@
                     "version",
                     "access",
                     "canSwitch",
-                    "enabled"
+                    "enabled",
+                    "state",
+                    "paid",
+                    "trialAvailable",
+                    "mayTurnOn"
                 ]
             },
             "WorkspaceCodePluginHistoryResponse": {
@@ -106886,7 +107263,8 @@
                                     "type": "string",
                                     "enum": [
                                         "enabled",
-                                        "disabled"
+                                        "disabled",
+                                        "trial_started"
                                     ]
                                 },
                                 "at": {
@@ -106941,6 +107319,33 @@
                             },
                             "enabled": {
                                 "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "enabled"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "WorkspaceCodePluginTrialResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "trialEndsAt": {
+                                "type": "string",
+                                "nullable": true
                             }
                         },
                         "required": [

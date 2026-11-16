@@ -1841,6 +1841,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/chat/chats/discuss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open the chat about a board, a meeting or a record, starting it if new
+         * @description One group chat per linked board, meeting or record, named after it. You join it if you are not in it yet. 201 when the chat was started, 200 when it was already there; `created` says the same.
+         */
+        post: operations["post_api_v1_chat_chats_discuss"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/chat/chats/{id}": {
         parameters: {
             query?: never;
@@ -10945,6 +10965,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspace/code-plugins/{plugin}/trial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start this workspace's free trial of a paid plugin
+         * @description Once per workspace and plugin. Turns the plugin on until the trial ends; then 7 days of grace, then read-only unless it was bought.
+         */
+        post: operations["post_api_v1_workspace_code_plugins_plugin_trial"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -11953,6 +11993,8 @@ export interface components {
             needs_approval?: boolean;
         };
         CalendarSettings: {
+            /** @description The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only. */
+            booking_page_url?: string | null;
             /** @description The workspace time zone (IANA). */
             time_zone: string;
             booking_page_enabled: boolean;
@@ -12286,6 +12328,20 @@ export interface components {
                     role?: string;
                     role_ar?: string;
                 }[];
+            };
+        };
+        ChatDiscussRequest: {
+            link: components["schemas"]["ChatLink"];
+        };
+        ChatDiscussResponse: {
+            data: components["schemas"]["Chat"] & {
+                members: components["schemas"]["ChatMember"][];
+                messages: components["schemas"]["ChatMessage"][];
+                has_earlier?: boolean;
+                my_member_id?: number;
+                last_read_message_id?: number;
+                /** @description True when this call started the chat. */
+                created: boolean;
             };
         };
         ChatDoneResponse: {
@@ -15507,6 +15563,12 @@ export interface components {
         FrontendFeature: {
             id: string;
             plugin: string;
+            pluginAccess?: {
+                /** @enum {string} */
+                state?: "on" | "read_only";
+                reason?: string | null;
+                graceUntil?: string | null;
+            } | null;
             label: string;
             icon: string | null;
             group: string;
@@ -15673,8 +15735,10 @@ export interface components {
         IdentityCheckResponse: {
             data: {
                 /** @enum {string} */
-                method: "totp" | "email_code";
+                method: "totp" | "email_code" | "fresh_sign_in";
                 email_hint: string | null;
+                provider_key?: string | null;
+                purpose?: string | null;
             };
         };
         IdentityProvider: {
@@ -20013,11 +20077,27 @@ export interface components {
                 id?: number;
                 name?: string;
             } | null;
+            /**
+             * @description read_only: a paid plugin whose access ended; reads work, writes are refused
+             * @enum {string}
+             */
+            state: "on" | "read_only" | "off";
+            /** @enum {string|null} */
+            reason?: "free_for_all" | "entitled" | "trial" | "grace" | "lapsed" | "installation_unlicensed" | "installation_grace" | null;
+            graceUntil?: string | null;
+            trialEndsAt?: string | null;
+            paid: boolean;
+            /** @description What the workspace buys, plugin.<slug> */
+            product?: string | null;
+            trialDays?: number;
+            trialAvailable: boolean;
+            /** @description Free, included in the plan or an add-on, free for every workspace, or in a trial */
+            mayTurnOn: boolean;
         };
         WorkspaceCodePluginHistoryResponse: {
             data: {
                 /** @enum {string} */
-                action: "enabled" | "disabled";
+                action: "enabled" | "disabled" | "trial_started";
                 at: string;
                 by?: {
                     id?: number;
@@ -20032,6 +20112,13 @@ export interface components {
             data: {
                 name: string;
                 enabled: boolean;
+            };
+        };
+        WorkspaceCodePluginTrialResponse: {
+            data: {
+                name: string;
+                enabled: boolean;
+                trialEndsAt?: string | null;
             };
         };
         WorkspacePlugin: {
@@ -29636,6 +29723,102 @@ export interface operations {
                 };
             };
             /** @description No name, someone who is not in this workspace, or an agent that does not work for you */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_chat_chats_discuss: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatDiscussRequest"];
+            };
+        };
+        responses: {
+            /** @description The chat it already had */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDiscussResponse"];
+                };
+            };
+            /** @description The chat, just started */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatDiscussResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The link is not a board, a meeting or a record with an id and a name */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -78593,6 +78776,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description A paid plugin needs a plan that includes it, a purchase or a trial; details.reason is needs_purchase */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Insufficient permissions */
             403: {
                 headers: {
@@ -78690,6 +78882,83 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_code_plugins_plugin_trial: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The installed plugin's name, as it gives it (FrontOffice). */
+                plugin: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The trial started */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceCodePluginTrialResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a plugin this workspace can use */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already had its trial, or the plugin offers none */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
