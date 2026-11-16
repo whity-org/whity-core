@@ -82,7 +82,8 @@ final class SecretReencryptor
             $json[$ref->field] = $fresh;
             $fresh = (string) json_encode($json, JSON_UNESCAPED_SLASHES);
         }
-        // @tenant-guard-ignore: instance maintenance after a key rotation; one row by its id, and only while it still holds what was read
+        // Instance maintenance: one row, found by its id, and only while it
+        // still holds what was read.
         $stmt = $this->db->prepare(
             "UPDATE {$ref->table} SET {$ref->column} = :fresh WHERE {$ref->idColumn} = :id AND {$ref->column} = :stored"
         );
