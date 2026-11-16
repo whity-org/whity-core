@@ -19446,8 +19446,8 @@ final class CoreApiSchemas
             ], ['name', 'access', 'freeForAll']),
             'CodePluginAccessListResponse' => self::listEnvelope('CodePluginAccess'),
             'CodePluginAccessRequest' => self::object([
-                'access' => ['type' => 'string', 'enum' => ['all', 'choose', 'operator']],
-                'freeForAll' => self::bool(),
+                'access' => ['type' => 'string', 'enum' => ['all', 'choose', 'operator'], 'description' => 'Who can use it: all (on for every workspace), choose (each workspace turns it on) or operator (the system workspace only)'],
+                'freeForAll' => self::bool() + ['description' => 'For a paid plugin: free for every workspace, with no plan, add-on or trial needed. Left out: unchanged.'],
             ], ['access']),
             'CodePluginAccessResponse' => self::object([
                 'data' => SchemaBuilder::ref('CodePluginAccess'),

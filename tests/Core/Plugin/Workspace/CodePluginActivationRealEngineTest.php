@@ -95,7 +95,7 @@ PHP);
         $this->pdo = SchemaFromMigrations::make(true);
         $this->pdo->exec("INSERT OR IGNORE INTO tenants (id, name) VALUES (0, 'system')");
         $this->pdo->exec("INSERT INTO tenants (id, name) VALUES (1, 'example-bakery'), (2, 'example-cafe')");
-        $this->pdo->exec("INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at) VALUES (7, 'Amro Saleh', 'x', 0, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        $this->pdo->exec("INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at) VALUES (7, 'Amro Saleh', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
 
         $this->activation = new CodePluginActivation($this->pdo);
         $this->router = new Router();

@@ -12613,8 +12613,12 @@ export interface components {
             data: components["schemas"]["CodePluginAccess"][];
         };
         CodePluginAccessRequest: {
-            /** @enum {string} */
+            /**
+             * @description Who can use it: all (on for every workspace), choose (each workspace turns it on) or operator (the system workspace only)
+             * @enum {string}
+             */
             access: "all" | "choose" | "operator";
+            /** @description For a paid plugin: free for every workspace, with no plan, add-on or trial needed. Left out: unchanged. */
             freeForAll?: boolean;
         };
         CodePluginAccessResponse: {
