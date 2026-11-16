@@ -102,8 +102,8 @@ final class FormUploadStore
             'storage_key'            => $key,
             'content_type'           => $contentType,
             'byte_size'              => strlen($bytes),
-            // Computed here, over the bytes actually stored. It travels onto
-            // `document_artifacts.checksum_sha256` when the upload is claimed,
+            // Computed here, over the bytes actually stored. It is kept on the
+            // file's `stored_files` row, which the artifact shares when the upload is claimed,
             // so "is this the file the applicant sent" is answerable later
             // without trusting anything the applicant's client said.
             'checksum_sha256'        => $stored['checksum_sha256'],

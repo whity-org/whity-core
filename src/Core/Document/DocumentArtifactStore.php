@@ -46,7 +46,8 @@ use Whity\Storage\StorageKey;
  * would leave the guarantee resting on 128 bits of luck and on the driver's
  * put() semantics, which overwrite by design on both backends.
  *
- * The database's `UNIQUE (storage_key)` is the independent second half. Both
+ * The database's `UNIQUE (tenant_id, storage_key)` on `stored_files`, and the
+ * unique `stored_file_id` on `document_artifacts`, are the independent second half. Both
  * can fail on their own, and neither is load-bearing for the other.
  */
 final class DocumentArtifactStore

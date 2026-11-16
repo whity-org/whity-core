@@ -16,7 +16,7 @@ use Whity\Storage\StorageDriverInterface;
 use Whity\Storage\StorageException;
 
 /**
- * The one file store (merge map plumbing, WHIT-1159; migration 298): every
+ * The one file store (merge map plumbing, WHIT-1159; migrations 298 and 299): every
  * stored object has one `stored_files` row in its workspace, the owner points
  * at it, the same object recorded twice is one row, and a deleted file's row
  * goes with it.
@@ -105,14 +105,13 @@ final class StoredFilesRealEngineTest extends TestCase
     public function testTheBackfillLinksExistingRowsAndCanRunAgain(): void
     {
         // A printout and an upload recorded before migration 298, sharing one object.
+        $db = $this->beforeMigration299();
         $this->pdo->exec("INSERT INTO documents (id, tenant_id, template_name, title, created_by, created_at) VALUES (43, 1, 'Letter', 'Delivery note', 10, CURRENT_TIMESTAMP)");
         $this->pdo->exec("INSERT INTO document_artifacts (tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by)
                           VALUES (1, 43, 'tenants/1/documents/43/a.pdf', 'application/pdf', 9, 'abc', 10)");
         $this->pdo->exec("INSERT INTO document_artifacts (tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by)
                           VALUES (1, 43, 'tenants/1/documents/43/b.pdf', 'application/pdf', 9, 'def', 10)");
 
-        $db = \Whity\Database\Database::withFactory(fn (): PDO => $this->pdo, 86400, 86400);
-        $db->forceConnect();
         require_once dirname(__DIR__, 2) . '/database/migrations/298_create_stored_files.php';
         \Database\Migrations\CreateStoredFiles::up($db);
         \Database\Migrations\CreateStoredFiles::up($db);
@@ -120,6 +119,86 @@ final class StoredFilesRealEngineTest extends TestCase
         self::assertSame(2, (int) $this->q('SELECT COUNT(*) FROM stored_files')->fetchColumn(), 'one row per object, however often it runs');
         self::assertSame(0, (int) $this->q('SELECT COUNT(*) FROM document_artifacts WHERE stored_file_id IS NULL')->fetchColumn());
         self::assertSame('abc', $this->q("SELECT f.checksum_sha256 FROM document_artifacts a JOIN stored_files f ON f.id = a.stored_file_id WHERE a.storage_key LIKE '%a.pdf'")->fetchColumn());
+    }
+
+    /**
+     * Migration 299: a row written after 298 by the old code (no stored_file_id)
+     * is linked first, the copied columns go, the files stay readable through
+     * the repository, and a second run changes nothing.
+     */
+    public function testMigration299LinksLateRowsDropsTheCopiesAndCanRunAgain(): void
+    {
+        $db = $this->beforeMigration299();
+        $this->pdo->exec("INSERT INTO documents (id, tenant_id, template_name, title, created_by, created_at) VALUES (44, 1, 'Letter', 'Invoice', 10, CURRENT_TIMESTAMP)");
+        $this->pdo->exec("INSERT INTO document_artifacts (tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by)
+                          VALUES (1, 44, 'tenants/1/documents/44/a.pdf', 'application/pdf', 9, 'abc', 10)");
+        require_once dirname(__DIR__, 2) . '/database/migrations/298_create_stored_files.php';
+        \Database\Migrations\CreateStoredFiles::up($db);
+        // Written by the old code between 298 and 299: no stored_file_id.
+        $this->pdo->exec("INSERT INTO document_artifacts (tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by)
+                          VALUES (1, 44, 'tenants/1/documents/44/b.pdf', 'application/pdf', 12, 'def', 10)");
+
+        \Database\Migrations\DropCopiedFileColumns::up($db);
+        $files = (int) $this->q('SELECT COUNT(*) FROM stored_files')->fetchColumn();
+        \Database\Migrations\DropCopiedFileColumns::up($db);
+
+        self::assertSame(2, $files);
+        self::assertSame($files, (int) $this->q('SELECT COUNT(*) FROM stored_files')->fetchColumn(), 'a second run changes nothing');
+        $artifacts = (new DocumentArtifactRepository($this->pdo))->listForDocument(44, 1);
+        self::assertCount(2, $artifacts);
+        self::assertSame(['tenants/1/documents/44/b.pdf', 12, 'def'], [$artifacts[0]['storage_key'], $artifacts[0]['byte_size'], $artifacts[0]['checksum_sha256']]);
+        self::assertSame(['tenants/1/documents/44/a.pdf', 9, 'abc'], [$artifacts[1]['storage_key'], $artifacts[1]['byte_size'], $artifacts[1]['checksum_sha256']]);
+        self::assertFalse($this->hasColumn('document_artifacts', 'storage_key'));
+        self::assertFalse($this->hasColumn('form_uploads', 'client_filename'));
+        self::assertFalse($this->hasColumn('chat_attachments', 'filename'));
+    }
+
+    /** A row that cannot be linked stops 299 before anything is dropped. */
+    public function testMigration299StopsOnARowItCannotLink(): void
+    {
+        $db = $this->beforeMigration299();
+        if ($this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
+            $this->pdo->exec('ALTER TABLE chat_attachments ALTER COLUMN storage_key DROP NOT NULL');
+        }
+        $this->pdo->exec("INSERT INTO conversations (id, tenant_id, kind, channel, subject, status, contact_address, last_message_at, created_at, updated_at)
+                          VALUES (102, 2, 'team', 'team', 'Spring bouquets', 'open', '', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        // A file with no key at all: nothing to link it to.
+        $this->pdo->exec("INSERT INTO chat_attachments (tenant_id, conversation_id, kind, storage_key, content_type, byte_size, created_at)
+                          VALUES (2, 102, 'file', NULL, 'text/plain', 5, CURRENT_TIMESTAMP)");
+
+        try {
+            \Database\Migrations\DropCopiedFileColumns::up($db);
+            self::fail('migration 299 should stop on an unlinked row');
+        } catch (\RuntimeException $e) {
+            self::assertStringContainsString('1 in chat_attachments', $e->getMessage());
+        }
+        self::assertTrue($this->hasColumn('chat_attachments', 'storage_key'), 'nothing was dropped');
+        self::assertTrue($this->hasColumn('document_artifacts', 'storage_key'), 'nothing was dropped');
+    }
+
+    /** The schema as it was between 298 and 299: the copied columns back, filled from stored_files. */
+    private function beforeMigration299(): \Whity\Database\Database
+    {
+        $db = \Whity\Database\Database::withFactory(fn (): PDO => $this->pdo, 86400, 86400);
+        $db->forceConnect();
+        require_once dirname(__DIR__, 2) . '/database/migrations/299_drop_copied_file_columns.php';
+        \Database\Migrations\DropCopiedFileColumns::down($db);
+
+        return $db;
+    }
+
+    private function hasColumn(string $table, string $column): bool
+    {
+        if ($this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
+            return (int) $this->q("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = '{$table}' AND column_name = '{$column}'")->fetchColumn() > 0;
+        }
+        foreach ($this->q("PRAGMA table_info({$table})")->fetchAll(PDO::FETCH_ASSOC) as $info) {
+            if ($info['name'] === $column) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function q(string $sql): \PDOStatement
