@@ -44,9 +44,9 @@ final class QrCode
     public readonly int $size;
     public readonly int $mask;
 
-    /** @var list<list<bool>> */
+    /** @var array<int, array<int, bool>> */
     private array $modules = [];
-    /** @var list<list<bool>> */
+    /** @var array<int, array<int, bool>> */
     private array $isFunction = [];
 
     /** Encodes bytes at the given level, in the smallest version that holds them. */
@@ -86,7 +86,7 @@ final class QrCode
         return new self($version, $ecl, $codewords, $forceMask);
     }
 
-    /** @param list<int> $dataCodewords */
+    /** @param array<int, int> $dataCodewords */
     private function __construct(int $version, private readonly int $ecl, array $dataCodewords, int $forceMask)
     {
         $this->version = $version;
@@ -247,8 +247,8 @@ final class QrCode
     }
 
     /**
-     * @param list<int> $data
-     * @return list<int>
+     * @param array<int, int> $data
+     * @return array<int, int>
      */
     private function addEccAndInterleave(array $data): array
     {
@@ -284,7 +284,7 @@ final class QrCode
         return $result;
     }
 
-    /** @param list<int> $data */
+    /** @param array<int, int> $data */
     private function drawCodewords(array $data): void
     {
         $i = 0;
@@ -467,7 +467,7 @@ final class QrCode
             - self::ECC_CODEWORDS_PER_BLOCK[$ecl][$version] * self::NUM_ERROR_CORRECTION_BLOCKS[$ecl][$version];
     }
 
-    /** @return list<int> */
+    /** @return array<int, int> */
     private static function reedSolomonDivisor(int $degree): array
     {
         $result = array_fill(0, $degree, 0);
@@ -487,9 +487,9 @@ final class QrCode
     }
 
     /**
-     * @param list<int> $data
-     * @param list<int> $divisor
-     * @return list<int>
+     * @param array<int, int> $data
+     * @param array<int, int> $divisor
+     * @return array<int, int>
      */
     private static function reedSolomonRemainder(array $data, array $divisor): array
     {

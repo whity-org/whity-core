@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Sdk\Print;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Whity\Sdk\Print\QrCode;
 
@@ -24,7 +25,7 @@ final class QrCodeTest extends TestCase
         yield 'Arabic UTF-8, H' => ['فاتورة 8.250 JOD', QrCode::ECC_H, 3, 1, '1612b6d8f18371baabc599051b4f8840dfc92d3e19745eab7dda20cc6b8910ed'];
     }
 
-    /** @dataProvider known */
+    #[DataProvider('known')]
     public function testMatchesKnownGoodCodes(string $data, int $ecl, int $version, int $mask, string $sha): void
     {
         $q = QrCode::encode($data, $ecl);
