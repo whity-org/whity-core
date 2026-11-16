@@ -556,12 +556,47 @@ describe('PluginsPage rejected screens (#953)', () => {
 
       expect(screen.queryByRole('switch', { name: 'Use FrontOffice in this workspace' })).not.toBeInTheDocument();
       expect(await screen.findByRole('button', { name: 'Buy' })).toBeInTheDocument();
-      expect(screen.getByText(/a month for this workspace/)).toBeInTheDocument();
+      expect(screen.getByText(/For this workspace: .*a month/)).toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: 'Start 14-day trial' }));
       await waitFor(() =>
         expect(mockApiPost).toHaveBeenCalledWith('/api/v1/workspace/code-plugins/{plugin}/trial', {
           params: { path: { plugin: 'FrontOffice' } },
+        }),
+      );
+    });
+
+    it('offers each billing period when a plugin is sold monthly, every 6 months and yearly (WHIT-1149)', async () => {
+      const user = userEvent.setup();
+      setCapabilities(['plugins:read', 'plugins:enable', 'billing:pay']);
+      mockPluginList(
+        [ACTIVE_PLUGIN],
+        false,
+        [],
+        [
+          {
+            name: 'Salons', version: '0.1.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null,
+            state: 'off', reason: null, graceUntil: null, trialEndsAt: null, paid: true, product: 'plugin.salons',
+            trialDays: 14, trialAvailable: false, mayTurnOn: false, onboarding: true, dependsOn: [],
+          },
+        ],
+        [
+          { plan_key: 'plugin.salons.yearly', is_addon: true, unit_amount: 100000, currency: 'JOD', billing_period: 'year' },
+          { plan_key: 'plugin.salons.monthly', is_addon: true, unit_amount: 15000, currency: 'JOD', billing_period: 'month' },
+          { plan_key: 'plugin.salons.half_year', is_addon: true, unit_amount: 60000, currency: 'JOD', billing_period: 'half_year' },
+        ],
+      );
+      mockApiPost.mockResolvedValue({ data: { data: { url: '' } }, response: { ok: false } });
+
+      render(<PluginsPage />);
+      await screen.findByText('Salons');
+      expect(await screen.findByText(/a month · .*every 6 months · .*a year/)).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Buy' }));
+      await user.click(await screen.findByRole('menuitem', { name: /every 6 months/ }));
+      await waitFor(() =>
+        expect(mockApiPost).toHaveBeenCalledWith('/api/v1/billing/checkout', {
+          body: { plan_key: 'plugin.salons.half_year', billing_period: 'half_year' },
         }),
       );
     });
