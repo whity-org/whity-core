@@ -6668,6 +6668,9 @@ final class CoreApiSchemas
                 // resubmits.
                 'resume_from' => ['type' => 'string', 'enum' => ['sender', 'start'], 'nullable' => true],
                 'occurred_at' => self::str(),
+                // Merge map A2: the person who was away, when the actor decided
+                // for them ("Awss Haddad for Amro Saleh"). Null otherwise.
+                'on_behalf_of_profile_id' => self::int(true),
                 // WHIT-922, on the audit page only: the hash of the entry before
                 // this one on the document, and this entry's own. Null on
                 // entries written before the chain began.

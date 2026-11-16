@@ -14739,6 +14739,7 @@ export interface components {
             /** @enum {string|null} */
             resume_from?: "sender" | "start" | null;
             occurred_at: string;
+            on_behalf_of_profile_id?: number | null;
             prev_hash?: string | null;
             entry_hash?: string | null;
         };

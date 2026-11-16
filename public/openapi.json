@@ -87296,6 +87296,10 @@
                     "occurred_at": {
                         "type": "string"
                     },
+                    "on_behalf_of_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
                     "prev_hash": {
                         "type": "string",
                         "nullable": true
