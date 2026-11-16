@@ -15811,8 +15811,10 @@ export interface components {
         IdentityCheckResponse: {
             data: {
                 /** @enum {string} */
-                method: "totp" | "email_code";
+                method: "totp" | "email_code" | "fresh_sign_in";
                 email_hint: string | null;
+                provider_key?: string | null;
+                purpose?: string | null;
             };
         };
         IdentityProvider: {

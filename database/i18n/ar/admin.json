@@ -3755,6 +3755,8 @@
         "twoStep.identity.code": "الرمز",
         "twoStep.identity.email": "أرسلنا رمزاً إلى {email}. أدخله هنا.",
         "twoStep.identity.failed": "تعذّر بدء التحقق. حاول مرة أخرى بعد دقائق.",
+        "twoStep.identity.freshSignIn": "سجّل الدخول مرة أخرى لتأكيد هويتك، ثم عد ووافق خلال خمس دقائق.",
+        "twoStep.identity.signInAgain": "سجّل الدخول مرة أخرى",
         "twoStep.identity.title": "أكّد هويتك",
         "twoStep.identity.totp": "أدخل الرمز من تطبيق المصادقة.",
         "twoStep.identity.wrong": "الرمز غير صحيح أو انتهت صلاحيته.",

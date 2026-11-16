@@ -3754,6 +3754,8 @@
         "twoStep.identity.code": "Code",
         "twoStep.identity.email": "We sent a code to {email}. Enter it here.",
         "twoStep.identity.failed": "We could not start the check. Try again in a few minutes.",
+        "twoStep.identity.freshSignIn": "Sign in again to confirm it’s you, then come back and approve within five minutes.",
+        "twoStep.identity.signInAgain": "Sign in again",
         "twoStep.identity.title": "Confirm it’s you",
         "twoStep.identity.totp": "Enter the code from your authenticator app.",
         "twoStep.identity.wrong": "That code is not right or has expired.",
