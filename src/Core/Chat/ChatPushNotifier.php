@@ -94,10 +94,13 @@ final class ChatPushNotifier
     {
         $chatId = (int) $chat['id'];
         $mentioned = [];
+        $everyone = false;
         foreach ($mentions as $m) {
             if ($m['type'] === 'person') {
                 $mentioned[$m['id']] = true;
             }
+            // UC.10: @everyone tells every person in the group.
+            $everyone = $everyone || $m['type'] === 'everyone';
         }
         $group = (string) $chat['type'] !== 'direct';
         $title = trim((string) ($chat['subject'] ?? ''));
@@ -114,7 +117,11 @@ final class ChatPushNotifier
                 }
                 $mark = max((int) $member['last_read_message_id'], (int) $member['reads_after_message_id']);
                 $unread = max(1, $this->chats->unreadLines($tenantId, $chatId, $mark, $profileId));
-                $isMention = isset($mentioned[$profileId]);
+                $isMention = $everyone || isset($mentioned[$profileId]);
+                // UC.8: a muted chat pushes nothing, except a mention, which reaches them through mute.
+                if (!$isMention && $this->chats->isMuted($tenantId, $chatId, $profileId)) {
+                    continue;
+                }
                 [$subject, $subjectAr] = self::subject($group, $title, $authorName, $unread, $isMention);
 
                 $this->dispatcher->dispatch($tenantId, $profileId, $isMention ? self::TYPE_MENTION : self::TYPE_MESSAGE, [

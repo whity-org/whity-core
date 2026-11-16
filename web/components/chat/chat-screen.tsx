@@ -233,6 +233,20 @@ export function ChatScreen() {
     [api, loadList]
   );
 
+  // UC.8: mute a chat for yourself; mentions still reach you.
+  const mute = useCallback(
+    async (id: number, muted: boolean) => {
+      setItems((prev) => prev?.map((i) => (i.id === id ? { ...i, muted } : i)) ?? prev);
+      try {
+        await api.mute(id, muted);
+      } catch (e) {
+        setListError(chatErrorText(e, ''));
+        void loadList();
+      }
+    },
+    [api, loadList]
+  );
+
   const readCustomer = useCallback(
     (id: number, messageId: number) => {
       void api.readCustomer(id, messageId).then(
@@ -301,6 +315,8 @@ export function ChatScreen() {
             detailsOpen={detailsOpen}
             pinned={current?.pinned ?? false}
             onPin={(pinned) => void pin(selected, pinned)}
+            muted={current?.muted ?? false}
+            onMute={(muted) => void mute(selected, muted)}
             onToggleDetails={toggleDetails}
             onBack={() => open(null)}
             onChanged={() => void loadList()}
@@ -317,6 +333,8 @@ export function ChatScreen() {
             unreadAtOpen={unreadAtOpen?.id === selected ? unreadAtOpen.n : 0}
             pinned={current?.pinned ?? false}
             onPin={(pinned) => void pin(selected, pinned)}
+            muted={current?.muted ?? false}
+            onMute={(muted) => void mute(selected, muted)}
             detailsOpen={detailsOpen}
             onToggleDetails={toggleDetails}
             initialDraft={askDraft?.chatId === selected ? askDraft.text : undefined}
@@ -353,6 +371,7 @@ export function ChatScreen() {
           onOpenChange={setNewOpen}
           api={api}
           myId={myId}
+          customers={customersOn && has('messages:reply')}
           onStarted={(id) => {
             setNewOpen(false);
             void loadList();
@@ -588,6 +607,11 @@ function ListRow({ item, active, onOpen, t }: { item: ChatInboxItem; active: boo
               <span className="sr-only">{item.assignee.name}</span>
             </span>
           )}
+          {item.muted && (
+            <span role="img" aria-label={t('mute.muted', 'Muted')} className="text-muted-foreground">
+              <Icon name="notification" size={14} />
+            </span>
+          )}
           {item.unread > 0 && (
             <span
               className="grid h-5 min-w-5 place-items-center rounded-full bg-primary px-1.5 text-xs text-primary-foreground"
@@ -648,6 +672,8 @@ function OpenChat({
   unreadAtOpen,
   pinned,
   onPin,
+  muted,
+  onMute,
   detailsOpen,
   onToggleDetails,
   initialDraft,
@@ -658,6 +684,8 @@ function OpenChat({
   api: ChatApi;
   chatId: number;
   myId: number;
+  muted: boolean;
+  onMute: (muted: boolean) => void;
   layout: ChatLayout;
   /** Unread lines when the chat opened: the "n new" line goes above them. */
   unreadAtOpen: number;
@@ -924,6 +952,8 @@ function OpenChat({
         <SidePanel
           t={t}
           api={api}
+          muted={muted}
+          onMute={onMute}
           onClose={() => toggleSide('details')}
           chat={chat}
           people={people}
@@ -1983,6 +2013,8 @@ function SearchPane({
 function SidePanel({
   t,
   api,
+  muted,
+  onMute,
   onClose,
   chat,
   people,
@@ -1995,6 +2027,8 @@ function SidePanel({
 }: {
   t: TranslateFn;
   api: ChatApi;
+  muted: boolean;
+  onMute: (muted: boolean) => void;
   onClose: () => void;
   chat: ChatDetail;
   people: ChatMember[];
@@ -2078,6 +2112,9 @@ function SidePanel({
       <div className="grid gap-2">
         <Button variant="outline" size="sm" icon="plus" onClick={() => onAdd('agent')}>
           {t('side.add', 'Add a person or an agent')}
+        </Button>
+        <Button variant="ghost" size="sm" icon="notification" aria-pressed={muted} onClick={() => onMute(!muted)}>
+          {muted ? t('mute.off', 'Unmute') : t('mute.on', 'Mute')}
         </Button>
         {chat.type === 'group' && people.length > 1 && (
           <Button

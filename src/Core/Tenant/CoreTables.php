@@ -223,6 +223,9 @@ final class CoreTables
         'chat_attachments' => '279_create_chat_attachments.php',
         // Votes in chat polls (UC.5).
         'chat_poll_votes' => '280_create_chat_poll_votes.php',
+        // Bots and blocked senders (UC.4, UC.12).
+        'chat_bots' => '283_create_chat_bots_and_blocking.php',
+        'chat_blocked_senders' => '283_create_chat_bots_and_blocking.php',
         'tenant_settings' => '025_create_tenant_settings.php',
         'tenant_storage_config' => '053_create_tenant_storage_config.php',
         'tenants' => '001_create_users_roles.php',

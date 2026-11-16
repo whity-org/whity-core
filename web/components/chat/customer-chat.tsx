@@ -30,6 +30,11 @@ import {
   DropdownMenuTrigger,
 } from '@whity/ui/dropdown-menu';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
+import { Checkbox } from '@whity/ui/checkbox';
+import { ConfirmAction } from '@whity/ui/confirm-action';
+import { apiFetch } from '@/lib/api/client';
+import type { ChatBlockedSender } from '@/lib/chat-wire';
+import { chatApi, chatErrorText } from './chat-api';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
 import { api, type components } from '@/lib/api/client';
@@ -113,6 +118,8 @@ export function CustomerChat({
   detailsOpen,
   pinned,
   onPin,
+  muted = false,
+  onMute,
   onToggleDetails,
   onBack,
   onChanged,
@@ -126,6 +133,8 @@ export function CustomerChat({
   detailsOpen: boolean;
   pinned: boolean;
   onPin: (pinned: boolean) => void;
+  muted?: boolean;
+  onMute?: (muted: boolean) => void;
   onToggleDetails: () => void;
   onBack: () => void;
   onChanged: () => void;
@@ -135,6 +144,7 @@ export function CustomerChat({
   const tc = useTranslation('chat');
   const { user } = useAuth();
   const { addToast } = useToast();
+  const { date: dateOnly } = useDateDisplay();
   const [mode, setMode] = useState<'reply' | 'note'>('reply');
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -142,6 +152,16 @@ export function CustomerChat({
   const box = useRef<HTMLTextAreaElement>(null);
   // The unread line stays where it was when the chat opened, as the card draws it.
   const [newFrom, setNewFrom] = useState<number | null>(null);
+  // UC.12: whether this contact is blocked, and since when.
+  const chat = useMemo(() => chatApi(apiFetch), []);
+  const [blocked, setBlocked] = useState<ChatBlockedSender | null>(null);
+  useEffect(() => {
+    let live = true;
+    chat.blockStatus(id).then((b) => live && setBlocked(b), () => undefined);
+    return () => {
+      live = false;
+    };
+  }, [chat, id]);
 
   const detail = useFetch<ConversationDetail>(async () => {
     const { data, response } = await api.GET('/api/v1/messages/conversations/{id}', { params: { path: { id } } });
@@ -403,6 +423,31 @@ export function CustomerChat({
           <div ref={bottom} />
         </ol>
 
+        {blocked && (
+          <div className="flex flex-wrap items-center gap-3 border-t border-border bg-muted px-4 py-2.5 text-sm">
+            <Icon name="ban" size={16} />
+            <span className="flex-1">
+              {tc('block.banner', 'You blocked this contact on {date}. Nothing they send reaches the team.', { date: dateOnly(blocked.created_at) ?? '' })}
+            </span>
+            {canManage && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await chat.unblock(blocked.id);
+                    setBlocked(null);
+                  } catch (e) {
+                    addToast(chatErrorText(e, ''), 'error');
+                  }
+                }}
+              >
+                {tc('blocked.unblock', 'Unblock')}
+              </Button>
+            )}
+          </div>
+        )}
         {canReply ? (
           <form
             className="grid gap-2 border-t border-border bg-card px-4 py-3"
@@ -482,7 +527,26 @@ export function CustomerChat({
           </div>
         )}
       </section>
-      {detailsOpen && <CustomerDetails conversation={conversation} channel={channel} pinned={pinned} onPin={onPin} onClose={onToggleDetails} />}
+      {detailsOpen && (
+        <CustomerDetails
+          conversation={conversation}
+          channel={channel}
+          pinned={pinned}
+          onPin={onPin}
+          muted={muted}
+          onMute={onMute}
+          canBlock={canManage && blocked === null}
+          onBlock={async (reportSpam) => {
+            try {
+              setBlocked(await chat.block(id, reportSpam));
+              addToast(tc('block.done', 'Blocked. Nothing they send reaches the team.'), 'success');
+            } catch (e) {
+              addToast(chatErrorText(e, ''), 'error');
+            }
+          }}
+          onClose={onToggleDetails}
+        />
+      )}
     </>
   );
 }
@@ -526,9 +590,12 @@ function CustomerMessageItem({
   const note = message.kind === 'note';
   const pending = isPending(message);
   const failed = message.status === 'failed';
-  const author = message.by_agent
-    ? t('messages.byAgent', 'Agent for {name}', { name: message.author?.name ?? '' })
-    : message.author?.name ?? t('messages.workspace', 'Your team');
+  const bot = (message.source ?? '').startsWith('bot.');
+  const author = bot
+    ? tc('bot.name', 'Bot')
+    : message.by_agent
+      ? t('messages.byAgent', 'Agent for {name}', { name: message.author?.name ?? '' })
+      : message.author?.name ?? t('messages.workspace', 'Your team');
   const at = useListTime(true)(message.created_at);
 
   return (
@@ -545,7 +612,8 @@ function CustomerMessageItem({
           className={cn(
             'grid gap-1 rounded-[14px] border px-3.5 py-2 text-start',
             inbound && 'border-border bg-card',
-            !inbound && !note && 'border-transparent bg-primary-tint',
+            !inbound && !note && !bot && 'border-transparent bg-primary-tint',
+            bot && 'border-border bg-muted',
             note && 'border-[1.5px] border-dashed border-warning bg-warning-tint',
             pending && 'border-[1.5px] border-dashed border-input bg-card',
             failed && 'border-[1.5px] border-destructive',
@@ -555,7 +623,9 @@ function CustomerMessageItem({
           {!inbound && (
             <p className="flex flex-wrap items-center gap-2 text-xs">
               {message.by_agent && <Icon name="robot" size={12} />}
-              <span className="font-semibold text-warning-text">{author}</span>
+              {bot && <Icon name="trigger" size={12} />}
+              <span className={cn('font-semibold', bot ? 'text-muted-foreground' : 'text-warning-text')}>{author}</span>
+              {bot && <span className="rounded-control-sm bg-card px-1.5 text-xs font-semibold text-muted-foreground">{tc('bot.tag', 'Bot')}</span>}
               {note && <span className="text-muted-foreground">{tc('customer.noteOnly', 'Only the team sees this')}</span>}
             </p>
           )}
@@ -616,14 +686,25 @@ function CustomerDetails({
   channel,
   pinned,
   onPin,
+  muted,
+  onMute,
+  canBlock,
+  onBlock,
   onClose,
 }: {
   conversation: ConversationDetail;
   channel: string;
   pinned: boolean;
   onPin: (pinned: boolean) => void;
+  muted: boolean;
+  onMute?: (muted: boolean) => void;
+  canBlock: boolean;
+  onBlock: (reportSpam: boolean) => Promise<void>;
   onClose: () => void;
 }) {
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const [reportSpam, setReportSpam] = useState(false);
+  const whatsapp = channel === 'WhatsApp';
   const t = useTranslation('admin');
   const tc = useTranslation('chat');
   const { date } = useDateDisplay();
@@ -660,7 +741,46 @@ function CustomerDetails({
         <Button variant="ghost" size="sm" icon="star" onClick={() => onPin(!pinned)} aria-pressed={pinned}>
           {pinned ? tc('pin.offShort', 'Unpin') : tc('pin.onShort', 'Pin')}
         </Button>
+        {onMute && (
+          <Button variant="ghost" size="sm" icon="notification" onClick={() => onMute(!muted)} aria-pressed={muted}>
+            {muted ? tc('mute.off', 'Unmute') : tc('mute.on', 'Mute')}
+          </Button>
+        )}
+        {canBlock && (
+          <Button variant="ghost" size="sm" icon="ban" onClick={() => setConfirmBlock(true)}>
+            {tc('block.action', 'Block')}
+          </Button>
+        )}
       </div>
+      <ConfirmAction
+        open={confirmBlock}
+        onOpenChange={setConfirmBlock}
+        title={tc('block.title', 'Block {who}?', { who: displayAddress(conversation.contact.address) || name })}
+        description={
+          <span className="grid gap-3">
+            <span>
+              {tc(
+                'block.body',
+                'They won’t be able to message you on {channel} any more. Past messages stay. You can unblock in Settings › Chat.',
+                { channel }
+              )}
+            </span>
+            {whatsapp && (
+              <label className="flex items-center gap-2 text-foreground">
+                <Checkbox checked={reportSpam} onCheckedChange={(v) => setReportSpam(v === true)} />
+                {tc('block.spam', 'Also report as spam to WhatsApp')}
+              </label>
+            )}
+          </span>
+        }
+        confirmLabel={tc('block.confirm', 'Block')}
+        cancelLabel={tc('action.cancel', 'Cancel')}
+        variant="destructive"
+        onConfirm={async () => {
+          setConfirmBlock(false);
+          await onBlock(reportSpam);
+        }}
+      />
     </ChatSidePane>
   );
 }

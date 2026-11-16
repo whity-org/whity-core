@@ -672,6 +672,15 @@ final class ChatRepository
         return $out;
     }
 
+    /** Whether this person muted this chat (UC.8). */
+    public function isMuted(int $tenantId, int $chatId, int $profileId): bool
+    {
+        $stmt = $this->db->prepare('SELECT 1 FROM chat_person_state WHERE tenant_id = :tid AND conversation_id = :cid AND profile_id = :pid AND muted = TRUE');
+        $stmt->execute([':tid' => $tenantId, ':cid' => $chatId, ':pid' => $profileId]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
     /** Bubbles (the default) or compact rows, the person's own choice (UC.7). */
     public function chatLayout(int $profileId): string
     {
