@@ -129,6 +129,7 @@ PHP);
         $ran = new \ArrayObject();
         $registry = new JobRegistry();
         $registry->registerFromSource('WsBakes', ['bake' => new class ($ran) implements JobInterface {
+            /** @param \ArrayObject<int, mixed> $ran */
             public function __construct(private readonly \ArrayObject $ran)
             {
             }
@@ -193,6 +194,6 @@ PHP);
         $this->assertNotSame([], $channels->keys());
         $channels->setWorkspaceGate($gate);
         $this->assertSame([], $channels->keys());
-        $this->assertNull($channels->get($channels->keys()[0] ?? 'wsbakes:sms'));
+        $this->assertNull($channels->get('wsbakes:sms'));
     }
 }
