@@ -619,6 +619,16 @@ final class DocumentRouter
             $onBehalfOf = $recipient !== null ? (int) $recipient['profile_id'] : null;
         }
         if ($recipient === null) {
+            $decidedBy = $this->decidedByOther($tenantId, $routeId, $actorId);
+            if ($decidedBy !== null) {
+                // `first answer decides` (and any quorum met before you): your
+                // item closed when someone else's answer settled the step.
+                throw RoutingRejectedException::because(
+                    $decidedBy === ''
+                        ? 'This was already decided, so nothing more is needed from you.'
+                        : "This was already decided by {$decidedBy}, so nothing more is needed from you."
+                );
+            }
             throw RoutingRejectedException::because(
                 'You have no open item on this route. An item you have already acted on cannot be acted on '
                 . 'again — add a note instead, which appends to the trail without changing what happened.'
@@ -908,6 +918,8 @@ final class DocumentRouter
             $number = $this->numberOnFinalApproval($tenantId, $documentId, $routeId);
             // WHIT-1017: and what the subject itself earns, such as a reference.
             $this->subjectOnFinalApproval($tenantId, $subjectType, $subjectId, $routeId);
+            // Merge map A4: and what it does when turned down.
+            $this->subjectOnFinalRejection($tenantId, $subjectType, $subjectId, $routeId);
 
             if ($ownTransaction) {
                 $this->db->commit();
@@ -1454,10 +1466,26 @@ final class DocumentRouter
     }
 
     /**
-     * For a caller that held its own transaction around an act: make the
-     * route's final document now that it has committed. Does nothing when the
-     * route is not waiting for one.
+     * When the actor's newest item on this route was closed by someone else's
+     * decision: that person's name ('' when it can't be read). Null otherwise.
      */
+    private function decidedByOther(int $tenantId, int $routeId, int $actorId): ?string
+    {
+        $stmt = $this->db->prepare(
+            'SELECT e.actor_profile_id, p.display_name
+               FROM document_route_recipients r
+               JOIN document_route_events e ON e.id = r.closed_by_event_id AND e.tenant_id = r.tenant_id
+               LEFT JOIN profiles p ON p.id = e.actor_profile_id
+              WHERE r.tenant_id = :tenant_id AND r.route_id = :route_id AND r.profile_id = :profile_id
+                AND e.verdict IS NOT NULL AND (e.actor_profile_id IS NULL OR e.actor_profile_id <> :actor)
+              ORDER BY r.id DESC LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':route_id' => $routeId, ':profile_id' => $actorId, ':actor' => $actorId]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        return is_array($row) ? (string) ($row['display_name'] ?? '') : null;
+    }
+
     /**
      * Merge map A2: an open step item on this route held by someone the actor
      * decides approvals for today, or null. Items sent back to an author stay
@@ -1477,6 +1505,11 @@ final class DocumentRouter
         return null;
     }
 
+    /**
+     * For a caller that held its own transaction around an act: make the
+     * route's final document now that it has committed. Does nothing when the
+     * route is not waiting for one.
+     */
     public function finalisePending(int $tenantId, int $routeId): void
     {
         if ($this->db->inTransaction()) {
@@ -1570,6 +1603,21 @@ final class DocumentRouter
             return;
         }
         $provider->approved($tenantId, $subjectId, $routeId);
+    }
+
+    /**
+     * Merge map A4: tell a subject that cares that its route finished not
+     * approved (nothing left open, and the last verdict a rejection).
+     */
+    private function subjectOnFinalRejection(int $tenantId, string $subjectType, int $subjectId, int $routeId): void
+    {
+        $provider = $this->subjects?->get($subjectType);
+        if (!$provider instanceof RouteSubjectRejectedInterface
+            || $this->recipients->hasOpenOnRoute($tenantId, $routeId)
+            || $this->events->latestVerdictOnRoute($routeId, $tenantId) !== RouteVerdict::REJECTED) {
+            return;
+        }
+        $provider->rejected($tenantId, $subjectId, $routeId);
     }
 
     private function numberOnFinalApproval(int $tenantId, ?int $documentId, int $routeId): ?string

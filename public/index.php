@@ -5707,6 +5707,20 @@ $customerSignupService = new \Whity\Core\Signup\CustomerSignupService(
     $customerSafeRoles,
     $hookManager
 );
+// Merge map A4: a join request is decided on a route: the workspace's chosen
+// template, or one step for everyone who can manage sign-ups.
+$routeSubjectRegistry->register(new \Whity\Core\Signup\CustomerSignupRouteSubject($db->getPdo(), $customerSignupService));
+$customerSignupRoutes = new \Whity\Core\Signup\CustomerSignupRoutes(
+    $db->getPdo(),
+    $documentRouter,
+    $routeRepository,
+    $routeTemplateRepository,
+    $signupSettings,
+    $roleChecker,
+);
+$customerSignupService->whenPending(static function (int $tenantId, int $signupId) use ($customerSignupRoutes): void {
+    $customerSignupRoutes->issue($tenantId, $signupId);
+});
 $joinProviders = new \Whity\Core\Signup\JoinProviders(
     new \Whity\Core\Identity\IdentityProviderRepository($db->getPdo()),
     $settingsService
@@ -5925,6 +5939,8 @@ $workspaceSignupHandler =new \Whity\Api\WorkspaceSignupApiHandler(
     $publicFormBotCheck,
     $joinProviders,
     new \Whity\Core\Signup\JoinDecisionMailer($brandedEmailSender, $frontendUrls->linkOrPath(\Whity\Core\Http\FrontendUrls::SSO_LOGIN)),
+    $customerSignupRoutes,
+    $documentRouter,
 );
 $router->register('GET',  '/api/signup/settings',                   [$workspaceSignupHandler, 'getSettings'],    null, null, CorePermissions::SIGNUP_MANAGE);
 $router->register('PUT',  '/api/signup/settings',                   [$workspaceSignupHandler, 'updateSettings'], null, null, CorePermissions::SIGNUP_MANAGE);
