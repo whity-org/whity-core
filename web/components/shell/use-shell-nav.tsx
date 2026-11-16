@@ -161,8 +161,10 @@ export function useWaitingCounts(pathname: string | null): Record<string, number
       };
       const sum = (rows: Record<string, unknown>[], key: string) =>
         rows.reduce((total, row) => total + (typeof row[key] === 'number' ? (row[key] as number) : 0), 0);
-      const inbox = sum(list(sources), 'open_count');
       const approvals = list(proposals).length;
+      // The Inbox's Waiting for me holds agents' proposals too (owner, 16 Nov
+      // 2026), so its count does; Approvals keeps its own count of them.
+      const inbox = sum(list(sources), 'open_count') + approvals;
       // Chat (CH.3, UC.1): unread messages over every chat the person is in,
       // customer conversations included for people who may read them.
       const chat = sum(list(chats), 'unread');
