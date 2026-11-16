@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use PDO;
 use Whity\Auth\TokenValidator;
+use Whity\Core\Db\DbBool;
 use Whity\Core\Notification\NotificationPreferenceRepository;
 use Whity\Core\Notification\Push\PushSubscriptionRepository;
 use Whity\Core\Request;
@@ -77,7 +78,8 @@ final class NotificationSummaryApiHandler
             if (($choice['channel'] ?? null) !== $channel) {
                 continue;
             }
-            $enabled = (bool) ($choice['enabled'] ?? true);
+            // DbBool: Postgres and SQLite spell a boolean differently (#891).
+            $enabled = DbBool::of($choice['enabled'] ?? true);
             if (($choice['type'] ?? null) === '*') {
                 $wildcardOff = !$enabled;
                 continue;
