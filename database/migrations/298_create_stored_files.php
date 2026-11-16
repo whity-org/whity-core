@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Migrations;
 
+use RuntimeException;
 use Whity\Database\Database;
 
 /**
@@ -15,7 +16,8 @@ use Whity\Database\Database;
  * source files, document artifacts and chat attachments each get a
  * `stored_file_id` pointing at their file.
  *
- * Backfill, safe to re-run: one `stored_files` row per stored object already
+ * Backfill, safe to re-run, and it fails loudly if any row is left
+ * without a stored_file_id: one `stored_files` row per stored object already
  * recorded (an upload claimed onto a document is one object, one row), then
  * each owner row is pointed at it. Files don't move. On app.whity.dev that is
  * 4 uploads, 2 source files, 11 artifacts and no chat attachments.
@@ -85,6 +87,27 @@ final class CreateStoredFiles
                     SELECT f.id FROM stored_files f WHERE f.tenant_id = {$table}.tenant_id AND f.storage_key = {$table}.storage_key
                 ) WHERE stored_file_id IS NULL
             ");
+        }
+
+        // Every row must now point at its file. One that doesn't stops the
+        // upgrade here, named, rather than leaving a file only half recorded
+        // for migration 299 to drop the details of.
+        $unlinked = [];
+        foreach (['document_artifacts', 'form_uploads', 'document_source_files', 'chat_attachments'] as $table) {
+            $left = $db->getPdo()->query("SELECT COUNT(*) FROM {$table} WHERE stored_file_id IS NULL");
+            $count = $left !== false ? (int) $left->fetchColumn() : 0;
+            if ($left !== false) {
+                $left->closeCursor();
+            }
+            if ($count > 0) {
+                $unlinked[] = "{$count} in {$table}";
+            }
+        }
+        if ($unlinked !== []) {
+            throw new RuntimeException(
+                'Some stored files could not be recorded in stored_files (' . implode(', ', $unlinked) . '). '
+                . 'Nothing in file storage was changed. Fix those rows and run the upgrade again.'
+            );
         }
     }
 

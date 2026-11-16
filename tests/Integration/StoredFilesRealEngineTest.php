@@ -102,6 +102,26 @@ final class StoredFilesRealEngineTest extends TestCase
         StoredFiles::store($taken, 2, 'forms', '7', 'first', 'text/plain', 'txt');
     }
 
+    public function testTheBackfillLinksExistingRowsAndCanRunAgain(): void
+    {
+        // A printout and an upload recorded before migration 298, sharing one object.
+        $this->pdo->exec("INSERT INTO documents (id, tenant_id, template_name, title, created_by, created_at) VALUES (43, 1, 'Letter', 'Delivery note', 10, CURRENT_TIMESTAMP)");
+        $this->pdo->exec("INSERT INTO document_artifacts (tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by)
+                          VALUES (1, 43, 'tenants/1/documents/43/a.pdf', 'application/pdf', 9, 'abc', 10)");
+        $this->pdo->exec("INSERT INTO document_artifacts (tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by)
+                          VALUES (1, 43, 'tenants/1/documents/43/b.pdf', 'application/pdf', 9, 'def', 10)");
+
+        $db = \Whity\Database\Database::withFactory(fn (): PDO => $this->pdo, 86400, 86400);
+        $db->forceConnect();
+        require_once dirname(__DIR__, 2) . '/database/migrations/298_create_stored_files.php';
+        \Database\Migrations\CreateStoredFiles::up($db);
+        \Database\Migrations\CreateStoredFiles::up($db);
+
+        self::assertSame(2, (int) $this->q('SELECT COUNT(*) FROM stored_files')->fetchColumn(), 'one row per object, however often it runs');
+        self::assertSame(0, (int) $this->q('SELECT COUNT(*) FROM document_artifacts WHERE stored_file_id IS NULL')->fetchColumn());
+        self::assertSame('abc', $this->q("SELECT f.checksum_sha256 FROM document_artifacts a JOIN stored_files f ON f.id = a.stored_file_id WHERE a.storage_key LIKE '%a.pdf'")->fetchColumn());
+    }
+
     private function q(string $sql): \PDOStatement
     {
         $stmt = $this->pdo->query($sql);
