@@ -9,6 +9,9 @@
  * `calendar:manage`, so the person field is only offered to managers. Someone
  * who can't change the event sees it read-only.
  *
+ * One calendar (WHIT-1116): an event can invite other staff (they are busy for
+ * it unless they decline), take a room (which it then blocks) and say where.
+ *
  * Times are picked on the workspace's clock and sent with its offset; an
  * all-day event runs from the first day's midnight to the midnight after the
  * last day, in that zone.
@@ -33,7 +36,8 @@ import { Textarea } from '@whity/ui/textarea';
 import { ConfirmAction } from '@whity/ui/confirm-action';
 import { useTranslation } from '@whity/features/i18n';
 import { toZonedIso, zonedDate, zonedInstant } from '@whity/features/datetime';
-import { calendarApi, type CalendarEvent, type CalendarStaff } from '@/lib/calendar/api';
+import { calendarApi, type CalendarEvent, type CalendarRoom, type CalendarStaff } from '@/lib/calendar/api';
+import { Checkbox } from '@whity/ui/checkbox';
 import {
   addDays,
   dateInZone,
@@ -58,6 +62,8 @@ export interface EventDialogProps {
   canChange: boolean;
   initialDate?: CalendarDate | null;
   onSaved: () => void;
+  /** Rooms it can be held in. */
+  rooms?: CalendarRoom[];
 }
 
 export function EventDialog(props: EventDialogProps) {
@@ -69,9 +75,10 @@ export function EventDialog(props: EventDialogProps) {
 }
 
 const STARTS = timeOptions(15);
+const NO_ROOM = 'none';
 const ENDS = timeOptions(15, true);
 
-function EventForm({ onOpenChange, event, staff, timeZone, me, canManage, canChange, initialDate = null, onSaved }: EventDialogProps) {
+function EventForm({ onOpenChange, event, staff, timeZone, me, canManage, canChange, initialDate = null, onSaved, rooms = [] }: EventDialogProps) {
   const t = useTranslation('calendar');
   const words = useCalendarWords();
   const { addToast } = useToast();
@@ -93,6 +100,9 @@ function EventForm({ onOpenChange, event, staff, timeZone, me, canManage, canCha
   const [endTime, setEndTime] = useState(event && !event.all_day ? timeFieldValue(event.ends_at, timeZone) : '10:00');
   const [busy, setBusy] = useState(event?.busy ?? true);
   const [notes, setNotes] = useState(event?.notes ?? '');
+  const [guests, setGuests] = useState<Set<number>>(() => new Set((event?.people ?? []).map((p) => p.profile_id)));
+  const [roomId, setRoomId] = useState<string>(event?.room_id ? String(event.room_id) : NO_ROOM);
+  const [location, setLocation] = useState(event?.location ?? '');
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -136,6 +146,9 @@ function EventForm({ onOpenChange, event, staff, timeZone, me, canManage, canCha
         all_day: allDay,
         busy,
         ...when,
+        people: [...guests],
+        room_id: roomId === NO_ROOM ? null : Number(roomId),
+        location: location.trim(),
         ...(canManage && person !== '' && event === null ? { profile_id: Number(person) } : {}),
       };
       const saved = event ? await calendarApi.updateEvent(event.id, body) : await calendarApi.createEvent(body);
@@ -288,6 +301,62 @@ function EventForm({ onOpenChange, event, staff, timeZone, me, canManage, canCha
             </span>
             <Switch checked={busy} onCheckedChange={setBusy} aria-label={t('event.field.busy', 'Blocks bookings')} />
           </label>
+
+          {staff.length > 1 && (
+            <fieldset className="space-y-1" data-testid="event-guests">
+              <legend className="text-sm font-medium text-foreground">{t('event.field.guests', 'Guests')}</legend>
+              <span className="block text-sm text-muted-foreground">
+                {t('event.field.guestsHint', 'They are busy for it unless they say they can’t come.')}
+              </span>
+              <div className="max-h-48 space-y-1 overflow-y-auto rounded-control border border-border p-2">
+                {staff
+                  .filter((s) => String(s.profile_id) !== (event ? String(event.profile_id) : person))
+                  .map((s) => (
+                    <label key={s.profile_id} className="flex min-h-9 items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={guests.has(s.profile_id)}
+                        onCheckedChange={(value) =>
+                          setGuests((current) => {
+                            const next = new Set(current);
+                            if (value === true) next.add(s.profile_id);
+                            else next.delete(s.profile_id);
+                            return next;
+                          })
+                        }
+                      />
+                      {s.display_name}
+                    </label>
+                  ))}
+              </div>
+            </fieldset>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {rooms.some((r) => r.active) && (
+              <div className="space-y-1">
+                <label htmlFor="event-room" className="text-sm font-medium text-foreground">
+                  {t('event.field.room', 'Room')}
+                </label>
+                <FieldSelect
+                  id="event-room"
+                  value={roomId}
+                  onChange={setRoomId}
+                  options={[
+                    { value: NO_ROOM, label: t('event.field.noRoom', 'No room') },
+                    ...rooms.filter((r) => r.active || String(r.id) === roomId).map((r) => ({ value: String(r.id), label: words.label(r.name) })),
+                  ]}
+                />
+              </div>
+            )}
+            <Input
+              id="event-location"
+              label={t('event.field.location', 'Where')}
+              maxLength={200}
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder={t('event.field.locationPlaceholder', 'Abdali branch, or a video link')}
+            />
+          </div>
 
           <div className="space-y-1">
             <label htmlFor="event-notes" className="text-sm font-medium text-foreground">

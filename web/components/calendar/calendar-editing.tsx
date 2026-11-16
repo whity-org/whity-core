@@ -402,8 +402,11 @@ export function useGridEditing({ services, staff, timeZone, canWrite, canChange,
 
   const canDrag = useCallback(
     (item: CalItem) => {
+      if (item.allDay) return false;
+      // The server says what this person may move (the one-calendar `can`, WHIT-1116).
+      if (item.can !== undefined && !item.can.move) return false;
       if (item.booking) return canWrite && item.kind !== 'cancelled';
-      if (item.event) return !item.allDay && canChange(item.event.profile_id);
+      if (item.event) return item.kind !== 'meeting' && canChange(item.event.profile_id);
       return false;
     },
     [canWrite, canChange]
@@ -429,8 +432,16 @@ export function useGridEditing({ services, staff, timeZone, canWrite, canChange,
     });
   }, []);
 
-  // Only team events can be pulled to a new length; a booking lasts as long as its service (Q35.7).
-  const canResize = useCallback((item: CalItem) => item.event !== undefined && !item.allDay && canChange(item.event.profile_id), [canChange]);
+  // Only team events and time off can be pulled to a new length; a booking lasts as long as its service (Q35.7).
+  const canResize = useCallback(
+    (item: CalItem) =>
+      item.event !== undefined &&
+      (item.kind === 'event' || item.kind === 'timeoff') &&
+      !item.allDay &&
+      (item.can === undefined || item.can.resize) &&
+      canChange(item.event.profile_id),
+    [canChange]
+  );
 
   const name = (item: CalItem) => item.booking?.customer.name ?? '';
 
