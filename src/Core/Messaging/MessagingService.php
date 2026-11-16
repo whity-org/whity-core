@@ -50,6 +50,25 @@ final class MessagingService implements HostWiredService
     ) {
     }
 
+    /** UC.12: says whether a sender is blocked; what they send is then dropped. */
+    private ?Closure $blocked = null;
+
+    /** UC.4: the workspace's bots, after a customer's message is filed. */
+    private ?Closure $afterInbound = null;
+
+    /**
+     * Rules for what customers send (design 3.5, WHIT-1097): blocked senders
+     * are dropped before anything is filed, and the workspace's bots run after.
+     *
+     * @param Closure(int, string, string): bool|null $blocked tenant, channel, address
+     * @param Closure(MessagingService, int, int, bool): void|null $afterInbound tenant, conversation, whether it is new
+     */
+    public function useInboundRules(?Closure $blocked, ?Closure $afterInbound): void
+    {
+        $this->blocked = $blocked;
+        $this->afterInbound = $afterInbound;
+    }
+
     public function conversations(): ConversationRepository
     {
         return $this->conversations;
@@ -172,8 +191,13 @@ final class MessagingService implements HostWiredService
         if (!$this->channels->has($channelKey)) {
             throw new MessagingException('Unknown channel.');
         }
+        // A blocked sender's message goes nowhere (UC.12); the sender is not told.
+        if ($this->blocked !== null && ($this->blocked)($tenantId, $channelKey, $in->from)) {
+            return null;
+        }
 
         $conversationId ??= $this->threadFor($tenantId, $channelKey, $in);
+        $isNew = $conversationId === null;
         if ($conversationId === null) {
             $customerProfileId ??= $channelKey === 'email' ? $this->conversations->customerByEmail($tenantId, $in->from) : null;
             $subject = $in->subject !== null ? InboundEmailParser::baseSubject($in->subject) : null;
@@ -204,8 +228,16 @@ final class MessagingService implements HostWiredService
             'source' => 'customer',
         ]);
         $this->conversations->touch($tenantId, $conversationId, true);
+        $filed = $this->messages->find($tenantId, $id);
+        if ($this->afterInbound !== null) {
+            try {
+                ($this->afterInbound)($this, $tenantId, $conversationId, $isNew);
+            } catch (\Throwable) {
+                // The customer's message is filed whatever a bot does.
+            }
+        }
 
-        return $this->messages->find($tenantId, $id);
+        return $filed;
     }
 
     /** A provider's delivery news. Moves a message's status forward only. */

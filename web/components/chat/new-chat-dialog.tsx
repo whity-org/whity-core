@@ -11,6 +11,7 @@ import { Button } from '@whity/ui/button';
 import { Checkbox } from '@whity/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
 import { Input } from '@whity/ui/input';
+import { Textarea } from '@whity/ui/textarea';
 import { ToggleGroup } from '@whity/ui/toggle-group';
 import { useLanguageDirection, useTranslation } from '@whity/features/i18n';
 import type { ChatDirectory } from '@/lib/chat-wire';
@@ -22,16 +23,22 @@ export function NewChatDialog({
   api,
   myId,
   onStarted,
+  customers = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   api: ChatApi;
   myId: number;
   onStarted: (id: number) => void;
+  /** UC.1: people who may reply to customers can also start a customer chat here. */
+  customers?: boolean;
 }) {
   const t = useTranslation('chat');
   const dir = useLanguageDirection();
-  const [kind, setKind] = useState<'direct' | 'group'>('direct');
+  const [kind, setKind] = useState<'direct' | 'group' | 'customer'>('direct');
+  const [to, setTo] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [firstMessage, setFirstMessage] = useState('');
   const [q, setQ] = useState('');
   const [title, setTitle] = useState('');
   const [people, setPeople] = useState<number[]>([]);
@@ -76,12 +83,55 @@ export function NewChatDialog({
           label={t('new.kind', 'Kind of chat')}
           required
           value={kind}
-          onChange={(v) => setKind((v as 'direct' | 'group') ?? 'direct')}
+          onChange={(v) => setKind((v as 'direct' | 'group' | 'customer') ?? 'direct')}
           options={[
             { value: 'direct', label: t('new.direct', 'One person or agent') },
             { value: 'group', label: t('new.group', 'A group') },
+            ...(customers ? [{ value: 'customer', label: t('new.customer', 'A customer') }] : []),
           ]}
         />
+        {kind === 'customer' && (
+          <div className="grid gap-3">
+            <p className="text-sm text-muted-foreground">
+              {t('new.customerHint', 'Write to a customer by email. Their answers come back to this chat. WhatsApp and SMS come with their plugins.')}
+            </p>
+            <Input label={t('new.customerEmail', 'Email address')} type="email" value={to} onChange={(e) => setTo(e.target.value)} />
+            <Input label={t('new.customerName', 'Name')} value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
+            <Textarea
+              aria-label={t('new.customerMessage', 'Message')}
+              placeholder={t('new.customerMessage', 'Message')}
+              rows={3}
+              maxLength={4000}
+              value={firstMessage}
+              onChange={(e) => setFirstMessage(e.target.value)}
+            />
+            {error !== null && (
+              <p role="alert" className="text-sm text-error-text">
+                {error || t('error.generic', 'Something went wrong with Chat. Please try again.')}
+              </p>
+            )}
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                {t('action.cancel', 'Cancel')}
+              </Button>
+              <Button
+                icon="send"
+                loading={busy}
+                disabled={!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to.trim()) || firstMessage.trim() === ''}
+                onClick={() =>
+                  void run(async () => {
+                    const sent = await api.messageCustomer(to.trim(), customerName.trim(), firstMessage.trim());
+                    return { id: sent.conversation_id };
+                  })
+                }
+              >
+                {t('new.customerSend', 'Send')}
+              </Button>
+            </DialogFooter>
+          </div>
+        )}
+        {kind !== 'customer' && (
+          <>
         {kind === 'group' && (
           <Input
             label={t('new.name', 'Group name')}
@@ -157,6 +207,8 @@ export function NewChatDialog({
               {t('new.start', 'Start the group')}
             </Button>
           </DialogFooter>
+        )}
+          </>
         )}
       </DialogContent>
     </Dialog>

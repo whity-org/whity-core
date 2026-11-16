@@ -3,7 +3,7 @@
  * messages: the server's own sentence for a refusal, ours otherwise.
  */
 
-import type { ChatAttachment, ChatDetail, ChatRecordBlock, ChatDirectory, ChatInbox, ChatLayout, ChatMessage, ChatMode, ChatReads, ChatState, ChatSummary, ChatLink } from '@/lib/chat-wire';
+import type { ChatAttachment, ChatBlockedSender, ChatBot, ChatDetail, ChatRecordBlock, ChatDirectory, ChatInbox, ChatLayout, ChatMessage, ChatMode, ChatReads, ChatState, ChatSummary, ChatLink } from '@/lib/chat-wire';
 
 type ApiClient = (path: string, init?: RequestInit) => Promise<Response>;
 
@@ -65,6 +65,18 @@ export function chatApi(api: ApiClient) {
     thread: (messageId: number) => call<{ root: ChatMessage; replies: ChatMessage[] }>(api, `/api/v1/chat/messages/${messageId}/thread`),
     search: (id: number, q: string, from: number | null) =>
       call<ChatMessage[]>(api, `/api/v1/chat/chats/${id}/search?q=${encodeURIComponent(q)}${from ? `&from=${from}` : ''}`),
+    // Start a customer chat by email (UC.1); the reply comes back to Chat.
+    messageCustomer: (to: string, name: string, body: string) =>
+      call<{ id: number; conversation_id: number }>(api, '/api/v1/messages/conversations', json('POST', { to, channel: 'email', ...(name ? { name } : {}), body })),
+    // Mute, blocking and bots (UC.4, UC.8, UC.12).
+    mute: (id: number, muted: boolean) => call<unknown>(api, `/api/v1/chat/inbox/${id}/mute`, json('POST', { muted })),
+    blockStatus: (id: number) => call<ChatBlockedSender | null>(api, `/api/v1/chat/inbox/${id}/block`),
+    block: (id: number, reportSpam: boolean) => call<ChatBlockedSender>(api, `/api/v1/chat/inbox/${id}/block`, json('POST', { report_spam: reportSpam })),
+    blocked: () => call<ChatBlockedSender[]>(api, '/api/v1/chat/blocked'),
+    unblock: (id: number) => call<unknown>(api, `/api/v1/chat/blocked/${id}`, { method: 'DELETE' }),
+    bots: () => call<ChatBot[]>(api, '/api/v1/chat/bots'),
+    saveBot: (kind: ChatBot['kind'], enabled: boolean, settings: Record<string, unknown>) =>
+      call<ChatBot>(api, `/api/v1/chat/bots/${kind}`, json('PUT', { enabled, settings })),
     // Blocks inside messages (UC.5).
     vote: (messageId: number, choices: number[]) => call<ChatMessage>(api, `/api/v1/chat/messages/${messageId}/vote`, json('POST', { choices })),
     records: (type: 'booking' | 'document', q: string) =>

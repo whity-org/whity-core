@@ -50,13 +50,14 @@ final class ChatInbox
         }
 
         $pins = $this->pins($tenantId, $viewer->profileId, array_map(static fn (array $c): int => (int) $c['id'], $team));
+        $muted = $this->muted($tenantId, $viewer->profileId);
         $items = [];
         foreach ($team as $c) {
-            $items[] = ['kind' => 'team', 'pinned' => isset($pins[(int) $c['id']])] + $c;
+            $items[] = ['kind' => 'team', 'pinned' => isset($pins[(int) $c['id']]), 'muted' => isset($muted[(int) $c['id']])] + $c;
         }
         if ($customers) {
             foreach ($this->customerRows($tenantId, $viewer->profileId) as $row) {
-                $items[] = self::presentCustomer($row);
+                $items[] = ['muted' => isset($muted[(int) $row['id']])] + self::presentCustomer($row);
             }
         }
 
@@ -74,6 +75,39 @@ final class ChatInbox
     {
         $this->assertVisible($tenantId, $viewer, $conversationId, $customers);
         $this->upsert($tenantId, $conversationId, $viewer->profileId, 'pinned_at', $pinned ? date('Y-m-d H:i:s') : null);
+    }
+
+    /**
+     * Mute a chat for this person (UC.8): no pushes from it, except when they
+     * are mentioned.
+     *
+     * @throws ChatException when the viewer can't see it
+     */
+    public function mute(int $tenantId, ChatViewer $viewer, int $conversationId, bool $muted, bool $customers): void
+    {
+        $this->assertVisible($tenantId, $viewer, $conversationId, $customers);
+        $stmt = $this->db->prepare('INSERT INTO chat_person_state (tenant_id, conversation_id, profile_id, muted, updated_at)
+             VALUES (:tid, :cid, :pid, :muted, :now)
+             ON CONFLICT (conversation_id, profile_id) DO UPDATE SET muted = excluded.muted, updated_at = excluded.updated_at');
+        $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':cid', $conversationId, PDO::PARAM_INT);
+        $stmt->bindValue(':pid', $viewer->profileId, PDO::PARAM_INT);
+        $stmt->bindValue(':muted', $muted, PDO::PARAM_BOOL);
+        $stmt->bindValue(':now', date('Y-m-d H:i:s'));
+        $stmt->execute();
+    }
+
+    /** @return array<int, true> conversation ids this person muted */
+    private function muted(int $tenantId, int $profileId): array
+    {
+        $stmt = $this->db->prepare('SELECT conversation_id FROM chat_person_state WHERE tenant_id = :tid AND profile_id = :pid AND muted = TRUE');
+        $stmt->execute([':tid' => $tenantId, ':pid' => $profileId]);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $id) {
+            $out[(int) $id] = true;
+        }
+
+        return $out;
     }
 
     /**

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Core\Chat\ChatException;
+use Whity\Core\Chat\ChatBlocking;
+use Whity\Core\Chat\ChatBots;
 use Whity\Core\Chat\ChatInbox;
 use Whity\Core\Chat\ChatService;
 use Whity\Core\Chat\ChatViewer;
@@ -36,7 +38,110 @@ final class ChatApiHandler
         private readonly ChatService $chat,
         private readonly ?ChatInbox $inbox = null,
         private readonly ?PermissionResolver $permissions = null,
+        private readonly ?ChatBots $bots = null,
+        private readonly ?ChatBlocking $blocking = null,
     ) {
+    }
+
+    // ── Mute, blocking and bots (UC.4, UC.8, UC.12; WHIT-1097) ───────────────
+
+    /** @param array<string, string> $params */
+    public function mute(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            if ($v->isAgent()) {
+                return Response::error('Agents can\'t mute chats.', 403);
+            }
+            $muted = (JsonBody::parsed($request)['muted'] ?? true) !== false;
+            $this->theInbox()->mute($t, $v, (int) ($params['id'] ?? 0), $muted, $this->readsCustomers($t, $v));
+
+            return Response::json(['data' => ['muted' => $muted]]);
+        });
+    }
+
+    /** Whether a customer conversation's contact is blocked, and since when. */
+    /** @param array<string, string> $params */
+    public function blockStatus(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($params): Response {
+            if (!$this->readsCustomers($t, $v) || $this->blocking === null) {
+                return Response::error('Chat not found', 404);
+            }
+
+            return Response::json(['data' => $this->blocking->forConversation($t, (int) ($params['id'] ?? 0))]);
+        });
+    }
+
+    /** Block a customer conversation's contact (admins: messages.manage). */
+    /** @param array<string, string> $params */
+    public function block(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            if (!$this->manages($t, $v) || $this->blocking === null) {
+                return Response::error('Only people who manage customer messages can block someone.', 403);
+            }
+            $spam = (JsonBody::parsed($request)['report_spam'] ?? false) === true;
+
+            return Response::json(['data' => $this->blocking->blockConversation($t, (int) ($params['id'] ?? 0), $spam, $v->profileId)], 201);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function blocked(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v): Response {
+            if (!$this->manages($t, $v) || $this->blocking === null) {
+                return Response::error('Only people who manage customer messages see who is blocked.', 403);
+            }
+
+            return Response::json(['data' => $this->blocking->list($t)]);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function unblock(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($params): Response {
+            if (!$this->manages($t, $v) || $this->blocking === null) {
+                return Response::error('Only people who manage customer messages can unblock someone.', 403);
+            }
+            if (!$this->blocking->unblock($t, (int) ($params['id'] ?? 0))) {
+                return Response::error('Not found', 404);
+            }
+
+            return Response::json(['data' => ['ok' => true]]);
+        });
+    }
+
+    /** The workspace's bots (Settings › Chat). */
+    /** @param array<string, string> $params */
+    public function bots(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            if (!$this->manages($t, $v) || $this->bots === null) {
+                return Response::error('Only people who manage customer messages set up bots.', 403);
+            }
+            if ($request->getMethod() === 'PUT') {
+                $body = JsonBody::parsed($request);
+
+                return Response::json(['data' => $this->bots->save(
+                    $t,
+                    (string) ($params['kind'] ?? ''),
+                    ($body['enabled'] ?? false) === true,
+                    is_array($body['settings'] ?? null) ? $body['settings'] : [],
+                    $v->profileId,
+                )]);
+            }
+
+            return Response::json(['data' => $this->bots->all($t)]);
+        });
+    }
+
+    private function manages(int $tenantId, ChatViewer $viewer): bool
+    {
+        return !$viewer->isAgent()
+            && $this->permissions !== null
+            && $this->permissions->hasPermission($viewer->profileId, $tenantId, CorePermissions::MESSAGES_MANAGE);
     }
 
     /**

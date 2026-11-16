@@ -7162,6 +7162,34 @@ final class CoreApiSchemas
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('ChatInboxItem')],
                 'customers' => self::bool() + ['description' => 'Whether the list includes customer conversations (messages.read).'],
             ], ['data', 'customers']),
+            'ChatMuteRequest' => self::object([
+                'muted' => self::bool() + ['description' => 'False unmutes; true by default.'],
+            ], []),
+            'ChatBlockRequest' => self::object([
+                'report_spam' => self::bool() + ['description' => 'Also report them as spam where the channel takes reports.'],
+            ], []),
+            'ChatBlockedSender' => self::object([
+                'id' => self::int(),
+                'channel' => self::str(),
+                'address' => self::str(),
+                'name' => self::str(true),
+                'reported_spam' => self::bool(),
+                'blocked_by' => self::str(true),
+                'created_at' => self::str(true),
+            ], ['id', 'channel', 'address', 'reported_spam']),
+            'ChatBlockedSenderResponse' => self::dataEnvelope(['oneOf' => [SchemaBuilder::ref('ChatBlockedSender'), ['type' => 'null']]]),
+            'ChatBlockedSendersResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('ChatBlockedSender')]),
+            'ChatBot' => self::object([
+                'kind' => ['type' => 'string', 'enum' => ['away', 'welcome', 'handover']],
+                'enabled' => self::bool(),
+                'settings' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'away: text, timezone, days (1 Monday to 7 Sunday), from, to. welcome: text. handover: people (ids, in turn).'],
+            ], ['kind', 'enabled', 'settings']),
+            'ChatBotRequest' => self::object([
+                'enabled' => self::bool(),
+                'settings' => ['type' => 'object', 'additionalProperties' => true],
+            ], ['enabled']),
+            'ChatBotResponse' => self::dataEnvelope(SchemaBuilder::ref('ChatBot')),
+            'ChatBotsResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('ChatBot')]),
             'ChatPinRequest' => self::object([
                 'pinned' => self::bool() + ['description' => 'False unpins; true by default.'],
             ], []),
@@ -13191,6 +13219,52 @@ final class CoreApiSchemas
                 'tags' => ['chat'],
                 'request' => 'ChatPreferencesRequest',
                 'responses' => [200 => self::jsonResponse('Your preference', 'ChatPreferencesResponse')] + self::authErrors(),
+            ]),
+            // Mute, blocking and bots (UC.4, UC.8, UC.12; WHIT-1097).
+            self::ungatedRoute('POST', '/api/chat/inbox/{id:\d+}/mute', [
+                'mcp' => $personOnly,
+                'summary' => 'Mute a chat for yourself, or unmute it; mentions still reach you',
+                'tags' => ['chat'],
+                'request' => 'ChatMuteRequest',
+                'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/inbox/{id:\d+}/block', [
+                'mcp' => $personOnly,
+                'summary' => 'Whether a customer conversation\'s contact is blocked, and since when',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('The block, or null', 'ChatBlockedSenderResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('POST', '/api/chat/inbox/{id:\d+}/block', [
+                'mcp' => $personOnly,
+                'summary' => 'Block a customer conversation\'s number or address: what they send is dropped (messages.manage)',
+                'tags' => ['chat'],
+                'request' => 'ChatBlockRequest',
+                'responses' => [201 => self::jsonResponse('The block', 'ChatBlockedSenderResponse'), 403 => self::errorResponse('Needs messages.manage')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/blocked', [
+                'mcp' => $personOnly,
+                'summary' => 'Everyone the workspace blocked (messages.manage)',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('Blocked senders', 'ChatBlockedSendersResponse'), 403 => self::errorResponse('Needs messages.manage')] + self::authErrors(),
+            ]),
+            self::ungatedRoute('DELETE', '/api/chat/blocked/{id:\d+}', [
+                'mcp' => $personOnly,
+                'summary' => 'Unblock a sender (messages.manage)',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('Done', 'ChatDoneResponse'), 403 => self::errorResponse('Needs messages.manage')] + $notFound + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/chat/bots', [
+                'mcp' => $personOnly,
+                'summary' => 'The workspace\'s bots: away reply, welcome and hand-over (messages.manage)',
+                'tags' => ['chat'],
+                'responses' => [200 => self::jsonResponse('Bots', 'ChatBotsResponse'), 403 => self::errorResponse('Needs messages.manage')] + self::authErrors(),
+            ]),
+            self::ungatedRoute('PUT', '/api/chat/bots/{kind:[a-z]+}', [
+                'mcp' => $personOnly,
+                'summary' => 'Turn a bot on or off and set its rule (messages.manage)',
+                'tags' => ['chat'],
+                'request' => 'ChatBotRequest',
+                'responses' => [200 => self::jsonResponse('The bot', 'ChatBotResponse'), 403 => self::errorResponse('Needs messages.manage'), 422 => self::errorResponse('Not a bot Chat has')] + self::authErrors(),
             ]),
             self::ungatedRoute('GET', '/api/chat/directory', [
                 'summary' => 'Find people and agents to add to a chat or mention',

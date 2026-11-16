@@ -247,12 +247,31 @@ export interface CustomerChatItem {
   waiting_since: string | null;
   unread: number;
   pinned: boolean;
+  muted?: boolean;
   last_message: CustomerLastMessage | null;
   last_message_at: string | null;
   created_at: string | null;
 }
 
-export type TeamChatItem = ChatSummary & { kind: 'team'; pinned: boolean };
+export type TeamChatItem = ChatSummary & { kind: 'team'; pinned: boolean; muted?: boolean };
+
+/** A number or address the workspace blocked (UC.12). */
+export interface ChatBlockedSender {
+  id: number;
+  channel: string;
+  address: string;
+  name: string | null;
+  reported_spam: boolean;
+  blocked_by: string | null;
+  created_at: string | null;
+}
+
+/** A bot set by the workspace (UC.4). */
+export interface ChatBot {
+  kind: 'away' | 'welcome' | 'handover';
+  enabled: boolean;
+  settings: Record<string, unknown>;
+}
 
 export type ChatInboxItem = TeamChatItem | CustomerChatItem;
 

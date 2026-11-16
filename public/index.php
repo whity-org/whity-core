@@ -5747,10 +5747,21 @@ $chatHandler = new \Whity\Api\ChatApiHandler(
     $chatService,
     new \Whity\Core\Chat\ChatInbox($db->getPdo(), $chatService),
     $permissionResolver,
+    new \Whity\Core\Chat\ChatBots($db->getPdo()),
+    new \Whity\Core\Chat\ChatBlocking($db->getPdo()),
 );
 $router->register('GET',    '/api/chat/inbox',                                  [$chatHandler, 'inbox'],         null);
 $router->register('POST',   '/api/chat/inbox/{id:\d+}/pin',                     [$chatHandler, 'pin'],           null);
 $router->register('POST',   '/api/chat/inbox/{id:\d+}/read',                    [$chatHandler, 'readCustomer'],  null);
+// Mute, blocking and bots (UC.4, UC.8, UC.12; WHIT-1097). Blocking and bots
+// need messages.manage, checked in the handler like the rest of Chat.
+$router->register('POST',   '/api/chat/inbox/{id:\d+}/mute',                    [$chatHandler, 'mute'],          null);
+$router->register('GET',    '/api/chat/inbox/{id:\d+}/block',                   [$chatHandler, 'blockStatus'],   null);
+$router->register('POST',   '/api/chat/inbox/{id:\d+}/block',                   [$chatHandler, 'block'],         null);
+$router->register('GET',    '/api/chat/blocked',                                [$chatHandler, 'blocked'],       null);
+$router->register('DELETE', '/api/chat/blocked/{id:\d+}',                       [$chatHandler, 'unblock'],       null);
+$router->register('GET',    '/api/chat/bots',                                   [$chatHandler, 'bots'],          null);
+$router->register('PUT',    '/api/chat/bots/{kind:[a-z]+}',                     [$chatHandler, 'bots'],          null);
 $router->register('GET',    '/api/chat/chats',                                  [$chatHandler, 'list'],          null);
 $router->register('POST',   '/api/chat/chats',                                  [$chatHandler, 'create'],        null);
 $router->register('GET',    '/api/chat/chats/{id:\d+}',                         [$chatHandler, 'show'],          null);
