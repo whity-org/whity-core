@@ -15457,6 +15457,10 @@ export interface components {
             minRows?: number;
             /** @description Most rows a repeating question takes, up to 200. */
             maxRows?: number;
+            /** @description A long answer limit in words, 1 to 20000. Refused on submit above it; printed as "142 of 300 words" (WHIT-1164). */
+            maxWords?: number;
+            /** @description Questions that print together under one number and title, as text or {en, ar}. Consecutive questions sharing it print as one block (WHIT-1164). */
+            printGroup?: unknown;
         };
         FormListResponse: {
             data: components["schemas"]["Form"][];

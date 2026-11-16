@@ -864,6 +864,29 @@ final class FormFieldsApiHandler
             $rules += $table;
         }
 
+        // Design 3.4 (FP.8): a long answer's limit in words, enforced on submit
+        // and printed under the answer as "142 of 300 words". WHIT-1164: it was
+        // offered in the question panel but not kept.
+        if (isset($raw['maxWords'])) {
+            if (!is_int($raw['maxWords']) || $raw['maxWords'] < 1 || $raw['maxWords'] > 20000) {
+                return Response::error('validation.maxWords must be a whole number from 1 to 20000', 422);
+            }
+            $rules['maxWords'] = $raw['maxWords'];
+        }
+
+        // WHIT-1164: questions that print together under one number and title
+        // (an applicant's name, ID and email; a checklist). Text, or {en, ar}.
+        if (isset($raw['printGroup'])) {
+            $group = $raw['printGroup'];
+            $ok = (is_string($group) && trim($group) !== '' && mb_strlen($group) <= 160)
+                || (is_array($group) && $group !== [] && !array_is_list($group)
+                    && array_filter($group, static fn ($v, $k): bool => !in_array($k, ['en', 'ar'], true) || !is_string($v) || mb_strlen($v) > 160, ARRAY_FILTER_USE_BOTH) === []);
+            if (!$ok) {
+                return Response::error('validation.printGroup must be text of up to 160 characters, or {en, ar}', 422);
+            }
+            $rules['printGroup'] = is_string($group) ? trim($group) : $group;
+        }
+
         // HOW MANY files a `file` question takes. The ceiling is a stop on one
         // question spending a tenant's storage, not a modelling opinion.
         if (isset($raw['maxFiles'])) {
