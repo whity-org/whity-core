@@ -45,7 +45,7 @@ export const SETTING_KEYWORDS: Readonly<Record<string, string>> = {
   notifications: 'notifications push alerts email phone إشعارات الإشعارات تنبيهات بريد هاتف',
   'signed-in': 'sessions devices sign out log out signed in الجلسات الأجهزة تسجيل الخروج',
   role: 'role permissions access what can i do دور صلاحيات وصول',
-  general: 'general workspace name address company contact عام مساحة العمل اسم عنوان شركة',
+  general: 'general workspace name address company contact currency dollars dinars عام مساحة العمل اسم عنوان شركة عملة العملة',
   branding: 'branding logo colour color brand icon الهوية البصرية الشعار اللون العلامة',
   'document-themes': 'document themes letterhead print printout stamp أنساق المستندات الترويسة طباعة ختم',
   billing: 'billing plan subscription invoices payment upgrade الباقة الفوترة الاشتراك فواتير دفع ترقية',
