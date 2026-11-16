@@ -7186,6 +7186,7 @@ final class CoreApiSchemas
                 'url' => self::str() + ['description' => 'The link the customer got.'],
                 'service' => self::object(['id' => self::int(), 'name' => self::str(), 'minutes' => self::int()], ['id', 'name', 'minutes']),
                 'times' => ['type' => 'array', 'items' => self::str()],
+                'time_zone' => self::str() + ['description' => 'The calendar\'s zone, which the customer\'s text uses.'],
                 'form' => self::object(['id' => self::int(), 'title' => self::str()], ['id', 'title']),
                 'description' => self::str(),
                 'amount' => self::str() + ['description' => 'In normal units, as a decimal string.'],
@@ -7194,9 +7195,10 @@ final class CoreApiSchemas
             ], ['type', 'url']),
             'ChatCustomerBlockOptionsResponse' => self::dataEnvelope(self::object([
                 'booking_page' => self::bool(),
+                'time_zone' => self::str() + ['description' => 'The calendar\'s zone: times are picked in it.'],
                 'services' => ['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str(), 'minutes' => self::int()], ['id', 'name', 'minutes'])],
                 'forms' => ['type' => 'array', 'items' => self::object(['id' => self::int(), 'title' => self::str()], ['id', 'title'])],
-            ], ['booking_page', 'services', 'forms'])),
+            ], ['booking_page', 'time_zone', 'services', 'forms'])),
             'ChatCustomerBlockRequest' => self::object([
                 'type' => ['type' => 'string', 'enum' => ['booking_times', 'form', 'payment']],
                 'text' => self::str() + ['description' => 'Your words above the link.'],

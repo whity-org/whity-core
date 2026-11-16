@@ -59,6 +59,7 @@ final class ChatCustomerBlocksAndForwardRealEngineTest extends TestCase
     {
         $options = $this->blocks->options(self::A);
         self::assertTrue($options['booking_page']);
+        self::assertSame('Asia/Amman', $options['time_zone']);
         self::assertSame([['id' => 1, 'name' => 'Cake tasting', 'minutes' => 75]], $options['services']);
 
         $built = $this->blocks->build(self::A, [
@@ -69,6 +70,7 @@ final class ChatCustomerBlocksAndForwardRealEngineTest extends TestCase
         ]);
         self::assertSame(['2099-01-04T08:00:00Z', '2099-01-04T12:00:00Z'], $built['block']['times'], 'past times are dropped');
         self::assertSame('https://app.whity.test/book/bakery', $built['block']['url']);
+        self::assertSame('Asia/Amman', $built['block']['time_zone']);
         self::assertStringContainsString("Pick a time that suits you\n\nCake tasting: Sun 4 Jan, 11:00 · Sun 4 Jan, 15:00\nhttps://app.whity.test/book/bakery", $built['text']);
 
         $this->bookingPage = false;

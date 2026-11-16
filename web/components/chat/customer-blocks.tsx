@@ -18,7 +18,7 @@ import { Icon } from '@whity/ui/icon';
 import { Input } from '@whity/ui/input';
 import { Textarea } from '@whity/ui/textarea';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
-import { useDateDisplay } from '@whity/features/datetime';
+import { useDateDisplay, zonedInstant } from '@whity/features/datetime';
 import { apiFetch } from '@/lib/api/client';
 import { cn } from '@/lib/utils';
 import type { CustomerBlock, CustomerBlockOptions } from '@/lib/chat-wire';
@@ -38,7 +38,7 @@ export function useCustomerBlockOptions(conversationId: number, enabled: boolean
     if (!enabled) return;
     let live = true;
     Promise.all([api.customerBlockOptions(conversationId).catch(() => null), api.paymentsAvailable()]).then(([o, payments]) => {
-      if (live) setOptions({ booking_page: o?.booking_page ?? false, services: o?.services ?? [], forms: o?.forms ?? [], payments });
+      if (live) setOptions({ booking_page: o?.booking_page ?? false, time_zone: o?.time_zone ?? 'UTC', services: o?.services ?? [], forms: o?.forms ?? [], payments });
     });
     return () => {
       live = false;
@@ -49,8 +49,8 @@ export function useCustomerBlockOptions(conversationId: number, enabled: boolean
 
 /** The block the team sees on a message it sent a customer. */
 export function CustomerBlockCard({ t, block }: { t: TranslateFn; block: CustomerBlock }) {
-  const { dateTime } = useDateDisplay();
-  const head = (icon: 'calendar' | 'form' | 'card', label: string) => (
+  const { dateTime } = useDateDisplay({ timeZone: block.type === 'booking_times' ? block.time_zone : undefined });
+  const head = (icon: 'calendar' | 'form' | 'billing', label: string) => (
     <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
       <Icon name={icon} size={14} />
       {label}
@@ -79,7 +79,7 @@ export function CustomerBlockCard({ t, block }: { t: TranslateFn; block: Custome
       )}
       {block.type === 'payment' && (
         <>
-          {head('card', t('cblock.payLabel', 'Payment link'))}
+          {head('billing', t('cblock.payLabel', 'Payment link'))}
           <p className="font-semibold">{block.description}</p>
           <p className="flex items-center gap-2">
             <span dir="ltr" className="font-mono">
@@ -104,6 +104,24 @@ export function CustomerBlockCard({ t, block }: { t: TranslateFn; block: Custome
 }
 
 type Kind = 'booking_times' | 'form' | 'payment';
+
+/** A `datetime-local` value (`2026-11-20T10:00`) read as the wall clock in `timeZone`, as an ISO instant. */
+export function wallTimeIn(value: string, timeZone: string): string {
+  const [day, clock = '00:00'] = value.split('T');
+  const [year, month, date] = day.split('-').map(Number);
+  const [hour, minute] = clock.split(':').map(Number);
+  return zonedInstant({ year, month, day: date }, hour * 60 + minute, timeZone).toISOString();
+}
+
+/**
+ * What the team sees above a block: only the person's own words. The line and
+ * link under them are what the customer got, and the card shows those.
+ */
+export function wordsAbove(body: string, block: CustomerBlock): string {
+  if (!body.endsWith(block.url)) return body;
+  const cut = body.lastIndexOf('\n\n');
+  return cut >= 0 ? body.slice(0, cut) : '';
+}
 
 /** One dialog for the three: what to send, with the person's own words above the link. */
 export function CustomerBlockDialog({
@@ -155,7 +173,7 @@ export function CustomerBlockDialog({
           type: 'booking_times',
           text: words,
           service_id: serviceId,
-          times: times.filter((x) => x !== '').map((x) => new Date(x).toISOString()),
+          times: times.filter((x) => x !== '').map((x) => wallTimeIn(x, options.time_zone)),
         });
       } else {
         await api.sendCustomerBlock(conversationId, { type: 'form', text: words, form_id: formId });
@@ -191,6 +209,7 @@ export function CustomerBlockDialog({
             </label>
             <div className="grid gap-2">
               <span className="text-sm">{t('cblock.times', 'Times to suggest')}</span>
+              <span className="text-xs text-muted-foreground">{t('cblock.zone', 'In {zone}, the time zone your booking page uses.', { zone: options.time_zone })}</span>
               {times.map((value, i) => (
                 <Input
                   key={i}

@@ -35,7 +35,7 @@ import { ConfirmAction } from '@whity/ui/confirm-action';
 import { apiFetch } from '@/lib/api/client';
 import type { ChatBlockedSender } from '@/lib/chat-wire';
 import { chatApi, chatErrorText } from './chat-api';
-import { CustomerBlockCard, CustomerBlockDialog, useCustomerBlockOptions } from './customer-blocks';
+import { CustomerBlockCard, CustomerBlockDialog, useCustomerBlockOptions, wordsAbove } from './customer-blocks';
 import { useWorkspaceCurrency } from '@/lib/branding-context';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
@@ -503,7 +503,7 @@ export function CustomerChat({
                   <DropdownMenuContent align="start" side="top">
                     {blockOptions.payments && (
                       <DropdownMenuItem onSelect={() => setBlockKind('payment')}>
-                        <Icon name="card" size={16} />
+                        <Icon name="billing" size={16} />
                         {tc('cblock.menuPay', 'Payment link')}
                       </DropdownMenuItem>
                     )}
@@ -656,6 +656,7 @@ function CustomerMessageItem({
       ? t('messages.byAgent', 'Agent for {name}', { name: message.author?.name ?? '' })
       : message.author?.name ?? t('messages.workspace', 'Your team');
   const at = useListTime(true)(message.created_at);
+  const shownBody = message.block && !inbound ? wordsAbove(message.body, message.block) : message.body;
 
   return (
     <>
@@ -688,7 +689,7 @@ function CustomerMessageItem({
               {note && <span className="text-muted-foreground">{tc('customer.noteOnly', 'Only the team sees this')}</span>}
             </p>
           )}
-          <p dir="auto" className="whitespace-pre-wrap break-words text-start text-foreground max-sm:text-lg">{message.body}</p>
+          {shownBody !== '' && <p dir="auto" className="whitespace-pre-wrap break-words text-start text-foreground max-sm:text-lg">{shownBody}</p>}
           {message.block && !inbound && <CustomerBlockCard t={blockText} block={message.block} />}
           {message.attachments_not_shown > 0 && (
             <p className="text-xs text-muted-foreground">{t('messages.attachments', '{n} attachment(s) not shown', { n: message.attachments_not_shown })}</p>

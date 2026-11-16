@@ -39,7 +39,7 @@ final class CustomerBlocks
     /**
      * What the + menu can offer this workspace's customer chats.
      *
-     * @return array{booking_page: bool, services: list<array{id: int, name: string, minutes: int}>, forms: list<array{id: int, title: string}>}
+     * @return array{booking_page: bool, time_zone: string, services: list<array{id: int, name: string, minutes: int}>, forms: list<array{id: int, title: string}>}
      */
     public function options(int $tenantId): array
     {
@@ -59,7 +59,8 @@ final class CustomerBlocks
             $forms[] = ['id' => (int) $r['id'], 'title' => self::name($r['title'] ?? null) !== '' ? self::name($r['title']) : (string) $r['name']];
         }
 
-        return ['booking_page' => $services !== [], 'services' => $services, 'forms' => $forms];
+        // Times are picked and shown in the calendar's zone, the one the customer's text uses.
+        return ['booking_page' => $services !== [], 'time_zone' => $calendar->zone->getName(), 'services' => $services, 'forms' => $forms];
     }
 
     /**
@@ -123,6 +124,7 @@ final class CustomerBlocks
             'type' => 'booking_times',
             'service' => ['id' => (int) $service['id'], 'name' => $name, 'minutes' => (int) $service['duration_minutes']],
             'times' => $times,
+            'time_zone' => $calendar->zone->getName(),
             'url' => $url,
         ]];
     }

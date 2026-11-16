@@ -259,13 +259,15 @@ export type TeamChatItem = ChatSummary & { kind: 'team'; pinned: boolean; muted?
 
 /** A block the team sent a customer (UC.5): the customer got words and the link. */
 export type CustomerBlock =
-  | { type: 'booking_times'; service: { id: number; name: string; minutes: number }; times: string[]; url: string }
+  | { type: 'booking_times'; service: { id: number; name: string; minutes: number }; times: string[]; time_zone?: string; url: string }
   | { type: 'form'; form: { id: number; title: string }; url: string }
   | { type: 'payment'; description: string; amount: string; currency: string; url: string; reference: string | null };
 
 /** What a customer chat's + can send in this workspace. */
 export interface CustomerBlockOptions {
   booking_page: boolean;
+  /** The calendar's zone: times are picked and shown in it, as the customer's text has them. */
+  time_zone: string;
   services: { id: number; name: string; minutes: number }[];
   forms: { id: number; title: string }[];
 }

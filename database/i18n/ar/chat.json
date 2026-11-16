@@ -106,6 +106,7 @@
         "cblock.timesTitle": "إرسال أوقات الحجز",
         "cblock.words": "كلماتك",
         "cblock.wordsHint": "سطر إلى {name} (اختياري)",
+        "cblock.zone": "بتوقيت {zone}، المنطقة الزمنية التي تستخدمها صفحة الحجز.",
         "compose.cancelEdit": "إلغاء التعديل",
         "compose.cancelReply": "إلغاء الرد",
         "compose.editing": "تعديل",

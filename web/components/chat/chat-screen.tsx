@@ -1027,7 +1027,7 @@ function OpenChat({
       )}
       {tasking !== null && (
         <NewTaskDialog
-          initialTitle={taskTitle(tasking.body)}
+          initialTitle={taskTitle(tasking.body || (tasking.block?.type === 'poll' ? tasking.block.question : tasking.block?.type === 'record' ? tasking.block.title : ''))}
           initialDetail={t('task.detail', '{text}\n\nFrom {name} in {chat}: {link}', {
             text: tasking.body,
             name: tasking.author?.name ?? '',

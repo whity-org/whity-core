@@ -105,6 +105,7 @@
         "cblock.timesTitle": "Send booking times",
         "cblock.words": "Your words",
         "cblock.wordsHint": "A line for {name} (optional)",
+        "cblock.zone": "In {zone}, the time zone your booking page uses.",
         "compose.cancelEdit": "Stop editing",
         "compose.cancelReply": "Stop replying",
         "compose.editing": "Editing",

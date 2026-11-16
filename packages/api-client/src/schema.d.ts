@@ -12020,6 +12020,8 @@ export interface components {
                 minutes: number;
             };
             times?: string[];
+            /** @description The calendar's zone, which the customer's text uses. */
+            time_zone?: string;
             form?: {
                 id: number;
                 title: string;
@@ -12033,6 +12035,8 @@ export interface components {
         ChatCustomerBlockOptionsResponse: {
             data: {
                 booking_page: boolean;
+                /** @description The calendar's zone: times are picked in it. */
+                time_zone: string;
                 services: {
                     id: number;
                     name: string;

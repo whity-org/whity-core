@@ -78191,6 +78191,10 @@
                             "type": "string"
                         }
                     },
+                    "time_zone": {
+                        "type": "string",
+                        "description": "The calendar's zone, which the customer's text uses."
+                    },
                     "form": {
                         "type": "object",
                         "properties": {
@@ -78235,6 +78239,10 @@
                             "booking_page": {
                                 "type": "boolean"
                             },
+                            "time_zone": {
+                                "type": "string",
+                                "description": "The calendar's zone: times are picked in it."
+                            },
                             "services": {
                                 "type": "array",
                                 "items": {
@@ -78278,6 +78286,7 @@
                         },
                         "required": [
                             "booking_page",
+                            "time_zone",
                             "services",
                             "forms"
                         ]

@@ -21,10 +21,11 @@ jest.mock('@whity/features/i18n', () => ({
       Object.entries(v ?? {}).reduce((s, [k, x]) => s.replace(`{${k}}`, x), f),
 }));
 jest.mock('@whity/features/datetime', () => ({
+  ...jest.requireActual('@whity/features/datetime'),
   useDateDisplay: () => ({ dateTime: (v: string | null) => v, time: (v: string | null) => v, date: (v: string | null) => v }),
 }));
 
-import { CustomerBlockCard, CustomerBlockDialog } from '@/components/chat/customer-blocks';
+import { CustomerBlockCard, CustomerBlockDialog, wallTimeIn, wordsAbove } from '@/components/chat/customer-blocks';
 import type { CustomerBlockOptions } from '@/lib/chat-wire';
 
 const t = (_key: string, fallback: string, values?: Record<string, string | number>) =>
@@ -36,6 +37,7 @@ function respond(body: unknown, status = 200) {
 
 const options: CustomerBlockOptions = {
   booking_page: true,
+  time_zone: 'Asia/Amman',
   services: [{ id: 1, name: 'Cake tasting', minutes: 75 }],
   forms: [
     { id: 1, title: 'Event order' },
@@ -136,4 +138,16 @@ test('booking times show the service and each time offered', () => {
   expect(screen.getByText('Cake tasting · 75 minutes')).toBeInTheDocument();
   expect(screen.getByText('2099-01-04T08:00:00Z')).toBeInTheDocument();
   expect(screen.getByText('2099-01-04T12:00:00Z')).toBeInTheDocument();
+});
+
+test("a time is picked on the booking page's clock, wherever the person is", () => {
+  expect(wallTimeIn('2026-11-20T10:00', 'Asia/Amman')).toBe('2026-11-20T07:00:00.000Z');
+  expect(wallTimeIn('2026-11-20T10:00', 'UTC')).toBe('2026-11-20T10:00:00.000Z');
+});
+
+test('the team sees only the words above a block; the card has the line and the link', () => {
+  const block = { type: 'form' as const, form: { id: 1, title: 'Event order' }, url: 'https://app.whity.test/f/aaa' };
+  expect(wordsAbove('Please fill this in\n\nEvent order\nhttps://app.whity.test/f/aaa', block)).toBe('Please fill this in');
+  expect(wordsAbove('Event order\nhttps://app.whity.test/f/aaa', block)).toBe('');
+  expect(wordsAbove('Something else', block)).toBe('Something else');
 });
