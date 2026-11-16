@@ -17,7 +17,7 @@ use Whity\Storage\LocalStorageDriver;
 
 /**
  * Files, photos and voice in Chat on the real schema (design 3.5, UC.10,
- * WHIT-1095; migration 283): the type comes from the bytes, a file joins only
+ * WHIT-1095; migration 279): the type comes from the bytes, a file joins only
  * its uploader's next message in that chat and only once, it is read back only
  * by people in the chat, a voice message keeps its words, and deleting the
  * message for everyone takes its files with it.
