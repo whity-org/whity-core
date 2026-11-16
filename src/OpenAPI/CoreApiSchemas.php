@@ -2996,8 +2996,11 @@ final class CoreApiSchemas
         return [
             self::permissionRoute('GET', '/api/audit-logs', 'audit:read', [
                 'summary' => 'List the tenant\'s audit entries (newest first, paginated)',
+                'description' => 'Besides the audit log, the list reads what agents did with their tools (`agent.action.ran`) and the decisions people made on routes '
+                    . '(`route.approved`, `route.rejected`, `route.signed`, `route.declined`, `route.sent_back`). A target filter, or `source=audit`, reads the audit log alone. The CSV export is the audit log.',
                 'tags' => ['audit-logs'],
                 'parameters' => [
+                    self::queryParam('source', 'string', '`audit` for the audit log alone; otherwise everything'),
                     self::queryParam('action', 'string', 'Exact action match (e.g. users:create)'),
                     self::queryParam('actor', 'integer', 'Filter by actor user id'),
                     self::queryParam('agent', 'string', 'Filter by agent principal, as listed by /api/audit-logs/facets'),
@@ -4630,6 +4633,9 @@ final class CoreApiSchemas
 
         $auditEntry = self::object([
             'id' => self::int(),
+            // Merge map plumbing: which record the entry is. Ids repeat across
+            // sources, so a client keys rows by source and id.
+            'source' => ['type' => 'string', 'enum' => ['audit', 'agents', 'routes'], 'description' => 'audit (the audit log), agents (what an agent did with a tool) or routes (a decision on a route).'],
             'tenantId' => self::int(),
             'actorUserId' => self::int(true),
             'action' => self::str(),

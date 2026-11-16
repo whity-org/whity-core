@@ -90,7 +90,7 @@ export function AuditFeed({ entries }: { entries: AuditLogEntry[] }) {
             <ul>
               {group.rows.map((entry) => (
                 <li
-                  key={entry.id}
+                  key={`${entry.source ?? 'audit'}:${entry.id}`}
                   data-testid={`audit-entry-${entry.id}`}
                   className="grid grid-cols-[auto_minmax(0,1fr)] gap-3 border-b border-border py-3 last:border-b-0"
                 >

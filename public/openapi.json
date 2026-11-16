@@ -3419,7 +3419,17 @@
                 "tags": [
                     "audit-logs"
                 ],
+                "description": "Besides the audit log, the list reads what agents did with their tools (`agent.action.ran`) and the decisions people made on routes (`route.approved`, `route.rejected`, `route.signed`, `route.declined`, `route.sent_back`). A target filter, or `source=audit`, reads the audit log alone. The CSV export is the audit log.",
                 "parameters": [
+                    {
+                        "name": "source",
+                        "in": "query",
+                        "required": false,
+                        "description": "`audit` for the audit log alone; otherwise everything",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "name": "action",
                         "in": "query",
@@ -76969,6 +76979,15 @@
                 "properties": {
                     "id": {
                         "type": "integer"
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": [
+                            "audit",
+                            "agents",
+                            "routes"
+                        ],
+                        "description": "audit (the audit log), agents (what an agent did with a tool) or routes (a decision on a route)."
                     },
                     "tenantId": {
                         "type": "integer"
