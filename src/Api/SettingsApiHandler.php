@@ -103,7 +103,7 @@ final class SettingsApiHandler
      *   settings.tab.email = Email
      *   settings.tab.email_domains = Email domains
      *   settings.tab.public_forms = Public forms
-     *   settings.tab.messages = Messages
+     *   settings.tab.messages = Chat
      *   settings.tab.storage = Storage
      *   settings.tab.feature_flags = Feature flags
      *   settings.tab.security = Security
