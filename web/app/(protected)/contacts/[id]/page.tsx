@@ -16,6 +16,7 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
 import { ContactFormDialog } from '@/components/contacts/contact-form-dialog';
+import { CustomerActivity } from '@/components/contacts/customer-activity';
 import { fieldLabel, isEditableHere } from '@/components/contacts/field-input';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
@@ -244,6 +245,8 @@ export default function ContactPage({ params }: { params: Promise<{ id: string }
           )}
         </section>
       </div>
+
+      {contact.is_customer && <CustomerActivity contactId={contact.id} />}
 
       {canWrite && !contact.archived && (
         <div className="border-t border-border pt-4">

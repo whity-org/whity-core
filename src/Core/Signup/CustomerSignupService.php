@@ -285,6 +285,7 @@ final class CustomerSignupService
                 return $none;
             }
 
+            $this->linkContact($tenantId, $signupId);
             $result = $this->finish($ownTx, ['result' => $outcome, 'tenant_id' => $tenantId, 'profile_id' => $profileId]);
         } catch (\Throwable $e) {
             if ($ownTx && $this->db->inTransaction()) {
@@ -383,6 +384,7 @@ final class CustomerSignupService
                 ':status' => $approval ? self::STATUS_PENDING : self::STATUS_JOINED,
                 ':pid' => $profileId,
             ]);
+            $this->linkContact($tenantId, (int) $this->db->lastInsertId());
 
             if ($approval) {
                 $signupId = (int) $this->db->lastInsertId();
@@ -585,6 +587,28 @@ final class CustomerSignupService
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return is_array($row) && in_array((string) $row['status'], $statuses, true) ? $row : null;
+    }
+
+    /** Contacts is the one customer record: the request points at it. */
+    private function linkContact(int $tenantId, int $signupId): void
+    {
+        $stmt = $this->db->prepare('SELECT display_name, email, profile_id FROM customer_signups WHERE id = :id AND tenant_id = :tid');
+        $stmt->execute([':id' => $signupId, ':tid' => $tenantId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return;
+        }
+        $contactId = (new \Whity\Core\Contacts\CustomerContacts($this->db))->forCustomer(
+            $tenantId,
+            (string) $row['display_name'],
+            (string) $row['email'],
+            '',
+            $row['profile_id'] !== null ? (int) $row['profile_id'] : null,
+        );
+        if ($contactId !== null) {
+            $this->db->prepare('UPDATE customer_signups SET contact_id = :contact WHERE id = :id AND tenant_id = :tid')
+                ->execute([':contact' => $contactId, ':id' => $signupId, ':tid' => $tenantId]);
+        }
     }
 
     private function decide(int $signupId, int $tenantId, string $status, int $actorId): void

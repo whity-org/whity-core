@@ -5396,7 +5396,7 @@ $contactImportService = new \Whity\Core\Contacts\Import\ContactImportService(
     new \Whity\Core\Contacts\Import\ContactImportRepository($db->getPdo()),
 );
 $contactImportService->addTargets(new \Whity\Core\CustomFields\CustomFieldImportTargets($customFieldService, $customFieldRepository, 'contact'));
-$contactsHandler = new \Whity\Api\ContactsApiHandler($contactService, $contactTags, $contactImportService, $roleChecker);
+$contactsHandler = new \Whity\Api\ContactsApiHandler($contactService, $contactTags, $contactImportService, $roleChecker, new \Whity\Core\Contacts\CustomerActivity($db->getPdo()));
 $customFieldsHandler = new \Whity\Api\CustomFieldsApiHandler($customFieldService, $roleChecker);
 // Listing a type's fields checks that type's read permission in the handler.
 $router->register('GET',    '/api/custom-fields/record-types',             [$customFieldsHandler, 'recordTypes'], null);
@@ -5409,6 +5409,7 @@ $router->register('GET',    '/api/contacts',                               [$con
 $router->register('POST',   '/api/contacts',                               [$contactsHandler, 'create'],      null, null, CorePermissions::CONTACTS_WRITE);
 $router->register('GET',    '/api/contacts/tags',                          [$contactsHandler, 'listTags'],    null, null, CorePermissions::CONTACTS_READ);
 $router->register('GET',    '/api/contacts/{id:\d+}',                      [$contactsHandler, 'show'],        null, null, CorePermissions::CONTACTS_READ);
+$router->register('GET',    '/api/contacts/{id:\d+}/activity',             [$contactsHandler, 'activity'],    null, null, CorePermissions::CONTACTS_READ);
 $router->register('PATCH',  '/api/contacts/{id:\d+}',                      [$contactsHandler, 'update'],      null, null, CorePermissions::CONTACTS_WRITE);
 $router->register('POST',   '/api/contacts/{id:\d+}/archive',              [$contactsHandler, 'archive'],     null, null, CorePermissions::CONTACTS_WRITE);
 $router->register('POST',   '/api/contacts/{id:\d+}/restore',              [$contactsHandler, 'restore'],     null, null, CorePermissions::CONTACTS_WRITE);
