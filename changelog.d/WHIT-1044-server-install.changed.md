@@ -1,4 +1,4 @@
-- **Installing Whity is now `npm install -g whity`, then `whity install`, on your own server
+- **Installing Whity is now `npm install -g @whity/cli`, then `whity install`, on your own server
   with your own domain.** The owner chose the installer card's server install over the local one.
   `whity install` asks for the web address and your email, checks the server first ("Nothing was
   changed" when something is missing), downloads the latest release, starts it, puts Caddy in

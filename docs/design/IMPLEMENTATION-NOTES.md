@@ -4,7 +4,7 @@
 
 **Decision.** The owner chose the server install `SiteInstallerTerminal` draws ("Server install"),
 replacing register WS.20's local install at localhost:3000; and installing Whity is two npm lines,
-`npm install -g whity` then `whity install` (the plain npm name, claimed for this), with
+`npm install -g @whity/cli` then `whity install` (the command stays `whity`), with
 `curl -fsSL https://whity.dev/install.sh | sh` kept as a thin bootstrap that checks Node.js 20+
 and runs those two. The register's WS.20 still reads "local install"; it is for the owner and the
 design team to update, not engineering.
@@ -31,14 +31,13 @@ the address and `whity update`.
   Windows PowerShell 5.1's classic console keeps English and plain marks, as WHIT-840 decided.
 - Node.js 20+ is needed on the server, besides Docker: the install is the `whity` command.
 
-**Publishing.** `packages/whity` is the plain `whity` package: only a bin that runs `@whity/cli` at
-the same version (both at 0.2.0; bump together). `publish-whity.yml` publishes it on a release to
-main, by npm trusted publishing like `publish-cli.yml`. The name has to be claimed on npmjs.com
-first, with that workflow file set as its trusted publisher; that first step is the owner's.
+**Publishing.** The package is `@whity/cli` (0.2.0), published by `publish-cli.yml` on a release
+to main through npm trusted publishing. A plain `whity` name was tried and dropped: npm refused it
+as too similar to existing packages (`which`, `write`), so the owner chose `@whity/cli` (16 Nov 2026).
 
 **Order, so the live one-liner never breaks.** whity.dev serves `install.sh` from whity-core's
-develop on every whity-web deploy. So `install.sh` stays the local installer until `whity` 0.2.0 is
-on npm (the owner claims the name, then the next release publishes it); only then does it become
+develop on every whity-web deploy. So `install.sh` stays the local installer until `@whity/cli`
+0.2.0 is on npm (the next release publishes it); only then does it become
 the bootstrap, and whity.dev/install switch to the two npm lines and this output, in English and
 Arabic.
 
