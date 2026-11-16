@@ -152,6 +152,8 @@ export interface RouteFlowStepInput {
   labelAr: string | null;
   required: boolean;
   maxLength: number;
+  /** Merge map A3: a person in the workspace (the supervisor), or a line of text. */
+  type?: 'text' | 'person';
 }
 
 /** One STORED transition, keyed by the verdict that takes it. */

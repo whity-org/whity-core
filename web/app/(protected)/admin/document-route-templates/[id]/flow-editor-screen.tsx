@@ -867,7 +867,7 @@ function StageValuesEditor({
     if (label === '') return;
     onChange([
       ...inputs,
-      { key: stageValueKey(label, inputs.map((input) => input.key)), label, labelAr: null, required: true, maxLength: 100 },
+      { key: stageValueKey(label, inputs.map((input) => input.key)), label, labelAr: null, required: true, maxLength: 100, type: 'text' },
     ]);
     setDraft('');
   };
@@ -912,6 +912,14 @@ function StageValuesEditor({
                 onCheckedChange={(checked) => update(index, { required: checked })}
               />
               {t('routeTemplates.inspector.valueRequired', 'Needed to approve')}
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Switch
+                checked={input.type === 'person'}
+                disabled={readOnly}
+                onCheckedChange={(checked) => update(index, { type: checked ? 'person' : 'text' })}
+              />
+              {t('routeTemplates.inspector.valuePerson', 'A person in the workspace')}
             </label>
             {!readOnly && (
               <Button
@@ -985,12 +993,12 @@ function StageExclusionsEditor({
   return (
     <section className="space-y-2" aria-labelledby="stage-exclusions-heading">
       <h3 id="stage-exclusions-heading" className="text-sm font-medium">
-        {t('routeTemplates.inspector.exclusions', 'Leave out people named on the form')}
+        {t('routeTemplates.inspector.exclusions', 'Leave out people named on the form or at an earlier stage')}
       </h3>
       <p className="text-xs text-muted-foreground">
         {t(
           'routeTemplates.inspector.exclusionsHelp',
-          'People picked in these questions, such as the supervisor, are not asked here, are not counted towards approval and are not printed among the approvals.'
+          'People picked in these questions or stage values, such as the supervisor, are not asked here, are not counted towards approval and are not printed among the approvals.'
         )}
       </p>
       {keys.length > 0 && (

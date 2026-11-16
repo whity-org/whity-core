@@ -294,10 +294,6 @@ final class FormSubmissionRepository
               WHERE tenant_id = :tenant_id AND id = :id
                 AND submitted_by_profile_id = :profile_id
                 AND withdrawn_at IS NULL
-                AND NOT EXISTS (
-                    SELECT 1 FROM form_submission_reviews r
-                     WHERE r.submission_id = form_submissions.id AND r.tenant_id = form_submissions.tenant_id
-                )
                 AND NOT (
                     EXISTS (
                         SELECT 1 FROM document_routes dr

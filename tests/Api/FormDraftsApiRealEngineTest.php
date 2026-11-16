@@ -80,7 +80,6 @@ final class FormDraftsApiRealEngineTest extends TestCase
         $id = $this->forms->create(self::TENANT, $key, ['en' => 'Supplier request'], null, null, null);
         $this->fields->create(self::TENANT, $id, 'supplier', 'text', ['en' => 'Supplier'], null, true, [], [], null, null, 1);
         $this->fields->create(self::TENANT, $id, 'paper', 'file', ['en' => 'Paper'], null, false, [], [], null, null, 2);
-        $this->fields->create(self::TENANT, $id, 'decision', 'text', ['en' => 'Decision'], null, false, [], [], null, null, 3, null, 'staff');
         $this->forms->transition(self::TENANT, $id, 'draft', 'published');
 
         return $id;
@@ -144,12 +143,11 @@ final class FormDraftsApiRealEngineTest extends TestCase
         self::assertSame(200, $this->save(self::SUBMITTER, ['data' => []])->getStatusCode());
     }
 
-    public function testFileAndStaffAnswersAndUnknownKeysAreNotKept(): void
+    public function testFileAnswersAndUnknownKeysAreNotKept(): void
     {
         $this->save(self::SUBMITTER, ['data' => [
             'supplier' => 'Example Mill',
             'paper' => 'tenants/1/form-uploads/7/x.pdf',
-            'decision' => 'approved',
             'invented' => 'x',
         ]]);
 
