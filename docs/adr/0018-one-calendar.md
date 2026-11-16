@@ -63,7 +63,7 @@ As a result, meetings did not block bookings (#1933). Meeting guests got no cale
 | T3 | WHIT-1110 | Time off and extra hours become events (copy keyed by `legacy_ref`) | 285 |
 | T4 | WHIT-1112 | Meetings scheduled as events; `MeetingBusySource` retires | 286 |
 | T5 | WHIT-1113 | One invite path (`CalendarInvites`: notice, push, email with `.ics`; formal meetings keep their `convening.meeting.*` notice kinds). Staff reminders for events wait for the owner's lead time; booking reminders are unchanged | - |
-| T6 | WHIT-1114 | Task due dates and SDK `CalendarSource` | - |
+| T6 | WHIT-1114 | Task due dates (`TaskDueDates`, only when `kinds` names `task_due`, with `tasks:read`; fail-open as `unavailable`). The SDK `CalendarSource` merge of `ExternalBusySource` and `HostCalendarEvents` waits for an SDK version: both keep working as they are | - |
 | T7 | WHIT-1115 | Meetings inside the calendar on the web, redirects from `/admin/x/convening-*`, one free-time picker | - |
 | T8 | (later) | Drop `meeting_invitations`, `meetings.scheduled_at/location` and closed exceptions, one release after their copies | ask |
 

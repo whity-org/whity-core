@@ -6237,6 +6237,8 @@ $router->register('POST',   '/api/taskaat/connect',          [$taskaatHandler, '
 $router->register('POST',   '/api/taskaat/connect/complete', [$taskaatHandler, 'complete'],   null, null, CorePermissions::TASKS_MANAGE);
 $router->register('DELETE', '/api/taskaat/connection',       [$taskaatHandler, 'disconnect'], null, null, CorePermissions::TASKS_MANAGE);
 // Tasks and Boards read and written through Taskaat's record tools (TplTasks, TplBoard).
+// ADR 0018: tasks due show on the calendar, read from Taskaat when asked for.
+$calendarHandler->setTaskDueDates(new \Whity\Core\Taskaat\TaskDueDates($taskaatClient, $logger));
 $tasksHandler = new \Whity\Api\TasksApiHandler(
     $taskaatClient,
     new \Whity\Core\Taskaat\TaskPeople($db->getPdo(), new \Whity\Core\Agent\AgentRepository($db->getPdo())),
