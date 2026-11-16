@@ -8,6 +8,10 @@ use Whity\Core\Chat\ChatException;
 use Whity\Core\Chat\ChatBlocking;
 use Whity\Core\Chat\ChatBots;
 use Whity\Core\Chat\ChatInbox;
+use Whity\Core\Chat\CustomerBlocks;
+use Whity\Core\Messaging\MessagesPresenter;
+use Whity\Core\Messaging\MessagingException;
+use Whity\Core\Messaging\MessagingService;
 use Whity\Core\Chat\ChatService;
 use Whity\Core\Chat\ChatViewer;
 use Whity\Core\Request;
@@ -40,7 +44,67 @@ final class ChatApiHandler
         private readonly ?PermissionResolver $permissions = null,
         private readonly ?ChatBots $bots = null,
         private readonly ?ChatBlocking $blocking = null,
+        private readonly ?CustomerBlocks $customerBlocks = null,
+        private readonly ?MessagingService $messaging = null,
     ) {
+    }
+
+    // ── Forward and customer blocks (UC.5, UC.9, UC.10; WHIT-1106) ───────────
+
+    /** @param array<string, string> $params */
+    public function forward(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            $to = (int) (JsonBody::parsed($request)['chat_id'] ?? 0);
+
+            return Response::json(['data' => $this->chat->forward($t, $v, (int) ($params['id'] ?? 0), $to)], 201);
+        });
+    }
+
+    /** What a customer chat's + can send here: booking times, forms. */
+    /** @param array<string, string> $params */
+    public function customerBlockOptions(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v): Response {
+            if (!$this->repliesToCustomers($t, $v) || $this->customerBlocks === null) {
+                return Response::error('Replying to customers needs the "Reply to customers" permission.', 403);
+            }
+
+            return Response::json(['data' => $this->customerBlocks->options($t)]);
+        });
+    }
+
+    /** Send booking times, a form or a payment link to a customer (UC.5). */
+    /** @param array<string, string> $params */
+    public function sendCustomerBlock(Request $request, array $params = []): Response
+    {
+        return $this->guard($request, function (int $t, ChatViewer $v) use ($request, $params): Response {
+            if (!$this->repliesToCustomers($t, $v) || $this->customerBlocks === null || $this->messaging === null) {
+                return Response::error('Replying to customers needs the "Reply to customers" permission.', 403);
+            }
+            $conversation = (int) ($params['id'] ?? 0);
+            if ($this->messaging->conversations()->find($t, $conversation) === null) {
+                return Response::error('Chat not found', 404);
+            }
+            $built = $this->customerBlocks->build($t, JsonBody::parsed($request));
+            try {
+                $message = $this->messaging->reply($t, $conversation, $v->profileId, $built['text'], false, 'staff.reply', ['block' => $built['block']]);
+            } catch (MessagingException $e) {
+                // Its plain sentence, written for people; the detail stays in the log.
+                error_log('[ChatApiHandler] customer block not sent: ' . $e->getMessage());
+
+                return Response::error($e->plain(), 422);
+            }
+
+            return Response::json(['data' => MessagesPresenter::message($message)], 201);
+        });
+    }
+
+    private function repliesToCustomers(int $tenantId, ChatViewer $viewer): bool
+    {
+        return !$viewer->isAgent()
+            && $this->permissions !== null
+            && $this->permissions->hasPermission($viewer->profileId, $tenantId, CorePermissions::MESSAGES_REPLY);
     }
 
     // ── Mute, blocking and bots (UC.4, UC.8, UC.12; WHIT-1097) ───────────────

@@ -171,6 +171,38 @@ final class ChatAttachments
         return is_array($row) ? $row : null;
     }
 
+    /**
+     * A copy of a sent file for a message in another chat (Forward, UC.9): its
+     * own bytes under a fresh name, so deleting either message leaves the other.
+     *
+     * @return int the copy's id, not sent yet
+     */
+    public function copyForChat(int $tenantId, int $attachmentId, int $chatId, int $profileId): int
+    {
+        $row = $this->row($tenantId, $attachmentId);
+        if ($row === null) {
+            throw ChatException::notFound();
+        }
+        $copy = $this->upload(
+            $tenantId,
+            $chatId,
+            $profileId,
+            $this->bytes((string) $row['storage_key']),
+            (string) $row['content_type'],
+            isset($row['filename']) ? (string) $row['filename'] : null,
+            [
+                'duration_ms' => isset($row['duration_ms']) ? (int) $row['duration_ms'] : null,
+                'width' => isset($row['width']) ? (int) $row['width'] : null,
+                'height' => isset($row['height']) ? (int) $row['height'] : null,
+            ],
+        );
+        if (isset($row['transcript']) && $row['transcript'] !== '') {
+            $this->setTranscript($tenantId, (int) $copy['id'], (string) $row['transcript']);
+        }
+
+        return (int) $copy['id'];
+    }
+
     public function setTranscript(int $tenantId, int $id, string $text): void
     {
         $text = trim(mb_substr($text, 0, 4000));

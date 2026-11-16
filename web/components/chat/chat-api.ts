@@ -3,7 +3,7 @@
  * messages: the server's own sentence for a refusal, ours otherwise.
  */
 
-import type { ChatAttachment, ChatBlockedSender, ChatBot, ChatDetail, ChatRecordBlock, ChatDirectory, ChatInbox, ChatLayout, ChatMessage, ChatMode, ChatReads, ChatState, ChatSummary, ChatLink } from '@/lib/chat-wire';
+import type { ChatAttachment, ChatBlockedSender, ChatBot, ChatDetail, ChatRecordBlock, CustomerBlockOptions, ChatDirectory, ChatInbox, ChatLayout, ChatMessage, ChatMode, ChatReads, ChatState, ChatSummary, ChatLink } from '@/lib/chat-wire';
 
 type ApiClient = (path: string, init?: RequestInit) => Promise<Response>;
 
@@ -68,6 +68,25 @@ export function chatApi(api: ApiClient) {
     // Start a customer chat by email (UC.1); the reply comes back to Chat.
     messageCustomer: (to: string, name: string, body: string) =>
       call<{ id: number; conversation_id: number }>(api, '/api/v1/messages/conversations', json('POST', { to, channel: 'email', ...(name ? { name } : {}), body })),
+    // Forward and customer blocks (UC.5, UC.9, UC.10).
+    forward: (messageId: number, chatId: number) => call<ChatMessage>(api, `/api/v1/chat/messages/${messageId}/forward`, json('POST', { chat_id: chatId })),
+    customerBlockOptions: (id: number) => call<CustomerBlockOptions>(api, `/api/v1/chat/inbox/${id}/block-options`),
+    sendCustomerBlock: (id: number, body: Record<string, unknown>) => call<unknown>(api, `/api/v1/chat/inbox/${id}/send-block`, json('POST', body)),
+    /** Whity Pay answers only when it is installed and set up for this workspace. */
+    paymentsAvailable: async (): Promise<boolean> => {
+      try {
+        const response = await api('/api/v1/whity-pay/workspace/setup');
+        return response.ok;
+      } catch {
+        return false;
+      }
+    },
+    createPayment: (amount: string, currency: string, description: string) =>
+      call<{ reference: string; url: string }>(
+        api,
+        '/api/v1/whity-pay/workspace/payments',
+        json('POST', { amount, currency, description, return_url: `${window.location.origin}/` })
+      ),
     // Mute, blocking and bots (UC.4, UC.8, UC.12).
     mute: (id: number, muted: boolean) => call<unknown>(api, `/api/v1/chat/inbox/${id}/mute`, json('POST', { muted })),
     blockStatus: (id: number) => call<ChatBlockedSender | null>(api, `/api/v1/chat/inbox/${id}/block`),

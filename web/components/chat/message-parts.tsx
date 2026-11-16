@@ -57,6 +57,10 @@ export interface MessageActions {
   onEdit: (m: ChatMessage) => void;
   onDelete: (m: ChatMessage) => void;
   onQuote: (messageId: number) => void;
+  /** Forward to another chat (UC.9); absent where there is nowhere to forward. */
+  onForward?: (m: ChatMessage) => void;
+  /** Turn into a task in Taskaat (UC.9); absent without Taskaat or tasks:write. */
+  onTask?: (m: ChatMessage) => void;
   /** Vote in a poll (UC.5); absent where nobody can vote (a preview). */
   onVote?: (m: ChatMessage, choices: number[]) => void;
 }
@@ -253,6 +257,18 @@ function ActionBar({
             <Icon name="copy" size={16} />
             {t('msg.copy', 'Copy text')}
           </DropdownMenuItem>
+          {actions.onForward && (
+            <DropdownMenuItem onSelect={() => actions.onForward!(message)}>
+              <Icon name="send" size={16} />
+              {t('msg.forward', 'Forward to another chat')}
+            </DropdownMenuItem>
+          )}
+          {actions.onTask && (
+            <DropdownMenuItem onSelect={() => actions.onTask!(message)}>
+              <Icon name="list-todo" size={16} />
+              {t('msg.task', 'Turn into a task (Taskaat)')}
+            </DropdownMenuItem>
+          )}
           {(message.can_edit || message.can_delete) && <DropdownMenuSeparator />}
           {message.can_edit && (
             <DropdownMenuItem onSelect={() => actions.onEdit(message)}>
@@ -335,6 +351,12 @@ export function MessageItem({
     </p>
   ) : (
     <>
+      {message.forwarded_from && (
+        <p className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Icon name="send" size={12} />
+          {t('msg.forwarded', 'Forwarded from {name}', { name: message.forwarded_from })}
+        </p>
+      )}
       <Quote t={t} message={message} onOpen={actions.onQuote} />
       <MessageAttachments t={t} attachments={message.attachments ?? []} />
       {message.block && <MessageBlock t={t} block={message.block} onVote={actions.onVote ? (choices) => actions.onVote!(message, choices) : undefined} />}
@@ -554,6 +576,18 @@ function ActionSheet({
             <Icon name="copy" size={20} />
             {t('msg.copy', 'Copy text')}
           </button>
+          {actions.onTask && (
+            <button type="button" className={row} onClick={() => run(() => actions.onTask!(message))}>
+              <Icon name="list-todo" size={20} />
+              {t('msg.taskShort', 'Turn into a task')}
+            </button>
+          )}
+          {actions.onForward && (
+            <button type="button" className={row} onClick={() => run(() => actions.onForward!(message))}>
+              <Icon name="send" size={20} />
+              {t('msg.forwardShort', 'Forward')}
+            </button>
+          )}
           {message.can_edit && (
             <button type="button" className={row} onClick={() => run(() => actions.onEdit(message))}>
               <Icon name="edit" size={20} />

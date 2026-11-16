@@ -196,3 +196,25 @@ test('on a phone, swiping a message sideways replies to it', () => {
 
   expect(a.onReply).toHaveBeenCalled();
 });
+
+test('Forward and Turn into a task are in the menu when offered, and a forwarded message says so (UC.9)', async () => {
+  const a = { ...actions(), onForward: jest.fn(), onTask: jest.fn() };
+  const m = message({ forwarded_from: 'Emad Nasser' });
+  render(<MessageItem t={t} message={m} layout="bubbles" myId={AMRO} readMarks={marks} actions={a} />);
+
+  expect(screen.getByText('Forwarded from Emad Nasser')).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'More actions' }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: /Forward to another chat/ }));
+  expect(a.onForward).toHaveBeenCalledWith(m);
+  await userEvent.click(screen.getByRole('button', { name: 'More actions' }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: /Turn into a task/ }));
+  expect(a.onTask).toHaveBeenCalledWith(m);
+});
+
+test('without Taskaat or tasks:write there is no Turn into a task', async () => {
+  render(<MessageItem t={t} message={message()} layout="bubbles" myId={AMRO} readMarks={marks} actions={actions()} />);
+
+  await userEvent.click(screen.getByRole('button', { name: 'More actions' }));
+  await screen.findByRole('menuitem', { name: /Copy text/ });
+  expect(screen.queryByRole('menuitem', { name: /Turn into a task/ })).not.toBeInTheDocument();
+});

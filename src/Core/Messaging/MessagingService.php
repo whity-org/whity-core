@@ -124,9 +124,10 @@ final class MessagingService implements HostWiredService
     /**
      * A reply in an existing conversation, on its channel.
      *
+     * @param array<string, mixed> $meta what the team sees with it (a block, UC.5); the customer gets the words
      * @return array<string, mixed> the message
      */
-    public function reply(int $tenantId, int $conversationId, ?int $authorProfileId, string $body, bool $byAgent = false, ?string $source = null): array
+    public function reply(int $tenantId, int $conversationId, ?int $authorProfileId, string $body, bool $byAgent = false, ?string $source = null, array $meta = []): array
     {
         if ($source !== null && preg_match('/^[a-z][a-z0-9_.:-]{0,63}$/', $source) !== 1) {
             throw new MessagingException('The source must be a short lowercase word such as calendar.reminder.');
@@ -150,7 +151,8 @@ final class MessagingService implements HostWiredService
             $body,
             $authorProfileId,
             $byAgent,
-            $source ?? ($byAgent ? 'agent.reply' : 'staff.reply')
+            $source ?? ($byAgent ? 'agent.reply' : 'staff.reply'),
+            $meta,
         );
     }
 
@@ -320,6 +322,7 @@ final class MessagingService implements HostWiredService
     }
 
     /**
+     * @param array<string, mixed> $meta
      * @return array<string, mixed>
      */
     private function queueOutbound(
@@ -330,6 +333,7 @@ final class MessagingService implements HostWiredService
         ?int $authorProfileId,
         bool $byAgent,
         string $source,
+        array $meta = [],
     ): array {
         $body = self::cleanBody($body, $channel->capabilities()->maxBodyLength);
         $hold = $byAgent ? self::AGENT_HOLD_SECONDS : 0;
@@ -342,6 +346,7 @@ final class MessagingService implements HostWiredService
             'by_agent' => $byAgent,
             'source' => $source,
             'send_after_seconds' => $hold,
+            'chat_meta' => $meta,
         ]);
         $this->conversations->touch($tenantId, $conversationId, false);
         $this->count($tenantId);

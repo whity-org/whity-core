@@ -5760,12 +5760,23 @@ $chatHandler = new \Whity\Api\ChatApiHandler(
     $permissionResolver,
     new \Whity\Core\Chat\ChatBots($db->getPdo()),
     new \Whity\Core\Chat\ChatBlocking($db->getPdo()),
+    // UC.5 (WHIT-1106): booking times, forms and payment links in customer chats.
+    new \Whity\Core\Chat\CustomerBlocks(
+        $db->getPdo(),
+        $publicFormLink,
+        $frontendUrls->base(),
+        static fn (int $tenantId): array => $settingsService->effective($tenantId),
+    ),
+    $messagingService,
 );
 $router->register('GET',    '/api/chat/inbox',                                  [$chatHandler, 'inbox'],         null);
 $router->register('POST',   '/api/chat/inbox/{id:\d+}/pin',                     [$chatHandler, 'pin'],           null);
 $router->register('POST',   '/api/chat/inbox/{id:\d+}/read',                    [$chatHandler, 'readCustomer'],  null);
 // Mute, blocking and bots (UC.4, UC.8, UC.12; WHIT-1097). Blocking and bots
 // need messages.manage, checked in the handler like the rest of Chat.
+$router->register('GET',    '/api/chat/inbox/{id:\d+}/block-options',           [$chatHandler, 'customerBlockOptions'], null);
+$router->register('POST',   '/api/chat/inbox/{id:\d+}/send-block',              [$chatHandler, 'sendCustomerBlock'],    null);
+$router->register('POST',   '/api/chat/messages/{id:\d+}/forward',              [$chatHandler, 'forward'],       null);
 $router->register('POST',   '/api/chat/inbox/{id:\d+}/mute',                    [$chatHandler, 'mute'],          null);
 $router->register('GET',    '/api/chat/inbox/{id:\d+}/block',                   [$chatHandler, 'blockStatus'],   null);
 $router->register('POST',   '/api/chat/inbox/{id:\d+}/block',                   [$chatHandler, 'block'],         null);

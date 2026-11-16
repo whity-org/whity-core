@@ -35,6 +35,8 @@ import { ConfirmAction } from '@whity/ui/confirm-action';
 import { apiFetch } from '@/lib/api/client';
 import type { ChatBlockedSender } from '@/lib/chat-wire';
 import { chatApi, chatErrorText } from './chat-api';
+import { CustomerBlockCard, CustomerBlockDialog, useCustomerBlockOptions, wordsAbove } from './customer-blocks';
+import { useWorkspaceCurrency } from '@/lib/branding-context';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useAuth } from '@/lib/auth-context';
 import { api, type components } from '@/lib/api/client';
@@ -147,6 +149,10 @@ export function CustomerChat({
   const { date: dateOnly } = useDateDisplay();
   const [mode, setMode] = useState<'reply' | 'note'>('reply');
   const [draft, setDraft] = useState('');
+  // UC.5: booking times, a form or a payment link, from the + beside the reply box.
+  const currency = useWorkspaceCurrency();
+  const blockOptions = useCustomerBlockOptions(id, canReply);
+  const [blockKind, setBlockKind] = useState<'booking_times' | 'form' | 'payment' | null>(null);
   const [sending, setSending] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -418,6 +424,7 @@ export function CustomerChat({
               onEdit={canReply ? () => void edit(message) : undefined}
               onRetry={canReply ? () => void retry(message) : undefined}
               onCopy={() => copy(message)}
+              blockText={tc}
             />
           ))}
           <div ref={bottom} />
@@ -486,6 +493,35 @@ export function CustomerChat({
                 mode === 'note' ? 'border-[1.5px] border-dashed border-warning bg-warning-tint' : 'border-input bg-card'
               )}
             >
+              {mode === 'reply' && blockOptions && (blockOptions.payments || (blockOptions.booking_page && blockOptions.services.length > 0) || blockOptions.forms.length > 0) && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="ghost" size="icon-sm" className="mb-1" aria-label={tc('cblock.add', 'Send a booking, form or payment')}>
+                      <Icon name="plus" size={18} />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" side="top">
+                    {blockOptions.payments && (
+                      <DropdownMenuItem onSelect={() => setBlockKind('payment')}>
+                        <Icon name="billing" size={16} />
+                        {tc('cblock.menuPay', 'Payment link')}
+                      </DropdownMenuItem>
+                    )}
+                    {blockOptions.booking_page && blockOptions.services.length > 0 && (
+                      <DropdownMenuItem onSelect={() => setBlockKind('booking_times')}>
+                        <Icon name="calendar" size={16} />
+                        {tc('cblock.menuTimes', 'Booking times')}
+                      </DropdownMenuItem>
+                    )}
+                    {blockOptions.forms.length > 0 && (
+                      <DropdownMenuItem onSelect={() => setBlockKind('form')}>
+                        <Icon name="form" size={16} />
+                        {tc('cblock.menuForm', 'Ask for a form')}
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
               <Textarea
                 ref={box}
                 value={draft}
@@ -527,6 +563,22 @@ export function CustomerChat({
           </div>
         )}
       </section>
+      {blockKind !== null && blockOptions && (
+        <CustomerBlockDialog
+          t={tc}
+          kind={blockKind}
+          conversationId={id}
+          customerName={firstName}
+          options={blockOptions}
+          currency={currency}
+          onClose={() => setBlockKind(null)}
+          onSent={() => {
+            setBlockKind(null);
+            detail.refetch();
+            onChanged();
+          }}
+        />
+      )}
       {detailsOpen && (
         <CustomerDetails
           conversation={conversation}
@@ -573,7 +625,9 @@ function CustomerMessageItem({
   onEdit,
   onRetry,
   onCopy,
+  blockText,
 }: {
+  blockText: TranslateFn;
   message: Message;
   customerName: string;
   /** When above zero, the "n new" line goes above this message. */
@@ -602,6 +656,7 @@ function CustomerMessageItem({
       ? t('messages.byAgent', 'Agent for {name}', { name: message.author?.name ?? '' })
       : message.author?.name ?? t('messages.workspace', 'Your team');
   const at = useListTime(true)(message.created_at);
+  const shownBody = message.block && !inbound ? wordsAbove(message.body, message.block) : message.body;
 
   return (
     <>
@@ -634,7 +689,8 @@ function CustomerMessageItem({
               {note && <span className="text-muted-foreground">{tc('customer.noteOnly', 'Only the team sees this')}</span>}
             </p>
           )}
-          <p dir="auto" className="whitespace-pre-wrap break-words text-start text-foreground max-sm:text-lg">{message.body}</p>
+          {shownBody !== '' && <p dir="auto" className="whitespace-pre-wrap break-words text-start text-foreground max-sm:text-lg">{shownBody}</p>}
+          {message.block && !inbound && <CustomerBlockCard t={blockText} block={message.block} />}
           {message.attachments_not_shown > 0 && (
             <p className="text-xs text-muted-foreground">{t('messages.attachments', '{n} attachment(s) not shown', { n: message.attachments_not_shown })}</p>
           )}

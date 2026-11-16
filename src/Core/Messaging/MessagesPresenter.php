@@ -70,7 +70,17 @@ final class MessagesPresenter
             'send_after' => $row['send_after'] !== null ? (string) $row['send_after'] : null,
             'sent_at' => $row['sent_at'] !== null ? (string) $row['sent_at'] : null,
             'created_at' => (string) $row['created_at'],
+            // One chat (UC.5): booking times, a form or a payment link the team sent; staff only.
+            'block' => self::block($row['chat_meta'] ?? null),
         ];
+    }
+
+    /** @return array<string, mixed>|null */
+    private static function block(mixed $meta): ?array
+    {
+        $decoded = is_string($meta) ? json_decode($meta, true) : $meta;
+
+        return is_array($decoded) && is_array($decoded['block'] ?? null) ? $decoded['block'] : null;
     }
 
     /**
