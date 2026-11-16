@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.107).
+ * SDK identity (v1.108).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1300,12 +1300,19 @@ namespace Whity\Sdk;
  * billing plugin calls to grant and revoke a workspace's add-on plans (WHIT-1125).
  *
  * Purely additive.)
+ *
+ * 1.108 (WORKSPACE SETUP FOR PACKS: {@see Setup\WorkspaceSetup} lets a plugin set a workspace up
+ * through core's own routes (calendar settings, services, staff and hours; workspace settings;
+ * forms), as the person acting there and with only that person's permissions, so an industry pack
+ * can prepare a workspace when it is turned on (WHIT-1129).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.107.0';
+    public const VERSION = '1.108.0';
 
     /**
      * Static identity only — never instantiated.

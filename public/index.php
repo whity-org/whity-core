@@ -2894,6 +2894,9 @@ $codePluginActivation->useInstallLicence(static function (string $plugin) use ($
     return $hostStoreLicence->status($slug)->state;
 });
 \Whity\register_service(\Whity\Sdk\Billing\WorkspaceAddons::class, new \Whity\Core\Plan\HostWorkspaceAddons($db->getPdo(), $codePluginActivation, $auditLogger)); // @phpstan-ignore-line
+// WHIT-1129 (SDK 1.108): packs set a workspace up through core's own routes,
+// as the person acting there, limited to WorkspaceSetup::ROUTES.
+\Whity\register_service(\Whity\Sdk\Setup\WorkspaceSetup::class, new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker)); // @phpstan-ignore-line
 // EM.1: workspace emails carry the workspace's brand, and white-label by plan.
 $brandedEmailSender->useBranding(new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService));
 $tenantEntitlementsHandler = new \Whity\Api\TenantEntitlementsApiHandler(
