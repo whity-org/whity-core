@@ -6,6 +6,7 @@ namespace Whity\Core\Chat;
 
 use Whity\Core\Agent\AgentAssignmentRepository;
 use Whity\Core\Db\DbBool;
+use Whity\Core\Mention\Mentions;
 use Whity\Core\Store\SharedStoreInterface;
 
 /**
@@ -1002,17 +1003,19 @@ final class ChatService
     private static function mentions(array $mentions, array $members, bool $group = false): array
     {
         $kept = [];
-        foreach (array_slice($mentions, 0, 20) as $m) {
-            if (!is_array($m)) {
+        foreach (array_slice($mentions, 0, 20) as $raw) {
+            // N4: the shared mention shape; one that isn't a mention is skipped.
+            $m = Mentions::parse([$raw], 1)[0] ?? null;
+            if ($m === null) {
                 continue;
             }
-            $type = $m['type'] ?? null;
+            $type = $m['type'];
             // UC.10: @everyone tells every person in a group.
             if ($type === 'everyone' && $group) {
                 $kept['everyone'] = ['type' => 'everyone', 'id' => 0, 'name' => 'everyone'];
                 continue;
             }
-            $id = (int) ($m['id'] ?? 0);
+            $id = $m['id'];
             foreach ($members as $member) {
                 if ($type === 'person' && $member['profile_id'] !== null && (int) $member['profile_id'] === $id) {
                     $kept[$type . $id] = ['type' => 'person', 'id' => $id, 'name' => (string) $member['person_name']];

@@ -13344,8 +13344,12 @@ export interface components {
             body: {
                 [key: string]: unknown;
             }[];
-            /** @description Profile ids @mentioned; members who can read the document are told in-app */
-            mentions?: number[];
+            /** @description The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox › Mentions and a push */
+            mentions?: (number | {
+                /** @enum {string} */
+                type: "person" | "agent" | "everyone";
+                id?: number;
+            })[];
         };
         DocumentCommentMessageResponse: {
             data: components["schemas"]["DocumentCommentMessage"];
@@ -13377,8 +13381,12 @@ export interface components {
             body: {
                 [key: string]: unknown;
             }[];
-            /** @description Profile ids @mentioned; members who can read the document are told in-app */
-            mentions?: number[];
+            /** @description The people @mentioned, as profile ids or the {type, id} shape chat uses (N4); members who can read the document get a notice in Inbox › Mentions and a push */
+            mentions?: (number | {
+                /** @enum {string} */
+                type: "person" | "agent" | "everyone";
+                id?: number;
+            })[];
         };
         DocumentCommentThreadListResponse: {
             data: components["schemas"]["DocumentCommentThread"][];

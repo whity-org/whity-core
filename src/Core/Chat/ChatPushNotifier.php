@@ -112,12 +112,17 @@ final class ChatPushNotifier
                 continue;
             }
             try {
-                if ($this->devices->listForProfile($tenantId, $profileId) === [] || $this->isLooking($tenantId, $profileId, $chatId)) {
+                $isMention = $everyone || isset($mentioned[$profileId]);
+                if ($this->isLooking($tenantId, $profileId, $chatId)) {
+                    continue;
+                }
+                // N4: a mention is a notice in the Inbox's Mentions tab, with or
+                // without a device; push follows it to any device they have.
+                if (!$isMention && $this->devices->listForProfile($tenantId, $profileId) === []) {
                     continue;
                 }
                 $mark = max((int) $member['last_read_message_id'], (int) $member['reads_after_message_id']);
                 $unread = max(1, $this->chats->unreadLines($tenantId, $chatId, $mark, $profileId));
-                $isMention = $everyone || isset($mentioned[$profileId]);
                 // UC.8: a muted chat pushes nothing, except a mention, which reaches them through mute.
                 if (!$isMention && $this->chats->isMuted($tenantId, $chatId, $profileId)) {
                     continue;
@@ -125,7 +130,7 @@ final class ChatPushNotifier
                 [$subject, $subjectAr] = self::subject($group, $title, $authorName, $unread, $isMention);
 
                 $this->dispatcher->dispatch($tenantId, $profileId, $isMention ? self::TYPE_MENTION : self::TYPE_MESSAGE, [
-                    'channels' => ['push'],
+                    'channels' => [$isMention ? 'in_app' : 'push'],
                     'subject'  => $subject,
                     'body'     => $group ? $authorName . ': ' . $preview : $preview,
                     'data'     => [
