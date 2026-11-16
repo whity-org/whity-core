@@ -20,6 +20,7 @@ use Whity\Core\Document\Routing\RouteRepository;
 use Whity\Core\Document\Routing\RouteStepRepository;
 use Whity\Core\Document\Routing\RouteSubjectRegistry;
 use Whity\Core\Document\Routing\RouteVerdict;
+use Whity\Core\Document\Routing\RoutingRejectedException;
 use Whity\Core\Document\Routing\RoutingRuleRegistry;
 use Whity\Core\Document\RouteTemplate\RouteTemplateRepository;
 use Whity\Core\Group\GroupResolver;
@@ -123,19 +124,39 @@ final class JoinRequestsOnRoutesRealEngineTest extends TestCase
         self::assertNull($this->routes->openRoute($this->tenant, $signupId), 'one approval decides it');
     }
 
-    public function testThePersonIsTurnedAwayOnceNobodyLeftWouldLetThemIn(): void
+    public function testTheFirstTurnAwayDecidesAndALaterAnswerIsPolitelyRefused(): void
     {
         $signupId = $this->ask();
         $route = $this->routes->openRoute($this->tenant, $signupId);
         self::assertNotNull($route);
 
-        // Any one of them can let Ibrahim in, so one "no" leaves it with Amro.
+        // Owner, 2026-11-16: the first answer decides, even a "no".
         $this->router->act($this->tenant, self::AWSS, $route, RouteAction::ACKNOWLEDGED, 'Not one of our customers', RouteVerdict::REJECTED);
-        self::assertSame('pending', $this->signup($signupId)[0]);
-
-        $this->router->act($this->tenant, self::AMRO, $route, RouteAction::ACKNOWLEDGED, 'Agreed', RouteVerdict::REJECTED);
-        self::assertSame(['rejected', (string) self::AMRO], $this->signup($signupId));
+        self::assertSame(['rejected', (string) self::AWSS], $this->signup($signupId));
         self::assertNull($this->membershipStatus(self::IBRAHIM));
+        self::assertNull($this->routes->openRoute($this->tenant, $signupId), 'Amro has nothing left to answer');
+
+        try {
+            $this->router->act($this->tenant, self::AMRO, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+            self::fail('a later answer must not decide it again');
+        } catch (RoutingRejectedException $e) {
+            self::assertSame('This was already decided by Awss Haddad, so nothing more is needed from you.', $e->clientMessage);
+        }
+        self::assertSame('rejected', $this->signup($signupId)[0]);
+    }
+
+    public function testTheFirstApprovalDecidesAndALaterAnswerIsPolitelyRefused(): void
+    {
+        $signupId = $this->ask();
+        $route = $this->routes->openRoute($this->tenant, $signupId);
+        self::assertNotNull($route);
+
+        $this->router->act($this->tenant, self::AMRO, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertSame('approved', $this->signup($signupId)[0]);
+
+        $this->expectException(RoutingRejectedException::class);
+        $this->expectExceptionMessage('already decided by Amro Saleh');
+        $this->router->act($this->tenant, self::AWSS, $route, RouteAction::ACKNOWLEDGED, 'No', RouteVerdict::REJECTED);
     }
 
     public function testAWorkspacesOwnRouteTemplateReplacesTheDefault(): void

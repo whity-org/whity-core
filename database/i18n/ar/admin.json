@@ -2739,6 +2739,7 @@
         "routeTemplates.phone.told": "يُبلَّغ {who}",
         "routeTemplates.quorum.all": "يجب أن يعتمد الجميع",
         "routeTemplates.quorum.any": "يكفي اعتماد أيٍّ منهم",
+        "routeTemplates.quorum.first": "أول إجابة تقرّر",
         "routeTemplates.quorum.inherit": "اتّباع الإعداد الافتراضي لمساحة العمل ({value})",
         "routeTemplates.quorum.majority": "يجب أن تعتمد الأغلبية",
         "routeTemplates.record.error": "تعذّر تحميل قالب المسار هذا",

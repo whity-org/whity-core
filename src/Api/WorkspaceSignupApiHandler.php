@@ -269,6 +269,33 @@ final class WorkspaceSignupApiHandler
         return $this->decided($ctx, $id, $approve, $approve && $membershipId !== false ? (int) $membershipId : null);
     }
 
+    /** A request decided on its route: a polite 409 naming who answered, or null. */
+    private function alreadyDecided(int $tenantId, int $id): ?Response
+    {
+        if ($this->routes === null) {
+            return null;
+        }
+        $stmt = $this->db->prepare(
+            "SELECT s.status, p.display_name FROM customer_signups s
+               LEFT JOIN profiles p ON p.id = s.decided_by
+              WHERE s.id = :id AND s.tenant_id = :tid AND s.status IN ('approved', 'rejected')
+                AND EXISTS (SELECT 1 FROM document_routes r WHERE r.tenant_id = s.tenant_id AND r.subject_type = :type AND r.subject_id = s.id)"
+        );
+        $stmt->execute([':id' => $id, ':tid' => $tenantId, ':type' => \Whity\Core\Signup\CustomerSignupRouteSubject::TYPE]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+        $who = (string) ($row['display_name'] ?? '');
+        $what = $row['status'] === 'approved' ? 'let them in' : 'turned them away';
+
+        return Response::error(
+            $who !== '' ? "{$who} already {$what}, so nothing more is needed." : "Someone already {$what}, so nothing more is needed.",
+            409,
+            ['code' => 'already_decided', 'status' => (string) $row['status'], 'decided_by' => $who !== '' ? $who : null]
+        );
+    }
+
     private function templateExists(int $tenantId, int $templateId): bool
     {
         $stmt = $this->db->prepare('SELECT 1 FROM document_route_templates WHERE id = :id AND tenant_id = :tid');
@@ -296,6 +323,12 @@ final class WorkspaceSignupApiHandler
         $route = $this->routes?->openRoute($ctx['tenantId'], $id);
         if ($route !== null && $this->router !== null) {
             return $this->decideOnRoute($ctx, $id, $route, $approve);
+        }
+        // Answered on its route already (the first answer decides): say so
+        // rather than decide it again.
+        $already = $this->alreadyDecided($ctx['tenantId'], $id);
+        if ($already !== null) {
+            return $already;
         }
 
         try {

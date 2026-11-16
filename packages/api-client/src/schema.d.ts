@@ -13849,7 +13849,7 @@ export interface components {
             steps: components["schemas"]["DocumentRouteStep"][];
             edges: components["schemas"]["DocumentRouteEdge"][];
             /** @enum {string} */
-            default_quorum: "all" | "any" | "majority";
+            default_quorum: "all" | "any" | "majority" | "first";
             values?: components["schemas"]["RouteStepValue"][];
         };
         DocumentRouteActionRequest: {
@@ -13896,7 +13896,7 @@ export interface components {
                 label?: string | null;
                 decision?: boolean | null;
                 /** @enum {string|null} */
-                decision_quorum?: "all" | "any" | "majority" | null;
+                decision_quorum?: "all" | "any" | "majority" | "first" | null;
                 on_approved?: number | null;
                 on_rejected?: number | null;
                 /** @enum {string} */
@@ -13967,7 +13967,7 @@ export interface components {
             label?: string | null;
             decision: boolean;
             /** @enum {string|null} */
-            decision_quorum?: "all" | "any" | "majority" | null;
+            decision_quorum?: "all" | "any" | "majority" | "first" | null;
             /** @enum {string} */
             satisfied_by: "act" | "delivery";
             /** @enum {string} */

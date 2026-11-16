@@ -85170,7 +85170,8 @@
                         "enum": [
                             "all",
                             "any",
-                            "majority"
+                            "majority",
+                            "first"
                         ]
                     },
                     "values": {
@@ -85305,7 +85306,8 @@
                                     "enum": [
                                         "all",
                                         "any",
-                                        "majority"
+                                        "majority",
+                                        "first"
                                     ],
                                     "nullable": true
                                 },
@@ -85563,7 +85565,8 @@
                         "enum": [
                             "all",
                             "any",
-                            "majority"
+                            "majority",
+                            "first"
                         ],
                         "nullable": true
                     },

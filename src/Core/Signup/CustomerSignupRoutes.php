@@ -18,8 +18,8 @@ use Whity\Core\RBAC\CorePermissions;
  *
  * The workspace's chosen route template (`signup.route_template_id`, on the
  * Customer sign-up screen), or by default one approval step for everyone who
- * can manage sign-ups (`signup:manage`) when the request arrives, where any one
- * of them decides.
+ * can manage sign-ups (`signup:manage`) when the request arrives, where the
+ * first of them to answer decides, approve or turn away (`first`).
  */
 final class CustomerSignupRoutes
 {
@@ -66,7 +66,8 @@ final class CustomerSignupRoutes
                 'rule_config' => ['profile_ids' => $deciders],
                 'label' => 'Approve the join request',
                 'decision' => true,
-                'decision_quorum' => 'any',
+                // Owner, 2026-11-16: the first answer decides, either way.
+                'decision_quorum' => \Whity\Core\Document\Routing\RouteQuorum::FIRST,
             ]];
         }
 

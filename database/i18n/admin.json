@@ -2737,6 +2737,7 @@
         "routeTemplates.phone.told": "{who} is told",
         "routeTemplates.quorum.all": "all must approve",
         "routeTemplates.quorum.any": "any one may approve",
+        "routeTemplates.quorum.first": "the first answer decides",
         "routeTemplates.quorum.inherit": "Follow the tenant default ({value})",
         "routeTemplates.quorum.majority": "a majority must approve",
         "routeTemplates.record.error": "This route template could not be loaded",

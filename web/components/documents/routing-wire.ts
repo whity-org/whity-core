@@ -83,7 +83,7 @@ export type RouteVerdictName = (typeof ROUTE_VERDICTS)[number];
  * the reject edge fires when the approval quorum has become arithmetically
  * unreachable — so a second control here would offer a rule that does not exist.
  */
-export const ROUTE_QUORUMS = ['all', 'any', 'majority'] as const;
+export const ROUTE_QUORUMS = ['all', 'any', 'majority', 'first'] as const;
 
 export type RouteQuorumName = (typeof ROUTE_QUORUMS)[number];
 

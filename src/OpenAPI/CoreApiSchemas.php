@@ -6435,7 +6435,7 @@ final class CoreApiSchemas
                 // it fans out to many people. NULL is not "no quorum": it defers
                 // to the tenant's `documents.routing_approval_quorum` setting,
                 // which defaults to `all`.
-                'decision_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority'], 'nullable' => true],
+                'decision_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority', 'first'], 'nullable' => true],
                 // #1054. WHETHER ANYBODY HERE IS ASKED TO ACT. `delivery` means
                 // the people this step reaches are TOLD: their inbox item is
                 // closed by the event that created it and the document carries
@@ -6515,7 +6515,7 @@ final class CoreApiSchemas
                 // step is the least likely person in the tenant to hold it - so
                 // without this a client could not tell an approver whether their
                 // single approval carries the gate or is one of four hundred.
-                'default_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority']],
+                'default_quorum' => ['type' => 'string', 'enum' => ['all', 'any', 'majority', 'first']],
                 // WHIT-1016: what people entered at the steps that ask for
                 // values, each key's latest. On the route lists; absent on the
                 // response that issues a route, where nothing is entered yet.
@@ -6568,7 +6568,7 @@ final class CoreApiSchemas
                         'decision' => self::bool(true),
                         'decision_quorum' => [
                             'type' => 'string',
-                            'enum' => ['all', 'any', 'majority'],
+                            'enum' => ['all', 'any', 'majority', 'first'],
                             'nullable' => true,
                         ],
                         // Targets are named by 1-BASED POSITION in this same

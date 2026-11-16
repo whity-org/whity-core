@@ -75,12 +75,16 @@ final class CustomerSignupRouteSubject implements RouteSubjectProviderInterface,
         return false;
     }
 
-    /** Decided some other way, or superseded: nothing is left to decide on the route. */
+    /**
+     * Gone, or replaced by a newer request from the same person. A decided
+     * request is not withdrawn: a later answer on its route is told who
+     * decided it ({@see \Whity\Core\Document\Routing\DocumentRouter}).
+     */
     public function isWithdrawn(int $tenantId, int $subjectId): bool
     {
         $row = $this->row($tenantId, $subjectId);
 
-        return $row === null || (string) $row['status'] !== CustomerSignupService::STATUS_PENDING;
+        return $row === null || (string) $row['status'] === CustomerSignupService::STATUS_SUPERSEDED;
     }
 
     public function approved(int $tenantId, int $subjectId, int $routeId): void
