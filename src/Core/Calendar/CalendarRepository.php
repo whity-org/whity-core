@@ -333,7 +333,7 @@ final class CalendarRepository
         $params = [':tenant_id' => $tenantId, ':from' => Interval::toDb($from), ':to' => Interval::toDb($to)];
         if ($kinds !== null) {
             $kindIn = [];
-            foreach (array_values($kinds) as $i => $kind) {
+            foreach ($kinds as $i => $kind) {
                 $kindIn[] = ':k' . $i;
                 $params[':k' . $i] = $kind;
             }
