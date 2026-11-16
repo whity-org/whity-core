@@ -2358,6 +2358,7 @@ $router->register('GET', '/api/workspace/code-plugins', [$workspaceCodePluginsHa
 $router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/enable', [$workspaceCodePluginsHandler, 'enable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
 $router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/disable', [$workspaceCodePluginsHandler, 'disable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_DISABLE);
 $router->register('GET', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/history', [$workspaceCodePluginsHandler, 'history'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/trial', [$workspaceCodePluginsHandler, 'trial'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
 $router->register('GET', '/api/plugins/workspace-access', [$workspaceCodePluginsHandler, 'accessList'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
 $router->register('PUT', '/api/plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/workspace-access', [$workspaceCodePluginsHandler, 'setAccess'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
 
@@ -2871,6 +2872,28 @@ $router->register('POST', '/api/instance/complete-setup', [$instanceHandler, 'co
 $entitlementService = new \Whity\Core\Entitlement\EntitlementService(
     new \Whity\Core\Entitlement\TenantEntitlementRepository($db->getPdo())
 );
+// WHIT-1125: paid plugins. A workspace may use one its plan or add-on grants,
+// during its trial or grace, or when the operator made it free for everyone.
+// One installed from the store also needs this installation's store licence.
+$codePluginActivation->usePaidAccess(static fn (): array => $pluginLoader->getPaidAccess());
+$codePluginActivation->useEntitlements(static function (int $tenantId, string $key) use ($entitlementService): bool {
+    try {
+        return $entitlementService->isGranted($tenantId, $key);
+    } catch (\Throwable) {
+        return false; // an undeclared entitlement grants nothing
+    }
+});
+$codePluginRecords = new \Whity\Core\Plugin\PluginRecords($db->getPdo());
+$codePluginActivation->useInstallLicence(static function (string $plugin) use ($codePluginRecords, $hostStoreLicence): ?string {
+    $install = $codePluginRecords->install($plugin);
+    $slug = $install['store_slug'] ?? null;
+    if (($install['source'] ?? null) !== 'store' || !is_string($slug) || $slug === '') {
+        return null;
+    }
+
+    return $hostStoreLicence->status($slug)->state;
+});
+\Whity\register_service(\Whity\Sdk\Billing\WorkspaceAddons::class, new \Whity\Core\Plan\HostWorkspaceAddons($db->getPdo(), $codePluginActivation, $auditLogger)); // @phpstan-ignore-line
 // EM.1: workspace emails carry the workspace's brand, and white-label by plan.
 $brandedEmailSender->useBranding(new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService));
 $tenantEntitlementsHandler = new \Whity\Api\TenantEntitlementsApiHandler(

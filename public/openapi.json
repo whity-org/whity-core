@@ -74872,6 +74872,16 @@
                             }
                         }
                     },
+                    "402": {
+                        "description": "A paid plugin needs a plan that includes it, a purchase or a trial; details.reason is needs_purchase",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
                     "403": {
                         "description": "Insufficient permissions",
                         "content": {
@@ -75000,6 +75010,112 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/workspace/code-plugins/{plugin}/trial": {
+            "post": {
+                "operationId": "post_api_v1_workspace_code_plugins_plugin_trial",
+                "summary": "Start this workspace's free trial of a paid plugin",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Once per workspace and plugin. Turns the plugin on until the trial ends; then 7 days of grace, then read-only unless it was bought.",
+                "parameters": [
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "plugin",
+                        "in": "path",
+                        "required": true,
+                        "description": "The installed plugin's name, as it gives it (FrontOffice).",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The trial started",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspaceCodePluginTrialResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not a plugin this workspace can use",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Already had its trial, or the plugin offers none",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -107346,6 +107462,55 @@
                                 "type": "string"
                             }
                         }
+                    },
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "on",
+                            "read_only",
+                            "off"
+                        ],
+                        "description": "read_only: a paid plugin whose access ended; reads work, writes are refused"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "free_for_all",
+                            "entitled",
+                            "trial",
+                            "grace",
+                            "lapsed",
+                            "installation_unlicensed",
+                            "installation_grace",
+                            null
+                        ]
+                    },
+                    "graceUntil": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "trialEndsAt": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "paid": {
+                        "type": "boolean"
+                    },
+                    "product": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "What the workspace buys, plugin.<slug>"
+                    },
+                    "trialDays": {
+                        "type": "integer"
+                    },
+                    "trialAvailable": {
+                        "type": "boolean"
+                    },
+                    "mayTurnOn": {
+                        "type": "boolean",
+                        "description": "Free, included in the plan or an add-on, free for every workspace, or in a trial"
                     }
                 },
                 "required": [
@@ -107353,7 +107518,11 @@
                     "version",
                     "access",
                     "canSwitch",
-                    "enabled"
+                    "enabled",
+                    "state",
+                    "paid",
+                    "trialAvailable",
+                    "mayTurnOn"
                 ]
             },
             "WorkspaceCodePluginHistoryResponse": {
@@ -107368,7 +107537,8 @@
                                     "type": "string",
                                     "enum": [
                                         "enabled",
-                                        "disabled"
+                                        "disabled",
+                                        "trial_started"
                                     ]
                                 },
                                 "at": {
@@ -107423,6 +107593,33 @@
                             },
                             "enabled": {
                                 "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "enabled"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "WorkspaceCodePluginTrialResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "trialEndsAt": {
+                                "type": "string",
+                                "nullable": true
                             }
                         },
                         "required": [

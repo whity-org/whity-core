@@ -19393,8 +19393,20 @@ final class CoreApiSchemas
                 'parameters' => [$codePlugin],
                 'responses' => [
                     200 => self::jsonResponse('Turned on', 'WorkspaceCodePluginSwitchResponse'),
+                    402 => self::errorResponse('A paid plugin needs a plan that includes it, a purchase or a trial; details.reason is needs_purchase'),
                     404 => self::errorResponse('Not a plugin this workspace can use'),
                     409 => self::errorResponse('The plugin is on for every workspace and has no switch'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/trial', 'plugins:enable', [
+                'summary' => 'Start this workspace\'s free trial of a paid plugin',
+                'description' => 'Once per workspace and plugin. Turns the plugin on until the trial ends; then 7 days of grace, then read-only unless it was bought.',
+                'tags' => ['platform-ops'],
+                'parameters' => [$codePlugin],
+                'responses' => [
+                    200 => self::jsonResponse('The trial started', 'WorkspaceCodePluginTrialResponse'),
+                    404 => self::errorResponse('Not a plugin this workspace can use'),
+                    409 => self::errorResponse('Already had its trial, or the plugin offers none'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/workspace/code-plugins/{plugin:[A-Za-z][A-Za-z0-9_]*}/disable', 'plugins:disable', [
@@ -19473,17 +19485,29 @@ final class CoreApiSchemas
                 'enabled' => self::bool() + ['description' => 'Whether it is on in this workspace'],
                 'changedAt' => ['type' => 'string', 'nullable' => true],
                 'changedBy' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'name' => self::str()]],
-            ], ['name', 'version', 'access', 'canSwitch', 'enabled']),
+                'state' => ['type' => 'string', 'enum' => ['on', 'read_only', 'off'], 'description' => 'read_only: a paid plugin whose access ended; reads work, writes are refused'],
+                'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['free_for_all', 'entitled', 'trial', 'grace', 'lapsed', 'installation_unlicensed', 'installation_grace', null]],
+                'graceUntil' => ['type' => 'string', 'nullable' => true],
+                'trialEndsAt' => ['type' => 'string', 'nullable' => true],
+                'paid' => self::bool(),
+                'product' => ['type' => 'string', 'nullable' => true, 'description' => 'What the workspace buys, plugin.<slug>'],
+                'trialDays' => self::int(),
+                'trialAvailable' => self::bool(),
+                'mayTurnOn' => self::bool() + ['description' => 'Free, included in the plan or an add-on, free for every workspace, or in a trial'],
+            ], ['name', 'version', 'access', 'canSwitch', 'enabled', 'state', 'paid', 'trialAvailable', 'mayTurnOn']),
             'WorkspaceCodePluginListResponse' => self::listEnvelope('WorkspaceCodePlugin'),
             'WorkspaceCodePluginSwitchResponse' => self::object([
                 'data' => self::object(['name' => self::str(), 'enabled' => self::bool()], ['name', 'enabled']),
             ], ['data']),
             'WorkspaceCodePluginHistoryResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => self::object([
-                    'action' => ['type' => 'string', 'enum' => ['enabled', 'disabled']],
+                    'action' => ['type' => 'string', 'enum' => ['enabled', 'disabled', 'trial_started']],
                     'at' => self::str(),
                     'by' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'name' => self::str()]],
                 ], ['action', 'at'])],
+            ], ['data']),
+            'WorkspaceCodePluginTrialResponse' => self::object([
+                'data' => self::object(['name' => self::str(), 'enabled' => self::bool(), 'trialEndsAt' => ['type' => 'string', 'nullable' => true]], ['name', 'enabled']),
             ], ['data']),
             'CodePluginAccess' => self::object([
                 'name' => self::str(),
