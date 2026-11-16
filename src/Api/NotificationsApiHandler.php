@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use Whity\Auth\TokenValidator;
 use Whity\Core\Notification\NotificationRepository;
+use Whity\Core\Notification\NotificationTabs;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Http\PaginationParams;
@@ -13,7 +14,7 @@ use Whity\Http\PaginationParams;
 /**
  * HTTP handler for the caller's in-app notification INBOX (WC-notifications).
  *
- *   GET  /api/v1/me/notifications                 — paginated inbox + unread count
+ *   GET  /api/v1/me/notifications[?tab=mentions|updates] — paginated notices + unread counts per tab
  *   GET  /api/v1/me/notifications/unread-count     — just the unread badge count
  *   POST /api/v1/me/notifications/{id}/read        — mark one read (204)
  *   POST /api/v1/me/notifications/read-all          — mark all read ({marked})
@@ -24,7 +25,7 @@ use Whity\Http\PaginationParams;
  * their own notifications. No RBAC permission is required (self-service, like
  * /api/me/sessions); admin-facing management permissions are a separate task.
  */
-final class InboxApiHandler
+final class NotificationsApiHandler
 {
     public function __construct(
         private readonly TokenValidator $tokenValidator,
@@ -49,13 +50,27 @@ final class InboxApiHandler
         $unreadOnly = self::isTruthy($query['unread'] ?? null);
         $p = PaginationParams::fromQuery($query);
 
-        $rows = $this->notifications->listForRecipient($tenantId, $profileId, $unreadOnly, $p->perPage, $p->offset);
-        $total = $this->notifications->countForRecipient($tenantId, $profileId, $unreadOnly);
+        // The Inbox's tabs (M.43): Mentions, or Updates (everything else that
+        // isn't already in Waiting for me). No tab: every notice, as before.
+        $tab = $query['tab'] ?? '';
+        if ($tab !== '' && !in_array($tab, NotificationTabs::TABS, true)) {
+            return Response::error('tab is mentions or updates', 422);
+        }
+        [$only, $except] = $tab !== '' ? NotificationTabs::filter($tab) : [null, null];
+
+        $rows = $this->notifications->listForRecipient($tenantId, $profileId, $unreadOnly, $p->perPage, $p->offset, $only, $except);
+        $total = $this->notifications->countForRecipient($tenantId, $profileId, $unreadOnly, $only, $except);
+        [$mentionsOnly, $mentionsExcept] = NotificationTabs::filter(NotificationTabs::MENTIONS);
+        [$updatesOnly, $updatesExcept] = NotificationTabs::filter(NotificationTabs::UPDATES);
 
         return Response::json([
             'data'         => array_map(static fn (array $r): array => self::toPublic($r), $rows),
             'pagination'   => $p->meta($total),
             'unread_count' => $this->notifications->unreadCount($tenantId, $profileId),
+            'unread'       => [
+                'mentions' => $this->notifications->countForRecipient($tenantId, $profileId, true, $mentionsOnly, $mentionsExcept),
+                'updates'  => $this->notifications->countForRecipient($tenantId, $profileId, true, $updatesOnly, $updatesExcept),
+            ],
         ], 200);
     }
 

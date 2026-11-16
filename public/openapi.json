@@ -43776,7 +43776,17 @@
                 "tags": [
                     "notifications"
                 ],
+                "description": "The Inbox's Mentions and Updates tabs (M.43): `tab=mentions` is someone naming you in a chat or a comment; `tab=updates` is every other notice except those whose item is already in Waiting for me (GET /api/me/waiting). Without a tab, every notice. `unread` counts each tab.",
                 "parameters": [
+                    {
+                        "name": "tab",
+                        "in": "query",
+                        "required": false,
+                        "description": "mentions or updates; every notice when omitted",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     {
                         "name": "unread",
                         "in": "query",
@@ -44840,7 +44850,7 @@
                         "name": "limit",
                         "in": "query",
                         "required": false,
-                        "description": "How many rows (default 6, max 50)",
+                        "description": "How many rows (default 6, max 200: the Inbox reads the whole list)",
                         "schema": {
                             "type": "integer"
                         }
@@ -93828,12 +93838,28 @@
                     },
                     "unread_count": {
                         "type": "integer"
+                    },
+                    "unread": {
+                        "type": "object",
+                        "properties": {
+                            "mentions": {
+                                "type": "integer"
+                            },
+                            "updates": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "mentions",
+                            "updates"
+                        ]
                     }
                 },
                 "required": [
                     "data",
                     "pagination",
-                    "unread_count"
+                    "unread_count",
+                    "unread"
                 ]
             },
             "NotificationMetrics": {
