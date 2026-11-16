@@ -47313,7 +47313,7 @@
                 "tags": [
                     "messages"
                 ],
-                "description": "Sent on the conversation's channel from a background job. An agent's reply waits five minutes and can be cancelled in that time.",
+                "description": "Sent from a background job on the channel the customer last wrote on, or on `channel` when it names another they have (`send_by`). An agent's reply waits five minutes and can be cancelled in that time.",
                 "parameters": [
                     {
                         "name": "id",
@@ -47329,7 +47329,20 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/MessagingBodyRequest"
+                                "type": "object",
+                                "properties": {
+                                    "body": {
+                                        "type": "string",
+                                        "description": "The text, in plain words."
+                                    },
+                                    "channel": {
+                                        "type": "string",
+                                        "description": "Send by this channel (one from the conversation's send_by). Default: where the customer last wrote."
+                                    }
+                                },
+                                "required": [
+                                    "body"
+                                ]
                             }
                         }
                     }
@@ -93204,6 +93217,25 @@
                                         "items": {
                                             "$ref": "#/components/schemas/MessagingMessage"
                                         }
+                                    },
+                                    "send_by": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "channel": {
+                                                    "type": "string"
+                                                },
+                                                "address": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "channel",
+                                                "address"
+                                            ]
+                                        },
+                                        "description": "The channels a reply can go on (UC.3): those the customer wrote on, the last first."
                                     }
                                 },
                                 "required": [
@@ -93344,6 +93376,11 @@
                     },
                     "created_at": {
                         "type": "string"
+                    },
+                    "channel": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The channel this message came or went on; one conversation can span channels (C5)."
                     }
                 },
                 "required": [

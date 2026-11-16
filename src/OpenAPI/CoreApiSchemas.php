@@ -7282,6 +7282,7 @@ final class CoreApiSchemas
                 'send_after' => self::str(true),
                 'sent_at' => self::str(true),
                 'created_at' => self::str(),
+                'channel' => self::str(true) + ['description' => 'The channel this message came or went on; one conversation can span channels (C5).'],
             ], ['id', 'conversation_id', 'kind', 'body', 'status', 'created_at']),
             'MessagingConversationListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('MessagingConversation')],
@@ -7292,7 +7293,10 @@ final class CoreApiSchemas
             'MessagingConversationDetailResponse' => self::dataEnvelope([
                 'allOf' => [
                     SchemaBuilder::ref('MessagingConversation'),
-                    self::object(['messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('MessagingMessage')]], ['messages']),
+                    self::object([
+                        'messages' => ['type' => 'array', 'items' => SchemaBuilder::ref('MessagingMessage')],
+                        'send_by' => ['type' => 'array', 'items' => self::object(['channel' => self::str(), 'address' => self::str()], ['channel', 'address']), 'description' => 'The channels a reply can go on (UC.3): those the customer wrote on, the last first.'],
+                    ], ['messages']),
                 ],
             ]),
             'MessagingConversationResponse' => self::dataEnvelope(SchemaBuilder::ref('MessagingConversation')),
@@ -13481,10 +13485,13 @@ final class CoreApiSchemas
             self::permissionRoute('POST', '/api/messages/conversations/{id:\d+}/replies', 'messages:reply', [
                 'mcp' => $cancelHeld,
                 'summary' => 'Reply to the customer in a conversation',
-                'description' => 'Sent on the conversation\'s channel from a background job. An agent\'s reply waits five minutes '
+                'description' => 'Sent from a background job on the channel the customer last wrote on, or on `channel` when it names another they have (`send_by`). An agent\'s reply waits five minutes '
                     . 'and can be cancelled in that time.',
                 'tags' => ['messages'],
-                'request' => 'MessagingBodyRequest',
+                'request' => self::object([
+                    'body' => self::str() + ['description' => 'The text, in plain words.'],
+                    'channel' => self::str() + ['description' => 'Send by this channel (one from the conversation\'s send_by). Default: where the customer last wrote.'],
+                ], ['body']),
                 'responses' => [
                     201 => self::jsonResponse('The queued reply', 'MessagingMessageResponse'),
                 ] + $refused + self::authErrors(),
