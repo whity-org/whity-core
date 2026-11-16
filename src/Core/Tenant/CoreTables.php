@@ -212,6 +212,7 @@ final class CoreTables
         'tenant_plan_addons' => '241_create_tenant_plan_addons.php',
         'conversations' => '243_create_conversations_and_messages.php',
         'messages' => '243_create_conversations_and_messages.php',
+        'conversation_contacts' => '289_one_conversation_per_customer.php',
         'webchat_visitors' => '245_create_webchat_and_messaging_settings.php',
         'messaging_settings' => '245_create_webchat_and_messaging_settings.php',
         'chats' => '253_create_team_chat.php',

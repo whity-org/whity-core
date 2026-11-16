@@ -7060,7 +7060,7 @@ export interface paths {
         put?: never;
         /**
          * Reply to the customer in a conversation
-         * @description Sent on the conversation's channel from a background job. An agent's reply waits five minutes and can be cancelled in that time.
+         * @description Sent from a background job on the channel the customer last wrote on, or on `channel` when it names another they have (`send_by`). An agent's reply waits five minutes and can be cancelled in that time.
          */
         post: operations["post_api_v1_messages_conversations_id_replies"];
         delete?: never;
@@ -16331,6 +16331,11 @@ export interface components {
         MessagingConversationDetailResponse: {
             data: components["schemas"]["MessagingConversation"] & {
                 messages: components["schemas"]["MessagingMessage"][];
+                /** @description The channels a reply can go on (UC.3): those the customer wrote on, the last first. */
+                send_by?: {
+                    channel: string;
+                    address: string;
+                }[];
             };
         };
         MessagingConversationListResponse: {
@@ -16365,6 +16370,8 @@ export interface components {
             send_after?: string | null;
             sent_at?: string | null;
             created_at: string;
+            /** @description The channel this message came or went on; one conversation can span channels (C5). */
+            channel?: string | null;
         };
         MessagingMessageResponse: {
             data: components["schemas"]["MessagingMessage"];
@@ -56997,7 +57004,12 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MessagingBodyRequest"];
+                "application/json": {
+                    /** @description The text, in plain words. */
+                    body: string;
+                    /** @description Send by this channel (one from the conversation's send_by). Default: where the customer last wrote. */
+                    channel?: string;
+                };
             };
         };
         responses: {
