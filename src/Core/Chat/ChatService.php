@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace Whity\Core\Chat;
 
-use Whity\Core\Store\SharedStoreInterface;
 use Whity\Core\Agent\AgentAssignmentRepository;
+use Whity\Core\Db\DbBool;
+use Whity\Core\Store\SharedStoreInterface;
 
 /**
  * Team chat (CH.1, CH.2): groups and direct chats between staff, with agents as
@@ -757,7 +758,7 @@ final class ChatService
                     'deleted' => $q['deleted_at'] !== null,
                 ],
                 'thread_root_id' => isset($r['thread_root_id']) ? (int) $r['thread_root_id'] : null,
-                'in_chat' => (bool) ($r['in_chat'] ?? true),
+                'in_chat' => isset($r['in_chat']) ? DbBool::of($r['in_chat']) : true,
                 'thread' => $thread === null ? null : [
                     'count' => $thread['count'],
                     'last_at' => self::iso($thread['last_at']),
