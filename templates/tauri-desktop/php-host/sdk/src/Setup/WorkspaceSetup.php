@@ -20,9 +20,10 @@ namespace Whity\Sdk\Setup;
  * permissions allow. Nothing more is possible through here than the person
  * could do by hand. Only the routes in {@see self::ROUTES} are reachable:
  * calendar settings, services, staff and hours; workspace settings (name,
- * contact details, colour); forms; and, since 1.109, the people in the
- * workspace and inviting staff, for a guided setup
- * ({@see \Whity\Sdk\PluginOnboardingInterface}).
+ * contact details, colour); forms; since 1.109, the people in the workspace
+ * and inviting staff, for a guided setup
+ * ({@see \Whity\Sdk\PluginOnboardingInterface}); and since 1.110, listing,
+ * creating and checking in bookings, and listing and creating contacts.
  *
  * Without a workspace or a person in scope (a job, the CLI) every call answers
  * 403 and changes nothing.
@@ -56,6 +57,13 @@ interface WorkspaceSetup
         'GET /api/invitations',
         'POST /api/invitations',
         'GET /api/branding',
+        // 1.110 (WHIT-1154): a salon's walk-ins become bookings, its customers
+        // contacts, and its commission is read from bookings.
+        'GET /api/calendar/bookings',
+        'POST /api/calendar/bookings',
+        'POST /api/calendar/bookings/{id}/check-in',
+        'GET /api/contacts',
+        'POST /api/contacts',
     ];
 
     /**

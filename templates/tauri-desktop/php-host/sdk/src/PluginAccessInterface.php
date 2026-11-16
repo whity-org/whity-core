@@ -17,6 +17,11 @@ namespace Whity\Sdk;
  * - `product`: what the workspace buys, `plugin.<store slug>`. Whity Pay sells
  *   it as an add-on plan keyed `plugin.<store slug>.<plan>`.
  * - `trialDays` (optional, 0 to 90): a free trial, once per workspace.
+ * - `seats` (optional, SDK 1.110): sold per seat, such as per chair. `setting` is
+ *   one of the plugin's own integer settings ({@see Settings\PluginSettingsInterface})
+ *   holding how many the workspace has; `unit` and `units` name one and several,
+ *   `{en, ar}`. The workspace buys that many, and when the setting changes the
+ *   subscription's quantity follows.
  *
  * The host also lets a workspace use it when the operator made it free for
  * every workspace. When access ends (trial over, add-on or plan gone) the
@@ -31,7 +36,7 @@ namespace Whity\Sdk;
 interface PluginAccessInterface
 {
     /**
-     * @return array{entitlement: string, product: string, trialDays?: int}|null null when free
+     * @return array{entitlement: string, product: string, trialDays?: int, seats?: array{setting: string, unit: array{en: string, ar: string}, units: array{en: string, ar: string}}}|null null when free
      */
     public function getAccess(): ?array;
 }

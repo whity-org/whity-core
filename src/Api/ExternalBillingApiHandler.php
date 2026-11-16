@@ -166,6 +166,31 @@ final class ExternalBillingApiHandler
             return Response::error('That plan cannot be bought on these terms.', 422);
         }
 
+        // SDK 1.110: a plugin sold per seat (Whity for Salons per chair) is
+        // bought for the count the workspace set, never a number the caller
+        // sends.
+        $quantity = $isPluginAddon ? ($this->pluginSeats?->quantityForPlan(trim($planKey), $tenantId) ?? 1) : 1;
+        if ($quantity > 1) {
+            $bridge = $this->pluginBridge();
+            if ($bridge === null) {
+                return Response::error('This payment provider can\'t sell several at once.', 422, ['reason' => 'quantity_unsupported']);
+            }
+            try {
+                $handoff = $bridge->startCheckoutForQuantity(
+                    $this->actorFor($request),
+                    BillingSubject::forTenant($tenantId),
+                    $priceRef,
+                    $quantity,
+                    $this->appUrl . '/billing/return',
+                    $this->appUrl . '/billing',
+                );
+            } catch (BillingPortalException $e) {
+                return $this->portalFailure($e, 'start a checkout', ['tenant_id' => $tenantId]);
+            }
+
+            return Response::json(['data' => ['url' => $handoff->url, 'quantity' => $quantity]]);
+        }
+
         try {
             $handoff = $this->portal->startCheckout(
                 $this->actorFor($request),
@@ -754,6 +779,14 @@ final class ExternalBillingApiHandler
     }
 
     /** The plugin portal's bridge, only when a plugin portal is the one in use. */
+    private ?\Whity\Core\Plugin\Workspace\PluginSeats $pluginSeats = null;
+
+    /** Plugins sold per seat (SDK 1.110): the count a checkout buys. */
+    public function usePluginSeats(\Whity\Core\Plugin\Workspace\PluginSeats $seats): void
+    {
+        $this->pluginSeats = $seats;
+    }
+
     private function pluginBridge(): ?SdkBillingPortalBridge
     {
         return $this->portal instanceof ResolvingBillingPortal ? $this->portal->pluginBridge() : null;

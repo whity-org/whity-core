@@ -107618,6 +107618,22 @@
                             "type": "string"
                         },
                         "description": "Plugins turned on with it in this workspace"
+                    },
+                    "seats": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Sold per seat (SDK 1.110): how many this workspace has, and what one is called",
+                        "properties": {
+                            "count": {
+                                "type": "integer"
+                            },
+                            "unit": {
+                                "$ref": "#/components/schemas/LocalizedLabel"
+                            },
+                            "units": {
+                                "$ref": "#/components/schemas/LocalizedLabel"
+                            }
+                        }
                     }
                 },
                 "required": [

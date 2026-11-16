@@ -2167,6 +2167,7 @@
         "plugins.paid.prices": "لمساحة العمل هذه: {prices}",
         "plugins.paid.readOnly": "للقراءة فقط: يمكنك رؤية كل شيء دون تغييره حتى تشتريها مجدداً. لم يُحذف شيء.",
         "plugins.paid.readOnlyBadge": "للقراءة فقط",
+        "plugins.paid.seats": "{count} {units} × {each} = {total}",
         "plugins.paid.startTrial": "بدء تجربة لمدة {days} يوماً",
         "plugins.paid.trialError": "تعذّر بدء الفترة التجريبية. حاول مرة أخرى.",
         "plugins.paid.trialStarted": "بدأت تجربتك لـ {name} لمدة {days} يوماً.",

@@ -19487,6 +19487,16 @@ final class CoreApiSchemas
                 'mayTurnOn' => self::bool() + ['description' => 'Free, included in the plan or an add-on, free for every workspace, or in a trial'],
                 'onboarding' => self::bool() + ['description' => 'It has a guided setup at /admin/setup/{plugin}'],
                 'dependsOn' => ['type' => 'array', 'items' => self::str(), 'description' => 'Plugins turned on with it in this workspace'],
+                'seats' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'description' => 'Sold per seat (SDK 1.110): how many this workspace has, and what one is called',
+                    'properties' => [
+                        'count' => self::int(),
+                        'unit' => SchemaBuilder::ref('LocalizedLabel'),
+                        'units' => SchemaBuilder::ref('LocalizedLabel'),
+                    ],
+                ],
             ], ['name', 'version', 'access', 'canSwitch', 'enabled', 'state', 'paid', 'trialAvailable', 'mayTurnOn']),
             'WorkspaceCodePluginListResponse' => self::listEnvelope('WorkspaceCodePlugin'),
             'WorkspaceCodePluginSwitchResponse' => self::object([

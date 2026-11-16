@@ -3196,6 +3196,22 @@ $externalBillingHandler = new \Whity\Api\ExternalBillingApiHandler(
     $logger,
     $auditLogger
 );
+// WHIT-1152 (SDK 1.110): plugins sold per seat. Checkout buys the count the
+// workspace set; when the count changes, the subscription's quantity follows.
+$pluginSeats = new \Whity\Core\Plugin\Workspace\PluginSeats(
+    static fn (int $tenantId): array => $settingsService->effective($tenantId),
+    static fn (): array => $pluginLoader->getPaidAccess(),
+    $db->getPdo(),
+    $billingPortal,
+    $logger,
+);
+$externalBillingHandler->usePluginSeats($pluginSeats);
+$workspaceCodePluginsHandler->useSeats($pluginSeats);
+$hookManager->listen(\Whity\Sdk\Hooks\Events::PLUGIN_SETTINGS_CHANGED, static function (array $data) use ($pluginSeats): array {
+    $pluginSeats->onSettingChanged($data);
+
+    return $data;
+});
 
 $router->register('POST', '/api/billing/checkout', [$externalBillingHandler, 'checkout'], null, null, CorePermissions::BILLING_PAY);
 $router->register('GET',  '/api/billing/return',   [$externalBillingHandler, 'returnFrom'], null, null, CorePermissions::BILLING_VIEW);
