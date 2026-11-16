@@ -95,6 +95,11 @@ beforeEach(() => {
   addToast.mockReset();
 });
 
+// A test that fixes the clock gets the real one back, whatever happens in it.
+afterEach(() => {
+  jest.useRealTimers();
+});
+
 describe('Approvals page', () => {
   it('shows the oldest waiting proposal first, one at a time', async () => {
     serve([proposal(3), proposal(1), proposal(2), proposal(4, { status: 'approved', decidedAt: '2026-10-31 05:00:00' })]);
@@ -251,6 +256,10 @@ describe('Approvals page', () => {
   });
 
   it('lists what was decided by day, with the outcome, the agent and who decided (TplApprovalsDecided)', async () => {
+    // A fixed midday (local time), so "5 and 10 minutes ago" is always Today:
+    // on the real clock this failed in the first minutes after midnight (WHIT-1107).
+    // advanceTimers keeps timers moving, so user events and findBy* still settle.
+    jest.useFakeTimers({ now: new Date('2026-11-10T12:00:00'), advanceTimers: true });
     const now = new Date();
     const iso = (minutesAgo: number) => new Date(now.getTime() - minutesAgo * 60_000).toISOString();
     const lastWeek = iso(60 * 24 * 6);
