@@ -10,6 +10,7 @@
  */
 
 import { Button } from '@whity/ui/button';
+import { DiscussInChat, recordLink } from '@/components/chat/discuss-in-chat';
 import { Icon, type IconName } from '@whity/ui/icon';
 import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -151,6 +152,7 @@ export function BookingDetails({
               </Button>
             ) : null}
           </div>
+          <DiscussInChat className="h-12" link={recordLink('booking', booking.id, item.title)} />
           {live && canChange && (
             <Button variant="ghost" className="h-12" onClick={onCancel} data-testid="calendar-details-cancel">
               {t('details.cancelBooking', 'Cancel booking')}
@@ -179,6 +181,7 @@ export function BookingDetails({
                 </a>
               </Button>
             )}
+            <DiscussInChat size="sm" link={recordLink('booking', booking.id, item.title)} />
             {live && canChange && (
               <Button size="sm" variant="ghost" onClick={onCancel} data-testid="calendar-details-cancel">
                 {t('action.cancel', 'Cancel')}
