@@ -481,7 +481,12 @@ function ReviewAnswer({
                 const cell = row[column.key];
                 const label = localizedText(column.label, preferArabic ? 'ar' : 'en') || column.key;
 
-                const shown = column.type === 'date' && typeof cell === 'string' ? (date(cell) ?? '—') : String(cell);
+                const shown =
+                  column.type === 'date' && typeof cell === 'string'
+                    ? (date(cell) ?? '—')
+                    : column.type === 'profile_ref'
+                      ? (references?.profile_ref?.find((option) => option.value === String(cell))?.label ?? String(cell))
+                      : String(cell);
 
                 return `${label}: ${cell === true ? t('field.yes', 'Yes') : shown}`;
               })

@@ -34,7 +34,8 @@ final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface,
     /**
      * WHIT-1018: the people the submission names in these questions (its
      * people pickers, such as a supervisor), from its answers as they are now.
-     * A key that is not a people question names nobody.
+     * A key that is not a people question names nobody. A key naming a table
+     * names everyone in its person cells (WHIT-1162).
      *
      * WHIT-1028, merge map A3: the office names people at a route step (a
      * person value, such as the supervisor at pre-check), so those are read from
@@ -56,14 +57,12 @@ final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface,
         $answers = is_array($submission['data']) ? $submission['data'] : [];
         $people = [];
         foreach ((new FormFieldRepository($this->db))->listForForm($tenantId, (int) $submission['form_id']) as $field) {
-            if (($field['field_type'] ?? null) !== 'profile_ref' || !in_array((string) $field['field_key'], $keys, true)) {
+            if (!in_array((string) $field['field_key'], $keys, true)) {
                 continue;
             }
-            $answer = $answers[(string) $field['field_key']] ?? null;
-            foreach (is_array($answer) ? $answer : [$answer] as $id) {
-                if (is_int($id) || (is_string($id) && ctype_digit($id))) {
-                    $people[(int) $id] = (int) $id;
-                }
+            // A person question, or (WHIT-1162) every person cell in a table's rows.
+            foreach (FieldType::peopleIn($field, $answers[(string) $field['field_key']] ?? null) as $id) {
+                $people[$id] = $id;
             }
         }
         foreach ($this->peopleNamedOnRoutes($tenantId, $subjectId, $keys) as $id) {
@@ -274,10 +273,11 @@ final class FormSubmissionRouteSubject implements RouteSubjectProviderInterface,
         $allFields = (new FormFieldRepository($this->db))->listForForm($tenantId, (int) $row['form_id']);
 
         $values = [];
+        $names = new ProfileNames($this->db);
         foreach ($allFields as $field) {
             $key = (string) $field['field_key'];
             $answer = $answers[$key] ?? null;
-            $text = ResponsesCsv::printed($field, $answer, $language);
+            $text = ResponsesCsv::printed($field, $answer, $language, $names);
             $values[FormSubmissionFieldProvider::path($key)] = $text !== '' ? $text : null;
         }
 

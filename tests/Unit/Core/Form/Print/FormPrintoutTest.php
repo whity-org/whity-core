@@ -44,9 +44,10 @@ final class FormPrintoutTest extends TestCase
     /**
      * @param array<string, mixed> $style
      * @param array<string, mixed> $answers
+     * @param list<array<string, mixed>> $extraFields
      * @return array<string, mixed>
      */
-    private function build(array $style = [], array $answers = [], string $lang = 'en', bool $custom = true): array
+    private function build(array $style = [], array $answers = [], string $lang = 'en', bool $custom = true, array $extraFields = []): array
     {
         return (new FormPrintout())->build([
             'lang' => $lang,
@@ -61,7 +62,7 @@ final class FormPrintoutTest extends TestCase
                     ['key' => 'regulated', 'title' => ['en' => 'Regulated substances'], 'description' => []],
                     ['key' => 'declaration', 'title' => ['en' => 'Declaration and signatures'], 'description' => []],
                 ],
-                'fields' => self::fields(),
+                'fields' => [...self::fields(), ...$extraFields],
             ],
             'answers' => $answers + [
                 'title' => 'Sleep and exams',
@@ -80,6 +81,7 @@ final class FormPrintoutTest extends TestCase
             ],
             'verify' => ['url' => 'https://app.whity.dev/verify/abc', 'reference' => 'ABC-123'],
             'marks' => [['src' => 'data:image/png;base64,iVBORw0KGgo=', 'alt' => 'ISO 9001:2015']],
+            'names' => static fn (string $type, int $id): ?string => $type === 'profile' ? [13 => 'Ahmad Khalil', 12 => 'Awss Haddad'][$id] ?? null : null,
         ]);
     }
 
@@ -132,6 +134,36 @@ final class FormPrintoutTest extends TestCase
         self::assertSame(['kind' => 'empty', 'text' => 'Not answered'], $reviewed['answer']);
         self::assertSame('Optional.', $reviewed['guidance']);
         self::assertSame('1.1', $byText['Project title']['number']);
+    }
+
+    public function testAPersonColumnPrintsThePersonsNameInTheTable(): void
+    {
+        // WHIT-1162: the other researchers, a table with a person column.
+        $researchers = [
+            'field_key' => 'researchers', 'field_type' => 'repeating', 'label' => ['en' => 'Other researchers'],
+            'help_text' => null, 'help_text_i18n' => [], 'is_required' => false, 'options' => [],
+            'validation' => ['columns' => [
+                ['key' => 'person', 'type' => 'profile_ref', 'label' => ['en' => 'Researcher']],
+                ['key' => 'role', 'type' => 'text', 'label' => ['en' => 'Role']],
+            ]],
+            'section_key' => 'project', 'visible_when' => null,
+        ];
+        $payload = $this->build(answers: ['researchers' => [
+            ['person' => 13, 'role' => 'Co-researcher'],
+            ['person' => 12],
+            ['person' => 99, 'role' => 'Left the workspace'],
+        ]], extraFields: [$researchers]);
+
+        $table = null;
+        foreach (self::blocks($payload, 'formQuestion') as $q) {
+            if ($q['text'] === 'Other researchers') {
+                $table = $q['answer'];
+            }
+        }
+        self::assertNotNull($table);
+        self::assertSame('table', $table['kind']);
+        self::assertSame(['Researcher', 'Role'], $table['columns']);
+        self::assertSame([['Ahmad Khalil', 'Co-researcher'], ['Awss Haddad', ''], ['—', 'Left the workspace']], $table['rows']);
     }
 
     public function testASectionAnsweredNaThroughoutIsOneLine(): void

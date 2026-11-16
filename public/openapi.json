@@ -89988,8 +89988,10 @@
                             "number",
                             "date",
                             "select",
-                            "checkbox"
-                        ]
+                            "checkbox",
+                            "profile_ref"
+                        ],
+                        "description": "What the cell holds. profile_ref is a person, checked against the workspace like a person question."
                     },
                     "label": {
                         "type": "object",

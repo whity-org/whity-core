@@ -86,6 +86,68 @@ final class RepeatingAndSignatureFieldsTest extends TestCase
         ], $result['values']['suppliers']);
     }
 
+    /**
+     * WHIT-1162: a person column, such as the other researchers on an ethics form.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function researchers(): array
+    {
+        return self::table(['columns' => [
+            ['key' => 'role', 'type' => 'text', 'label' => ['en' => 'Role'], 'required' => false],
+            ['key' => 'person', 'type' => FieldType::PROFILE_REF, 'label' => ['en' => 'Researcher'], 'required' => true],
+        ]], ['field_key' => 'researchers', 'label' => ['en' => 'Other researchers']]);
+    }
+
+    public function testAPersonCellIsCheckedAndStoredAsAProfileId(): void
+    {
+        self::assertContains(FieldType::PROFILE_REF, FieldType::COLUMN_KINDS);
+
+        $result = SubmissionValidator::validate(self::researchers(), ['researchers' => [
+            ['role' => 'Co-researcher', 'person' => '13'],
+            ['person' => 12],
+        ]]);
+
+        self::assertSame([['role' => 'Co-researcher', 'person' => 13], ['person' => 12]], $result['values']['researchers']);
+        self::assertSame([13, 12], FieldType::peopleIn(self::researchers()[0], $result['values']['researchers']));
+    }
+
+    public function testAPersonCellThatIsNotAnIdIsRefusedWithItsRowAndColumn(): void
+    {
+        foreach (['Ahmad Khalil', '0', -4, 1.5] as $bad) {
+            $e = self::refusal(self::researchers(), ['researchers' => [['person' => 12], ['person' => $bad]]]);
+
+            self::assertSame('Other researchers, row 2: Researcher must name a record in this tenant', $e->clientMessage);
+            self::assertSame(
+                ['reason' => 'bad_reference', 'field_key' => 'researchers', 'params' => ['row' => 2, 'column' => 'person']],
+                $e->details(),
+            );
+        }
+    }
+
+    public function testAPersonCellIsExportedAndPrintedByName(): void
+    {
+        $names = static fn (int $id): ?string => [13 => 'Ahmad Khalil'][$id] ?? null;
+        $rows = [['role' => 'Co-researcher', 'person' => 13], ['person' => 99]];
+
+        self::assertSame(
+            'Role: Co-researcher; Researcher: Ahmad Khalil | Researcher: —',
+            \Whity\Core\Form\ResponsesCsv::printed(self::researchers()[0], $rows, 'en', $names),
+        );
+        self::assertStringContainsString(
+            'Researcher: Ahmad Khalil',
+            \Whity\Core\Form\ResponsesCsv::build(self::researchers(), [['data' => ['researchers' => $rows]]], 'en', $names),
+        );
+    }
+
+    public function testATableWithAPersonColumnIsNotServedOnAPublicForm(): void
+    {
+        self::assertTrue(FieldType::holdsReference(self::researchers()[0]));
+        self::assertFalse(FieldType::holdsReference(self::table()[0]));
+        self::assertSame(['researchers'], \Whity\Core\Form\PublicFormView::unanswerableFieldKeys(self::researchers()));
+        self::assertSame([], \Whity\Core\Form\PublicFormView::answerableFields(self::researchers()));
+    }
+
     public function testABadCellNamesTheQuestionRowAndColumn(): void
     {
         $e = self::refusal(self::table(), ['suppliers' => [['name' => 'A'], ['crates' => 2]]]);
