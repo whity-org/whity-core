@@ -75,6 +75,11 @@ final class RouteTrailChain
                 $facts[$field] = $value === null ? null : (string) $value;
             }
         }
+        // Merge map A2 (migration 292): whom a delegate acted for. Recorded only
+        // when set, so every entry written before it still verifies.
+        if (($row['on_behalf_of_profile_id'] ?? null) !== null) {
+            $facts['on_behalf_of_profile_id'] = (int) $row['on_behalf_of_profile_id'];
+        }
         ksort($facts);
 
         return $facts;
@@ -138,7 +143,7 @@ final class RouteTrailChain
         $stmt = $db->prepare(
             'SELECT id, tenant_id, document_id, route_id, step_id, actor_profile_id, action,
                     from_ou_id, to_ou_id, note, verdict, withdrawal, subject_version, content_hash,
-                    to_author, resume_from, occurred_at, prev_hash, entry_hash, entry_body
+                    to_author, resume_from, occurred_at, on_behalf_of_profile_id, prev_hash, entry_hash, entry_body
                FROM document_route_events
               WHERE tenant_id = :tenant_id AND document_id = :document_id
               ORDER BY id ASC'

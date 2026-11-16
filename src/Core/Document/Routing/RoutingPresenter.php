@@ -305,6 +305,8 @@ final class RoutingPresenter
             'to_author' => DbBool::of($event['to_author'] ?? false),
             'resume_from' => $event['resume_from'] ?? null,
             'occurred_at' => (string) $event['occurred_at'],
+            // Merge map A2: whom the actor decided for while they were away.
+            'on_behalf_of_profile_id' => $event['on_behalf_of_profile_id'] ?? null,
         ];
     }
 
