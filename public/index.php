@@ -5475,7 +5475,8 @@ $hookManager->listen('navigation.register', function ($data, $context) use ($rou
 // In-app notification INBOX (WC-notifications, 6e10d9ea). Self-scoped to the
 // caller's (tenant, profile) — session-gated, no RBAC permission (like
 // /api/me/sessions). Reads the notifications the dispatcher persisted.
-$inboxHandler = new \Whity\Api\InboxApiHandler($tokenValidator, $notificationRepository);
+// #1934: the person's notices (Inbox › Mentions and Updates), not the waiting list.
+$inboxHandler = new \Whity\Api\NotificationsApiHandler($tokenValidator, $notificationRepository);
 $router->register('GET',  '/api/me/notifications',                [$inboxHandler, 'list'],         null);
 $router->register('GET',  '/api/me/notifications/unread-count',   [$inboxHandler, 'unreadCount'],  null);
 $router->register('POST', '/api/me/notifications/read-all',       [$inboxHandler, 'markAllRead'],  null);

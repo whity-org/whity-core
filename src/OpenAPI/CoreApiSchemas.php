@@ -3233,8 +3233,10 @@ final class CoreApiSchemas
                 'requiredPermission' => null,
                 'schema' => [
                     'summary' => 'List the caller\'s in-app notifications (newest first, paginated) + unread count',
+                    'description' => 'The Inbox\'s Mentions and Updates tabs (M.43): `tab=mentions` is someone naming you in a chat or a comment; `tab=updates` is every other notice except those whose item is already in Waiting for me (GET /api/me/waiting). Without a tab, every notice. `unread` counts each tab.',
                     'tags' => ['notifications'],
                     'parameters' => [
+                        self::queryParam('tab', 'string', 'mentions or updates; every notice when omitted'),
                         self::queryParam('unread', 'boolean', 'Restrict to unread notifications when truthy'),
                         self::queryParam('page', 'integer', '1-indexed page (default 1)'),
                         self::queryParam('per_page', 'integer', 'Page size (default 25, max 100)'),
@@ -11114,7 +11116,11 @@ final class CoreApiSchemas
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationEntry')],
                 'pagination' => SchemaBuilder::ref('Pagination'),
                 'unread_count' => self::int(),
-            ], ['data', 'pagination', 'unread_count']),
+                'unread' => self::object([
+                    'mentions' => self::int(),
+                    'updates' => self::int(),
+                ], ['mentions', 'updates']),
+            ], ['data', 'pagination', 'unread_count', 'unread']),
             'UnreadCountResponse' => self::object([
                 'unread_count' => self::int(),
             ], ['unread_count']),
@@ -16148,7 +16154,7 @@ final class CoreApiSchemas
                         . '`unavailable` and the rest is still served. There are no pages: the rest is on Inbox and Approvals.',
                     'tags' => ['inbox'],
                     'parameters' => [
-                        self::queryParam('limit', 'integer', 'How many rows (default 6, max 50)'),
+                        self::queryParam('limit', 'integer', 'How many rows (default 6, max 200: the Inbox reads the whole list)'),
                     ],
                     'responses' => [
                         200 => self::jsonResponse('The oldest rows and the totals', 'WaitingListResponse'),
