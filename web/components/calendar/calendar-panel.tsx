@@ -76,7 +76,7 @@ export function zoneLabel(timeZone: string): string {
   }
 }
 
-function Check({
+export function Check({
   entry,
   onChange,
   testId,
@@ -106,13 +106,27 @@ function Check({
   );
 }
 
-function Group({ title, children }: { title: string; children: ReactNode }) {
+export function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div role="group" aria-label={title}>
       <h4 className="mb-0.5 text-xs font-semibold text-muted-foreground">{title}</h4>
       {children}
     </div>
   );
+}
+
+/** One letter a day, Monday first (ISO), as the cards write them (S M T W T F S; ح ن ث ر خ ج س). */
+export function useDayLetters(): string[] {
+  const t = useTranslation('calendar');
+  return [
+    t('panel.letter.mon', 'M'),
+    t('panel.letter.tue', 'T'),
+    t('panel.letter.wed', 'W'),
+    t('panel.letter.thu', 'T'),
+    t('panel.letter.fri', 'F'),
+    t('panel.letter.sat', 'S'),
+    t('panel.letter.sun', 'S'),
+  ];
 }
 
 /** The mini month: jumps to any date; the range in view is banded, today filled. */
@@ -131,16 +145,7 @@ export function MiniMonth({
   const base = { year: shownFrom.year, month: shownFrom.month, day: 1 };
   const month = paged !== null && paged.base === dateKey(base) ? paged.month : base;
   const weeks = monthWeeks(month, weekStart);
-  // One letter a day, Monday first (ISO), as the card writes them.
-  const letters = [
-    t('panel.letter.mon', 'M'),
-    t('panel.letter.tue', 'T'),
-    t('panel.letter.wed', 'W'),
-    t('panel.letter.thu', 'T'),
-    t('panel.letter.fri', 'F'),
-    t('panel.letter.sat', 'S'),
-    t('panel.letter.sun', 'S'),
-  ];
+  const letters = useDayLetters();
   const from = dateKey(shownFrom);
   const to = dateKey(shownTo);
 

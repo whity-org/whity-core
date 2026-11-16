@@ -40,13 +40,21 @@ import type { CalendarBooking, CalendarEvent, CalendarTimeOff } from '@/lib/cale
 import { useCalendarWords } from './use-calendar-words';
 
 export const HOUR_PX = 48;
+/** An hour on a phone (CV.11). */
+export const PHONE_HOUR_PX = 56;
 /** From this long a booking shows its second line (CV.5). */
 const SECOND_LINE_MINUTES = 54;
 
 export type ItemKind = 'booking' | 'wait' | 'request' | 'event' | 'timeoff' | 'cancelled';
 
-/** One thing on the calendar, ready to draw. */
+/**
+ * One thing on the calendar, ready to draw. The grid, the details and the
+ * editing read only these fields, so meetings and other kinds can join the
+ * same grid when the calendar's items become one model (the unify plan's
+ * `/api/calendar/items`).
+ */
 export interface CalItem {
+  /** "booking:7", "event:12", "time_off:5": the id the one-calendar items endpoint will use. */
   key: string;
   kind: ItemKind;
   starts_at: string;
@@ -90,6 +98,8 @@ export interface TimeGridProps {
   preview?: GridPreview | null;
   /** The quick booking beside a new slot (`preview` with no key). */
   renderDraft?: () => ReactNode;
+  /** The phone (CV.11): 56px an hour, 14px text, a narrower hour column. */
+  phone?: boolean;
 }
 
 /** A place on the grid: a day and minutes from its midnight. */
@@ -208,15 +218,17 @@ export function TimeGrid({
   onChange,
   preview = null,
   renderDraft,
+  phone = false,
 }: TimeGridProps) {
+  const hourPx = phone ? PHONE_HOUR_PX : HOUR_PX;
   const t = useTranslation('calendar');
   const dates = useDateDisplay({ timeZone });
   const words = useCalendarWords();
   const itemLabel = useItemLabel();
   const now = useNowMinute(timeZone);
   const wide = days.length === 1;
-  const columns: CSSProperties = { gridTemplateColumns: `64px repeat(${days.length}, minmax(0, 1fr))` };
-  const height = (endHour - startHour) * HOUR_PX;
+  const columns: CSSProperties = { gridTemplateColumns: `${phone ? 48 : 64}px repeat(${days.length}, minmax(0, 1fr))` };
+  const height = (endHour - startHour) * hourPx;
   const grid = useRef<HTMLDivElement>(null);
   const columnRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -242,7 +254,7 @@ export function TimeGrid({
       }
     });
     const top = columnRefs.current[dayIndex]?.getBoundingClientRect().top ?? 0;
-    return { dayIndex, minute: first + ((y - top) / HOUR_PX) * 60 };
+    return { dayIndex, minute: first + ((y - top) / hourPx) * 60 };
   };
 
   const stopListening = useRef<() => void>(() => undefined);
@@ -324,10 +336,16 @@ export function TimeGrid({
       setDrag(null);
       stopListening.current();
     };
+    // Once a finger has picked a booking up, the page must not scroll under it.
+    const holdStill = (ev: TouchEvent) => {
+      if (dragRef.current?.active) ev.preventDefault();
+    };
     window.addEventListener('pointermove', move, { passive: false });
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', cancel);
+    window.addEventListener('touchmove', holdStill, { passive: false });
     stopListening.current = () => {
+      window.removeEventListener('touchmove', holdStill);
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', cancel);
@@ -371,7 +389,7 @@ export function TimeGrid({
   return (
     <div
       ref={grid}
-      className="rounded-xl border border-border bg-card text-xs"
+      className={cn('rounded-xl border border-border bg-card', phone ? 'text-sm' : 'text-xs')}
       data-testid="calendar-time-grid"
       onClick={(event) => {
         if (event.target === event.currentTarget) onSelect(null);
@@ -446,7 +464,7 @@ export function TimeGrid({
             <span
               key={hour}
               className="absolute end-2 -translate-y-1/2 text-xs text-muted-foreground tabular-nums"
-              style={{ top: (hour - startHour) * HOUR_PX }}
+              style={{ top: (hour - startHour) * hourPx }}
               dir="ltr"
             >
               {minuteToTime(hour * 60)}
@@ -469,8 +487,8 @@ export function TimeGrid({
               : { insetInlineStart: 'calc(100% + 10px)' };
           const ghostHere = shown !== null && sameDate(shown.date, date);
           const ghostItem = ghostHere && shown.key !== null ? items.find((item) => item.key === shown.key) ?? null : null;
-          const ghostTop = ghostHere ? ((shown.startMinute - first) / 60) * HOUR_PX : 0;
-          const ghostTall = ghostHere ? ((shown.endMinute - shown.startMinute) / 60) * HOUR_PX : 0;
+          const ghostTop = ghostHere ? ((shown.startMinute - first) / 60) * hourPx : 0;
+          const ghostTall = ghostHere ? ((shown.endMinute - shown.startMinute) / 60) * hourPx : 0;
           return (
             <div
               key={dateKey(date)}
@@ -480,7 +498,7 @@ export function TimeGrid({
               className={cn('relative border-s border-border', isWeekend(date, weekendDays) && 'bg-muted', onCreate && 'cursor-cell')}
               style={{
                 height,
-                backgroundImage: `repeating-linear-gradient(to bottom, var(--border) 0 1px, transparent 1px ${HOUR_PX}px)`,
+                backgroundImage: `repeating-linear-gradient(to bottom, var(--border) 0 1px, transparent 1px ${hourPx}px)`,
               }}
               data-testid="calendar-day-column"
               data-date={dateKey(date)}
@@ -497,8 +515,8 @@ export function TimeGrid({
               }}
             >
               {placed.map(({ item, startMinute, endMinute, lane, lanes }) => {
-                const top = ((startMinute - first) / 60) * HOUR_PX;
-                const tall = ((endMinute - startMinute) / 60) * HOUR_PX;
+                const top = ((startMinute - first) / 60) * hourPx;
+                const tall = ((endMinute - startMinute) / 60) * hourPx;
                 if (top + tall <= 0 || top >= height) return null;
                 const from = dates.time(item.starts_at);
                 const to = dates.time(item.ends_at);
@@ -509,7 +527,7 @@ export function TimeGrid({
                 // Being moved: the old place stays, dashed (CV.9).
                 const leaving = shown !== null && shown.key === item.key && shown.how === 'move';
                 const resizing = shown !== null && shown.key === item.key && shown.how === 'resize';
-                const height2 = resizing ? ((shown.endMinute - startMinute) / 60) * HOUR_PX : Math.min(tall, height - top);
+                const height2 = resizing ? ((shown.endMinute - startMinute) / 60) * hourPx : Math.min(tall, height - top);
                 return (
                   <div key={item.key}>
                     <button
@@ -560,7 +578,8 @@ export function TimeGrid({
                       aria-expanded={selected}
                       aria-keyshortcuts={draggable ? 'ArrowUp ArrowDown ArrowLeft ArrowRight Enter Escape' : undefined}
                       className={cn(
-                        'absolute box-border grid content-start overflow-hidden rounded-md px-1.5 py-[3px] text-start text-xs leading-[18px] text-foreground outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
+                        'absolute box-border grid content-start overflow-hidden rounded-md px-1.5 py-[3px] text-start leading-[18px] text-foreground outline-none select-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
+                        phone ? 'text-sm' : 'text-xs',
                         draggable && 'cursor-grab touch-manipulation',
                         selected && !leaving && 'z-[2] shadow-[0_0_0_2px_var(--card),0_0_0_4px_var(--primary)]',
                         resizing && 'z-[3] shadow-float'
@@ -663,7 +682,7 @@ export function TimeGrid({
               {sameDate(date, today) && now !== null && now >= first && now <= last && (
                 <div
                   className="pointer-events-none absolute -start-px end-0 z-[2] border-t-2 border-destructive"
-                  style={{ top: ((now - first) / 60) * HOUR_PX }}
+                  style={{ top: ((now - first) / 60) * hourPx }}
                   data-testid="calendar-now"
                   aria-hidden="true"
                 >

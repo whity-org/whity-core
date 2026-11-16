@@ -182,7 +182,7 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
                 ? t('grid.checkedInShort', 'checked in')
                 : '';
       out.push({
-        key: `b${b.id}`,
+        key: `booking:${b.id}`,
         kind,
         starts_at: b.starts_at,
         ends_at: b.ends_at,
@@ -197,7 +197,7 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
     for (const e of data.events) {
       if (e.status === 'cancelled' || hiddenPeople.has(e.profile_id)) continue;
       out.push({
-        key: `e${e.id}`,
+        key: `event:${e.id}`,
         kind: 'event',
         starts_at: e.starts_at,
         ends_at: e.ends_at,
@@ -214,7 +214,7 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
       const name = staffName.get(off.profile_id) ?? '';
       const span = new Date(off.ends_at).getTime() - new Date(off.starts_at).getTime();
       out.push({
-        key: `o${off.id}`,
+        key: `time_off:${off.id}`,
         kind: 'timeoff',
         starts_at: off.starts_at,
         ends_at: off.ends_at,
