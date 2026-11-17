@@ -54,6 +54,7 @@ import { localizedText } from '@whity/ui/localized-text';
 import { isInSettingsArea, useSettingsGroups } from '@/components/settings/settings-area';
 import { searchSettings, useSettingsIndex, type SettingEntry } from '@/components/settings/settings-index';
 import { SETTINGS_HOME_HREF } from '@/lib/settings/my-settings';
+import { useCanOfferWorkspaceCreate } from '@/lib/use-workspace-create';
 import { useCurrentWorkspace } from '@/components/settings/scope';
 
 
@@ -92,6 +93,7 @@ export function AppCommandPalette() {
     toggle: toggleTheme,
   } = useThemeMode();
   const { user, memberships, switchTenant } = useAuth();
+  const canCreateWorkspace = useCanOfferWorkspaceCreate();
   const { has } = useCapabilities();
   const { addToast } = useToast();
   const [open, setOpen] = useState(false);
@@ -250,9 +252,11 @@ export function AppCommandPalette() {
       waitingLoaded: data.waitingLoaded,
       agents: data.agents,
       connectAgentHref: aiPage?.href ?? null,
+      canCreateWorkspace,
     };
     return buildCoreCommands(commandT, ctx);
   }, [
+    canCreateWorkspace,
     t,
     commandT,
     has,

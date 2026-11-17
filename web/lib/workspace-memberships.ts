@@ -15,6 +15,7 @@ export interface WorkspaceMembershipLike {
   role: string;
   roles?: string[];
   kind?: 'member' | 'customer';
+  is_owner?: boolean;
 }
 
 /** Every role the person holds in this workspace, the primary one first. */
@@ -45,6 +46,9 @@ export function oneEntryPerWorkspace<T extends WorkspaceMembershipLike>(membersh
     const merged: T = { ...seen, roles: roleNames({ role: seen.role, roles: [...roleNames(seen), ...roleNames(membership)] }) };
     if (seen.kind === 'customer' && membership.kind !== 'customer') {
       merged.kind = membership.kind ?? 'member';
+    }
+    if (membership.is_owner === true) {
+      merged.is_owner = true;
     }
     byTenant.set(membership.tenant_id, merged);
   }

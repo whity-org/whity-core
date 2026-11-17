@@ -29,6 +29,7 @@ import { AppSidebar, useForcedRail } from '@whity/ui/app-sidebar';
 import { useCurrentLanguage, useLanguageCode, useI18nEnabled, useTranslation } from '@whity/features/i18n';
 import { roleLabel } from '@whity/features/roles/role-label';
 import { rolesLabel } from '@/lib/workspace-memberships';
+import { useCanOfferWorkspaceCreate } from '@/lib/use-workspace-create';
 import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
 import {
   IconLogout,
@@ -68,6 +69,8 @@ function capitalise(text: string): string {
 
 export function TenantSwitcher({ memberships, activeTenantId, collapsed }: TenantSwitcherProps) {
   const { switchTenant } = useAuth();
+  const router = useRouter();
+  const canCreate = useCanOfferWorkspaceCreate();
   const { refresh: refreshNav } = useNavigation();
   const { addToast } = useToast();
   const t = useTranslation('common');
@@ -80,9 +83,13 @@ export function TenantSwitcher({ memberships, activeTenantId, collapsed }: Tenan
         id: String(m.tenant_id),
         // #821: the reader's language, else the original name.
         name: localizedText(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
-        role: capitalise(rolesLabel(m)) || undefined,
+        // "Owner" first when they own it (WHIT-1169), then their roles.
+        role:
+          [m.is_owner ? t('sidebar.tenantSwitcher.owner', 'Owner') : '', capitalise(rolesLabel(m))]
+            .filter((part) => part !== '')
+            .join(', ') || undefined,
       })),
-    [memberships, currentLanguage],
+    [memberships, currentLanguage, t],
   );
 
   const handleSwitch = useCallback(
@@ -117,7 +124,9 @@ export function TenantSwitcher({ memberships, activeTenantId, collapsed }: Tenan
       onChange={handleSwitch}
       collapsed={collapsed}
       disabled={isSwitching}
+      onCreate={canCreate ? () => router.push('/workspaces/new') : undefined}
       labels={{
+        create: t('sidebar.tenantSwitcher.create', 'Create workspace'),
         trigger: t('sidebar.tenantSwitcher.trigger', 'Switch workspace, current: {name}'),
         find: t('sidebar.tenantSwitcher.find', 'Find a workspace'),
         noResults: t('sidebar.tenantSwitcher.noResults', 'No workspace matches'),

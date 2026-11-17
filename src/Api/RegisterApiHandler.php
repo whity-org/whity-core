@@ -291,6 +291,9 @@ final class RegisterApiHandler
                     ]);
                 }
 
+                // The person who registers owns the workspace (WHIT-1169).
+                (new \Whity\Core\Tenant\WorkspaceOwners($this->db))->add($tenantId, $profileId, $profileId);
+
                 // 6. WHO SENT THEM. Inside the transaction, because a referral
                 // pointing at a workspace whose creation rolled back would be a
                 // commission owed for a customer that does not exist.

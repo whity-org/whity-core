@@ -925,6 +925,10 @@ class TenantsApiHandler
             'via'           => 'tenant_bootstrap',
         ];
 
+        // The tenant's first administrator is its owner (WHIT-1169). After the
+        // membership id is read: this insert moves lastInsertId on.
+        (new \Whity\Core\Tenant\WorkspaceOwners($this->db))->add($tenantId, $profileId, null);
+
         return ['id' => $profileId, 'email' => $admin['email'], 'role' => $admin['role']];
     }
 

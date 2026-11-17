@@ -34,6 +34,8 @@ export interface Membership {
    * and their navigation never reach them; this is for wording only.
    */
   kind?: 'member' | 'customer';
+  /** True when the person owns this workspace (WHIT-1169). */
+  is_owner?: boolean;
 }
 
 interface AuthContextType {
