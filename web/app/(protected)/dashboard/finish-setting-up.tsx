@@ -2,9 +2,13 @@
 
 /**
  * Finish setting up (section 20): the steps that block real work, each with why it
- * matters. For people who can change the workspace, and gone once every step is
- * done. The server says which steps apply and which are done; the words and where
- * each opens are here.
+ * matters, and gone once every step is done. Core's steps are for people who can
+ * change the workspace; the server says which apply and which are done, and the
+ * words and where each opens are here.
+ *
+ * Apps add their own points after core's (SDK 1.115, H.5), with their own words
+ * and link, for people holding the app's permission. Each app's route says which
+ * are done; an app whose route fails is left off, and the rest still shows.
  */
 
 import { useEffect, useState } from 'react';
@@ -15,8 +19,10 @@ import { Icon } from '@whity/ui/icon';
 import { Lottie } from '@whity/ui/lottie';
 import type { IconName } from '@whity/ui/icon-map';
 import { useTranslation } from '@whity/features/i18n';
-import { api } from '@/lib/api/client';
+import { api, apiFetch } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
+import { iconNames } from '@whity/ui/icon-map';
+import type { DashboardSetup } from './use-dashboard';
 
 interface SetupSteps {
   steps: Array<{ key: string; done: boolean }>;
@@ -27,17 +33,71 @@ interface SetupSteps {
 /** Set while the checklist is unfinished, so its completion can be marked once. */
 const SETUP_PENDING_KEY = 'whity.setup.pending';
 
-export function FinishSettingUp() {
+/** A step on the card, core's or an app's, with its words already chosen. */
+interface Row {
+  key: string;
+  done: boolean;
+  icon: IconName;
+  label: string;
+  why?: string;
+  action: string;
+  href: string;
+}
+
+export function FinishSettingUp({ canSetUp, apps }: { canSetUp: boolean; apps: DashboardSetup[] }) {
   const t = useTranslation('common');
 
   const setup = useFetch<SetupSteps | null>(async () => {
+    if (!canSetUp) return { steps: [], done: 0, total: 0 };
     const { data: body, response } = await api.GET('/api/v1/me/setup-steps');
     // Not worth an error on the home: the card just doesn't appear.
     if (!response.ok) return null;
     return ((body as { data?: SetupSteps } | undefined)?.data) ?? null;
-  }, []);
+  }, [canSetUp]);
 
-  const data = setup.data;
+  // Each app's own answer; an app whose route fails contributes nothing.
+  const appStatus = useFetch<Record<string, Record<string, boolean>>>(async () => {
+    const answers = await Promise.all(
+      apps.map(async (app) => {
+        try {
+          const response = await apiFetch(app.status);
+          if (!response.ok) return null;
+          const body = (await response.json()) as { data?: { points?: Record<string, boolean> } };
+          return [app.plugin, body.data?.points ?? {}] as const;
+        } catch {
+          return null;
+        }
+      }),
+    );
+    return Object.fromEntries(answers.filter((answer) => answer !== null));
+  }, [apps]);
+
+  const appRows: Row[] = [];
+  for (const app of apps) {
+    const done = appStatus.data?.[app.plugin];
+    if (done === undefined) continue;
+    for (const point of app.points) {
+      appRows.push({
+        key: `${app.plugin}:${point.id}`,
+        done: done[point.id] === true,
+        icon: iconNames.includes(point.icon as IconName) ? (point.icon as IconName) : 'plugin',
+        label: point.label ?? point.id,
+        why: point.why ?? undefined,
+        action: point.action ?? t('dashboard.setup.appAction', 'Set up'),
+        href: point.href,
+      });
+    }
+  }
+
+  const core = setup.data;
+  // Undecided until every app has answered, so the card never says "ready" early.
+  const data =
+    (core === null && appRows.length === 0) || (apps.length > 0 && appStatus.data === null)
+      ? null
+      : {
+          done: (core?.done ?? 0) + appRows.filter((row) => row.done).length,
+          total: (core?.total ?? 0) + appRows.length,
+        };
   const complete = data !== null && data.total > 0 && data.done === data.total;
   const pending = data !== null && data.total > 0 && data.done < data.total;
 
@@ -75,7 +135,7 @@ export function FinishSettingUp() {
 
   if (data === null || !pending) return null;
 
-  const words: Record<string, { icon: IconName; label: string; why: string; action: string; href: string }> = {
+  const words: Record<string, Omit<Row, 'key' | 'done'>> = {
     branding: {
       icon: 'branding',
       label: t('dashboard.setup.branding', 'Add your logo and colour'),
@@ -113,6 +173,10 @@ export function FinishSettingUp() {
     },
   };
 
+  const rows: Row[] = [
+    ...(core?.steps ?? []).flatMap((step) => (words[step.key] ? [{ key: step.key, done: step.done, ...words[step.key] }] : [])),
+    ...appRows,
+  ];
   const summary = t('dashboard.setup.summary', '{done} of {total} done', { done: data.done, total: data.total });
 
   return (
@@ -125,9 +189,8 @@ export function FinishSettingUp() {
         <div className="h-full rounded-full bg-primary" style={{ width: `${Math.round((data.done / data.total) * 100)}%` }} />
       </div>
       <ul className="grid gap-3">
-        {data.steps.map((step) => {
-          const word = words[step.key];
-          if (word === undefined) return null;
+        {rows.map((step) => {
+          const word = step;
           return (
             <li key={step.key} className="flex items-center gap-3">
               <span className={step.done ? 'text-success-text' : 'text-muted-foreground'} aria-hidden="true">
@@ -135,7 +198,7 @@ export function FinishSettingUp() {
               </span>
               <div className="min-w-0 flex-1">
                 <p className={step.done ? 'text-sm text-muted-foreground' : 'text-sm font-medium text-foreground'}>{word.label}</p>
-                {!step.done && <p className="text-sm text-muted-foreground">{word.why}</p>}
+                {!step.done && word.why && <p className="text-sm text-muted-foreground">{word.why}</p>}
               </div>
               {!step.done && (
                 <Button variant="outline" size="sm" asChild>
