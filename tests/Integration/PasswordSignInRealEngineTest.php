@@ -76,22 +76,21 @@ final class PasswordSignInRealEngineTest extends TestCase
 
     public function testOffRefusesEveryGuardedRoute(): void
     {
-        $called = false;
-        $route = PasswordSignIn::guard(function () use (&$called): Response {
-            $called = true;
+        $calls = new \ArrayObject();
+        $route = PasswordSignIn::guard(function () use ($calls): Response {
+            $calls->append(true);
 
             return Response::json(['ok' => true]);
         }, $this->settings);
 
         self::assertSame(200, $route(new Request('POST', '/api/v1/login', [], '{}'))->getStatusCode());
-        self::assertTrue($called);
+        self::assertCount(1, $calls);
 
         $this->turnOff();
-        $called = false;
         $refused = $route(new Request('POST', '/api/v1/login', [], '{}'));
 
         self::assertSame(403, $refused->getStatusCode());
-        self::assertFalse($called, 'the password handler never runs');
+        self::assertCount(1, $calls, 'the password handler never runs');
         self::assertSame(PasswordSignIn::REFUSED_CODE, json_decode($refused->getBody(), true)['details']['code'] ?? null, $refused->getBody());
     }
 
@@ -147,8 +146,16 @@ final class PasswordSignInRealEngineTest extends TestCase
         ));
 
         self::assertSame(403, $accept->getStatusCode(), $accept->getBody());
-        self::assertSame(0, (int) $this->pdo->query("SELECT COUNT(*) FROM profile_emails WHERE email = 'newbie@whity.test'")->fetchColumn(), 'no account with a password was made');
-        self::assertSame('pending', (string) $this->pdo->query("SELECT status FROM invitations WHERE email = 'newbie@whity.test'")->fetchColumn(), 'the invitation still works through the provider');
+        self::assertSame(0, (int) $this->scalar("SELECT COUNT(*) FROM profile_emails WHERE email = 'newbie@whity.test'"), 'no account with a password was made');
+        self::assertSame('pending', (string) $this->scalar("SELECT status FROM invitations WHERE email = 'newbie@whity.test'"), 'the invitation still works through the provider');
+    }
+
+    private function scalar(string $sql): mixed
+    {
+        $statement = $this->pdo->query($sql);
+        self::assertNotFalse($statement, $sql);
+
+        return $statement->fetchColumn();
     }
 
     private function addOperatorProvider(): void
@@ -181,7 +188,7 @@ final class PasswordSignInRealEngineTest extends TestCase
     {
         $this->pdo->exec("INSERT INTO tenants (name, slug, created_at) VALUES ('Example Bakery', 'example-bakery', NOW())");
         $tenant = (int) $this->pdo->lastInsertId();
-        $role = (int) $this->pdo->query('SELECT id FROM roles ORDER BY id ASC LIMIT 1')->fetchColumn();
+        $role = (int) $this->scalar('SELECT id FROM roles ORDER BY id ASC LIMIT 1');
 
         return (new InvitationService($this->pdo, new ProfileProvisioner($this->pdo)))->invite($tenant, $email, $role)['token'];
     }
