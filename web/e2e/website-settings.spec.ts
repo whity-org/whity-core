@@ -58,6 +58,9 @@ test.describe('Website Settings — admin (settings:read/write/manage)', () => {
     // The product name is on Branding now, not General.
     await expect(page.getByLabel('Site name', { exact: true })).toHaveCount(0);
     await expect(page.getByLabel('Main language', { exact: true })).toBeEnabled();
+    // Owners and admins (tenants:write) rename their workspace here (WHIT-1189).
+    // Not renamed in this spec: other specs look the shared workspace up by name.
+    await expect(page.getByLabel('Workspace name', { exact: true })).toBeEditable();
 
     const supportEmail = page.getByLabel('Support email', { exact: true });
     await expect(supportEmail).toBeEnabled();
@@ -139,6 +142,8 @@ test.describe('Website Settings — read-only delegate (settings:read only)', ()
     await expect(page.getByLabel('Support email', { exact: true })).toBeDisabled();
     await expect(page.getByLabel('Timezone', { exact: true })).toBeDisabled();
     await expect(page.getByLabel('Main language', { exact: true })).toBeDisabled();
+    // Renaming the workspace takes tenants:write, which a settings:read delegate lacks.
+    await expect(page.getByLabel('Workspace name', { exact: true })).toHaveCount(0);
     await expect(
       page.getByRole('button', { name: 'Save tenant settings' })
     ).toHaveCount(0);
