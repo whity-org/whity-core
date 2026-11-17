@@ -11323,6 +11323,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspace/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the workspace templates on offer
+         * @description Core's Blank and the templates of the plugins on in this workspace, in the caller's language: what each sets up, whether it has examples and a guided setup, the paid plugin it offers with its trial, and which ones this workspace chose.
+         */
+        get: operations["get_api_v1_workspace_templates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/templates/examples": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove the example contacts and bookings a template added
+         * @description Cancels the example bookings and archives the example contacts still in the workspace, as the caller. Nothing else is touched.
+         */
+        delete: operations["delete_api_v1_workspace_templates_examples"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/templates/{key}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply a workspace template as the caller
+         * @description Sets the workspace up through core's own routes with the caller's permissions, adding only what is missing and never overwriting what the workspace changed. Each part that could not be done is listed with why. Free; the plugin it offers starts only through its own trial.
+         */
+        post: operations["post_api_v1_workspace_templates_key_apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces": {
         parameters: {
             query?: never;
@@ -11845,6 +11905,24 @@ export interface components {
         AgentUnassignResponse: {
             data: {
                 revokedCredentials: number;
+            };
+        };
+        ApplyWorkspaceTemplateRequest: {
+            /** @description Add the template's example contacts and bookings. Default true. */
+            examples?: boolean;
+        };
+        ApplyWorkspaceTemplateResponse: {
+            data: {
+                template: string;
+                /** @description How many of each part were made */
+                made: {
+                    [key: string]: number;
+                };
+                skipped: {
+                    part: string;
+                    key: string;
+                    reason: string;
+                }[];
             };
         };
         ApprovalStatusResponse: {
@@ -18540,6 +18618,12 @@ export interface components {
         RelationshipTypeListResponse: {
             data: components["schemas"]["RelationshipType"][];
         };
+        RemoveWorkspaceTemplateExamplesResponse: {
+            data: {
+                removed: number;
+                failed: number;
+            };
+        };
         ResolvedDocumentTheme: {
             /** @description The theme actually used, after falling back past any that isn't available */
             ref: string;
@@ -20899,6 +20983,42 @@ export interface components {
         };
         WorkspacePluginVersionResponse: {
             data: components["schemas"]["WorkspacePluginVersion"];
+        };
+        WorkspaceTemplateCard: {
+            key: string;
+            /** @description The plugin that offers it; null for core's Blank */
+            plugin?: string | null;
+            version: number;
+            name: string;
+            summary: string;
+            icon?: string | null;
+            setsUp: string[];
+            hasExamples: boolean;
+            hasSetup: boolean;
+            offer?: components["schemas"]["WorkspaceTemplateOffer"] | null;
+            chosen: boolean;
+        };
+        WorkspaceTemplateListResponse: {
+            data: {
+                templates: components["schemas"]["WorkspaceTemplateCard"][];
+                /** @description Keys of the templates this workspace applied */
+                chosen: string[];
+                /** @description Example contacts and bookings still in the workspace */
+                examples: number;
+            };
+        };
+        WorkspaceTemplateOffer: {
+            plugin: string;
+            /** @description What the workspace can do free in Whity */
+            free: string[];
+            /** @description What the plugin adds */
+            paid: string[];
+            trialDays: number;
+            trialAvailable: boolean;
+            /** @enum {string} */
+            state: "on" | "read_only" | "off";
+            reason?: string | null;
+            trialEndsAt?: string | null;
         };
     };
     responses: never;
@@ -81323,6 +81443,217 @@ export interface operations {
             };
             /** @description No longer open */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_workspace_templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The templates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceTemplateListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_workspace_templates_examples: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many were removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoveWorkspaceTemplateExamplesResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_templates_key_apply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The template's key (bakery) */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyWorkspaceTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description What was made and what was skipped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyWorkspaceTemplateResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description There is no such template */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
