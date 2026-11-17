@@ -62,6 +62,20 @@ final class WorkspaceCodePluginsApiHandler
         $this->seats = $seats;
     }
 
+    /** @var (\Closure(int): list<array<string, mixed>>)|null */
+    private ?\Closure $templateOnboardings = null;
+
+    /**
+     * WHIT-1195: the guided setups of the templates a workspace chose join
+     * the plugins' setups, under the names `template-{key}`.
+     *
+     * @param \Closure(int): list<array<string, mixed>> $onboardings by workspace
+     */
+    public function useTemplateOnboardings(\Closure $onboardings): void
+    {
+        $this->templateOnboardings = $onboardings;
+    }
+
     /**
      * GET /api/workspace/onboarding: the guided setups (SDK 1.109) of the
      * plugins on in this workspace that the caller may run, in their language.
@@ -72,7 +86,8 @@ final class WorkspaceCodePluginsApiHandler
             $profileId = self::profileId($request);
             $language = $this->language !== null ? (string) ($this->language)() : 'en';
             $data = [];
-            foreach ($this->loader->getOnboardings() as $onboarding) {
+            $templates = $this->templateOnboardings !== null ? ($this->templateOnboardings)($tenantId) : [];
+            foreach ([...$this->loader->getOnboardings(), ...$templates] as $onboarding) {
                 $permission = (string) $onboarding['permission'];
                 if ($this->roles !== null && ($profileId === null || !$this->roles->hasPermissionForProfile($profileId, $permission, $tenantId))) {
                     continue;

@@ -20,7 +20,7 @@ final class ExampleBakeryTemplate
             'version' => 2,
             'name' => $t('Bakery or café', 'مخبز أو مقهى'),
             'summary' => $t('Orders, a menu with prices and opening hours.', 'الطلبات وقائمة بالأسعار وساعات العمل.'),
-            'icon' => 'cake',
+            'icon' => 'recipe',
             'setsUp' => [$t('Your menu with prices', 'قائمتك بالأسعار'), $t('A cake order form', 'نموذج طلب كيك')],
             'settings' => ['billing.default_currency' => 'JOD', 'timezone' => 'Asia/Amman'],
             'calendar' => [

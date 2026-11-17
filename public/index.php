@@ -2928,10 +2928,19 @@ $workspaceTemplatesHandler = new \Whity\Api\WorkspaceTemplatesApiHandler(
     $codePluginActivation,
     $auditLogger,
     static fn (): string => $serverLabels->languageCode(),
+    static fn (): \Whity\Core\Workspace\Templates\TemplateSetup => new \Whity\Core\Workspace\Templates\TemplateSetup($hostWorkspaceSetup),
 );
+$workspaceCodePluginsHandler->useTemplateOnboardings(static fn (int $tenantId): array => $workspaceTemplatesHandler->onboardings($tenantId));
+$dashboardHandler->useTemplateSetup(static fn (int $tenantId): array => $workspaceTemplatesHandler->dashboardSetup($tenantId));
 $router->register('GET', '/api/workspace/templates', [$workspaceTemplatesHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 $router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', [$workspaceTemplatesHandler, 'apply'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 $router->register('DELETE', '/api/workspace/templates/examples', [$workspaceTemplatesHandler, 'removeExamples'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+// WHIT-1195: a chosen template's guided setup, as the caller.
+$router->register('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/status', [$workspaceTemplatesHandler, 'setupStatus'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/current/{kind:business|hours|booking}', [$workspaceTemplatesHandler, 'setupCurrent'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/services', [$workspaceTemplatesHandler, 'setupServices'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/offer/close', [$workspaceTemplatesHandler, 'closeOffer'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/{kind:business|hours|services|team|booking}', [$workspaceTemplatesHandler, 'setupSave'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 // EM.1: workspace emails carry the workspace's brand, and white-label by plan.
 $brandedEmailSender->useBranding(new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService));
 $tenantEntitlementsHandler = new \Whity\Api\TenantEntitlementsApiHandler(

@@ -18,6 +18,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Core\Workspace\Templates\TemplateApplier;
 use Whity\Core\Workspace\Templates\TemplateCatalogue;
 use Whity\Core\Workspace\Templates\TemplateRuns;
+use Whity\Core\Workspace\Templates\TemplateSetup;
 
 /**
  * WHIT-1194 (SDK 1.116): a plugin's templates are checked one by one, listed
@@ -131,6 +132,7 @@ PHP);
         self::assertNull($data['templates'][1]['plugin']);
         self::assertNull($data['templates'][1]['offer']);
         self::assertSame([], $data['chosen']);
+        self::assertTrue($data['offerPicker'], 'A new workspace with no template goes to the picker');
     }
 
     public function testATemplateIsOnlyOfferedWhereItsPluginIsOn(): void
@@ -150,7 +152,28 @@ PHP);
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame(['blank'], $this->list('en')['chosen']);
+        self::assertFalse($this->list('en')['offerPicker'], 'Once chosen, never again');
         self::assertSame(404, $this->handler('en')->apply($request, ['key' => 'nowhere'])->getStatusCode());
+    }
+
+    public function testAChosenTemplatesSetupJoinsTheOnboardingsAndTheDashboard(): void
+    {
+        TenantContext::setTenantId(self::BAKERY);
+        $handler = $this->handler('en');
+        self::assertSame([], $handler->onboardings(self::BAKERY), 'Nothing before a template is chosen');
+
+        $request = new Request('POST', '/api/v1/workspace/templates/bakery/apply', ['content-type' => 'application/json'], '{"examples":false}');
+        $request->user = (object) ['profile_id' => self::AMRO];
+        self::assertSame(200, $handler->apply($request, ['key' => 'bakery'])->getStatusCode());
+
+        $onboardings = $handler->onboardings(self::BAKERY);
+        self::assertSame(['template-bakery'], array_column($onboardings, 'plugin'));
+        self::assertSame('settings:write', $onboardings[0]['permission']);
+        self::assertSame(['hours', 'menu', 'logo', 'offer'], array_column($onboardings[0]['steps'], 'id'), 'The offer of the installed paid plugin comes last');
+
+        $points = $handler->dashboardSetup(self::BAKERY);
+        self::assertSame(['hours', 'menu', 'offer'], array_column($points[0]['points'], 'id'), 'A screen step has nothing to say it is done, so it is not a point');
+        self::assertSame('/api/v1/workspace/templates/bakery/setup/status', $points[0]['status']);
     }
 
     /** @return array<string, mixed> */
@@ -178,6 +201,7 @@ PHP);
             $this->activation,
             null,
             static fn (): string => $language,
+            static fn (): TemplateSetup => new TemplateSetup(new FakeSetup()),
         );
     }
 }

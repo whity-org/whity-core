@@ -13,6 +13,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Core\Workspace\Templates\TemplateApplier;
 use Whity\Core\Workspace\Templates\TemplateCatalogue;
 use Whity\Core\Workspace\Templates\TemplateRuns;
+use Whity\Core\Workspace\Templates\TemplateSetup;
 use Whity\Http\JsonBody;
 
 /**
@@ -20,6 +21,14 @@ use Whity\Http\JsonBody;
  *   GET    /api/workspace/templates              → the cards, which ones this workspace chose, live examples
  *   POST   /api/workspace/templates/{key}/apply  → { examples?: bool } apply it as the caller
  *   DELETE /api/workspace/templates/examples     → remove the examples in one click
+ *
+ * and a chosen template's guided setup (WHIT-1195), listed with the plugins'
+ * in `GET /api/workspace/onboarding` as `template-{key}`:
+ *   GET  /api/workspace/templates/{key}/setup/status         → which steps are done
+ *   GET  /api/workspace/templates/{key}/setup/current/{kind} → what a step opens with
+ *   GET  /api/workspace/templates/{key}/setup/services       → the template's services to tick
+ *   POST /api/workspace/templates/{key}/setup/{kind}         → save a step, as the caller
+ *   POST /api/workspace/templates/{key}/setup/offer/close    → "Not now" on the plugin offer
  *
  * Templates are free. A template's `offer` is shown only when the plugin it
  * names is installed and paid; the trial itself starts through
@@ -31,7 +40,13 @@ final class WorkspaceTemplatesApiHandler
     public const AUDIT_APPLIED = 'workspace_template.applied';
     public const AUDIT_EXAMPLES_REMOVED = 'workspace_template.examples_removed';
 
-    /** @param \Closure(): TemplateApplier $applier */
+    /** A workspace this new, with no template yet, is sent to the picker after sign-in. */
+    public const PICKER_DAYS = 14;
+
+    /**
+     * @param \Closure(): TemplateApplier $applier
+     * @param (\Closure(): TemplateSetup)|null $setup
+     */
     public function __construct(
         private readonly TemplateCatalogue $catalogue,
         private readonly TemplateRuns $runs,
@@ -39,7 +54,167 @@ final class WorkspaceTemplatesApiHandler
         private readonly ?CodePluginActivation $activation = null,
         private readonly ?AuditLogger $audit = null,
         private readonly ?\Closure $language = null,
+        private readonly ?\Closure $setup = null,
     ) {
+    }
+
+    /**
+     * The guided setups of the templates this workspace chose, as plugin
+     * onboarding entries with text still `{en, ar}` (WHIT-1195).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function onboardings(int $tenantId): array
+    {
+        $out = [];
+        foreach ($this->runs->forTenant($tenantId) as $run) {
+            $template = $this->catalogue->find($run['template_key']);
+            if ($template === null) {
+                continue;
+            }
+            $entry = TemplateSetup::onboarding($template, $this->rawOffer($template), \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+            if ($entry !== null) {
+                $out[] = $entry;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The chosen templates' steps as dashboard setup points (SDK 1.115 shape):
+     * a screen step is left out, since nothing in the workspace says it is
+     * done, and at most six are listed.
+     *
+     * @return list<array{plugin: string, permission: string, status: string, points: list<array<string, mixed>>}>
+     */
+    public function dashboardSetup(int $tenantId): array
+    {
+        $out = [];
+        foreach ($this->onboardings($tenantId) as $entry) {
+            $points = [];
+            foreach ($entry['steps'] as $step) {
+                if (self::isScreenStep($entry, (string) $step['id'])) {
+                    continue;
+                }
+                $points[] = ['id' => $step['id'], 'label' => $step['title'], 'why' => $step['description']];
+            }
+            if ($points !== []) {
+                $out[] = ['plugin' => (string) $entry['plugin'], 'permission' => (string) $entry['permission'], 'status' => (string) $entry['status'], 'points' => array_slice($points, 0, 6)];
+            }
+        }
+
+        return $out;
+    }
+
+    /** @param array<string, mixed> $entry */
+    private function isScreenStep(array $entry, string $stepId): bool
+    {
+        $template = $this->catalogue->find(substr((string) $entry['plugin'], strlen(TemplateSetup::PREFIX)));
+        if ($template === null) {
+            return false;
+        }
+        foreach (is_array($template['setup']['steps'] ?? null) ? $template['setup']['steps'] : [] as $step) {
+            if (is_array($step) && $step['id'] === $stepId) {
+                return $step['kind'] === 'screen';
+            }
+        }
+
+        return false;
+    }
+
+    /** @param array<string, string> $params */
+    public function setupStatus(Request $request, array $params = []): Response
+    {
+        return $this->withSetup($request, $params, function (TemplateSetup $setup, array $template, int $tenantId, int $profileId): Response {
+            $offer = $this->rawOffer($template);
+            $state = $offer !== null && $this->activation !== null ? $this->activation->stateFor((string) $offer['plugin'], $tenantId) : null;
+            $run = $this->runs->find($tenantId, (string) $template['key']);
+
+            $steps = $setup->status($template, $profileId, $state, ($run['offer_closed_at'] ?? null) !== null);
+
+            // The stepper reads `steps`, the dashboard's setup points `points`.
+            return Response::json(['data' => ['steps' => $steps, 'points' => $steps]]);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function setupCurrent(Request $request, array $params = []): Response
+    {
+        return $this->withSetup($request, $params, static fn (TemplateSetup $setup, array $template, int $tenantId, int $profileId): Response => Response::json(['data' => $setup->current((string) ($params['kind'] ?? ''), $profileId)]));
+    }
+
+    /** @param array<string, string> $params */
+    public function setupServices(Request $request, array $params = []): Response
+    {
+        return $this->withSetup($request, $params, static fn (TemplateSetup $setup, array $template): Response => Response::json(['data' => $setup->serviceRows($template)]));
+    }
+
+    /** @param array<string, string> $params */
+    public function setupSave(Request $request, array $params = []): Response
+    {
+        return $this->withSetup($request, $params, static function (TemplateSetup $setup, array $template, int $tenantId, int $profileId) use ($request, $params): Response {
+            $kind = (string) ($params['kind'] ?? '');
+            $kinds = array_column(is_array($template['setup']['steps'] ?? null) ? $template['setup']['steps'] : [], 'kind');
+            if (!in_array($kind, $kinds, true)) {
+                return Response::error('This template has no such step.', 404);
+            }
+
+            try {
+                return Response::json(['data' => $setup->save($kind, $profileId, JsonBody::parsed($request))]);
+            } catch (\InvalidArgumentException $e) {
+                return Response::error($e->getMessage(), 422, ['reason' => 'unreadable']);
+            }
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function closeOffer(Request $request, array $params = []): Response
+    {
+        return $this->withSetup($request, $params, function (TemplateSetup $setup, array $template, int $tenantId): Response {
+            return Response::json(['data' => ['closed' => $this->runs->close($tenantId, (string) $template['key'], 'offer')]]);
+        });
+    }
+
+    /**
+     * Run a setup route for a template this workspace chose.
+     *
+     * @param array<string, string> $params
+     * @param callable(TemplateSetup, array<string, mixed>, int, int): Response $then
+     */
+    private function withSetup(Request $request, array $params, callable $then): Response
+    {
+        return $this->inWorkspace(function (int $tenantId) use ($request, $params, $then): Response {
+            $profileId = self::profileId($request);
+            if ($profileId === null || $this->setup === null) {
+                return Response::error('Sign in to set up this workspace.', 401);
+            }
+            $key = (string) ($params['key'] ?? '');
+            $template = $this->catalogue->find($key);
+            if ($template === null || $this->runs->find($tenantId, $key) === null) {
+                return Response::error('This workspace did not start from that template.', 404);
+            }
+
+            return $then(($this->setup)(), $template, $tenantId, $profileId);
+        });
+    }
+
+    /**
+     * The template's offer with its text still `{en, ar}` and the plugin's
+     * trial days, when the plugin is installed and paid.
+     *
+     * @param array<string, mixed> $template
+     * @return array<string, mixed>|null
+     */
+    private function rawOffer(array $template): ?array
+    {
+        $offer = $template['offer'] ?? null;
+        if (!is_array($offer) || $this->activation === null) {
+            return null;
+        }
+        $paid = $this->activation->paidAccessOf((string) $offer['plugin']);
+
+        return $paid === null ? null : $offer + ['trialDays' => $paid['trialDays']];
     }
 
     public function list(Request $request): Response
@@ -67,6 +242,7 @@ final class WorkspaceTemplatesApiHandler
             return Response::json(['data' => [
                 'templates' => $cards,
                 'chosen' => $chosen,
+                'offerPicker' => $chosen === [] && $this->runs->isNew($tenantId, self::PICKER_DAYS),
                 'examples' => count($this->runs->liveExamples($tenantId)),
             ]]);
         });

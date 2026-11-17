@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useRichTranslation, useTranslation } from '@whity/features/i18n';
 import { clearReferral, readReferralCode } from '@/lib/referral';
 import { continueSignupPlugin, rememberSignupPlugin, signupPluginFrom } from '@/lib/signup-plugin';
+import { templatePickerPath } from '@/lib/workspace-template';
 import { SsoLoginButtons } from '@/components/sso-login-buttons';
 
 /**
@@ -217,7 +218,7 @@ export default function RegisterPage() {
         if (loginRes.ok) {
           await refreshAuth();
           addToast(t('register.toast.welcome', 'Welcome! Your workspace is ready.'), 'success');
-          router.push((await continueSignupPlugin()) ?? '/dashboard');
+          router.push((await continueSignupPlugin()) ?? (await templatePickerPath()) ?? '/dashboard');
         } else {
           // Account exists but auto-login did not complete (unexpected for a
           // fresh single-membership owner) — send them to the login page.
