@@ -3235,7 +3235,7 @@
         "settings.meta.website.plans.label": "Plans on the website",
         "settings.meta.workspaces.additional_plan.help": "The plan key a person’s second and later owned workspaces start on, in a trial, so each extra workspace pays. Their first starts on the default plan, and being invited stays free. Empty means the default plan for every workspace.",
         "settings.meta.workspaces.additional_plan.label": "Plan for each further workspace",
-        "settings.meta.workspaces.additional_trial_days.help": "How long that plan is free before the workspace has to be paid for. 0 means it opens only once it’s paid. Used only when the plan above is set.",
+        "settings.meta.workspaces.additional_trial_days.help": "How long that plan is free. If it isn’t paid when the trial ends, the workspace becomes read-only until it is; nothing is deleted. 0 means it is read-only until it’s paid. Used only when the plan above is set.",
         "settings.meta.workspaces.additional_trial_days.label": "Trial for each further workspace (days)",
         "settings.meta.workspaces.max_owned_per_person.help": "The most workspaces one person may own, counting ones they co-own. 0 means no limit.",
         "settings.meta.workspaces.max_owned_per_person.label": "Workspaces one person may own",

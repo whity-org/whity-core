@@ -350,7 +350,7 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
       label: t('settings.meta.workspaces.additional_trial_days.label', 'Trial for each further workspace (days)'),
       help: t(
         'settings.meta.workspaces.additional_trial_days.help',
-        'How long that plan is free before the workspace has to be paid for. 0 means it opens only once it’s paid. Used only when the plan above is set.'
+        'How long that plan is free. If it isn’t paid when the trial ends, the workspace becomes read-only until it is; nothing is deleted. 0 means it is read-only until it’s paid. Used only when the plan above is set.'
       ),
     },
     'auth.password_sign_in': {

@@ -8,7 +8,8 @@ import { createAuthedApi, ensureUser } from './support/api';
  * With `workspaces.additional_plan` set, a person who already owns a workspace
  * is told on /workspaces/new, before creating it, that their first workspace is
  * free and this one starts a trial of the paid plan, with its monthly price.
- * Creating it puts it on that plan in a trial, behind block_all.
+ * Creating it puts it on that plan in a trial; unpaid after it, the workspace
+ * is read-only (block_writes), never closed.
  *
  * It runs as a person made for this run, not the seeded admin: a workspace
  * with members cannot be deleted, and the admin owning extra workspaces would
@@ -66,7 +67,7 @@ test.describe('Create a further workspace on a paid plan (WHIT-1203)', () => {
         'workspaces.self_create_enabled': 'true',
         'workspaces.max_owned_per_person': '0',
         'workspaces.additional_plan': planKey,
-        'workspaces.additional_trial_days': '14',
+        'workspaces.additional_trial_days': '30',
         'billing.default_currency': 'USD',
       });
 
@@ -87,8 +88,9 @@ test.describe('Create a further workspace on a paid plan (WHIT-1203)', () => {
       const notice = page.getByTestId('workspace-new-paid');
       await expect(notice).toBeVisible();
       await expect(notice).toContainText('Your first workspace is free.');
-      await expect(notice).toContainText('This one starts a 14-day trial of Team, then');
+      await expect(notice).toContainText('This one starts a 30-day trial of Team, then');
       await expect(page.getByTestId('workspace-new-price')).toHaveText('$69.00');
+      await expect(notice).toContainText('it becomes read-only until it is. Nothing is deleted.');
       // One main button.
       await expect(page.getByRole('button', { name: 'Create workspace' })).toHaveCount(1);
 
@@ -109,7 +111,7 @@ test.describe('Create a further workspace on a paid plan (WHIT-1203)', () => {
         data: { status: string; plan: { plan_key: string } | null; enforcement_mode: string | null; current_period_end: string | null };
       };
       expect(subscription.data.status).toBe('trialing');
-      expect(subscription.data.enforcement_mode).toBe('block_all');
+      expect(subscription.data.enforcement_mode).toBe('block_writes');
       expect(subscription.data.current_period_end).not.toBeNull();
       expect(subscription.data.plan?.plan_key).toBe(planKey);
     } finally {

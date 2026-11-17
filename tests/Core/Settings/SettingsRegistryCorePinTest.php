@@ -289,7 +289,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'workspaces.self_create_enabled' => 'false',
             'workspaces.max_owned_per_person' => '0',
             'workspaces.additional_plan' => '',
-            'workspaces.additional_trial_days' => '14',
+            'workspaces.additional_trial_days' => '30',
             'auth.password_sign_in' => 'true',
             'auth.desktop_login_max_hours' => '72',
             'storage.driver' => 'local',

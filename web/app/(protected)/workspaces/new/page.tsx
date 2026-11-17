@@ -40,9 +40,11 @@ type FieldError = 'name_required' | 'name_too_long' | null;
 type StartsOn = NonNullable<NonNullable<ReturnType<typeof useWorkspaceCreateState>>['starts_on']>;
 
 /**
- * "Your first workspace is free. This one starts a 14-day trial of Team, then
- * $69.00 a month." One sentence per case with a {price} hole, so the amount is
- * isolated (`<bdi>`, left to right) inside Arabic text.
+ * "Your first workspace is free. This one starts a 30-day trial of Team, then
+ * $69.00 a month. If it isn't paid when the trial ends, it becomes read-only
+ * until it is. Nothing is deleted." One sentence per case with a {price} hole,
+ * so the amount is isolated (`<bdi>`, left to right) inside Arabic text.
+ * Unpaid means read-only, never closed (owner 2026-11-17).
  */
 function PaidWorkspaceNotice({ t, startsOn }: { t: TranslateFn; startsOn: StartsOn }) {
   const plan = startsOn.plan_name;
@@ -54,13 +56,17 @@ function PaidWorkspaceNotice({ t, startsOn }: { t: TranslateFn; startsOn: Starts
   if (price !== null && days > 0) {
     sentence = t('workspaceNew.paid.trialThenPrice', 'This one starts a {days}-day trial of {plan}, then {price} a month.', { days, plan });
   } else if (price !== null) {
-    sentence = t('workspaceNew.paid.price', 'This one is on {plan} at {price} a month, and opens once it’s paid.', { plan });
+    sentence = t('workspaceNew.paid.price', 'This one is on {plan} at {price} a month, and is read-only until it’s paid.', { plan });
   } else if (days > 0) {
-    sentence = t('workspaceNew.paid.trial', 'This one starts a {days}-day trial of {plan}, then it needs paying for.', { days, plan });
+    sentence = t('workspaceNew.paid.trial', 'This one starts a {days}-day trial of {plan}.', { days, plan });
   } else {
-    sentence = t('workspaceNew.paid.noTrial', 'This one is on {plan}, and opens once it’s paid.', { plan });
+    sentence = t('workspaceNew.paid.noTrial', 'This one is on {plan}, and is read-only until it’s paid.', { plan });
   }
   const [before, after] = sentence.split('{price}');
+  const afterTrial =
+    days > 0
+      ? t('workspaceNew.paid.afterTrial', 'If it isn’t paid when the trial ends, it becomes read-only until it is. Nothing is deleted.')
+      : null;
 
   return (
     <Alert data-testid="workspace-new-paid">
@@ -75,6 +81,7 @@ function PaidWorkspaceNotice({ t, startsOn }: { t: TranslateFn; startsOn: Starts
             {after}
           </>
         )}
+        {afterTrial !== null && <> {afterTrial}</>}
       </AlertDescription>
     </Alert>
   );

@@ -23,7 +23,7 @@ use Whity\Core\Tenant\WorkspaceOwners;
 /**
  * "Each new workspace pays" (WHIT-1203): a person's first owned workspace
  * starts on the default plan, every further one on the additional plan in a
- * trial, then behind the payment gate. On the real schema from migrations.
+ * 30-day trial, then read-only until it is paid. On the real schema from migrations.
  */
 final class AdditionalWorkspacePlanRealEngineTest extends TestCase
 {
@@ -62,7 +62,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
     public function testSelfHostedDefaultsLeaveEveryWorkspaceOnTheDefaultPlan(): void
     {
         self::assertSame('', SettingsRegistry::defaultFor(SettingsRegistry::WORKSPACES_ADDITIONAL_PLAN));
-        self::assertSame('14', SettingsRegistry::defaultFor(SettingsRegistry::WORKSPACES_ADDITIONAL_TRIAL_DAYS));
+        self::assertSame('30', SettingsRegistry::defaultFor(SettingsRegistry::WORKSPACES_ADDITIONAL_TRIAL_DAYS));
         self::assertTrue(SettingsRegistry::isGlobalOnly(SettingsRegistry::WORKSPACES_ADDITIONAL_PLAN));
         self::assertTrue(SettingsRegistry::isGlobalOnly(SettingsRegistry::WORKSPACES_ADDITIONAL_TRIAL_DAYS));
 
@@ -95,7 +95,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
             [
                 'plan_key' => 'team',
                 'plan_name' => 'Team',
-                'trial_days' => 14,
+                'trial_days' => 30,
                 'price' => ['unit_amount' => 6900, 'currency' => 'USD', 'billing_period' => 'month'],
             ],
             $this->creator->stateFor($pid)['starts_on']
@@ -110,14 +110,14 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
         self::assertIsArray($row);
         self::assertSame($this->teamId, (int) $row['plan_id']);
         self::assertSame('trialing', $row['status']);
-        self::assertSame('block_all', $row['enforcement_mode']);
+        self::assertSame('block_writes', $row['enforcement_mode']);
         $ends = (int) strtotime((string) $row['current_period_end']);
-        self::assertGreaterThanOrEqual($before + 14 * 86400 - 1, $ends);
-        self::assertLessThanOrEqual(time() + 14 * 86400 + 1, $ends);
+        self::assertGreaterThanOrEqual($before + 30 * 86400 - 1, $ends);
+        self::assertLessThanOrEqual(time() + 30 * 86400 + 1, $ends);
         self::assertSame($pid, (int) $row['assigned_by']);
     }
 
-    public function testTheTrialOpensTheWorkspaceAndItsEndClosesItBehindTheGate(): void
+    public function testTheTrialOpensTheWorkspaceAndItsEndMakesItReadOnly(): void
     {
         $this->appWhityDevSettings();
         $pid = $this->profile('Awss Haddad', 'awss@example.test');
@@ -129,9 +129,14 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
         self::assertTrue($during->allowed);
         self::assertFalse($during->warn);
 
-        $after = $this->subscriptions(fn (): int => $ends + 60)->decide($tenantId, false);
-        self::assertFalse($after->allowed);
-        self::assertSame('block_all', $after->mode);
+        // After it: read-only. Reading still works (with the unpaid warning),
+        // a change is refused, nothing is closed.
+        $read = $this->subscriptions(fn (): int => $ends + 60)->decide($tenantId, false);
+        self::assertTrue($read->allowed);
+        self::assertTrue($read->warn);
+        $write = $this->subscriptions(fn (): int => $ends + 60)->decide($tenantId, true);
+        self::assertFalse($write->allowed);
+        self::assertSame('block_writes', $write->mode);
     }
 
     public function testATrialWithNoEndDateStaysOpenAsBefore(): void
@@ -146,7 +151,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
         self::assertTrue($this->subscriptions(fn (): int => time() + 365 * 86400)->decide($tenantId, true)->allowed);
     }
 
-    public function testNoTrialMeansTheSecondWorkspaceWaitsBehindTheGate(): void
+    public function testNoTrialMeansTheSecondWorkspaceIsReadOnlyUntilPaid(): void
     {
         $this->appWhityDevSettings();
         $this->settings->setGlobal(SettingsRegistry::WORKSPACES_ADDITIONAL_TRIAL_DAYS, '0');
@@ -157,8 +162,9 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
         $row = $this->planRow($tenantId);
         self::assertIsArray($row);
         self::assertSame($this->teamId, (int) $row['plan_id']);
-        self::assertSame(['expired', 'block_all', null], [$row['status'], $row['enforcement_mode'], $row['current_period_end']]);
-        self::assertFalse($this->subscriptions()->decide($tenantId, false)->allowed);
+        self::assertSame(['expired', 'block_writes', null], [$row['status'], $row['enforcement_mode'], $row['current_period_end']]);
+        self::assertTrue($this->subscriptions()->decide($tenantId, false)->allowed);
+        self::assertFalse($this->subscriptions()->decide($tenantId, true)->allowed);
     }
 
     public function testACoOwnedWorkspaceCountsSoTheNextOneTheyCreateIsPaid(): void
@@ -198,11 +204,12 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
 
         $first = $this->planRow((int) $this->creator->createFor($pid, 'Example Bakery')['tenant_id']);
         self::assertIsArray($first);
+        // The first keeps sign-up's own closed gate, unchanged.
         self::assertSame(['expired', 'block_all'], [$first['status'], $first['enforcement_mode']]);
 
         $second = $this->planRow((int) $this->creator->createFor($pid, 'Example Cafe')['tenant_id']);
         self::assertIsArray($second);
-        self::assertSame(['trialing', 'block_all'], [$second['status'], $second['enforcement_mode']]);
+        self::assertSame(['trialing', 'block_writes'], [$second['status'], $second['enforcement_mode']]);
         self::assertSame($this->teamId, (int) $second['plan_id']);
     }
 
@@ -245,7 +252,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
 
         $state = $this->creator->stateFor($pid)['starts_on'];
         self::assertIsArray($state);
-        self::assertSame(14, $state['trial_days']);
+        self::assertSame(30, $state['trial_days']);
         self::assertNull($state['price']);
     }
 

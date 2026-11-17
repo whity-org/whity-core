@@ -17,9 +17,11 @@ use Whity\Core\Subscription\SubscriptionService;
  * Owning more than one workspace is what is paid. A person's FIRST owned
  * workspace starts on `billing.default_plan` (Free on app.whity.dev); every
  * further one they create starts on `workspaces.additional_plan` (Team there)
- * in a trial of `workspaces.additional_trial_days`, and when the trial ends
- * unpaid it is behind the payment gate (`block_all`), the same gate sign-up
- * uses when payment is required. Being invited into workspaces is never
+ * in a trial of `workspaces.additional_trial_days` (30 days, owner
+ * 2026-11-17), and when the trial ends unpaid it turns READ-ONLY
+ * (`block_writes`, owner 2026-11-17): people still open and read everything,
+ * changes are refused until it is paid, and nothing is deleted. The same
+ * "grace, then read-only" rule the paid plugins follow. Being invited into workspaces is never
  * counted: only {@see WorkspaceOwners} rows are, so a co-owned workspace
  * counts for each of its owners.
  *
@@ -126,9 +128,9 @@ final class AdditionalWorkspacePlan
 
     /**
      * Put a just-founded workspace on the paid plan: in a trial that ends
-     * $trialDays from now, or, with no trial, straight behind the payment gate.
-     * Either way enforcement is `block_all`, so an unpaid workspace is closed
-     * once the trial is over. Must run inside the founder's transaction, so the
+     * $trialDays from now, or, with no trial, already unpaid. Either way
+     * enforcement is `block_writes`, so an unpaid workspace is read-only once
+     * the trial is over: readable, never closed, nothing deleted. Must run inside the founder's transaction, so the
      * workspace and its bill are one act or neither.
      *
      * @param array{plan_id: int, plan_key: string, plan_name: string, trial_days: int} $plan
@@ -154,14 +156,14 @@ final class AdditionalWorkspacePlan
             ':assigned_by' => $assignedBy,
             ':status'      => $trialDays > 0 ? SubscriptionService::STATUS_TRIALING : SubscriptionService::STATUS_EXPIRED,
             ':period_end'  => $periodEnd,
-            ':mode'        => SubscriptionService::MODE_BLOCK_ALL,
+            ':mode'        => SubscriptionService::MODE_BLOCK_WRITES,
         ]);
     }
 
     /** @param array<string, mixed> $global */
     private static function trialDays(array $global): int
     {
-        $raw = (string) ($global[SettingsRegistry::WORKSPACES_ADDITIONAL_TRIAL_DAYS] ?? '14');
-        return preg_match('/^\d+$/', $raw) === 1 ? min(90, (int) $raw) : 14;
+        $raw = (string) ($global[SettingsRegistry::WORKSPACES_ADDITIONAL_TRIAL_DAYS] ?? '30');
+        return preg_match('/^\d+$/', $raw) === 1 ? min(90, (int) $raw) : 30;
     }
 }

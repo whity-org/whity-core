@@ -3236,7 +3236,7 @@
         "settings.meta.website.plans.label": "الخطط في الموقع",
         "settings.meta.workspaces.additional_plan.help": "مفتاح الخطة التي تبدأ عليها مساحة العمل الثانية وما بعدها التي يملكها الشخص، بتجربة مجانية، لتكون كل مساحة عمل إضافية مدفوعة. الأولى تبدأ على الخطة الافتراضية، والانضمام بدعوة يبقى مجانيًا. اتركه فارغًا لتبدأ كل مساحة عمل على الخطة الافتراضية.",
         "settings.meta.workspaces.additional_plan.label": "خطة كل مساحة عمل إضافية",
-        "settings.meta.workspaces.additional_trial_days.help": "كم يومًا تبقى تلك الخطة مجانية قبل أن يلزم دفع اشتراك مساحة العمل. 0 يعني أنها لا تُفتح إلا بعد الدفع. يُستخدم فقط عند تحديد الخطة أعلاه.",
+        "settings.meta.workspaces.additional_trial_days.help": "كم يومًا تبقى تلك الخطة مجانية. إذا لم يُدفع الاشتراك عند انتهاء التجربة، تصبح مساحة العمل للقراءة فقط إلى أن يُدفع، ولا يُحذف شيء. 0 يعني أنها للقراءة فقط إلى أن يُدفع اشتراكها. يُستخدم فقط عند تحديد الخطة أعلاه.",
         "settings.meta.workspaces.additional_trial_days.label": "تجربة كل مساحة عمل إضافية (بالأيام)",
         "settings.meta.workspaces.max_owned_per_person.help": "أقصى عدد من مساحات العمل يملكها شخص واحد، بما فيها التي يشترك في ملكيتها. 0 يعني بلا حد.",
         "settings.meta.workspaces.max_owned_per_person.label": "مساحات العمل التي يملكها شخص واحد",

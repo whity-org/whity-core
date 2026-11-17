@@ -28,7 +28,7 @@ use Whity\Core\Settings\SettingsService;
  * (`billing.default_plan`, Free on app.whity.dev), behind the payment gate when
  * the operator requires payment for new workspaces, exactly as sign-up does.
  * Their second and later ones start on `workspaces.additional_plan` in a trial,
- * then behind the payment gate (WHIT-1203, {@see AdditionalWorkspacePlan}).
+ * then read-only until paid (WHIT-1203, {@see AdditionalWorkspacePlan}).
  * Which one applies is decided under the profile lock, from the same owned
  * count the limit reads.
  */
