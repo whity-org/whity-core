@@ -487,17 +487,19 @@ final class TemplateSetup
      */
     private static function offerBlocks(array $offer, string $api): array
     {
-        $plugin = (string) $offer['plugin'];
+        // SDK 1.117: the name people know the plugin by, never its id.
+        $named = is_array($offer['pluginName'] ?? null) ? $offer['pluginName'] : [];
+        $plugin = ['en' => (string) ($named['en'] ?? $offer['plugin']), 'ar' => (string) ($named['ar'] ?? $offer['plugin'])];
         $days = (int) ($offer['trialDays'] ?? 0);
         $ticks = static fn (array $lines): array => array_map(static fn (array $line): array => ['type' => 'text', 'value' => ['en' => '✓ ' . $line['en'], 'ar' => '✓ ' . $line['ar']]], $lines);
         $blocks = [
             ['type' => 'text', 'tone' => 'muted', 'value' => [
-                'en' => 'Your template is free, and so is everything below in Whity. ' . $plugin . ' is a paid app that does more for your kind of business.',
-                'ar' => 'القالب مجاني، وكذلك كل ما يلي في Whity. ' . $plugin . ' تطبيق مدفوع يقدّم المزيد لنوع عملك.',
+                'en' => 'Your template is free, and so is everything below in Whity. ' . $plugin['en'] . ' is a paid app that does more for your kind of business.',
+                'ar' => 'القالب مجاني، وكذلك كل ما يلي في Whity. ' . $plugin['ar'] . ' تطبيق مدفوع يقدّم المزيد لنوع عملك.',
             ]],
             ['type' => 'text', 'value' => ['en' => 'Free in Whity', 'ar' => 'مجاناً في Whity']],
             ...$ticks((array) $offer['free']),
-            ['type' => 'text', 'value' => ['en' => 'With ' . $plugin, 'ar' => 'مع ' . $plugin]],
+            ['type' => 'text', 'value' => ['en' => 'With ' . $plugin['en'], 'ar' => 'مع ' . $plugin['ar']]],
             ...$ticks((array) $offer['paid']),
         ];
         if ($days > 0) {

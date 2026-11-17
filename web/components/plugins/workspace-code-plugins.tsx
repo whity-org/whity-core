@@ -123,7 +123,7 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
       return;
     }
     addToast(
-      t('plugins.paid.trialStarted', 'Your {days}-day trial of {name} has started.', { days: plugin.trialDays ?? 0, name: plugin.name }),
+      t('plugins.paid.trialStarted', 'Your {days}-day trial of {name} has started.', { days: plugin.trialDays ?? 0, name: plugin.displayName }),
       'success',
     );
     refetch();
@@ -191,9 +191,9 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
     }
     addToast(
       on
-        ? t('plugins.workspaceCode.turnedOn', '{name} is on for this workspace.', { name: plugin.name })
+        ? t('plugins.workspaceCode.turnedOn', '{name} is on for this workspace.', { name: plugin.displayName })
         : t('plugins.workspaceCode.turnedOff', '{name} is off. Its data is kept, and turning it back on brings everything back.', {
-            name: plugin.name,
+            name: plugin.displayName,
           }),
       'success',
     );
@@ -262,7 +262,7 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
               <li key={plugin.name} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-foreground">{plugin.name}</p>
+                    <p className="font-medium text-foreground">{plugin.displayName}</p>
                     <span className="font-mono text-muted-foreground" dir="ltr">
                       {plugin.version}
                     </span>
@@ -328,7 +328,7 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
                       checked={plugin.enabled}
                       disabled={!allowed || pending === plugin.name}
                       onCheckedChange={(checked) => void switchPlugin(plugin, checked)}
-                      aria-label={t('plugins.workspaceCode.switch', 'Use {name} in this workspace', { name: plugin.name })}
+                      aria-label={t('plugins.workspaceCode.switch', 'Use {name} in this workspace', { name: plugin.displayName })}
                     />
                   ) : null}
                 </div>

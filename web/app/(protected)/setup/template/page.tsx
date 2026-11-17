@@ -147,7 +147,7 @@ function TemplateCard({ template, onChoose }: { template: Template; onChoose: ()
         <SetsUp lines={template.setsUp.slice(0, 5)} />
         {template.offer && template.offer.trialDays > 0 ? (
           <span className="mt-auto text-xs text-muted-foreground">
-            {t('templates.offers', 'Offers {plugin} · {days}-day free trial', { plugin: template.offer.plugin, days: template.offer.trialDays })}
+            {t('templates.offers', 'Offers {plugin} · {days}-day free trial', { plugin: template.offer.pluginName, days: template.offer.trialDays })}
           </span>
         ) : null}
       </button>

@@ -42,6 +42,28 @@ final class WorkspaceTemplatesRealEngineTest extends TestCase
         self::$dir = sys_get_temp_dir() . '/whity_ws_templates_' . uniqid();
         mkdir(self::$dir . '/WsTemplates', 0755, true);
         mkdir(self::$dir . '/WsCounter', 0755, true);
+        mkdir(self::$dir . '/WsBadName', 0755, true);
+        file_put_contents(self::$dir . '/WsBadName/Plugin.php', <<<'PHP'
+<?php
+
+declare(strict_types=1);
+
+namespace WsBadName;
+
+use Whity\Sdk\PluginDisplayNameInterface;
+use Whity\Sdk\PluginInterface;
+
+final class Plugin implements PluginInterface, PluginDisplayNameInterface
+{
+    public function getName(): string { return 'WsBadName'; }
+    public function getVersion(): string { return '1.0.0'; }
+    public function getMigrations(): array { return []; }
+    public function getPermissions(): array { return []; }
+    public function getHooks(): array { return []; }
+    public function getRoutes(): array { return []; }
+    public function getDisplayName(): array { return ['en' => 'Only English']; }
+}
+PHP);
         file_put_contents(self::$dir . '/WsTemplates/Plugin.php', <<<'PHP'
 <?php
 
@@ -80,10 +102,12 @@ declare(strict_types=1);
 namespace WsCounter;
 
 use Whity\Sdk\PluginAccessInterface;
+use Whity\Sdk\PluginDisplayNameInterface;
 use Whity\Sdk\PluginInterface;
 
-final class Plugin implements PluginInterface, PluginAccessInterface
+final class Plugin implements PluginInterface, PluginAccessInterface, PluginDisplayNameInterface
 {
+    public function getDisplayName(): array { return ['en' => 'Whity for Counters', 'ar' => 'Whity للكاونترات']; }
     public function getName(): string { return 'WsCounter'; }
     public function getVersion(): string { return '1.0.0'; }
     public function getMigrations(): array { return []; }
@@ -132,6 +156,7 @@ PHP);
         self::assertSame(30, $bakery['offer']['trialDays'], 'The template\'s own trial, since the plugin offers one');
         self::assertTrue($bakery['offer']['trialAvailable']);
         self::assertSame(['الطلبات عند الكاونتر برمز QR'], $bakery['offer']['paid']);
+        self::assertSame('Whity للكاونترات', $bakery['offer']['pluginName'], 'The display name, never the id; Whity stays in Latin letters');
         self::assertNull($data['templates'][1]['plugin']);
         self::assertNull($data['templates'][1]['offer']);
         self::assertSame([], $data['chosen']);
@@ -200,6 +225,30 @@ PHP);
         self::assertSame(409, $handler->startOfferTrial($request, ['key' => 'bakery'])->getStatusCode(), 'One trial per workspace');
     }
 
+    public function testDisplayNamesFallBackToTheId(): void
+    {
+        $names = $this->loader->getDisplayNames();
+
+        self::assertSame(['en' => 'Whity for Counters', 'ar' => 'Whity للكاونترات'], $names['WsCounter']);
+        self::assertSame(['en' => 'WsBadName', 'ar' => 'WsBadName'], $names['WsBadName'], 'A declaration without Arabic is ignored');
+        self::assertSame(['en' => 'WsTemplates', 'ar' => 'WsTemplates'], $names['WsTemplates'], 'None declared');
+    }
+
+    public function testTheOfferStepNamesThePluginByItsDisplayName(): void
+    {
+        TenantContext::setTenantId(self::BAKERY);
+        $handler = $this->handler('en');
+        $request = new Request('POST', '/api/v1/workspace/templates/bakery/apply', ['content-type' => 'application/json'], '{"examples":false}');
+        $request->user = (object) ['profile_id' => self::AMRO];
+        $handler->apply($request, ['key' => 'bakery']);
+
+        $offer = json_encode(end($handler->onboardings(self::BAKERY)[0]['steps'])['blocks'], JSON_UNESCAPED_UNICODE);
+        self::assertIsString($offer);
+        self::assertStringContainsString('With Whity for Counters', $offer);
+        self::assertStringContainsString('مع Whity للكاونترات', $offer);
+        self::assertStringNotContainsString('WsCounter', $offer);
+    }
+
     /** @return array<string, mixed> */
     private function list(string $language): array
     {
@@ -218,7 +267,7 @@ PHP);
     {
         $runs = new TemplateRuns($this->pdo);
 
-        return new WorkspaceTemplatesApiHandler(
+        $handler = new WorkspaceTemplatesApiHandler(
             new TemplateCatalogue($this->loader),
             $runs,
             static fn (): TemplateApplier => new TemplateApplier(new FakeSetup(), $runs, static fn (): bool => true),
@@ -227,5 +276,8 @@ PHP);
             static fn (): string => $language,
             static fn (): TemplateSetup => new TemplateSetup(new FakeSetup()),
         );
+        $handler->useDisplayNames(fn (): array => $this->loader->getDisplayNames());
+
+        return $handler;
     }
 }

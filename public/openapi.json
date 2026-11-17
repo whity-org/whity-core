@@ -111420,6 +111420,10 @@
                         "type": "string",
                         "description": "The plugin's name"
                     },
+                    "displayName": {
+                        "type": "string",
+                        "description": "The name people see, in the reader's language (SDK 1.117); the name when the plugin declares none"
+                    },
                     "version": {
                         "type": "string"
                     },
@@ -111534,6 +111538,7 @@
                 },
                 "required": [
                     "name",
+                    "displayName",
                     "version",
                     "access",
                     "canSwitch",
@@ -112182,6 +112187,10 @@
                     "plugin": {
                         "type": "string"
                     },
+                    "pluginName": {
+                        "type": "string",
+                        "description": "The plugin's display name in the reader's language (SDK 1.117)"
+                    },
                     "free": {
                         "type": "array",
                         "items": {
@@ -112221,6 +112230,7 @@
                 },
                 "required": [
                     "plugin",
+                    "pluginName",
                     "free",
                     "paid",
                     "trialDays",
