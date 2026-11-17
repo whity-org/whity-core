@@ -86,7 +86,7 @@ final class WorkspaceOwners
      */
     public function countOwnedBy(int $profileId): int
     {
-        // @tenant-guard-ignore: the person's OWN rows across every workspace, counted for the per-person limit
+        // The person's OWN rows across every workspace, counted for the per-person limit.
         $stmt = $this->db->prepare('SELECT COUNT(*) FROM workspace_owners WHERE profile_id = :p AND tenant_id <> 0');
         $stmt->execute([':p' => $profileId]);
         return (int) $stmt->fetchColumn();
