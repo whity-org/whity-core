@@ -5612,6 +5612,12 @@ $displayPreferencesHandler = new \Whity\Api\DisplayPreferencesApiHandler($tokenV
 $router->register('GET', '/api/me/display-preferences', [$displayPreferencesHandler, 'get'], null);
 $router->register('PUT', '/api/me/display-preferences', [$displayPreferencesHandler, 'update'], null);
 
+// WHIT-1181: a person's own phone number, E.164 on their profile. Self-scoped,
+// session-gated, no RBAC permission, no current password.
+$myPhoneHandler = new \Whity\Api\MyPhoneApiHandler($tokenValidator, new \Whity\Core\Identity\PersonalPhone($db->getPdo()));
+$router->register('GET', '/api/me/phone', [$myPhoneHandler, 'get'], null);
+$router->register('PUT', '/api/me/phone', [$myPhoneHandler, 'update'], null);
+
 // Per-tenant notification SENDER configuration (WC-notifications, d70c6083). A
 // tenant admin manages their OWN tenant's per-channel sender (from/reply-to,
 // transport, encrypted creds). settings:manage gated; creds are write-only.
@@ -6147,6 +6153,8 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     $signingChallengeRepository,
     // WHIT-1168: accept an invitation by signing in with the identity provider.
     $invitationService,
+    // WHIT-1181: a verified phone_number fills the person's own phone.
+    new \Whity\Core\Identity\PersonalPhone($db->getPdo()),
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).
@@ -6176,6 +6184,29 @@ $workspacesHandler = new \Whity\Api\WorkspacesApiHandler(
 );
 $router->register('GET', '/api/workspaces/new', [$workspacesHandler, 'state'], null);
 $router->register('POST', '/api/workspaces', [$workspacesHandler, 'create'], null);
+// WHIT-1170: owners, and offers to hand a workspace over or co-own it. The
+// workspace routes act in the caller's current workspace (owners act, staff
+// read); the /me routes are the person offered, from any workspace. Making and
+// accepting an offer go through "Confirm it's you" (GatedApproval).
+$workspaceOwnersHandler = new \Whity\Api\WorkspaceOwnersApiHandler(
+    new \Whity\Core\Tenant\WorkspaceOwnership(
+        $db->getPdo(),
+        $auditLogger,
+        $hookManager,
+        new \Whity\Core\Tenant\OwnershipNotifier($notificationDispatcher, $brandedEmailSender, $profileEmailRepository, $frontendUrls->base()),
+    ),
+    $tokenValidator,
+    $gatedApproval,
+);
+$router->register('GET',    '/api/workspace/owners',                         [$workspaceOwnersHandler, 'list'], null);
+$router->register('POST',   '/api/workspace/owners/offers/identity-check',   [$workspaceOwnersHandler, 'offerIdentityCheck'], null);
+$router->register('POST',   '/api/workspace/owners/offers',                  [$workspaceOwnersHandler, 'offer'], null);
+$router->register('DELETE', '/api/workspace/owners/offers/{id:\d+}',         [$workspaceOwnersHandler, 'cancel'], null);
+$router->register('GET',    '/api/me/ownership-offers',                      [$workspaceOwnersHandler, 'mine'], null);
+$router->register('GET',    '/api/me/ownership-offers/{id:\d+}',             [$workspaceOwnersHandler, 'showMine'], null);
+$router->register('POST',   '/api/me/ownership-offers/{id:\d+}/identity-check', [$workspaceOwnersHandler, 'acceptIdentityCheck'], null);
+$router->register('POST',   '/api/me/ownership-offers/{id:\d+}/accept',      [$workspaceOwnersHandler, 'accept'], null);
+$router->register('POST',   '/api/me/ownership-offers/{id:\d+}/decline',     [$workspaceOwnersHandler, 'decline'], null);
 
 // 13g. Authenticated "connected accounts" management (WC-f3b17bd2): the caller
 // lists / unlinks their own federated identities. Self-authenticating via the

@@ -15,6 +15,8 @@ namespace Whity\Core\Security;
  *    two admins), and starting one for a named person;
  *  - {@see self::PASSWORD_RESET}: applying a password reset that waits for an
  *    admin (`auth.password_reset_approval_required`);
+ *  - {@see self::WORKSPACE_OWNERSHIP}: offering ownership of a workspace or
+ *    co-ownership of it, and accepting such an offer (WHIT-1170);
  *  - {@see self::AGENT_PROPOSAL}: approving an agent's proposal that is "Needs
  *    verifying" (tier 3, {@see \Whity\Core\Agent\ProposalTier}).
  *
@@ -35,14 +37,16 @@ final class GatedApproval
     public const TWO_FACTOR_RECOVERY = '2fa-recovery';
     public const PASSWORD_RESET = 'password-reset';
     public const AGENT_PROPOSAL = 'agent-proposal';
+    public const WORKSPACE_OWNERSHIP = 'workspace-ownership';
 
-    private const KINDS = [self::TWO_FACTOR_RECOVERY, self::PASSWORD_RESET, self::AGENT_PROPOSAL];
+    private const KINDS = [self::TWO_FACTOR_RECOVERY, self::PASSWORD_RESET, self::AGENT_PROPOSAL, self::WORKSPACE_OWNERSHIP];
 
     /** What the emailed code says it is for, per kind. */
     private const WHAT = [
         self::TWO_FACTOR_RECOVERY => 'approving a two-step reset',
         self::PASSWORD_RESET => 'approving a password reset',
         self::AGENT_PROPOSAL => 'approving what an agent asked to do',
+        self::WORKSPACE_OWNERSHIP => 'changing who owns a workspace',
     ];
 
     public function __construct(private readonly IdentityCheck $identity)

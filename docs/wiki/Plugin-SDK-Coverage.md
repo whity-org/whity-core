@@ -136,6 +136,7 @@ Planned: later.
 - tenant.creating to tenant.deleted hook events (SDK 1.0)
 - Veto a workspace deletion inside its transaction (SDK 1.15)
 - Owned tables cascade on workspace deletion (PluginTablesInterface) (SDK 1.20)
+- workspace.owner_added, workspace.owner_removed and workspace.ownership_transferred when a workspace changes hands or gains or loses a co-owner (SDK 1.112)
 
 **Missing**
 

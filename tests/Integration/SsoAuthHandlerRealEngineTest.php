@@ -130,6 +130,7 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
             $this->hooks,
             $frontendUrls,
             invitations: new \Whity\Core\Identity\InvitationService($this->pdo, new \Whity\Core\Identity\ProfileProvisioner($this->pdo)),
+            phones: new \Whity\Core\Identity\PersonalPhone($this->pdo),
         );
         $this->handler = ($this->makeHandler)();
 
@@ -222,6 +223,8 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
     /**
      * Build a valid oidc_flow cookie + matching $_GET, and a signed id_token in
      * the stubbed token response.
+     *
+     * @param array<string, mixed> $extraClaims more claims in the id_token (WHIT-1181: phone_number)
      */
     private function primeFlow(
         string $state = 'state-1',
@@ -231,7 +234,8 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         bool $emailVerified = true,
         ?int $providerId = null,
         ?int $tenantId = null,
-        ?string $invite = null
+        ?string $invite = null,
+        array $extraClaims = [],
     ): void {
         // Default flow is GLOBAL-TRUST (operator provider @ system tenant 0).
         $flow = $this->jwtParser->create([
@@ -250,7 +254,7 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
             'iss' => self::ISSUER, 'aud' => self::CLIENT_ID, 'sub' => $sub,
             'email' => $email, 'email_verified' => $emailVerified, 'name' => 'Alice',
             'nonce' => $nonce, 'iat' => $now, 'exp' => $now + 3600,
-        ], $this->privatePem, 'RS256', $this->kid);
+        ] + $extraClaims, $this->privatePem, 'RS256', $this->kid);
         $this->http->tokenResponse = ['id_token' => $idToken, 'access_token' => 'at'];
     }
 
@@ -799,6 +803,74 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
 
         self::assertStringContainsString('/login?sso_error=', $this->location($res));
         self::assertSame($tenantsBefore, (int) $this->col('SELECT COUNT(*) FROM tenants'));
+    }
+
+    // ── WHIT-1181: the person's phone from a verified phone_number ─────────
+
+    private function phoneOf(int $profileId): ?string
+    {
+        $phone = $this->col('SELECT phone FROM profiles WHERE id = ' . $profileId);
+
+        return is_string($phone) ? $phone : null;
+    }
+
+    private function signInWithPhone(string $phone, bool $verified = true): void
+    {
+        $this->primeFlow(extraClaims: ['phone_number' => $phone, 'phone_number_verified' => $verified]);
+        $_GET = ['code' => 'authcode', 'state' => 'state-1'];
+        $res = $this->runCallback();
+        self::assertSame(self::APP_URL . '/dashboard', $this->location($res), $res->getBody());
+    }
+
+    public function testAVerifiedPhoneFromTheOperatorsProviderFillsAnEmptyPhoneAndRefreshesItsOwn(): void
+    {
+        $this->linkIdentity();
+        $this->signInWithPhone('+962 79 123 4567');
+        self::assertSame('+962791234567', $this->phoneOf($this->profileId));
+        self::assertSame('identity_provider', $this->col('SELECT phone_source FROM profiles WHERE id = ' . $this->profileId));
+
+        $this->signInWithPhone('+962791112222');
+        self::assertSame('+962791112222', $this->phoneOf($this->profileId), 'a phone that came from a sign-in follows the provider');
+    }
+
+    public function testASignInNeverReplacesOrRefillsAPhoneThePersonSetOrCleared(): void
+    {
+        $this->linkIdentity();
+        $phones = new \Whity\Core\Identity\PersonalPhone($this->pdo);
+
+        $phones->setByPerson($this->profileId, '+447400123456');
+        $this->signInWithPhone('+962791234567');
+        self::assertSame('+447400123456', $this->phoneOf($this->profileId));
+
+        $phones->setByPerson($this->profileId, null);
+        $this->signInWithPhone('+962791234567');
+        self::assertNull($this->phoneOf($this->profileId), 'cleared on purpose stays cleared');
+    }
+
+    public function testAnUnverifiedOrUnreadablePhoneIsIgnored(): void
+    {
+        $this->linkIdentity();
+        $this->signInWithPhone('+962791234567', verified: false);
+        self::assertNull($this->phoneOf($this->profileId));
+
+        $this->signInWithPhone('0791234567');
+        self::assertNull($this->phoneOf($this->profileId), 'no country code, nothing to store');
+    }
+
+    public function testAWorkspacesOwnProviderNeverWritesThePersonsPhone(): void
+    {
+        $this->primeFlow(
+            sub: 'tenant-sub',
+            email: 'alice@acme.test',
+            emailVerified: true,
+            providerId: $this->tenantProviderId,
+            tenantId: $this->tenantId,
+            extraClaims: ['phone_number' => '+962791234567', 'phone_number_verified' => true],
+        );
+        $_GET = ['code' => 'authcode', 'state' => 'state-1'];
+        $res = $this->runCallback();
+        self::assertSame(self::APP_URL . '/dashboard', $this->location($res), $res->getBody());
+        self::assertNull($this->phoneOf($this->profileId));
     }
 }
 

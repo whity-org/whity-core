@@ -121,6 +121,10 @@
                 {
                     "what": "Owned tables cascade on workspace deletion (PluginTablesInterface)",
                     "since": "1.20"
+                },
+                {
+                    "what": "workspace.owner_added, workspace.owner_removed and workspace.ownership_transferred when a workspace changes hands or gains or loses a co-owner",
+                    "since": "1.112"
                 }
             ],
             "missing": [

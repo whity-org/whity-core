@@ -4,6 +4,7 @@ import * as React from "react"
 import { IconCheck, IconPlus, IconSearch, IconSelector } from "@tabler/icons-react"
 
 import { Popover, PopoverContent, PopoverTrigger } from "./popover"
+import { RoleSummary, type RoleSummaryLabels } from "./role-summary"
 import { TenantLogo } from "./tenant-logo"
 import { cn } from "./utils"
 
@@ -23,6 +24,13 @@ export interface TenantSwitcherWorkspace {
   name: string
   /** The person's role in this workspace, shown under its name. */
   role?: string
+  /**
+   * Every role held here, the primary first. Takes the place of `role` and
+   * shows as one line: the first role and "+N more" (WHIT-1175).
+   */
+  roles?: string[]
+  /** Words before the roles on that line, such as "Owner". */
+  roleBefore?: string
   logoUrl?: string | null
 }
 
@@ -32,6 +40,8 @@ export interface TenantSwitcherLabels {
   find?: string
   noResults?: string
   create?: string
+  /** The "+N more" and list labels of each row's roles. */
+  roles?: RoleSummaryLabels
 }
 
 export interface TenantSwitcherProps {
@@ -113,11 +123,11 @@ function TenantSwitcher({
             />
           </div>
         )}
-        <ul role="listbox" aria-label={labels.find ?? "Find a workspace"} className="grid gap-px">
+        <ul role="listbox" aria-label={labels.find ?? "Find a workspace"} className="grid grid-cols-1 gap-px">
           {shown.map((workspace) => {
             const selected = workspace.id === current?.id
             return (
-              <li key={workspace.id} role="option" aria-selected={selected}>
+              <li key={workspace.id} role="option" aria-selected={selected} className="min-w-0">
                 <button
                   type="button"
                   onClick={() => choose(workspace.id)}
@@ -131,8 +141,19 @@ function TenantSwitcher({
                     <span className={cn("block truncate text-sm", selected ? "text-primary-tint-foreground" : "text-foreground")}>
                       {workspace.name}
                     </span>
-                    {workspace.role && (
-                      <span className="block truncate text-xs text-muted-foreground">{workspace.role}</span>
+                    {workspace.roles && workspace.roles.length > 0 ? (
+                      <RoleSummary
+                        roles={workspace.roles}
+                        before={workspace.roleBefore}
+                        labels={labels.roles}
+                        className="text-xs text-muted-foreground"
+                      />
+                    ) : (
+                      (workspace.roleBefore || workspace.role) && (
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {[workspace.roleBefore, workspace.role].filter(Boolean).join(" · ")}
+                        </span>
+                      )
                     )}
                   </span>
                   {selected && <IconCheck aria-hidden="true" className="size-4 shrink-0" />}

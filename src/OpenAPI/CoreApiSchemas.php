@@ -2880,6 +2880,33 @@ final class CoreApiSchemas
             ]),
             [
                 'method' => 'GET',
+                'path' => '/api/me/phone',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Your own phone number (WHIT-1181)',
+                    'tags' => ['me'],
+                    'responses' => [200 => self::jsonResponse('Your phone', 'MyPhoneResponse')] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/phone',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Set or remove your own phone number (WHIT-1181)',
+                    'description' => 'Stored as E.164 on your profile, across every workspace. A number you set here is never replaced by one from a sign-in.',
+                    'tags' => ['me'],
+                    'request' => 'MyPhoneRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('Your phone', 'MyPhoneResponse'),
+                        422 => self::errorResponse('Not a phone number with its country code'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
                 'path' => '/api/me/away',
                 'requiredRole' => null,
                 'requiredPermission' => null,
@@ -4677,6 +4704,7 @@ final class CoreApiSchemas
         $sessionUser = self::object([
             'id' => self::int(),
             'email' => self::str(),
+            'phone' => self::str(true) + ['description' => 'Your own phone number in E.164, or null (WHIT-1181).'],
             'role' => self::str(),
             'tenant_id' => self::int(),
         ], ['id', 'email', 'role', 'tenant_id']);
@@ -5070,6 +5098,16 @@ final class CoreApiSchemas
                 'user' => $selfUser,
             ] + $tokenPair, ['user']),
 
+            // GET and PUT /api/me/phone (WHIT-1181)
+            'MyPhoneResponse' => self::object([
+                'data' => self::object([
+                    'phone' => self::str(true) + ['description' => 'E.164, such as +962791234567, or null when none is set.'],
+                ], ['phone']),
+            ], ['data']),
+            'MyPhoneRequest' => self::object([
+                'phone' => self::str(true) + ['description' => 'With its country code; spaces, dashes and Arabic-Indic digits are accepted and stored as E.164. Null or empty removes it.'],
+            ], ['phone']),
+
             // PATCH /api/me — request body
             'MeUpdateRequest' => self::object([
                 'email' => self::str(),
@@ -5227,6 +5265,46 @@ final class CoreApiSchemas
                 'tenant_id' => self::int(),
                 'name' => self::str(),
             ], ['tenant_id', 'name'])),
+            // Owners and ownership offers (WHIT-1170).
+            'OwnershipOffer' => self::object([
+                'id' => self::int(),
+                'tenant_id' => self::int(),
+                'workspace_name' => self::str(),
+                'kind' => ['type' => 'string', 'enum' => ['transfer', 'co_owner']],
+                'from' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name']),
+                'to' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name']),
+                'leave_after' => self::bool(),
+                'status' => ['type' => 'string', 'enum' => ['open', 'accepted', 'declined', 'cancelled', 'expired', 'void']],
+                'expires_at' => self::str(),
+                'created_at' => self::str(),
+            ], ['id', 'tenant_id', 'workspace_name', 'kind', 'from', 'to', 'leave_after', 'status', 'expires_at', 'created_at']),
+            'OwnershipOfferResponse' => self::dataEnvelope(SchemaBuilder::ref('OwnershipOffer')),
+            'OwnershipOfferListResponse' => self::listEnvelope('OwnershipOffer'),
+            'WorkspaceOwnersResponse' => self::dataEnvelope(self::object([
+                'owners' => ['type' => 'array', 'items' => self::object([
+                    'profile_id' => self::int(),
+                    'name' => self::str(),
+                    'email' => self::str(),
+                    'since' => self::str(),
+                ], ['profile_id', 'name', 'email', 'since'])],
+                'offers' => ['type' => 'array', 'items' => SchemaBuilder::ref('OwnershipOffer')],
+                'candidates' => ['type' => 'array', 'items' => self::object([
+                    'profile_id' => self::int(),
+                    'name' => self::str(),
+                    'email' => self::str(),
+                ], ['profile_id', 'name', 'email'])],
+                'is_owner' => self::bool(),
+            ], ['owners', 'offers', 'candidates', 'is_owner'])),
+            'OwnershipOfferCheckRequest' => self::object([
+                'to_profile_id' => self::int(),
+                'kind' => ['type' => 'string', 'enum' => ['transfer', 'co_owner']],
+            ], ['to_profile_id', 'kind']),
+            'OwnershipOfferCreateRequest' => self::object([
+                'to_profile_id' => self::int(),
+                'kind' => ['type' => 'string', 'enum' => ['transfer', 'co_owner']],
+                'leave_after' => ['type' => 'boolean', 'description' => 'Transfer only: the giver leaves the workspace once it is accepted'],
+                'code' => ['type' => 'string', 'description' => 'The code from "Confirm it is you"; empty after a fresh sign-in'],
+            ], ['to_profile_id', 'kind', 'code']),
             'WorkspaceCreateStateResponse' => self::dataEnvelope(self::object([
                 'allowed' => self::bool(),
                 'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['disabled', 'limit_reached', null]],
@@ -10569,7 +10647,7 @@ final class CoreApiSchemas
             'PublicBookingVisitor' => self::object([
                 'name' => self::str() + ['description' => 'The display name on their own profile; may be empty.'],
                 'email' => self::str() + ['description' => 'The email of their own sign-in; may be empty.'],
-                'phone' => self::str(true) + ['description' => 'Null until a profile carries a phone number.'],
+                'phone' => self::str(true) + ['description' => 'Their own phone in E.164, or null.'],
             ], ['name', 'email', 'phone']) + ['nullable' => true, 'description' => 'The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in.'],
             'PublicBookingPage' => self::object([
                 'workspace' => self::object(['name' => self::str(), 'slug' => self::str()], ['name', 'slug']),
@@ -12758,11 +12836,109 @@ final class CoreApiSchemas
             ],
         ];
 
+        // WHIT-1170: owners and ownership offers. Authenticated, no single
+        // permission: staff read, the handler checks who may act.
+        $offerId = [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'ID of the offer.', 'schema' => ['type' => 'integer']]];
+        $ownerRoute = static fn (string $method, string $path, array $schema): array => [
+            'method' => $method,
+            'path' => $path,
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => $schema + ['tags' => ['tenants']],
+        ];
+        $ownershipRoutes = [
+            $ownerRoute('GET', '/api/workspace/owners', [
+                'summary' => 'Who owns this workspace; for owners, the open offers and who could be offered',
+                'responses' => [
+                    200 => self::jsonResponse('Owners, offers and candidates', 'WorkspaceOwnersResponse'),
+                    403 => self::errorResponse('Not a staff member of this workspace'),
+                    422 => self::errorResponse('The platform workspace has no owners'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('POST', '/api/workspace/owners/offers/identity-check', [
+                'summary' => 'Start "confirm it is you" before offering ownership or co-ownership',
+                'request' => 'OwnershipOfferCheckRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The check to make', 'IdentityCheckResponse'),
+                    403 => self::errorResponse('Only an owner can offer'),
+                    409 => self::errorResponse('Already an owner, or an offer is waiting'),
+                    422 => self::errorResponse('Not an active member, or the caller themselves'),
+                    429 => self::errorResponse('Too many codes were sent lately'),
+                    503 => self::errorResponse('Confirming it is you is not available'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('POST', '/api/workspace/owners/offers', [
+                'summary' => 'Offer ownership (hand over) or co-ownership to a member; they accept within 7 days',
+                'request' => 'OwnershipOfferCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The offer', 'OwnershipOfferResponse'),
+                    403 => self::errorResponse('Only an owner can offer, or the identity check failed'),
+                    409 => self::errorResponse('Already an owner, or an offer is waiting'),
+                    422 => self::errorResponse('Not an active member, or the caller themselves'),
+                    503 => self::errorResponse('Confirming it is you is not available'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('DELETE', '/api/workspace/owners/offers/{id:\d+}', [
+                'summary' => 'Withdraw an open offer',
+                'parameters' => $offerId,
+                'responses' => [
+                    204 => ['description' => 'Withdrawn'],
+                    403 => self::errorResponse('Only an owner can withdraw'),
+                    409 => self::errorResponse('No longer open'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('GET', '/api/me/ownership-offers', [
+                'summary' => 'Open offers of ownership made to me, in any workspace',
+                'responses' => [200 => self::jsonResponse('My open offers', 'OwnershipOfferListResponse')] + self::authErrors(),
+            ]),
+            $ownerRoute('GET', '/api/me/ownership-offers/{id:\d+}', [
+                'summary' => 'One offer made to me',
+                'parameters' => $offerId,
+                'responses' => [
+                    200 => self::jsonResponse('The offer', 'OwnershipOfferResponse'),
+                    404 => self::errorResponse('No such offer made to you'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('POST', '/api/me/ownership-offers/{id:\d+}/identity-check', [
+                'summary' => 'Start "confirm it is you" before accepting an offer',
+                'parameters' => $offerId,
+                'responses' => [
+                    200 => self::jsonResponse('The check to make', 'IdentityCheckResponse'),
+                    404 => self::errorResponse('No such offer made to you'),
+                    409 => self::errorResponse('No longer open'),
+                    429 => self::errorResponse('Too many codes were sent lately'),
+                    503 => self::errorResponse('Confirming it is you is not available'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('POST', '/api/me/ownership-offers/{id:\d+}/accept', [
+                'summary' => 'Accept an offer: become an owner (on a hand-over the giver stops being one)',
+                'parameters' => $offerId,
+                'request' => 'GatedApprovalRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The accepted offer', 'OwnershipOfferResponse'),
+                    403 => self::errorResponse('The identity check failed'),
+                    404 => self::errorResponse('No such offer made to you'),
+                    409 => self::errorResponse('No longer open, or expired'),
+                    422 => self::errorResponse('No longer an active member of that workspace'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('POST', '/api/me/ownership-offers/{id:\d+}/decline', [
+                'summary' => 'Decline an offer',
+                'parameters' => $offerId,
+                'responses' => [
+                    204 => ['description' => 'Declined'],
+                    404 => self::errorResponse('No such offer made to you'),
+                    409 => self::errorResponse('No longer open'),
+                ] + self::authErrors(),
+            ]),
+        ];
+
         return [
             $ssoWorkspaceShow,
             $ssoWorkspaceCreate,
             $workspaceCreateState,
             $workspaceCreate,
+            ...$ownershipRoutes,
             self::permissionRoute('GET', '/api/identity-providers', 'auth_providers:manage', [
                 'summary' => 'List the tenant\'s configured identity providers',
                 'tags' => ['sso'],

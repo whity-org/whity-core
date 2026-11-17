@@ -224,6 +224,8 @@ final class CoreTables
         'stored_files' => '298_create_stored_files.php',
         // Who owns each workspace (WHIT-1169).
         'workspace_owners' => '300_create_workspace_owners.php',
+        // Offers to hand a workspace over or co-own it (WHIT-1170).
+        'workspace_ownership_offers' => '301_create_workspace_ownership_offers.php',
         'workspace_template_items' => '305_create_workspace_templates.php',
         'workspace_template_runs' => '305_create_workspace_templates.php',
         // Votes in chat polls (UC.5).

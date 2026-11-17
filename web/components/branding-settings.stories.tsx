@@ -8,32 +8,32 @@ const meta = {
   title: "App/BrandingSettings",
   component: BrandingSettings,
   tags: ["autodocs"],
-  // The main colour refreshes the app router after a save.
+  // Saving refreshes the app's branding.
   parameters: { layout: "padded", nextjs: { appDirectory: true } },
 } satisfies Meta<typeof BrandingSettings>
 
 export default meta
 type Story = StoryObj<typeof meta>
 
-// Saving the main colour PATCHes the tenant or global settings.
+// Save branding PATCHes the tenant or global settings.
 const saveSettings = http.patch("*/api/v1/settings*", () => HttpResponse.json({ data: {} }))
 
 const withWrite = [capabilitiesHandler(["settings:write", "settings:manage"]), saveSettings, ...defaultHandlers]
 
-// Tenant admin who can override per-tenant branding assets.
-export const TenantOverridable: Story = {
-  args: { tenantOverridable: true },
+// A workspace admin editing the workspace's own branding.
+export const Workspace: Story = {
+  args: { scope: "tenant", canWrite: true },
   parameters: { msw: { handlers: withWrite } },
 }
 
-// Read-only view: caller lacks settings:write, so uploads are disabled.
+// Read-only: no settings:write, so no Save, Upload or Clear.
 export const ReadOnly: Story = {
-  args: { tenantOverridable: true },
+  args: { scope: "tenant", canWrite: false },
   parameters: { msw: { handlers: [capabilitiesHandler([]), ...defaultHandlers] } },
 }
 
-// System tenant: only the global (platform-wide) assets are editable.
+// The system tenant: the platform-wide defaults and the web address.
 export const SystemTenant: Story = {
-  args: { tenantOverridable: false },
+  args: { scope: "global", canWrite: true },
   parameters: { msw: { handlers: withWrite } },
 }

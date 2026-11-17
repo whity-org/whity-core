@@ -28,7 +28,9 @@ import { TenantSwitcher as WorkspaceSwitcher } from '@whity/ui/tenant-switcher';
 import { AppSidebar, useForcedRail } from '@whity/ui/app-sidebar';
 import { useCurrentLanguage, useLanguageCode, useI18nEnabled, useTranslation } from '@whity/features/i18n';
 import { roleLabel } from '@whity/features/roles/role-label';
-import { rolesLabel } from '@/lib/workspace-memberships';
+import { RoleSummary } from '@whity/ui/role-summary';
+import { roleLabels } from '@/lib/workspace-memberships';
+import { useRoleSummaryLabels } from '@/hooks/useRoleSummaryLabels';
 import { useCanOfferWorkspaceCreate } from '@/lib/use-workspace-create';
 import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
 import {
@@ -76,6 +78,7 @@ export function TenantSwitcher({ memberships, activeTenantId, collapsed }: Tenan
   const t = useTranslation('common');
   const currentLanguage = useLanguageCode();
   const [isSwitching, setIsSwitching] = useState(false);
+  const roleSummaryLabels = useRoleSummaryLabels();
 
   const workspaces = useMemo(
     () =>
@@ -83,11 +86,10 @@ export function TenantSwitcher({ memberships, activeTenantId, collapsed }: Tenan
         id: String(m.tenant_id),
         // #821: the reader's language, else the original name.
         name: localizedText(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
-        // "Owner" first when they own it (WHIT-1169), then their roles.
-        role:
-          [m.is_owner ? t('sidebar.tenantSwitcher.owner', 'Owner') : '', capitalise(rolesLabel(m))]
-            .filter((part) => part !== '')
-            .join(', ') || undefined,
+        // "Owner" first when they own it (WHIT-1169), then the first role and
+        // "+N more" on one line (WHIT-1175).
+        roleBefore: m.is_owner ? t('sidebar.tenantSwitcher.owner', 'Owner') : undefined,
+        roles: roleLabels(m).map(capitalise),
       })),
     [memberships, currentLanguage, t],
   );
@@ -130,6 +132,7 @@ export function TenantSwitcher({ memberships, activeTenantId, collapsed }: Tenan
         trigger: t('sidebar.tenantSwitcher.trigger', 'Switch workspace, current: {name}'),
         find: t('sidebar.tenantSwitcher.find', 'Find a workspace'),
         noResults: t('sidebar.tenantSwitcher.noResults', 'No workspace matches'),
+        roles: roleSummaryLabels,
       }}
     />
   );
@@ -227,7 +230,11 @@ export function Sidebar() {
   // what the old foot showed as four stacked controls.
   const displayName = user?.display_name || user?.email || '';
   const activeMembership = memberships.find((membership) => membership.tenant_id === user?.tenant_id);
-  const activeRole = (activeMembership ? rolesLabel(activeMembership) : '') || user?.role || '';
+  // Every role held here, in words; the row shows the first and "+N more"
+  // (WHIT-1175) and the menu it opens lists them all.
+  const activeRoles = activeMembership ? roleLabels(activeMembership) : [];
+  if (activeRoles.length === 0 && user?.role) activeRoles.push(roleLabel(user.role));
+  const roleSummaryLabels = useRoleSummaryLabels();
   const footer = (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -243,9 +250,11 @@ export function Sidebar() {
               <span className="block truncate text-sm font-medium" data-testid="account-name">
                 {displayName}
               </span>
-              {activeRole && (
-                <span className="block truncate text-xs text-muted-foreground">{roleLabel(activeRole)}</span>
-              )}
+              <RoleSummary
+                roles={activeRoles}
+                labels={roleSummaryLabels}
+                className="text-xs text-muted-foreground"
+              />
             </span>
             <IconSelector size={16} className="shrink-0 text-muted-foreground" aria-hidden />
           </>
@@ -256,6 +265,13 @@ export function Sidebar() {
           <span className="block truncate text-sm font-medium text-foreground">{displayName}</span>
           {user?.email && user.email !== displayName && (
             <span className="block truncate text-xs text-muted-foreground">{user.email}</span>
+          )}
+          {activeRoles.length > 1 && (
+            // The row shows the first role and "+N more"; the menu names them all,
+            // wrapping, so keyboard users reach the list too (WHIT-1175).
+            <span className="mt-1 block text-xs text-muted-foreground" data-testid="account-roles">
+              {activeRoles.join(roleSummaryLabels.separator ?? ', ')}
+            </span>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

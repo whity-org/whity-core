@@ -50,6 +50,7 @@ export const SETTING_KEYWORDS: Readonly<Record<string, string>> = {
   'document-themes': 'document themes letterhead print printout stamp أنساق المستندات الترويسة طباعة ختم',
   billing: 'billing plan subscription invoices payment upgrade الباقة الفوترة الاشتراك فواتير دفع ترقية',
   plugins: 'plugins apps store extensions add-ons الإضافات المتجر تطبيقات',
+  owners: 'owners owner co-owner hand over transfer ownership shareholders المالكون المالك شريك نقل الملكية تسليم',
   security: 'security password rules policy two-step required الأمان سياسة كلمة المرور إلزامي',
   sso: 'single sign-on sso google microsoft oidc saml الدخول الموحد',
   signup: 'sign-up sign up register registration join التسجيل تسجيل انضمام',
