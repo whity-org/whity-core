@@ -29,6 +29,7 @@ use Whity\Storage\StorageKey;
  *  - GET  /api/v1/branding/asset/{t}/{n} — public hardened asset serve
  *  - POST/DELETE /api/v1/branding/assets/{key}        — tenant override (settings:write)
  *  - POST/DELETE /api/v1/branding/global/assets/{key} — global default (settings:manage)
+ *  - GET /api/v1/branding/host                       — the caller's own workspace's host (settings:read)
  *  - PUT /api/v1/tenants/{id}/branding-host           — custom host (settings:manage)
  *
  * Holds no request state — safe for a FrankenPHP worker.
@@ -221,6 +222,34 @@ final class BrandingApiHandler
         }
         $view = $this->branding->effective($scopeTenant);
         return Response::json(['data' => $view->toArray()], 200);
+    }
+
+    /**
+     * GET /api/v1/branding/host — the web address of the caller's OWN workspace
+     * (settings:read), so Branding can show it where TplAdminBranding puts it.
+     *
+     * Read-only and scoped by the session, not the path: there is no tenant id
+     * to change, so a workspace can only ever read its own address. Setting it
+     * stays system-tenant only (setBrandingHost below), because the host routes
+     * every request.
+     */
+    public function getBrandingHost(Request $request): Response
+    {
+        $ctx = $this->authorize($request, CorePermissions::SETTINGS_READ);
+        if ($ctx instanceof Response) {
+            return $ctx;
+        }
+        if ($this->hostRepo === null) {
+            return Response::error('Branding host store unavailable', 500);
+        }
+
+        $data = ['branding_host' => $this->hostRepo->findBrandingHostById($ctx['tenantId'])];
+        // WHIT-932: own web address is a plan feature; say so, never refuse.
+        if ($this->entitlements !== null && $ctx['tenantId'] !== 0) {
+            $data['included_in_plan'] = $this->entitlements->isGranted($ctx['tenantId'], EntitlementRegistry::BRAND_CUSTOM_DOMAIN);
+        }
+
+        return Response::json(['data' => $data], 200);
     }
 
     /**
