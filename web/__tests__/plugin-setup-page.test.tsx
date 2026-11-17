@@ -12,8 +12,10 @@ jest.mock('@/lib/api/client', () => ({
   api: { GET: jest.fn() },
   apiFetch: jest.fn(),
 }));
+let mockQuery = '';
 jest.mock('next/navigation', () => ({
   useParams: () => ({ plugin: 'Salons' }),
+  useSearchParams: () => new URLSearchParams(mockQuery),
 }));
 jest.mock('@/components/plugin/blocks/block-renderer', () => ({
   BlockRenderer: ({ blocks }: { blocks: Array<{ type: string; value?: string }> }) => (
@@ -55,6 +57,14 @@ describe('PluginSetupPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Back' }));
     expect(await screen.findByText('hours form')).toBeInTheDocument();
+  });
+
+  it('opens the step a dashboard setup point names (SDK 1.115)', async () => {
+    mockQuery = 'step=link';
+    render(<PluginSetupPage />);
+
+    expect(await screen.findByText('link step')).toBeInTheDocument();
+    mockQuery = '';
   });
 
   it('says so when the plugin is off or has no setup here', async () => {
