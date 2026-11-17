@@ -11323,6 +11323,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspace/owners/{profileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove an owner, or stop being one; they keep their roles. Never the last owner. */
+        delete: operations["delete_api_v1_workspace_owners_profileid"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/owners/{profileId}/identity-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start "confirm it is you" before removing an owner, or stopping being one */
+        post: operations["post_api_v1_workspace_owners_profileid_identity_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspace/templates": {
         parameters: {
             query?: never;
@@ -21171,9 +21205,47 @@ export interface components {
                 };
             };
         };
-        /** @description The step's form, as its blocks submit it */
         WorkspaceTemplateSetupStepRequest: {
-            [key: string]: unknown;
+            /** @description business: the business name in English */
+            name_en?: string;
+            /** @description business: the business name in Arabic */
+            name_ar?: string;
+            /** @description business */
+            phone?: string;
+            /** @description business */
+            address?: string;
+            /** @description business: the main colour, #rrggbb */
+            colour?: string;
+            /** @description hours: the caller's opening hours */
+            hours?: {
+                /** @description 0 Sunday to 6 Saturday */
+                weekday: number;
+                /** @description HH:MM */
+                start_time: string;
+                /** @description HH:MM */
+                end_time: string;
+            }[];
+            /** @description services: the rows to add; names that exist are skipped */
+            services?: {
+                include?: boolean;
+                name_en: string;
+                name_ar?: string;
+                minutes?: number;
+                /** @description In normal units of the workspace currency (49.000) */
+                price?: string;
+            }[];
+            /** @description team: people to invite */
+            people?: {
+                email: string;
+            }[];
+            /** @description booking */
+            min_notice_minutes?: number;
+            /** @description booking */
+            max_advance_days?: number;
+            /** @description booking */
+            reminder_hours_before?: number;
+            /** @description booking */
+            instant_booking?: boolean;
         };
         WorkspaceTemplateSetupValuesResponse: {
             data: {
@@ -81612,6 +81684,189 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_workspace_owners_profileid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The owner to remove (yourself to step down). */
+                profileId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GatedApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description No longer an owner */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Only an owner can remove an owner, or the identity check failed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not an owner of this workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A workspace always keeps at least one owner */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_owners_profileid_identity_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The owner to remove (yourself to step down). */
+                profileId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The check to make */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityCheckResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Only an owner can remove an owner */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not an owner of this workspace */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A workspace always keeps at least one owner */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many codes were sent lately */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Confirming it is you is not available */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

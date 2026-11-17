@@ -227,7 +227,7 @@ final class TemplateSetup
             'services' => ['added' => $this->services($profileId, is_array($body['services'] ?? null) ? $body['services'] : [])],
             'team' => ['invited' => $this->team(is_array($body['people'] ?? null) ? $body['people'] : [])],
             'booking' => ['saved' => $this->booking($body)],
-            default => throw new \InvalidArgumentException('That step saves nothing.'),
+            default => throw new StepNotSaved('That step saves nothing.'),
         };
     }
 
@@ -245,7 +245,7 @@ final class TemplateSetup
             'branding_main_color' => $colour !== null && preg_match('/^#[0-9A-Fa-f]{6}$/', $colour) === 1 ? strtolower($colour) : null,
         ], static fn (?string $v): bool => $v !== null);
         if ($values === []) {
-            throw new \InvalidArgumentException('Write at least the name of your business.');
+            throw new StepNotSaved('Write at least the name of your business.');
         }
         $effective = $this->data('GET', '/api/settings')['effective'] ?? [];
         $effective = is_array($effective) ? $effective : [];
@@ -263,12 +263,12 @@ final class TemplateSetup
             }
         }
         if ($rows === []) {
-            throw new \InvalidArgumentException('Open at least one day.');
+            throw new StepNotSaved('Open at least one day.');
         }
         $this->api->call('PUT', "/api/calendar/staff/{$profileId}", ['bookable' => true]);
         $result = $this->api->call('PUT', "/api/calendar/staff/{$profileId}/hours", ['hours' => $rows]);
         if (!$this->ok($result)) {
-            throw new \InvalidArgumentException(self::reason($result));
+            throw new StepNotSaved(self::reason($result));
         }
 
         return true;
@@ -293,7 +293,7 @@ final class TemplateSetup
             }
             $minutes = is_numeric($row['minutes'] ?? null) ? (int) $row['minutes'] : 0;
             if ($minutes < 5 || $minutes > 1440) {
-                throw new \InvalidArgumentException("{$en}: a service takes between 5 and 1440 minutes.");
+                throw new StepNotSaved("{$en}: a service takes between 5 and 1440 minutes.");
             }
             $ar = is_string($row['name_ar'] ?? null) && trim($row['name_ar']) !== '' ? trim($row['name_ar']) : $en;
             $body = ['name' => ['en' => $en, 'ar' => $ar], 'duration_minutes' => $minutes, 'staff_profile_ids' => [$profileId]];
@@ -303,7 +303,7 @@ final class TemplateSetup
                     $body['price_minor'] = Currency::parse(str_contains($price, '.') ? rtrim(rtrim($price, '0'), '.') : $price, $currency);
                     $body['currency'] = $currency;
                 } catch (\Throwable) {
-                    throw new \InvalidArgumentException("{$en}: \"{$price}\" is not a price.");
+                    throw new StepNotSaved("{$en}: \"{$price}\" is not a price.");
                 }
             }
             if ($this->ok($this->api->call('POST', '/api/calendar/services', $body))) {
@@ -334,14 +334,14 @@ final class TemplateSetup
                 continue;
             }
             if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-                throw new \InvalidArgumentException("\"{$email}\" is not an email address.");
+                throw new StepNotSaved("\"{$email}\" is not an email address.");
             }
             if (isset($already[mb_strtolower($email)])) {
                 continue;
             }
             $result = $this->api->call('POST', '/api/invitations', ['email' => $email]);
             if (!$this->ok($result)) {
-                throw new \InvalidArgumentException(self::reason($result));
+                throw new StepNotSaved(self::reason($result));
             }
             $invited[] = $email;
         }
@@ -363,7 +363,7 @@ final class TemplateSetup
         }
         $result = $this->api->call('PUT', '/api/calendar/settings', $rules);
         if (!$this->ok($result)) {
-            throw new \InvalidArgumentException(self::reason($result));
+            throw new StepNotSaved(self::reason($result));
         }
 
         return true;

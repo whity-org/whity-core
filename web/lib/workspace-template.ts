@@ -1,11 +1,13 @@
 /**
  * Workspace templates (WHIT-1195): where a new workspace's owner goes next.
  *
- * Right after a workspace is created, or after the first sign-in into one,
- * its owner is offered the template picker, once: while the workspace has
- * no template (Blank counts as one) and is less than two weeks old. Anyone
- * who can't set the workspace up (no `settings:write`), and every workspace
- * that has been running for longer, goes where it always did.
+ * Only right after a workspace is created (sign-up, register, "Create
+ * another workspace") is its owner offered the template picker: while the
+ * workspace has no template (Blank counts as one) and is less than two weeks
+ * old. Signing in never leads there, so existing and seeded workspaces land
+ * on the dashboard; they can still start from a template (adopt mode) on
+ * Settings › Plugins. Anyone who can't set the workspace up (no
+ * `settings:write`) goes where they always did.
  */
 import { api } from '@/lib/api/client';
 

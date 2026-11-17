@@ -12900,6 +12900,29 @@ final class CoreApiSchemas
                     409 => self::errorResponse('No longer open'),
                 ] + self::authErrors(),
             ]),
+            $ownerRoute('POST', '/api/workspace/owners/{profileId:\d+}/identity-check', [
+                'summary' => 'Start "confirm it is you" before removing an owner, or stopping being one',
+                'parameters' => [['name' => 'profileId', 'in' => 'path', 'required' => true, 'description' => 'The owner to remove (yourself to step down).', 'schema' => ['type' => 'integer']]],
+                'responses' => [
+                    200 => self::jsonResponse('The check to make', 'IdentityCheckResponse'),
+                    403 => self::errorResponse('Only an owner can remove an owner'),
+                    404 => self::errorResponse('Not an owner of this workspace'),
+                    409 => self::errorResponse('A workspace always keeps at least one owner'),
+                    429 => self::errorResponse('Too many codes were sent lately'),
+                    503 => self::errorResponse('Confirming it is you is not available'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('DELETE', '/api/workspace/owners/{profileId:\d+}', [
+                'summary' => 'Remove an owner, or stop being one; they keep their roles. Never the last owner.',
+                'parameters' => [['name' => 'profileId', 'in' => 'path', 'required' => true, 'description' => 'The owner to remove (yourself to step down).', 'schema' => ['type' => 'integer']]],
+                'request' => 'GatedApprovalRequest',
+                'responses' => [
+                    204 => ['description' => 'No longer an owner'],
+                    403 => self::errorResponse('Only an owner can remove an owner, or the identity check failed'),
+                    404 => self::errorResponse('Not an owner of this workspace'),
+                    409 => self::errorResponse('A workspace always keeps at least one owner'),
+                ] + self::authErrors(),
+            ]),
             $ownerRoute('GET', '/api/me/ownership-offers', [
                 'summary' => 'Open offers of ownership made to me, in any workspace',
                 'responses' => [200 => self::jsonResponse('My open offers', 'OwnershipOfferListResponse')] + self::authErrors(),
@@ -20151,7 +20174,32 @@ final class CoreApiSchemas
                     'price' => self::str() + ['description' => 'In normal units of the workspace\'s currency; empty when the template has no price in it'],
                 ], ['include', 'name_en', 'name_ar', 'minutes', 'price'])],
             ], ['data']),
-            'WorkspaceTemplateSetupStepRequest' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The step\'s form, as its blocks submit it'],
+            // Each step reads only its own fields: business (name_en to colour),
+            // hours (hours), services (services), team (people), booking (the rest).
+            'WorkspaceTemplateSetupStepRequest' => self::object([
+                'name_en' => self::str() + ['description' => 'business: the business name in English'],
+                'name_ar' => self::str() + ['description' => 'business: the business name in Arabic'],
+                'phone' => self::str() + ['description' => 'business'],
+                'address' => self::str() + ['description' => 'business'],
+                'colour' => self::str() + ['description' => 'business: the main colour, #rrggbb'],
+                'hours' => ['type' => 'array', 'description' => 'hours: the caller\'s opening hours', 'items' => self::object([
+                    'weekday' => self::int() + ['description' => '0 Sunday to 6 Saturday'],
+                    'start_time' => self::str() + ['description' => 'HH:MM'],
+                    'end_time' => self::str() + ['description' => 'HH:MM'],
+                ], ['weekday', 'start_time', 'end_time'])],
+                'services' => ['type' => 'array', 'description' => 'services: the rows to add; names that exist are skipped', 'items' => self::object([
+                    'include' => self::bool(),
+                    'name_en' => self::str(),
+                    'name_ar' => self::str(),
+                    'minutes' => self::int(),
+                    'price' => self::str() + ['description' => 'In normal units of the workspace currency (49.000)'],
+                ], ['name_en'])],
+                'people' => ['type' => 'array', 'description' => 'team: people to invite', 'items' => self::object(['email' => self::str()], ['email'])],
+                'min_notice_minutes' => self::int() + ['description' => 'booking'],
+                'max_advance_days' => self::int() + ['description' => 'booking'],
+                'reminder_hours_before' => self::int() + ['description' => 'booking'],
+                'instant_booking' => self::bool() + ['description' => 'booking'],
+            ], []),
             'WorkspaceTemplateSetupSavedResponse' => self::object([
                 'data' => ['type' => 'object', 'additionalProperties' => true],
             ], ['data']),

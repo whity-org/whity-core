@@ -278,6 +278,70 @@ final class WorkspaceOwnership
     }
 
     /**
+     * An owner removes another owner, or stops being one themselves
+     * (WHIT-1171). Never the last owner. The person keeps their memberships
+     * and roles here; they only stop being an owner. Checked by the HTTP layer
+     * with "Confirm it's you" first.
+     *
+     * @throws OwnershipException
+     */
+    public function removeOwner(int $tenantId, int $byId, int $profileId): void
+    {
+        if ($this->db->inTransaction()) {
+            throw new \LogicException('WorkspaceOwnership::removeOwner() must own its transaction.');
+        }
+        $this->db->beginTransaction();
+        try {
+            // Lock the workspace's owner rows so two owners removing each other
+            // at once can't leave it with none.
+            $forUpdate = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql' ? ' FOR UPDATE' : '';
+            $stmt = $this->db->prepare('SELECT profile_id FROM workspace_owners WHERE tenant_id = :t' . $forUpdate);
+            $stmt->execute([':t' => $tenantId]);
+            $owners = array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+            if (!in_array($byId, $owners, true)) {
+                throw new OwnershipException(OwnershipException::NOT_OWNER);
+            }
+            if (!in_array($profileId, $owners, true)) {
+                throw new OwnershipException(OwnershipException::NOT_FOUND);
+            }
+            if (count($owners) <= 1) {
+                throw new OwnershipException(OwnershipException::LAST_OWNER);
+            }
+            $this->owners->remove($tenantId, $profileId);
+            // Offers this person made can no longer be accepted.
+            $this->db->prepare(
+                "UPDATE workspace_ownership_offers SET status = 'void', decided_at = NOW()
+                  WHERE tenant_id = :t AND from_profile_id = :p AND status = 'open'"
+            )->execute([':t' => $tenantId, ':p' => $profileId]);
+            $this->db->commit();
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+
+        RoleChecker::clearCache();
+        $via = $byId === $profileId ? 'left' : 'removed';
+        $this->record(self::AUDIT_OWNER_REMOVED, $tenantId, $byId, $profileId, ['via' => $via]);
+        $this->announce(Events::WORKSPACE_OWNER_REMOVED, [
+            'tenant_id' => $tenantId, 'profile_id' => $profileId, 'removed_by' => $byId, 'via' => $via,
+        ]);
+        if ($via === 'removed') {
+            $this->notifier?->removed($tenantId, $this->workspaceName($tenantId), $profileId, $this->displayName($byId));
+        }
+    }
+
+    private function workspaceName(int $tenantId): string
+    {
+        // The tenants table is the tenant registry itself, not a tenant-scoped resource
+        $stmt = $this->db->prepare('SELECT name FROM tenants WHERE id = :id');
+        $stmt->execute([':id' => $tenantId]);
+        $name = $stmt->fetchColumn();
+        return is_string($name) ? $name : '';
+    }
+
+    /**
      * The workspace's open offers, newest first. Offers past their date are
      * marked expired on the way.
      *

@@ -46,6 +46,12 @@ export function DeleteUserModal({
       });
 
       if (error !== undefined || !response.ok) {
+        // An owner stops being one first, in Settings › Owners (WHIT-1171).
+        if ((error as { details?: { code?: string } } | undefined)?.details?.code === 'is_owner') {
+          throw new Error(
+            t('users.delete.isOwner', 'This person owns the workspace. Remove them as an owner in Settings › Owners first.'),
+          );
+        }
         throw new Error(error?.error ?? t('users.delete.error', 'Failed to delete user'));
       }
 
