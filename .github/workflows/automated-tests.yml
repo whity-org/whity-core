@@ -1475,7 +1475,7 @@ jobs:
       # evidence rather than one following the other.
       - name: npm security audit
         working-directory: render-service
-        run: npm audit --audit-level=high
+        run: node ../scripts/npm-audit-gate.mjs --level high
 
       - name: Run unit tests (Puppeteer mocked)
         working-directory: render-service
@@ -1898,7 +1898,7 @@ jobs:
       # raises the floor without newly failing anything today.
       - name: npm security audit
         working-directory: .
-        run: npm audit --audit-level=high
+        run: node scripts/npm-audit-gate.mjs --level high
 
       # The web app imports its types from @whity/api-client (it kept its own
       # copy until WHIT A14's clean-up), so this one gate covers both: the
