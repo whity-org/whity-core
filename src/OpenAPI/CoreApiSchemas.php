@@ -7523,8 +7523,51 @@ final class CoreApiSchemas
                 'source' => self::str(true),
                 'value' => ['type' => 'integer', 'nullable' => true],
                 'hidden' => ['type' => 'boolean'],
+                'position' => ['type' => 'integer', 'nullable' => true, 'description' => "Its place in the person's own order, null when they never moved it (SDK 1.115)"],
             ], ['key', 'label', 'labelAr', 'hidden']),
             'HomeCardListResponse' => self::listEnvelope('HomeCard'),
+            // SDK 1.115 (WHIT-1177): what apps add to the dashboard, in the reader's language.
+            'DashboardSetupPoint' => self::object([
+                'id' => self::str(),
+                'label' => self::str(true),
+                'why' => self::str(true),
+                'action' => self::str(true),
+                'href' => self::str() + ['description' => "The plugin's guided-setup step or screen it opens"],
+                'icon' => self::str(true),
+            ], ['id', 'href']),
+            'DashboardSetup' => self::object([
+                'plugin' => self::str(),
+                'status' => self::str() + ['description' => "The plugin's GET route answering {data: {points: {<id>: bool}}}"],
+                'points' => ['type' => 'array', 'items' => SchemaBuilder::ref('DashboardSetupPoint')],
+            ], ['plugin', 'status', 'points']),
+            'DashboardWidget' => self::object([
+                'key' => self::str() + ['description' => '<plugin>:<id>'],
+                'plugin' => self::str(),
+                'kind' => ['type' => 'string', 'enum' => ['stat', 'list', 'chart', 'actions']],
+                'title' => self::str(true),
+                'description' => self::str(true),
+                'icon' => self::str(true),
+                'href' => self::str(true),
+                'source' => self::str(true),
+                'sizes' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['small', 'medium', 'large']]],
+                'size' => ['type' => 'string', 'enum' => ['small', 'medium', 'large']],
+                'hidden' => ['type' => 'boolean'],
+                'position' => ['type' => 'integer', 'nullable' => true],
+                'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]],
+            ], ['key', 'plugin', 'kind', 'sizes', 'size', 'hidden', 'blocks']),
+            'DashboardResponse' => self::object([
+                'data' => self::object([
+                    'setup' => ['type' => 'array', 'items' => SchemaBuilder::ref('DashboardSetup')],
+                    'widgets' => ['type' => 'array', 'items' => SchemaBuilder::ref('DashboardWidget')],
+                ], ['setup', 'widgets']),
+            ], ['data']),
+            'DashboardLayoutRequest' => self::object([
+                'items' => ['type' => 'array', 'items' => self::object([
+                    'key' => self::str(),
+                    'hidden' => ['type' => 'boolean'],
+                    'size' => ['type' => 'string', 'enum' => ['small', 'medium', 'large'], 'nullable' => true],
+                ], ['key'])],
+            ], ['items']),
             'RecentDocument' => self::object([
                 'kind' => ['type' => 'string', 'enum' => ['document', 'draft']],
                 'id' => self::int(),
@@ -16429,6 +16472,44 @@ final class CoreApiSchemas
                         200 => self::jsonResponse('The card and its new state', 'HomeCardHiddenResponse'),
                         404 => self::errorResponse('No card by that name that the caller may see'),
                         422 => self::errorResponse('hidden is missing or not true or false'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            // WHIT-1177 (SDK 1.115): what apps add to the dashboard, and the
+            // caller's own arrangement of it.
+            [
+                'method' => 'GET',
+                'path' => '/api/me/dashboard',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => "The setup points and widgets the caller's apps add to their dashboard, in the caller's order",
+                    'description' => 'Only points and widgets whose permission the caller holds in this workspace, from plugins on here, '
+                        . "in the caller's language. Hidden widgets are listed too, so a client can offer Show. Each names the plugin "
+                        . "route it reads; that route applies its own permission and the caller's scope.",
+                    'tags' => ['home'],
+                    // The person's own page layout, with nothing in it an agent needs.
+                    'mcp' => ['expose' => false],
+                    'responses' => [
+                        200 => self::jsonResponse('The setup points and widgets', 'DashboardResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/dashboard/layout',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => "Arrange the caller's dashboard: the order, hidden items and widget sizes",
+                    'description' => 'Items are home cards (by plugin name) and widgets (`<plugin>:<id>`) the caller can see, in the order '
+                        . "they want them. Items left out go after, in the apps' own order. Answers with the dashboard as GET does.",
+                    'tags' => ['home'],
+                    'mcp' => ['expose' => false],
+                    'request' => 'DashboardLayoutRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('The dashboard, arranged', 'DashboardResponse'),
+                        422 => self::errorResponse("An item that is not on the caller's dashboard, listed twice, or a size it does not fit"),
                     ] + self::authErrors(),
                 ],
             ],

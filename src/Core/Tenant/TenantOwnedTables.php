@@ -263,8 +263,9 @@ final class TenantOwnedTables
         // WHIT-784: an agent's Ask-first calls, waiting for the person who
         // granted it (migration 176).
         'agent_proposals' => '176_create_agent_proposals.php',
-        // WHIT-872: which home cards a person hid, per workspace (migration 200).
-        'home_card_hidden' => '200_add_home_card_hidden.php',
+        // WHIT-1177: how a person arranged their dashboard, per workspace
+        // (migration 303; it replaced home_card_hidden).
+        'dashboard_layout' => '303_create_dashboard_layout.php',
         // WHIT-838: a plugin's secrets, per workspace (migration 187).
         'plugin_secrets' => '187_create_plugin_secrets.php',
 

@@ -421,6 +421,7 @@ The page people land on after signing in, replacing the `/dashboard` placeholder
 | H.2 | What leads | **Waiting for you**: one list merging Inbox documents and agent Approvals, oldest first, with the decision buttons inline. |
 | H.3 | Server statistics | `/admin/stats` becomes **System**, under Platform, for system-tenant operators only. Its numbers also feed the operators' cards on the home. |
 | H.4 | Cards | Installed apps can each add one card to the home. People can hide cards but not rearrange them (v1). |
+| H.5 | Apps on the dashboard (SDK 1.115) | **Owner, 17 Nov 2026:** apps add setup points to Finish setting up (each opens the app's setup step or screen, done by the app's own check) and widgets of four kinds, stat, list, chart and actions, built from blocks, several per app. People hide, show, move and resize the cards and widgets from their apps, for themselves in each workspace; this replaces H.4's "not rearrange". A widget that fails shows one calm line and never stops the page. |
 
 Values set while drawing, open to change:
 - The title greets the person by first name with the time of day; the description gives the date, the workspace and their branch.

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration;
 
-use Database\Migrations\AddHomeCardHidden;
+use Database\Migrations\CreateDashboardLayout;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
@@ -97,7 +97,7 @@ final class HomeCardsApiRealEngineTest extends TestCase
         self::assertSame(404, $this->setHidden(self::BAKERY, self::OMAR, 'Inventory', true));
         self::assertSame(404, $this->setHidden(self::BAKERY, self::RANA, 'NoSuchPlugin', true));
 
-        self::assertSame(0, $this->hiddenRows());
+        self::assertSame(0, $this->rows('dashboard_layout'));
     }
 
     public function testHiddenMustBeABoolean(): void
@@ -141,23 +141,28 @@ final class HomeCardsApiRealEngineTest extends TestCase
         self::assertSame(401, $this->handler()->list(new Request('GET', '/api/me/home-cards'))->getStatusCode());
     }
 
-    public function testTheMigrationGoesBothWays(): void
+    /** WHIT-1177: hidden cards move into the dashboard layout and back. */
+    public function testTheMigrationKeepsHiddenCardsBothWays(): void
     {
-        require_once dirname(__DIR__, 2) . '/database/migrations/200_add_home_card_hidden.php';
+        require_once dirname(__DIR__, 2) . '/database/migrations/303_create_dashboard_layout.php';
         $pdo = $this->pdo;
         $db = Database::withFactory(static fn (): PDO => $pdo);
+        self::assertSame(200, $this->setHidden(self::BAKERY, self::RANA, 'Inventory', true));
 
-        AddHomeCardHidden::down($db);
+        CreateDashboardLayout::down($db);
+        $this->assertTableMissing('dashboard_layout');
+        self::assertSame(1, $this->rows('home_card_hidden'));
+
+        CreateDashboardLayout::up($db);
+        CreateDashboardLayout::up($db);
         $this->assertTableMissing('home_card_hidden');
-
-        AddHomeCardHidden::up($db);
-        AddHomeCardHidden::up($db);
-        self::assertSame(0, $this->hiddenRows());
+        self::assertSame(1, $this->rows('dashboard_layout'));
+        self::assertTrue($this->cards(self::BAKERY, self::RANA)[0]['hidden'], 'Still hidden after the move');
     }
 
-    private function hiddenRows(): int
+    private function rows(string $table): int
     {
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM home_card_hidden');
+        $stmt = $this->pdo->prepare("SELECT COUNT(*) FROM {$table}");
         $stmt->execute();
 
         return (int) $stmt->fetchColumn();

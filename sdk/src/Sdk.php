@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.114).
+ * SDK identity (v1.115).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1346,12 +1346,22 @@ namespace Whity\Sdk;
  * From Whity Pay's own client (WHIT-1058).
  *
  * Purely additive.)
+ *
+ * 1.115 (THE DASHBOARD: {@see PluginDashboardInterface} lets a plugin add setup points to the
+ * dashboard's "Finish setting up" card, each opening one of its guided-setup steps or screens and
+ * marked done by its own status route, and widgets of four kinds (stat, list, chart, actions) built
+ * from blocks, each with a permission, the sizes it fits and one data route. Core lists them only to
+ * people holding the permission in a workspace where the plugin is on, and people hide, show, move and
+ * resize widgets on their own dashboard. {@see Manifest\DashboardValidator} checks the shape
+ * (WHIT-1177).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.114.0';
+    public const VERSION = '1.115.0';
 
     /**
      * Static identity only — never instantiated.
