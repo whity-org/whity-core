@@ -90,7 +90,7 @@ final class DashboardApiHandler
                 'source' => $widget['source'],
                 'sizes' => $widget['sizes'],
                 'size' => is_string($size) && in_array($size, $widget['sizes'], true) ? $size : $widget['sizes'][0],
-                'hidden' => (bool) ($row['hidden'] ?? false),
+                'hidden' => $row['hidden'] ?? false,
                 'position' => $row['position'] ?? null,
                 'blocks' => array_map(static fn (array $block): array => BlockText::resolve($block, $language), $widget['blocks']),
             ];

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Dashboard;
 
 use PDO;
+use Whity\Core\Db\DbBool;
 
 /**
  * How one person arranged their dashboard in one workspace (SDK 1.115,
@@ -39,7 +40,7 @@ final class DashboardLayoutRepository
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $rows[(string) $row['item_key']] = [
                 'position' => $row['position'] === null ? null : (int) $row['position'],
-                'hidden' => (bool) $row['hidden'],
+                'hidden' => DbBool::of($row['hidden']),
                 'size' => $row['size'] === null ? null : (string) $row['size'],
             ];
         }

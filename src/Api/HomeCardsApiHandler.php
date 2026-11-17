@@ -61,7 +61,7 @@ final class HomeCardsApiHandler
         $data = [];
         foreach ($this->visibleCards($tenantId, $profileId) as $card) {
             $row = $rows[$card['key']] ?? null;
-            $data[] = $card + ['hidden' => (bool) ($row['hidden'] ?? false), 'position' => $row['position'] ?? null];
+            $data[] = $card + ['hidden' => $row['hidden'] ?? false, 'position' => $row['position'] ?? null];
         }
 
         return Response::json(['data' => DashboardLayoutRepository::ordered($data, $rows)], 200);
