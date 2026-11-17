@@ -6142,6 +6142,29 @@ $workspacesHandler = new \Whity\Api\WorkspacesApiHandler(
 );
 $router->register('GET', '/api/workspaces/new', [$workspacesHandler, 'state'], null);
 $router->register('POST', '/api/workspaces', [$workspacesHandler, 'create'], null);
+// WHIT-1170: owners, and offers to hand a workspace over or co-own it. The
+// workspace routes act in the caller's current workspace (owners act, staff
+// read); the /me routes are the person offered, from any workspace. Making and
+// accepting an offer go through "Confirm it's you" (GatedApproval).
+$workspaceOwnersHandler = new \Whity\Api\WorkspaceOwnersApiHandler(
+    new \Whity\Core\Tenant\WorkspaceOwnership(
+        $db->getPdo(),
+        $auditLogger,
+        $hookManager,
+        new \Whity\Core\Tenant\OwnershipNotifier($notificationDispatcher, $brandedEmailSender, $profileEmailRepository, $frontendUrls->base()),
+    ),
+    $tokenValidator,
+    $gatedApproval,
+);
+$router->register('GET',    '/api/workspace/owners',                         [$workspaceOwnersHandler, 'list'], null);
+$router->register('POST',   '/api/workspace/owners/offers/identity-check',   [$workspaceOwnersHandler, 'offerIdentityCheck'], null);
+$router->register('POST',   '/api/workspace/owners/offers',                  [$workspaceOwnersHandler, 'offer'], null);
+$router->register('DELETE', '/api/workspace/owners/offers/{id:\d+}',         [$workspaceOwnersHandler, 'cancel'], null);
+$router->register('GET',    '/api/me/ownership-offers',                      [$workspaceOwnersHandler, 'mine'], null);
+$router->register('GET',    '/api/me/ownership-offers/{id:\d+}',             [$workspaceOwnersHandler, 'showMine'], null);
+$router->register('POST',   '/api/me/ownership-offers/{id:\d+}/identity-check', [$workspaceOwnersHandler, 'acceptIdentityCheck'], null);
+$router->register('POST',   '/api/me/ownership-offers/{id:\d+}/accept',      [$workspaceOwnersHandler, 'accept'], null);
+$router->register('POST',   '/api/me/ownership-offers/{id:\d+}/decline',     [$workspaceOwnersHandler, 'decline'], null);
 
 // 13g. Authenticated "connected accounts" management (WC-f3b17bd2): the caller
 // lists / unlinks their own federated identities. Self-authenticating via the

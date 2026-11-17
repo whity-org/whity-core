@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.111).
+ * SDK identity (v1.112).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1330,12 +1330,19 @@ namespace Whity\Sdk;
  * receipt (WHIT-1060).
  *
  * Purely additive.)
+ *
+ * 1.112 (WORKSPACE OWNERS: {@see Hooks\Events::WORKSPACE_OWNER_ADDED},
+ * {@see Hooks\Events::WORKSPACE_OWNER_REMOVED} and
+ * {@see Hooks\Events::WORKSPACE_OWNERSHIP_TRANSFERRED}, when a workspace changes hands or gains
+ * or loses a co-owner (WHIT-1170).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.111.0';
+    public const VERSION = '1.112.0';
 
     /**
      * Static identity only — never instantiated.

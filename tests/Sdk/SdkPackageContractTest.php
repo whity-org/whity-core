@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.111.0',
+            '1.112.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.111 ADDS Print\QrCode: the QR encoder moved from Front Office (WHIT-1060). '
+            'SDK 1.112 ADDS workspace owner events: owner_added, owner_removed, ownership_transferred (WHIT-1170). '
+            . 'SDK 1.111 ADDS Print\QrCode: the QR encoder moved from Front Office (WHIT-1060). '
             . 'SDK 1.110 ADDS per-seat plugins (getAccess seats) and Billing\\QuantityCheckout (WHIT-1152). '
             . 'SDK 1.109 ADDS PluginOnboardingInterface and more WorkspaceSetup routes: guided setups (WHIT-1148). '
             . 'SDK 1.108 ADDS Setup\\WorkspaceSetup: packs set a workspace up through core routes as the acting person (WHIT-1129). '
