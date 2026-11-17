@@ -102,7 +102,13 @@ export function NewTemplateDialog({
               <h3 id="new-template-starters" className="text-sm font-semibold text-foreground">
                 {t('documentTemplates.new.starters', 'From a Whity starter')}
               </h3>
-              <ul className="grid gap-2 sm:grid-cols-2">
+              {/*
+                grid-cols-1, not an implicit column: an implicit `auto` column
+                grows to a row's min-content, and a truncated name never wraps,
+                so on a phone the row ran past the dialog and pushed its
+                English and Arabic buttons out of view.
+              */}
+              <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {starters.map((group) => {
                   const named = group.rows.find((row) => row.lang === ui) ?? group.rows[0];
                   const Icon = named.kind === 'label' ? IconTag : IconTemplate;
