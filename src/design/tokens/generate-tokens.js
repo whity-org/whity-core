@@ -662,7 +662,7 @@ function generateTokensPackageCss(base) {
 /**
  * Self-hosted @font-face declarations for the four type families of design
  * system 2.2, at only the weights it declares (decision 3.6, stage 9): Noto
- * Sans and Noto Sans Arabic 400/500/600, Geist Mono 400/500, Readex Pro 600
+ * Sans and Noto Sans Arabic 400/500/600, Geist Mono 400/500/600, Readex Pro 600
  * (Latin, and its Arabic design for Arabic document titles, E.35). No 700.
  * Binaries live in packages/tokens/fonts/ (the brand kit's web subsets, see
  * that directory's LICENSE-*.txt files, all OFL). Woff2-only: every browser
@@ -673,7 +673,7 @@ const READEX_ARABIC_RANGE =
 const FONT_FACES = [
   { family: 'Noto Sans', fileStem: 'noto-sans-latin', weights: [400, 500, 600] },
   { family: 'Noto Sans Arabic', fileStem: 'noto-sans-arabic', weights: [400, 500, 600] },
-  { family: 'Geist Mono', fileStem: 'geist-mono', weights: [400, 500] },
+  { family: 'Geist Mono', fileStem: 'geist-mono', weights: [400, 500, 600] },
   { family: 'Readex Pro', fileStem: 'readex-pro-latin', weights: [600] },
   { family: 'Readex Pro', fileStem: 'readex-pro-arabic', weights: [600], unicodeRange: READEX_ARABIC_RANGE },
 ];

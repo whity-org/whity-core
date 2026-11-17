@@ -74,6 +74,14 @@
 }
 
 @font-face {
+  font-family: 'Geist Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/geist-mono-600.woff2') format('woff2');
+}
+
+@font-face {
   font-family: 'Readex Pro';
   font-style: normal;
   font-weight: 600;
