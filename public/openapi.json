@@ -57118,6 +57118,95 @@
                 }
             }
         },
+        "/api/v1/public/booking/{workspace}/me": {
+            "get": {
+                "operationId": "get_api_v1_public_booking_workspace_me",
+                "summary": "The name and email of the signed-in visitor, to fill the booking form (public)",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "Reads only the session and profile of the visitor, never the contacts of this workspace or the data of another. `data` is null when nobody is signed in. Sent `Cache-Control: private, no-store`.",
+                "parameters": [
+                    {
+                        "name": "workspace",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "workspace",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The workspace slug."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The visitor, or null",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicBookingVisitor"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This booking page is not available",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/public/booking/{workspace}/slots": {
             "get": {
                 "operationId": "get_api_v1_public_booking_workspace_slots",
@@ -99415,6 +99504,31 @@
                     "email",
                     "elapsed_ms"
                 ]
+            },
+            "PublicBookingVisitor": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The display name on their own profile; may be empty."
+                    },
+                    "email": {
+                        "type": "string",
+                        "description": "The email of their own sign-in; may be empty."
+                    },
+                    "phone": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Null until a profile carries a phone number."
+                    }
+                },
+                "required": [
+                    "name",
+                    "email",
+                    "phone"
+                ],
+                "nullable": true,
+                "description": "The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in."
             },
             "PublicChatInfoResponse": {
                 "type": "object",

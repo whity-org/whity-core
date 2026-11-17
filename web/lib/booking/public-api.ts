@@ -20,6 +20,13 @@ export type PublicStaff = PublicBookingPage['staff'][number];
 export type PublicBooking = Schemas['PublicBooking'];
 export type PublicBookingRequest = Schemas['PublicBookingRequest'];
 
+/** WHIT-1179: the signed-in visitor's own name and email, to fill the form. */
+export interface BookingVisitor {
+  name: string;
+  email: string;
+  phone: string | null;
+}
+
 /** A free time. The manage link's slots carry no `profile_ids`. */
 export interface FreeTime {
   starts_at: string;
@@ -193,6 +200,33 @@ function readPayment(value: unknown): BookingPayment | null {
 export const publicBookingApi = {
   async page(workspace: string): Promise<PublicBookingPage> {
     return (await send<{ data: PublicBookingPage }>(PAGE(workspace))).data;
+  },
+
+  /**
+   * WHIT-1179: the signed-in visitor's own name and email, or null when
+   * nobody is signed in. Never cached (the server sends `no-store`), and the
+   * cookie goes only to this same-origin route. Any failure is "nothing to
+   * fill": the form simply stays empty, as it is for a signed-out visitor.
+   */
+  async visitor(workspace: string): Promise<BookingVisitor | null> {
+    try {
+      const res = await fetch(`${PAGE(workspace)}/me`, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      if (!res.ok) return null;
+      const body = (await res.json()) as { data?: unknown };
+      const data = body.data;
+      if (data === null || typeof data !== 'object') return null;
+      const v = data as Record<string, unknown>;
+      const name = typeof v.name === 'string' ? v.name : '';
+      const email = typeof v.email === 'string' ? v.email : '';
+      const phone = typeof v.phone === 'string' && v.phone !== '' ? v.phone : null;
+      return name === '' && email === '' && phone === null ? null : { name, email, phone };
+    } catch {
+      return null;
+    }
   },
 
   async slots(

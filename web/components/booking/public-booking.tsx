@@ -252,6 +252,36 @@ function BookingForm({
   const [submitting, setSubmitting] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<Field, string>>>({});
+  const [prefilled, setPrefilled] = useState(false);
+
+  // WHIT-1179: someone signed in to Whity finds their own name and email
+  // already filled. Only their own account is asked (a no-store route), only
+  // empty fields are filled so nothing they typed is replaced, and every
+  // field stays editable: what they send is what the booking uses.
+  useEffect(() => {
+    let cancelled = false;
+    void publicBookingApi.visitor(workspace).then((me) => {
+      if (cancelled || me === null) return;
+      let filled = false;
+      if (me.name !== '') {
+        setName((current) => (current === '' ? me.name : current));
+        filled = true;
+      }
+      if (me.email !== '') {
+        setEmail((current) => (current === '' ? me.email : current));
+        filled = true;
+      }
+      if (me.phone) {
+        const phoneValue = me.phone;
+        setPhone((current) => (current === '' ? phoneValue : current));
+        filled = true;
+      }
+      setPrefilled(filled);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [workspace]);
 
   const service: PublicService | null = page.services.find((s) => s.id === serviceId) ?? null;
 
@@ -631,6 +661,11 @@ function BookingForm({
               <p className="text-sm text-muted-foreground">
                 {t('field.email.hint', 'We email the confirmation and a link to change the booking.')}
               </p>
+              {prefilled && (
+                <p className="text-sm text-muted-foreground" data-testid="book-prefilled">
+                  {t('field.prefilled', 'Filled in from your Whity account. You can change it.')}
+                </p>
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <TextField
                   id="book-name"
