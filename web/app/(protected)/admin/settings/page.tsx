@@ -14,7 +14,8 @@ import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { IconDeviceFloppy } from '@tabler/icons-react';
 import { useTranslation } from '@whity/features/i18n';
-import { TENANTS_READ } from '@/lib/capabilities';
+import { TENANTS_READ, TENANTS_WRITE } from '@/lib/capabilities';
+import { Input } from '@/components/ui/input';
 import {
   SETTINGS_READ,
   SETTINGS_WRITE,
@@ -80,7 +81,11 @@ export default function AdminSettingsPage() {
           {t('settings.description.permission', 'Editing needs the settings:write permission.')}
         </p>
       </TechnicalDetails>
-      <TenantSettingsSection canWrite={canWrite} addToast={addToast} />
+      <TenantSettingsSection
+        canWrite={canWrite}
+        canRename={!isSystemTenant && hasPermission(TENANTS_WRITE)}
+        addToast={addToast}
+      />
       {!isSystemTenant && typeof user?.tenant_id === 'number' && hasPermission(TENANTS_READ) && (
         <WorkspaceRecordLink tenantId={user.tenant_id} />
       )}
@@ -117,12 +122,24 @@ function WorkspaceRecordLink({ tenantId }: { tenantId: number }) {
 
 function TenantSettingsSection({
   canWrite,
+  canRename,
   addToast,
 }: {
   canWrite: boolean;
+  /**
+   * WHIT-1189: the workspace's owners and admins (tenants:write) rename it here,
+   * as TplSettingsGeneral shows. The server audits it (tenant.updated) and
+   * refuses a blank name.
+   */
+  canRename: boolean;
   addToast: AddToast;
 }) {
   const t = useTranslation('admin');
+  const { user, memberships, refreshAuth } = useAuth();
+  const savedWorkspaceName = memberships.find((m) => m.tenant_id === user?.tenant_id)?.tenant_name ?? '';
+  const [nameDraft, setNameDraft] = useState<string | undefined>(undefined);
+  const workspaceName = nameDraft ?? savedWorkspaceName;
+  const renaming = canRename && nameDraft !== undefined && nameDraft.trim() !== savedWorkspaceName;
   const { data, loading, error, refetch } = useFetch(async () => {
     const { data: body, error: getError } = await api.GET('/api/v1/settings');
     if (body === undefined) {
@@ -185,6 +202,11 @@ function TenantSettingsSection({
       locale: valueOf('locale'),
     };
 
+    if (renaming && workspaceName.trim() === '') {
+      addToast(t('settings.workspaceName.required', 'The workspace name cannot be empty.'), 'error');
+      return;
+    }
+
     // The product name is on Branding now; only the email is checked here.
     const validationError = validate({ site_name: '', support_email: current.support_email }, false, t);
     if (validationError) {
@@ -212,11 +234,25 @@ function TenantSettingsSection({
 
     setSaving(true);
     try {
-      const { error: patchError } = await api.PATCH('/api/v1/settings', {
-        body: { settings },
-      });
-      if (patchError) {
-        throw new Error(errorMessage(patchError, t('settings.tenant.saveFailed', 'Failed to save settings')));
+      if (canWrite) {
+        const { error: patchError } = await api.PATCH('/api/v1/settings', {
+          body: { settings },
+        });
+        if (patchError) {
+          throw new Error(errorMessage(patchError, t('settings.tenant.saveFailed', 'Failed to save settings')));
+        }
+      }
+      if (renaming && typeof user?.tenant_id === 'number') {
+        const { error: renameError } = await api.PATCH('/api/v1/tenants/{id}', {
+          params: { path: { id: user.tenant_id } },
+          body: { name: workspaceName.trim() },
+        });
+        if (renameError) {
+          throw new Error(errorMessage(renameError, t('settings.workspaceName.saveFailed', 'Failed to rename the workspace')));
+        }
+        setNameDraft(undefined);
+        // The workspace switcher and every "Workspace settings for …" line read it.
+        void refreshAuth();
       }
       addToast(t('settings.tenant.saved', 'Tenant settings saved.'), 'success');
       setDraft({});
@@ -275,6 +311,28 @@ function TenantSettingsSection({
           </div>
         ) : (
           <>
+            {canRename && (
+              // Labelled like the SettingsField rows below it, so the card reads as one list.
+              <div className="space-y-1.5">
+                <label htmlFor="tenant-workspace-name" className="text-sm font-medium text-foreground">
+                  {t('settings.workspaceName.label', 'Workspace name')}
+                </label>
+                <Input
+                  id="tenant-workspace-name"
+                  value={workspaceName}
+                  maxLength={255}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  aria-describedby="tenant-workspace-name-help"
+                  data-testid="settings-workspace-name"
+                />
+                <p id="tenant-workspace-name-help" className="text-xs text-muted-foreground">
+                  {t(
+                    'settings.workspaceName.help',
+                    'What your team sees in the workspace switcher. Names in other languages are on the workspace record.'
+                  )}
+                </p>
+              </div>
+            )}
             {GENERAL_SETTING_KEYS.map((key) => (
               <SettingsField
                 key={key}
@@ -325,7 +383,7 @@ function TenantSettingsSection({
                 ))}
               </div>
             )}
-            {canWrite && (
+            {(canWrite || canRename) && (
               <div className="flex justify-end pt-2">
                 <Button onClick={handleSave} disabled={saving} className="gap-2">
                   <IconDeviceFloppy className="w-4 h-4" />

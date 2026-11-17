@@ -64,13 +64,21 @@ const PLAIN: Branding = {
 const WITH_WIDE: Branding = { ...PLAIN, logoWideUrl: '/api/v1/branding/asset/1/logo_wide-abc.png' };
 const ORANGE: Branding = { ...PLAIN, mainColor: '#B74C05' };
 
+let mockHost: { branding_host: string | null; included_in_plan?: boolean } = { branding_host: null };
+
 function serve(branding: Branding = PLAIN) {
-  mockApiGet.mockImplementation(() => Promise.resolve({ data: { data: branding }, error: undefined }));
+  mockApiGet.mockImplementation((path: string) =>
+    Promise.resolve({
+      data: { data: path === '/api/v1/branding/host' ? mockHost : branding },
+      error: undefined,
+    })
+  );
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockMode = 'light';
+  mockHost = { branding_host: null };
   serve();
   mockUploadBrandingAsset.mockResolvedValue(WITH_WIDE);
   mockClearBrandingAsset.mockResolvedValue(PLAIN);
@@ -215,10 +223,31 @@ describe('Branding — logos', () => {
 });
 
 describe('Branding — workspace and platform', () => {
-  it('a workspace cannot set its web address; it is told who can', async () => {
+  it('a workspace sees its own web address, read-only, and is told who sets it', async () => {
+    mockHost = { branding_host: 'office.example.com', included_in_plan: true };
     await renderForm();
+    expect(mockApiGet).toHaveBeenCalledWith('/api/v1/branding/host');
+    const domain = await screen.findByDisplayValue('office.example.com');
+    expect(domain).toHaveAttribute('readonly');
     expect(screen.queryByTestId('branding-custom-host-input')).not.toBeInTheDocument();
-    expect(screen.getByTestId('branding-domain-note')).toBeInTheDocument();
+    expect(screen.getByText('Your own web address is set up by the person who runs this Whity.')).toBeInTheDocument();
+  });
+
+  it('says when the plan does not include an own web address', async () => {
+    mockHost = { branding_host: null, included_in_plan: false };
+    await renderForm();
+    expect(await screen.findByText(/Your plan doesn’t include your own web address/)).toBeInTheDocument();
+    expect(screen.getByTestId('branding-domain-readonly')).toHaveValue('');
+  });
+
+  it('the system tenant sees its current address and only saves a change', async () => {
+    mockHost = { branding_host: 'app.example.com' };
+    await renderForm({ scope: 'global' });
+    expect(await screen.findByDisplayValue('app.example.com')).toBeInTheDocument();
+    expect(screen.getByTestId('branding-save')).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Domain'), { target: { value: 'office.example.com' } });
+    fireEvent.click(screen.getByTestId('branding-save'));
+    await waitFor(() => expect(mockSetBrandingHost).toHaveBeenCalledWith(0, 'office.example.com'));
   });
 
   it('the system tenant edits the platform defaults and the web address', async () => {
