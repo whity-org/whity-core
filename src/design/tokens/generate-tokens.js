@@ -18,6 +18,9 @@
  *     (@whity/tokens — standalone, Next-independent JSON + Tailwind v4
  *     theme CSS, shadcn base/reset layer, and self-hosted @font-face CSS for
  *     non-Next clients; see packages/tokens/fonts/ for the font binaries)
+ *   - ../../../packages/tokens/generated/site.css and packages/tokens/logos/
+ *     (copies of the brand handoff's docs/design/handoff/web/tokens.css and
+ *     handoff/logos/, so the websites and other repos install them; WHIT-1055)
  *
  * Determinism: output is a pure function of base.json (no timestamps), so
  * regenerating without source changes produces byte-identical files.
@@ -29,7 +32,7 @@
  *     dart          - regenerate generated/tokens.dart (+ the Flutter package copy)
  *     web           - sync web/app/globals.css
  *     theme         - regenerate generated/theme.json
- *     tokensPackage - regenerate packages/tokens/generated/{tokens.json,theme.css,base.css,fonts.css}
+ *     tokensPackage - regenerate packages/tokens/generated/{tokens.json,theme.css,base.css,fonts.css,site.css} and packages/tokens/logos/
  *     check         - regenerate in-memory and fail (exit 1) if any target is stale
  */
 
@@ -45,6 +48,13 @@ const TOKENS_PACKAGE_DIR = path.join(__dirname, '..', '..', '..', 'packages', 't
 const FLUTTER_TOKENS_DART_PATH = path.join(
   __dirname, '..', '..', '..', 'flutter', 'whity_tokens', 'lib', 'src', 'generated', 'tokens.dart'
 );
+// The brand team's handoff (WHIT-1055): the websites' token CSS and the logo
+// set. @whity/tokens carries copies so other repos install them instead of
+// keeping their own; the handoff stays the place the brand team updates.
+const HANDOFF_SITE_CSS_PATH = path.join(__dirname, '..', '..', '..', 'docs', 'design', 'handoff', 'web', 'tokens.css');
+const HANDOFF_LOGOS_DIR = path.join(__dirname, '..', '..', '..', 'docs', 'design', 'handoff', 'logos');
+const TOKENS_PACKAGE_FONTS_DIR = path.join(__dirname, '..', '..', '..', 'packages', 'tokens', 'fonts');
+const TOKENS_PACKAGE_LOGOS_DIR = path.join(__dirname, '..', '..', '..', 'packages', 'tokens', 'logos');
 
 // Sentinel markers delimiting the generated region inside globals.css.
 const CSS_BEGIN = '/* === AUTO-GENERATED TOKENS: do not edit between markers — run `npm run tokens:generate` === */';
@@ -884,8 +894,67 @@ function buildTargets(base, { json = true, dart = true, web = true, theme = true
     targets.push({ path: path.join(TOKENS_PACKAGE_DIR, 'theme.css'), content: generateTokensPackageCss(base) });
     targets.push({ path: path.join(TOKENS_PACKAGE_DIR, 'base.css'), content: generateBaseCss() });
     targets.push({ path: path.join(TOKENS_PACKAGE_DIR, 'fonts.css'), content: generateFontsCss() });
+    targets.push({
+      path: path.join(TOKENS_PACKAGE_DIR, 'site.css'),
+      content: generateSiteCss(fs.readFileSync(HANDOFF_SITE_CSS_PATH, 'utf8')),
+    });
+    for (const rel of listFiles(HANDOFF_LOGOS_DIR)) {
+      targets.push({
+        path: path.join(TOKENS_PACKAGE_LOGOS_DIR, rel),
+        content: fs.readFileSync(path.join(HANDOFF_LOGOS_DIR, rel)),
+      });
+    }
   }
   return targets;
+}
+
+/** Every file under dir, as forward-slash paths relative to it, sorted. */
+function listFiles(dir, prefix = '') {
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      out.push(...listFiles(path.join(dir, entry.name), rel));
+    } else if (entry.isFile()) {
+      out.push(rel);
+    }
+  }
+  return out.sort();
+}
+
+/**
+ * The websites' token CSS (WHIT-1055): the brand handoff's
+ * docs/design/handoff/web/tokens.css, unchanged except that its fonts are read
+ * from the package's own fonts/ folder, relative to this file. Every font it
+ * names must ship in the package, or the copy would point at nothing.
+ */
+function generateSiteCss(handoffCss, fontsDir = TOKENS_PACKAGE_FONTS_DIR) {
+  const css = handoffCss.replace(/\r\n/g, '\n');
+  const rewritten = css.replace(/url\((['"]?)\/fonts\//g, 'url($1../fonts/');
+  const named = [...rewritten.matchAll(/url\(['"]?\.\.\/fonts\/([^'")]+)['"]?\)/g)].map((m) => m[1]);
+  if (named.length === 0) {
+    throw new TokenValidationError('handoff/web/tokens.css names no /fonts/ files; the font path rewrite no longer matches it.');
+  }
+  for (const file of named) {
+    if (!fs.existsSync(path.join(fontsDir, file))) {
+      throw new TokenValidationError(`handoff/web/tokens.css uses fonts/${file}, which packages/tokens/fonts does not ship.`);
+    }
+  }
+  const header = [
+    '/**',
+    ' * Whity design tokens for the websites (whity.dev, docs, brand) and other',
+    ' * plain-CSS pages: CSS variables for both themes, @font-face and type classes.',
+    ' * Source: docs/design/handoff/web/tokens.css in whity-core, the brand handoff.',
+    ' * Do not edit manually - run: npm run tokens:generate',
+    ' *',
+    ' * Fonts load from ../fonts/ next to this file. To serve it from a static',
+    ' * folder, run `npx whity-tokens copy <folder>`, which writes tokens.css,',
+    ' * fonts/ and logos/ there.',
+    ' */',
+    '',
+  ].join('\n');
+  return header + rewritten;
 }
 
 function writeTargets(targets) {
@@ -894,8 +963,29 @@ function writeTargets(targets) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(p, content, 'utf8');
+    if (Buffer.isBuffer(content)) {
+      fs.writeFileSync(p, content);
+    } else {
+      fs.writeFileSync(p, content, 'utf8');
+    }
   }
+}
+
+/**
+ * Files in packages/tokens/logos that the handoff no longer has. The
+ * package must carry exactly the handoff's logo set, so a logo the brand team
+ * removed is stale too.
+ */
+function findOrphanLogos(targets) {
+  const wanted = new Set(
+    targets
+      .map((t) => t.path)
+      .filter((p) => p.startsWith(TOKENS_PACKAGE_LOGOS_DIR + path.sep))
+      .map((p) => path.relative(TOKENS_PACKAGE_LOGOS_DIR, p).split(path.sep).join('/'))
+  );
+  return listFiles(TOKENS_PACKAGE_LOGOS_DIR)
+    .filter((rel) => !wanted.has(rel))
+    .map((rel) => path.join(TOKENS_PACKAGE_LOGOS_DIR, rel));
 }
 
 /**
@@ -909,11 +999,20 @@ function findStaleTargets(targets) {
   const normalize = (s) => s.replace(/\r\n/g, '\n');
   const stale = [];
   for (const { path: p, content } of targets) {
+    if (Buffer.isBuffer(content)) {
+      // Logos are compared byte for byte; .gitattributes keeps them binary.
+      const current = fs.existsSync(p) ? fs.readFileSync(p) : null;
+      if (current === null || !current.equals(content)) {
+        stale.push(p);
+      }
+      continue;
+    }
     const current = fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null;
     if (current === null || normalize(current) !== normalize(content)) {
       stale.push(p);
     }
   }
+  stale.push(...findOrphanLogos(targets));
   return stale;
 }
 
@@ -954,6 +1053,12 @@ function main() {
 
     const targets = buildTargets(base, opts);
     writeTargets(targets);
+    if (opts.tokensPackage) {
+      for (const orphan of findOrphanLogos(targets)) {
+        fs.unlinkSync(orphan);
+        console.log(`✓ Removed: ${path.relative(process.cwd(), orphan)} (no longer in the handoff)`);
+      }
+    }
     for (const { path: p } of targets) {
       console.log(`✓ Generated: ${path.relative(process.cwd(), p)}`);
     }
@@ -986,10 +1091,13 @@ module.exports = {
   generateTokensPackageCss,
   generateBaseCss,
   generateFontsCss,
+  generateSiteCss,
   generateCssRegion,
   syncGlobalsCss,
   buildTargets,
   findStaleTargets,
+  findOrphanLogos,
+  listFiles,
   CSS_BEGIN,
   CSS_END,
   BASE_PATH,
