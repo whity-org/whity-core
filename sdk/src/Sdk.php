@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.113).
+ * SDK identity (v1.114).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1338,12 +1338,20 @@ namespace Whity\Sdk;
  * setup screen offers a ready list to tick and edit instead of text to type (WHIT-1172).
  *
  * Purely additive.)
+ *
+ * 1.114 (OUTBOUND HTTP: {@see Http\Outbound\HttpClient} is the one way plugin code calls another
+ * server, and {@see Http\Outbound\StreamHttpClient} implements it over PHP streams: https only
+ * unless asked (`allowHttp`), verified TLS, no redirects, timeouts, a size cap, and failures that
+ * name the host and nothing else. {@see Testing\RecordedHttpClient} answers from a script for tests.
+ * From Whity Pay's own client (WHIT-1058).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.113.0';
+    public const VERSION = '1.114.0';
 
     /**
      * Static identity only — never instantiated.
