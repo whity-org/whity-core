@@ -258,9 +258,9 @@ export class AppShell {
     });
   }
 
-  /** The "Whity" brand heading, hidden when the sidebar is collapsed. */
+  /** The "Whity" brand (not a heading: each page's title is its one h1), hidden when the sidebar is collapsed. */
   get brandHeading(): Locator {
-    return this.sidebar.getByRole('heading', { name: 'Whity' });
+    return this.sidebar.locator('[data-slot="sidebar-brand"]').getByRole('img', { name: 'Whity' });
   }
 
   async expectLoggedInAs(email: string): Promise<void> {

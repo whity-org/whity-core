@@ -215,11 +215,13 @@ export function Sidebar() {
         // The Whity lockup, as on every 3.3 card; a renamed installation keeps
         // its own name in text.
         // Not a heading: each page's own title is its one h1 (WHIT-1202).
-        <p className="m-0">
+        <p className="m-0" data-slot="sidebar-brand">
           <Lockup size={24} />
         </p>
       ) : (
-        <p className="text-xl font-semibold">{branding.siteName}</p>
+        <p className="text-xl font-semibold" data-slot="sidebar-brand">
+          {branding.siteName}
+        </p>
       )}
     </>
   );

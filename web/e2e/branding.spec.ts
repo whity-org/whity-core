@@ -96,14 +96,14 @@ test.describe('Branding — display wiring (Slice 4, no upload UI)', () => {
     // If a wide logo (or square logo as fallback) IS uploaded the sidebar
     // renders an <img> instead of <h1> text — mirroring the component logic.
     if (logoWideUrl !== null || logoSquareUrl !== null) {
-      // Logo is present: the sidebar must show an <img>, not a text heading.
+      // Logo is present: the sidebar must show an <img>, not the text brand.
       await expect(page.locator('aside img[alt]').first()).toBeVisible();
-      await expect(page.locator('aside h1')).toHaveCount(0);
+      await expect(page.locator('aside [data-slot="sidebar-brand"]')).toHaveCount(0);
     } else {
       // No logo: the sidebar header must show the site name as text.
       const sidebarHeader = page.locator('aside').first().locator('div').first();
       await expect(sidebarHeader.getByText(siteName)).toBeVisible();
-      await expect(page.locator('aside h1')).toHaveText(siteName);
+      await expect(page.locator('aside [data-slot="sidebar-brand"]')).toHaveText(siteName);
     }
   });
 
@@ -138,7 +138,7 @@ test.describe('Branding — display wiring (Slice 4, no upload UI)', () => {
       // Only assert sidebar text when no logo is present (same guard as above).
       const branding = await fetchEffectiveBranding(baseURL!);
       if (branding.logoWideUrl === null && branding.logoSquareUrl === null) {
-        await expect(page.locator('aside h1')).toHaveText(testSiteName);
+        await expect(page.locator('aside [data-slot="sidebar-brand"]')).toHaveText(testSiteName);
       }
 
       // (d) Restore the original site_name.
@@ -154,7 +154,7 @@ test.describe('Branding — display wiring (Slice 4, no upload UI)', () => {
       await page.goto('/dashboard');
       await expect(page).toHaveTitle(originalSiteName);
       if (branding.logoWideUrl === null && branding.logoSquareUrl === null) {
-        await expect(page.locator('aside h1')).toHaveText(originalSiteName);
+        await expect(page.locator('aside [data-slot="sidebar-brand"]')).toHaveText(originalSiteName);
       }
     } finally {
       // Ensure restore runs even on failure so the suite stays re-runnable.
@@ -231,9 +231,9 @@ test.describe('Branding — logo/favicon round-trips (requires Slice 5)', () => 
     });
 
     await page.goto('/dashboard');
-    // The sidebar brand slot must now be an <img>, not a text heading.
+    // The sidebar brand slot must now be an <img>, not the text brand.
     await expect(page.locator('aside img[alt]').first()).toBeVisible();
-    await expect(page.locator('aside h1')).toHaveCount(0);
+    await expect(page.locator('aside [data-slot="sidebar-brand"]')).toHaveCount(0);
 
     // --- Byte-integrity check (Fix 2): prove the proxy forwards the PNG
     // byte-exact without corrupting non-UTF-8 bytes via text() decode. ---
@@ -310,7 +310,7 @@ test.describe('Branding — logo/favicon round-trips (requires Slice 5)', () => 
     await expect(page.getByText('Wide logo cleared.')).toBeVisible({ timeout: 10_000 });
 
     await page.goto('/dashboard');
-    await expect(page.locator('aside h1')).toBeVisible();
+    await expect(page.locator('aside [data-slot="sidebar-brand"]')).toBeVisible();
     await expect(page.locator('aside img[alt]')).toHaveCount(0);
   });
 });
