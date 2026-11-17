@@ -102,6 +102,8 @@ PHP);
         $this->pdo = SchemaFromMigrations::make(true);
         $this->pdo->exec("INSERT OR IGNORE INTO tenants (id, name) VALUES (0, 'system')");
         $this->pdo->exec("INSERT INTO tenants (id, name) VALUES (1, 'example-bakery')");
+        $this->pdo->prepare("INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
+                             VALUES (?, 'Amro Saleh', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)")->execute([self::AMRO]);
         $this->activation = new CodePluginActivation($this->pdo);
         $this->loader = new PluginLoader(self::$dir, new Router(), new PermissionRegistry(), new HookManager());
         $this->loader->setWorkspaceActivation($this->activation);
