@@ -15,6 +15,7 @@ import { PageHeader } from '@whity/ui/page-header';
 import { ToggleGroup } from '@whity/ui/toggle-group';
 import { Input } from '@/components/ui/input';
 import { MAIN_COLOUR_SWATCHES } from '@/components/branding-main-colour';
+import { moneyText } from '@whity/ui/money/currency';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
 import type { components } from '@whity/api-client';
 
@@ -27,9 +28,57 @@ import type { components } from '@whity/api-client';
  *
  * No card for this screen yet (brand ask: brand-ask-workspace-owners.md §3);
  * built from TplWelcomeWorkspace's create step, inside the app.
+ *
+ * WHIT-1203: a person's first owned workspace is on the default plan; when the
+ * operator has set `workspaces.additional_plan`, every further one starts a
+ * trial of that plan. `starts_on` says so before they create it, with the
+ * plan's monthly price (CU.1-4).
  */
 
 type FieldError = 'name_required' | 'name_too_long' | null;
+
+type StartsOn = NonNullable<NonNullable<ReturnType<typeof useWorkspaceCreateState>>['starts_on']>;
+
+/**
+ * "Your first workspace is free. This one starts a 14-day trial of Team, then
+ * $69.00 a month." One sentence per case with a {price} hole, so the amount is
+ * isolated (`<bdi>`, left to right) inside Arabic text.
+ */
+function PaidWorkspaceNotice({ t, startsOn }: { t: TranslateFn; startsOn: StartsOn }) {
+  const plan = startsOn.plan_name;
+  const days = startsOn.trial_days;
+  const price = startsOn.price;
+  const lead = t('workspaceNew.paid.first', 'Your first workspace is free.');
+
+  let sentence: string;
+  if (price !== null && days > 0) {
+    sentence = t('workspaceNew.paid.trialThenPrice', 'This one starts a {days}-day trial of {plan}, then {price} a month.', { days, plan });
+  } else if (price !== null) {
+    sentence = t('workspaceNew.paid.price', 'This one is on {plan} at {price} a month, and opens once it’s paid.', { plan });
+  } else if (days > 0) {
+    sentence = t('workspaceNew.paid.trial', 'This one starts a {days}-day trial of {plan}, then it needs paying for.', { days, plan });
+  } else {
+    sentence = t('workspaceNew.paid.noTrial', 'This one is on {plan}, and opens once it’s paid.', { plan });
+  }
+  const [before, after] = sentence.split('{price}');
+
+  return (
+    <Alert data-testid="workspace-new-paid">
+      <AlertDescription>
+        <span className="font-medium text-foreground">{lead}</span>{' '}
+        {before}
+        {price !== null && after !== undefined && (
+          <>
+            <bdi dir="ltr" className="font-mono" data-testid="workspace-new-price">
+              {moneyText(price.unit_amount, price.currency)}
+            </bdi>
+            {after}
+          </>
+        )}
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 const NAME_MAX = 120;
 
@@ -240,9 +289,13 @@ export default function NewWorkspacePage() {
               </div>
             </fieldset>
 
-            <p className="text-sm text-muted-foreground">
-              {t('workspaceNew.plan', 'It starts on the plan every new workspace gets here. You stay in your other workspaces.')}
-            </p>
+            {state?.starts_on ? (
+              <PaidWorkspaceNotice t={t} startsOn={state.starts_on} />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {t('workspaceNew.plan', 'It starts on the plan every new workspace gets here. You stay in your other workspaces.')}
+              </p>
+            )}
 
             <div className="flex flex-wrap gap-3">
               <Button type="submit" size="lg" disabled={submitting || state === null}>

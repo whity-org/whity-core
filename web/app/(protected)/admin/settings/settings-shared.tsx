@@ -329,7 +329,7 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
       label: t('settings.meta.workspaces.self_create_enabled.label', 'People create their own workspaces'),
       help: t(
         'settings.meta.workspaces.self_create_enabled.help',
-        'Let anyone signed in create another workspace from the workspace switcher and own it. It starts on the default plan.'
+        'Let anyone signed in create another workspace from the workspace switcher and own it. It starts on the default plan, unless a plan for each further workspace is set below.'
       ),
     },
     'workspaces.max_owned_per_person': {
@@ -337,6 +337,20 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
       help: t(
         'settings.meta.workspaces.max_owned_per_person.help',
         'The most workspaces one person may own, counting ones they co-own. 0 means no limit.'
+      ),
+    },
+    'workspaces.additional_plan': {
+      label: t('settings.meta.workspaces.additional_plan.label', 'Plan for each further workspace'),
+      help: t(
+        'settings.meta.workspaces.additional_plan.help',
+        'The plan key a person’s second and later owned workspaces start on, in a trial, so each extra workspace pays. Their first starts on the default plan, and being invited stays free. Empty means the default plan for every workspace.'
+      ),
+    },
+    'workspaces.additional_trial_days': {
+      label: t('settings.meta.workspaces.additional_trial_days.label', 'Trial for each further workspace (days)'),
+      help: t(
+        'settings.meta.workspaces.additional_trial_days.help',
+        'How long that plan is free before the workspace has to be paid for. 0 means it opens only once it’s paid. Used only when the plan above is set.'
       ),
     },
     'auth.password_sign_in': {
@@ -565,6 +579,9 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         // Creating more workspaces while signed in (WHIT-1169).
         'workspaces.self_create_enabled',
         'workspaces.max_owned_per_person',
+        // Each further owned workspace pays (WHIT-1203).
+        'workspaces.additional_plan',
+        'workspaces.additional_trial_days',
       ],
     },
     {

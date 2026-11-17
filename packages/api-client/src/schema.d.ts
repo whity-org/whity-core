@@ -21037,6 +21037,16 @@ export interface components {
                 reason: "disabled" | "limit_reached" | null;
                 owned: number;
                 limit: number;
+                starts_on: {
+                    plan_key: string;
+                    plan_name: string;
+                    trial_days: number;
+                    price: {
+                        unit_amount: number;
+                        currency: string;
+                        billing_period: string;
+                    } | null;
+                } | null;
             };
         };
         WorkspaceOnboarding: {

@@ -111952,13 +111952,55 @@
                             },
                             "limit": {
                                 "type": "integer"
+                            },
+                            "starts_on": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                    "plan_key": {
+                                        "type": "string"
+                                    },
+                                    "plan_name": {
+                                        "type": "string"
+                                    },
+                                    "trial_days": {
+                                        "type": "integer"
+                                    },
+                                    "price": {
+                                        "type": "object",
+                                        "nullable": true,
+                                        "properties": {
+                                            "unit_amount": {
+                                                "type": "integer"
+                                            },
+                                            "currency": {
+                                                "type": "string"
+                                            },
+                                            "billing_period": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "unit_amount",
+                                            "currency",
+                                            "billing_period"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "plan_key",
+                                    "plan_name",
+                                    "trial_days",
+                                    "price"
+                                ]
                             }
                         },
                         "required": [
                             "allowed",
                             "reason",
                             "owned",
-                            "limit"
+                            "limit",
+                            "starts_on"
                         ]
                     }
                 },
