@@ -8499,6 +8499,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/booking/{workspace}/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The name and email of the signed-in visitor, to fill the booking form (public)
+         * @description Reads only the session and profile of the visitor, never the contacts of this workspace or the data of another. `data` is null when nobody is signed in. Sent `Cache-Control: private, no-store`.
+         */
+        get: operations["get_api_v1_public_booking_workspace_me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/booking/{workspace}/slots": {
         parameters: {
             query?: never;
@@ -17745,6 +17765,15 @@ export interface components {
             /** @description The bot-check token, when the page shows one. */
             bot_token?: string;
         };
+        /** @description The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in. */
+        PublicBookingVisitor: {
+            /** @description The display name on their own profile; may be empty. */
+            name: string;
+            /** @description The email of their own sign-in; may be empty. */
+            email: string;
+            /** @description Null until a profile carries a phone number. */
+            phone: string | null;
+        } | null;
         PublicChatInfoResponse: {
             data: {
                 workspace_name: string;
@@ -65118,6 +65147,67 @@ export interface operations {
             };
             /** @description The bot check could not be reached */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_public_booking_workspace_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace slug. */
+                workspace: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The visitor, or null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicBookingVisitor"];
+                    };
+                };
+            };
+            /** @description This booking page is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

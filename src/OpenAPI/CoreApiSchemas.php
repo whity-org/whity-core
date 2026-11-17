@@ -10523,6 +10523,11 @@ final class CoreApiSchemas
                     ], ['body', 'agenda', 'decisions', 'invitations', 'attendance']),
                 ]]
             ),
+            'PublicBookingVisitor' => self::object([
+                'name' => self::str() + ['description' => 'The display name on their own profile; may be empty.'],
+                'email' => self::str() + ['description' => 'The email of their own sign-in; may be empty.'],
+                'phone' => self::str(true) + ['description' => 'Null until a profile carries a phone number.'],
+            ], ['name', 'email', 'phone']) + ['nullable' => true, 'description' => 'The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in.'],
             'PublicBookingPage' => self::object([
                 'workspace' => self::object(['name' => self::str(), 'slug' => self::str()], ['name', 'slug']),
                 'settings' => self::object([
@@ -18719,6 +18724,15 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('Free times', self::listEnvelope('CalendarSlot')),
                     404 => self::errorResponse('This booking page is not available'),
                     422 => self::errorResponse('A missing or unreadable range'),
+                ] + $limits,
+            ]),
+            $route('GET', '/api/public/booking/{workspace}/me', [
+                'summary' => 'The name and email of the signed-in visitor, to fill the booking form (public)',
+                'description' => 'Reads only the session and profile of the visitor, never the contacts of this workspace or the data of another. `data` is null when nobody is signed in. Sent `Cache-Control: private, no-store`.',
+                'parameters' => [$workspace],
+                'responses' => [
+                    200 => self::jsonResponse('The visitor, or null', self::dataEnvelope(SchemaBuilder::ref('PublicBookingVisitor'))),
+                    404 => self::errorResponse('This booking page is not available'),
                 ] + $limits,
             ]),
             $route('POST', '/api/public/booking/{workspace}/bookings', [

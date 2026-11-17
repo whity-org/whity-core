@@ -45,6 +45,7 @@
         "field.note.label": "Anything we should know? (optional)",
         "field.phone.error": "Enter a phone number with digits only, such as +962 79 555 0142.",
         "field.phone.label": "Phone (optional)",
+        "field.prefilled": "Filled in from your Whity account. You can change it.",
         "intro": "Choose what you’d like, then a time that suits you. We’ll email you the details.",
         "loading": "Loading the booking page…",
         "manage.booked": "You’re booked",

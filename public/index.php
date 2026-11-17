@@ -5708,9 +5708,16 @@ $publicBookingHandler = new \Whity\Api\PublicBookingApiHandler(
     $publicFormBotCheck,
     new DatabaseSharedStore($db->getPdo()),
     $brandingService,
+    // WHIT-1179: the signed-in visitor's own name and email, from their
+    // session cookie and profile only.
+    new \Whity\Core\Calendar\BookingVisitor(
+        static fn (): ?array => $tokenValidator->validateAccessToken(),
+        $db->getPdo(),
+    ),
 );
 $router->register('GET',  '/api/public/booking/{workspace}',                       [$publicBookingHandler, 'page'],        null);
 $router->register('GET',  '/api/public/booking/{workspace}/slots',                 [$publicBookingHandler, 'slots'],       null);
+$router->register('GET',  '/api/public/booking/{workspace}/me',                    [$publicBookingHandler, 'visitor'],     null);
 $router->register('POST', '/api/public/booking/{workspace}/bookings',              [$publicBookingHandler, 'book'],        null);
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}',             [$publicBookingHandler, 'showBooking'], null);
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/slots',       [$publicBookingHandler, 'manageSlots'], null);
