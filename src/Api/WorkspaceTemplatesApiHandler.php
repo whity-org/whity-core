@@ -141,12 +141,29 @@ final class WorkspaceTemplatesApiHandler
             'plugin' => $plugin,
             'free' => array_map(static fn (array $line): ?string => self::text($line, $language), $offer['free']),
             'paid' => array_map(static fn (array $line): ?string => self::text($line, $language), $offer['paid']),
-            'trialDays' => $paid['trialDays'],
+            'trialDays' => self::trialDays($offer, $paid['trialDays']),
             'trialAvailable' => $this->activation->trialAvailable($plugin, $tenantId),
             'state' => $state['state'],
             'reason' => $state['reason'],
             'trialEndsAt' => $state['trialEndsAt'],
         ];
+    }
+
+    /**
+     * The trial a template's setup starts: the template's own length
+     * (owner, 2026-11-17: 30 days) when the plugin offers a trial at all,
+     * else the plugin's.
+     *
+     * @param array<string, mixed> $offer
+     */
+    public static function trialDays(array $offer, int $pluginDays): int
+    {
+        if ($pluginDays <= 0) {
+            return 0;
+        }
+        $days = $offer['trialDays'] ?? null;
+
+        return is_int($days) && $days > 0 ? min($days, \Whity\Sdk\Manifest\WorkspaceTemplateValidator::MAX_TRIAL_DAYS) : $pluginDays;
     }
 
     private function language(): string

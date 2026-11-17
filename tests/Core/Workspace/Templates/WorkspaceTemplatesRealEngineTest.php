@@ -127,7 +127,7 @@ PHP);
         self::assertSame(['قائمتك بالأسعار', 'نموذج طلب كيك'], $bakery['setsUp']);
         self::assertTrue($bakery['hasExamples']);
         self::assertSame('WsCounter', $bakery['offer']['plugin']);
-        self::assertSame(21, $bakery['offer']['trialDays']);
+        self::assertSame(30, $bakery['offer']['trialDays'], 'The template\'s own trial, since the plugin offers one');
         self::assertTrue($bakery['offer']['trialAvailable']);
         self::assertSame(['الطلبات عند الكاونتر برمز QR'], $bakery['offer']['paid']);
         self::assertNull($data['templates'][1]['plugin']);

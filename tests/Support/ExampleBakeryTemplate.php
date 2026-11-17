@@ -58,6 +58,7 @@ final class ExampleBakeryTemplate
             ]],
             'offer' => [
                 'plugin' => 'FrontOffice',
+                'trialDays' => 30,
                 'free' => [$t('Bookings and a booking page', 'الحجوزات وصفحة الحجز')],
                 'paid' => [$t('Orders at the counter by QR', 'الطلبات عند الكاونتر برمز QR')],
             ],

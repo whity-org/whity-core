@@ -25,11 +25,15 @@ namespace Whity\Sdk\Manifest;
  *     'documents' => [['key' => 'price-list', 'kind' => 'note', 'title' => [...], 'blocks' => ['en' => [...], 'ar' => [...]]]],
  *     'examples' => ['contacts' => [['key' => 'c1', 'name' => 'Example Bakery', 'email' => 'hello@example.com']], 'bookings' => [['key' => 'b1', 'service' => 'cake-order', 'contact' => 'c1', 'inDays' => 1, 'time' => '10:00']]],
  *     'setup' => ['steps' => [['id' => 'hours', 'kind' => 'hours', 'title' => [...]]]],
- *     'offer' => ['plugin' => 'FrontOffice', 'free' => [[...]], 'paid' => [[...]]],
+ *     'offer' => ['plugin' => 'Bakeries', 'trialDays' => 30, 'free' => [[...]], 'paid' => [[...]]],
  * ]
  * ```
  *
  * Everything but `key`, `version`, `name`, `summary` and `setsUp` is optional.
+ * `offer` names the plugin made for this kind of business; it stays hidden
+ * until that plugin is installed and paid, so a template can carry its offer
+ * before the plugin exists. `offer.trialDays` is the trial started from the
+ * template's setup, used only when the plugin offers a trial at all.
  * Every visible string is `{en, ar}`. This checks what the manifest says about
  * itself; the host also checks what only it knows (that the offered plugin is
  * installed and paid, that each permission exists) and applies only what the
@@ -46,6 +50,9 @@ final class WorkspaceTemplateValidator
     public const MAX_EXAMPLES = 10;
     public const MAX_STEPS = 8;
     public const MAX_OFFER_LINES = 6;
+
+    /** The longest trial a template may give, the same cap as a plugin's own. */
+    public const MAX_TRIAL_DAYS = 90;
 
     /** Workspace settings a template may set, and only while the workspace keeps the default. */
     public const SETTINGS = ['billing.default_currency', 'timezone', 'locale', 'calendar.week_start', 'calendar.weekend_days'];
@@ -501,7 +508,11 @@ final class WorkspaceTemplateValidator
         if (!is_array($offer) || array_is_list($offer)) {
             return ['template.offer: must be an object'];
         }
-        $errors = self::unknownKeys($offer, ['plugin', 'free', 'paid'], 'template.offer');
+        $errors = self::unknownKeys($offer, ['plugin', 'trialDays', 'free', 'paid'], 'template.offer');
+        $days = $offer['trialDays'] ?? null;
+        if ($days !== null && (!is_int($days) || $days < 1 || $days > self::MAX_TRIAL_DAYS)) {
+            $errors[] = 'template.offer.trialDays: 1 to ' . self::MAX_TRIAL_DAYS . ' days';
+        }
         if (!is_string($offer['plugin'] ?? null) || preg_match('/^[A-Za-z][A-Za-z0-9_]{0,63}$/', $offer['plugin']) !== 1) {
             $errors[] = 'template.offer.plugin: required, the name of the plugin offered';
         }

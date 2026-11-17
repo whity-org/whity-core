@@ -42,7 +42,7 @@ Checked by `Whity\Sdk\Manifest\WorkspaceTemplateValidator::errors()`. A template
 | `documents` | no | Up to 5: `key`, `kind` (`note`, `letter`, `template`, `label`), `title`, `blocks` as `{en: [...], ar: [...]}` editor blocks |
 | `examples` | no | Up to 10 `contacts` (`key`, `name`, an `@example.com` `email`, `phone`, `notes`) and 10 `bookings` (`key`, `service`, `contact`, `inDays` 1-14, `time` HH:MM) |
 | `setup` | no | The guided setup: `title`, `description`, and 1 to 8 `steps`, each an `id`, a `kind`, a `title` and a `why` |
-| `offer` | no | `plugin` (the paid plugin's name), `free` and `paid`: 1 to 6 lines each |
+| `offer` | no | `plugin` (the name of the plugin made for this business), `trialDays` (1 to 90, the trial started from the template's setup), and `free` and `paid`: 1 to 6 lines each. Hidden until that plugin is installed and paid, so a template can carry its offer before the plugin exists |
 
 ### Guided setup step kinds
 
