@@ -13,6 +13,8 @@ import { roleLabel } from '@whity/features/roles/role-label';
 import { useAuth } from '@/lib/auth-context';
 import { localizedText } from '@whity/ui/localized-text';
 import { roleNames } from '@/lib/workspace-memberships';
+import { RoleSummary } from '@whity/ui/role-summary';
+import { useRoleSummaryLabels } from '@/hooks/useRoleSummaryLabels';
 import { MySettingsHeader, useCurrentWorkspace } from '@/components/settings/scope';
 
 export default function RoleSettingsPage() {
@@ -20,6 +22,7 @@ export default function RoleSettingsPage() {
   const language = useLanguageCode() ?? 'en';
   const { user, memberships } = useAuth();
   const { id: currentId, name: workspace } = useCurrentWorkspace();
+  const roleSummaryLabels = useRoleSummaryLabels();
 
   // A person may hold several roles in one workspace (WHIT-1079): `roles`
   // lists them, and an older answer may still send one entry per role.
@@ -81,7 +84,13 @@ export default function RoleSettingsPage() {
               {[...others.entries()].map(([id, entry]) => (
                 <li key={id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                   <TenantLogo name={entry.name} size={24} />
-                  <span className="text-muted-foreground">{entry.roles.map((role) => roleLabel(role)).join(' · ')}</span>
+                  {/* First role and a focusable "+N more" with the full list (WHIT-1175). */}
+                  <RoleSummary
+                    roles={entry.roles.map((role) => roleLabel(role))}
+                    labels={roleSummaryLabels}
+                    interactive
+                    className="justify-end text-muted-foreground"
+                  />
                 </li>
               ))}
             </ul>

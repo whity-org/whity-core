@@ -28,7 +28,9 @@ import { useThemeMode } from '@/lib/theme-mode-context';
 import { useShellNav } from '@/components/shell/use-shell-nav';
 import { TenantSwitcher } from '@/components/sidebar';
 import { InstallOffer } from '@/components/pwa/install-offer';
-import { rolesLabel } from '@/lib/workspace-memberships';
+import { roleLabels } from '@/lib/workspace-memberships';
+import { RoleSummary } from '@whity/ui/role-summary';
+import { useRoleSummaryLabels } from '@/hooks/useRoleSummaryLabels';
 import { SETTINGS_AREA_NAV_IDS, WORKSPACE_PAGE_NAV_IDS } from '@/components/settings/settings-area';
 import { MY_SETTINGS_HREF, WORKSPACE_SETTINGS_MENU_HREF } from '@/lib/settings/my-settings';
 import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
@@ -90,8 +92,11 @@ export default function MorePage() {
   const workspace = membership
     ? localizedText(membership.tenant_names, currentLanguage ?? 'en', membership.tenant_name_language, membership.tenant_name)
     : '';
-  // Every role held here (WHIT-1079), already in words.
-  const role = (membership ? rolesLabel(membership) : '') || (user?.role ? roleLabel(user.role) : '');
+  // Every role held here (WHIT-1079), already in words; the row shows the first
+  // and "+N more" so a long list never wraps it (WHIT-1175).
+  const roles = membership ? roleLabels(membership) : [];
+  if (roles.length === 0 && user?.role) roles.push(roleLabel(user.role));
+  const roleSummaryLabels = useRoleSummaryLabels();
 
   // Workspace settings only for someone the server shows at least one of them to.
   const workspaceIds = [...SETTINGS_AREA_NAV_IDS, ...Object.keys(WORKSPACE_PAGE_NAV_IDS)] as string[];
@@ -118,9 +123,13 @@ export default function MorePage() {
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-base font-medium">{displayName}</span>
                 {/* The card used to carry no label at all (the owner's failure path). */}
-                <span className="block truncate text-sm text-muted-foreground">
-                  {[ta('settings.profile.title', 'Profile'), role, workspace].filter(Boolean).join(' · ')}
-                </span>
+                <RoleSummary
+                  roles={roles}
+                  before={ta('settings.profile.title', 'Profile')}
+                  after={workspace}
+                  labels={roleSummaryLabels}
+                  className="text-sm text-muted-foreground"
+                />
               </span>
               <Icon name="chevron-right" size={18} className="text-muted-foreground" />
             </Link>
