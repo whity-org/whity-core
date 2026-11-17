@@ -2931,7 +2931,6 @@ $workspaceTemplatesHandler = new \Whity\Api\WorkspaceTemplatesApiHandler(
     static fn (): \Whity\Core\Workspace\Templates\TemplateSetup => new \Whity\Core\Workspace\Templates\TemplateSetup($hostWorkspaceSetup),
 );
 $workspaceCodePluginsHandler->useTemplateOnboardings(static fn (int $tenantId): array => $workspaceTemplatesHandler->onboardings($tenantId));
-$dashboardHandler->useTemplateSetup(static fn (int $tenantId): array => $workspaceTemplatesHandler->dashboardSetup($tenantId));
 $router->register('GET', '/api/workspace/templates', [$workspaceTemplatesHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 $router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', [$workspaceTemplatesHandler, 'apply'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 $router->register('DELETE', '/api/workspace/templates/examples', [$workspaceTemplatesHandler, 'removeExamples'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
@@ -6530,6 +6529,8 @@ $dashboardHandler = new \Whity\Api\DashboardApiHandler(
     $homeCardsHandler,
     static fn (): string => $serverLabels->languageCode(),
 );
+// WHIT-1195: the template's steps join Finish setting up.
+$dashboardHandler->useTemplateSetup(static fn (int $tenantId): array => $workspaceTemplatesHandler->dashboardSetup($tenantId));
 $router->register('GET', '/api/me/dashboard', [$dashboardHandler, 'show'], null);
 $router->register('PUT', '/api/me/dashboard/layout', [$dashboardHandler, 'saveLayout'], null);
 // WHIT-815: workspace agents (persona, toolsets, starting grant) and the
