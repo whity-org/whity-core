@@ -9,6 +9,8 @@
  *  - the brand accent + semantic + type-scale tokens are present
  */
 
+import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 interface Oklch {
@@ -20,7 +22,7 @@ interface Oklch {
 
 interface Target {
   path: string;
-  content: string;
+  content: string | Buffer;
 }
 
 interface GeneratorModule {
@@ -42,6 +44,8 @@ interface GeneratorModule {
   syncGlobalsCss: (existing: string, base: unknown) => string;
   buildTargets: (base: unknown, opts?: Record<string, boolean>) => Target[];
   findStaleTargets: (targets: Target[]) => string[];
+  findOrphanLogos: (targets: Target[]) => string[];
+  generateSiteCss: (handoffCss: string, fontsDir?: string) => string;
   CSS_BEGIN: string;
   CSS_END: string;
 }
@@ -265,4 +269,113 @@ describe('generated outputs', () => {
     const stale = gen.findStaleTargets(targets);
     expect(stale).toEqual([]);
   });
+});
+
+// WHIT-1055: @whity/tokens carries the websites' token CSS and the logo set, so
+// other repos install them instead of keeping copies.
+describe('site tokens and logos in @whity/tokens', () => {
+  const root = path.join(__dirname, '..', '..');
+  const handoffCss = fs.readFileSync(path.join(root, 'docs', 'design', 'handoff', 'web', 'tokens.css'), 'utf8');
+  const fontsDir = path.join(root, 'packages', 'tokens', 'fonts');
+
+  it('keeps the handoff CSS and reads fonts from the package', () => {
+    const css = gen.generateSiteCss(handoffCss);
+    expect(css).not.toMatch(/url\(['"]?\/fonts\//);
+    const fonts = [...css.matchAll(/url\('\.\.\/fonts\/([^']+)'\)/g)].map((m) => m[1]);
+    // The handoff's own count of @font-face sources, independent of the generator.
+    expect(fonts).toHaveLength((handoffCss.match(/url\('\/fonts\//g) ?? []).length);
+    for (const f of fonts) expect(fs.existsSync(path.join(fontsDir, f))).toBe(true);
+    // Everything else is the handoff unchanged.
+    const strip = (s: string) => s.replace(/\r\n/g, '\n').replace(/url\('(\.\.)?\/fonts\//g, 'url(FONTS/');
+    expect(strip(css).endsWith(strip(handoffCss))).toBe(true);
+  });
+
+  it('refuses a handoff that uses a font the package does not ship', () => {
+    const extra = handoffCss + "\n@font-face { font-family: 'X'; src: url('/fonts/not-shipped-700.woff2'); }\n";
+    expect(() => gen.generateSiteCss(extra)).toThrow(/not-shipped-700\.woff2/);
+  });
+
+  it('refuses a handoff whose fonts no longer sit under /fonts/', () => {
+    expect(() => gen.generateSiteCss(handoffCss.replace(/\/fonts\//g, '/type/'))).toThrow(/names no \/fonts\//);
+  });
+
+  it('carries every handoff logo byte for byte', () => {
+    const targets = gen.buildTargets(base(), { json: false, dart: false, web: false, theme: false, tokensPackage: true });
+    const logos = targets.filter((t) => t.path.includes(`${path.sep}packages${path.sep}tokens${path.sep}logos${path.sep}`));
+    const handoffLogos = path.join(root, 'docs', 'design', 'handoff', 'logos');
+    const expected: string[] = [];
+    const walk = (d: string, pre: string) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        if (e.isDirectory()) walk(path.join(d, e.name), `${pre}${e.name}/`);
+        else expected.push(`${pre}${e.name}`);
+      }
+    };
+    walk(handoffLogos, '');
+    expect(logos).toHaveLength(expected.length);
+    expect(expected).toContain('whity-lockup-horizontal-colour.svg');
+    expect(expected).toContain('png/app-icon-512.png');
+    for (const t of logos) expect(Buffer.isBuffer(t.content)).toBe(true);
+  });
+
+  it('reports a logo the handoff no longer has as stale', () => {
+    const targets = gen.buildTargets(base(), { json: false, dart: false, web: false, theme: false, tokensPackage: true });
+    const orphan = path.join(root, 'packages', 'tokens', 'logos', 'zz-removed-by-brand-team.svg');
+    fs.writeFileSync(orphan, '<svg/>');
+    try {
+      expect(gen.findOrphanLogos(targets)).toEqual([orphan]);
+      expect(gen.findStaleTargets(targets)).toContain(orphan);
+    } finally {
+      fs.unlinkSync(orphan);
+    }
+    expect(gen.findOrphanLogos(targets)).toEqual([]);
+  });
+
+  it('copies tokens.css, fonts and logos into a site folder with working font paths', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const bin = require(path.join(root, 'packages', 'tokens', 'bin', 'whity-tokens.js')) as {
+      main: (argv: string[]) => number;
+    };
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'whity-tokens-'));
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    try {
+      expect(bin.main(['copy', dir])).toBe(0);
+      const css = fs.readFileSync(path.join(dir, 'tokens.css'), 'utf8');
+      const fonts = [...css.matchAll(/url\('([^']+\.woff2)'\)/g)].map((m) => m[1]);
+      expect(fonts.length).toBeGreaterThan(0);
+      for (const f of fonts) {
+        expect(f.startsWith('fonts/')).toBe(true);
+        expect(fs.existsSync(path.join(dir, f))).toBe(true);
+      }
+      expect(fs.existsSync(path.join(dir, 'logos', 'whity-mark-colour.svg'))).toBe(true);
+      expect(fs.existsSync(path.join(dir, 'logos', 'png', 'app-icon-512.png'))).toBe(true);
+    } finally {
+      log.mockRestore();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('copy leaves out fonts and logos when asked, and rejects bad arguments', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const bin = require(path.join(root, 'packages', 'tokens', 'bin', 'whity-tokens.js')) as {
+      main: (argv: string[]) => number;
+    };
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'whity-tokens-'));
+    const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    const err = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      expect(bin.main(['copy', dir, '--no-fonts', '--no-logos'])).toBe(0);
+      expect(fs.readdirSync(dir)).toEqual(['tokens.css']);
+      expect(bin.main(['copy'])).toBe(2);
+      expect(bin.main(['copy', dir, '--logos-only'])).toBe(2);
+      expect(bin.main(['paste', dir])).toBe(2);
+    } finally {
+      log.mockRestore();
+      err.mockRestore();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  function base() {
+    return gen.loadBase();
+  }
 });
