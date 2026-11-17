@@ -86,5 +86,7 @@ runs:
           if [ -n "${NPM_CONFIG_USERCONFIG:-}" ] && [ -f "$NPM_CONFIG_USERCONFIG" ]; then
             sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
           fi
-          npm publish --provenance --access public
+          # Verbose so a failed trusted-publishing exchange says why (npm only
+          # logs the OIDC exchange error at verbose; tokens are redacted).
+          npm publish --provenance --access public --loglevel verbose
         fi
