@@ -219,7 +219,31 @@ final class WorkspaceTemplatesApiHandler
         }
         $paid = $this->activation->paidAccessOf((string) $offer['plugin']);
 
-        return $paid === null ? null : ['trialDays' => self::trialDays($offer, $paid['trialDays'])] + $offer;
+        return $paid === null ? null : [
+            'trialDays' => self::trialDays($offer, $paid['trialDays']),
+            'pluginName' => $this->displayName((string) $offer['plugin']),
+        ] + $offer;
+    }
+
+    /** @var (\Closure(): array<string, array{en: string, ar: string}>)|null */
+    private ?\Closure $displayNames = null;
+
+    /**
+     * The names people see for plugins (SDK 1.117).
+     *
+     * @param \Closure(): array<string, array{en: string, ar: string}> $displayNames
+     */
+    public function useDisplayNames(\Closure $displayNames): void
+    {
+        $this->displayNames = $displayNames;
+    }
+
+    /** @return array{en: string, ar: string} the plugin's display name, its id when it has none */
+    private function displayName(string $plugin): array
+    {
+        $names = $this->displayNames !== null ? ($this->displayNames)() : [];
+
+        return $names[$plugin] ?? ['en' => $plugin, 'ar' => $plugin];
     }
 
     /** @var (\Closure(int, ?int, string, ?int): Response)|null */
@@ -356,6 +380,7 @@ final class WorkspaceTemplatesApiHandler
 
         return [
             'plugin' => $plugin,
+            'pluginName' => self::text($this->displayName($plugin), $language),
             'free' => array_map(static fn (array $line): ?string => self::text($line, $language), $offer['free']),
             'paid' => array_map(static fn (array $line): ?string => self::text($line, $language), $offer['paid']),
             'trialDays' => self::trialDays($offer, $paid['trialDays']),

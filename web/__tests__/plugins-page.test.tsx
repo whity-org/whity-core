@@ -490,8 +490,8 @@ describe('PluginsPage rejected screens (#953)', () => {
       const user = userEvent.setup();
       setCapabilities(['plugins:read', 'plugins:upload', 'plugins:reload', 'plugins:uninstall', 'plugins:enable', 'plugins:disable']);
       mockPluginList([ACTIVE_PLUGIN], false, [], [
-        { name: 'HelloWorld', version: '1.2.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null },
-        { name: 'AlwaysThere', version: '2.0.0', access: 'all', canSwitch: false, enabled: true, changedAt: null, changedBy: null },
+        { name: 'HelloWorld', displayName: 'HelloWorld', version: '1.2.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null },
+        { name: 'AlwaysThere', displayName: 'AlwaysThere', version: '2.0.0', access: 'all', canSwitch: false, enabled: true, changedAt: null, changedBy: null },
       ]);
       mockApiPost.mockResolvedValue({ data: { data: { name: 'HelloWorld', enabled: true } } });
 
@@ -506,6 +506,26 @@ describe('PluginsPage rejected screens (#953)', () => {
       await waitFor(() =>
         expect(mockApiPost).toHaveBeenCalledWith('/api/v1/workspace/code-plugins/{plugin}/enable', {
           params: { path: { plugin: 'HelloWorld' } },
+        }),
+      );
+    });
+
+    it('names a plugin by its display name, while the switch still acts on its id (WHIT-1198)', async () => {
+      const user = userEvent.setup();
+      setCapabilities(['plugins:read', 'plugins:enable', 'plugins:disable']);
+      mockPluginList([ACTIVE_PLUGIN], false, [], [
+        { name: 'Salons', displayName: 'Whity for Salons', version: '0.1.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null },
+      ]);
+      mockApiPost.mockResolvedValue({ data: { data: { name: 'Salons', enabled: true } } });
+
+      render(<PluginsPage />);
+      await screen.findByText('Whity for Salons');
+      expect(screen.queryByText('Salons')).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('switch', { name: 'Use Whity for Salons in this workspace' }));
+      await waitFor(() =>
+        expect(mockApiPost).toHaveBeenCalledWith('/api/v1/workspace/code-plugins/{plugin}/enable', {
+          params: { path: { plugin: 'Salons' } },
         }),
       );
     });
@@ -542,7 +562,7 @@ describe('PluginsPage rejected screens (#953)', () => {
         [],
         [
           {
-            name: 'FrontOffice', version: '0.8.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null,
+            name: 'FrontOffice', displayName: 'FrontOffice', version: '0.8.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null,
             state: 'off', reason: null, graceUntil: null, trialEndsAt: null, paid: true, product: 'plugin.front-office',
             trialDays: 14, trialAvailable: true, mayTurnOn: false,
           },
@@ -575,7 +595,7 @@ describe('PluginsPage rejected screens (#953)', () => {
         [],
         [
           {
-            name: 'Salons', version: '0.1.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null,
+            name: 'Salons', displayName: 'Salons', version: '0.1.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null,
             state: 'off', reason: null, graceUntil: null, trialEndsAt: null, paid: true, product: 'plugin.salons',
             trialDays: 14, trialAvailable: false, mayTurnOn: false, onboarding: true, dependsOn: [],
             seats: { count: 3, unit: { en: 'chair', ar: 'كرسي' }, units: { en: 'chairs', ar: 'كراسي' } },
@@ -608,7 +628,7 @@ describe('PluginsPage rejected screens (#953)', () => {
       setCapabilities(['plugins:read', 'plugins:enable', 'plugins:disable']);
       mockPluginList([ACTIVE_PLUGIN], false, [], [
         {
-          name: 'Salons', version: '0.1.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null,
+          name: 'Salons', displayName: 'Salons', version: '0.1.0', access: 'choose', canSwitch: true, enabled: false, changedAt: null, changedBy: null,
           state: 'off', reason: null, graceUntil: null, trialEndsAt: null, paid: false, product: null,
           trialDays: 0, trialAvailable: false, mayTurnOn: true, onboarding: true, dependsOn: ['Appointments'],
         },
@@ -629,7 +649,7 @@ describe('PluginsPage rejected screens (#953)', () => {
         [ACTIVE_PLUGIN],
         false,
         [{ name: 'CakeOrders', version: null, removed_by: null, removed_at: 'x', purge_after: 'y', purge_failed: false }],
-        [{ name: 'HelloWorld', version: '1.2.0', access: 'all', canSwitch: false, enabled: true, changedAt: null, changedBy: null }],
+        [{ name: 'HelloWorld', displayName: 'HelloWorld', version: '1.2.0', access: 'all', canSwitch: false, enabled: true, changedAt: null, changedBy: null }],
       );
 
       render(<PluginsPage />);

@@ -136,6 +136,8 @@ final class WorkspaceCodePluginsApiHandler
         return $this->inWorkspace(function (int $tenantId): Response {
             $rows = $this->activation->workspaceRows($tenantId);
             $onboarding = $this->loader->pluginsWithOnboarding();
+            $displayNames = $this->loader->getDisplayNames();
+            $language = $this->language !== null ? (string) ($this->language)() : 'en';
             $data = [];
             foreach ($this->activePlugins() as $name => $version) {
                 $access = $this->activation->accessOf($name);
@@ -147,6 +149,8 @@ final class WorkspaceCodePluginsApiHandler
                 $paid = $this->activation->paidAccessOf($name);
                 $data[] = [
                     'name' => $name,
+                    // SDK 1.117: what people read; the id when it declares none.
+                    'displayName' => self::text($displayNames[$name] ?? $name, $language),
                     'version' => $version,
                     'access' => $access,
                     'canSwitch' => $access === CodePluginActivation::CHOOSE,

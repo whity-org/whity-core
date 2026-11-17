@@ -70,6 +70,8 @@ Core draws each step and works out whether it is done from what the workspace ho
 
 ## The offer
 
+The offer names the plugin by its display name (SDK 1.117, `PluginDisplayNameInterface`), such as "Whity for Salons", never its id; a plugin that declares none shows its id.
+
 `GET /api/workspace/templates` shows a template's `offer` only when the plugin it names is installed and paid (`PluginAccessInterface`). It carries the plugin's `trialDays`, whether this workspace can still start a trial, and the plugin's state here. The trial itself starts through `POST /api/workspace/code-plugins/{plugin}/trial` (`plugins:enable`), the same one-click, no-card trial as Settings › Plugins.
 
 ## Example data

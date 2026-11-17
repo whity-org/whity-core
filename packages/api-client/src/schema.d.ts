@@ -20949,6 +20949,8 @@ export interface components {
         WorkspaceCodePlugin: {
             /** @description The plugin's name */
             name: string;
+            /** @description The name people see, in the reader's language (SDK 1.117); the name when the plugin declares none */
+            displayName: string;
             version: string;
             /**
              * @description all: on for every workspace; choose: this workspace decides
@@ -21165,6 +21167,8 @@ export interface components {
         };
         WorkspaceTemplateOffer: {
             plugin: string;
+            /** @description The plugin's display name in the reader's language (SDK 1.117) */
+            pluginName: string;
             /** @description What the workspace can do free in Whity */
             free: string[];
             /** @description What the plugin adds */

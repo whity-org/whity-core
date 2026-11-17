@@ -30,8 +30,14 @@ final class TemplateSetup
 
     private const OFFER_STEP = 'offer';
 
-    public function __construct(private readonly WorkspaceSetup $api)
-    {
+    /**
+     * @param (\Closure(): ?string)|null $workspaceName the workspace's own name, as
+     *     given when it was created (WHIT-1198: the business step opens with it)
+     */
+    public function __construct(
+        private readonly WorkspaceSetup $api,
+        private readonly ?\Closure $workspaceName = null,
+    ) {
     }
 
     /**
@@ -148,17 +154,30 @@ final class TemplateSetup
 
             return $out;
         }
+        // WHIT-1198: everything the workspace already holds, in adopt mode
+        // too. Contact details have no platform default, so any value is the
+        // workspace's; the colour counts only once the workspace chose one.
         $settings = $this->data('GET', '/api/settings');
         $effective = is_array($settings['effective'] ?? null) ? $settings['effective'] : [];
         $overridden = is_array($settings['overridden'] ?? null) ? $settings['overridden'] : [];
         $out = [];
         foreach (['name_en' => 'company.name', 'name_ar' => 'company.name_ar', 'phone' => 'company.phone', 'address' => 'company.address'] as $field => $key) {
-            if (in_array($key, $overridden, true) && is_string($effective[$key] ?? null) && $effective[$key] !== '') {
-                $out[$field] = $effective[$key];
+            if (is_string($effective[$key] ?? null) && trim($effective[$key]) !== '') {
+                $out[$field] = trim($effective[$key]);
+            }
+        }
+        if (!isset($out['name_en']) && in_array('site_name', $overridden, true) && is_string($effective['site_name'] ?? null) && trim($effective['site_name']) !== '') {
+            $out['name_en'] = trim($effective['site_name']);
+        }
+        if (!isset($out['name_en']) && $this->workspaceName !== null) {
+            $name = ($this->workspaceName)();
+            if (is_string($name) && trim($name) !== '') {
+                // An Arabic name goes in the Arabic field.
+                $out[preg_match('/\p{Arabic}/u', $name) === 1 && !isset($out['name_ar']) ? 'name_ar' : 'name_en'] = trim($name);
             }
         }
         $colour = $effective['branding_main_color'] ?? null;
-        if (in_array('branding_main_color', $overridden, true) && is_string($colour)) {
+        if (in_array('branding_main_color', $overridden, true) && is_string($colour) && preg_match('/^#[0-9A-Fa-f]{6}$/', $colour) === 1) {
             $out['colour'] = strtolower($colour);
         }
 
@@ -468,17 +487,19 @@ final class TemplateSetup
      */
     private static function offerBlocks(array $offer, string $api): array
     {
-        $plugin = (string) $offer['plugin'];
+        // SDK 1.117: the name people know the plugin by, never its id.
+        $named = is_array($offer['pluginName'] ?? null) ? $offer['pluginName'] : [];
+        $plugin = ['en' => (string) ($named['en'] ?? $offer['plugin']), 'ar' => (string) ($named['ar'] ?? $offer['plugin'])];
         $days = (int) ($offer['trialDays'] ?? 0);
         $ticks = static fn (array $lines): array => array_map(static fn (array $line): array => ['type' => 'text', 'value' => ['en' => '✓ ' . $line['en'], 'ar' => '✓ ' . $line['ar']]], $lines);
         $blocks = [
             ['type' => 'text', 'tone' => 'muted', 'value' => [
-                'en' => 'Your template is free, and so is everything below in Whity. ' . $plugin . ' is a paid app that does more for your kind of business.',
-                'ar' => 'القالب مجاني، وكذلك كل ما يلي في Whity. ' . $plugin . ' تطبيق مدفوع يقدّم المزيد لنوع عملك.',
+                'en' => 'Your template is free, and so is everything below in Whity. ' . $plugin['en'] . ' is a paid app that does more for your kind of business.',
+                'ar' => 'القالب مجاني، وكذلك كل ما يلي في Whity. ' . $plugin['ar'] . ' تطبيق مدفوع يقدّم المزيد لنوع عملك.',
             ]],
             ['type' => 'text', 'value' => ['en' => 'Free in Whity', 'ar' => 'مجاناً في Whity']],
             ...$ticks((array) $offer['free']),
-            ['type' => 'text', 'value' => ['en' => 'With ' . $plugin, 'ar' => 'مع ' . $plugin]],
+            ['type' => 'text', 'value' => ['en' => 'With ' . $plugin['en'], 'ar' => 'مع ' . $plugin['ar']]],
             ...$ticks((array) $offer['paid']),
         ];
         if ($days > 0) {

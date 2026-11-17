@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.116).
+ * SDK identity (v1.117).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1373,12 +1373,19 @@ namespace Whity\Sdk;
  * holds. {@see Manifest\WorkspaceTemplateValidator} checks the shape (WHIT-1194).
  *
  * Purely additive.)
+ *
+ * 1.117 (DISPLAY NAMES: {@see PluginDisplayNameInterface} gives a plugin the name people read, in
+ * English and Arabic ("Whity for Salons", "Whity للصالونات"), shown on Settings › Plugins and in a
+ * workspace template's offer instead of its id. `getName()` stays the id. Without it, people see the
+ * id (WHIT-1198).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.116.0';
+    public const VERSION = '1.117.0';
 
     /**
      * Static identity only — never instantiated.

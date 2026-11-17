@@ -20061,6 +20061,7 @@ final class CoreApiSchemas
             'WorkspacePluginListResponse' => self::listEnvelope('WorkspacePlugin'),
             'WorkspaceCodePlugin' => self::object([
                 'name' => self::str() + ['description' => 'The plugin\'s name'],
+                'displayName' => self::str() + ['description' => 'The name people see, in the reader\'s language (SDK 1.117); the name when the plugin declares none'],
                 'version' => self::str(),
                 'access' => ['type' => 'string', 'enum' => ['all', 'choose'], 'description' => 'all: on for every workspace; choose: this workspace decides'],
                 'canSwitch' => self::bool(),
@@ -20088,7 +20089,7 @@ final class CoreApiSchemas
                         'units' => SchemaBuilder::ref('LocalizedLabel'),
                     ],
                 ],
-            ], ['name', 'version', 'access', 'canSwitch', 'enabled', 'state', 'paid', 'trialAvailable', 'mayTurnOn']),
+            ], ['name', 'displayName', 'version', 'access', 'canSwitch', 'enabled', 'state', 'paid', 'trialAvailable', 'mayTurnOn']),
             'WorkspaceCodePluginListResponse' => self::listEnvelope('WorkspaceCodePlugin'),
             'WorkspaceCodePluginSwitchResponse' => self::object([
                 'data' => self::object(['name' => self::str(), 'enabled' => self::bool()], ['name', 'enabled']),
@@ -20115,6 +20116,7 @@ final class CoreApiSchemas
             'WorkspaceOnboardingListResponse' => self::listEnvelope('WorkspaceOnboarding'),
             'WorkspaceTemplateOffer' => self::object([
                 'plugin' => self::str(),
+                'pluginName' => self::str() + ['description' => 'The plugin\'s display name in the reader\'s language (SDK 1.117)'],
                 'free' => ['type' => 'array', 'items' => self::str(), 'description' => 'What the workspace can do free in Whity'],
                 'paid' => ['type' => 'array', 'items' => self::str(), 'description' => 'What the plugin adds'],
                 'trialDays' => self::int(),
@@ -20122,7 +20124,7 @@ final class CoreApiSchemas
                 'state' => ['type' => 'string', 'enum' => ['on', 'read_only', 'off']],
                 'reason' => ['type' => 'string', 'nullable' => true],
                 'trialEndsAt' => ['type' => 'string', 'nullable' => true],
-            ], ['plugin', 'free', 'paid', 'trialDays', 'trialAvailable', 'state']),
+            ], ['plugin', 'pluginName', 'free', 'paid', 'trialDays', 'trialAvailable', 'state']),
             'WorkspaceTemplateCard' => self::object([
                 'key' => self::str(),
                 'plugin' => ['type' => 'string', 'nullable' => true, 'description' => 'The plugin that offers it; null for core\'s Blank'],

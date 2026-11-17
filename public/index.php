@@ -2928,9 +2928,24 @@ $workspaceTemplatesHandler = new \Whity\Api\WorkspaceTemplatesApiHandler(
     $codePluginActivation,
     $auditLogger,
     static fn (): string => $serverLabels->languageCode(),
-    static fn (): \Whity\Core\Workspace\Templates\TemplateSetup => new \Whity\Core\Workspace\Templates\TemplateSetup($hostWorkspaceSetup),
+    static fn (): \Whity\Core\Workspace\Templates\TemplateSetup => new \Whity\Core\Workspace\Templates\TemplateSetup(
+        $hostWorkspaceSetup,
+        // WHIT-1198: the business step opens with the workspace's own name.
+        static function () use ($db): ?string {
+            $tenantId = \Whity\Core\Tenant\TenantContext::getTenantId();
+            if ($tenantId === null || $tenantId === 0) {
+                return null;
+            }
+            $stmt = $db->getPdo()->prepare('SELECT name FROM tenants WHERE id = ?');
+            $stmt->execute([$tenantId]);
+            $name = $stmt->fetchColumn();
+
+            return is_string($name) ? $name : null;
+        },
+    ),
 );
 $workspaceCodePluginsHandler->useTemplateOnboardings(static fn (int $tenantId): array => $workspaceTemplatesHandler->onboardings($tenantId));
+$workspaceTemplatesHandler->useDisplayNames(static fn (): array => $pluginLoader->getDisplayNames());
 $workspaceTemplatesHandler->useTrialStarter(static fn (int $tenantId, ?int $profileId, string $plugin, ?int $days): \Whity\Core\Response => $workspaceCodePluginsHandler->startTrialFor($tenantId, $profileId, $plugin, $days));
 $router->register('GET', '/api/workspace/templates', [$workspaceTemplatesHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 $router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', [$workspaceTemplatesHandler, 'apply'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);

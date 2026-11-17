@@ -731,6 +731,44 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     }
 
     /**
+     * The names people see for the loaded plugins (SDK 1.117), by plugin
+     * name: `{en, ar}`, or the id in both when a plugin declares none or a
+     * bad one.
+     *
+     * @return array<string, array{en: string, ar: string}>
+     */
+    public function getDisplayNames(): array
+    {
+        $out = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $plugin = $info['plugin'];
+            $name = $plugin->getName();
+            $out[$name] = ['en' => $name, 'ar' => $name];
+            if (!$plugin instanceof \Whity\Sdk\PluginDisplayNameInterface) {
+                continue;
+            }
+            try {
+                // Read untyped: a plugin's array is runtime data whatever its
+                // declared shape, so both languages are checked below.
+                /** @var array<string, mixed> $declared */
+                $declared = $plugin->getDisplayName();
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getDisplayName', false);
+                continue;
+            }
+            $en = $declared['en'] ?? null;
+            $ar = $declared['ar'] ?? null;
+            if (!is_string($en) || trim($en) === '' || mb_strlen($en) > 60 || !is_string($ar) || trim($ar) === '' || mb_strlen($ar) > 60) {
+                $this->logWarning("[Plugin:{$pluginKey}] getDisplayName(): needs en and ar, each up to 60 characters; its id is shown.");
+                continue;
+            }
+            $out[$name] = ['en' => trim($en), 'ar' => trim($ar)];
+        }
+
+        return $out;
+    }
+
+    /**
      * Each plugin's validated workspace templates (SDK 1.116), by plugin key.
      *
      * @var array<string, list<array<string, mixed>>>

@@ -23,6 +23,9 @@ final class FakeSetup implements WorkspaceSetup
     /** @var list<string> */
     public array $overridden = ['billing.default_currency', 'locale'];
 
+    /** @var array<string, mixed> */
+    public array $effective = ['billing.default_currency' => 'JOD', 'timezone' => 'Asia/Amman', 'locale' => 'en'];
+
     public function call(string $method, string $path, array $body = []): array
     {
         $route = "{$method} {$path}";
@@ -48,7 +51,7 @@ final class FakeSetup implements WorkspaceSetup
 
         return match (true) {
             $route === 'GET /api/settings' => ['status' => 200, 'body' => ['data' => [
-                'effective' => ['billing.default_currency' => 'JOD', 'timezone' => 'Asia/Amman', 'locale' => 'en'],
+                'effective' => $this->effective,
                 'overridden' => $this->overridden,
             ]]],
             $route === 'GET /api/calendar/services' => ['status' => 200, 'body' => ['data' => $this->services]],
