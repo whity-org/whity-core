@@ -169,3 +169,14 @@ export function WeeklyHoursFields({ idPrefix, week, order, disabled = false, onC
     </ul>
   );
 }
+
+/** Says which day's ranges end before they start or overlap. */
+export function WeeklyHoursProblem({ day }: { day: number }) {
+  const t = useTranslation('calendar');
+  const words = useCalendarWords();
+  return (
+    <p className="text-sm text-destructive" role="alert">
+      {t('hours.error.overlap', 'On {day}, each end must come after its start, and the hours must not overlap.', { day: words.weekday(day) })}
+    </p>
+  );
+}

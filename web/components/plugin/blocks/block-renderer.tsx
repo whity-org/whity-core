@@ -91,8 +91,7 @@ import { Chart } from '@whity/ui/chart';
 import { DataTable as SharedDataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
 import { FieldSelect } from '@/components/field-select';
-import { WeeklyHoursFields } from '@/components/calendar/weekly-hours-fields';
-import { useCalendarWords } from '@/components/calendar/use-calendar-words';
+import { WeeklyHoursFields, WeeklyHoursProblem } from '@/components/calendar/weekly-hours-fields';
 import { firstBadDay, rowsOf, weekOf, weekOrder } from '@/lib/calendar/hours';
 import { timeOptions } from '@/lib/calendar/times';
 import { Checkbox } from '@whity/ui/checkbox';
@@ -3703,16 +3702,6 @@ function WeeklyHoursRenderer({ block }: { block: WeeklyHoursBlock }) {
       />
       {bad !== null && <WeeklyHoursProblem day={bad} />}
     </div>
-  );
-}
-
-function WeeklyHoursProblem({ day }: { day: number }) {
-  const t = useTranslation('calendar');
-  const words = useCalendarWords();
-  return (
-    <p className="text-sm text-destructive" role="alert">
-      {t('hours.error.overlap', 'On {day}, each end must come after its start, and the hours must not overlap.', { day: words.weekday(day) })}
-    </p>
   );
 }
 

@@ -19,6 +19,7 @@
         "action.toast.completed": "Completed successfully",
         "action.toast.downloaded": "Generated successfully — your download has started",
         "action.toast.requestFailed": "Request failed",
+        "blocks.color.custom": "Custom",
         "blocks.data.empty": "No data available.",
         "blocks.data.loadError": "Failed to load data.",
         "blocks.data.refresh": "Refresh",
@@ -210,7 +211,6 @@
         "record.noRecord.description": "This address is missing the record it is about.",
         "record.noRecord.title": "No record named",
         "record.noRecordPage.description": "The '{id}' feature does not describe individual records, so there is nothing at this address.",
-        "record.noRecordPage.title": "No record page",
-        "blocks.color.custom": "Custom"
+        "record.noRecordPage.title": "No record page"
     }
 }

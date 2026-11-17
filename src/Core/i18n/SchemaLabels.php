@@ -85,6 +85,8 @@ final class SchemaLabels
         'trigger',
         // What one row of a `fieldArray` is called ("Attendee", "Question").
         'itemLabel',
+        // The caption on a `fieldArray`'s "Add another" button (SDK 1.113).
+        'addLabel',
     ];
 
     /**
