@@ -31,6 +31,13 @@ use Whity\Core\Settings\SettingsService;
  * A service that needs a room (design 3.3) also takes that room's lock,
  * AFTER the people's, and the room's live bookings count as busy time.
  *
+ * SEVERAL SERVICES (WHIT-1173)
+ * With `calendar.multi_service_booking` on, one booking may hold several
+ * services back to back, done by one person or each by their own. Such a
+ * booking takes every person's lock in profile-id order, then every room's
+ * in id order, and each person is busy only for their own services
+ * ({@see self::bookMany()}).
+ *
  * REQUESTS (design 3.3)
  * A customer's booking is a request when the service needs approval or the
  * workspace turned instant booking off. A request holds its time like a
@@ -41,6 +48,9 @@ use Whity\Core\Settings\SettingsService;
  */
 final class BookingService
 {
+    /** At most this many services in one booking (WHIT-1173). */
+    public const MAX_SERVICES = 8;
+
     private ?CalendarInvites $invites = null;
 
     private ?EventReminders $reminders = null;
@@ -171,19 +181,141 @@ final class BookingService
     }
 
     /**
-     * Book a service.
+     * Free start times for several services back to back (WHIT-1173), in
+     * `[from, to)`. A time is free when, for each service, someone who may do
+     * it is free for that service's own part of the span, buffers included,
+     * inside their hours. Each item's `profile_id` null is "anyone", who may
+     * be a different person per service; `$samePerson` asks for one person
+     * who does them all. Each time comes with the people it would be with.
+     *
+     * Moving a booking of several passes its own id as `$exceptBookingId`,
+     * so its own time counts as free, and `$requireSetting` false, so a
+     * booking made before the workspace turned the setting off still moves.
+     *
+     * @param list<array{service_id: int, profile_id: ?int}> $items
+     * @return list<array{starts_at: string, ends_at: string, profile_ids: list<int>, items: list<array{service_id: int, profile_id: int, starts_at: string, ends_at: string}>}>
+     */
+    public function availabilityForMany(int $tenantId, array $items, bool $samePerson, DateTimeImmutable $from, DateTimeImmutable $to, bool $publicOnly = false, ?int $exceptBookingId = null, bool $requireSetting = true): array
+    {
+        $plan = $this->plan($tenantId, $items, $samePerson, $publicOnly, $requireSetting);
+        $settings = $this->settingsFor($tenantId);
+        $now = $this->now();
+        $earliest = max($from, $now->modify('+' . $settings->minNoticeMinutes . ' minutes'));
+        $latest = min($to, $now->modify('+' . $settings->maxAdvanceDays . ' days'));
+        if ($latest <= $earliest) {
+            return [];
+        }
+
+        $total = 0;
+        foreach ($plan['services'] as $service) {
+            $total += (int) $service['duration_minutes'];
+        }
+        $wideFrom = $earliest->modify('-1 day');
+        $wideTo = $latest->modify('+1 day')->modify('+' . $total . ' minutes');
+        $dayStart = $earliest->setTimezone($settings->zone)->setTime(0, 0);
+        $windows = [];
+        $busy = [];
+        foreach ($plan['candidates'] as $who) {
+            foreach ($who as $person) {
+                if (isset($windows[$person])) {
+                    continue;
+                }
+                $windows[$person] = Availability::openWindows(
+                    $this->calendar->hours($tenantId, $person),
+                    $this->calendar->exceptions($tenantId, $person, $wideFrom, $wideTo),
+                    $settings->zone,
+                    $dayStart,
+                    $latest->modify('+' . $total . ' minutes'),
+                );
+                $busy[$person] = Interval::merge($this->busyFor($tenantId, $person, $wideFrom, $wideTo, $now, $exceptBookingId));
+            }
+        }
+        $roomBusy = [];
+        foreach ($plan['services'] as $service) {
+            $roomId = $service['room_id'] ?? null;
+            if (is_int($roomId) && !isset($roomBusy[$roomId])) {
+                $roomBusy[$roomId] = Interval::merge($this->rooms()->busy($tenantId, $roomId, $wideFrom, $wideTo, $now, $exceptBookingId));
+            }
+        }
+        $free = static function (int $person, int $k, DateTimeImmutable $at) use ($plan, $windows, $busy, $roomBusy): bool {
+            $service = $plan['services'][$k];
+            $minutes = (int) $service['duration_minutes'];
+            if (!Availability::withinWindows($at, $minutes, $windows[$person] ?? [])) {
+                return false;
+            }
+            if (Availability::clashes($at, $minutes, (int) $service['buffer_before_minutes'], (int) $service['buffer_after_minutes'], $busy[$person] ?? [])) {
+                return false;
+            }
+            $roomId = $service['room_id'] ?? null;
+
+            return !is_int($roomId) || !Availability::clashes($at, $minutes, (int) $service['buffer_before_minutes'], (int) $service['buffer_after_minutes'], $roomBusy[$roomId] ?? []);
+        };
+
+        // Start times step from the start of each open window of whoever may
+        // do the first service, as one service's do (on the hours' grid).
+        $step = max(1, $settings->slotStepMinutes) * 60;
+        $firstMinutes = (int) $plan['services'][0]['duration_minutes'] * 60;
+        $starts = [];
+        foreach ($plan['candidates'][0] as $person) {
+            foreach ($windows[$person] as $window) {
+                for ($t = $window->start->getTimestamp(); $t + $firstMinutes <= $window->end->getTimestamp(); $t += $step) {
+                    if ($t >= $earliest->getTimestamp() && $t < $latest->getTimestamp()) {
+                        $starts[$t] = true;
+                    }
+                }
+            }
+        }
+        ksort($starts);
+
+        $out = [];
+        foreach (array_keys($starts) as $t) {
+            $start = (new DateTimeImmutable('@' . $t))->setTimezone(new DateTimeZone('UTC'));
+            $people = self::assign($plan, $start, $free);
+            if ($people === null) {
+                continue;
+            }
+            $parts = self::parts($plan['services'], $people, $start);
+            $out[] = [
+                'starts_at' => Interval::toApi($start),
+                'ends_at' => Interval::toApi($parts[count($parts) - 1]['ends_at']),
+                'profile_ids' => array_values(array_unique($people)),
+                'items' => array_map(static fn (array $part): array => [
+                    'service_id' => $part['service_id'],
+                    'profile_id' => $part['profile_id'],
+                    'starts_at' => Interval::toApi($part['starts_at']),
+                    'ends_at' => Interval::toApi($part['ends_at']),
+                ], $parts),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Book a service, or several back to back (WHIT-1173: `items` with two
+     * or more, when the workspace turned `calendar.multi_service_booking`
+     * on; see {@see self::bookMany()}).
      *
      * @param array{
      *   service_id: int, profile_id: ?int, starts_at: DateTimeImmutable,
      *   customer_profile_id: ?int, customer_name: string, customer_email: string,
      *   customer_phone: string, customer_note: string, source: string,
      *   created_by_profile_id: ?int, enforce_hours: bool, public: bool,
-     *   book_anyway?: bool, within_hours?: bool, notify?: bool
+     *   book_anyway?: bool, within_hours?: bool, notify?: bool,
+     *   items?: list<array{service_id: int, profile_id: ?int}>, same_person?: bool
      * } $request
      * @return array<string, mixed> the booking
      */
     public function book(int $tenantId, array $request): array
     {
+        $items = $request['items'] ?? [];
+        if (count($items) > 1) {
+            return $this->bookMany($tenantId, $request, $items);
+        }
+        if (count($items) === 1) {
+            $request['service_id'] = $items[0]['service_id'];
+            $request['profile_id'] = $items[0]['profile_id'];
+        }
         $service = $this->service($tenantId, $request['service_id'], $request['public']);
         // Staff only: Book anyway, keep to the hours, and whether the customer
         // is emailed (CV.8, CV.9). A booking's length is always its service's:
@@ -254,29 +386,149 @@ final class BookingService
                 ]);
             }, $room);
             if ($id !== null) {
-                $booking = $this->afterWrite($tenantId, $id);
-                if ($requirement !== null && $hold !== null) {
-                    return $this->startPayment($tenantId, $booking, $quote, $requirement, $hold, $step);
-                }
-                if ($asRequest) {
-                    $this->announceBooking(CalendarEventNames::BOOKING_CREATED, $tenantId, $booking);
-                    $this->tell('requested', $tenantId, $booking);
-
-                    return $booking;
-                }
-                $this->announceBooking(CalendarEventNames::BOOKING_CREATED, $tenantId, $booking);
-                $this->announceBooking(CalendarEventNames::BOOKING_CONFIRMED, $tenantId, $booking);
-                if ($notify) {
-                    $this->tell('confirmed', $tenantId, $booking);
-                }
-
-                return $booking;
+                return $this->created($tenantId, $id, $quote, $requirement, $hold, $step, $asRequest, $notify);
             }
         }
 
         // One person asked for: say why that person's time is not free, so
         // staff can choose Book anyway. Anyone, or a customer: the plain 409.
         throw $staffOnly && count($candidates) === 1 && is_string($why) ? CalendarRejectedException::notFree($why) : CalendarRejectedException::taken();
+    }
+
+    /**
+     * Book several services back to back as one booking (WHIT-1173).
+     *
+     * The booking row is the first service's (service, person, room) and
+     * spans them all, priced at the total; each service is its own row with
+     * its own person, time and buffers ({@see BookingRepository::insertItems()}).
+     *
+     * NO DOUBLE BOOKING, AS FOR ONE SERVICE. Who does what is chosen first
+     * from what is free now ({@see self::assign()}); then every person in it
+     * is locked in profile-id order, then every room in id order, and each
+     * service's time is checked again under the locks before anything is
+     * written. If someone was taken in between, the choice is made again
+     * (a few times at most) before the plain 409.
+     *
+     * @param array<string, mixed> $request as {@see self::book()} takes it
+     * @param list<array{service_id: int, profile_id: ?int}> $items
+     * @return array<string, mixed>
+     */
+    private function bookMany(int $tenantId, array $request, array $items): array
+    {
+        // The request's flags are PHP booleans the handlers built, not database values.
+        $public = $request['public'] === true;
+        $plan = $this->plan($tenantId, $items, ($request['same_person'] ?? false) === true, $public);
+        $staffOnly = !$public;
+        $bookAnyway = $staffOnly && ($request['book_anyway'] ?? false) === true;
+        $checkHours = $request['enforce_hours'] === true || ($staffOnly && ($request['within_hours'] ?? false) === true);
+        $notify = !$staffOnly || ($request['notify'] ?? true) !== false;
+        $settings = $this->settingsFor($tenantId);
+        $now = $this->now();
+        $start = $request['starts_at'];
+        if (!$start instanceof DateTimeImmutable) {
+            throw new CalendarRejectedException('Choose a time', 422);
+        }
+        if ($request['enforce_hours']) {
+            $this->assertInWindow($start, $settings, $now);
+        }
+        $needsApproval = false;
+        foreach ($plan['services'] as $service) {
+            $needsApproval = $needsApproval || $service['needs_approval'] === true;
+        }
+        $asRequest = $public && ($needsApproval || !$settings->instantBooking);
+        $step = $asRequest ? null : $this->plugins?->paymentStep();
+        $total = self::totalPrice($plan['services']);
+
+        $why = null;
+        $tried = [];
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            $people = self::assign($plan, $start, function (int $person, int $k, DateTimeImmutable $at) use ($tenantId, $plan, $settings, $now, $checkHours, $bookAnyway, &$why): bool {
+                $why = $this->whyNotFree($tenantId, $person, $plan['services'][$k], $settings, $at, $now, null, $checkHours, $bookAnyway);
+
+                return $why === null;
+            });
+            if ($people === null || isset($tried[implode(',', $people)])) {
+                break;
+            }
+            $tried[implode(',', $people)] = true;
+            $parts = self::parts($plan['services'], $people, $start);
+            $end = $parts[count($parts) - 1]['ends_at'];
+            $quote = new BookingQuote($tenantId, $parts[0]['service_id'], $parts[0]['profile_id'], $start, $end, $total, $plan['currency'], (string) $request['customer_email'], (string) $request['source']);
+            $requirement = null;
+            if ($step !== null) {
+                try {
+                    $requirement = $step->requirement($quote);
+                } catch (Throwable $e) {
+                    error_log('[calendar] the payment step failed to answer: ' . $e->getMessage());
+                    throw new CalendarRejectedException('Booking is unavailable right now. Try again later.', 503);
+                }
+            }
+            $hold = $requirement !== null ? $now->modify('+' . $settings->paymentHoldMinutes . ' minutes') : null;
+            $id = $this->underLocks($tenantId, $people, self::roomsOf($parts), function () use ($tenantId, $plan, $parts, $settings, $request, $start, $end, $now, $hold, $asRequest, $total, $checkHours, $bookAnyway, &$why): ?int {
+                foreach ($parts as $k => $part) {
+                    $why = $this->whyNotFree($tenantId, $part['profile_id'], $plan['services'][$k], $settings, $part['starts_at'], $now, null, $checkHours, $bookAnyway);
+                    if ($why !== null) {
+                        return null;
+                    }
+                }
+                $id = $this->bookings->insert($tenantId, [
+                    'service_id' => $parts[0]['service_id'],
+                    'profile_id' => $parts[0]['profile_id'],
+                    'customer_profile_id' => $request['customer_profile_id'],
+                    'customer_name' => $request['customer_name'],
+                    'customer_email' => $request['customer_email'],
+                    'customer_phone' => $request['customer_phone'],
+                    'customer_note' => $request['customer_note'],
+                    'starts_at' => $start,
+                    'ends_at' => $end,
+                    'block' => self::span($parts),
+                    'status' => $asRequest ? BookingRepository::STATUS_REQUESTED : ($hold !== null ? BookingRepository::STATUS_PENDING_PAYMENT : BookingRepository::STATUS_CONFIRMED),
+                    'hold_expires_at' => $hold,
+                    'source' => $request['source'],
+                    'price_minor' => $total,
+                    'currency' => $plan['currency'],
+                    'reminder_due_at' => $asRequest ? null : $this->reminderDue($start, $settings, $now),
+                    'created_by_profile_id' => $request['created_by_profile_id'],
+                    'room_id' => $parts[0]['room_id'],
+                ]);
+                $this->bookings->insertItems($tenantId, $id, $parts);
+
+                return $id;
+            });
+            if ($id !== null) {
+                return $this->created($tenantId, $id, $quote, $requirement, $hold, $step, $asRequest, $notify);
+            }
+        }
+
+        // Every person chosen by staff: say why, so they can choose Book anyway.
+        throw $staffOnly && $plan['fixed'] && is_string($why) ? CalendarRejectedException::notFree($why) : CalendarRejectedException::taken();
+    }
+
+    /**
+     * After a booking is written: its link and reminder, then the payment
+     * step, the request or the confirmation, and who is told.
+     *
+     * @return array<string, mixed>
+     */
+    private function created(int $tenantId, int $id, BookingQuote $quote, ?PaymentRequirement $requirement, ?DateTimeImmutable $hold, ?BookingPaymentStep $step, bool $asRequest, bool $notify): array
+    {
+        $booking = $this->afterWrite($tenantId, $id);
+        if ($requirement !== null && $hold !== null && $step !== null) {
+            return $this->startPayment($tenantId, $booking, $quote, $requirement, $hold, $step);
+        }
+        if ($asRequest) {
+            $this->announceBooking(CalendarEventNames::BOOKING_CREATED, $tenantId, $booking);
+            $this->tell('requested', $tenantId, $booking);
+
+            return $booking;
+        }
+        $this->announceBooking(CalendarEventNames::BOOKING_CREATED, $tenantId, $booking);
+        $this->announceBooking(CalendarEventNames::BOOKING_CONFIRMED, $tenantId, $booking);
+        if ($notify) {
+            $this->tell('confirmed', $tenantId, $booking);
+        }
+
+        return $booking;
     }
 
     /**
@@ -415,6 +667,9 @@ final class BookingService
         if (!in_array($current['status'], BookingRepository::LIVE, true)) {
             throw new CalendarRejectedException('Only a booking that is still on can be moved.', 422);
         }
+        if (is_array($current['items'] ?? null) && $current['items'] !== []) {
+            return $this->moveManyUnderLock($tenantId, $current, $start, $profileId, $enforceHours, $bookAnyway, $withinHours);
+        }
         $isRequest = $current['status'] === BookingRepository::STATUS_REQUESTED;
         $service = $this->service($tenantId, (int) $current['service_id'], false);
         // A move keeps the booking's own length, so one made before the
@@ -446,6 +701,80 @@ final class BookingService
 
             return true;
         }, $this->roomLock($tenantId, $service));
+        if (!$moved) {
+            throw is_string($why) ? CalendarRejectedException::notFree($why) : CalendarRejectedException::taken();
+        }
+
+        return $this->afterWrite($tenantId, $bookingId);
+    }
+
+    /**
+     * Move a booking of several services (WHIT-1173): every service moves by
+     * the same amount and stays back to back. Each keeps its person, unless
+     * `$profileId` names one person for them all, who must do every one.
+     * Every person before and after is locked in profile-id order, then the
+     * rooms.
+     *
+     * @param array<string, mixed> $current the booking row, with its `items`
+     * @return array<string, mixed>
+     */
+    private function moveManyUnderLock(int $tenantId, array $current, DateTimeImmutable $start, ?int $profileId, bool $enforceHours, bool $bookAnyway, bool $withinHours): array
+    {
+        $bookingId = (int) $current['id'];
+        $isRequest = $current['status'] === BookingRepository::STATUS_REQUESTED;
+        $settings = $this->settingsFor($tenantId);
+        $now = $this->now();
+        if ($enforceHours) {
+            $this->assertInWindow($start, $settings, $now);
+        }
+        $shift = $start->getTimestamp() - Interval::fromDb((string) $current['starts_at'])->getTimestamp();
+        $parts = [];
+        $services = [];
+        $people = [];
+        /** @var list<array<string, mixed>> $items */
+        $items = $current['items'];
+        foreach ($items as $item) {
+            $service = $this->service($tenantId, (int) $item['service_id'], false);
+            $from = Interval::fromDb((string) $item['starts_at']);
+            // Each keeps the length it was booked for.
+            $kept = (int) round((Interval::fromDb((string) $item['ends_at'])->getTimestamp() - $from->getTimestamp()) / 60);
+            $service = self::withLength($service, $kept > 0 && $kept !== $service['duration_minutes'] ? $kept : null);
+            $was = (int) $item['profile_id'];
+            $person = $profileId ?? $was;
+            if ($person !== $was && !in_array($person, $this->candidates($tenantId, $service, $person, false), true)) {
+                throw new CalendarRejectedException('That person does not offer all of these services.', 422);
+            }
+            $at = (new DateTimeImmutable('@' . ($from->getTimestamp() + $shift)))->setTimezone(new DateTimeZone('UTC'));
+            $parts[] = [
+                'service_id' => (int) $item['service_id'],
+                'profile_id' => $person,
+                'room_id' => isset($item['room_id']) ? (int) $item['room_id'] : null,
+                'starts_at' => $at,
+                'ends_at' => $at->modify('+' . $service['duration_minutes'] . ' minutes'),
+                'block' => Availability::blockFor($at, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes']),
+                'price_minor' => $item['price_minor'] !== null ? (int) $item['price_minor'] : null,
+            ];
+            $services[] = $service;
+            $people[] = $was;
+            $people[] = $person;
+        }
+        if ($parts === []) {
+            throw CalendarRejectedException::notFound('Booking');
+        }
+
+        $why = null;
+        $moved = $this->underLocks($tenantId, $people, self::roomsOf($parts), function () use ($tenantId, $bookingId, $parts, $services, $settings, $start, $now, $enforceHours, $withinHours, $isRequest, $bookAnyway, &$why): bool {
+            foreach ($parts as $k => $part) {
+                $why = $this->whyNotFree($tenantId, $part['profile_id'], $services[$k], $settings, $part['starts_at'], $now, $bookingId, $enforceHours || $withinHours, $bookAnyway);
+                if ($why !== null) {
+                    return false;
+                }
+            }
+            $this->bookings->move($tenantId, $bookingId, $parts[0]['profile_id'], $start, $parts[count($parts) - 1]['ends_at'], self::span($parts), $isRequest ? null : $this->reminderDue($start, $settings, $now));
+            $this->bookings->moveItems($tenantId, $bookingId, $parts);
+
+            return true;
+        });
         if (!$moved) {
             throw is_string($why) ? CalendarRejectedException::notFree($why) : CalendarRejectedException::taken();
         }
@@ -570,6 +899,16 @@ final class BookingService
         }
         $settings = $this->settingsFor($tenantId);
         $start = Interval::fromDb((string) $row['starts_at']);
+        if (is_array($row['items'] ?? null) && $row['items'] !== []) {
+            $done = $this->confirmPaidMany($tenantId, $bookingId, array_values($row['items']), $settings, $paymentRef);
+            if ($done) {
+                $booking = $this->bookingOrFail($tenantId, $bookingId);
+                $this->announceBooking(CalendarEventNames::BOOKING_CONFIRMED, $tenantId, $booking);
+                $this->tell('confirmed', $tenantId, $booking);
+            }
+
+            return $done;
+        }
         $done = $this->underLock([[$tenantId, (int) $row['profile_id']]], function () use ($tenantId, $bookingId, $row, $service, $settings, $start, $paymentRef): bool {
             if ($this->whyNotFree($tenantId, (int) $row['profile_id'], $service, $settings, $start, $this->now(), $bookingId, false) !== null) {
                 return false;
@@ -591,6 +930,48 @@ final class BookingService
         $this->tell('confirmed', $tenantId, $booking);
 
         return true;
+    }
+
+    /**
+     * Confirm a paid booking of several services: each service's time is
+     * checked again under every person's and room's lock.
+     *
+     * @param list<array<string, mixed>> $items
+     */
+    private function confirmPaidMany(int $tenantId, int $bookingId, array $items, CalendarSettings $settings, string $paymentRef): bool
+    {
+        $checks = [];
+        $people = [];
+        $rooms = [];
+        foreach ($items as $item) {
+            $service = $this->services->find($tenantId, (int) $item['service_id']);
+            if ($service === null) {
+                return false;
+            }
+            $at = Interval::fromDb((string) $item['starts_at']);
+            $kept = (int) round((Interval::fromDb((string) $item['ends_at'])->getTimestamp() - $at->getTimestamp()) / 60);
+            $checks[] = [(int) $item['profile_id'], self::withLength($service, $kept > 0 ? $kept : null), $at];
+            $people[] = (int) $item['profile_id'];
+            if (isset($item['room_id'])) {
+                $rooms[] = (int) $item['room_id'];
+            }
+        }
+
+        return $this->underLocks($tenantId, $people, $rooms, function () use ($tenantId, $bookingId, $checks, $settings, $paymentRef): bool {
+            foreach ($checks as [$person, $service, $at]) {
+                if ($this->whyNotFree($tenantId, $person, $service, $settings, $at, $this->now(), $bookingId, false) !== null) {
+                    return false;
+                }
+            }
+
+            return $this->bookings->transition(
+                $tenantId,
+                $bookingId,
+                [BookingRepository::STATUS_PENDING_PAYMENT, BookingRepository::STATUS_EXPIRED],
+                BookingRepository::STATUS_CONFIRMED,
+                ['payment_ref' => mb_substr($paymentRef, 0, 255)],
+            );
+        });
     }
 
     /** A payment step gives up on a held booking: cancel it and free its time. */
@@ -673,6 +1054,22 @@ final class BookingService
         $booking = BookingRepository::toApi($row);
         $booking['service'] = $this->services->find($tenantId, (int) $row['service_id']);
         $booking['staff_name'] = $this->calendar->displayName((int) $row['profile_id']);
+        // WHIT-1173: a booking of several services reads as one to everything
+        // that shows a booking's service (the emails, reminders, calendar
+        // files, the customer's page): their names joined, the whole length
+        // and the total price, and everyone doing them. `items` lists each.
+        if (count($booking['items']) > 1) {
+            $minutes = 0;
+            foreach ($booking['items'] as $item) {
+                $minutes += $item['duration_minutes'];
+            }
+            if (is_array($booking['service'])) {
+                $booking['service']['name'] = BookingRepository::joinedNames($booking['items']);
+                $booking['service']['duration_minutes'] = $minutes;
+                $booking['service']['price_minor'] = $booking['price_minor'];
+            }
+            $booking['staff_name'] = BookingRepository::joinedStaff($booking['items']);
+        }
 
         return $booking;
     }
@@ -939,6 +1336,42 @@ final class BookingService
      */
     private function underLock(array $locks, callable $work, ?array $room = null): mixed
     {
+        return $this->locked($locks, $room !== null ? [$room] : [], $work);
+    }
+
+    /**
+     * Run `$work` holding several people's locks, taken in profile-id order,
+     * then several rooms', in room-id order (a booking of several services).
+     *
+     * @template T
+     * @param list<int> $people
+     * @param list<int> $rooms
+     * @param callable(): T $work
+     * @return T
+     */
+    private function underLocks(int $tenantId, array $people, array $rooms, callable $work): mixed
+    {
+        $people = array_values(array_unique($people));
+        sort($people);
+        $rooms = array_values(array_unique($rooms));
+        sort($rooms);
+
+        return $this->locked(
+            array_map(static fn (int $p): array => [$tenantId, $p], $people),
+            array_map(static fn (int $r): array => [$tenantId, $r], $rooms),
+            $work,
+        );
+    }
+
+    /**
+     * @template T
+     * @param list<array{0: int, 1: int}> $locks [tenantId, profileId] pairs, in order
+     * @param list<array{0: int, 1: int}> $rooms [tenantId, roomId] pairs, in order, after the people
+     * @param callable(): T $work
+     * @return T
+     */
+    private function locked(array $locks, array $rooms, callable $work): mixed
+    {
         $own = !$this->db->inTransaction();
         if ($own) {
             $this->db->beginTransaction();
@@ -947,8 +1380,8 @@ final class BookingService
             foreach ($locks as [$tenantId, $profileId]) {
                 $this->calendar->lockStaff($tenantId, $profileId);
             }
-            if ($room !== null) {
-                $this->rooms()->lock($room[0], $room[1]);
+            foreach ($rooms as [$tenantId, $roomId]) {
+                $this->rooms()->lock($tenantId, $roomId);
             }
             $result = $work();
             if ($own) {
@@ -967,6 +1400,204 @@ final class BookingService
     private function rooms(): RoomRepository
     {
         return $this->rooms ??= new RoomRepository($this->db);
+    }
+
+    /**
+     * The services of a booking of several, who may do each, and the
+     * currency of the total (WHIT-1173). `fixed` is true when staff named a
+     * person for every service, so a refusal can say why.
+     *
+     * @param list<array{service_id: int, profile_id: ?int}> $items
+     * @return array{services: list<array<string, mixed>>, candidates: list<list<int>>, same: bool, currency: string, fixed: bool}
+     */
+    private function plan(int $tenantId, array $items, bool $samePerson, bool $publicOnly, bool $requireSetting = true): array
+    {
+        if ($items === []) {
+            throw new CalendarRejectedException('Choose a service.', 422);
+        }
+        if (count($items) > self::MAX_SERVICES) {
+            throw new CalendarRejectedException('A booking can hold at most ' . self::MAX_SERVICES . ' services.', 422);
+        }
+        if ($requireSetting && count($items) > 1 && !$this->settingsFor($tenantId)->multiServiceBooking) {
+            throw new CalendarRejectedException('Booking several services at once is turned off here. Book them one at a time.', 422, ['code' => 'multi_service_off']);
+        }
+        $services = [];
+        $candidates = [];
+        $currency = null;
+        $fixed = true;
+        foreach ($items as $item) {
+            $service = $this->service($tenantId, $item['service_id'], $publicOnly);
+            $who = $this->candidates($tenantId, $service, $item['profile_id'], $publicOnly);
+            if ($who === []) {
+                throw new CalendarRejectedException(count($items) > 1 ? 'Nobody offers one of these services.' : 'Nobody offers this service.', 422);
+            }
+            if ($service['price_minor'] !== null) {
+                $currency ??= (string) $service['currency'];
+                if ($currency !== (string) $service['currency']) {
+                    throw new CalendarRejectedException('These services are priced in different currencies, so they can’t be booked together.', 422);
+                }
+            }
+            $fixed = $fixed && $item['profile_id'] !== null;
+            $services[] = $service;
+            $candidates[] = $who;
+        }
+        if ($samePerson) {
+            $common = $candidates[0];
+            foreach ($candidates as $who) {
+                $common = array_values(array_filter($common, static fn (int $p): bool => in_array($p, $who, true)));
+            }
+            if ($common === []) {
+                throw new CalendarRejectedException('Nobody does all of these services. Choose someone for each, or anyone.', 422);
+            }
+            $candidates = array_fill(0, count($services), $common);
+        }
+
+        return [
+            'services' => $services,
+            'candidates' => $candidates,
+            'same' => $samePerson,
+            'currency' => $currency ?? (string) $services[0]['currency'],
+            'fixed' => $fixed,
+        ];
+    }
+
+    /**
+     * Who does each service when they start at `$start`, back to back, or
+     * null when nobody can do one of them. Each service's choice depends only
+     * on its own time, so taking the first free person for each finds an
+     * answer whenever there is one; the person who did the service before is
+     * tried first, so a booking stays with one person when it can.
+     *
+     * @param array{services: list<array<string, mixed>>, candidates: list<list<int>>, same: bool} $plan
+     * @param callable(int, int, DateTimeImmutable): bool $free person, service index, its start
+     * @return list<int>|null
+     */
+    private static function assign(array $plan, DateTimeImmutable $start, callable $free): ?array
+    {
+        $starts = [];
+        $at = $start;
+        foreach ($plan['services'] as $service) {
+            $starts[] = $at;
+            $at = $at->modify('+' . (int) $service['duration_minutes'] . ' minutes');
+        }
+        if ($plan['same']) {
+            foreach ($plan['candidates'][0] as $person) {
+                $all = true;
+                foreach ($starts as $k => $t) {
+                    if (!$free($person, $k, $t)) {
+                        $all = false;
+                        break;
+                    }
+                }
+                if ($all) {
+                    return array_fill(0, count($starts), $person);
+                }
+            }
+
+            return null;
+        }
+        $people = [];
+        foreach ($starts as $k => $t) {
+            $order = $plan['candidates'][$k];
+            $previous = $k > 0 ? $people[$k - 1] : null;
+            if ($previous !== null && in_array($previous, $order, true)) {
+                $order = [$previous, ...array_values(array_filter($order, static fn (int $p): bool => $p !== $previous))];
+            }
+            $chosen = null;
+            foreach ($order as $person) {
+                if ($free($person, $k, $t)) {
+                    $chosen = $person;
+                    break;
+                }
+            }
+            if ($chosen === null) {
+                return null;
+            }
+            $people[] = $chosen;
+        }
+
+        return $people;
+    }
+
+    /**
+     * Each service's own part of the booking, back to back from `$start`.
+     *
+     * @param list<array<string, mixed>> $services
+     * @param list<int> $people who does each
+     * @return non-empty-list<array{service_id: int, profile_id: int, room_id: ?int, starts_at: DateTimeImmutable, ends_at: DateTimeImmutable, block: Interval, price_minor: ?int}>
+     */
+    private static function parts(array $services, array $people, DateTimeImmutable $start): array
+    {
+        $parts = [];
+        $at = $start;
+        foreach ($services as $k => $service) {
+            $end = $at->modify('+' . (int) $service['duration_minutes'] . ' minutes');
+            $parts[] = [
+                'service_id' => (int) $service['id'],
+                'profile_id' => $people[$k],
+                'room_id' => is_int($service['room_id'] ?? null) ? $service['room_id'] : null,
+                'starts_at' => $at,
+                'ends_at' => $end,
+                'block' => Availability::blockFor($at, (int) $service['duration_minutes'], (int) $service['buffer_before_minutes'], (int) $service['buffer_after_minutes']),
+                'price_minor' => is_int($service['price_minor'] ?? null) ? $service['price_minor'] : null,
+            ];
+            $at = $end;
+        }
+        if ($parts === []) {
+            throw new CalendarRejectedException('Choose a service.', 422);
+        }
+
+        return $parts;
+    }
+
+    /**
+     * Everything the parts block together, buffers included.
+     *
+     * @param non-empty-list<array{block: Interval}> $parts
+     */
+    private static function span(array $parts): Interval
+    {
+        $from = $parts[0]['block']->start;
+        $until = $parts[0]['block']->end;
+        foreach ($parts as $part) {
+            $from = min($from, $part['block']->start);
+            $until = max($until, $part['block']->end);
+        }
+
+        return new Interval($from, $until);
+    }
+
+    /**
+     * The total of the services' prices; null when none shows a price.
+     *
+     * @param list<array<string, mixed>> $services
+     */
+    private static function totalPrice(array $services): ?int
+    {
+        $total = null;
+        foreach ($services as $service) {
+            if (is_int($service['price_minor'] ?? null)) {
+                $total = ($total ?? 0) + $service['price_minor'];
+            }
+        }
+
+        return $total;
+    }
+
+    /**
+     * @param list<array{room_id: ?int}> $parts
+     * @return list<int>
+     */
+    private static function roomsOf(array $parts): array
+    {
+        $rooms = [];
+        foreach ($parts as $part) {
+            if ($part['room_id'] !== null) {
+                $rooms[] = $part['room_id'];
+            }
+        }
+
+        return $rooms;
     }
 
     /**
@@ -989,6 +1620,9 @@ final class BookingService
             'profile_id' => $booking['profile_id'],
             'service_id' => $booking['service_id'],
             'status' => $booking['status'],
+            // WHIT-1173: everyone doing one of its services, and the services.
+            'profile_ids' => array_values(array_unique(array_map('intval', array_column($booking['items'] ?? [], 'profile_id')) ?: [(int) $booking['profile_id']])),
+            'service_ids' => array_map('intval', array_column($booking['items'] ?? [], 'service_id')) ?: [(int) $booking['service_id']],
         ]);
     }
 

@@ -338,6 +338,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'The most workspaces one person may own, counting ones they co-own. 0 means no limit.'
       ),
     },
+    'auth.password_sign_in': {
+      label: t('settings.meta.auth.password_sign_in.label', 'Password sign-in'),
+      help: t(
+        'settings.meta.auth.password_sign_in.help',
+        'Off: people sign in and sign up only with the identity provider. Password sign-in, reset and two-step set-up stop. The server can turn it back on with whity-cli auth password-sign-in on.'
+      ),
+    },
     'storage.driver': {
       label: t('settings.meta.storage.driver.label', 'Storage driver'),
       help: t(
@@ -575,7 +582,7 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'settings.section.signin.description',
         'Federated sign-in across the whole instance.'
       ),
-      keys: ['auth.sso_enabled'],
+      keys: ['auth.sso_enabled', 'auth.password_sign_in'],
     },
     {
       id: 'integrations',

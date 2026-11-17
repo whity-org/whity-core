@@ -117,7 +117,15 @@ export function toCalItems(rows: readonly ServerItem[], ctx: ItemContext): CalIt
     let who = person;
     let where = place;
     if (booking) {
-      title = ctx.serviceName(ctx.services.get(booking.service_id));
+      // WHIT-1173: a booking of several services is drawn once per person,
+      // each part named by the services in it ("Colour + Blow-dry").
+      const parts = (booking.items ?? []).filter(
+        (part) => part.profile_id === row.organiser_id && part.starts_at >= row.starts_at && part.ends_at <= row.ends_at
+      );
+      title =
+        (booking.items?.length ?? 0) > 1 && parts.length > 0
+          ? parts.map((part) => ctx.label(part.service_name)).filter((name) => name !== '').join(' + ')
+          : ctx.serviceName(ctx.services.get(booking.service_id));
       who = [booking.customer.name ?? ctx.words.noName, firstName(person)].filter((part) => part !== '').join(' · ');
       const state =
         kind === 'wait'

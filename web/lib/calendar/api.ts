@@ -26,6 +26,12 @@ export type CalendarServiceRequest = Schemas['CalendarServiceRequest'];
 export type CalendarSlot = Schemas['CalendarSlot'];
 export type CalendarBooking = Schemas['CalendarBooking'];
 export type CalendarBookingCreateRequest = Schemas['CalendarBookingCreateRequest'];
+/** One service of a booking of several, and who does it (null: anyone). WHIT-1173. */
+export interface ServiceChoice {
+  service_id: number;
+  profile_id: number | null;
+}
+export type CalendarBookingItem = Schemas['CalendarBookingItem'];
 export type CalendarEvent = Schemas['CalendarEvent'];
 export type CalendarEventRequest = Schemas['CalendarEventRequest'];
 export type CalendarRoom = Schemas['CalendarRoom'];
@@ -165,6 +171,32 @@ export const calendarApi = {
     read<CalendarSlot[]>(
       await api.GET('/api/v1/calendar/availability', {
         params: { query: query({ service_id: serviceId, from, to, profile_id: profileId }) },
+      }),
+      'Free times could not be loaded'
+    ),
+
+  /**
+   * Free times for several services back to back (WHIT-1173). Each person is
+   * the one for that service, or null for anyone; `samePerson` asks for one
+   * person who does them all. Each slot's `items` says who would do which.
+   * `exceptBookingId`: moving that booking, so its own time counts as free.
+   */
+  availabilityMany: async (
+    choices: ServiceChoice[],
+    { from, to, samePerson = false, exceptBookingId = null }: { from: string; to: string; samePerson?: boolean; exceptBookingId?: number | null }
+  ) =>
+    read<CalendarSlot[]>(
+      await api.GET('/api/v1/calendar/availability', {
+        params: {
+          query: query({
+            service_ids: choices.map((c) => c.service_id).join(','),
+            profile_ids: choices.some((c) => c.profile_id !== null) ? choices.map((c) => c.profile_id ?? 0).join(',') : null,
+            same_person: samePerson ? 'true' : null,
+            except_booking_id: exceptBookingId,
+            from,
+            to,
+          }),
+        },
       }),
       'Free times could not be loaded'
     ),

@@ -7727,8 +7727,8 @@
                     {
                         "name": "service_id",
                         "in": "query",
-                        "required": true,
-                        "description": "The service.",
+                        "required": false,
+                        "description": "The service. Leave out when sending `service_ids`.",
                         "schema": {
                             "type": "integer"
                         }
@@ -7756,6 +7756,42 @@
                         "in": "query",
                         "required": false,
                         "description": "Only this member of staff.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "service_ids",
+                        "in": "query",
+                        "required": false,
+                        "description": "Several services back to back, in order, comma-separated (4,7,9). Each slot then says who would do which in `items`. Needs the calendar setting `multi_service_booking`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "profile_ids",
+                        "in": "query",
+                        "required": false,
+                        "description": "With `service_ids`: the person for each service, comma-separated, 0 for anyone (11,0,12).",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "same_person",
+                        "in": "query",
+                        "required": false,
+                        "description": "With `service_ids`: one person who does them all.",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "except_booking_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "With `service_ids`: moving this booking, so its own time counts as free.",
                         "schema": {
                             "type": "integer"
                         }
@@ -41182,6 +41218,180 @@
                 }
             }
         },
+        "/api/v1/me/dashboard": {
+            "get": {
+                "operationId": "get_api_v1_me_dashboard",
+                "summary": "The setup points and widgets the caller's apps add to their dashboard, in the caller's order",
+                "tags": [
+                    "home"
+                ],
+                "description": "Only points and widgets whose permission the caller holds in this workspace, from plugins on here, in the caller's language. Hidden widgets are listed too, so a client can offer Show. Each names the plugin route it reads; that route applies its own permission and the caller's scope.",
+                "responses": {
+                    "200": {
+                        "description": "The setup points and widgets",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DashboardResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/dashboard/layout": {
+            "put": {
+                "operationId": "put_api_v1_me_dashboard_layout",
+                "summary": "Arrange the caller's dashboard: the order, hidden items and widget sizes",
+                "tags": [
+                    "home"
+                ],
+                "description": "Items are home cards (by plugin name) and widgets (`<plugin>:<id>`) the caller can see, in the order they want them. Items left out go after, in the apps' own order. Answers with the dashboard as GET does.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DashboardLayoutRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The dashboard, arranged",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DashboardResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "An item that is not on the caller's dashboard, listed twice, or a size it does not fit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/display-preferences": {
             "get": {
                 "operationId": "get_api_v1_me_display_preferences",
@@ -57412,6 +57622,95 @@
                 }
             }
         },
+        "/api/v1/public/booking/{workspace}/me": {
+            "get": {
+                "operationId": "get_api_v1_public_booking_workspace_me",
+                "summary": "The name and email of the signed-in visitor, to fill the booking form (public)",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "Reads only the session and profile of the visitor, never the contacts of this workspace or the data of another. `data` is null when nobody is signed in. Sent `Cache-Control: private, no-store`.",
+                "parameters": [
+                    {
+                        "name": "workspace",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "workspace",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The workspace slug."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The visitor, or null",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicBookingVisitor"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This booking page is not available",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/public/booking/{workspace}/slots": {
             "get": {
                 "operationId": "get_api_v1_public_booking_workspace_slots",
@@ -57440,8 +57739,8 @@
                     {
                         "name": "service_id",
                         "in": "query",
-                        "required": true,
-                        "description": "The service.",
+                        "required": false,
+                        "description": "The service. Leave out when sending `service_ids`.",
                         "schema": {
                             "type": "integer"
                         }
@@ -57471,6 +57770,33 @@
                         "description": "End (exclusive), with an offset. At most 14 days after `from`.",
                         "schema": {
                             "type": "string"
+                        }
+                    },
+                    {
+                        "name": "service_ids",
+                        "in": "query",
+                        "required": false,
+                        "description": "Several services back to back, in order, comma-separated (4,7,9). Each slot then says who would do which in `items`. Needs the calendar setting `multi_service_booking`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "profile_ids",
+                        "in": "query",
+                        "required": false,
+                        "description": "With `service_ids`: the person for each service, comma-separated, 0 for anyone (11,0,12).",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "same_person",
+                        "in": "query",
+                        "required": false,
+                        "description": "With `service_ids`: one person who does them all.",
+                        "schema": {
+                            "type": "boolean"
                         }
                     }
                 ],
@@ -79765,6 +80091,13 @@
                             "type": "string"
                         },
                         "description": "In lists: the room's name, language code => text."
+                    },
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarBookingItem"
+                        },
+                        "description": "A booking of several services (WHIT-1173): each, in order, with who does it and when. Empty for one service. `service_id`, `profile_id` and `room_id` are then the first service's, the times span them all and `price_minor` is the total."
                     }
                 },
                 "required": [
@@ -79793,11 +80126,24 @@
                 "properties": {
                     "service_id": {
                         "type": "integer",
-                        "description": "The service to book."
+                        "description": "The service to book. Leave out when sending `services`."
+                    },
+                    "services": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 8,
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarBookingServiceChoice"
+                        },
+                        "description": "Several services back to back, in order, as one booking, when the calendar setting `multi_service_booking` is on (WHIT-1173). Each may name its own person."
+                    },
+                    "same_person": {
+                        "type": "boolean",
+                        "description": "With `services` and nobody chosen: one person who does them all."
                     },
                     "profile_id": {
                         "type": "integer",
-                        "description": "Leave out for whoever is free."
+                        "description": "Leave out for whoever is free. With `services`: the person for every service that names none."
                     },
                     "starts_at": {
                         "type": "string",
@@ -79829,7 +80175,6 @@
                     }
                 },
                 "required": [
-                    "service_id",
                     "starts_at",
                     "customer"
                 ]
@@ -79858,6 +80203,65 @@
                         "maxLength": 1000
                     }
                 }
+            },
+            "CalendarBookingItem": {
+                "type": "object",
+                "properties": {
+                    "position": {
+                        "type": "integer",
+                        "description": "0 for the first service."
+                    },
+                    "service_id": {
+                        "type": "integer"
+                    },
+                    "service_name": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Language code => text."
+                    },
+                    "profile_id": {
+                        "type": "integer"
+                    },
+                    "staff_name": {
+                        "type": "string"
+                    },
+                    "room_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "starts_at": {
+                        "type": "string"
+                    },
+                    "ends_at": {
+                        "type": "string"
+                    },
+                    "blocks_from": {
+                        "type": "string"
+                    },
+                    "blocks_until": {
+                        "type": "string"
+                    },
+                    "duration_minutes": {
+                        "type": "integer"
+                    },
+                    "price_minor": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "position",
+                    "service_id",
+                    "service_name",
+                    "profile_id",
+                    "staff_name",
+                    "starts_at",
+                    "ends_at",
+                    "duration_minutes",
+                    "price_minor"
+                ]
             },
             "CalendarBookingMoveRequest": {
                 "type": "object",
@@ -79889,6 +80293,22 @@
                 },
                 "required": [
                     "starts_at"
+                ]
+            },
+            "CalendarBookingServiceChoice": {
+                "type": "object",
+                "properties": {
+                    "service_id": {
+                        "type": "integer"
+                    },
+                    "profile_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Who does it; null or left out for anyone."
+                    }
+                },
+                "required": [
+                    "service_id"
                 ]
             },
             "CalendarBookingSuggestRequest": {
@@ -80592,6 +81012,10 @@
                     "instant_booking": {
                         "type": "boolean",
                         "description": "Off: every booking from the booking page is a request."
+                    },
+                    "multi_service_booking": {
+                        "type": "boolean",
+                        "description": "On: one booking may hold several services back to back (WHIT-1173). Default off."
                     }
                 },
                 "required": [
@@ -80676,6 +81100,10 @@
                     "instant_booking": {
                         "type": "boolean",
                         "description": "Off turns every booking from the booking page into a request staff accept."
+                    },
+                    "multi_service_booking": {
+                        "type": "boolean",
+                        "description": "On lets one booking hold several services back to back, on the booking page and at the desk (WHIT-1173). Default off."
                     }
                 }
             },
@@ -80693,7 +81121,34 @@
                         "items": {
                             "type": "integer"
                         },
-                        "description": "Who is free then."
+                        "description": "Who is free then. For several services: the people this time would be with."
+                    },
+                    "items": {
+                        "type": "array",
+                        "description": "Only when several services were asked for (WHIT-1173): who would do each, and when.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "service_id": {
+                                    "type": "integer"
+                                },
+                                "profile_id": {
+                                    "type": "integer"
+                                },
+                                "starts_at": {
+                                    "type": "string"
+                                },
+                                "ends_at": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "service_id",
+                                "profile_id",
+                                "starts_at",
+                                "ends_at"
+                            ]
+                        }
                     }
                 },
                 "required": [
@@ -84088,6 +84543,207 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "DashboardLayoutRequest": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "key": {
+                                    "type": "string"
+                                },
+                                "hidden": {
+                                    "type": "boolean"
+                                },
+                                "size": {
+                                    "type": "string",
+                                    "enum": [
+                                        "small",
+                                        "medium",
+                                        "large"
+                                    ],
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "key"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "items"
+                ]
+            },
+            "DashboardResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "setup": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/DashboardSetup"
+                                }
+                            },
+                            "widgets": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/DashboardWidget"
+                                }
+                            }
+                        },
+                        "required": [
+                            "setup",
+                            "widgets"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DashboardSetup": {
+                "type": "object",
+                "properties": {
+                    "plugin": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "The plugin's GET route answering {data: {points: {<id>: bool}}}"
+                    },
+                    "points": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DashboardSetupPoint"
+                        }
+                    }
+                },
+                "required": [
+                    "plugin",
+                    "status",
+                    "points"
+                ]
+            },
+            "DashboardSetupPoint": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "why": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "action": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "href": {
+                        "type": "string",
+                        "description": "The plugin's guided-setup step or screen it opens"
+                    },
+                    "icon": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "href"
+                ]
+            },
+            "DashboardWidget": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "<plugin>:<id>"
+                    },
+                    "plugin": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "stat",
+                            "list",
+                            "chart",
+                            "actions"
+                        ]
+                    },
+                    "title": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "icon": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "href": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "source": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "sizes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "small",
+                                "medium",
+                                "large"
+                            ]
+                        }
+                    },
+                    "size": {
+                        "type": "string",
+                        "enum": [
+                            "small",
+                            "medium",
+                            "large"
+                        ]
+                    },
+                    "hidden": {
+                        "type": "boolean"
+                    },
+                    "position": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "blocks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                },
+                "required": [
+                    "key",
+                    "plugin",
+                    "kind",
+                    "sizes",
+                    "size",
+                    "hidden",
+                    "blocks"
                 ]
             },
             "DataType": {
@@ -93175,6 +93831,11 @@
                     },
                     "hidden": {
                         "type": "boolean"
+                    },
+                    "position": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Its place in the person's own order, null when they never moved it (SDK 1.115)"
                     }
                 },
                 "required": [
@@ -93820,6 +94481,9 @@
                             "requires_password": {
                                 "type": "boolean"
                             },
+                            "password_sign_in": {
+                                "type": "boolean"
+                            },
                             "inviter_name": {
                                 "type": "string",
                                 "nullable": true
@@ -93833,6 +94497,7 @@
                             "email",
                             "tenant_name",
                             "requires_password",
+                            "password_sign_in",
                             "inviter_name",
                             "role_name"
                         ]
@@ -99883,6 +100548,42 @@
                     },
                     "time_zone": {
                         "type": "string"
+                    },
+                    "services": {
+                        "type": "array",
+                        "description": "A booking of several services (WHIT-1173): each, in order. Empty for one service; `service` then names it. For several, `service` names them together with the whole length.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "$ref": "#/components/schemas/LocalizedLabel"
+                                },
+                                "staff_name": {
+                                    "type": "string"
+                                },
+                                "starts_at": {
+                                    "type": "string"
+                                },
+                                "ends_at": {
+                                    "type": "string"
+                                },
+                                "duration_minutes": {
+                                    "type": "integer"
+                                },
+                                "price_minor": {
+                                    "type": "integer",
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "name",
+                                "staff_name",
+                                "starts_at",
+                                "ends_at",
+                                "duration_minutes",
+                                "price_minor"
+                            ]
+                        }
                     }
                 },
                 "required": [
@@ -99947,6 +100648,10 @@
                                 "items": {
                                     "type": "string"
                                 }
+                            },
+                            "multi_service_booking": {
+                                "type": "boolean",
+                                "description": "The customer may book several services back to back as one booking (WHIT-1173)."
                             }
                         },
                         "required": [
@@ -100055,11 +100760,24 @@
                 "properties": {
                     "service_id": {
                         "type": "integer",
-                        "description": "The service."
+                        "description": "The service. Leave out when sending `services`."
+                    },
+                    "services": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 8,
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarBookingServiceChoice"
+                        },
+                        "description": "Several services back to back, in order, as one booking, when the page's `multi_service_booking` is on (WHIT-1173)."
+                    },
+                    "same_person": {
+                        "type": "boolean",
+                        "description": "With `services` and no person chosen: one person who does them all."
                     },
                     "profile_id": {
                         "type": "integer",
-                        "description": "One person; leave out for anyone."
+                        "description": "One person; leave out for anyone. With `services`: the person for every service that names none."
                     },
                     "starts_at": {
                         "type": "string",
@@ -100099,12 +100817,36 @@
                     }
                 },
                 "required": [
-                    "service_id",
                     "starts_at",
                     "name",
                     "email",
                     "elapsed_ms"
                 ]
+            },
+            "PublicBookingVisitor": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The display name on their own profile; may be empty."
+                    },
+                    "email": {
+                        "type": "string",
+                        "description": "The email of their own sign-in; may be empty."
+                    },
+                    "phone": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Null until a profile carries a phone number."
+                    }
+                },
+                "required": [
+                    "name",
+                    "email",
+                    "phone"
+                ],
+                "nullable": true,
+                "description": "The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in."
             },
             "PublicChatInfoResponse": {
                 "type": "object",
@@ -101031,7 +101773,8 @@
                             "email_signup_reason": {
                                 "type": "string",
                                 "enum": [
-                                    "bot_check_unavailable"
+                                    "bot_check_unavailable",
+                                    "password_sign_in_off"
                                 ],
                                 "nullable": true
                             },
@@ -104779,10 +105522,14 @@
                         "items": {
                             "$ref": "#/components/schemas/SsoProvider"
                         }
+                    },
+                    "password_sign_in": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
-                    "data"
+                    "data",
+                    "password_sign_in"
                 ]
             },
             "SsoWorkspaceCreateRequest": {

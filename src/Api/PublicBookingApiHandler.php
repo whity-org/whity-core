@@ -10,12 +10,14 @@ use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Calendar\BookingRepository;
 use Whity\Core\Calendar\BookingService;
+use Whity\Core\Calendar\BookingVisitor;
 use Whity\Core\Calendar\CalendarFeed;
 use Whity\Core\Calendar\CalendarRejectedException;
 use Whity\Core\Calendar\CalendarRepository;
 use Whity\Core\Calendar\Ics;
 use Whity\Core\Calendar\Interval;
 use Whity\Core\Calendar\ManageLinks;
+use Whity\Core\Calendar\ServiceChoices;
 use Whity\Core\Calendar\ServiceRepository;
 use Whity\Core\i18n\LocalizedText;
 use Whity\Core\Plugin\PublicForm\BotCheck;
@@ -34,6 +36,7 @@ use Whity\Http\JsonBody;
  *
  *   GET  /api/v1/public/booking/{workspace}                 services, staff, settings
  *   GET  /api/v1/public/booking/{workspace}/slots           free times
+ *   GET  /api/v1/public/booking/{workspace}/me              the visitor's own name and email
  *   POST /api/v1/public/booking/{workspace}/bookings        book
  *   GET  /api/v1/public/bookings/{token}                    the customer's booking
  *   GET  /api/v1/public/bookings/{token}/slots              free times to move to
@@ -77,6 +80,8 @@ final class PublicBookingApiHandler
         private readonly SharedStoreInterface $store,
         // WHIT-1014: the workspace's own brand on its public pages. Null: none sent.
         private readonly ?BrandingService $branding = null,
+        // WHIT-1179: the signed-in visitor's own account. Null: never prefilled.
+        private readonly ?BookingVisitor $visitor = null,
     ) {
     }
 
@@ -115,7 +120,8 @@ final class PublicBookingApiHandler
                 // WHIT-1014: on a shared host the page's own branding is the
                 // instance's, so the workspace's brand comes with the page.
                 'brand' => $this->brandFor($tenantId, $workspace['name']),
-                'settings' => array_intersect_key($settings->toApi(), array_flip(['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days'])),
+                // WHIT-1173: `multi_service_booking` lets the customer add more services.
+                'settings' => array_intersect_key($settings->toApi(), array_flip(['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days', 'multi_service_booking'])),
                 'services' => $services,
                 'staff' => array_map(static fn (array $s): array => ['profile_id' => $s['profile_id'], 'display_name' => $s['display_name']], $staff),
                 'bot_check' => $this->bot->isRequired() && $this->bot->provider() !== null
@@ -131,8 +137,16 @@ final class PublicBookingApiHandler
         return $this->guard($request, 'cal:slots:', RateLimits::publicBookingSlotsPerAddress(), function () use ($request, $params): Response {
             $workspace = $this->workspace($request, $params) ?? throw CalendarRejectedException::notFound('Booking page');
             $q = self::query($request);
-            $serviceId = self::intOrNull($q['service_id'] ?? null) ?? throw new CalendarRejectedException('service_id is required', 422);
-            $profileId = self::intOrNull($q['profile_id'] ?? null);
+            $many = ServiceChoices::fromQuery($q);
+            if ($many !== null && count($many) > 1) {
+                // WHIT-1173: times when all of them fit back to back, each
+                // with who would do which (only people the page offers).
+                [$from, $to] = self::range($q);
+
+                return Response::json(['data' => $this->booking->availabilityForMany($workspace['id'], $many, ServiceChoices::samePerson($q['same_person'] ?? null), $from, $to, true)]);
+            }
+            $serviceId = $many[0]['service_id'] ?? self::intOrNull($q['service_id'] ?? null) ?? throw new CalendarRejectedException('service_id is required', 422);
+            $profileId = $many[0]['profile_id'] ?? self::intOrNull($q['profile_id'] ?? null);
             [$from, $to] = self::range($q);
             $slots = $this->booking->availability($workspace['id'], $serviceId, $profileId, $from, $to, true);
             $bookable = array_map(static fn (array $s): int => $s['profile_id'], array_filter($this->calendar->listStaff($workspace['id']), static fn (array $s): bool => $s['bookable']));
@@ -143,6 +157,34 @@ final class PublicBookingApiHandler
                 return $who === [] ? null : ['starts_at' => $slot['starts_at'], 'ends_at' => $slot['ends_at'], 'profile_ids' => $who];
             }, $slots)))]);
         });
+    }
+
+    /**
+     * The signed-in visitor's own name and email, so the page can fill its
+     * details for them (WHIT-1179). `data` is null when nobody is signed in.
+     * Only the person's own account is read (see {@see BookingVisitor}); the
+     * workspace learns nothing until they book. Never cached: the answer is
+     * the person's, so it is `private, no-store` and varies by cookie.
+     *
+     * @param array<string, string> $params
+     */
+    public function visitor(Request $request, array $params): Response
+    {
+        $answer = $this->guard($request, 'cal:me:', RateLimits::publicBookingInfoPerAddress(), function () use ($request, $params): Response {
+            $this->workspace($request, $params) ?? throw CalendarRejectedException::notFound('Booking page');
+            $me = null;
+            if ($this->visitor !== null) {
+                try {
+                    $me = $this->visitor->current();
+                } catch (\Throwable $e) {
+                    error_log('[PublicBookingApiHandler] visitor: ' . $e->getMessage());
+                }
+            }
+
+            return Response::json(['data' => $me]);
+        });
+
+        return $answer->withHeaders(['Cache-Control' => 'private, no-store', 'Vary' => 'Cookie']);
     }
 
     /** @param array<string, string> $params */
@@ -179,7 +221,9 @@ final class PublicBookingApiHandler
             if ($phone !== '' && preg_match('/^\+?[0-9 ()-]{6,40}$/', $phone) !== 1) {
                 return Response::error('Your phone number does not look right', 422, ['field' => 'phone']);
             }
-            $serviceId = is_int($body['service_id'] ?? null) ? $body['service_id'] : throw new CalendarRejectedException('Choose a service', 422);
+            // WHIT-1173: `services` books several back to back, when the workspace allows it.
+            $many = ServiceChoices::fromBody($body);
+            $serviceId = $many[0]['service_id'] ?? (is_int($body['service_id'] ?? null) ? $body['service_id'] : throw new CalendarRejectedException('Choose a service', 422));
             $start = Interval::fromApi($body['starts_at'] ?? null) ?? throw new CalendarRejectedException('Choose a time', 422);
             $profileId = is_int($body['profile_id'] ?? null) ? $body['profile_id'] : null;
 
@@ -198,6 +242,8 @@ final class PublicBookingApiHandler
             }
 
             $booking = $this->booking->book($tenantId, [
+                'items' => $many ?? [],
+                'same_person' => ServiceChoices::samePerson($body['same_person'] ?? null),
                 'service_id' => $serviceId,
                 'profile_id' => $profileId,
                 'starts_at' => $start,
@@ -247,6 +293,16 @@ final class PublicBookingApiHandler
         return $this->withLink($request, $params, function (int $tenantId, int $bookingId) use ($request): Response {
             $booking = $this->booking->bookingOrFail($tenantId, $bookingId);
             [$from, $to] = self::range(self::query($request));
+            if (count($booking['items']) > 1) {
+                // WHIT-1173: every service moves together, each with its own person.
+                $items = [];
+                foreach ($booking['items'] as $i) {
+                    $items[] = ['service_id' => (int) $i['service_id'], 'profile_id' => (int) $i['profile_id']];
+                }
+                $slots = $this->booking->availabilityForMany($tenantId, $items, false, $from, $to, true, $bookingId, false);
+
+                return Response::json(['data' => array_map(static fn (array $s): array => ['starts_at' => $s['starts_at'], 'ends_at' => $s['ends_at']], $slots)]);
+            }
             $slots = $this->booking->availability($tenantId, (int) $booking['service_id'], (int) $booking['profile_id'], $from, $to, true);
 
             return Response::json(['data' => array_map(static fn (array $s): array => ['starts_at' => $s['starts_at'], 'ends_at' => $s['ends_at']], $slots)]);
@@ -364,6 +420,15 @@ final class PublicBookingApiHandler
             'price_minor' => $booking['price_minor'],
             'currency' => $booking['currency'],
             'customer' => ['name' => $booking['customer']['name'] ?? '', 'email' => $booking['customer']['email'] ?? ''],
+            // WHIT-1173: each service of a booking of several, in order; empty for one.
+            'services' => count($booking['items'] ?? []) > 1 ? array_map(static fn (array $i): array => [
+                'name' => $i['service_name'],
+                'staff_name' => $i['staff_name'],
+                'starts_at' => $i['starts_at'],
+                'ends_at' => $i['ends_at'],
+                'duration_minutes' => $i['duration_minutes'],
+                'price_minor' => $i['price_minor'],
+            ], $booking['items']) : [],
         ];
     }
 

@@ -361,6 +361,10 @@ class EnforceTenantIsolation
         '#^/api/v1/public/booking/[a-z0-9-]+$#',
         '#^/api/v1/public/booking/[a-z0-9-]+/slots$#',
         '#^/api/v1/public/booking/[a-z0-9-]+/bookings$#',
+        // WHIT-1179: the visitor's own name and email. The handler validates
+        // the session cookie itself, as /api/v1/me does, and reads only the
+        // caller's own profile; signed out, it answers null.
+        '#^/api/v1/public/booking/[a-z0-9-]+/me$#',
         // Any single segment, so a mistyped link reaches the router and gets
         // its 404 instead of a 401 that would suggest signing in.
         '#^/api/v1/public/bookings/[^/]+$#',

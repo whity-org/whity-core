@@ -2027,6 +2027,38 @@ final class UiKitShowcasePlugin implements PluginInterface, PluginRequirementsIn
                                     'name' => 'accent',
                                     'label' => 'Accent colour',
                                     'default' => '#6366f1',
+                                    'swatches' => ['#6366f1', '#0961bb', '#00792f', '#c53829'],
+                                ],
+                                // SDK 1.113 (WHIT-1172): the setup inputs.
+                                [
+                                    'type' => 'timeInput',
+                                    'name' => 'opensAt',
+                                    'label' => 'Opens at',
+                                    'step' => 30,
+                                    'default' => '09:00',
+                                ],
+                                [
+                                    'type' => 'weeklyHours',
+                                    'name' => 'openingHours',
+                                    'label' => 'Opening hours',
+                                    'default' => [
+                                        ['weekday' => 1, 'start_time' => '09:00', 'end_time' => '17:00'],
+                                        ['weekday' => 2, 'start_time' => '09:00', 'end_time' => '17:00'],
+                                        ['weekday' => 3, 'start_time' => '09:00', 'end_time' => '17:00'],
+                                        ['weekday' => 4, 'start_time' => '09:00', 'end_time' => '17:00'],
+                                        ['weekday' => 5, 'start_time' => '09:00', 'end_time' => '13:00'],
+                                    ],
+                                ],
+                                [
+                                    'type' => 'checkboxGroup',
+                                    'name' => 'channels',
+                                    'label' => 'Tell me by',
+                                    'default' => ['email'],
+                                    'options' => [
+                                        ['value' => 'email', 'label' => 'Email'],
+                                        ['value' => 'sms', 'label' => 'Text message'],
+                                        ['value' => 'push', 'label' => 'Phone notification'],
+                                    ],
                                 ],
                                 // WC-532 A4: bilingual AR/EN paired-text input.
                                 // Labels deliberately avoid the substring "name"

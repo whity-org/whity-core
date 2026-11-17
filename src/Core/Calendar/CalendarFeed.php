@@ -64,10 +64,21 @@ final class CalendarFeed
         $events = [];
         foreach ($this->bookings->list($tenantId, [$profileId], $from, $to) as $row) {
             $service = LocalizedText::resolve(LocalizedText::decode((string) $row['service_name'], languages: LocalizedText::BILINGUAL));
+            $start = Interval::fromDb((string) $row['starts_at']);
+            $end = Interval::fromDb((string) $row['ends_at']);
+            // WHIT-1173: of a booking of several services, this person's own
+            // services, from the first of theirs to the end of the last.
+            $mine = array_values(array_filter(is_array($row['items'] ?? null) ? $row['items'] : [], static fn (array $i): bool => (int) $i['profile_id'] === $profileId));
+            if ($mine !== []) {
+                $apiItems = array_map([BookingRepository::class, 'itemToApi'], $mine);
+                $service = LocalizedText::resolve(BookingRepository::joinedNames($apiItems));
+                $start = Interval::fromDb((string) $mine[0]['starts_at']);
+                $end = Interval::fromDb((string) $mine[count($mine) - 1]['ends_at']);
+            }
             $events[] = [
                 'uid' => 'booking-' . (int) $row['id'] . '-' . $tenantId . '@whity',
-                'start' => Interval::fromDb((string) $row['starts_at']),
-                'end' => Interval::fromDb((string) $row['ends_at']),
+                'start' => $start,
+                'end' => $end,
                 'summary' => trim($service . ' · ' . (string) $row['customer_name'], ' ·'),
                 'description' => (string) $row['customer_note'],
                 'status' => $row['status'] === BookingRepository::STATUS_CONFIRMED ? 'CONFIRMED' : 'TENTATIVE',

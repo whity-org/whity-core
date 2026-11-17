@@ -74,7 +74,9 @@ final class SettingsApiHandler
     public function __construct(
         SettingsService $settings,
         RoleChecker $roleChecker,
-        ServerLabels $labels
+        ServerLabels $labels,
+        // WHIT-1168: checks that turning password sign-in off leaves a way in.
+        private readonly ?\PDO $pdo = null,
     ) {
         $this->settings = $settings;
         $this->roleChecker = $roleChecker;
@@ -411,6 +413,16 @@ final class SettingsApiHandler
         $elsewhere = self::writtenElsewhere(JsonBody::parsed($request)['settings'] ?? null);
         if ($elsewhere !== null) {
             return $elsewhere;
+        }
+
+        // WHIT-1168: never let the switch lock everybody, or its operator, out.
+        $written = JsonBody::parsed($request)['settings'] ?? null;
+        $wanted = is_array($written) ? ($written[\Whity\Core\Identity\PasswordSignIn::SETTING] ?? null) : null;
+        if ($this->pdo !== null && ($wanted === false || $wanted === 'false')) {
+            $problem = \Whity\Core\Identity\PasswordSignIn::cannotTurnOff($this->pdo, $context['userId']);
+            if ($problem !== null) {
+                return Response::error($problem, 422, [\Whity\Core\Identity\PasswordSignIn::SETTING => $problem]);
+            }
         }
 
         return $this->applyWrites(

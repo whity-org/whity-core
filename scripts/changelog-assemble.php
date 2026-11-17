@@ -7,6 +7,12 @@ declare(strict_types=1);
  *
  *     php scripts/changelog-assemble.php           fold changelog.d/ in and delete the fragments
  *     php scripts/changelog-assemble.php --check   only check the fragments (CI)
+ *     ... --root=/path/to/repo                     work on another repository
+ *
+ * This is the one copy of the tool for every Whity repository (WHIT-1057). The
+ * others run it through whity-org/.github: the reusable changelog-fragment.yml
+ * workflow checks fragments on their pull requests, and changelog/assemble.sh
+ * folds them in at release. Both pass --root.
  *
  * `release-prepare.yml` runs the first form just before it dates [Unreleased],
  * so the release commit carries the assembled notes and removes the fragments.
@@ -17,7 +23,16 @@ declare(strict_types=1);
 
 require __DIR__ . '/lib/changelog-fragments.php';
 
-$root      = dirname(__DIR__);
+$root = dirname(__DIR__);
+foreach ($_SERVER['argv'] ?? [] as $arg) {
+    if (str_starts_with($arg, '--root=')) {
+        $root = rtrim(substr($arg, 7), '/\\');
+    }
+}
+if (!is_dir("{$root}/changelog.d")) {
+    fwrite(STDERR, "::error::{$root} has no changelog.d/ folder.\n");
+    exit(1);
+}
 $dir       = "{$root}/changelog.d";
 $changelog = "{$root}/CHANGELOG.md";
 $checkOnly = in_array('--check', $_SERVER['argv'] ?? [], true);

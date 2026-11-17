@@ -1628,7 +1628,11 @@ $settingsService = new \Whity\Core\Settings\SettingsService(
 );
 \Whity\register_service(\Whity\Core\Settings\SettingsService::class, $settingsService); // @phpstan-ignore-line
 $authHandler = new AuthHandler($db->getPdo(), $jwtParser, null, null, $totpService, $logger, $auditLogger, $loginThrottle, $twoFactorPolicyResolver, $settingsService);
-$router->register('POST', '/api/login', [$authHandler, 'handle'], null);
+// WHIT-1168: every way in that takes a password refuses while the operator
+// has turned password sign-in off (auth.password_sign_in; break-glass
+// WHITY_PASSWORD_SIGN_IN=force). Sessions and tokens that exist keep working.
+$passwordRoute = static fn (callable $handler): callable => \Whity\Core\Identity\PasswordSignIn::guard($handler, $settingsService);
+$router->register('POST', '/api/login', $passwordRoute([$authHandler, 'handle']), null);
 // WC-235: public self-service registration — provisions a new tenant + owner
 // (profile + primary email + active admin membership). Public + no required
 // permission; the global rate-limiter (non-exempt path) throttles abuse.
@@ -1800,7 +1804,7 @@ $accountSecurityMailer = new \Whity\Core\Mail\AccountSecurityMailer(
 $authHandler->setSecurityMailer($accountSecurityMailer);
 
 $registerHandler = new RegisterApiHandler($db->getPdo(), $settingsService, $emailVerificationProvider, $hookManager);
-$router->register('POST', '/api/register', [$registerHandler, 'register'], null);
+$router->register('POST', '/api/register', $passwordRoute([$registerHandler, 'register']), null);
 
 // WC-235: public email verification — (re)send a link + confirm a token. Both are
 // unauthenticated (a new owner has no session yet; a confirm link carries no JWT),
@@ -1889,8 +1893,8 @@ $twoFactorProofThrottle = new LoginThrottleService(
 );
 $twoFactorHandler = new TwoFactorHandler($db->getPdo(), $totpService, $backupCodesService, $tokenValidator, $auditLogger, $twoFactorProofThrottle);
 $twoFactorHandler->setSecurityMailer($accountSecurityMailer);
-$router->register('POST', '/api/auth/2fa/setup', [$twoFactorHandler, 'setup'], null);
-$router->register('POST', '/api/auth/2fa/confirm', [$twoFactorHandler, 'confirm'], null);
+$router->register('POST', '/api/auth/2fa/setup', $passwordRoute([$twoFactorHandler, 'setup']), null);
+$router->register('POST', '/api/auth/2fa/confirm', $passwordRoute([$twoFactorHandler, 'confirm']), null);
 $router->register('POST', '/api/auth/2fa/disable', [$twoFactorHandler, 'disable'], null);
 $router->register('POST', '/api/auth/2fa/regenerate-codes', [$twoFactorHandler, 'regenerateCodes'], null);
 $router->register('GET', '/api/auth/2fa/status', [$twoFactorHandler, 'status'], null);
@@ -1913,8 +1917,8 @@ $passwordResetHandler = new \Whity\Api\PasswordResetHandler(
     $auditLogger,
     $settingsService
 );
-$router->register('POST', '/api/auth/password/forgot', [$passwordResetHandler, 'forgot'], null);
-$router->register('POST', '/api/auth/password/reset', [$passwordResetHandler, 'reset'], null);
+$router->register('POST', '/api/auth/password/forgot', $passwordRoute([$passwordResetHandler, 'forgot']), null);
+$router->register('POST', '/api/auth/password/reset', $passwordRoute([$passwordResetHandler, 'reset']), null);
 
 // AG.1: every gated approval (a password reset, a two-step reset, a Needs
 // verifying agent proposal) confirms the approver is who they say, through one
@@ -1955,7 +1959,7 @@ $adminPasswordResetHandler = new \Whity\Api\AdminPasswordResetApiHandler(
     $settingsService,
     $roleChecker
 );
-$router->register('POST', '/api/users/{id:\d+}/password-reset',      [$adminPasswordResetHandler, 'sendResetLink'],     null, null, CorePermissions::USERS_WRITE);
+$router->register('POST', '/api/users/{id:\d+}/password-reset', $passwordRoute([$adminPasswordResetHandler, 'sendResetLink']),     null, null, CorePermissions::USERS_WRITE);
 $router->register('GET',  '/api/password-resets/approver-coverage',  [$adminPasswordResetHandler, 'approverCoverage'], null, null, CorePermissions::USERS_READ);
 
 $twoFactorRecoveryService = new \Whity\Core\Identity\TwoFactorRecoveryService(
@@ -1976,8 +1980,8 @@ $twoFactorRecoveryHandler = new \Whity\Api\TwoFactorRecoveryHandler(
     $auditLogger,
     $settingsService
 );
-$router->register('POST', '/api/auth/2fa-recovery/request', [$twoFactorRecoveryHandler, 'request'], null);
-$router->register('POST', '/api/auth/2fa-recovery/confirm', [$twoFactorRecoveryHandler, 'confirm'], null);
+$router->register('POST', '/api/auth/2fa-recovery/request', $passwordRoute([$twoFactorRecoveryHandler, 'request']), null);
+$router->register('POST', '/api/auth/2fa-recovery/confirm', $passwordRoute([$twoFactorRecoveryHandler, 'confirm']), null);
 
 $twoFactorRecoveryApprovalsHandler = new \Whity\Api\TwoFactorRecoveryApprovalsApiHandler(
     $twoFactorRecoveryService,
@@ -2026,7 +2030,8 @@ $invitationsHandler = new \Whity\Api\InvitationsApiHandler(
 $invitationAcceptHandler = new \Whity\Api\InvitationAcceptHandler(
     $invitationService,
     new DatabaseSharedStore($db->getPdo()),
-    $auditLogger
+    $auditLogger,
+    $settingsService,
 );
 // The public pair is registered FIRST so `/invitations/accept` can never be
 // shadowed by a future `/invitations/{something}` route.
@@ -2750,7 +2755,9 @@ $settingsHandler = new \Whity\Api\SettingsApiHandler(
     $settingsService,
     $roleChecker,
     // #1044: the settings tab names answer in the caller's language.
-    $serverLabels
+    $serverLabels,
+    // WHIT-1168: turning password sign-in off must leave a way in.
+    $db->getPdo(),
 );
 $router->register('GET',   '/api/settings',        [$settingsHandler, 'get'],         null, null, CorePermissions::SETTINGS_READ);
 $router->register('PATCH', '/api/settings',        [$settingsHandler, 'patch'],       null, null, CorePermissions::SETTINGS_WRITE);
@@ -5701,9 +5708,16 @@ $publicBookingHandler = new \Whity\Api\PublicBookingApiHandler(
     $publicFormBotCheck,
     new DatabaseSharedStore($db->getPdo()),
     $brandingService,
+    // WHIT-1179: the signed-in visitor's own name and email, from their
+    // session cookie and profile only.
+    new \Whity\Core\Calendar\BookingVisitor(
+        static fn (): ?array => $tokenValidator->validateAccessToken(),
+        $db->getPdo(),
+    ),
 );
 $router->register('GET',  '/api/public/booking/{workspace}',                       [$publicBookingHandler, 'page'],        null);
 $router->register('GET',  '/api/public/booking/{workspace}/slots',                 [$publicBookingHandler, 'slots'],       null);
+$router->register('GET',  '/api/public/booking/{workspace}/me',                    [$publicBookingHandler, 'visitor'],     null);
 $router->register('POST', '/api/public/booking/{workspace}/bookings',              [$publicBookingHandler, 'book'],        null);
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}',             [$publicBookingHandler, 'showBooking'], null);
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/slots',       [$publicBookingHandler, 'manageSlots'], null);
@@ -5778,12 +5792,14 @@ $publicSignupHandler = new \Whity\Api\PublicSignupApiHandler(
     $joinProviders,
     // WHIT-1044: the workspace's logo and colour on the join pages.
     $brandingService,
+    // WHIT-1168: off, people join only through the identity provider.
+    $settingsService,
 );
 // The confirm pair first, so it can never be read as a workspace slug.
 $router->register('GET',  '/api/public/signup/confirm',               [$publicSignupHandler, 'preview'], null);
-$router->register('POST', '/api/public/signup/confirm',               [$publicSignupHandler, 'confirm'], null);
+$router->register('POST', '/api/public/signup/confirm',               $passwordRoute([$publicSignupHandler, 'confirm']), null);
 $router->register('GET',  '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'info'],    null);
-$router->register('POST', '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'request'], null);
+$router->register('POST', '/api/public/signup/workspaces/{workspace}', $passwordRoute([$publicSignupHandler, 'request']), null);
 
 // MESSAGES (ADR 0016, WHIT-938): conversations with customers by email and web
 // chat, one send API for every core module, channels a store plugin can add,
@@ -6113,6 +6129,8 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     $tokenValidator,
     $externalIdentityRepository,
     $signingChallengeRepository,
+    // WHIT-1168: accept an invitation by signing in with the identity provider.
+    $invitationService,
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).
@@ -6472,6 +6490,18 @@ $meHomeHandler = new \Whity\Api\MeHomeApiHandler($db->getPdo());
 $router->register('GET', '/api/me/recent-documents', [$meHomeHandler, 'recentDocuments'], null);
 $router->register('GET', '/api/me/setup-steps', [$meHomeHandler, 'setupSteps'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('PUT', '/api/me/home-cards/{key:[A-Za-z][A-Za-z0-9_]*}/hidden', [$homeCardsHandler, 'setHidden'], null);
+// WHIT-1177 (SDK 1.115, H.5): setup points and widgets the caller's apps add to
+// the dashboard, and the caller's own order, sizes and hidden items. Session-gated
+// and self-scoped; each point and widget is listed only under its own permission.
+$dashboardHandler = new \Whity\Api\DashboardApiHandler(
+    $roleChecker,
+    $pluginLoader,
+    new \Whity\Core\Dashboard\DashboardLayoutRepository($db->getPdo()),
+    $homeCardsHandler,
+    static fn (): string => $serverLabels->languageCode(),
+);
+$router->register('GET', '/api/me/dashboard', [$dashboardHandler, 'show'], null);
+$router->register('PUT', '/api/me/dashboard/layout', [$dashboardHandler, 'saveLayout'], null);
 // WHIT-815: workspace agents (persona, toolsets, starting grant) and the
 // presets they start from. Gated on agents:manage, which migration 180 grants
 // to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.

@@ -7,6 +7,7 @@ namespace Whity\Core\Tenant;
 use PDO;
 use Whity\Auth\RoleChecker;
 use Whity\Core\Audit\AuditLogger;
+use Whity\Core\Db\DbBool;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\MembershipRepository;
 use Whity\Sdk\Hooks\Events;
@@ -466,7 +467,7 @@ final class WorkspaceOwnership
             'from_name'       => (string) ($row['from_name'] ?? ''),
             'to_profile_id'   => (int) $row['to_profile_id'],
             'to_name'         => (string) ($row['to_name'] ?? ''),
-            'leave_after'     => (bool) $row['leave_after'],
+            'leave_after'     => DbBool::of($row['leave_after']),
             'status'          => $status,
             'expires_at'      => (string) $row['expires_at'],
             'created_at'      => (string) $row['created_at'],

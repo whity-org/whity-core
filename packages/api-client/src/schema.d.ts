@@ -6027,6 +6027,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The setup points and widgets the caller's apps add to their dashboard, in the caller's order
+         * @description Only points and widgets whose permission the caller holds in this workspace, from plugins on here, in the caller's language. Hidden widgets are listed too, so a client can offer Show. Each names the plugin route it reads; that route applies its own permission and the caller's scope.
+         */
+        get: operations["get_api_v1_me_dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/dashboard/layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Arrange the caller's dashboard: the order, hidden items and widget sizes
+         * @description Items are home cards (by plugin name) and widgets (`<plugin>:<id>`) the caller can see, in the order they want them. Items left out go after, in the apps' own order. Answers with the dashboard as GET does.
+         */
+        put: operations["put_api_v1_me_dashboard_layout"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/display-preferences": {
         parameters: {
             query?: never;
@@ -8578,6 +8618,26 @@ export interface paths {
          * @description Protected by per-IP and per-workspace limits, a hidden field, a minimum time on the page, a cap of three open bookings per email, and the instance's bot check when set up. The answer carries `manage_token` for the manage page; the same link is emailed.
          */
         post: operations["post_api_v1_public_booking_workspace_bookings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/booking/{workspace}/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The name and email of the signed-in visitor, to fill the booking form (public)
+         * @description Reads only the session and profile of the visitor, never the contacts of this workspace or the data of another. `data` is null when nobody is signed in. Sent `Cache-Control: private, no-store`.
+         */
+        get: operations["get_api_v1_public_booking_workspace_me"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -12078,15 +12138,21 @@ export interface components {
             room_name?: {
                 [key: string]: string;
             } | null;
+            /** @description A booking of several services (WHIT-1173): each, in order, with who does it and when. Empty for one service. `service_id`, `profile_id` and `room_id` are then the first service's, the times span them all and `price_minor` is the total. */
+            items?: components["schemas"]["CalendarBookingItem"][];
         };
         CalendarBookingCancelRequest: {
             /** @description Why, in a few words; shown to the customer. */
             reason?: string;
         };
         CalendarBookingCreateRequest: {
-            /** @description The service to book. */
-            service_id: number;
-            /** @description Leave out for whoever is free. */
+            /** @description The service to book. Leave out when sending `services`. */
+            service_id?: number;
+            /** @description Several services back to back, in order, as one booking, when the calendar setting `multi_service_booking` is on (WHIT-1173). Each may name its own person. */
+            services?: components["schemas"]["CalendarBookingServiceChoice"][];
+            /** @description With `services` and nobody chosen: one person who does them all. */
+            same_person?: boolean;
+            /** @description Leave out for whoever is free. With `services`: the person for every service that names none. */
             profile_id?: number;
             /** @description ISO 8601 with an offset. */
             starts_at: string;
@@ -12109,6 +12175,24 @@ export interface components {
             phone?: string;
             note?: string;
         };
+        CalendarBookingItem: {
+            /** @description 0 for the first service. */
+            position: number;
+            service_id: number;
+            /** @description Language code => text. */
+            service_name: {
+                [key: string]: string;
+            };
+            profile_id: number;
+            staff_name: string;
+            room_id?: number | null;
+            starts_at: string;
+            ends_at: string;
+            blocks_from?: string;
+            blocks_until?: string;
+            duration_minutes: number;
+            price_minor: number | null;
+        };
         CalendarBookingMoveRequest: {
             /** @description ISO 8601 with an offset. */
             starts_at: string;
@@ -12122,6 +12206,11 @@ export interface components {
             book_anyway?: boolean;
             /** @description Refuse a time outside the person's working hours, without the booking window's notice rules. */
             within_hours?: boolean;
+        };
+        CalendarBookingServiceChoice: {
+            service_id: number;
+            /** @description Who does it; null or left out for anyone. */
+            profile_id?: number | null;
         };
         CalendarBookingSuggestRequest: {
             /** @description The time to suggest, ISO 8601 with an offset. */
@@ -12330,6 +12419,8 @@ export interface components {
             currency: string;
             /** @description Off: every booking from the booking page is a request. */
             instant_booking?: boolean;
+            /** @description On: one booking may hold several services back to back (WHIT-1173). Default off. */
+            multi_service_booking?: boolean;
         };
         CalendarSettingsRequest: {
             /** @description Turn the public booking page on or off. */
@@ -12353,12 +12444,21 @@ export interface components {
             weekend_days?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[];
             /** @description Off turns every booking from the booking page into a request staff accept. */
             instant_booking?: boolean;
+            /** @description On lets one booking hold several services back to back, on the booking page and at the desk (WHIT-1173). Default off. */
+            multi_service_booking?: boolean;
         };
         CalendarSlot: {
             starts_at: string;
             ends_at: string;
-            /** @description Who is free then. */
+            /** @description Who is free then. For several services: the people this time would be with. */
             profile_ids: number[];
+            /** @description Only when several services were asked for (WHIT-1173): who would do each, and when. */
+            items?: {
+                service_id: number;
+                profile_id: number;
+                starts_at: string;
+                ends_at: string;
+            }[];
         };
         CalendarStaff: {
             profile_id: number;
@@ -13328,6 +13428,55 @@ export interface components {
         };
         CustomerMessageResponse: {
             data: components["schemas"]["CustomerMessage"] | null;
+        };
+        DashboardLayoutRequest: {
+            items: {
+                key: string;
+                hidden?: boolean;
+                /** @enum {string|null} */
+                size?: "small" | "medium" | "large" | null;
+            }[];
+        };
+        DashboardResponse: {
+            data: {
+                setup: components["schemas"]["DashboardSetup"][];
+                widgets: components["schemas"]["DashboardWidget"][];
+            };
+        };
+        DashboardSetup: {
+            plugin: string;
+            /** @description The plugin's GET route answering {data: {points: {<id>: bool}}} */
+            status: string;
+            points: components["schemas"]["DashboardSetupPoint"][];
+        };
+        DashboardSetupPoint: {
+            id: string;
+            label?: string | null;
+            why?: string | null;
+            action?: string | null;
+            /** @description The plugin's guided-setup step or screen it opens */
+            href: string;
+            icon?: string | null;
+        };
+        DashboardWidget: {
+            /** @description <plugin>:<id> */
+            key: string;
+            plugin: string;
+            /** @enum {string} */
+            kind: "stat" | "list" | "chart" | "actions";
+            title?: string | null;
+            description?: string | null;
+            icon?: string | null;
+            href?: string | null;
+            source?: string | null;
+            sizes: ("small" | "medium" | "large")[];
+            /** @enum {string} */
+            size: "small" | "medium" | "large";
+            hidden: boolean;
+            position?: number | null;
+            blocks: {
+                [key: string]: unknown;
+            }[];
         };
         DataType: {
             key: string;
@@ -16093,6 +16242,8 @@ export interface components {
             source?: string | null;
             value?: number | null;
             hidden: boolean;
+            /** @description Its place in the person's own order, null when they never moved it (SDK 1.115) */
+            position?: number | null;
         };
         HomeCardHiddenRequest: {
             hidden: boolean;
@@ -16280,6 +16431,7 @@ export interface components {
                 email: string;
                 tenant_name: string;
                 requires_password: boolean;
+                password_sign_in: boolean;
                 inviter_name: string | null;
                 role_name: string | null;
             };
@@ -17855,6 +18007,15 @@ export interface components {
             /** @description Only on the manage link: the brand of the workspace (WHIT-1014). */
             brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
             time_zone?: string;
+            /** @description A booking of several services (WHIT-1173): each, in order. Empty for one service; `service` then names it. For several, `service` names them together with the whole length. */
+            services?: {
+                name: components["schemas"]["LocalizedLabel"];
+                staff_name: string;
+                starts_at: string;
+                ends_at: string;
+                duration_minutes: number;
+                price_minor: number | null;
+            }[];
         };
         PublicBookingMoveRequest: {
             /** @description A free time, ISO 8601 with an offset. */
@@ -17871,6 +18032,8 @@ export interface components {
                 max_advance_days: number;
                 week_start: string;
                 weekend_days: string[];
+                /** @description The customer may book several services back to back as one booking (WHIT-1173). */
+                multi_service_booking?: boolean;
             };
             services: {
                 id: number;
@@ -17895,9 +18058,13 @@ export interface components {
             brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
         };
         PublicBookingRequest: {
-            /** @description The service. */
-            service_id: number;
-            /** @description One person; leave out for anyone. */
+            /** @description The service. Leave out when sending `services`. */
+            service_id?: number;
+            /** @description Several services back to back, in order, as one booking, when the page's `multi_service_booking` is on (WHIT-1173). */
+            services?: components["schemas"]["CalendarBookingServiceChoice"][];
+            /** @description With `services` and no person chosen: one person who does them all. */
+            same_person?: boolean;
+            /** @description One person; leave out for anyone. With `services`: the person for every service that names none. */
             profile_id?: number;
             /** @description A free time, ISO 8601 with an offset. */
             starts_at: string;
@@ -17916,6 +18083,15 @@ export interface components {
             /** @description The bot-check token, when the page shows one. */
             bot_token?: string;
         };
+        /** @description The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in. */
+        PublicBookingVisitor: {
+            /** @description The display name on their own profile; may be empty. */
+            name: string;
+            /** @description The email of their own sign-in; may be empty. */
+            email: string;
+            /** @description Null until a profile carries a phone number. */
+            phone: string | null;
+        } | null;
         PublicChatInfoResponse: {
             data: {
                 workspace_name: string;
@@ -18158,7 +18334,7 @@ export interface components {
                 } | null;
                 email_signup: boolean;
                 /** @enum {string|null} */
-                email_signup_reason: "bot_check_unavailable" | null;
+                email_signup_reason: "bot_check_unavailable" | "password_sign_in_off" | null;
                 providers: components["schemas"]["SignupJoinProvider"][];
                 /** @description The workspace logo and colour for the page (WHIT-1044). */
                 brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
@@ -19227,6 +19403,7 @@ export interface components {
         };
         SsoProviderListResponse: {
             data: components["schemas"]["SsoProvider"][];
+            password_sign_in: boolean;
         };
         SsoWorkspaceCreateRequest: {
             name: string;
@@ -26877,14 +27054,22 @@ export interface operations {
     get_api_v1_calendar_availability: {
         parameters: {
             query: {
-                /** @description The service. */
-                service_id: number;
+                /** @description The service. Leave out when sending `service_ids`. */
+                service_id?: number;
                 /** @description Start of the range, ISO 8601 with an offset, such as `2026-11-16T00:00:00+03:00`. */
                 from: string;
                 /** @description End of the range (exclusive), with an offset. At most 62 days after `from`. */
                 to: string;
                 /** @description Only this member of staff. */
                 profile_id?: number;
+                /** @description Several services back to back, in order, comma-separated (4,7,9). Each slot then says who would do which in `items`. Needs the calendar setting `multi_service_booking`. */
+                service_ids?: string;
+                /** @description With `service_ids`: the person for each service, comma-separated, 0 for anyone (11,0,12). */
+                profile_ids?: string;
+                /** @description With `service_ids`: one person who does them all. */
+                same_person?: boolean;
+                /** @description With `service_ids`: moving this booking, so its own time counts as free. */
+                except_booking_id?: number;
             };
             header?: never;
             path?: never;
@@ -52630,6 +52815,158 @@ export interface operations {
             };
         };
     };
+    get_api_v1_me_dashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setup points and widgets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_me_dashboard_layout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardLayoutRequest"];
+            };
+        };
+        responses: {
+            /** @description The dashboard, arranged */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description An item that is not on the caller's dashboard, listed twice, or a size it does not fit */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_me_display_preferences: {
         parameters: {
             query?: never;
@@ -65708,17 +66045,84 @@ export interface operations {
             };
         };
     };
+    get_api_v1_public_booking_workspace_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace slug. */
+                workspace: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The visitor, or null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicBookingVisitor"];
+                    };
+                };
+            };
+            /** @description This booking page is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_public_booking_workspace_slots: {
         parameters: {
             query: {
-                /** @description The service. */
-                service_id: number;
+                /** @description The service. Leave out when sending `service_ids`. */
+                service_id?: number;
                 /** @description One person; leave out for anyone. */
                 profile_id?: number;
                 /** @description Start, ISO 8601 with an offset. */
                 from: string;
                 /** @description End (exclusive), with an offset. At most 14 days after `from`. */
                 to: string;
+                /** @description Several services back to back, in order, comma-separated (4,7,9). Each slot then says who would do which in `items`. Needs the calendar setting `multi_service_booking`. */
+                service_ids?: string;
+                /** @description With `service_ids`: the person for each service, comma-separated, 0 for anyone (11,0,12). */
+                profile_ids?: string;
+                /** @description With `service_ids`: one person who does them all. */
+                same_person?: boolean;
             };
             header?: never;
             path: {

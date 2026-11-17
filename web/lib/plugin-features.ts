@@ -460,6 +460,10 @@ export interface FieldArrayBlock {
   source?: string;
   /** Master-detail bindings for `source`; ALL must resolve before it fetches. */
   params?: SourceParam[];
+  /** SDK 1.113: the rows it starts with (not with `source`), keyed by template input names. */
+  default?: Record<string, string>[];
+  /** SDK 1.113: the text of the "Add another" button. */
+  addLabel?: string;
   children: Block[];
 }
 
@@ -616,8 +620,55 @@ export interface ColorInputBlock {
   name: string;
   label: string;
   default?: string;
+  /** SDK 1.113: ready colours, `#RRGGBB`, offered before the free picker. */
+  swatches?: string[];
   /** WC-block-modal-drawer: a dot-path (`{targetId}.{field}`) or bare selector name into the master-detail context; resolved before `default`. */
   defaultFrom?: string;
+}
+
+/** Leaf (form only, SDK 1.113): a time of day, submitted as `HH:MM`. */
+export interface TimeInputBlock {
+  type: 'timeInput';
+  name: string;
+  label: string;
+  /** Minutes between the offered times; 15 when absent. */
+  step?: 5 | 10 | 15 | 30 | 60;
+  /** Offer `24:00`, for a closing time. */
+  allowEndOfDay?: boolean;
+  required?: boolean;
+  default?: string;
+  defaultFrom?: string;
+}
+
+/** One range of a week of hours: the calendar API's own row (ISO weekday 1 Monday … 7 Sunday). */
+export interface WeeklyHoursRow {
+  weekday: number;
+  start_time: string;
+  end_time: string;
+}
+
+/**
+ * Leaf (form only, SDK 1.113): a week of opening or working hours. Submits the
+ * calendar's `{weekday, start_time, end_time}` rows; a closed day has none.
+ */
+export interface WeeklyHoursBlock {
+  type: 'weeklyHours';
+  name: string;
+  label: string;
+  /** ISO weekday the week is drawn from; Monday when absent. */
+  firstDay?: number;
+  required?: boolean;
+  default?: WeeklyHoursRow[];
+}
+
+/** Leaf (form only, SDK 1.113): several choices as checkboxes; submits the chosen values. */
+export interface CheckboxGroupBlock {
+  type: 'checkboxGroup';
+  name: string;
+  label: string;
+  options: { value: string; label: string }[];
+  required?: boolean;
+  default?: string[];
 }
 
 /**
@@ -986,6 +1037,9 @@ export type Block = BlockFacets &
   | DateInputBlock
   | FileInputBlock
   | ColorInputBlock
+  | TimeInputBlock
+  | WeeklyHoursBlock
+  | CheckboxGroupBlock
   | BilingualTextInputBlock
   | ReferenceSelectBlock
   | OuScopePickerBlock
