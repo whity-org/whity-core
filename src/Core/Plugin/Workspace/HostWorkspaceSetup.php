@@ -28,10 +28,33 @@ final class HostWorkspaceSetup implements WorkspaceSetup
 {
     private const SYSTEM_TENANT_ID = 0;
 
+    /**
+     * Core's own workspace templates (WHIT-1194) also make roles and documents
+     * and remove their examples. Those routes are reachable only through
+     * {@see self::forTemplates()}, never by a plugin's WorkspaceSetup.
+     */
+    public const TEMPLATE_ROUTES = [
+        'GET /api/roles',
+        'POST /api/roles',
+        'POST /api/roles/{id}/permissions',
+        'GET /api/document-sources',
+        'POST /api/document-sources',
+        'POST /api/contacts/{id}/archive',
+        'POST /api/calendar/bookings/{id}/cancel',
+    ];
+
+    /** @param list<string> $extraRoutes */
     public function __construct(
         private readonly Router $router,
         private readonly RoleChecker $roles,
+        private readonly array $extraRoutes = [],
     ) {
+    }
+
+    /** The same gates, plus {@see self::TEMPLATE_ROUTES}: for core's template applier only. */
+    public function forTemplates(): self
+    {
+        return new self($this->router, $this->roles, self::TEMPLATE_ROUTES);
     }
 
     public function call(string $method, string $path, array $body = []): array
@@ -44,7 +67,7 @@ final class HostWorkspaceSetup implements WorkspaceSetup
         }
 
         $clean = '/' . ltrim((string) parse_url($path, PHP_URL_PATH), '/');
-        if (!self::allowed($method, $clean)) {
+        if (!self::allowed($method, $clean, $this->extraRoutes)) {
             return self::refused(403, 'That route is not one a setup may call.');
         }
 
@@ -89,10 +112,15 @@ final class HostWorkspaceSetup implements WorkspaceSetup
         return ['status' => $response->getStatusCode(), 'body' => $decoded];
     }
 
-    /** Is METHOD + path one of {@see WorkspaceSetup::ROUTES}, with `{name}` matching one id? */
-    public static function allowed(string $method, string $path): bool
+    /**
+     * Is METHOD + path one of {@see WorkspaceSetup::ROUTES} (or the extra
+     * routes given), with `{name}` matching one id?
+     *
+     * @param list<string> $extraRoutes
+     */
+    public static function allowed(string $method, string $path, array $extraRoutes = []): bool
     {
-        foreach (WorkspaceSetup::ROUTES as $route) {
+        foreach ([...WorkspaceSetup::ROUTES, ...$extraRoutes] as $route) {
             [$routeMethod, $routePath] = explode(' ', $route, 2);
             if ($routeMethod !== $method) {
                 continue;

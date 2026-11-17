@@ -19712,6 +19712,30 @@ final class CoreApiSchemas
                 'tags' => ['platform-ops'],
                 'responses' => [200 => self::jsonResponse('The guided setups', 'WorkspaceOnboardingListResponse')] + self::authErrors(),
             ]),
+            // WHIT-1194 (SDK 1.116): workspace templates.
+            self::permissionRoute('GET', '/api/workspace/templates', 'settings:write', [
+                'summary' => 'List the workspace templates on offer',
+                'description' => 'Core\'s Blank and the templates of the plugins on in this workspace, in the caller\'s language: what each sets up, whether it has examples and a guided setup, the paid plugin it offers with its trial, and which ones this workspace chose.',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('The templates', 'WorkspaceTemplateListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', 'settings:write', [
+                'summary' => 'Apply a workspace template as the caller',
+                'description' => 'Sets the workspace up through core\'s own routes with the caller\'s permissions, adding only what is missing and never overwriting what the workspace changed. Each part that could not be done is listed with why. Free; the plugin it offers starts only through its own trial.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'request' => 'ApplyWorkspaceTemplateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('What was made and what was skipped', 'ApplyWorkspaceTemplateResponse'),
+                    404 => self::errorResponse('There is no such template'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/workspace/templates/examples', 'settings:write', [
+                'summary' => 'Remove the example contacts and bookings a template added',
+                'description' => 'Cancels the example bookings and archives the example contacts still in the workspace, as the caller. Nothing else is touched.',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('How many were removed', 'RemoveWorkspaceTemplateExamplesResponse')] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/plugins/workspace-access', 'plugins:read', [
                 'summary' => 'List who can use each installed plugin',
                 'description' => 'Operator only (the system workspace).',
@@ -19813,6 +19837,49 @@ final class CoreApiSchemas
                 ], ['id', 'blocks'])],
             ], ['plugin', 'status', 'steps']),
             'WorkspaceOnboardingListResponse' => self::listEnvelope('WorkspaceOnboarding'),
+            'WorkspaceTemplateOffer' => self::object([
+                'plugin' => self::str(),
+                'free' => ['type' => 'array', 'items' => self::str(), 'description' => 'What the workspace can do free in Whity'],
+                'paid' => ['type' => 'array', 'items' => self::str(), 'description' => 'What the plugin adds'],
+                'trialDays' => self::int(),
+                'trialAvailable' => self::bool(),
+                'state' => ['type' => 'string', 'enum' => ['on', 'read_only', 'off']],
+                'reason' => ['type' => 'string', 'nullable' => true],
+                'trialEndsAt' => ['type' => 'string', 'nullable' => true],
+            ], ['plugin', 'free', 'paid', 'trialDays', 'trialAvailable', 'state']),
+            'WorkspaceTemplateCard' => self::object([
+                'key' => self::str(),
+                'plugin' => ['type' => 'string', 'nullable' => true, 'description' => 'The plugin that offers it; null for core\'s Blank'],
+                'version' => self::int(),
+                'name' => self::str(),
+                'summary' => self::str(),
+                'icon' => ['type' => 'string', 'nullable' => true],
+                'setsUp' => ['type' => 'array', 'items' => self::str()],
+                'hasExamples' => self::bool(),
+                'hasSetup' => self::bool(),
+                'offer' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('WorkspaceTemplateOffer')]],
+                'chosen' => self::bool(),
+            ], ['key', 'version', 'name', 'summary', 'setsUp', 'hasExamples', 'hasSetup', 'chosen']),
+            'WorkspaceTemplateListResponse' => self::object([
+                'data' => self::object([
+                    'templates' => ['type' => 'array', 'items' => SchemaBuilder::ref('WorkspaceTemplateCard')],
+                    'chosen' => ['type' => 'array', 'items' => self::str(), 'description' => 'Keys of the templates this workspace applied'],
+                    'examples' => self::int() + ['description' => 'Example contacts and bookings still in the workspace'],
+                ], ['templates', 'chosen', 'examples']),
+            ], ['data']),
+            'ApplyWorkspaceTemplateRequest' => self::object([
+                'examples' => self::bool() + ['description' => 'Add the template\'s example contacts and bookings. Default true.'],
+            ], []),
+            'ApplyWorkspaceTemplateResponse' => self::object([
+                'data' => self::object([
+                    'template' => self::str(),
+                    'made' => ['type' => 'object', 'additionalProperties' => self::int(), 'description' => 'How many of each part were made'],
+                    'skipped' => ['type' => 'array', 'items' => self::object(['part' => self::str(), 'key' => self::str(), 'reason' => self::str()], ['part', 'key', 'reason'])],
+                ], ['template', 'made', 'skipped']),
+            ], ['data']),
+            'RemoveWorkspaceTemplateExamplesResponse' => self::object([
+                'data' => self::object(['removed' => self::int(), 'failed' => self::int()], ['removed', 'failed']),
+            ], ['data']),
             'WorkspaceCodePluginTrialResponse' => self::object([
                 'data' => self::object(['name' => self::str(), 'enabled' => self::bool(), 'trialEndsAt' => ['type' => 'string', 'nullable' => true]], ['name', 'enabled']),
             ], ['data']),

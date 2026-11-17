@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.115.0',
+            '1.116.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.115 ADDS PluginDashboardInterface and Manifest\\DashboardValidator: setup points and dashboard widgets (WHIT-1177). '
+            'SDK 1.116 ADDS PluginWorkspaceTemplatesInterface and Manifest\\WorkspaceTemplateValidator: workspace templates (WHIT-1194). '
+            . 'SDK 1.115 ADDS PluginDashboardInterface and Manifest\\DashboardValidator: setup points and dashboard widgets (WHIT-1177). '
             . 'SDK 1.114 ADDS Http\\Outbound\\HttpClient, StreamHttpClient and Testing\\RecordedHttpClient: one outbound HTTP client (WHIT-1058). '
             . 'SDK 1.113 ADDS timeInput, weeklyHours, checkboxGroup, colorInput swatches and fieldArray default rows (WHIT-1172). '
             . 'SDK 1.111 ADDS Print\QrCode: the QR encoder moved from Front Office (WHIT-1060). '

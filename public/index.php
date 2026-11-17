@@ -2915,7 +2915,23 @@ $entitlementService->usePluginPacks(static fn (int $tenantId): array => $pluginL
 $invitationsHandler->useSeats(new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService));
 // WHIT-1129 (SDK 1.108): packs set a workspace up through core's own routes,
 // as the person acting there, limited to WorkspaceSetup::ROUTES.
-\Whity\register_service(\Whity\Sdk\Setup\WorkspaceSetup::class, new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker)); // @phpstan-ignore-line
+$hostWorkspaceSetup = new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker);
+\Whity\register_service(\Whity\Sdk\Setup\WorkspaceSetup::class, $hostWorkspaceSetup); // @phpstan-ignore-line
+// WHIT-1194 (SDK 1.116): workspace templates, applied as the person choosing
+// one, through the same gates plus the template-only routes (roles,
+// documents, removing examples).
+$templateRuns = new \Whity\Core\Workspace\Templates\TemplateRuns($db->getPdo());
+$workspaceTemplatesHandler = new \Whity\Api\WorkspaceTemplatesApiHandler(
+    new \Whity\Core\Workspace\Templates\TemplateCatalogue($pluginLoader),
+    $templateRuns,
+    static fn (): \Whity\Core\Workspace\Templates\TemplateApplier => new \Whity\Core\Workspace\Templates\TemplateApplier($hostWorkspaceSetup->forTemplates(), $templateRuns, static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId)),
+    $codePluginActivation,
+    $auditLogger,
+    static fn (): string => $serverLabels->languageCode(),
+);
+$router->register('GET', '/api/workspace/templates', [$workspaceTemplatesHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', [$workspaceTemplatesHandler, 'apply'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('DELETE', '/api/workspace/templates/examples', [$workspaceTemplatesHandler, 'removeExamples'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 // EM.1: workspace emails carry the workspace's brand, and white-label by plan.
 $brandedEmailSender->useBranding(new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService));
 $tenantEntitlementsHandler = new \Whity\Api\TenantEntitlementsApiHandler(

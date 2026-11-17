@@ -1356,12 +1356,22 @@ namespace Whity\Sdk;
  * (WHIT-1177).
  *
  * Purely additive.)
+ *
+ * 1.116 (WORKSPACE TEMPLATES: {@see PluginWorkspaceTemplatesInterface} lets a plugin offer ready
+ * starts for one kind of business, shown right after a workspace is created. A template is a
+ * versioned manifest, data only: workspace defaults, booking rules and hours, services with prices
+ * per currency, roles, forms, documents, example contacts and bookings (removed in one click), the
+ * steps of its guided setup, and the paid plugin it offers with a trial. Core applies it as the
+ * person choosing it, adding only what is missing, and grants a role only permissions that person
+ * holds. {@see Manifest\WorkspaceTemplateValidator} checks the shape (WHIT-1194).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.115.0';
+    public const VERSION = '1.116.0';
 
     /**
      * Static identity only — never instantiated.

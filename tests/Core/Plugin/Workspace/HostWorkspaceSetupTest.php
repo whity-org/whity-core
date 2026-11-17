@@ -80,6 +80,20 @@ final class HostWorkspaceSetupTest extends TestCase
         $this->assertSame([], $this->seen);
     }
 
+    public function testRolesAreForCoreTemplatesOnlyAndStillNeedThePermission(): void
+    {
+        $this->router->register('POST', '/api/roles', static fn (): Response => Response::json(['data' => ['id' => 9]], 201), null, null, 'roles:write');
+        TenantContext::setTenantId(5);
+        AuditContext::set(4, null);
+
+        $this->assertSame(403, $this->service()->call('POST', '/api/roles', ['name' => 'Counter'])['status'], 'A plugin never makes roles');
+        $this->assertSame(403, $this->service()->forTemplates()->call('POST', '/api/roles', ['name' => 'Counter'])['status'], 'The person lacks roles:write');
+
+        $this->granted[] = 'roles:write';
+        $this->assertSame(201, $this->service()->forTemplates()->call('POST', '/api/roles', ['name' => 'Counter'])['status']);
+        $this->assertFalse(HostWorkspaceSetup::allowed('POST', '/api/roles'));
+    }
+
     private function service(): HostWorkspaceSetup
     {
         $roles = $this->createStub(RoleChecker::class);

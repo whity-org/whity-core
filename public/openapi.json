@@ -75928,6 +75928,276 @@
                 ]
             }
         },
+        "/api/v1/workspace/templates": {
+            "get": {
+                "operationId": "get_api_v1_workspace_templates",
+                "summary": "List the workspace templates on offer",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Core's Blank and the templates of the plugins on in this workspace, in the caller's language: what each sets up, whether it has examples and a guided setup, the paid plugin it offers with its trial, and which ones this workspace chose.",
+                "responses": {
+                    "200": {
+                        "description": "The templates",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspaceTemplateListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/workspace/templates/examples": {
+            "delete": {
+                "operationId": "delete_api_v1_workspace_templates_examples",
+                "summary": "Remove the example contacts and bookings a template added",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Cancels the example bookings and archives the example contacts still in the workspace, as the caller. Nothing else is touched.",
+                "responses": {
+                    "200": {
+                        "description": "How many were removed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RemoveWorkspaceTemplateExamplesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/workspace/templates/{key}/apply": {
+            "post": {
+                "operationId": "post_api_v1_workspace_templates_key_apply",
+                "summary": "Apply a workspace template as the caller",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Sets the workspace up through core's own routes with the caller's permissions, adding only what is missing and never overwriting what the workspace changed. Each part that could not be done is listed with why. Free; the plugin it offers starts only through its own trial.",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "description": "The template's key (bakery)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApplyWorkspaceTemplateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "What was made and what was skipped",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApplyWorkspaceTemplateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "There is no such template",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/workspaces": {
             "post": {
                 "operationId": "post_api_v1_workspaces",
@@ -77882,6 +78152,65 @@
                         },
                         "required": [
                             "revokedCredentials"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "ApplyWorkspaceTemplateRequest": {
+                "type": "object",
+                "properties": {
+                    "examples": {
+                        "type": "boolean",
+                        "description": "Add the template's example contacts and bookings. Default true."
+                    }
+                }
+            },
+            "ApplyWorkspaceTemplateResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "template": {
+                                "type": "string"
+                            },
+                            "made": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "integer"
+                                },
+                                "description": "How many of each part were made"
+                            },
+                            "skipped": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "part": {
+                                            "type": "string"
+                                        },
+                                        "key": {
+                                            "type": "string"
+                                        },
+                                        "reason": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "part",
+                                        "key",
+                                        "reason"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "template",
+                            "made",
+                            "skipped"
                         ]
                     }
                 },
@@ -101128,6 +101457,29 @@
                     "data"
                 ]
             },
+            "RemoveWorkspaceTemplateExamplesResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "removed": {
+                                "type": "integer"
+                            },
+                            "failed": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "removed",
+                            "failed"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "ResolvedDocumentTheme": {
                 "type": "object",
                 "properties": {
@@ -109580,6 +109932,152 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "WorkspaceTemplateCard": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string"
+                    },
+                    "plugin": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The plugin that offers it; null for core's Blank"
+                    },
+                    "version": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "summary": {
+                        "type": "string"
+                    },
+                    "icon": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "setsUp": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "hasExamples": {
+                        "type": "boolean"
+                    },
+                    "hasSetup": {
+                        "type": "boolean"
+                    },
+                    "offer": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/WorkspaceTemplateOffer"
+                            }
+                        ]
+                    },
+                    "chosen": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "key",
+                    "version",
+                    "name",
+                    "summary",
+                    "setsUp",
+                    "hasExamples",
+                    "hasSetup",
+                    "chosen"
+                ]
+            },
+            "WorkspaceTemplateListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "templates": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/WorkspaceTemplateCard"
+                                }
+                            },
+                            "chosen": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Keys of the templates this workspace applied"
+                            },
+                            "examples": {
+                                "type": "integer",
+                                "description": "Example contacts and bookings still in the workspace"
+                            }
+                        },
+                        "required": [
+                            "templates",
+                            "chosen",
+                            "examples"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "WorkspaceTemplateOffer": {
+                "type": "object",
+                "properties": {
+                    "plugin": {
+                        "type": "string"
+                    },
+                    "free": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "What the workspace can do free in Whity"
+                    },
+                    "paid": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "What the plugin adds"
+                    },
+                    "trialDays": {
+                        "type": "integer"
+                    },
+                    "trialAvailable": {
+                        "type": "boolean"
+                    },
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "on",
+                            "read_only",
+                            "off"
+                        ]
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "trialEndsAt": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "plugin",
+                    "free",
+                    "paid",
+                    "trialDays",
+                    "trialAvailable",
+                    "state"
                 ]
             }
         },
