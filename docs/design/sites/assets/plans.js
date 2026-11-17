@@ -13,12 +13,12 @@
 
   var T = {
     en: { month: 'a month', people: function (n) { return 'Up to ' + num(n) + ' people'; }, customers: function (n) { return num(n) + ' customers a month'; } },
-    ar: { month: 'شهرياً', people: function (n) { return 'حتى ' + num(n) + ' ' + arCount(n, 'شخص', 'أشخاص', 'شخصاً'); }, customers: function (n) { return num(n) + ' ' + arCount(n, 'عميل', 'عملاء', 'عميلاً') + ' شهرياً'; } }
+    ar: { month: 'شهرياً', people: function (n) { return 'حتى ' + (n === 2 ? 'شخصين' : num(n) + ' ' + arCount(n, 'شخص', 'أشخاص', 'شخصاً')); }, customers: function (n) { return num(n) + ' ' + arCount(n, 'عميل', 'عملاء', 'عميلاً') + ' شهرياً'; } }
   };
 
   // Western digits in every language (brand rule).
   function num(n) { return Number(n).toLocaleString('en-US'); }
-  // Arabic counted nouns: 3–10 take the plural, 11–99 the accusative singular, hundreds and thousands the singular.
+  // Arabic counted nouns: 2 is the dual on its own ("حتى شخصين"), 3–10 take the plural, 11–99 the accusative singular, hundreds and thousands the singular.
   function arCount(n, one, few, many) {
     var r = n % 100;
     if (n >= 3 && r >= 3 && r <= 10) return few;

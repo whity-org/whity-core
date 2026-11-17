@@ -20,7 +20,7 @@ The public Whity sites, redesigned on the 3.x brand (WS.1–WS.3, 8 November 202
 4. **Agents** (WS.8, LT.2): one proposal visitors try themselves (Approve sets it down, Undo plays it back) beside the three steps, which light up as it goes; then "Agents never".
 5. **Works locally** (WS.9, WS.17): "Local where it matters": Arabic and English in both directions, your tax system's e-invoicing (Jordan's JoFotara first), local payments, cards and cash (like CliQ in Jordan), WhatsApp, and your currency to the right decimals, each with a small animation, beside a receipt visitors switch between English and Arabic.
 6. **Your name on it:** the white-label promise, with the brand animation (the workspace's sheet sets down on Whity's platform) and "Try a colour" buttons that recolour it.
-7. **Plans** (BM.3–BM.5): Free (5 people, 500 customers a month, $0), Team (25, 5,000) and Business (100, 25,000) at `[currency] [price]` (the currency comes from the backend; the built-in copy says USD); a line on dedicated hosting, your own server and reselling (BM.2, BM.10); then the four promises (BM.11).
+7. **Plans** (BM.3–BM.5): Free (2 people, 100 customers a month, $0), Team (25, 5,000) and Business (100, 25,000) at `[currency] [price]` (the currency comes from the backend; the built-in copy says USD); a line on dedicated hosting, your own server and reselling (BM.2, BM.10); then the four promises (BM.11).
 8. **For builders** (WS.11): a terminal that types the real install commands (from whity.dev/install) with Copy and Play again; open source (AGPL core, MIT SDK), build apps and agents can run it (MCP), each with a small animation; and one line for agencies linking to a partners page. Install takes three commands today; a single-line installer would make this section stronger.
 9. **Questions** (WS.12): eight straight answers, always open, then "Book 30 minutes with the team". **Final call:** on its own sheet on the plane, with four ticks. **Footer:** every Whity site, live status from `health.whity.dev/status` (`{"status": "ok" | "degraded" | "down"}`; a plain link if it doesn't answer in 3 seconds), the four promises and Back to top.
 
@@ -147,7 +147,7 @@ One page per main module at `whity.dev/money`, `/stock`, `/approvals` and `/docu
 3. **Agents:** two dashed proposals an agent would prepare in this module, with Decline and Approve.
 4. **Works with:** the other three modules.
 5. **Questions:** three plain answers, including the awkward ones (signatures and the law, the tax system being down).
-6. **Final call:** "Free for up to 5 people", then the footer.
+6. **Final call:** "Free for up to 2 people", then the footer.
 
 Screens are drawn in HTML and CSS, not images, so they stay sharp, translate and follow the theme. Pages for tasks, chat, appointments and customising come later, from the same template.
 

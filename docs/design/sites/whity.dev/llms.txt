@@ -1,6 +1,6 @@
 # Whity
 
-> Whity is an open-source, white-label platform a company's systems sit on: invoices and money, stock, approvals, documents, tasks, chat and appointments, with AI agents that propose work and wait for a person to approve. Arabic and English. Whity Core is AGPL-3.0 with a plugin exception; the plugin SDK is MIT. Whity Cloud is hosted in the EU and free for up to 5 people.
+> Whity is an open-source, white-label platform a company's systems sit on: invoices and money, stock, approvals, documents, tasks, chat and appointments, with AI agents that propose work and wait for a person to approve. Arabic and English. Whity Core is AGPL-3.0 with a plugin exception; the plugin SDK is MIT. Whity Cloud is hosted in the EU and free for up to 2 people.
 
 ## For companies
 
