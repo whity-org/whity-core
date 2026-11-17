@@ -2915,7 +2915,23 @@ $entitlementService->usePluginPacks(static fn (int $tenantId): array => $pluginL
 $invitationsHandler->useSeats(new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService));
 // WHIT-1129 (SDK 1.108): packs set a workspace up through core's own routes,
 // as the person acting there, limited to WorkspaceSetup::ROUTES.
-\Whity\register_service(\Whity\Sdk\Setup\WorkspaceSetup::class, new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker)); // @phpstan-ignore-line
+$hostWorkspaceSetup = new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker);
+\Whity\register_service(\Whity\Sdk\Setup\WorkspaceSetup::class, $hostWorkspaceSetup); // @phpstan-ignore-line
+// WHIT-1194 (SDK 1.116): workspace templates, applied as the person choosing
+// one, through the same gates plus the template-only routes (roles,
+// documents, removing examples).
+$templateRuns = new \Whity\Core\Workspace\Templates\TemplateRuns($db->getPdo());
+$workspaceTemplatesHandler = new \Whity\Api\WorkspaceTemplatesApiHandler(
+    new \Whity\Core\Workspace\Templates\TemplateCatalogue($pluginLoader),
+    $templateRuns,
+    static fn (): \Whity\Core\Workspace\Templates\TemplateApplier => new \Whity\Core\Workspace\Templates\TemplateApplier($hostWorkspaceSetup->forTemplates(), $templateRuns, static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId)),
+    $codePluginActivation,
+    $auditLogger,
+    static fn (): string => $serverLabels->languageCode(),
+);
+$router->register('GET', '/api/workspace/templates', [$workspaceTemplatesHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', [$workspaceTemplatesHandler, 'apply'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('DELETE', '/api/workspace/templates/examples', [$workspaceTemplatesHandler, 'removeExamples'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 // EM.1: workspace emails carry the workspace's brand, and white-label by plan.
 $brandedEmailSender->useBranding(new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService));
 $tenantEntitlementsHandler = new \Whity\Api\TenantEntitlementsApiHandler(
@@ -5596,6 +5612,12 @@ $displayPreferencesHandler = new \Whity\Api\DisplayPreferencesApiHandler($tokenV
 $router->register('GET', '/api/me/display-preferences', [$displayPreferencesHandler, 'get'], null);
 $router->register('PUT', '/api/me/display-preferences', [$displayPreferencesHandler, 'update'], null);
 
+// WHIT-1181: a person's own phone number, E.164 on their profile. Self-scoped,
+// session-gated, no RBAC permission, no current password.
+$myPhoneHandler = new \Whity\Api\MyPhoneApiHandler($tokenValidator, new \Whity\Core\Identity\PersonalPhone($db->getPdo()));
+$router->register('GET', '/api/me/phone', [$myPhoneHandler, 'get'], null);
+$router->register('PUT', '/api/me/phone', [$myPhoneHandler, 'update'], null);
+
 // Per-tenant notification SENDER configuration (WC-notifications, d70c6083). A
 // tenant admin manages their OWN tenant's per-channel sender (from/reply-to,
 // transport, encrypted creds). settings:manage gated; creds are write-only.
@@ -5708,9 +5730,16 @@ $publicBookingHandler = new \Whity\Api\PublicBookingApiHandler(
     $publicFormBotCheck,
     new DatabaseSharedStore($db->getPdo()),
     $brandingService,
+    // WHIT-1179: the signed-in visitor's own name and email, from their
+    // session cookie and profile only.
+    new \Whity\Core\Calendar\BookingVisitor(
+        static fn (): ?array => $tokenValidator->validateAccessToken(),
+        $db->getPdo(),
+    ),
 );
 $router->register('GET',  '/api/public/booking/{workspace}',                       [$publicBookingHandler, 'page'],        null);
 $router->register('GET',  '/api/public/booking/{workspace}/slots',                 [$publicBookingHandler, 'slots'],       null);
+$router->register('GET',  '/api/public/booking/{workspace}/me',                    [$publicBookingHandler, 'visitor'],     null);
 $router->register('POST', '/api/public/booking/{workspace}/bookings',              [$publicBookingHandler, 'book'],        null);
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}',             [$publicBookingHandler, 'showBooking'], null);
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/slots',       [$publicBookingHandler, 'manageSlots'], null);
@@ -5734,6 +5763,7 @@ $router->register('POST',   '/api/branding/assets/{key}',           [$brandingHa
 $router->register('DELETE', '/api/branding/assets/{key}',           [$brandingHandler, 'clearTenant'],   null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('POST',   '/api/branding/global/assets/{key}',    [$brandingHandler, 'uploadGlobal'],  null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('DELETE', '/api/branding/global/assets/{key}',    [$brandingHandler, 'clearGlobal'],   null, null, CorePermissions::SETTINGS_MANAGE);
+$router->register('GET',    '/api/branding/host',                   [$brandingHandler, 'getBrandingHost'], null, null, CorePermissions::SETTINGS_READ);
 $router->register('PUT',    '/api/tenants/{id}/branding-host',      [$brandingHandler, 'setBrandingHost'], null, null, CorePermissions::SETTINGS_MANAGE);
 
 // WHIT-915: workspace-controlled customer sign-up. Platform sign-up
@@ -6124,6 +6154,8 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     $signingChallengeRepository,
     // WHIT-1168: accept an invitation by signing in with the identity provider.
     $invitationService,
+    // WHIT-1181: a verified phone_number fills the person's own phone.
+    new \Whity\Core\Identity\PersonalPhone($db->getPdo()),
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).
@@ -6153,6 +6185,29 @@ $workspacesHandler = new \Whity\Api\WorkspacesApiHandler(
 );
 $router->register('GET', '/api/workspaces/new', [$workspacesHandler, 'state'], null);
 $router->register('POST', '/api/workspaces', [$workspacesHandler, 'create'], null);
+// WHIT-1170: owners, and offers to hand a workspace over or co-own it. The
+// workspace routes act in the caller's current workspace (owners act, staff
+// read); the /me routes are the person offered, from any workspace. Making and
+// accepting an offer go through "Confirm it's you" (GatedApproval).
+$workspaceOwnersHandler = new \Whity\Api\WorkspaceOwnersApiHandler(
+    new \Whity\Core\Tenant\WorkspaceOwnership(
+        $db->getPdo(),
+        $auditLogger,
+        $hookManager,
+        new \Whity\Core\Tenant\OwnershipNotifier($notificationDispatcher, $brandedEmailSender, $profileEmailRepository, $frontendUrls->base()),
+    ),
+    $tokenValidator,
+    $gatedApproval,
+);
+$router->register('GET',    '/api/workspace/owners',                         [$workspaceOwnersHandler, 'list'], null);
+$router->register('POST',   '/api/workspace/owners/offers/identity-check',   [$workspaceOwnersHandler, 'offerIdentityCheck'], null);
+$router->register('POST',   '/api/workspace/owners/offers',                  [$workspaceOwnersHandler, 'offer'], null);
+$router->register('DELETE', '/api/workspace/owners/offers/{id:\d+}',         [$workspaceOwnersHandler, 'cancel'], null);
+$router->register('GET',    '/api/me/ownership-offers',                      [$workspaceOwnersHandler, 'mine'], null);
+$router->register('GET',    '/api/me/ownership-offers/{id:\d+}',             [$workspaceOwnersHandler, 'showMine'], null);
+$router->register('POST',   '/api/me/ownership-offers/{id:\d+}/identity-check', [$workspaceOwnersHandler, 'acceptIdentityCheck'], null);
+$router->register('POST',   '/api/me/ownership-offers/{id:\d+}/accept',      [$workspaceOwnersHandler, 'accept'], null);
+$router->register('POST',   '/api/me/ownership-offers/{id:\d+}/decline',     [$workspaceOwnersHandler, 'decline'], null);
 
 // 13g. Authenticated "connected accounts" management (WC-f3b17bd2): the caller
 // lists / unlinks their own federated identities. Self-authenticating via the

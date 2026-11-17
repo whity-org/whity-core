@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.115).
+ * SDK identity (v1.116).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1331,6 +1331,13 @@ namespace Whity\Sdk;
  *
  * Purely additive.)
  *
+ * 1.112 (WORKSPACE OWNERS: {@see Hooks\Events::WORKSPACE_OWNER_ADDED},
+ * {@see Hooks\Events::WORKSPACE_OWNER_REMOVED} and
+ * {@see Hooks\Events::WORKSPACE_OWNERSHIP_TRANSFERRED}, when a workspace changes hands or gains
+ * or loses a co-owner (WHIT-1170).
+ *
+ * Purely additive.)
+ *
  * 1.113 (SETUP INPUTS: block forms gain `timeInput` (HH:MM), `weeklyHours` (a week of opening or
  * working hours, open/closed per day, breaks, copy to every day, submitted as the calendar's
  * `{weekday, start_time, end_time}` rows) and `checkboxGroup` (several choices, submitted as a
@@ -1356,12 +1363,22 @@ namespace Whity\Sdk;
  * (WHIT-1177).
  *
  * Purely additive.)
+ *
+ * 1.116 (WORKSPACE TEMPLATES: {@see PluginWorkspaceTemplatesInterface} lets a plugin offer ready
+ * starts for one kind of business, shown right after a workspace is created. A template is a
+ * versioned manifest, data only: workspace defaults, booking rules and hours, services with prices
+ * per currency, roles, forms, documents, example contacts and bookings (removed in one click), the
+ * steps of its guided setup, and the paid plugin it offers with a trial. Core applies it as the
+ * person choosing it, adding only what is missing, and grants a role only permissions that person
+ * holds. {@see Manifest\WorkspaceTemplateValidator} checks the shape (WHIT-1194).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.115.0';
+    public const VERSION = '1.116.0';
 
     /**
      * Static identity only — never instantiated.

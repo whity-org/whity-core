@@ -5,6 +5,8 @@
  *   go, fetches the free times again, and keeps what the customer typed.
  * - The spam fields: the hidden `website` field is sent empty, and
  *   `elapsed_ms` is the time since the page loaded.
+ * - Signed in to Whity (WHIT-1179): the name and email come from the
+ *   person's own account, stay editable, and what they send is booked.
  */
 
 import React from 'react';
@@ -270,5 +272,89 @@ describe('PublicBookingScreen', () => {
     render(<PublicBookingScreen workspace="example-bakery" />);
     fireEvent.click(await screen.findByRole('radio', { name: /Cake tasting/ }));
     expect(screen.queryByTestId('book-add-service')).toBeNull();
+  });
+
+  describe('signed in to Whity (WHIT-1179)', () => {
+    const me = { name: 'Ahmad Khalil', email: 'ahmad@example.com', phone: null };
+
+    function serve(visitor: unknown, data = page, posted: Record<string, unknown>[] = [], seen: RequestInit[] = []) {
+      fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+        if (url === '/api/v1/public/booking/example-bakery') return respond(200, { data });
+        if (url === '/api/v1/public/booking/example-bakery/me') {
+          seen.push(init ?? {});
+          return respond(200, { data: visitor });
+        }
+        if (url.startsWith('/api/v1/public/booking/example-bakery/slots')) return respond(200, { data: slots });
+        if (init?.method === 'POST') {
+          posted.push(JSON.parse(String(init.body)));
+          return respond(201, { data: booked });
+        }
+        return respond(404, {});
+      });
+    }
+
+    it('fills their own phone too when their account has one (WHIT-1181)', async () => {
+      serve({ ...me, phone: '+962791234567' });
+      render(<PublicBookingScreen workspace="example-bakery" />);
+      fireEvent.click(await screen.findByRole('radio', { name: /Cake tasting/ }));
+      fireEvent.click(await screen.findByRole('button', { name: '09:00' }));
+      await waitFor(() => expect(screen.getByLabelText('Phone (optional)')).toHaveValue('+962791234567'));
+      expect(screen.getByLabelText('Your name')).toHaveValue('Ahmad Khalil');
+    });
+
+    it('fills the name and email from their own account, never cached, and says so', async () => {
+      const seen: RequestInit[] = [];
+      serve(me, page, [], seen);
+      render(<PublicBookingScreen workspace="example-bakery" />);
+      fireEvent.click(await screen.findByRole('radio', { name: /Cake tasting/ }));
+      fireEvent.click(await screen.findByRole('button', { name: '09:00' }));
+
+      await waitFor(() => expect(screen.getByLabelText('Your name')).toHaveValue('Ahmad Khalil'));
+      expect(screen.getByLabelText('Email')).toHaveValue('ahmad@example.com');
+      expect(screen.getByLabelText('Phone (optional)')).toHaveValue('');
+      expect(screen.getByTestId('book-prefilled')).toHaveTextContent('Filled in from your Whity account. You can change it.');
+      expect(seen[0]).toMatchObject({ cache: 'no-store', credentials: 'same-origin' });
+    });
+
+    it('books several services with what they changed, not what was filled', async () => {
+      const salon = {
+        ...page,
+        settings: { ...page.settings, multi_service_booking: true },
+        services: [
+          ...page.services,
+          { id: 2, name: { en: 'Icing class', ar: 'درس التزيين' }, description: [], duration_minutes: 60, price_minor: 20000, currency: 'JOD', staff_profile_ids: [3] },
+        ],
+      };
+      const posted: Record<string, unknown>[] = [];
+      serve(me, salon, posted);
+      render(<PublicBookingScreen workspace="example-bakery" />);
+      fireEvent.click(await screen.findByRole('radio', { name: /Cake tasting/ }));
+      fireEvent.click(screen.getByTestId('book-add-service'));
+      await userEvent.click(screen.getByRole('combobox', { name: 'Then' }));
+      await userEvent.click(await screen.findByRole('option', { name: /Icing class/ }));
+      fireEvent.click(await screen.findByRole('button', { name: '09:00' }));
+
+      await waitFor(() => expect(screen.getByLabelText('Your name')).toHaveValue('Ahmad Khalil'));
+      fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Ahmad K.' } });
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ahmad.k@example.com' } });
+      fireEvent.change(screen.getByLabelText('Phone (optional)'), { target: { value: '+962 79 555 0142' } });
+      clock = 9_000;
+      fireEvent.click(screen.getByTestId('book-submit'));
+
+      await waitFor(() => expect(posted).toHaveLength(1));
+      expect(posted[0]).toMatchObject({ name: 'Ahmad K.', email: 'ahmad.k@example.com', phone: '+962 79 555 0142' });
+      expect(posted[0].services).toEqual([{ service_id: 1 }, { service_id: 2 }]);
+    });
+
+    it('fills nothing and says nothing for a signed-out visitor', async () => {
+      serve(null);
+      render(<PublicBookingScreen workspace="example-bakery" />);
+      fireEvent.click(await screen.findByRole('radio', { name: /Cake tasting/ }));
+      fireEvent.click(await screen.findByRole('button', { name: '09:00' }));
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/v1/public/booking/example-bakery/me', expect.anything()));
+      expect(screen.getByLabelText('Your name')).toHaveValue('');
+      expect(screen.getByLabelText('Email')).toHaveValue('');
+      expect(screen.queryByTestId('book-prefilled')).toBeNull();
+    });
   });
 });

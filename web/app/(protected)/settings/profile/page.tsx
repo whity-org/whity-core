@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { useTranslation } from '@whity/features/i18n';
 import { EmailAddressesSettings } from '@/components/EmailAddressesSettings';
 import { MySettingsHeader } from '@/components/settings/scope';
+import { MyPhoneSettings } from '@/components/settings/my-phone-settings';
 import { ProfileForm } from '../profile-form';
 
 export default function ProfileSettingsPage() {
@@ -24,6 +25,17 @@ export default function ProfileSettingsPage() {
         </CardHeader>
         <CardContent>
           <ProfileForm />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('settings.phone.title', 'Phone number')}</CardTitle>
+          <CardDescription>
+            {t('settings.phone.description', 'Your own number, on your account in every workspace')}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <MyPhoneSettings />
         </CardContent>
       </Card>
       <Card>

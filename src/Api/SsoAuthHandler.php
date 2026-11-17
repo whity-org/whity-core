@@ -111,6 +111,9 @@ final class SsoAuthHandler
         // WHIT-1168: accepting an invitation by signing in, for servers that
         // sign people in only through their identity provider.
         private readonly ?\Whity\Core\Identity\InvitationService $invitations = null,
+        // WHIT-1181: a verified phone_number from the operator's provider fills
+        // the person's own phone, never one they set themselves.
+        private readonly ?\Whity\Core\Identity\PersonalPhone $phones = null,
     ) {
     }
 
@@ -531,6 +534,17 @@ final class SsoAuthHandler
         $profileId = $resolution['profile_id'] ?? null;
         if ($profileId === null) {
             return $joinTenantId !== null ? $this->joinOutcome($joinSlug, 'failed') : $this->fail('failed');
+        }
+
+        // WHIT-1181: only a global-trust (operator) provider speaks for the
+        // person's own account; a workspace's own provider never writes to a
+        // detail every other workspace sees. A failure here never blocks sign-in.
+        if ($this->phones !== null && $ctx->isGlobalTrust()) {
+            try {
+                $this->phones->fillFromSignIn($profileId, $identity->claims);
+            } catch (\Throwable $e) {
+                error_log('[SsoAuthHandler] phone from sign-in: ' . $e->getMessage());
+            }
         }
 
         if ($joinTenantId !== null) {

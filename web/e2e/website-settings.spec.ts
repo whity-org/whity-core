@@ -8,8 +8,11 @@ import { LoginPage, chooseOption } from './support/pages';
  * overrides), driven against the full live stack.
  *
  * Scenarios:
- *  1. ADMIN edits the tenant site_name + timezone, saves, and the values
+ *  1. ADMIN edits the tenant support email + timezone, saves, and the values
  *     persist across a reload (effective settings reflect the override).
+ *     General holds support email, timezone and main language
+ *     (TplSettingsGeneral); the product name moved to Branding
+ *     (TplAdminBranding, WHIT-1187), so it must not be on General.
  *  2. A settings:read-ONLY delegate sees the tenant form as read-only and the
  *     Global defaults section is absent (settings:manage is required for it).
  *
@@ -49,12 +52,19 @@ test.describe('Website Settings — admin (settings:read/write/manage)', () => {
   test('edits a tenant setting, saves, and it persists across reload', async ({ page }) => {
     await openWebsiteSettings(page);
 
-    const newName = `E2E Site ${uniqueSuffix()}`;
+    const newEmail = `e2e-support-${uniqueSuffix()}@example.com`;
     const newTz = 'Europe/Berlin';
 
-    const siteName = page.getByLabel('Site name', { exact: true });
-    await expect(siteName).toBeEnabled();
-    await siteName.fill(newName);
+    // The product name is on Branding now, not General.
+    await expect(page.getByLabel('Site name', { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel('Main language', { exact: true })).toBeEnabled();
+    // Owners and admins (tenants:write) rename their workspace here (WHIT-1189).
+    // Not renamed in this spec: other specs look the shared workspace up by name.
+    await expect(page.getByLabel('Workspace name', { exact: true })).toBeEditable();
+
+    const supportEmail = page.getByLabel('Support email', { exact: true });
+    await expect(supportEmail).toBeEnabled();
+    await supportEmail.fill(newEmail);
 
     await chooseOption(page, page.getByLabel('Timezone', { exact: true }), newTz);
 
@@ -71,7 +81,7 @@ test.describe('Website Settings — admin (settings:read/write/manage)', () => {
     // Reload — the override is reflected in the effective settings.
     await page.reload();
     await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
-    await expect(page.getByLabel('Site name', { exact: true })).toHaveValue(newName);
+    await expect(page.getByLabel('Support email', { exact: true })).toHaveValue(newEmail);
     await expect(page.getByLabel('Timezone', { exact: true })).toHaveText(newTz);
   });
 
@@ -129,8 +139,11 @@ test.describe('Website Settings — read-only delegate (settings:read only)', ()
 
     // The form renders (settings:read) but every field is disabled, and no
     // tenant save control is offered.
-    await expect(page.getByLabel('Site name', { exact: true })).toBeDisabled();
+    await expect(page.getByLabel('Support email', { exact: true })).toBeDisabled();
     await expect(page.getByLabel('Timezone', { exact: true })).toBeDisabled();
+    await expect(page.getByLabel('Main language', { exact: true })).toBeDisabled();
+    // Renaming the workspace takes tenants:write, which a settings:read delegate lacks.
+    await expect(page.getByLabel('Workspace name', { exact: true })).toHaveCount(0);
     await expect(
       page.getByRole('button', { name: 'Save tenant settings' })
     ).toHaveCount(0);

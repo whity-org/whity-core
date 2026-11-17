@@ -164,6 +164,8 @@ final class TenantOwnedTables
         'stored_files' => '298_create_stored_files.php',
         // Who owns each workspace (WHIT-1169).
         'workspace_owners' => '300_create_workspace_owners.php',
+        // Offers to hand a workspace over or co-own it (WHIT-1170).
+        'workspace_ownership_offers' => '301_create_workspace_ownership_offers.php',
         // Votes in chat polls (UC.5).
         'chat_poll_votes' => '280_create_chat_poll_votes.php',
         // Bots and blocked senders (UC.4, UC.12).
@@ -266,6 +268,10 @@ final class TenantOwnedTables
         // WHIT-1177: how a person arranged their dashboard, per workspace
         // (migration 303; it replaced home_card_hidden).
         'dashboard_layout' => '303_create_dashboard_layout.php',
+        // WHIT-1194: the template a workspace started from and what applying
+        // it made, examples marked (migration 305).
+        'workspace_template_runs' => '305_create_workspace_templates.php',
+        'workspace_template_items' => '305_create_workspace_templates.php',
         // WHIT-838: a plugin's secrets, per workspace (migration 187).
         'plugin_secrets' => '187_create_plugin_secrets.php',
 

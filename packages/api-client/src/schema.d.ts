@@ -1291,6 +1291,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/branding/host": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read your own workspace's custom web address
+         * @description Scoped by the session: a workspace reads only its own address. Setting one is PUT /api/tenants/{id}/branding-host, system tenant only.
+         */
+        get: operations["get_api_v1_branding_host"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/availability": {
         parameters: {
             query?: never;
@@ -6650,6 +6670,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/ownership-offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Open offers of ownership made to me, in any workspace */
+        get: operations["get_api_v1_me_ownership_offers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/ownership-offers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One offer made to me */
+        get: operations["get_api_v1_me_ownership_offers_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/ownership-offers/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept an offer: become an owner (on a hand-over the giver stops being one) */
+        post: operations["post_api_v1_me_ownership_offers_id_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/ownership-offers/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline an offer */
+        post: operations["post_api_v1_me_ownership_offers_id_decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/ownership-offers/{id}/identity-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start "confirm it is you" before accepting an offer */
+        post: operations["post_api_v1_me_ownership_offers_id_identity_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/permitted-actions": {
         parameters: {
             query?: never;
@@ -6661,6 +6766,27 @@ export interface paths {
         put?: never;
         /** Resolve which of a batch of requests the caller is permitted to make */
         post: operations["post_api_v1_me_permitted_actions"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/phone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your own phone number (WHIT-1181) */
+        get: operations["get_api_v1_me_phone"];
+        /**
+         * Set or remove your own phone number (WHIT-1181)
+         * @description Stored as E.164 on your profile, across every workspace. A number you set here is never replaced by one from a sign-in.
+         */
+        put: operations["put_api_v1_me_phone"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -8533,6 +8659,26 @@ export interface paths {
          * @description Protected by per-IP and per-workspace limits, a hidden field, a minimum time on the page, a cap of three open bookings per email, and the instance's bot check when set up. The answer carries `manage_token` for the manage page; the same link is emailed.
          */
         post: operations["post_api_v1_public_booking_workspace_bookings"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/booking/{workspace}/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The name and email of the signed-in visitor, to fill the booking form (public)
+         * @description Reads only the session and profile of the visitor, never the contacts of this workspace or the data of another. `data` is null when nobody is signed in. Sent `Cache-Control: private, no-store`.
+         */
+        get: operations["get_api_v1_public_booking_workspace_me"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -11109,6 +11255,134 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspace/owners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Who owns this workspace; for owners, the open offers and who could be offered */
+        get: operations["get_api_v1_workspace_owners"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/owners/offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Offer ownership (hand over) or co-ownership to a member; they accept within 7 days */
+        post: operations["post_api_v1_workspace_owners_offers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/owners/offers/identity-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start "confirm it is you" before offering ownership or co-ownership */
+        post: operations["post_api_v1_workspace_owners_offers_identity_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/owners/offers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Withdraw an open offer */
+        delete: operations["delete_api_v1_workspace_owners_offers_id"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the workspace templates on offer
+         * @description Core's Blank and the templates of the plugins on in this workspace, in the caller's language: what each sets up, whether it has examples and a guided setup, the paid plugin it offers with its trial, and which ones this workspace chose.
+         */
+        get: operations["get_api_v1_workspace_templates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/templates/examples": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove the example contacts and bookings a template added
+         * @description Cancels the example bookings and archives the example contacts still in the workspace, as the caller. Nothing else is touched.
+         */
+        delete: operations["delete_api_v1_workspace_templates_examples"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/templates/{key}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply a workspace template as the caller
+         * @description Sets the workspace up through core's own routes with the caller's permissions, adding only what is missing and never overwriting what the workspace changed. Each part that could not be done is listed with why. Free; the plugin it offers starts only through its own trial.
+         */
+        post: operations["post_api_v1_workspace_templates_key_apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces": {
         parameters: {
             query?: never;
@@ -11633,6 +11907,24 @@ export interface components {
                 revokedCredentials: number;
             };
         };
+        ApplyWorkspaceTemplateRequest: {
+            /** @description Add the template's example contacts and bookings. Default true. */
+            examples?: boolean;
+        };
+        ApplyWorkspaceTemplateResponse: {
+            data: {
+                template: string;
+                /** @description How many of each part were made */
+                made: {
+                    [key: string]: number;
+                };
+                skipped: {
+                    part: string;
+                    key: string;
+                    reason: string;
+                }[];
+            };
+        };
         ApprovalStatusResponse: {
             data: {
                 id: number;
@@ -11865,6 +12157,14 @@ export interface components {
             builtOnWhity?: boolean;
             /** @description The workspace currency as an ISO 4217 code (billing.default_currency; USD by default). Amounts with a currency of their own show in that one. */
             currency?: string;
+        };
+        BrandingHostReadResponse: {
+            data: {
+                /** @description The workspace's own web address, or null when none is set. */
+                branding_host: string | null;
+                /** @description Whether the workspace's plan includes its own web address (WHIT-932). Absent for the system tenant. */
+                included_in_plan?: boolean;
+            };
         };
         BrandingHostRequest: {
             host?: string | null;
@@ -16341,6 +16641,8 @@ export interface components {
             user?: {
                 id: number;
                 email: string;
+                /** @description Your own phone number in E.164, or null (WHIT-1181). */
+                phone?: string | null;
                 role: string;
                 tenant_id: number;
             } | null;
@@ -16465,6 +16767,8 @@ export interface components {
             user: {
                 id: number;
                 email: string;
+                /** @description Your own phone number in E.164, or null (WHIT-1181). */
+                phone?: string | null;
                 role: string;
                 tenant_id: number;
             };
@@ -16996,6 +17300,16 @@ export interface components {
                 message?: components["schemas"]["CustomerMessage"];
             } | null;
         };
+        MyPhoneRequest: {
+            /** @description With its country code; spaces, dashes and Arabic-Indic digits are accepted and stored as E.164. Null or empty removes it. */
+            phone: string | null;
+        };
+        MyPhoneResponse: {
+            data: {
+                /** @description E.164, such as +962791234567, or null when none is set. */
+                phone: string | null;
+            };
+        };
         NavigationItem: {
             id: string;
             label: string;
@@ -17230,6 +17544,46 @@ export interface components {
             ou_type_id?: number | null;
             /** @description New kind of unit, by stable key. An explicit null removes the type. Send this or `ou_type_id`, not both. */
             type?: string | null;
+        };
+        OwnershipOffer: {
+            id: number;
+            tenant_id: number;
+            workspace_name: string;
+            /** @enum {string} */
+            kind: "transfer" | "co_owner";
+            from: {
+                profile_id: number;
+                name: string;
+            };
+            to: {
+                profile_id: number;
+                name: string;
+            };
+            leave_after: boolean;
+            /** @enum {string} */
+            status: "open" | "accepted" | "declined" | "cancelled" | "expired" | "void";
+            expires_at: string;
+            created_at: string;
+        };
+        OwnershipOfferCheckRequest: {
+            to_profile_id: number;
+            /** @enum {string} */
+            kind: "transfer" | "co_owner";
+        };
+        OwnershipOfferCreateRequest: {
+            to_profile_id: number;
+            /** @enum {string} */
+            kind: "transfer" | "co_owner";
+            /** @description Transfer only: the giver leaves the workspace once it is accepted */
+            leave_after?: boolean;
+            /** @description The code from "Confirm it is you"; empty after a fresh sign-in */
+            code: string;
+        };
+        OwnershipOfferListResponse: {
+            data: components["schemas"]["OwnershipOffer"][];
+        };
+        OwnershipOfferResponse: {
+            data: components["schemas"]["OwnershipOffer"];
         };
         Pagination: {
             page: number;
@@ -17836,6 +18190,15 @@ export interface components {
             /** @description The bot-check token, when the page shows one. */
             bot_token?: string;
         };
+        /** @description The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in. */
+        PublicBookingVisitor: {
+            /** @description The display name on their own profile; may be empty. */
+            name: string;
+            /** @description The email of their own sign-in; may be empty. */
+            email: string;
+            /** @description Their own phone in E.164, or null. */
+            phone: string | null;
+        } | null;
         PublicChatInfoResponse: {
             data: {
                 workspace_name: string;
@@ -18254,6 +18617,12 @@ export interface components {
         };
         RelationshipTypeListResponse: {
             data: components["schemas"]["RelationshipType"][];
+        };
+        RemoveWorkspaceTemplateExamplesResponse: {
+            data: {
+                removed: number;
+                failed: number;
+            };
         };
         ResolvedDocumentTheme: {
             /** @description The theme actually used, after falling back past any that isn't available */
@@ -18900,6 +19269,8 @@ export interface components {
             user: {
                 id: number;
                 email: string;
+                /** @description Your own phone number in E.164, or null (WHIT-1181). */
+                phone?: string | null;
                 role: string;
                 tenant_id: number;
             };
@@ -20530,6 +20901,23 @@ export interface components {
         WorkspaceOnboardingListResponse: {
             data: components["schemas"]["WorkspaceOnboarding"][];
         };
+        WorkspaceOwnersResponse: {
+            data: {
+                owners: {
+                    profile_id: number;
+                    name: string;
+                    email: string;
+                    since: string;
+                }[];
+                offers: components["schemas"]["OwnershipOffer"][];
+                candidates: {
+                    profile_id: number;
+                    name: string;
+                    email: string;
+                }[];
+                is_owner: boolean;
+            };
+        };
         WorkspacePlugin: {
             /** @description The name in lower case, used in routes */
             slug: string;
@@ -20595,6 +20983,42 @@ export interface components {
         };
         WorkspacePluginVersionResponse: {
             data: components["schemas"]["WorkspacePluginVersion"];
+        };
+        WorkspaceTemplateCard: {
+            key: string;
+            /** @description The plugin that offers it; null for core's Blank */
+            plugin?: string | null;
+            version: number;
+            name: string;
+            summary: string;
+            icon?: string | null;
+            setsUp: string[];
+            hasExamples: boolean;
+            hasSetup: boolean;
+            offer?: components["schemas"]["WorkspaceTemplateOffer"] | null;
+            chosen: boolean;
+        };
+        WorkspaceTemplateListResponse: {
+            data: {
+                templates: components["schemas"]["WorkspaceTemplateCard"][];
+                /** @description Keys of the templates this workspace applied */
+                chosen: string[];
+                /** @description Example contacts and bookings still in the workspace */
+                examples: number;
+            };
+        };
+        WorkspaceTemplateOffer: {
+            plugin: string;
+            /** @description What the workspace can do free in Whity */
+            free: string[];
+            /** @description What the plugin adds */
+            paid: string[];
+            trialDays: number;
+            trialAvailable: boolean;
+            /** @enum {string} */
+            state: "on" | "read_only" | "off";
+            reason?: string | null;
+            trialEndsAt?: string | null;
         };
     };
     responses: never;
@@ -26750,6 +27174,71 @@ export interface operations {
                 };
             };
             /** @description Unknown branding key */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_branding_host: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workspace's address, or null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandingHostReadResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -55570,6 +56059,408 @@ export interface operations {
             };
         };
     };
+    get_api_v1_me_ownership_offers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description My open offers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnershipOfferListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_ownership_offers_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the offer. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The offer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnershipOfferResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such offer made to you */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_ownership_offers_id_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the offer. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GatedApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description The accepted offer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnershipOfferResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The identity check failed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such offer made to you */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No longer open, or expired */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No longer an active member of that workspace */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_ownership_offers_id_decline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the offer. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Declined */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such offer made to you */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No longer open */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_me_ownership_offers_id_identity_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the offer. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The check to make */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityCheckResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such offer made to you */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No longer open */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many codes were sent lately */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Confirming it is you is not available */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_me_permitted_actions: {
         parameters: {
             query?: never;
@@ -55638,6 +56529,158 @@ export interface operations {
                 };
             };
             /** @description Missing 'checks' list, or more than 200 checks */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_phone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your phone */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPhoneResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_me_phone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MyPhoneRequest"];
+            };
+        };
+        responses: {
+            /** @description Your phone */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPhoneResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a phone number with its country code */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -65361,6 +66404,67 @@ export interface operations {
             };
             /** @description The bot check could not be reached */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_public_booking_workspace_me: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace slug. */
+                workspace: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The visitor, or null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicBookingVisitor"];
+                    };
+                };
+            };
+            /** @description This booking page is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -79961,6 +81065,585 @@ export interface operations {
                 };
             };
             /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_workspace_owners: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Owners, offers and candidates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceOwnersResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a staff member of this workspace */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The platform workspace has no owners */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_owners_offers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnershipOfferCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description The offer */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnershipOfferResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Only an owner can offer, or the identity check failed */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already an owner, or an offer is waiting */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not an active member, or the caller themselves */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Confirming it is you is not available */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_owners_offers_identity_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnershipOfferCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description The check to make */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IdentityCheckResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Only an owner can offer */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already an owner, or an offer is waiting */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not an active member, or the caller themselves */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many codes were sent lately */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Confirming it is you is not available */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_workspace_owners_offers_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description ID of the offer. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Withdrawn */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Only an owner can withdraw */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No longer open */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_workspace_templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The templates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceTemplateListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_workspace_templates_examples: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many were removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoveWorkspaceTemplateExamplesResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_templates_key_apply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The template's key (bakery) */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyWorkspaceTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description What was made and what was skipped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyWorkspaceTemplateResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description There is no such template */
             404: {
                 headers: {
                     [name: string]: unknown;

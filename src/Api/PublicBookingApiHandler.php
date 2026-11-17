@@ -10,6 +10,7 @@ use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Calendar\BookingRepository;
 use Whity\Core\Calendar\BookingService;
+use Whity\Core\Calendar\BookingVisitor;
 use Whity\Core\Calendar\CalendarFeed;
 use Whity\Core\Calendar\CalendarRejectedException;
 use Whity\Core\Calendar\CalendarRepository;
@@ -35,6 +36,7 @@ use Whity\Http\JsonBody;
  *
  *   GET  /api/v1/public/booking/{workspace}                 services, staff, settings
  *   GET  /api/v1/public/booking/{workspace}/slots           free times
+ *   GET  /api/v1/public/booking/{workspace}/me              the visitor's own name and email
  *   POST /api/v1/public/booking/{workspace}/bookings        book
  *   GET  /api/v1/public/bookings/{token}                    the customer's booking
  *   GET  /api/v1/public/bookings/{token}/slots              free times to move to
@@ -78,6 +80,8 @@ final class PublicBookingApiHandler
         private readonly SharedStoreInterface $store,
         // WHIT-1014: the workspace's own brand on its public pages. Null: none sent.
         private readonly ?BrandingService $branding = null,
+        // WHIT-1179: the signed-in visitor's own account. Null: never prefilled.
+        private readonly ?BookingVisitor $visitor = null,
     ) {
     }
 
@@ -153,6 +157,34 @@ final class PublicBookingApiHandler
                 return $who === [] ? null : ['starts_at' => $slot['starts_at'], 'ends_at' => $slot['ends_at'], 'profile_ids' => $who];
             }, $slots)))]);
         });
+    }
+
+    /**
+     * The signed-in visitor's own name and email, so the page can fill its
+     * details for them (WHIT-1179). `data` is null when nobody is signed in.
+     * Only the person's own account is read (see {@see BookingVisitor}); the
+     * workspace learns nothing until they book. Never cached: the answer is
+     * the person's, so it is `private, no-store` and varies by cookie.
+     *
+     * @param array<string, string> $params
+     */
+    public function visitor(Request $request, array $params): Response
+    {
+        $answer = $this->guard($request, 'cal:me:', RateLimits::publicBookingInfoPerAddress(), function () use ($request, $params): Response {
+            $this->workspace($request, $params) ?? throw CalendarRejectedException::notFound('Booking page');
+            $me = null;
+            if ($this->visitor !== null) {
+                try {
+                    $me = $this->visitor->current();
+                } catch (\Throwable $e) {
+                    error_log('[PublicBookingApiHandler] visitor: ' . $e->getMessage());
+                }
+            }
+
+            return Response::json(['data' => $me]);
+        });
+
+        return $answer->withHeaders(['Cache-Control' => 'private, no-store', 'Vary' => 'Cookie']);
     }
 
     /** @param array<string, string> $params */

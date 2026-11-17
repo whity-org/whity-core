@@ -26,6 +26,7 @@ Welcome to the Whity Core documentation.
 - **[Offline PHP plugin host](../../templates/tauri-desktop/README.md#the-offline-php-plugin-host)** — the Tauri desktop template's bundled FrankenPHP process that runs real, unmodified whity plugins fully offline (discovery, hooks, RBAC), plus `Whity\Sdk\Testing\OfflinePluginHostConformanceTestCase` (see `sdk/README.md`) for proving your own plugin works there.
 - **[Desktop plugin releases](Desktop-Plugin-Releases.md)** — the `bin/desktop-plugin-release` pipeline that source-obfuscates a plugin, packages it in the shape the desktop installer requires, and catalogues it in `desktop_plugin_releases` for `GET /api/desktop-plugins`.
 - **[Plugin Dashboard](Plugin-Dashboard.md)** — Setup points on Finish setting up and dashboard widgets (stat, list, chart, actions) from a plugin (SDK 1.115).
+- **[Workspace Templates](Plugin-Workspace-Templates.md)** — Ready starts for one kind of business, applied as the person choosing them, with a paid plugin offered on trial (SDK 1.116).
 - **[Plugin UI Blocks](Plugin-UI-Blocks.md)** — Server-driven UI: the platform-neutral block contract (display / data-bound / interactive) plugins declare and each platform renders.
 - **[Plugin Data Types](Plugin-Data-Types.md)** — `registerDataType`: a plugin declares its records' lifecycle (trashed ≠ retired) and reference graph as data; core owns the guard evaluation, the refusals, and the generated trash/restore/retire surface.
 - **[Family Relations](RELATIONS.md)** — Person-node graph, relationship types, the relations API + admin hub.

@@ -25,7 +25,16 @@ export function roleNames(membership: Pick<WorkspaceMembershipLike, 'role' | 'ro
   return all.filter((name, index) => name !== '' && all.indexOf(name) === index);
 }
 
-/** The roles as one label, e.g. "admin, Hello viewer". Empty when there are none. */
+/** Every role held here in words, the primary one first, for `RoleSummary` (WHIT-1175). */
+export function roleLabels(membership: Pick<WorkspaceMembershipLike, 'role' | 'roles'>): string[] {
+  return roleNames(membership).map(roleLabel);
+}
+
+/**
+ * The roles as one label, e.g. "admin, Hello viewer". Empty when there are none.
+ * For text that may hold every role (an accessible name, a tooltip); a line
+ * under a name uses `RoleSummary` with `roleLabels` so it never grows.
+ */
 export function rolesLabel(membership: Pick<WorkspaceMembershipLike, 'role' | 'roles'>): string {
   return roleNames(membership).map(roleLabel).join(', ');
 }
