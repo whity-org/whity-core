@@ -44923,6 +44923,177 @@
                 }
             }
         },
+        "/api/v1/me/phone": {
+            "get": {
+                "operationId": "get_api_v1_me_phone",
+                "summary": "Your own phone number (WHIT-1181)",
+                "tags": [
+                    "me"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Your phone",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MyPhoneResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "put": {
+                "operationId": "put_api_v1_me_phone",
+                "summary": "Set or remove your own phone number (WHIT-1181)",
+                "tags": [
+                    "me"
+                ],
+                "description": "Stored as E.164 on your profile, across every workspace. A number you set here is never replaced by one from a sign-in.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/MyPhoneRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Your phone",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MyPhoneResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a phone number with its country code",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/push-subscriptions": {
             "get": {
                 "operationId": "get_api_v1_me_push_subscriptions",
@@ -93753,6 +93924,11 @@
                             "email": {
                                 "type": "string"
                             },
+                            "phone": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "Your own phone number in E.164, or null (WHIT-1181)."
+                            },
                             "role": {
                                 "type": "string"
                             },
@@ -94168,6 +94344,11 @@
                             },
                             "email": {
                                 "type": "string"
+                            },
+                            "phone": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "Your own phone number in E.164, or null (WHIT-1181)."
                             },
                             "role": {
                                 "type": "string"
@@ -96247,6 +96428,40 @@
                                 "$ref": "#/components/schemas/CustomerMessage"
                             }
                         }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "MyPhoneRequest": {
+                "type": "object",
+                "properties": {
+                    "phone": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "With its country code; spaces, dashes and Arabic-Indic digits are accepted and stored as E.164. Null or empty removes it."
+                    }
+                },
+                "required": [
+                    "phone"
+                ]
+            },
+            "MyPhoneResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "phone": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "E.164, such as +962791234567, or null when none is set."
+                            }
+                        },
+                        "required": [
+                            "phone"
+                        ]
                     }
                 },
                 "required": [
@@ -99519,7 +99734,7 @@
                     "phone": {
                         "type": "string",
                         "nullable": true,
-                        "description": "Null until a profile carries a phone number."
+                        "description": "Their own phone in E.164, or null."
                     }
                 },
                 "required": [
@@ -103248,6 +103463,11 @@
                             },
                             "email": {
                                 "type": "string"
+                            },
+                            "phone": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "Your own phone number in E.164, or null (WHIT-1181)."
                             },
                             "role": {
                                 "type": "string"

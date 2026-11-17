@@ -6667,6 +6667,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/phone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your own phone number (WHIT-1181) */
+        get: operations["get_api_v1_me_phone"];
+        /**
+         * Set or remove your own phone number (WHIT-1181)
+         * @description Stored as E.164 on your profile, across every workspace. A number you set here is never replaced by one from a sign-in.
+         */
+        put: operations["put_api_v1_me_phone"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/push-subscriptions": {
         parameters: {
             query?: never;
@@ -16361,6 +16382,8 @@ export interface components {
             user?: {
                 id: number;
                 email: string;
+                /** @description Your own phone number in E.164, or null (WHIT-1181). */
+                phone?: string | null;
                 role: string;
                 tenant_id: number;
             } | null;
@@ -16485,6 +16508,8 @@ export interface components {
             user: {
                 id: number;
                 email: string;
+                /** @description Your own phone number in E.164, or null (WHIT-1181). */
+                phone?: string | null;
                 role: string;
                 tenant_id: number;
             };
@@ -17015,6 +17040,16 @@ export interface components {
                 conversation_id?: number;
                 message?: components["schemas"]["CustomerMessage"];
             } | null;
+        };
+        MyPhoneRequest: {
+            /** @description With its country code; spaces, dashes and Arabic-Indic digits are accepted and stored as E.164. Null or empty removes it. */
+            phone: string | null;
+        };
+        MyPhoneResponse: {
+            data: {
+                /** @description E.164, such as +962791234567, or null when none is set. */
+                phone: string | null;
+            };
         };
         NavigationItem: {
             id: string;
@@ -17862,7 +17897,7 @@ export interface components {
             name: string;
             /** @description The email of their own sign-in; may be empty. */
             email: string;
-            /** @description Null until a profile carries a phone number. */
+            /** @description Their own phone in E.164, or null. */
             phone: string | null;
         } | null;
         PublicChatInfoResponse: {
@@ -18929,6 +18964,8 @@ export interface components {
             user: {
                 id: number;
                 email: string;
+                /** @description Your own phone number in E.164, or null (WHIT-1181). */
+                phone?: string | null;
                 role: string;
                 tenant_id: number;
             };
@@ -55667,6 +55704,158 @@ export interface operations {
                 };
             };
             /** @description Missing 'checks' list, or more than 200 checks */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_phone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your phone */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPhoneResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_me_phone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MyPhoneRequest"];
+            };
+        };
+        responses: {
+            /** @description Your phone */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPhoneResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a phone number with its country code */
             422: {
                 headers: {
                     [name: string]: unknown;

@@ -21,8 +21,7 @@ use PDO;
  * their own account, so the page behaves the same for everyone signed in.
  *
  * PHONE
- * Neither a profile nor a Whity ID sign-in carries a phone number yet, so
- * `phone` is null until one does.
+ * The person's own phone from their profile (WHIT-1181), E.164, or null.
  */
 final class BookingVisitor
 {
@@ -52,21 +51,18 @@ final class BookingVisitor
         if ($email !== '' && (mb_strlen($email) > 320 || filter_var($email, FILTER_VALIDATE_EMAIL) === false)) {
             $email = '';
         }
-        $name = mb_substr(trim($this->displayName($profileId)), 0, 200);
-        if ($name === '' && $email === '') {
+        // profiles is a sanctioned GLOBAL identity table (ADR 0005 §1, SanctionedGlobalTables); the id is the caller's own, from their validated session token.
+        $stmt = $this->db->prepare('SELECT display_name, phone FROM profiles WHERE id = ?');
+        $stmt->execute([$profileId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $row = is_array($row) ? $row : [];
+
+        $name = mb_substr(trim(is_string($row['display_name'] ?? null) ? $row['display_name'] : ''), 0, 200);
+        $phone = is_string($row['phone'] ?? null) && $row['phone'] !== '' ? $row['phone'] : null;
+        if ($name === '' && $email === '' && $phone === null) {
             return null;
         }
 
-        return ['name' => $name, 'email' => $email, 'phone' => null];
-    }
-
-    private function displayName(int $profileId): string
-    {
-        // profiles is a sanctioned GLOBAL identity table (ADR 0005 §1, SanctionedGlobalTables); the id is the caller's own, from their validated session token.
-        $stmt = $this->db->prepare('SELECT display_name FROM profiles WHERE id = ?');
-        $stmt->execute([$profileId]);
-        $name = $stmt->fetchColumn();
-
-        return is_string($name) ? $name : '';
+        return ['name' => $name, 'email' => $email, 'phone' => $phone];
     }
 }
