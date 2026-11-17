@@ -189,3 +189,59 @@ describe('BlockRenderer — SDK 1.113 setup inputs', () => {
     ]);
   });
 });
+
+describe('BlockRenderer — WHIT-1176 a setup step opens with what is saved', () => {
+  it('a preloaded number shows in its field, lists seed their inputs, and an unchanged save sends them back', async () => {
+    mockApiClient.mockImplementation((url: string, init?: { method?: string }) => {
+      if ((init?.method ?? 'GET') === 'GET' && url.includes('/x/current')) {
+        return Promise.resolve(
+          stubResponse(true, 200, {
+            data: {
+              chairs: 3,
+              colour: '#a67c00',
+              clientele: ['women'],
+              hours: [{ weekday: 6, start_time: '10:00', end_time: '21:00' }],
+            },
+          })
+        );
+      }
+      return Promise.resolve(stubResponse(true, 200, {}));
+    });
+    const form = {
+      type: 'form',
+      submit: { method: 'POST', endpoint: '/api/v1/x/save' },
+      dataSource: { method: 'GET', path: '/api/v1/x/current' },
+      children: [
+        { type: 'numberInput', name: 'chairs', label: 'Chairs' },
+        { type: 'colorInput', name: 'colour', label: 'Colour', swatches: ['#a67c00', '#0961bb'] },
+        { type: 'checkboxGroup', name: 'clientele', label: 'Who comes', options: [{ value: 'men', label: 'Men' }, { value: 'women', label: 'Women' }] },
+        { type: 'weeklyHours', name: 'hours', label: 'Hours', firstDay: 6 },
+        { type: 'submitButton', label: 'Save' },
+      ],
+    } as Block;
+    render(<BlockRenderer blocks={[form]} />, { wrapper: ({ children: c }) => <ToastProvider>{c}</ToastProvider> });
+
+    expect(await screen.findByDisplayValue('3')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '#a67c00' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('Women')).toBeChecked();
+    expect(screen.getByTestId('block-input-hours-open-6')).toHaveAttribute('data-state', 'checked');
+
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    await waitFor(() => expect(mockApiClient.mock.calls.some(([u]) => String(u).includes('/x/save'))).toBe(true));
+    const [, options] = mockApiClient.mock.calls.find(([u]) => String(u).includes('/x/save')) as [string, { body: string }];
+    expect(JSON.parse(options.body)).toEqual({
+      chairs: '3',
+      colour: '#a67c00',
+      clientele: ['women'],
+      hours: [{ weekday: 6, start_time: '10:00', end_time: '21:00' }],
+    });
+  });
+
+  it('colorInput with nothing chosen says so and sends nothing', async () => {
+    renderForm([{ type: 'colorInput', name: 'colour', label: 'Colour', swatches: ['#a67c00'] } as Block]);
+    expect(screen.getByText('No colour chosen')).toBeInTheDocument();
+    expect(screen.queryByText('#000000')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '#a67c00' })).toHaveAttribute('aria-pressed', 'false');
+    expect(await save()).not.toHaveProperty('colour');
+  });
+});

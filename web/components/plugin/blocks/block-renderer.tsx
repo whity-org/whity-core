@@ -95,6 +95,7 @@ import { WeeklyHoursFields, WeeklyHoursProblem } from '@/components/calendar/wee
 import { firstBadDay, rowsOf, weekOf, weekOrder } from '@/lib/calendar/hours';
 import { timeOptions } from '@/lib/calendar/times';
 import { Checkbox } from '@whity/ui/checkbox';
+import { ColorPicker } from '@whity/ui/color-picker';
 import { BilingualInput } from '@whity/ui/bilingual-input';
 import { MathText } from '@whity/ui/math-text';
 import { renderMarkdown } from '@/lib/safe-markdown';
@@ -3626,11 +3627,13 @@ function ColorInputRenderer({ block }: { block: ColorInputBlock }) {
   if (ctx === null) return <UnsupportedBlock type="colorInput" />;
   const inputId = `block-input-${block.name}`;
   const value = ctx.values[block.name];
-  const strValue = typeof value === 'string' && value !== '' ? value : (block.default ?? '#000000');
+  // WHIT-1176: with nothing chosen there is no colour to name. Showing a
+  // fallback (#000000) read as "your colour is black".
+  const chosen = typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value.toLowerCase() : (block.default?.toLowerCase() ?? null);
   const swatches = (block.swatches ?? []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c));
-  const selected = strValue.toLowerCase();
-  // SDK 1.113: with swatches, a person picks a colour (TplAdminBranding's row
-  // of swatches, then Custom) and the code is shown, never asked for.
+  // SDK 1.113: swatches first (TplAdminBranding's row), then the design
+  // system's colour picker for any other colour. The picker names the chosen
+  // code, or says nothing is chosen; nobody types one.
   return (
     <div className="space-y-1.5">
       <InputLabel inputId={inputId} label={block.label} error={ctx.errors[block.name]} />
@@ -3640,18 +3643,28 @@ function ColorInputRenderer({ block }: { block: ColorInputBlock }) {
             key={swatch}
             type="button"
             aria-label={swatch}
-            aria-pressed={selected === swatch.toLowerCase()}
+            aria-pressed={chosen === swatch.toLowerCase()}
             onClick={() => ctx.setValue(block.name, swatch.toLowerCase())}
             className="size-10 rounded-lg border border-border outline-offset-2 aria-pressed:outline aria-pressed:outline-2 aria-pressed:outline-foreground"
             style={{ background: swatch }}
             data-slot="color-swatch"
           />
         ))}
-        <label className={cn('flex items-center gap-2 text-sm text-muted-foreground', swatches.length > 0 && 'ms-2')}>
-          <Input id={inputId} type="color" value={strValue} onChange={(e) => ctx.setValue(block.name, e.target.value.toLowerCase())} aria-label={block.label} className="h-10 w-14 cursor-pointer p-0.5" />
-          {swatches.length > 0 && t('blocks.color.custom', 'Custom')}
-        </label>
-        <span dir="ltr" className="ms-auto font-mono text-sm text-foreground">{strValue}</span>
+        <div className={cn('w-48', swatches.length > 0 && 'ms-2')}>
+          <ColorPicker
+            id={inputId}
+            value={chosen ?? undefined}
+            onChange={(next) => ctx.setValue(block.name, next === null ? undefined : next.toLowerCase())}
+            presets={swatches.length > 0 ? swatches : undefined}
+            placeholder={t('blocks.color.none', 'No colour chosen')}
+            clearLabel={t('blocks.color.clear', 'Clear the colour')}
+            clearSelectionLabel={t('blocks.color.clear', 'Clear the colour')}
+            presetsLabel={t('blocks.color.custom', 'Custom')}
+            copyHexLabel={t('blocks.color.copyHex', 'Copy the colour code')}
+            copyLabel={t('blocks.color.copy', 'Copy')}
+            copiedLabel={t('blocks.color.copied', 'Copied')}
+          />
+        </div>
       </div>
     </div>
   );
