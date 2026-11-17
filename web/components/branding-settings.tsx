@@ -319,6 +319,14 @@ export function BrandingSettings({ scope, canWrite }: BrandingSettingsProps) {
     return data.data;
   }, []);
 
+  // WHIT-1189: the workspace's own web address, read back for the Domain field.
+  // Only the system tenant can set it; a workspace reads its own and nothing else.
+  const { data: hostInfo, refetch: refetchHost } = useFetch(async () => {
+    const { data } = await api.GET('/api/v1/branding/host');
+    return data?.data ?? null;
+  }, []);
+  const savedHost = hostInfo?.branding_host ?? '';
+
   // An upload or clear answers with the new branding: show it at once.
   const [afterAsset, setAfterAsset] = useState<Branding | null>(null);
   const branding = afterAsset ?? fetched;
@@ -326,7 +334,7 @@ export function BrandingSettings({ scope, canWrite }: BrandingSettingsProps) {
   // Drafts: undefined means untouched, so the saved value shows.
   const [nameDraft, setNameDraft] = useState<string | undefined>(undefined);
   const [colourDraft, setColourDraft] = useState<string | null | undefined>(undefined);
-  const [hostDraft, setHostDraft] = useState('');
+  const [hostDraft, setHostDraft] = useState<string | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   const savedName = branding?.siteName ?? '';
@@ -335,7 +343,8 @@ export function BrandingSettings({ scope, canWrite }: BrandingSettingsProps) {
   const colour = colourDraft === undefined ? savedColour : colourDraft;
   const nameChanged = nameDraft !== undefined && nameDraft.trim() !== savedName;
   const colourChanged = colourDraft !== undefined && colourDraft !== savedColour;
-  const hostChanged = scope === 'global' && hostDraft.trim() !== '';
+  const host = hostDraft ?? savedHost;
+  const hostChanged = scope === 'global' && hostDraft !== undefined && hostDraft.trim() !== savedHost;
   const dirty = nameChanged || colourChanged || hostChanged;
 
   const handleSave = async () => {
@@ -357,13 +366,14 @@ export function BrandingSettings({ scope, canWrite }: BrandingSettingsProps) {
       }
       if (hostChanged) {
         // The system tenant's own id is 0: the platform's address.
-        await setBrandingHost(0, hostDraft.trim());
+        await setBrandingHost(0, host.trim() === '' ? null : host.trim());
       }
       setNameDraft(undefined);
       setColourDraft(undefined);
-      setHostDraft('');
+      setHostDraft(undefined);
       setAfterAsset(null);
       refetch();
+      refetchHost();
       // The whole app wears the brand: refresh its copy (a router refresh can't, #1716).
       void refreshAppBranding();
       addToast(t('branding.saved', 'Branding saved.'), 'success');
@@ -473,19 +483,33 @@ export function BrandingSettings({ scope, canWrite }: BrandingSettingsProps) {
                       label={t('branding.host.label', 'Domain')}
                       placeholder="app.example.com"
                       dir="ltr"
-                      value={hostDraft}
+                      value={host}
                       disabled={!canWrite}
                       onChange={(e) => setHostDraft(e.target.value)}
                       helperText={t('branding.host.help', 'Point a CNAME record at your Whity host.')}
                       data-testid="branding-custom-host-input"
                     />
                   ) : (
-                    <p className="text-xs text-muted-foreground" data-testid="branding-domain-note">
-                      {t(
-                        'branding.host.tenantNote',
-                        'Your own web address is set up by the person who runs this Whity.'
-                      )}
-                    </p>
+                    <Input
+                      id="branding-domain"
+                      label={t('branding.host.label', 'Domain')}
+                      placeholder={t('branding.host.notSet', 'Not set up yet')}
+                      dir="ltr"
+                      value={savedHost}
+                      readOnly
+                      helperText={
+                        hostInfo?.included_in_plan === false
+                          ? t(
+                              'branding.host.notInPlan',
+                              'Your plan doesn’t include your own web address. The person who runs this Whity sets it up.'
+                            )
+                          : t(
+                              'branding.host.tenantNote',
+                              'Your own web address is set up by the person who runs this Whity.'
+                            )
+                      }
+                      data-testid="branding-domain-readonly"
+                    />
                   )}
                 </div>
 

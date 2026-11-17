@@ -4385,6 +4385,14 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Unknown branding key'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/branding/host', 'settings:read', [
+                'summary' => 'Read your own workspace\'s custom web address',
+                'description' => 'Scoped by the session: a workspace reads only its own address. Setting one is PUT /api/tenants/{id}/branding-host, system tenant only.',
+                'tags' => ['branding'],
+                'responses' => [
+                    200 => self::jsonResponse('The workspace\'s address, or null', 'BrandingHostReadResponse'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('PUT', '/api/tenants/{id}/branding-host', 'settings:manage', [
                 'summary' => 'Set or clear a tenant\'s custom branding hostname',
                 'tags' => ['branding'],
@@ -11909,6 +11917,11 @@ final class CoreApiSchemas
             'BrandingResponse' => self::dataEnvelope(SchemaBuilder::ref('Branding')),
             // PUT /api/tenants/{id}/branding-host request body.
             'BrandingHostRequest' => self::object(['host' => self::str(true)], []),
+            // GET /api/branding/host response body: the caller's own workspace's address.
+            'BrandingHostReadResponse' => self::dataEnvelope(self::object([
+                'branding_host' => self::str(true) + ['description' => 'The workspace\'s own web address, or null when none is set.'],
+                'included_in_plan' => ['type' => 'boolean', 'description' => 'Whether the workspace\'s plan includes its own web address (WHIT-932). Absent for the system tenant.'],
+            ], ['branding_host'])),
             // PUT /api/tenants/{id}/branding-host response body.
             'BrandingHostResponse' => self::dataEnvelope(self::object([
                 'branding_host' => self::str(true),

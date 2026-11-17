@@ -61,9 +61,12 @@ jest.mock('@/hooks/useCapabilities', () => ({
 // REGULAR tenant admin who also holds settings:manage (WC-235's target case)
 // without a whole separate mock module per scenario.
 let mockTenantId = 0;
+const mockRefreshAuth = jest.fn(() => Promise.resolve());
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({
     user: { id: 1, email: 'admin@example.com', role: 'admin', tenant_id: mockTenantId },
+    memberships: [{ tenant_id: 5, tenant_name: 'Example Bakery' }],
+    refreshAuth: mockRefreshAuth,
   }),
 }));
 
@@ -261,6 +264,62 @@ describe('AdminSettingsPage (General) — RBAC gating', () => {
     const supportEmail = await screen.findByLabelText(/^support email$/i);
     expect(supportEmail).toBeEnabled();
     expect(screen.getByRole('button', { name: /save tenant settings/i })).toBeInTheDocument();
+  });
+});
+
+describe('AdminSettingsPage — Workspace name (WHIT-1189)', () => {
+  it('owners and admins (tenants:write) rename the workspace from General, audited by the server', async () => {
+    setTenant(5);
+    grant('settings:read', 'settings:write', 'tenants:write');
+    render(<AdminSettingsPage />);
+    const name = await screen.findByLabelText(/^workspace name$/i);
+    expect(name).toHaveValue('Example Bakery');
+
+    fireEvent.change(name, { target: { value: 'Example Bakery Amman' } });
+    fireEvent.click(screen.getByRole('button', { name: /save tenant settings/i }));
+
+    await waitFor(() =>
+      expect(mockApiPatch).toHaveBeenCalledWith('/api/v1/tenants/{id}', {
+        params: { path: { id: 5 } },
+        body: { name: 'Example Bakery Amman' },
+      })
+    );
+    await waitFor(() => expect(mockRefreshAuth).toHaveBeenCalled());
+  });
+
+  it('does not rename when the name is unchanged', async () => {
+    setTenant(5);
+    grant('settings:read', 'settings:write', 'tenants:write');
+    render(<AdminSettingsPage />);
+    await screen.findByLabelText(/^workspace name$/i);
+    fireEvent.click(screen.getByRole('button', { name: /save tenant settings/i }));
+    await waitFor(() => expect(mockApiPatch).toHaveBeenCalledWith('/api/v1/settings', expect.anything()));
+    expect(mockApiPatch).not.toHaveBeenCalledWith('/api/v1/tenants/{id}', expect.anything());
+  });
+
+  it('refuses an empty name before anything is sent', async () => {
+    setTenant(5);
+    grant('settings:read', 'settings:write', 'tenants:write');
+    render(<AdminSettingsPage />);
+    fireEvent.change(await screen.findByLabelText(/^workspace name$/i), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: /save tenant settings/i }));
+    expect(addToast).toHaveBeenCalledWith('The workspace name cannot be empty.', 'error');
+    expect(mockApiPatch).not.toHaveBeenCalled();
+  });
+
+  it('is not offered without tenants:write, or to the system tenant', async () => {
+    setTenant(5);
+    grant('settings:read', 'settings:write');
+    const { unmount } = render(<AdminSettingsPage />);
+    await screen.findByLabelText(/^support email$/i);
+    expect(screen.queryByLabelText(/^workspace name$/i)).not.toBeInTheDocument();
+    unmount();
+
+    setTenant(0);
+    grant('settings:read', 'settings:write', 'tenants:write');
+    render(<AdminSettingsPage />);
+    await screen.findByLabelText(/^support email$/i);
+    expect(screen.queryByLabelText(/^workspace name$/i)).not.toBeInTheDocument();
   });
 });
 

@@ -5773,6 +5773,7 @@ $router->register('POST',   '/api/branding/assets/{key}',           [$brandingHa
 $router->register('DELETE', '/api/branding/assets/{key}',           [$brandingHandler, 'clearTenant'],   null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('POST',   '/api/branding/global/assets/{key}',    [$brandingHandler, 'uploadGlobal'],  null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('DELETE', '/api/branding/global/assets/{key}',    [$brandingHandler, 'clearGlobal'],   null, null, CorePermissions::SETTINGS_MANAGE);
+$router->register('GET',    '/api/branding/host',                   [$brandingHandler, 'getBrandingHost'], null, null, CorePermissions::SETTINGS_READ);
 $router->register('PUT',    '/api/tenants/{id}/branding-host',      [$brandingHandler, 'setBrandingHost'], null, null, CorePermissions::SETTINGS_MANAGE);
 
 // WHIT-915: workspace-controlled customer sign-up. Platform sign-up

@@ -7715,6 +7715,83 @@
                 ]
             }
         },
+        "/api/v1/branding/host": {
+            "get": {
+                "operationId": "get_api_v1_branding_host",
+                "summary": "Read your own workspace's custom web address",
+                "tags": [
+                    "branding"
+                ],
+                "description": "Scoped by the session: a workspace reads only its own address. Setting one is PUT /api/tenants/{id}/branding-host, system tenant only.",
+                "responses": {
+                    "200": {
+                        "description": "The workspace's address, or null",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/BrandingHostReadResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/availability": {
             "get": {
                 "operationId": "get_api_v1_calendar_availability",
@@ -80808,6 +80885,31 @@
                     "mainColor",
                     "theme",
                     "installable"
+                ]
+            },
+            "BrandingHostReadResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "branding_host": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "The workspace's own web address, or null when none is set."
+                            },
+                            "included_in_plan": {
+                                "type": "boolean",
+                                "description": "Whether the workspace's plan includes its own web address (WHIT-932). Absent for the system tenant."
+                            }
+                        },
+                        "required": [
+                            "branding_host"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "BrandingHostRequest": {
