@@ -408,6 +408,12 @@
         "workspaceNew.name.label": "Workspace name",
         "workspaceNew.name.required": "Type a name for the workspace.",
         "workspaceNew.name.tooLong": "Use {max} characters or fewer.",
+        "workspaceNew.paid.afterTrial": "If it isn’t paid when the trial ends, it becomes read-only until it is. Nothing is deleted.",
+        "workspaceNew.paid.first": "Your first workspace is free.",
+        "workspaceNew.paid.noTrial": "This one is on {plan}, and is read-only until it’s paid.",
+        "workspaceNew.paid.price": "This one is on {plan} at {price} a month, and is read-only until it’s paid.",
+        "workspaceNew.paid.trial": "This one starts a {days}-day trial of {plan}.",
+        "workspaceNew.paid.trialThenPrice": "This one starts a {days}-day trial of {plan}, then {price} a month.",
         "workspaceNew.plan": "It starts on the plan every new workspace gets here. You stay in your other workspaces.",
         "workspaceNew.subtitle": "A new workspace for another company or team. You’ll be its owner, and you can invite people once it’s made.",
         "workspaceNew.title": "Create a workspace"

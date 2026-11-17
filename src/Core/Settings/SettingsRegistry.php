@@ -150,6 +150,23 @@ final class SettingsRegistry
     // Counted over workspace_owners, so co-owned workspaces count for each owner.
     // '0' means no limit (the self-hosted default); app.whity.dev uses 3.
     public const WORKSPACES_MAX_OWNED_PER_PERSON = 'workspaces.max_owned_per_person';
+
+    // The plan a person's second and later OWNED workspaces start on (WHIT-1203).
+    // Global/operator-level. A person's first owned workspace starts on
+    // `billing.default_plan` (Free on app.whity.dev); every further one they
+    // create starts on this plan in a trial, then read-only until paid, so
+    // owning more than one workspace is paid ("each new workspace pays"). Once
+    // an unpaid trial ends the workspace is read-only (block_writes), never
+    // closed, and nothing is deleted (owner 2026-11-17).
+    // Being invited into workspaces is never counted. '' (the default) means
+    // "same as the default plan": a self-hosted install pays only for paid
+    // plugins (BM.3) and is unchanged.
+    public const WORKSPACES_ADDITIONAL_PLAN = 'workspaces.additional_plan';
+
+    // How long that trial lasts, in days (WHIT-1203). Global/operator-level.
+    // Default '30' (owner 2026-11-17). '0' means no trial: the workspace is
+    // read-only until it is paid. Read only when `workspaces.additional_plan` is set.
+    public const WORKSPACES_ADDITIONAL_TRIAL_DAYS = 'workspaces.additional_trial_days';
     // Password sign-in on this server (WHIT-1168). Global/operator-level. When
     // 'false', people sign in and sign up only through the operator's identity
     // provider (app.whity.dev: Whity ID): password sign-in, reset, registration
@@ -947,6 +964,8 @@ final class SettingsRegistry
         self::SSO_SELF_PROVISION_WORKSPACE,
         self::WORKSPACES_SELF_CREATE_ENABLED,
         self::WORKSPACES_MAX_OWNED_PER_PERSON,
+        self::WORKSPACES_ADDITIONAL_PLAN,
+        self::WORKSPACES_ADDITIONAL_TRIAL_DAYS,
         self::PASSWORD_SIGN_IN,
         self::STORAGE_DRIVER,
         self::STORAGE_S3_ENDPOINT,
@@ -1198,6 +1217,8 @@ final class SettingsRegistry
         self::SSO_SELF_PROVISION_WORKSPACE => 'false',
         self::WORKSPACES_SELF_CREATE_ENABLED => 'false',
         self::WORKSPACES_MAX_OWNED_PER_PERSON => '0',
+        self::WORKSPACES_ADDITIONAL_PLAN => '',
+        self::WORKSPACES_ADDITIONAL_TRIAL_DAYS => '30',
         self::PASSWORD_SIGN_IN => 'true',
         // 72 hours (3 days). A native client offline longer than this must
         // re-authenticate online before it will work again.
@@ -1756,6 +1777,8 @@ final class SettingsRegistry
             self::SSO_SELF_PROVISION_WORKSPACE => self::validateBoolean($value, self::SSO_SELF_PROVISION_WORKSPACE),
             self::WORKSPACES_SELF_CREATE_ENABLED => self::validateBoolean($value, self::WORKSPACES_SELF_CREATE_ENABLED),
             self::WORKSPACES_MAX_OWNED_PER_PERSON => self::validateWholeNumberBetween($value, self::WORKSPACES_MAX_OWNED_PER_PERSON, 0, 1000),
+            self::WORKSPACES_ADDITIONAL_PLAN => self::validatePlanKey($value),
+            self::WORKSPACES_ADDITIONAL_TRIAL_DAYS => self::validateWholeNumberBetween($value, self::WORKSPACES_ADDITIONAL_TRIAL_DAYS, 0, 90),
             self::PASSWORD_SIGN_IN => self::validateBoolean($value, self::PASSWORD_SIGN_IN),
             self::AUTH_DESKTOP_LOGIN_MAX_HOURS => self::validateDesktopLoginMaxHours($value),
             self::STORAGE_DRIVER => self::validateStorageDriver($value),

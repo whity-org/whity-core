@@ -5318,7 +5318,30 @@ final class CoreApiSchemas
                 'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['disabled', 'limit_reached', null]],
                 'owned' => self::int(),
                 'limit' => self::int(),
-            ], ['allowed', 'reason', 'owned', 'limit'])),
+                // WHIT-1203: null = the default plan; else the paid plan a second
+                // or later owned workspace starts on, its trial, and its monthly
+                // price in minor units (null when the plan has no such price).
+                'next_plan' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'plan_key' => self::str(),
+                        'plan_name' => self::str(),
+                        'trial_days' => self::int(),
+                        'price' => [
+                            'type' => 'object',
+                            'nullable' => true,
+                            'properties' => [
+                                'unit_amount' => self::int(),
+                                'currency' => self::str(),
+                                'billing_period' => self::str(),
+                            ],
+                            'required' => ['unit_amount', 'currency', 'billing_period'],
+                        ],
+                    ],
+                    'required' => ['plan_key', 'plan_name', 'trial_days', 'price'],
+                ],
+            ], ['allowed', 'reason', 'owned', 'limit', 'next_plan'])),
             // A caller's linked external identity (connected account). `email` and
             // `last_login_at` may be null (asserted-at-link email; never-since-linked).
             'MeIdentity' => self::object([

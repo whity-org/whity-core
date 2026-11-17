@@ -24,9 +24,13 @@ use Whity\Core\Settings\SettingsService;
  *  - `workspaces.max_owned_per_person`: how many workspaces they already own
  *    (0 = no limit). Two racing requests can't both pass the limit.
  *
- * The workspace starts on the default plan (`billing.default_plan`, Free on
- * app.whity.dev), and behind the payment gate when the operator requires
- * payment for new workspaces, exactly as sign-up does.
+ * A person's first owned workspace starts on the default plan
+ * (`billing.default_plan`, Free on app.whity.dev), behind the payment gate when
+ * the operator requires payment for new workspaces, exactly as sign-up does.
+ * Their second and later ones start on `workspaces.additional_plan` in a trial,
+ * then read-only until paid (WHIT-1203, {@see AdditionalWorkspacePlan}).
+ * Which one applies is decided under the profile lock, from the same owned
+ * count the limit reads.
  */
 final class WorkspaceCreator
 {
@@ -56,7 +60,12 @@ final class WorkspaceCreator
     /**
      * What this person may do now, to show or hide "Create workspace".
      *
-     * @return array{allowed: bool, reason: ?string, owned: int, limit: int}
+     * `next_plan` is null for the default plan, else the paid plan this one
+     * would start on, its trial and its monthly price (WHIT-1203).
+     *
+     * @return array{allowed: bool, reason: ?string, owned: int, limit: int,
+     *               next_plan: array{plan_key: string, plan_name: string, trial_days: int,
+     *                                price: array{unit_amount: int, currency: string, billing_period: string}|null}|null}
      */
     public function stateFor(int $profileId): array
     {
@@ -68,13 +77,21 @@ final class WorkspaceCreator
         } elseif ($limit > 0 && $owned >= $limit) {
             $reason = self::LIMIT_REACHED;
         }
-        return ['allowed' => $reason === null, 'reason' => $reason, 'owned' => $owned, 'limit' => $limit];
+        return [
+            'allowed'   => $reason === null,
+            'reason'    => $reason,
+            'owned'     => $owned,
+            'limit'     => $limit,
+            'next_plan' => $reason === null ? $this->additional()->noticeFor($owned) : null,
+        ];
     }
 
     /**
      * Create a workspace this person owns.
      *
-     * @return array{status: string, tenant_id: ?int, name: ?string}
+     * `paid_plan` is the plan key when it started on the additional plan.
+     *
+     * @return array{status: string, tenant_id: ?int, name: ?string, paid_plan?: ?string}
      *
      * @throws \LogicException when called inside an open transaction
      */
@@ -97,10 +114,12 @@ final class WorkspaceCreator
                 $this->db->rollBack();
                 return ['status' => self::REFUSED, 'tenant_id' => null, 'name' => null];
             }
-            if ($limit > 0 && (new WorkspaceOwners($this->db))->countOwnedBy($profileId) >= $limit) {
+            $owned = (new WorkspaceOwners($this->db))->countOwnedBy($profileId);
+            if ($limit > 0 && $owned >= $limit) {
                 $this->db->rollBack();
                 return ['status' => self::LIMIT_REACHED, 'tenant_id' => null, 'name' => null];
             }
+            $paidPlan = $this->additional()->forOwnedCount($owned);
             $roleId = $founder->ownerRoleId();
             if ($roleId === null) {
                 error_log('[workspace-create] base "' . WorkspaceFounder::OWNER_ROLE . '" role missing; platform not seeded');
@@ -108,7 +127,12 @@ final class WorkspaceCreator
                 return ['status' => self::REFUSED, 'tenant_id' => null, 'name' => null];
             }
 
-            $founded = $founder->found($profileId, $name, $roleId, $paymentRequired);
+            // A paid workspace writes its own plan row (trial, then the gate),
+            // so the founder must not also write the closed gate.
+            $founded = $founder->found($profileId, $name, $roleId, $paymentRequired && $paidPlan === null);
+            if ($paidPlan !== null) {
+                $this->additional()->start($founded['tenant_id'], $paidPlan, $profileId);
+            }
             $this->db->commit();
         } catch (\Throwable $e) {
             if ($this->db->inTransaction()) {
@@ -119,6 +143,16 @@ final class WorkspaceCreator
 
         $founder->afterCommit($founded, $profileId, 'self_create');
 
-        return ['status' => self::CREATED, 'tenant_id' => $founded['tenant_id'], 'name' => $founded['name']];
+        return [
+            'status'    => self::CREATED,
+            'tenant_id' => $founded['tenant_id'],
+            'name'      => $founded['name'],
+            'paid_plan' => $paidPlan['plan_key'] ?? null,
+        ];
+    }
+
+    private function additional(): AdditionalWorkspacePlan
+    {
+        return new AdditionalWorkspacePlan($this->db, $this->settings);
     }
 }

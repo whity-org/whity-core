@@ -101,7 +101,7 @@ final class WorkspaceOwnersRealEngineTest extends TestCase
         self::assertSame(WorkspaceCreator::LIMIT_REACHED, $third['status']);
         self::assertNull($third['tenant_id']);
         self::assertSame(
-            ['allowed' => false, 'reason' => WorkspaceCreator::LIMIT_REACHED, 'owned' => 2, 'limit' => 2],
+            ['allowed' => false, 'reason' => WorkspaceCreator::LIMIT_REACHED, 'owned' => 2, 'limit' => 2, 'next_plan' => null],
             $this->creator->stateFor($pid)
         );
     }

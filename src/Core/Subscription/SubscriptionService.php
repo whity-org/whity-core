@@ -178,7 +178,8 @@ final class SubscriptionService
     }
 
     /**
-     * Whether a subscription still grants access: active/trialing always; past_due
+     * Whether a subscription still grants access: active always; trialing until
+     * its current_period_end (always, when it has none); past_due
      * only while within its grace window (grace_until, or — when unset — leniently
      * still in grace). canceled/expired never.
      *
@@ -186,8 +187,19 @@ final class SubscriptionService
      */
     private function isCurrent(string $status, array $sub): bool
     {
-        if ($status === self::STATUS_ACTIVE || $status === self::STATUS_TRIALING) {
+        if ($status === self::STATUS_ACTIVE) {
             return true;
+        }
+        if ($status === self::STATUS_TRIALING) {
+            // A trial with an end date is over once that date passes (WHIT-1203):
+            // until then "trialing" granted access for ever, so a trial that was
+            // never paid for never closed. A trial with no end date stays open.
+            $ends = $sub['current_period_end'] ?? null;
+            if (!is_string($ends) || $ends === '') {
+                return true;
+            }
+            $deadline = strtotime($ends);
+            return $deadline === false || ($this->clock)() <= $deadline;
         }
         if ($status === self::STATUS_PAST_DUE) {
             $graceUntil = $sub['grace_until'] ?? null;
