@@ -196,6 +196,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.weekend_days',
             // Design 3.3: off makes booking-page bookings requests.
             'calendar.instant_booking',
+            // WHIT-1173: one booking, several services back to back.
+            'calendar.multi_service_booking',
             // #1733. Whether the web app can be installed (instance-wide).
             'app.installable',
             // WS.5, WS.19: the operator's website (global-only).
@@ -433,6 +435,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.week_start' => 'saturday',
             'calendar.weekend_days' => 'friday,saturday',
             'calendar.instant_booking' => 'true',
+            'calendar.multi_service_booking' => 'false',
             // #1733: on, which is what app.whity.dev wants; an operator turns
             // it off here or with PWA_ENABLED.
             'app.installable' => 'true',

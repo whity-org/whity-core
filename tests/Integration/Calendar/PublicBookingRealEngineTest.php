@@ -390,4 +390,57 @@ final class PublicBookingRealEngineTest extends TestCase
         $this->service->move(1, (int) $made['id'], new DateTimeImmutable('2026-11-16 12:00:00', new DateTimeZone('UTC')), null, false);
         self::assertSame(['result' => 'moved'], $reminders->handle($payload));
     }
+
+    public function testSeveralServicesAreBookedTogetherWhenTheWorkspaceAllowsIt(): void
+    {
+        $services = new ServiceRepository($this->pdo);
+        $icing = $services->insert(1, [
+            'name' => ['en' => 'Icing class', 'ar' => 'درس التزيين'], 'description' => [],
+            'duration_minutes' => 60, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 0,
+            'price_minor' => 20000, 'currency' => 'JOD', 'bookable_online' => true, 'active' => true, 'sort_order' => 1,
+        ]);
+        $services->replaceStaff(1, $icing, [11]);
+        $page = ['workspace' => 'example-bakery'];
+        $both = [['service_id' => $this->cake], ['service_id' => $icing]];
+
+        // Off by default: the page says so, and asking for two is refused.
+        self::assertFalse(self::data($this->handler->page(self::request('GET', '/x'), $page))['data']['settings']['multi_service_booking']);
+        $off = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['services' => $both])), $page);
+        self::assertSame(422, $off->getStatusCode());
+
+        $this->settings->setTenant(1, 'calendar.multi_service_booking', 'true');
+        self::assertTrue(self::data($this->handler->page(self::request('GET', '/x'), $page))['data']['settings']['multi_service_booking']);
+
+        $_GET = ['service_ids' => $this->cake . ',' . $icing, 'from' => '2026-11-16T10:00:00+03:00', 'to' => '2026-11-16T11:00:00+03:00'];
+        try {
+            $slots = self::data($this->handler->slots(self::request('GET', '/x'), $page))['data'];
+        } finally {
+            $_GET = [];
+        }
+        self::assertSame(['2026-11-16T07:00:00Z', '2026-11-16T07:30:00Z'], array_column($slots, 'starts_at'));
+        self::assertSame('2026-11-16T08:30:00Z', $slots[0]['ends_at'], '30 + 60 minutes');
+
+        $response = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['services' => $both])), $page);
+        self::assertSame(201, $response->getStatusCode(), $response->getBody());
+        $booking = self::data($response)['data'];
+        self::assertSame('2026-11-16T08:30:00Z', $booking['ends_at']);
+        self::assertSame(32500, $booking['price_minor']);
+        self::assertSame(['ar' => 'تذوق الكعك + درس التزيين', 'en' => 'Cake tasting + Icing class'], $booking['service']['name']);
+        self::assertSame(90, $booking['service']['duration_minutes']);
+        self::assertSame([30, 60], array_column($booking['services'], 'duration_minutes'));
+        self::assertStringContainsString('Booked: Cake tasting + Icing class', $this->sent[count($this->sent) - 1]['subject']);
+
+        // The customer's link moves both together.
+        $token = (string) $booking['manage_token'];
+        $_GET = ['from' => '2026-11-16T13:00:00+03:00', 'to' => '2026-11-16T14:00:00+03:00'];
+        try {
+            $free = self::data($this->handler->manageSlots(self::request('GET', '/x', [], '198.51.100.1'), ['token' => $token]))['data'];
+        } finally {
+            $_GET = [];
+        }
+        self::assertSame(['2026-11-16T10:00:00Z', '2026-11-16T10:30:00Z'], array_column($free, 'starts_at'));
+        $moved = self::data($this->handler->move(self::request('POST', '/x', ['starts_at' => '2026-11-16T13:00:00+03:00'], '198.51.100.1'), ['token' => $token]))['data'];
+        self::assertSame('2026-11-16T11:30:00Z', $moved['ends_at']);
+        self::assertSame(['2026-11-16T10:00:00Z', '2026-11-16T10:30:00Z'], array_column($moved['services'], 'starts_at'));
+    }
 }

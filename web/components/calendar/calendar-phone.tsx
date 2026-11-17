@@ -524,6 +524,7 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
         timeZone={timeZone}
         initialDate={fullForm?.date ?? null}
         initialProfileId={fullForm?.profileId ?? null}
+        multiService={settings.multi_service_booking ?? false}
         onBooked={(made) => {
           setFullForm(null);
           addToast(t('booking.made', 'Booked for {name}', { name: made.customer.name ?? '' }), 'success');

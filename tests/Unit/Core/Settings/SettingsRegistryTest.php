@@ -132,6 +132,7 @@ final class SettingsRegistryTest extends TestCase
              'calendar.week_start',
              'calendar.weekend_days',
              'calendar.instant_booking',
+             'calendar.multi_service_booking',
              'app.installable',
              'website.plans',
              'website.contact_workspace',
@@ -306,7 +307,8 @@ final class SettingsRegistryTest extends TestCase
         // 51 since WHIT-941: eight calendar.* keys.
         // 52 since WHIT-966: calendar.instant_booking.
         // 54 since design 3.4 (P1): company.name_ar and company.address_ar.
-        self::assertCount(54, SettingsRegistry::tenantTextKeys());
+        // 55 since WHIT-1173: calendar.multi_service_booking.
+        self::assertCount(55, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -475,7 +477,8 @@ final class SettingsRegistryTest extends TestCase
         // 126 since merge map A4: signup.route_template_id.
         // 129 with migration 294's three messaging.* keys.
         // 131 since WHIT-1169: workspaces.self_create_enabled and max_owned_per_person.
-        self::assertCount(131, $describe);
+        // 132 since WHIT-1173: calendar.multi_service_booking.
+        self::assertCount(132, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

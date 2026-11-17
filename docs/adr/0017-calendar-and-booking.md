@@ -299,6 +299,34 @@ nothing is refused.
   and the call runs again under the lock; if the slot has gone by then, the
   approval fails with the same 409 and a fresh list of slots.
 
+### 10. Several services in one booking (WHIT-1173)
+
+- The calendar setting `calendar.multi_service_booking` (API field
+  `multi_service_booking`, default off) lets one booking hold several
+  services back to back, such as a cut, a colour and a blow-dry. The Salons
+  plugin turns it on through `PUT /api/calendar/settings`.
+- Each service is a row in `calendar_booking_services` (migration 302) with
+  its own person, service time, blocked time (its own buffers), room and
+  price. The booking row keeps the first service's service, person and room,
+  spans every service, and holds the total price. A booking of one service has
+  no rows there and is read exactly as before.
+- Busy time comes from the rows: each person is busy only for the services
+  they do, and a room only for the services that need it.
+- A time is free when, for each service, someone who may do it is free for
+  that service's own part, inside their hours. Anyone may be a different
+  person per service; the person who did the service before is tried first.
+  `same_person` asks for one person who does them all.
+- Locks: every person in the booking in profile-id order, then every room in
+  id order, then each service is checked again before anything is written.
+  If someone was taken meanwhile, who does what is chosen again, a few times
+  at most, before the 409.
+- Move and cancel act on the whole booking; a move shifts every service by
+  the same amount and each keeps its person unless one person for all is
+  named. Emails, reminders, calendar files and the customer's page name the
+  services together ("Cut + Colour") with the whole length and total price.
+- The payment step's quote is the first service and person, the whole span
+  and the total price; the SDK's `BookingQuote` is unchanged.
+
 ## Alternatives Considered
 
 - **Bookings as `calendar_events` rows with a type.** One table is simpler to

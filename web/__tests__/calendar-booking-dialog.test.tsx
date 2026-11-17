@@ -5,6 +5,7 @@
  */
 
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { BookingDialog } from '@/components/calendar/booking-dialog';
 import type { CalendarService, CalendarStaff } from '@/lib/calendar/api';
 
@@ -139,5 +140,77 @@ describe('BookingDialog', () => {
     expect(screen.getByText('Enter the customer’s name.')).toBeInTheDocument();
     expect(screen.getByText('Enter an email or a phone number.')).toBeInTheDocument();
     expect(mockApiClient.mock.calls.every(([url]) => String(url).includes('availability'))).toBe(true);
+  });
+
+  it('books several services back to back when the setting is on (WHIT-1173)', async () => {
+    const icing: CalendarService = { ...service, id: 8, name: { en: 'Icing class', ar: 'درس التزيين' }, duration_minutes: 60, price_minor: 20000 };
+    const posted: unknown[] = [];
+    const asked: string[] = [];
+    mockApiClient.mockImplementation((url: string, init?: RequestInit) => {
+      if (url.startsWith('/api/v1/calendar/availability')) {
+        asked.push(url);
+        return respond(200, { data: [{ ...slots[0], ends_at: '2026-11-14T07:30:00Z' }] });
+      }
+      if (url === '/api/v1/calendar/bookings' && init?.method === 'POST') {
+        posted.push(JSON.parse(String(init.body)));
+        return respond(201, { data: { id: 2, service_id: 7, profile_id: 11, customer: { name: 'Rana Haddad' }, starts_at: slots[0].starts_at, ends_at: '2026-11-14T07:30:00Z', status: 'confirmed', source: 'staff' } });
+      }
+      return respond(404, {});
+    });
+    const onBooked = jest.fn();
+    render(
+      <BookingDialog
+        open
+        onOpenChange={() => {}}
+        services={[service, icing]}
+        staff={staff}
+        timeZone="Asia/Amman"
+        initialDate={{ year: 2026, month: 11, day: 14 }}
+        initialProfileId={11}
+        multiService
+        onBooked={onBooked}
+      />
+    );
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Service' }));
+    await userEvent.click(await screen.findByRole('option', { name: /Cake tasting/ }));
+    fireEvent.click(screen.getByTestId('booking-add-service'));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Then' }));
+    await userEvent.click(await screen.findByRole('option', { name: /Icing class/ }));
+
+    // 30 + 60 minutes, JOD 12.500 + 20.000.
+    expect(screen.getByTestId('booking-total')).toHaveTextContent('In all: 90 min · JOD 32.500');
+    await waitFor(() => expect(asked.some((url) => url.includes('service_ids=7%2C8') && url.includes('profile_ids=11%2C0'))).toBe(true));
+
+    fireEvent.click(await screen.findByRole('button', { name: '09:00' }));
+    fireEvent.change(screen.getByLabelText(/Name/), { target: { value: 'Rana Haddad' } });
+    fireEvent.change(screen.getByLabelText(/Phone/), { target: { value: '+962790000000' } });
+    fireEvent.click(screen.getByTestId('booking-submit'));
+    await waitFor(() => expect(onBooked).toHaveBeenCalled());
+    expect(posted[0]).toMatchObject({
+      services: [
+        { service_id: 7, profile_id: 11 },
+        { service_id: 8, profile_id: null },
+      ],
+      starts_at: '2026-11-14T09:00:00+03:00',
+    });
+    expect(posted[0]).not.toHaveProperty('service_id');
+  });
+
+  it('offers no second service while the setting is off', async () => {
+    mockApiClient.mockImplementation(() => respond(200, { data: slots }));
+    render(
+      <BookingDialog
+        open
+        onOpenChange={() => {}}
+        services={[service]}
+        staff={staff}
+        timeZone="Asia/Amman"
+        initialDate={{ year: 2026, month: 11, day: 14 }}
+        onBooked={() => {}}
+      />
+    );
+    await screen.findByRole('button', { name: '09:00' });
+    expect(screen.queryByTestId('booking-add-service')).toBeNull();
   });
 });

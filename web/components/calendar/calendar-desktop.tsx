@@ -518,6 +518,7 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
         timeZone={timeZone}
         initialDate={moreFor?.date ?? (view === 'day' ? anchor : null)}
         initialProfileId={moreFor?.profileId ?? null}
+        multiService={settings.multi_service_booking ?? false}
         onBooked={(made) => {
           setNewBooking(false);
           addToast(t('booking.made', 'Booked for {name}', { name: made.customer.name ?? '' }), 'success');

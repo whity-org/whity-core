@@ -45,13 +45,24 @@ import {
   type FreeTime,
   type PublicBookingPage,
   type PublicService,
+  type ServicePick,
 } from '@/lib/booking/public-api';
+import { FieldSelect } from '@/components/field-select';
 import { FreeTimePicker } from './free-time-picker';
 import { BookingFacts, InYourZone, ZoneNote, useWhenAt } from './booking-parts';
 import { moneyText, useBookingWords } from './use-booking-words';
 import { cn } from '@/lib/utils';
 
 const ANYONE = 'anyone';
+/** Several services: a different person for each (WHIT-1173). */
+const EACH = 'each';
+/** At most this many services in one booking (the server's limit). */
+const MAX_SERVICES = 8;
+
+/** The time in ms, read only from the submit handler (kept out of render for the compiler). */
+function nowMs(): number {
+  return Date.now();
+}
 
 type Phase = 'loading' | 'closed' | 'error' | 'tooMany' | 'ready' | 'booked';
 type Field = 'name' | 'email' | 'phone';
@@ -243,11 +254,39 @@ function BookingForm({
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<Field, string>>>({});
 
   const service: PublicService | null = page.services.find((s) => s.id === serviceId) ?? null;
-  const providers = useMemo(
-    () => (service ? page.staff.filter((s) => service.staff_profile_ids.includes(s.profile_id)) : []),
-    [page.staff, service]
-  );
-  const profileId = person === ANYONE ? null : Number(person);
+
+  // WHIT-1173: more services after the first, back to back, when the
+  // workspace allows it; one person for all, anyone, or a person for each.
+  const multiOn = page.settings.multi_service_booking === true;
+  const [more, setMore] = useState<{ key: number; serviceId: number | null }[]>([]);
+  const [nextKey, setNextKey] = useState(1);
+  const [each, setEach] = useState<Record<number, string>>({});
+  const extra = more.map((row) => page.services.find((s) => s.id === row.serviceId) ?? null);
+  const severalOn = service !== null && extra.length > 0 && extra.every((s) => s !== null);
+  const chosen: PublicService[] = service ? [service, ...extra.filter((s): s is PublicService => s !== null)] : [];
+
+  // Who does every chosen service (one service: who does it).
+  const providers =
+    chosen.length === 0 ? [] : page.staff.filter((p) => chosen.every((s) => s.staff_profile_ids.includes(p.profile_id)));
+  const profileId = person === ANYONE || person === EACH ? null : Number(person);
+  const several: ServicePick[] | null = severalOn
+    ? chosen.map((s, i) => ({
+        service_id: s.id,
+        profile_id: person === EACH ? (each[i] && each[i] !== ANYONE ? Number(each[i]) : null) : profileId,
+      }))
+    : null;
+  const severalKey = several ? several.map((s) => `${s.service_id}:${s.profile_id ?? 0}`).join(',') : '';
+  const showPerson = severalOn ? true : providers.length > 1;
+  const totalMinutes = chosen.reduce((sum, s) => sum + s.duration_minutes, 0);
+  const pricedServices = chosen.filter((s) => s.price_minor !== null && s.price_minor !== undefined);
+  const totalPrice = pricedServices.length > 0 ? pricedServices.reduce((sum, s) => sum + (s.price_minor ?? 0), 0) : null;
+  const sendsRequest = chosen.some((s) => s.sends_request);
+  const servicesChanged = () => {
+    setPerson(ANYONE);
+    setEach({});
+    setSlot(null);
+    setProblem(null);
+  };
 
   const today = useMemo(() => zonedDate(timeZone), [timeZone]);
   const latest = useMemo(
@@ -255,13 +294,11 @@ function BookingForm({
     [today, page.settings.max_advance_days]
   );
 
-  const load = useCallback(
-    (range: { from: string; to: string }) =>
-      serviceId === null
-        ? Promise.resolve([])
-        : publicBookingApi.slots(workspace, { serviceId, profileId, ...range }),
-    [workspace, serviceId, profileId]
-  );
+  // The picker fetches when `loadKey` changes, not when this function does.
+  const load = (range: { from: string; to: string }) =>
+    serviceId === null
+      ? Promise.resolve([])
+      : publicBookingApi.slots(workspace, { serviceId, profileId, ...range, several });
 
   const onToken = useCallback((token: string | null) => {
     setBotToken(token);
@@ -271,9 +308,7 @@ function BookingForm({
 
   const chooseService = (value: string) => {
     setServiceId(Number(value));
-    setPerson(ANYONE);
-    setSlot(null);
-    setProblem(null);
+    servicesChanged();
   };
 
   const validate = (): Partial<Record<Field, string>> => {
@@ -289,7 +324,7 @@ function BookingForm({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setProblem(null);
-    if (service === null) {
+    if (service === null || (extra.length > 0 && !severalOn)) {
       setProblem(t('service.missing', 'Choose a service.'));
       return;
     }
@@ -312,8 +347,8 @@ function BookingForm({
     setSubmitting(true);
     try {
       // Someone who is quicker than the server's minimum is held back, not refused.
-      const opened = loadedAt.current ?? Date.now();
-      const waited = Date.now() - opened;
+      const opened = loadedAt.current ?? nowMs();
+      const waited = nowMs() - opened;
       if (waited < MIN_FILL_MS) await new Promise((resolve) => setTimeout(resolve, MIN_FILL_MS - waited));
       const body = bookingRequestBody({
         serviceId: service.id,
@@ -324,8 +359,9 @@ function BookingForm({
         phone,
         note,
         website,
-        elapsedMs: Date.now() - opened,
+        elapsedMs: nowMs() - opened,
         botToken,
+        several,
       });
       const booked = await publicBookingApi.book(workspace, body);
       onBooked(booked);
@@ -358,7 +394,7 @@ function BookingForm({
     }
   };
 
-  const serviceName = service ? words.name(service.name) : '';
+  const serviceName = chosen.map((s) => words.name(s.name)).join(' + ');
   const providerName = profileId !== null ? page.staff.find((s) => s.profile_id === profileId)?.display_name ?? '' : '';
 
   return (
@@ -422,10 +458,84 @@ function BookingForm({
                 );
               })}
             </RadioGroup>
+
+            {/* WHIT-1173: more services after the first, back to back. */}
+            {multiOn && service && (
+              <div className="space-y-3" data-testid="book-more">
+                {more.map((row, i) => (
+                  <div key={row.key} className="flex items-end gap-2" data-testid="book-more-service">
+                    <div className="min-w-0 flex-1 space-y-1.5">
+                      <label htmlFor={`book-more-${row.key}`} className="text-sm font-medium text-foreground">
+                        {t('more.then', 'Then')}
+                      </label>
+                      <FieldSelect
+                        id={`book-more-${row.key}`}
+                        value={row.serviceId === null ? '' : String(row.serviceId)}
+                        onChange={(value) => {
+                          setMore((rows) => rows.map((r) => (r.key === row.key ? { ...r, serviceId: Number(value) } : r)));
+                          servicesChanged();
+                        }}
+                        placeholder={t('more.choose', 'Choose a service')}
+                        invalid={extra[i] === null && problem !== null}
+                        options={page.services.map((s) => ({
+                          value: String(s.id),
+                          label: [words.name(s.name), words.duration(s.duration_minutes), words.price(s.price_minor, s.currency)]
+                            .filter((part): part is string => part !== null && part !== '')
+                            .join(' · '),
+                        }))}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setMore((rows) => rows.filter((r) => r.key !== row.key));
+                        servicesChanged();
+                      }}
+                      aria-label={t('more.remove', 'Remove this service')}
+                      title={t('more.remove', 'Remove this service')}
+                      data-testid="book-more-remove"
+                    >
+                      <Icon name="close" />
+                    </Button>
+                  </div>
+                ))}
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  {more.length + 1 < MAX_SERVICES && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setMore((rows) => [...rows, { key: nextKey, serviceId: null }]);
+                        setNextKey((k) => k + 1);
+                        servicesChanged();
+                      }}
+                      data-testid="book-add-service"
+                    >
+                      <Icon name="plus" />
+                      {t('more.add', 'Add another service')}
+                    </Button>
+                  )}
+                  {more.length > 0 && (
+                    <p className="text-sm text-muted-foreground" aria-live="polite" data-testid="book-total">
+                      {t('more.total', 'In all: {time}', { time: words.duration(totalMinutes) ?? '' })}
+                      {totalPrice !== null && (
+                        <>
+                          {' · '}
+                          <span dir="ltr" className="tabular-nums">
+                            {words.price(totalPrice, service.currency)}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </section>
 
-          {/* 2. Who, when more than one person offers it */}
-          {service && providers.length > 1 && (
+          {/* 2. Who, when more than one person offers it (or several services) */}
+          {service && showPerson && (
             <section className="space-y-3" aria-labelledby="book-step-person">
               <SectionTitle n={2} id="book-step-person">
                 {t('step.person', 'Who would you like to see?')}
@@ -439,7 +549,11 @@ function BookingForm({
                 aria-labelledby="book-step-person"
                 className="grid-cols-1 gap-2 sm:grid-cols-2"
               >
-                {[{ value: ANYONE, label: t('person.anyone', 'Anyone who is free') }, ...providers.map((p) => ({ value: String(p.profile_id), label: p.display_name }))].map(
+                {[
+                  { value: ANYONE, label: t('person.anyone', 'Anyone who is free') },
+                  ...providers.map((p) => ({ value: String(p.profile_id), label: p.display_name })),
+                  ...(severalOn ? [{ value: EACH, label: t('person.each', 'A different person for each service') }] : []),
+                ].map(
                   (choice) => (
                     <label
                       key={choice.value}
@@ -456,13 +570,38 @@ function BookingForm({
                   )
                 )}
               </RadioGroup>
+              {severalOn && person === EACH && (
+                <div className="grid gap-3 sm:grid-cols-2" data-testid="book-person-each">
+                  {chosen.map((s, i) => (
+                    <div key={`${s.id}-${i}`} className="space-y-1.5">
+                      <label htmlFor={`book-each-${i}`} className="text-sm font-medium text-foreground">
+                        {words.name(s.name)}
+                      </label>
+                      <FieldSelect
+                        id={`book-each-${i}`}
+                        value={each[i] ?? ANYONE}
+                        onChange={(value) => {
+                          setEach((current) => ({ ...current, [i]: value }));
+                          setSlot(null);
+                        }}
+                        options={[
+                          { value: ANYONE, label: t('person.anyone', 'Anyone who is free') },
+                          ...page.staff
+                            .filter((p) => s.staff_profile_ids.includes(p.profile_id))
+                            .map((p) => ({ value: String(p.profile_id), label: p.display_name })),
+                        ]}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           )}
 
           {/* 3. Day and time */}
           {service && (
             <section className="space-y-3" aria-labelledby="book-step-time">
-              <SectionTitle n={providers.length > 1 ? 3 : 2} id="book-step-time">
+              <SectionTitle n={showPerson ? 3 : 2} id="book-step-time">
                 {t('step.time', 'Choose a day and time')}
               </SectionTitle>
               <ZoneNote timeZone={timeZone} />
@@ -472,7 +611,7 @@ function BookingForm({
                 earliest={today}
                 latest={latest}
                 load={load}
-                loadKey={`${serviceId}:${person}`}
+                loadKey={`${serviceId}:${person}:${severalKey}`}
                 selected={slot}
                 onSelect={(next) => {
                   setSlot(next);
@@ -486,7 +625,7 @@ function BookingForm({
           {/* 4. Details */}
           {service && slot && (
             <section className="space-y-4" aria-labelledby="book-step-details">
-              <SectionTitle n={providers.length > 1 ? 4 : 3} id="book-step-details">
+              <SectionTitle n={showPerson ? 4 : 3} id="book-step-details">
                 {t('step.details', 'Your details')}
               </SectionTitle>
               <p className="text-sm text-muted-foreground">
@@ -571,10 +710,15 @@ function BookingForm({
                 <span className="block" data-testid="book-summary-when">
                   {whenAt(slot.starts_at)}
                 </span>
-                {words.price(service.price_minor, service.currency) !== null && (
+                {severalOn && (
+                  <span className="block text-sm text-muted-foreground" data-testid="book-summary-total">
+                    {t('more.total', 'In all: {time}', { time: words.duration(totalMinutes) ?? '' })}
+                  </span>
+                )}
+                {words.price(totalPrice, service.currency) !== null && (
                   <span className="block text-sm text-muted-foreground">
                     <span dir="ltr" className="tabular-nums">
-                      {words.price(service.price_minor, service.currency)}
+                      {words.price(totalPrice, service.currency)}
                     </span>
                   </span>
                 )}
@@ -606,7 +750,7 @@ function BookingForm({
               )}
 
               <Button type="submit" size="lg" className="w-full sm:w-auto" loading={submitting} data-testid="book-submit">
-                {service?.sends_request ? t('submitRequest', 'Send request') : t('submit', 'Book this time')}
+                {sendsRequest ? t('submitRequest', 'Send request') : t('submit', 'Book this time')}
               </Button>
             </section>
           )}

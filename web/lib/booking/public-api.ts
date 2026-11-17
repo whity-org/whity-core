@@ -124,6 +124,16 @@ export interface BookingDraft {
   /** Milliseconds since the page loaded. */
   elapsedMs: number;
   botToken: string | null;
+  /** WHIT-1173: several services back to back, in order; null or one for a single service. */
+  several?: ServicePick[] | null;
+  /** With `several` and nobody chosen: one person who does them all. */
+  samePerson?: boolean;
+}
+
+/** One service of a booking of several, and who does it (null: anyone). */
+export interface ServicePick {
+  service_id: number;
+  profile_id: number | null;
 }
 
 /**
@@ -141,6 +151,12 @@ export function bookingRequestBody(draft: BookingDraft): PublicBookingRequest {
     elapsed_ms: Math.max(0, Math.round(draft.elapsedMs)),
   };
   if (draft.profileId !== null) body.profile_id = draft.profileId;
+  if (draft.several && draft.several.length > 1) {
+    delete body.service_id;
+    delete body.profile_id;
+    body.services = draft.several.map((s) => (s.profile_id !== null ? { service_id: s.service_id, profile_id: s.profile_id } : { service_id: s.service_id }));
+    if (draft.samePerson) body.same_person = true;
+  }
   if (draft.phone.trim() !== '') body.phone = draft.phone.trim();
   if (draft.note.trim() !== '') body.note = draft.note.trim();
   if (draft.botToken) body.bot_token = draft.botToken;
@@ -181,10 +197,20 @@ export const publicBookingApi = {
 
   async slots(
     workspace: string,
-    query: { serviceId: number; profileId: number | null; from: string; to: string }
+    query: { serviceId: number; profileId: number | null; from: string; to: string; several?: ServicePick[] | null; samePerson?: boolean }
   ): Promise<FreeTime[]> {
     const params = new URLSearchParams({ service_id: String(query.serviceId), from: query.from, to: query.to });
     if (query.profileId !== null) params.set('profile_id', String(query.profileId));
+    // WHIT-1173: several services back to back.
+    if (query.several && query.several.length > 1) {
+      params.delete('service_id');
+      params.delete('profile_id');
+      params.set('service_ids', query.several.map((s) => s.service_id).join(','));
+      if (query.several.some((s) => s.profile_id !== null)) {
+        params.set('profile_ids', query.several.map((s) => s.profile_id ?? 0).join(','));
+      }
+      if (query.samePerson) params.set('same_person', 'true');
+    }
     return (await send<{ data: FreeTime[] }>(`${PAGE(workspace)}/slots?${params.toString()}`)).data;
   },
 
