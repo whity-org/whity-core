@@ -486,6 +486,17 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertSame(0, (int) $this->scalar('SELECT COUNT(*) FROM contacts WHERE tenant_id = 1'), 'looking adds nothing to the workspace');
     }
 
+    public function testTheirOwnPhoneComesFromTheirProfileNeverFromAContact(): void
+    {
+        // WHIT-1181: the profile's own phone, not the one Other Bakery saved.
+        $this->pdo->exec("INSERT INTO contacts (tenant_id, name, email, phone, profile_id) VALUES (2, 'Contact Name At Other', 'other@example.com', '+962 6 000 0000', 21)");
+        $this->claims = ['type' => 'access', 'profile_id' => 21, 'active_tenant_id' => 2, 'email' => 'ahmad@example.com'];
+        self::assertNull(self::data($this->visitor())['data']['phone']);
+
+        (new \Whity\Core\Identity\PersonalPhone($this->pdo))->setByPerson(21, '+962791234567');
+        self::assertSame(['name' => 'Baker 21', 'email' => 'ahmad@example.com', 'phone' => '+962791234567'], self::data($this->visitor())['data']);
+    }
+
     public function testAMemberOrContactOfTheWorkspaceGetsTheSameAnswerFromTheirOwnAccount(): void
     {
         $this->pdo->exec("INSERT INTO contacts (tenant_id, name, email, phone, profile_id) VALUES (1, 'Saved As Something Else', 'saved@example.com', '+962 6 111 1111', 11)");

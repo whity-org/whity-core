@@ -5596,6 +5596,12 @@ $displayPreferencesHandler = new \Whity\Api\DisplayPreferencesApiHandler($tokenV
 $router->register('GET', '/api/me/display-preferences', [$displayPreferencesHandler, 'get'], null);
 $router->register('PUT', '/api/me/display-preferences', [$displayPreferencesHandler, 'update'], null);
 
+// WHIT-1181: a person's own phone number, E.164 on their profile. Self-scoped,
+// session-gated, no RBAC permission, no current password.
+$myPhoneHandler = new \Whity\Api\MyPhoneApiHandler($tokenValidator, new \Whity\Core\Identity\PersonalPhone($db->getPdo()));
+$router->register('GET', '/api/me/phone', [$myPhoneHandler, 'get'], null);
+$router->register('PUT', '/api/me/phone', [$myPhoneHandler, 'update'], null);
+
 // Per-tenant notification SENDER configuration (WC-notifications, d70c6083). A
 // tenant admin manages their OWN tenant's per-channel sender (from/reply-to,
 // transport, encrypted creds). settings:manage gated; creds are write-only.
@@ -6131,6 +6137,8 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     $signingChallengeRepository,
     // WHIT-1168: accept an invitation by signing in with the identity provider.
     $invitationService,
+    // WHIT-1181: a verified phone_number fills the person's own phone.
+    new \Whity\Core\Identity\PersonalPhone($db->getPdo()),
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).

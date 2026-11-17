@@ -2880,6 +2880,33 @@ final class CoreApiSchemas
             ]),
             [
                 'method' => 'GET',
+                'path' => '/api/me/phone',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Your own phone number (WHIT-1181)',
+                    'tags' => ['me'],
+                    'responses' => [200 => self::jsonResponse('Your phone', 'MyPhoneResponse')] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/phone',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Set or remove your own phone number (WHIT-1181)',
+                    'description' => 'Stored as E.164 on your profile, across every workspace. A number you set here is never replaced by one from a sign-in.',
+                    'tags' => ['me'],
+                    'request' => 'MyPhoneRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('Your phone', 'MyPhoneResponse'),
+                        422 => self::errorResponse('Not a phone number with its country code'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
                 'path' => '/api/me/away',
                 'requiredRole' => null,
                 'requiredPermission' => null,
@@ -4677,6 +4704,7 @@ final class CoreApiSchemas
         $sessionUser = self::object([
             'id' => self::int(),
             'email' => self::str(),
+            'phone' => self::str(true) + ['description' => 'Your own phone number in E.164, or null (WHIT-1181).'],
             'role' => self::str(),
             'tenant_id' => self::int(),
         ], ['id', 'email', 'role', 'tenant_id']);
@@ -5069,6 +5097,16 @@ final class CoreApiSchemas
             'MeResponse' => self::object([
                 'user' => $selfUser,
             ] + $tokenPair, ['user']),
+
+            // GET and PUT /api/me/phone (WHIT-1181)
+            'MyPhoneResponse' => self::object([
+                'data' => self::object([
+                    'phone' => self::str(true) + ['description' => 'E.164, such as +962791234567, or null when none is set.'],
+                ], ['phone']),
+            ], ['data']),
+            'MyPhoneRequest' => self::object([
+                'phone' => self::str(true) + ['description' => 'With its country code; spaces, dashes and Arabic-Indic digits are accepted and stored as E.164. Null or empty removes it.'],
+            ], ['phone']),
 
             // PATCH /api/me — request body
             'MeUpdateRequest' => self::object([
@@ -10569,7 +10607,7 @@ final class CoreApiSchemas
             'PublicBookingVisitor' => self::object([
                 'name' => self::str() + ['description' => 'The display name on their own profile; may be empty.'],
                 'email' => self::str() + ['description' => 'The email of their own sign-in; may be empty.'],
-                'phone' => self::str(true) + ['description' => 'Null until a profile carries a phone number.'],
+                'phone' => self::str(true) + ['description' => 'Their own phone in E.164, or null.'],
             ], ['name', 'email', 'phone']) + ['nullable' => true, 'description' => 'The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in.'],
             'PublicBookingPage' => self::object([
                 'workspace' => self::object(['name' => self::str(), 'slug' => self::str()], ['name', 'slug']),
