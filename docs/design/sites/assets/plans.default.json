@@ -2,7 +2,7 @@
   "version": 1,
   "currency": "JOD",
   "decimals": 3,
-  "updatedAt": "2026-11-09",
+  "updatedAt": "2026-11-17",
   "plans": [
     {
       "id": "free",
@@ -19,8 +19,8 @@
         "monthly": "0"
       },
       "limits": {
-        "staff": 5,
-        "customersPerMonth": 500
+        "staff": 2,
+        "customersPerMonth": 100
       },
       "features": [
         {

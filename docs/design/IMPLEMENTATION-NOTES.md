@@ -492,7 +492,7 @@ No site needed a new repository.
 | --- | --- | --- |
 | Messages | Customer conversations: an inbox, email and web chat channels, a channel interface for plugins (`PluginMessageChannelsInterface`), merged inbox sources. WhatsApp and SMS are paid plugins | ADR 0016; #1811, #1820 (SDK 1.97), #1821 (migrations 243-245), #1824; `/admin/messages`, `/messages`, `/chat/[workspace]`, `src/Core/Messaging` |
 | Calendar | Staff calendars, services, availability (hours and time off), the public booking page and the customer's booking page, reminders through Messages, ICS feed and `.ics` attachment, outside busy times, a payment step | ADR 0017; #1819, #1822, #1823, #1825, #1826 (SDK 1.98), #1827, #1828; `/calendar`, `/calendar/services`, `/calendar/hours`, `/calendar/settings`, `/book/[workspace]`, `/booking/[token]`, `src/Core/Calendar` |
-| Plan limits | BM.2: 5 staff and 500 customers a month on the free plan, agents not counted, add-on packs, warn mode; Built on Whity follows the plan | #1787 (catalogue, default plan), #1799 (server), #1800 (Billing screen, add-on pack editor); `/billing/plan-limits.tsx`, `src/Core/Entitlement`, `src/Core/Usage` |
+| Plan limits | BM.2: 2 staff and 100 customers a month on the free plan (BM.3, owner 2026-11-17; Whity Cloud only, self-hosted has no plan limits), agents not counted, add-on packs, warn mode; Built on Whity follows the plan | #1787 (catalogue, default plan), #1799 (server), #1800 (Billing screen, add-on pack editor); `/billing/plan-limits.tsx`, `src/Core/Entitlement`, `src/Core/Usage` |
 
 **3.3 cards against that work:**
 

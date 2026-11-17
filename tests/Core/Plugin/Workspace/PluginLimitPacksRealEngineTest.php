@@ -46,7 +46,7 @@ final class PluginLimitPacksRealEngineTest extends TestCase
             (40, 'plugin.salons.monthly', 'Whity for Salons', true, 2, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
             (41, 'plugin.salons.yearly', 'Whity for Salons', true, 3, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
         $this->pdo->exec("INSERT INTO plan_entitlements (plan_id, entitlement_key, value) VALUES
-            (30, 'members.max', '5'), (30, 'customers.per_month', '500'),
+            (30, 'members.max', '2'), (30, 'customers.per_month', '100'),
             (40, 'members.max', '-1'), (40, 'salons.access', 'true'),
             (41, 'members.max', '-1'), (41, 'salons.access', 'true')");
         $this->pdo->exec("INSERT INTO tenant_plan (tenant_id, plan_id, status, assigned_at) VALUES (5, 30, 'active', CURRENT_TIMESTAMP)");
@@ -98,9 +98,9 @@ final class PluginLimitPacksRealEngineTest extends TestCase
         return $packs->packsFor(self::T)[0]['values'] ?? [];
     }
 
-    public function testFreeAloneStopsAtFiveStaff(): void
+    public function testFreeAloneStopsAtTwoStaff(): void
     {
-        self::assertSame(5, $this->staffLimit());
+        self::assertSame(2, $this->staffLimit());
         self::assertFalse((new SeatService($this->pdo, $this->entitlements, $this->settings))->decide(self::T)->allowed);
     }
 
@@ -111,7 +111,7 @@ final class PluginLimitPacksRealEngineTest extends TestCase
         self::assertSame(EntitlementRegistry::UNLIMITED, $this->staffLimit());
         self::assertTrue((new SeatService($this->pdo, $this->entitlements, $this->settings))->decide(self::T)->allowed);
         self::assertArrayNotHasKey('salons.access', $this->packValues(), 'Only number limits: a trial never entitles itself');
-        self::assertSame(500, $this->entitlements->limit(self::T, EntitlementRegistry::CUSTOMERS_PER_MONTH), 'Customers stay as they are');
+        self::assertSame(100, $this->entitlements->limit(self::T, EntitlementRegistry::CUSTOMERS_PER_MONTH), 'Customers stay as they are');
         self::assertSame('trial', $this->activation->stateFor('Salons', self::T)['reason']);
     }
 
@@ -122,7 +122,7 @@ final class PluginLimitPacksRealEngineTest extends TestCase
         self::assertSame(EntitlementRegistry::UNLIMITED, $this->staffLimit());
 
         $this->now += 7 * 86400; // read-only
-        self::assertSame(5, $this->staffLimit());
+        self::assertSame(2, $this->staffLimit());
         $count = $this->pdo->query("SELECT COUNT(*) FROM memberships WHERE tenant_id = 5 AND status = 'active'");
         self::assertNotFalse($count);
         self::assertSame(5, (int) $count->fetchColumn());
@@ -140,7 +140,7 @@ final class PluginLimitPacksRealEngineTest extends TestCase
 
     public function testOffInTheWorkspaceLiftsNothing(): void
     {
-        self::assertSame(5, $this->staffLimit());
+        self::assertSame(2, $this->staffLimit());
         $packs = new PluginLimitPacks($this->pdo, $this->activation, static fn (): array => ['Salons' => ['entitlement' => 'salons.access', 'product' => 'plugin.salons', 'trialDays' => 14]]);
         self::assertSame([], $packs->packsFor(self::T));
     }

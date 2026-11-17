@@ -34,15 +34,15 @@ Company-first (BM.1): **"Your company's work in one place. Agents prepare it, yo
 | Where | app.whity.dev, shared | Its own installation, hosted by Whity | The company's servers |
 | Who runs it | Whity | Whity hosts; the company manages its Whity | The company |
 | Apps | Whity's own apps | Plus Marketplace plugins and custom code | Plus Marketplace plugins and custom code |
-| Pays for | A plan above the free limits | A flat monthly fee by size (BM.7), plus services above the free limits | Services above the free limits |
+| Pays for | A plan above the free limits | A flat monthly fee by size (BM.7), plus services above the free limits | Paid plugins only; no plan limits (owner 2026-11-17) |
 
 ## Free, then plans (BM.3, BM.4)
 
-Whity's paid services (Whity ID, Whity Render, the mobile app, agents) are free up to the limits on every installation, ours or theirs. **Staff** are the company's own accounts; agents don't count. **Customers** are people outside the company who sign in with Whity ID, book, use the customer app or portal, or pay online, counted per month; contacts stored in records are always unlimited.
+The plans and their limits are only for Whity Cloud (app.whity.dev). A self-hosted installation has no plan limits of any kind, including on Whity's services; it pays only for paid plugins (owner 2026-11-17). **Staff** are the company's own accounts; agents don't count. **Customers** are people outside the company who sign in with Whity ID, book, use the customer app or portal, or pay online, counted per month; contacts stored in records are always unlimited.
 
 | Plan | Staff | Customers a month | White-label |
 | --- | --- | --- | --- |
-| Free | 5 | 500 | Logo and colour |
+| Free | 2 | 100 | Logo and colour |
 | Team | 25 | 5,000 | Plus own web address, sign-in page and email sender, no "Built on Whity" |
 | Business | 100 | 25,000 | Plus own app in the stores (M.16) |
 | Larger | Quote | Quote | Everything, with an on-premises licence if needed (BM.8) |
@@ -57,7 +57,7 @@ Logo and colour are free. Above that, every Whity service is white-labelled down
 
 ## Who hosts the services (BM.8, BM.9)
 
-Whity hosts Whity ID and Whity Render for every installation by default. Regulated companies (banks, clinics, government) and large partners can buy an on-premises licence instead (minimum contract, usage reported back). Self-hosted installations keep working for a while if Whity ID can't be reached. Hosted services run in the EU (servers, database, files and backups; WS.18). A company that needs its data inside its own country gets a dedicated installation there for a fee, or runs Whity on its own servers and pays for the Whity services it uses.
+Whity hosts Whity ID and Whity Render for every installation by default. Regulated companies (banks, clinics, government) and large partners can buy an on-premises licence instead (minimum contract, usage reported back). Self-hosted installations keep working for a while if Whity ID can't be reached. Hosted services run in the EU (servers, database, files and backups; WS.18). A company that needs its data inside its own country gets a dedicated installation there for a fee, or runs Whity on its own servers, with no plan limits, and pays only for the paid plugins it uses.
 
 ## Partners (BM.10)
 
