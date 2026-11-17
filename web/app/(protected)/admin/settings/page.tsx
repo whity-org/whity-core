@@ -37,9 +37,9 @@ import {
 } from './settings-shared';
 
 /**
- * General — the CURRENT tenant's overrides (site name, timezone, support
- * email). Locale + logos/colors live on the Branding tab; SSO, Sign-up,
- * Email, and Storage each have their own system-tenant-gated tab.
+ * General — the CURRENT tenant's overrides (support email, time zone, main
+ * language). The product name, logos and colour live on Branding; SSO,
+ * Sign-up, Email, and Storage each have their own system-tenant-gated tab.
  */
 export default function AdminSettingsPage() {
   const { addToast } = useToast();
@@ -180,12 +180,13 @@ function TenantSettingsSection({
     if (!effective) return;
 
     const current = {
-      site_name: valueOf('site_name'),
-      timezone: valueOf('timezone'),
       support_email: valueOf('support_email'),
+      timezone: valueOf('timezone'),
+      locale: valueOf('locale'),
     };
 
-    const validationError = validate(current, false, t);
+    // The product name is on Branding now; only the email is checked here.
+    const validationError = validate({ site_name: '', support_email: current.support_email }, false, t);
     if (validationError) {
       addToast(validationError, 'error');
       return;

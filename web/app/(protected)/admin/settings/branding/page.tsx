@@ -1,194 +1,44 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { NoAccess } from '@/components/no-access';
-import { api } from '@/lib/api/client';
-import { useToast } from '@/lib/toast-context';
 import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { useFetch } from '@/hooks/useFetch';
-import { AdminHeader } from '@/components/admin/admin-header';
-import { Button } from '@whity/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
-import { IconDeviceFloppy } from '@tabler/icons-react';
 import { BrandingSettings } from '@/components/branding-settings';
-import { FirstVisitScene } from '@/components/first-visit-scene';
 import { useTranslation } from '@whity/features/i18n';
-import {
-  SETTINGS_READ,
-  SETTINGS_WRITE,
-  SYSTEM_TENANT_ID,
-  generalFieldLabels,
-  errorMessage,
-  SettingsField,
-  type AddToast,
-} from '../settings-shared';
+import { SETTINGS_MANAGE, SETTINGS_READ, SETTINGS_WRITE, SYSTEM_TENANT_ID } from '../settings-shared';
 
 /**
- * Branding — the instance's visual + language identity: locale, logos,
- * favicon, and colors. Grouped together because they're all "what this
- * deployment looks and reads like", as distinct from General's operational
- * fields (site name, support email, timezone).
+ * Settings › Branding (TplAdminBranding, 09-white-label): the workspace's name,
+ * web address, main colour, logos and favicon, with a live preview. The system
+ * tenant edits the platform-wide defaults here instead, which takes
+ * settings:manage. The default language is on General (section 25).
  */
 export default function BrandingSettingsPage() {
-  const { addToast } = useToast();
   const { user } = useAuth();
   const { hasPermission, loading: isCapabilitiesLoading } = useCapabilities();
   const t = useTranslation('admin');
 
-  const canRead = hasPermission(SETTINGS_READ);
-  const canWrite = hasPermission(SETTINGS_WRITE);
-  const isSystemTenant = user?.tenant_id === SYSTEM_TENANT_ID;
-
-  // Fetch tenant_overridable at the page level so it can be passed to
-  // BrandingSettings. Must be called unconditionally (Rules of Hooks).
-  const { data: settingsMeta } = useFetch(async () => {
-    const { data: body } = await api.GET('/api/v1/settings');
-    return body?.data ?? null;
-  }, []);
-  const tenantOverridable = settingsMeta?.tenant_overridable ?? true;
-
   if (isCapabilitiesLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex min-h-96 items-center justify-center" aria-busy="true">
+        <div className="size-8 animate-spin rounded-full border-b-2 border-primary motion-reduce:animate-none" />
       </div>
     );
   }
 
-  if (!canRead) {
+  if (!hasPermission(SETTINGS_READ)) {
     return (
       <NoAccess area={t('access.area.settings.branding.accessDenied', 'branding')} permission="settings:read" />
     );
   }
 
+  const isSystemTenant = user?.tenant_id === SYSTEM_TENANT_ID;
+  const scope = isSystemTenant ? 'global' : 'tenant';
+  const canWrite = hasPermission(isSystemTenant ? SETTINGS_MANAGE : SETTINGS_WRITE);
+
   return (
-    <div className="space-y-8 max-w-4xl mx-auto px-4 md:px-0 pb-16">
-      <AdminHeader
-        title={t('settings.branding.title', 'Branding')}
-        description={t(
-          'settings.branding.description',
-          'Language, logos, favicon, and colors for this tenant.'
-        )}
-      />
-      {/* Your brand, the first visit only (LT.4): the workspace's sheet sets down on the platform. */}
-      <FirstVisitScene name="brand-sheet-platform" storageKey="branding-first" />
-      <LocaleSection canWrite={canWrite} tenantOverridable={tenantOverridable} addToast={addToast} />
-      <BrandingSettings variant="tenant" tenantOverridable={tenantOverridable} />
-      {isSystemTenant && <BrandingSettings variant="global" />}
+    <div className="mx-auto max-w-6xl px-4 pb-16 md:px-0">
+      <BrandingSettings scope={scope} canWrite={canWrite} />
     </div>
-  );
-}
-
-/**
- * The tenant's locale override — split out of the General tab's tenant form
- * (its own draft/save, PATCHing only `locale`) so Branding remains a single
- * self-contained page even though `locale` is still one of the four
- * `SettingsValueMap` keys the backend's per-tenant endpoint recognizes.
- */
-function LocaleSection({
-  canWrite,
-  tenantOverridable,
-  addToast,
-}: {
-  canWrite: boolean;
-  tenantOverridable: boolean;
-  addToast: AddToast;
-}) {
-  const t = useTranslation('admin');
-  const { data, loading, error, refetch } = useFetch(async () => {
-    const { data: body, error: getError } = await api.GET('/api/v1/settings');
-    if (body === undefined) {
-      throw new Error(
-        errorMessage(getError, t('settings.branding.locale.loadFailed', 'Failed to load settings'))
-      );
-    }
-    return body.data;
-  }, []);
-
-  const [draft, setDraft] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const effective = data?.effective?.locale;
-  const isOverridden = (data?.overridden ?? []).includes('locale');
-
-  useEffect(() => {
-    if (error) addToast(error, 'error');
-  }, [error, addToast]);
-
-  if (!tenantOverridable) {
-    // WC-224: the system tenant has no per-tenant override layer — edits
-    // happen on the global branding form below instead.
-    return null;
-  }
-
-  const value = draft ?? effective ?? '';
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const trimmed = value.trim();
-      const { error: patchError } = await api.PATCH('/api/v1/settings', {
-        body: { settings: { locale: trimmed === '' ? '' : trimmed } },
-      });
-      if (patchError) {
-        throw new Error(
-          errorMessage(patchError, t('settings.branding.locale.saveFailed', 'Failed to save language'))
-        );
-      }
-      addToast(t('settings.branding.locale.saved', 'Language saved.'), 'success');
-      setDraft(null);
-      refetch();
-    } catch (err) {
-      addToast(
-        err instanceof Error
-          ? err.message
-          : t('settings.branding.locale.saveFailed', 'Failed to save language'),
-        'error'
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Card className="border border-border bg-card shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-lg font-semibold font-heading">
-          <h2>{t('settings.branding.locale.title', 'Language')}</h2>
-        </CardTitle>
-        <CardDescription className="text-sm">
-          {t(
-            'settings.branding.locale.description',
-            'Default interface language for this tenant. Cleared falls back to the global default.'
-          )}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        {loading ? (
-          <div className="h-12 animate-pulse rounded-md bg-muted/40" />
-        ) : (
-          <SettingsField
-            settingKey="locale"
-            idPrefix="branding"
-            label={generalFieldLabels(t).locale}
-            value={value}
-            disabled={!canWrite}
-            onChange={setDraft}
-            status={isOverridden ? 'overridden' : 'inherited'}
-          />
-        )}
-        {canWrite && (
-          <div className="flex justify-end">
-            <Button onClick={handleSave} disabled={saving || draft === null} className="gap-2">
-              <IconDeviceFloppy className="w-4 h-4" />
-              {saving
-                ? t('settings.branding.saving', 'Saving…')
-                : t('settings.branding.locale.save', 'Save language')}
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }
