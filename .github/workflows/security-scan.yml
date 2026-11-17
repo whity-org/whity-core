@@ -127,4 +127,4 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: npm audit (workspace root)
-        run: npm audit --audit-level=high
+        run: node scripts/npm-audit-gate.mjs --level high

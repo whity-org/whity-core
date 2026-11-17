@@ -70,7 +70,7 @@ jobs:
         id: audit
         run: |
           set +e
-          npm audit --audit-level=high > audit.txt 2>&1
+          node scripts/npm-audit-gate.mjs --level high > audit.txt 2>&1
           echo "exit=$?" >> "$GITHUB_OUTPUT"
           cat audit.txt
           set -e
