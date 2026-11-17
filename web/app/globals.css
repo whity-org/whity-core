@@ -62,6 +62,24 @@
   color-scheme: dark;
 }
 
+/*
+ * A stack of groups with a divider between them (04-layout: 1px `divider`
+ * inside cards). Tailwind v4 puts both `space-y-*`'s gap and `divide-y`'s line
+ * on the bottom of each child, so the two together draw the line straight
+ * under the group's last control and leave the whole gap after it: a button
+ * at the end of a group sits on the line. This keeps the same gap on both
+ * sides of the line instead. `stack-divided-4` is 16px each side (between
+ * groups), `stack-divided-6` 24px (between sections). The design-system rules
+ * test refuses `space-y-*` and `divide-y` on one element.
+ */
+@utility stack-divided-* {
+  & > :not(:last-child) {
+    padding-block-end: --spacing(--value(integer));
+    margin-block-end: --spacing(--value(integer));
+    border-block-end: 1px solid var(--color-divider);
+  }
+}
+
 /* katex dark-mode overrides */
 .dark .katex { color: var(--foreground); }
 .dark .katex-error { color: var(--destructive); }
