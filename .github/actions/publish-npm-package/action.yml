@@ -77,5 +77,14 @@ runs:
           echo "::notice::$NAME@$VERSION is already published, skipping. Bump the version in packages/${{ inputs.package }}/package.json to publish a new release."
         else
           echo "Publishing $NAME@$VERSION"
+          # setup-node's registry-url writes an .npmrc with
+          # _authToken=${NODE_AUTH_TOKEN} and fills NODE_AUTH_TOKEN with a
+          # placeholder. npm then sends that placeholder instead of doing the
+          # trusted-publishing (OIDC) exchange, and the registry answers
+          # "404 Not Found - PUT". Drop both so only OIDC is left.
+          unset NODE_AUTH_TOKEN
+          if [ -n "${NPM_CONFIG_USERCONFIG:-}" ] && [ -f "$NPM_CONFIG_USERCONFIG" ]; then
+            sed -i '/_authToken/d' "$NPM_CONFIG_USERCONFIG"
+          fi
           npm publish --provenance --access public
         fi
