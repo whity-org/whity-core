@@ -88,12 +88,13 @@ export function isPluginKey(key: string): boolean {
 export type SettingsMap = Record<string, string>;
 
 /** The General tab's tenant-overridable key set. */
-export type GeneralSettingKey = 'site_name' | 'timezone' | 'support_email';
+export type GeneralSettingKey = 'support_email' | 'timezone' | 'locale';
 
-// The General tab's tenant-overridable keys, kept in display order. `locale`
-// lives on the Branding tab instead (grouped with logos/colors as the
-// instance's "identity & language" surface) — see branding/page.tsx.
-export const GENERAL_SETTING_KEYS: readonly GeneralSettingKey[] = ['site_name', 'timezone', 'support_email'];
+// The General tab's tenant-overridable keys, in the order of its card
+// (TplSettingsGeneral, section 25: support email, time zone, language). The
+// product name (`site_name`) is on Branding with the logo and colour
+// (TplAdminBranding).
+export const GENERAL_SETTING_KEYS: readonly GeneralSettingKey[] = ['support_email', 'timezone', 'locale'];
 
 /**
  * Per-tenant DISPLAY preferences, rendered on the General tab beneath the four
@@ -153,7 +154,7 @@ export function generalFieldLabels(t: TranslateFn): Record<SettingKey, string> {
   return {
     site_name: t('settings.field.site_name', 'Site name'),
     timezone: t('settings.field.timezone', 'Timezone'),
-    locale: t('settings.field.locale', 'Locale'),
+    locale: t('settings.field.locale', 'Main language'),
     support_email: t('settings.field.support_email', 'Support email'),
   };
 }

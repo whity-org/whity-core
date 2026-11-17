@@ -198,15 +198,15 @@ test.describe('Branding — logo/favicon round-trips (requires Slice 5)', () => 
   });
 
   test('uploading a wide logo shows an <img> in the sidebar (not text)', async ({ page, baseURL }) => {
-    // Navigate to /admin/settings/branding, find the BrandingSettings "Wide logo"
-    // global-scope file input (data-testid), upload a PNG, wait for the
+    // Navigate to /admin/settings/branding (the system tenant edits the platform
+    // brand there), find the "Wide logo" global-scope file input (data-testid), upload a PNG, wait for the
     // success toast, then navigate to the dashboard and assert the sidebar
     // renders an <img alt="…"> rather than an <h1> text node.
     if (!baseURL) test.skip();
 
     await page.goto('/admin/settings/branding');
     await expect(
-      page.getByRole('heading', { name: 'Global branding defaults', exact: true })
+      page.getByRole('heading', { name: 'Platform brand', exact: true })
     ).toBeVisible();
 
     // Use the data-testid selector for the hidden file input — more reliable

@@ -1,30 +1,24 @@
 /**
- * WC-233 Slice 5 — BrandingSettings component tests.
+ * Settings › Branding (TplAdminBranding): one form with one Save, a live
+ * preview, logos that upload at once, and the two layers (a workspace's own
+ * branding; the system tenant's platform defaults and web address).
  *
- * Verifies the three RBAC / tenantOverridable gates and the upload/clear flow
- * without spinning up a server. The branding-upload module and useCapabilities
- * hook are mocked.
+ * The branding-upload helpers, the API client and the hooks are mocked, so no
+ * server is needed.
  */
 
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
-// ---------------------------------------------------------------------------
-// Module mocks
-// ---------------------------------------------------------------------------
-
-// Mock the branding upload helpers.
 const mockUploadBrandingAsset = jest.fn();
 const mockClearBrandingAsset = jest.fn();
 const mockSetBrandingHost = jest.fn();
-
 jest.mock('@/lib/api/branding-upload', () => ({
   uploadBrandingAsset: (...args: unknown[]) => mockUploadBrandingAsset(...args),
   clearBrandingAsset: (...args: unknown[]) => mockClearBrandingAsset(...args),
   setBrandingHost: (...args: unknown[]) => mockSetBrandingHost(...args),
 }));
 
-// Mock the typed API client (used by useFetch inside BrandingSettings for GET /api/v1/branding).
 const mockApiGet = jest.fn();
 const mockApiPatch = jest.fn();
 jest.mock('@/lib/api/client', () => ({
@@ -42,348 +36,230 @@ jest.mock('@/lib/branding-context', () => ({
   useRefreshBranding: () => mockRefresh,
 }));
 
-// Mock useAuth so the component can read user?.tenant_id without an AuthProvider.
-jest.mock('@/lib/auth-context', () => ({
-  useAuth: () => ({ user: { id: 1, email: 'admin@example.com', role: 'admin', tenant_id: 0 } }),
+let mockMode: 'light' | 'dark' = 'light';
+jest.mock('@/lib/theme-mode-context', () => ({
+  useThemeMode: () => ({ resolved: mockMode, preference: mockMode, setPreference: jest.fn(), toggle: jest.fn() }),
 }));
 
-// Mock useCapabilities so tests can set permissions declaratively.
-const hasPermission = jest.fn<boolean, [string]>();
-jest.mock('@/hooks/useCapabilities', () => ({
-  useCapabilities: () => ({ hasPermission, loading: false, permissions: [] }),
-}));
+// The first-visit scene is a Lottie moment; it has nothing to do with the form.
+jest.mock('@/components/first-visit-scene', () => ({ FirstVisitScene: () => null }));
 
-// Mock useToast.
 const addToast = jest.fn();
 jest.mock('@/lib/toast-context', () => ({
   useToast: () => ({ addToast }),
 }));
 
 import { BrandingSettings } from '@/components/branding-settings';
-
-// ---------------------------------------------------------------------------
-// Fixtures
-// ---------------------------------------------------------------------------
-
 import type { Branding } from '@/lib/api/branding-upload';
 
-const BRANDING_NO_ASSETS: Branding = {
+const PLAIN: Branding = {
   siteName: 'Acme',
   logoWideUrl: null,
   logoSquareUrl: null,
   faviconUrl: null,
   mainColor: null,
   theme: null,
+  builtOnWhity: true,
 };
+const WITH_WIDE: Branding = { ...PLAIN, logoWideUrl: '/api/v1/branding/asset/1/logo_wide-abc.png' };
+const ORANGE: Branding = { ...PLAIN, mainColor: '#B74C05' };
 
-const BRANDING_WITH_WIDE: Branding = {
-  siteName: 'Acme',
-  logoWideUrl: '/api/v1/branding/asset/1/logo_wide-abc.png',
-  logoSquareUrl: null,
-  faviconUrl: null,
-  mainColor: null,
-  theme: null,
-};
-
-const BRANDING_ORANGE: Branding = { ...BRANDING_NO_ASSETS, mainColor: '#B74C05' };
-
-function brandingResponse(branding: Branding = BRANDING_NO_ASSETS) {
-  return Promise.resolve({ data: { data: branding }, error: undefined });
-}
-
-function grant(...perms: string[]) {
-  hasPermission.mockImplementation((slug: string) => perms.includes(slug));
+function serve(branding: Branding = PLAIN) {
+  mockApiGet.mockImplementation(() => Promise.resolve({ data: { data: branding }, error: undefined }));
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
-  // Default: settings endpoint returns branding with no assets.
-  mockApiGet.mockImplementation(() => brandingResponse());
-  mockUploadBrandingAsset.mockResolvedValue(BRANDING_WITH_WIDE);
-  mockClearBrandingAsset.mockResolvedValue(BRANDING_NO_ASSETS);
+  mockMode = 'light';
+  serve();
+  mockUploadBrandingAsset.mockResolvedValue(WITH_WIDE);
+  mockClearBrandingAsset.mockResolvedValue(PLAIN);
   mockSetBrandingHost.mockResolvedValue(undefined);
   mockApiPatch.mockResolvedValue({ data: { data: {} }, error: undefined });
-  // Default: no permissions (overridden in each test).
-  grant();
 });
 
-// ---------------------------------------------------------------------------
-// Gate 1: with settings:write, uploaders render and call uploadBrandingAsset
-// ---------------------------------------------------------------------------
+async function renderForm(props: Partial<React.ComponentProps<typeof BrandingSettings>> = {}) {
+  render(<BrandingSettings scope="tenant" canWrite {...props} />);
+  await screen.findByDisplayValue('Acme');
+}
 
-describe('BrandingSettings — settings:write gate', () => {
-  it('renders the asset uploaders when tenantOverridable and settings:write', async () => {
-    grant('settings:write');
-    render(<BrandingSettings tenantOverridable={true} />);
-
-    // All three upload buttons must be in the document.
-    await waitFor(() => {
-      expect(screen.getByTestId('branding-upload-btn-logo_wide-tenant')).toBeInTheDocument();
-    });
-    expect(screen.getByTestId('branding-upload-btn-logo_square-tenant')).toBeInTheDocument();
-    expect(screen.getByTestId('branding-upload-btn-favicon-tenant')).toBeInTheDocument();
+describe('Branding — the card', () => {
+  it('has the card’s parts: product name, main colour, logos, favicon, Built on Whity and a preview', async () => {
+    await renderForm();
+    expect(screen.getByRole('heading', { name: 'Your brand' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Product name')).toHaveValue('Acme');
+    expect(screen.getByTestId('branding-main-colour-tenant')).toBeInTheDocument();
+    for (const key of ['logo_wide', 'logo_square', 'favicon']) {
+      expect(screen.getByTestId(`branding-upload-btn-${key}-tenant`)).toBeInTheDocument();
+    }
+    expect(screen.getByTestId('branding-built-on-whity')).toBeChecked();
+    expect(screen.getByRole('heading', { name: 'Preview' })).toBeInTheDocument();
+    expect(screen.getByTestId('branding-preview-name')).toHaveTextContent('Acme');
   });
 
-  it('calls uploadBrandingAsset(tenant, logo_wide, file) on file select', async () => {
-    grant('settings:write');
-    render(<BrandingSettings tenantOverridable={true} />);
-
-    // Wait for the component to resolve its branding fetch.
-    await waitFor(() =>
-      expect(screen.getByTestId('branding-file-input-logo_wide-tenant')).toBeInTheDocument()
-    );
-
-    const fileInput = screen.getByTestId('branding-file-input-logo_wide-tenant');
-    const file = new File(['PNG'], 'logo-wide.png', { type: 'image/png' });
-
-    fireEvent.change(fileInput, { target: { files: [file] } });
-
-    await waitFor(() => {
-      expect(mockUploadBrandingAsset).toHaveBeenCalledWith('tenant', 'logo_wide', file);
-    });
-  });
-
-  it('shows a success toast after a successful upload', async () => {
-    grant('settings:write');
-    render(<BrandingSettings tenantOverridable={true} />);
-
-    await waitFor(() =>
-      expect(screen.getByTestId('branding-file-input-logo_wide-tenant')).toBeInTheDocument()
-    );
-
-    const file = new File(['PNG'], 'logo.png', { type: 'image/png' });
-    fireEvent.change(screen.getByTestId('branding-file-input-logo_wide-tenant'), {
-      target: { files: [file] },
-    });
-
-    await waitFor(() => {
-      expect(addToast).toHaveBeenCalledWith(
-        expect.stringContaining('uploaded'),
-        'success'
-      );
-    });
+  it('has one Save, in the header, off until something changes', async () => {
+    await renderForm();
+    const save = screen.getByTestId('branding-save');
+    expect(save).toHaveAttribute('data-variant', 'default');
+    expect(save).toBeDisabled();
+    // Logos and the colour have no Save of their own any more.
+    expect(screen.queryByText('Save colour')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button').filter((b) => b.getAttribute('data-variant') === 'default' && !b.closest('[inert]'))).toHaveLength(1);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Gate 2: !tenantOverridable → notice replaces tenant uploaders
-// ---------------------------------------------------------------------------
-
-describe('BrandingSettings — system tenant (!tenantOverridable)', () => {
-  it('shows the no-override notice instead of tenant uploaders', async () => {
-    grant('settings:write');
-    render(<BrandingSettings tenantOverridable={false} />);
-
-    // The notice must appear.
-    await waitFor(() =>
-      expect(screen.getByTestId('branding-no-override-notice')).toBeInTheDocument()
-    );
-
-    // No tenant-scope upload buttons.
-    expect(
-      screen.queryByTestId('branding-upload-btn-logo_wide-tenant')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('branding-upload-btn-logo_square-tenant')
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId('branding-upload-btn-favicon-tenant')
-    ).not.toBeInTheDocument();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Gate 3: custom-host field absent without settings:manage
-// ---------------------------------------------------------------------------
-
-describe('BrandingSettings — tenant vs global variant (WC-235)', () => {
-  it('the tenant variant never renders the global branding section or custom-host', async () => {
-    // Even WITH settings:manage, the tenant surface has no global section — the
-    // global branding + host moved to the system-tenant-only global page.
-    grant('settings:write', 'settings:manage');
-    render(<BrandingSettings variant="tenant" tenantOverridable={true} />);
+describe('Branding — save', () => {
+  it('saves the name and the colour together to the workspace', async () => {
+    await renderForm();
+    fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Example Office' } });
+    fireEvent.click(screen.getByTestId('branding-colour-swatch-b74c05'));
+    fireEvent.click(screen.getByTestId('branding-save'));
 
     await waitFor(() =>
-      expect(screen.getByTestId('branding-upload-btn-logo_wide-tenant')).toBeInTheDocument()
+      expect(mockApiPatch).toHaveBeenCalledWith('/api/v1/settings', {
+        body: { settings: { site_name: 'Example Office', branding_main_color: '#b74c05' } },
+      })
     );
-
-    expect(screen.queryByTestId('branding-custom-host-input')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('branding-upload-btn-logo_wide-global')).not.toBeInTheDocument();
+    expect(mockRefresh).toHaveBeenCalled();
+    expect(addToast).toHaveBeenCalledWith('Branding saved.', 'success');
+    expect(mockSetBrandingHost).not.toHaveBeenCalled();
   });
 
-  it('the global variant renders the global branding section and custom-host field', async () => {
-    grant('settings:write', 'settings:manage');
-    render(<BrandingSettings variant="global" />);
-
-    await waitFor(() =>
-      expect(screen.getByTestId('branding-custom-host-input')).toBeInTheDocument()
-    );
-
-    // Global upload buttons must also be present.
-    expect(screen.getByTestId('branding-upload-btn-logo_wide-global')).toBeInTheDocument();
-  });
-
-  it('calls setBrandingHost on Save host click (global variant)', async () => {
-    grant('settings:write', 'settings:manage');
-    render(<BrandingSettings variant="global" />);
-
-    await waitFor(() =>
-      expect(screen.getByTestId('branding-custom-host-input')).toBeInTheDocument()
-    );
-
-    fireEvent.change(screen.getByTestId('branding-custom-host-input'), {
-      target: { value: 'app.acme.com' },
-    });
-    fireEvent.click(screen.getByTestId('branding-custom-host-save'));
-
-    await waitFor(() => {
-      expect(mockSetBrandingHost).toHaveBeenCalledWith(0, 'app.acme.com');
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Clear flow
-// ---------------------------------------------------------------------------
-
-describe('BrandingSettings — clear flow', () => {
-  it('shows a Clear button when an asset URL is set, and calls clearBrandingAsset', async () => {
-    grant('settings:write');
-    // Return branding with wide logo already set.
-    mockApiGet.mockImplementation(() => brandingResponse(BRANDING_WITH_WIDE));
-
-    render(<BrandingSettings tenantOverridable={true} />);
-
-    // Wait for the Clear button to appear (asset is set).
-    await waitFor(() =>
-      expect(screen.getByTestId('branding-clear-btn-logo_wide-tenant')).toBeInTheDocument()
-    );
-
-    fireEvent.click(screen.getByTestId('branding-clear-btn-logo_wide-tenant'));
-
-    await waitFor(() => {
-      expect(mockClearBrandingAsset).toHaveBeenCalledWith('tenant', 'logo_wide');
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Main colour (decision 2.8, TplAdminBranding)
-// ---------------------------------------------------------------------------
-
-describe('BrandingSettings — main colour', () => {
-  it('shows the effective colour and saves a picked swatch to the tenant settings', async () => {
-    grant('settings:write');
-    mockApiGet.mockImplementation(() => brandingResponse(BRANDING_ORANGE));
-    render(<BrandingSettings tenantOverridable={true} />);
-
-    await waitFor(() =>
-      expect(screen.getByTestId('branding-colour-value-tenant')).toHaveTextContent('#b74c05')
-    );
-    expect(screen.getByTestId('branding-colour-swatch-b74c05')).toHaveAttribute('aria-pressed', 'true');
-    // Nothing to save until the colour changes.
-    expect(screen.getByTestId('branding-colour-save-tenant')).toBeDisabled();
-
+  it('sends only what changed', async () => {
+    await renderForm();
     fireEvent.click(screen.getByTestId('branding-colour-swatch-00792f'));
-    fireEvent.click(screen.getByTestId('branding-colour-save-tenant'));
-
+    fireEvent.click(screen.getByTestId('branding-save'));
     await waitFor(() =>
       expect(mockApiPatch).toHaveBeenCalledWith('/api/v1/settings', {
         body: { settings: { branding_main_color: '#00792f' } },
       })
     );
-    await waitFor(() => expect(mockRefresh).toHaveBeenCalled());
-    expect(addToast).toHaveBeenCalledWith('Main colour saved.', 'success');
   });
 
-  it('saves twice in a row: the card follows the saved colour and the second save goes out (#1716)', async () => {
-    grant('settings:write');
-    let current: Branding = BRANDING_ORANGE;
-    mockApiGet.mockImplementation(() => brandingResponse(current));
-    mockApiPatch.mockImplementation((_path: string, init: { body: { settings: { branding_main_color: string } } }) => {
-      current = { ...BRANDING_NO_ASSETS, mainColor: init.body.settings.branding_main_color };
-      return Promise.resolve({ data: { data: {} }, error: undefined });
-    });
-    render(<BrandingSettings tenantOverridable={true} />);
-
-    await waitFor(() =>
-      expect(screen.getByTestId('branding-colour-value-tenant')).toHaveTextContent('#b74c05')
-    );
-    fireEvent.click(screen.getByTestId('branding-colour-swatch-00792f'));
-    fireEvent.click(screen.getByTestId('branding-colour-save-tenant'));
-    await waitFor(() =>
-      expect(screen.getByTestId('branding-colour-swatch-00792f')).toHaveAttribute('aria-pressed', 'true')
-    );
-    await waitFor(() => expect(screen.getByTestId('branding-colour-save-tenant')).toBeDisabled());
-
-    fireEvent.click(screen.getByTestId('branding-colour-swatch-643b9a'));
-    fireEvent.click(screen.getByTestId('branding-colour-save-tenant'));
-    await waitFor(() =>
-      expect(mockApiPatch).toHaveBeenLastCalledWith('/api/v1/settings', {
-        body: { settings: { branding_main_color: '#643b9a' } },
-      })
-    );
-    await waitFor(() =>
-      expect(screen.getByTestId('branding-colour-value-tenant')).toHaveTextContent('#643b9a')
-    );
-    expect(mockApiPatch).toHaveBeenCalledTimes(2);
-    expect(mockRefresh).toHaveBeenCalledTimes(2);
-  });
-
-  it('takes a custom colour from the picker', async () => {
-    grant('settings:write');
-    render(<BrandingSettings tenantOverridable={true} />);
-
-    await waitFor(() =>
-      expect(screen.getByTestId('branding-colour-value-tenant')).toHaveTextContent('Whity Blue (default)')
-    );
-    fireEvent.change(screen.getByTestId('branding-colour-custom-tenant'), { target: { value: '#123ABC' } });
-    expect(screen.getByTestId('branding-colour-value-tenant')).toHaveTextContent('#123abc');
-    fireEvent.click(screen.getByTestId('branding-colour-save-tenant'));
-
+  it('Reset clears the colour, back to the default', async () => {
+    serve(ORANGE);
+    await renderForm();
+    expect(screen.getByTestId('branding-colour-value-tenant')).toHaveTextContent('#b74c05');
+    fireEvent.click(screen.getByTestId('branding-colour-reset-tenant'));
+    fireEvent.click(screen.getByTestId('branding-save'));
     await waitFor(() =>
       expect(mockApiPatch).toHaveBeenCalledWith('/api/v1/settings', {
-        body: { settings: { branding_main_color: '#123abc' } },
-      })
-    );
-  });
-
-  it('reset clears the setting, and the global variant writes the global layer', async () => {
-    grant('settings:write', 'settings:manage');
-    mockApiGet.mockImplementation(() => brandingResponse(BRANDING_ORANGE));
-    render(<BrandingSettings variant="global" />);
-
-    await waitFor(() => expect(screen.getByTestId('branding-colour-reset-global')).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId('branding-colour-reset-global'));
-
-    await waitFor(() =>
-      expect(mockApiPatch).toHaveBeenCalledWith('/api/v1/settings/global', {
         body: { settings: { branding_main_color: '' } },
       })
     );
   });
 
-  it('shows the server error and does not refresh when the save fails', async () => {
-    grant('settings:write');
-    mockApiPatch.mockResolvedValue({ data: undefined, error: { error: 'branding_main_color must be a #RRGGBB hex colour (e.g. #2B6CD2).' } });
-    render(<BrandingSettings tenantOverridable={true} />);
-
-    await waitFor(() => expect(screen.getByTestId('branding-colour-swatch-c53829')).toBeInTheDocument());
+  it('shows the server’s reason and keeps the draft when the save fails', async () => {
+    mockApiPatch.mockResolvedValue({ data: undefined, error: { error: 'branding_main_color must be a #RRGGBB hex colour' } });
+    await renderForm();
     fireEvent.click(screen.getByTestId('branding-colour-swatch-c53829'));
-    fireEvent.click(screen.getByTestId('branding-colour-save-tenant'));
-
+    fireEvent.click(screen.getByTestId('branding-save'));
     await waitFor(() =>
-      expect(addToast).toHaveBeenCalledWith('branding_main_color must be a #RRGGBB hex colour (e.g. #2B6CD2).', 'error')
+      expect(addToast).toHaveBeenCalledWith('branding_main_color must be a #RRGGBB hex colour', 'error')
     );
     expect(mockRefresh).not.toHaveBeenCalled();
+    expect(screen.getByTestId('branding-colour-value-tenant')).toHaveTextContent('#c53829');
+  });
+});
+
+describe('Branding — the preview', () => {
+  it('re-themes as the colour is picked, before anything is saved', async () => {
+    await renderForm();
+    const preview = screen.getByTestId('branding-live-preview');
+    expect(preview.style.getPropertyValue('--primary')).toBe('#0961bb');
+    fireEvent.click(screen.getByTestId('branding-colour-swatch-b74c05'));
+    expect(preview.style.getPropertyValue('--primary')).toBe('#b74c05');
+    expect(mockApiPatch).not.toHaveBeenCalled();
   });
 
-  it('is read-only without settings:write', async () => {
-    grant();
-    render(<BrandingSettings tenantOverridable={true} />);
+  it('uses the colour on dark in dark mode (decision 2.8)', async () => {
+    mockMode = 'dark';
+    serve(ORANGE);
+    await renderForm();
+    expect(screen.getByTestId('branding-live-preview').style.getPropertyValue('--primary')).toBe('#e97c47');
+  });
 
-    await waitFor(() => expect(screen.getByTestId('branding-main-colour-tenant')).toBeInTheDocument());
-    expect(screen.queryByTestId('branding-colour-save-tenant')).not.toBeInTheDocument();
+  it('follows the name as it is typed, and cannot be focused', async () => {
+    await renderForm();
+    fireEvent.change(screen.getByLabelText('Product name'), { target: { value: 'Example Office' } });
+    expect(screen.getByTestId('branding-preview-name')).toHaveTextContent('Example Office');
+    expect(screen.getByTestId('branding-live-preview')).toHaveAttribute('inert');
+  });
+
+  it('hides Built on Whity when the plan removes it', async () => {
+    serve({ ...PLAIN, builtOnWhity: false });
+    await renderForm();
+    expect(screen.getByTestId('branding-built-on-whity')).not.toBeChecked();
+    expect(screen.getByText('Hidden: your plan includes removing it.')).toBeInTheDocument();
+  });
+});
+
+describe('Branding — logos', () => {
+  it('uploads a logo the moment a file is picked', async () => {
+    await renderForm();
+    const file = new File(['png'], 'logo.png', { type: 'image/png' });
+    fireEvent.change(screen.getByTestId('branding-file-input-logo_wide-tenant'), { target: { files: [file] } });
+    await waitFor(() => expect(mockUploadBrandingAsset).toHaveBeenCalledWith('tenant', 'logo_wide', file));
+    expect(addToast).toHaveBeenCalledWith('Wide logo uploaded successfully.', 'success');
+    expect(await screen.findByTestId('branding-clear-btn-logo_wide-tenant')).toBeInTheDocument();
+    expect(mockRefresh).toHaveBeenCalled();
+  });
+
+  it('clears a logo', async () => {
+    serve(WITH_WIDE);
+    await renderForm();
+    fireEvent.click(await screen.findByTestId('branding-clear-btn-logo_wide-tenant'));
+    await waitFor(() => expect(mockClearBrandingAsset).toHaveBeenCalledWith('tenant', 'logo_wide'));
+    await waitFor(() => expect(screen.queryByTestId('branding-clear-btn-logo_wide-tenant')).not.toBeInTheDocument());
+  });
+});
+
+describe('Branding — workspace and platform', () => {
+  it('a workspace cannot set its web address; it is told who can', async () => {
+    await renderForm();
+    expect(screen.queryByTestId('branding-custom-host-input')).not.toBeInTheDocument();
+    expect(screen.getByTestId('branding-domain-note')).toBeInTheDocument();
+  });
+
+  it('the system tenant edits the platform defaults and the web address', async () => {
+    await renderForm({ scope: 'global' });
+    expect(screen.getByRole('heading', { name: 'Platform brand' })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Domain'), { target: { value: 'app.example.com' } });
+    fireEvent.click(screen.getByTestId('branding-colour-swatch-643b9a'));
+    fireEvent.click(screen.getByTestId('branding-save'));
+    await waitFor(() =>
+      expect(mockApiPatch).toHaveBeenCalledWith('/api/v1/settings/global', {
+        body: { settings: { branding_main_color: '#643b9a' } },
+      })
+    );
+    expect(mockSetBrandingHost).toHaveBeenCalledWith(0, 'app.example.com');
+  });
+
+  it('the platform name cannot be emptied', async () => {
+    await renderForm({ scope: 'global' });
+    fireEvent.change(screen.getByLabelText('Product name'), { target: { value: '  ' } });
+    fireEvent.click(screen.getByTestId('branding-save'));
+    expect(addToast).toHaveBeenCalledWith('The product name cannot be empty.', 'error');
+    expect(mockApiPatch).not.toHaveBeenCalled();
+  });
+
+  it('platform logos upload to the global layer', async () => {
+    await renderForm({ scope: 'global' });
+    const file = new File(['ico'], 'favicon.ico', { type: 'image/x-icon' });
+    fireEvent.change(screen.getByTestId('branding-file-input-favicon-global'), { target: { files: [file] } });
+    await waitFor(() => expect(mockUploadBrandingAsset).toHaveBeenCalledWith('global', 'favicon', file));
+  });
+});
+
+describe('Branding — read-only', () => {
+  it('shows the branding with no Save, Upload or Clear', async () => {
+    serve(WITH_WIDE);
+    await renderForm({ canWrite: false });
+    expect(screen.queryByTestId('branding-save')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('branding-upload-btn-logo_wide-tenant')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('branding-clear-btn-logo_wide-tenant')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Product name')).toBeDisabled();
     expect(screen.getByTestId('branding-colour-swatch-0961bb')).toBeDisabled();
+    expect(screen.getByText('You can see the branding but not change it.')).toBeInTheDocument();
   });
 });
