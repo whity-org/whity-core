@@ -21,6 +21,8 @@ Everything a web or Flutter team, or a coding agent, needs to build Whity screen
 | `handoff/motion/*.json`, `README.md` | all | The 31 Lottie files (LT.1–LT.4): brand stories, website spots, and the app's moments (empty, done, first run, waiting, errors), with the web player and Flutter code |
 | `handoff/emails/*.html`, `README.md` | server | The 15 emails in English and Arabic (EM.1), with placeholders |
 
+Other repositories don't copy these by hand. `npm run tokens:generate` puts `handoff/web/tokens.css` (as `site.css`, fonts read from the package) and `handoff/logos/` into `@whity/tokens`, and `tokens:check` fails when they differ. A static site runs `npx whity-tokens copy <folder>` at build to get `tokens.css`, `fonts/` and `logos/`; a Vite app imports `@whity/tokens/site.css` (WHIT-1055). After a new handoff, regenerate and commit both.
+
 ## Web (Next.js, Tailwind v4, shadcn)
 
 1. Replace the values in `@amroksaleh/tokens` (soon `@whity/tokens`) with `tokens.json` v3: it adds the status text and tint colours, the selected tint, the chart palette, the control sizes and the motion tokens, and fixes contrast (see the table below).
