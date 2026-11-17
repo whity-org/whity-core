@@ -824,6 +824,12 @@ final class SettingsRegistry
     public const CALENDAR_WEEKEND_DAYS = 'calendar.weekend_days';
     /** Design 3.3: off turns every booking from the booking page into a request staff accept. */
     public const CALENDAR_INSTANT_BOOKING = 'calendar.instant_booking';
+    /**
+     * WHIT-1173: on lets one booking hold several services back to back
+     * (a haircut, a colour and a blow-dry), on the booking page and at the
+     * desk. Off by default; the Salons plugin turns it on.
+     */
+    public const CALENDAR_MULTI_SERVICE_BOOKING = 'calendar.multi_service_booking';
 
     /**
      * Whether the web app offers itself as an installable app (#1733): the web
@@ -1035,6 +1041,7 @@ final class SettingsRegistry
         self::UI_HIDE_DATES,
         self::CALENDAR_BOOKING_PAGE_ENABLED,
         self::CALENDAR_INSTANT_BOOKING,
+        self::CALENDAR_MULTI_SERVICE_BOOKING,
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
         self::AFFILIATE_CLAWBACK_ON_REFUND,
@@ -1373,6 +1380,7 @@ final class SettingsRegistry
         self::CALENDAR_WEEK_START => 'saturday',
         self::CALENDAR_WEEKEND_DAYS => 'friday,saturday',
         self::CALENDAR_INSTANT_BOOKING => 'true',
+        self::CALENDAR_MULTI_SERVICE_BOOKING => 'false',
         // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
         self::APP_INSTALLABLE => 'true',
         // Empty: the plans page shows the active plans as they are, and the
@@ -1846,6 +1854,7 @@ final class SettingsRegistry
             self::CALENDAR_WEEK_START => in_array($value, self::ENUM_OPTIONS[self::CALENDAR_WEEK_START], true) ? null : 'calendar.week_start must be a day of the week.',
             self::CALENDAR_WEEKEND_DAYS => self::validateWeekdayList($value),
             self::CALENDAR_INSTANT_BOOKING => self::validateBoolean($value, self::CALENDAR_INSTANT_BOOKING),
+            self::CALENDAR_MULTI_SERVICE_BOOKING => self::validateBoolean($value, self::CALENDAR_MULTI_SERVICE_BOOKING),
             self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the

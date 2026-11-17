@@ -135,6 +135,29 @@ export function BookingFacts({
     ),
     testId: 'fact-service',
   });
+  // WHIT-1173: a booking of several services lists each, in order.
+  const several = booking.services ?? [];
+  if (several.length > 1) {
+    rows.push({
+      label: t('fact.services', 'In order'),
+      value: (
+        <ol className="m-0 grid list-none gap-1 p-0">
+          {several.map((part, i) => (
+            <li key={i}>
+              {words.name(part.name)}
+              <span className="block text-sm text-muted-foreground">
+                <span dir="ltr" className="tabular-nums">
+                  {dates.time(part.starts_at) ?? ''}–{dates.time(part.ends_at) ?? ''}
+                </span>
+                {part.staff_name ? ` · ${part.staff_name}` : ''}
+              </span>
+            </li>
+          ))}
+        </ol>
+      ),
+      testId: 'fact-services',
+    });
+  }
   if (booking.staff_name) {
     rows.push({ label: t('fact.with', 'With'), value: booking.staff_name, testId: 'fact-with' });
   }

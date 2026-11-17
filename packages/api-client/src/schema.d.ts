@@ -11891,15 +11891,21 @@ export interface components {
             room_name?: {
                 [key: string]: string;
             } | null;
+            /** @description A booking of several services (WHIT-1173): each, in order, with who does it and when. Empty for one service. `service_id`, `profile_id` and `room_id` are then the first service's, the times span them all and `price_minor` is the total. */
+            items?: components["schemas"]["CalendarBookingItem"][];
         };
         CalendarBookingCancelRequest: {
             /** @description Why, in a few words; shown to the customer. */
             reason?: string;
         };
         CalendarBookingCreateRequest: {
-            /** @description The service to book. */
-            service_id: number;
-            /** @description Leave out for whoever is free. */
+            /** @description The service to book. Leave out when sending `services`. */
+            service_id?: number;
+            /** @description Several services back to back, in order, as one booking, when the calendar setting `multi_service_booking` is on (WHIT-1173). Each may name its own person. */
+            services?: components["schemas"]["CalendarBookingServiceChoice"][];
+            /** @description With `services` and nobody chosen: one person who does them all. */
+            same_person?: boolean;
+            /** @description Leave out for whoever is free. With `services`: the person for every service that names none. */
             profile_id?: number;
             /** @description ISO 8601 with an offset. */
             starts_at: string;
@@ -11922,6 +11928,24 @@ export interface components {
             phone?: string;
             note?: string;
         };
+        CalendarBookingItem: {
+            /** @description 0 for the first service. */
+            position: number;
+            service_id: number;
+            /** @description Language code => text. */
+            service_name: {
+                [key: string]: string;
+            };
+            profile_id: number;
+            staff_name: string;
+            room_id?: number | null;
+            starts_at: string;
+            ends_at: string;
+            blocks_from?: string;
+            blocks_until?: string;
+            duration_minutes: number;
+            price_minor: number | null;
+        };
         CalendarBookingMoveRequest: {
             /** @description ISO 8601 with an offset. */
             starts_at: string;
@@ -11935,6 +11959,11 @@ export interface components {
             book_anyway?: boolean;
             /** @description Refuse a time outside the person's working hours, without the booking window's notice rules. */
             within_hours?: boolean;
+        };
+        CalendarBookingServiceChoice: {
+            service_id: number;
+            /** @description Who does it; null or left out for anyone. */
+            profile_id?: number | null;
         };
         CalendarBookingSuggestRequest: {
             /** @description The time to suggest, ISO 8601 with an offset. */
@@ -12143,6 +12172,8 @@ export interface components {
             currency: string;
             /** @description Off: every booking from the booking page is a request. */
             instant_booking?: boolean;
+            /** @description On: one booking may hold several services back to back (WHIT-1173). Default off. */
+            multi_service_booking?: boolean;
         };
         CalendarSettingsRequest: {
             /** @description Turn the public booking page on or off. */
@@ -12166,12 +12197,21 @@ export interface components {
             weekend_days?: ("monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday")[];
             /** @description Off turns every booking from the booking page into a request staff accept. */
             instant_booking?: boolean;
+            /** @description On lets one booking hold several services back to back, on the booking page and at the desk (WHIT-1173). Default off. */
+            multi_service_booking?: boolean;
         };
         CalendarSlot: {
             starts_at: string;
             ends_at: string;
-            /** @description Who is free then. */
+            /** @description Who is free then. For several services: the people this time would be with. */
             profile_ids: number[];
+            /** @description Only when several services were asked for (WHIT-1173): who would do each, and when. */
+            items?: {
+                service_id: number;
+                profile_id: number;
+                starts_at: string;
+                ends_at: string;
+            }[];
         };
         CalendarStaff: {
             profile_id: number;
@@ -17628,6 +17668,15 @@ export interface components {
             /** @description Only on the manage link: the brand of the workspace (WHIT-1014). */
             brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
             time_zone?: string;
+            /** @description A booking of several services (WHIT-1173): each, in order. Empty for one service; `service` then names it. For several, `service` names them together with the whole length. */
+            services?: {
+                name: components["schemas"]["LocalizedLabel"];
+                staff_name: string;
+                starts_at: string;
+                ends_at: string;
+                duration_minutes: number;
+                price_minor: number | null;
+            }[];
         };
         PublicBookingMoveRequest: {
             /** @description A free time, ISO 8601 with an offset. */
@@ -17644,6 +17693,8 @@ export interface components {
                 max_advance_days: number;
                 week_start: string;
                 weekend_days: string[];
+                /** @description The customer may book several services back to back as one booking (WHIT-1173). */
+                multi_service_booking?: boolean;
             };
             services: {
                 id: number;
@@ -17668,9 +17719,13 @@ export interface components {
             brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
         };
         PublicBookingRequest: {
-            /** @description The service. */
-            service_id: number;
-            /** @description One person; leave out for anyone. */
+            /** @description The service. Leave out when sending `services`. */
+            service_id?: number;
+            /** @description Several services back to back, in order, as one booking, when the page's `multi_service_booking` is on (WHIT-1173). */
+            services?: components["schemas"]["CalendarBookingServiceChoice"][];
+            /** @description With `services` and no person chosen: one person who does them all. */
+            same_person?: boolean;
+            /** @description One person; leave out for anyone. With `services`: the person for every service that names none. */
             profile_id?: number;
             /** @description A free time, ISO 8601 with an offset. */
             starts_at: string;
@@ -26633,14 +26688,22 @@ export interface operations {
     get_api_v1_calendar_availability: {
         parameters: {
             query: {
-                /** @description The service. */
-                service_id: number;
+                /** @description The service. Leave out when sending `service_ids`. */
+                service_id?: number;
                 /** @description Start of the range, ISO 8601 with an offset, such as `2026-11-16T00:00:00+03:00`. */
                 from: string;
                 /** @description End of the range (exclusive), with an offset. At most 62 days after `from`. */
                 to: string;
                 /** @description Only this member of staff. */
                 profile_id?: number;
+                /** @description Several services back to back, in order, comma-separated (4,7,9). Each slot then says who would do which in `items`. Needs the calendar setting `multi_service_booking`. */
+                service_ids?: string;
+                /** @description With `service_ids`: the person for each service, comma-separated, 0 for anyone (11,0,12). */
+                profile_ids?: string;
+                /** @description With `service_ids`: one person who does them all. */
+                same_person?: boolean;
+                /** @description With `service_ids`: moving this booking, so its own time counts as free. */
+                except_booking_id?: number;
             };
             header?: never;
             path?: never;
@@ -65065,14 +65128,20 @@ export interface operations {
     get_api_v1_public_booking_workspace_slots: {
         parameters: {
             query: {
-                /** @description The service. */
-                service_id: number;
+                /** @description The service. Leave out when sending `service_ids`. */
+                service_id?: number;
                 /** @description One person; leave out for anyone. */
                 profile_id?: number;
                 /** @description Start, ISO 8601 with an offset. */
                 from: string;
                 /** @description End (exclusive), with an offset. At most 14 days after `from`. */
                 to: string;
+                /** @description Several services back to back, in order, comma-separated (4,7,9). Each slot then says who would do which in `items`. Needs the calendar setting `multi_service_booking`. */
+                service_ids?: string;
+                /** @description With `service_ids`: the person for each service, comma-separated, 0 for anyone (11,0,12). */
+                profile_ids?: string;
+                /** @description With `service_ids`: one person who does them all. */
+                same_person?: boolean;
             };
             header?: never;
             path: {

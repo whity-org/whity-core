@@ -10526,6 +10526,7 @@ final class CoreApiSchemas
                     'max_advance_days' => self::int(),
                     'week_start' => self::str(),
                     'weekend_days' => ['type' => 'array', 'items' => self::str()],
+                    'multi_service_booking' => self::bool() + ['description' => 'The customer may book several services back to back as one booking (WHIT-1173).'],
                 ], ['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days']),
                 'services' => ['type' => 'array', 'items' => self::object([
                     'id' => self::int(),
@@ -10560,8 +10561,10 @@ final class CoreApiSchemas
                 ],
             ], ['name', 'logo_wide_url', 'logo_square_url', 'main_color', 'theme']),
             'PublicBookingRequest' => self::object([
-                'service_id' => self::int() + ['description' => 'The service.'],
-                'profile_id' => self::int() + ['description' => 'One person; leave out for anyone.'],
+                'service_id' => self::int() + ['description' => 'The service. Leave out when sending `services`.'],
+                'services' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 8, 'items' => SchemaBuilder::ref('CalendarBookingServiceChoice'), 'description' => 'Several services back to back, in order, as one booking, when the page\'s `multi_service_booking` is on (WHIT-1173).'],
+                'same_person' => self::bool() + ['description' => 'With `services` and no person chosen: one person who does them all.'],
+                'profile_id' => self::int() + ['description' => 'One person; leave out for anyone. With `services`: the person for every service that names none.'],
                 'starts_at' => self::str() + ['description' => 'A free time, ISO 8601 with an offset.'],
                 'name' => self::str() + ['maxLength' => 200, 'description' => 'The customer\'s name.'],
                 'email' => self::str() + ['maxLength' => 320, 'description' => 'Where the confirmation and link go.'],
@@ -10570,7 +10573,7 @@ final class CoreApiSchemas
                 'website' => self::str() + ['description' => 'Leave empty. A hidden field people never fill.'],
                 'elapsed_ms' => self::int() + ['description' => 'Milliseconds the page was open before sending.'],
                 'bot_token' => self::str() + ['description' => 'The bot-check token, when the page shows one.'],
-            ], ['service_id', 'starts_at', 'name', 'email', 'elapsed_ms']),
+            ], ['starts_at', 'name', 'email', 'elapsed_ms']),
             'PublicBookingMoveRequest' => self::object([
                 'starts_at' => self::str() + ['description' => 'A free time, ISO 8601 with an offset.'],
             ], ['starts_at']),
@@ -10596,6 +10599,14 @@ final class CoreApiSchemas
                 'workspace' => self::object(['name' => self::str()], ['name']),
                 'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'Only on the manage link: the brand of the workspace (WHIT-1014).'],
                 'time_zone' => self::str(),
+                'services' => ['type' => 'array', 'description' => 'A booking of several services (WHIT-1173): each, in order. Empty for one service; `service` then names it. For several, `service` names them together with the whole length.', 'items' => self::object([
+                    'name' => SchemaBuilder::ref('LocalizedLabel'),
+                    'staff_name' => self::str(),
+                    'starts_at' => self::str(),
+                    'ends_at' => self::str(),
+                    'duration_minutes' => self::int(),
+                    'price_minor' => self::int(true),
+                ], ['name', 'staff_name', 'starts_at', 'ends_at', 'duration_minutes', 'price_minor'])],
             ], ['id', 'status', 'starts_at', 'ends_at', 'service', 'staff_name', 'price_minor', 'currency', 'customer']),
             'CalendarSettings' => self::object([
                 'booking_page_url' => self::str(true) + ['description' => 'The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only.'],
@@ -10610,6 +10621,7 @@ final class CoreApiSchemas
                 'weekend_days' => ['type' => 'array', 'items' => self::str()],
                 'currency' => self::str(),
                 'instant_booking' => self::bool() + ['description' => 'Off: every booking from the booking page is a request.'],
+                'multi_service_booking' => self::bool() + ['description' => 'On: one booking may hold several services back to back (WHIT-1173). Default off.'],
             ], ['time_zone', 'booking_page_enabled', 'min_notice_minutes', 'max_advance_days', 'slot_step_minutes', 'reminder_hours_before', 'payment_hold_minutes', 'week_start', 'weekend_days', 'currency']),
             'CalendarSettingsRequest' => self::object([
                 'booking_page_enabled' => self::bool() + ['description' => 'Turn the public booking page on or off.'],
@@ -10621,6 +10633,7 @@ final class CoreApiSchemas
                 'week_start' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], 'description' => 'The first day of the week in calendar views.'],
                 'weekend_days' => ['type' => 'array', 'items' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']], 'description' => 'Days shown as the weekend.'],
                 'instant_booking' => self::bool() + ['description' => 'Off turns every booking from the booking page into a request staff accept.'],
+                'multi_service_booking' => self::bool() + ['description' => 'On lets one booking hold several services back to back, on the booking page and at the desk (WHIT-1173). Default off.'],
             ], []),
             'CalendarStaff' => self::object([
                 'profile_id' => self::int(),
@@ -10716,8 +10729,32 @@ final class CoreApiSchemas
             'CalendarSlot' => self::object([
                 'starts_at' => self::str(),
                 'ends_at' => self::str(),
-                'profile_ids' => ['type' => 'array', 'items' => self::int(), 'description' => 'Who is free then.'],
+                'profile_ids' => ['type' => 'array', 'items' => self::int(), 'description' => 'Who is free then. For several services: the people this time would be with.'],
+                'items' => ['type' => 'array', 'description' => 'Only when several services were asked for (WHIT-1173): who would do each, and when.', 'items' => self::object([
+                    'service_id' => self::int(),
+                    'profile_id' => self::int(),
+                    'starts_at' => self::str(),
+                    'ends_at' => self::str(),
+                ], ['service_id', 'profile_id', 'starts_at', 'ends_at'])],
             ], ['starts_at', 'ends_at', 'profile_ids']),
+            'CalendarBookingServiceChoice' => self::object([
+                'service_id' => self::int(),
+                'profile_id' => self::int(true) + ['description' => 'Who does it; null or left out for anyone.'],
+            ], ['service_id']),
+            'CalendarBookingItem' => self::object([
+                'position' => self::int() + ['description' => '0 for the first service.'],
+                'service_id' => self::int(),
+                'service_name' => ['type' => 'object', 'additionalProperties' => self::str(), 'description' => 'Language code => text.'],
+                'profile_id' => self::int(),
+                'staff_name' => self::str(),
+                'room_id' => self::int(true),
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'blocks_from' => self::str(),
+                'blocks_until' => self::str(),
+                'duration_minutes' => self::int(),
+                'price_minor' => self::int(true),
+            ], ['position', 'service_id', 'service_name', 'profile_id', 'staff_name', 'starts_at', 'ends_at', 'duration_minutes', 'price_minor']),
             'CalendarBookingCustomer' => self::object([
                 'profile_id' => self::int() + ['description' => 'An existing customer or member of this workspace.'],
                 'name' => self::str() + ['maxLength' => 200],
@@ -10749,17 +10786,20 @@ final class CoreApiSchemas
                 'suggested_at' => self::str(true) + ['description' => 'When staff suggested this time for a request.'],
                 'reminder_sent_at' => self::str(true),
                 'room_name' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => self::str(), 'description' => 'In lists: the room\'s name, language code => text.'],
+                'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingItem'), 'description' => 'A booking of several services (WHIT-1173): each, in order, with who does it and when. Empty for one service. `service_id`, `profile_id` and `room_id` are then the first service\'s, the times span them all and `price_minor` is the total.'],
             ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
             'CalendarBookingCreateRequest' => self::object([
-                'service_id' => self::int() + ['description' => 'The service to book.'],
-                'profile_id' => self::int() + ['description' => 'Leave out for whoever is free.'],
+                'service_id' => self::int() + ['description' => 'The service to book. Leave out when sending `services`.'],
+                'services' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 8, 'items' => SchemaBuilder::ref('CalendarBookingServiceChoice'), 'description' => 'Several services back to back, in order, as one booking, when the calendar setting `multi_service_booking` is on (WHIT-1173). Each may name its own person.'],
+                'same_person' => self::bool() + ['description' => 'With `services` and nobody chosen: one person who does them all.'],
+                'profile_id' => self::int() + ['description' => 'Leave out for whoever is free. With `services`: the person for every service that names none.'],
                 'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
                 'customer' => ['allOf' => [SchemaBuilder::ref('CalendarBookingCustomer')], 'description' => 'Who the booking is for: an existing customer by profile_id, or a name with an email or phone.'],
                 'keep_to_hours' => self::bool() + ['description' => 'Refuse a time outside working hours. Always on for agents.'],
                 'notify' => self::bool() + ['description' => 'Email the customer a confirmation. Default true.'],
                 'book_anyway' => self::bool() + ['description' => 'Book even though the person is busy then (a taken room or closed hours still refuse). Never for agents.'],
                 'within_hours' => self::bool() + ['description' => 'Refuse a time outside the person\'s working hours, without the booking window\'s notice rules.'],
-            ], ['service_id', 'starts_at', 'customer']),
+            ], ['starts_at', 'customer']),
             'CalendarBookingMoveRequest' => self::object([
                 'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
                 'profile_id' => self::int() + ['description' => 'Move to another person. Default: the same one.'],
@@ -18665,7 +18705,7 @@ final class CoreApiSchemas
             ]),
             $route('GET', '/api/public/booking/{workspace}/slots', [
                 'summary' => 'Free times for a service on the booking page (public)',
-                'parameters' => array_merge([$workspace, self::queryParam('service_id', 'integer', 'The service.', true), self::queryParam('profile_id', 'integer', 'One person; leave out for anyone.')], $range),
+                'parameters' => array_merge([$workspace, self::queryParam('service_id', 'integer', 'The service. Leave out when sending `service_ids`.'), self::queryParam('profile_id', 'integer', 'One person; leave out for anyone.')], $range, self::severalServicesParams()),
                 'responses' => [
                     200 => self::jsonResponse('Free times', self::listEnvelope('CalendarSlot')),
                     404 => self::errorResponse('This booking page is not available'),
@@ -19029,7 +19069,7 @@ final class CoreApiSchemas
                 'summary' => 'List free times for a service',
                 'description' => 'Each slot lists the people free then. Working hours, time off, existing bookings with their buffers, busy events, the minimum notice and the booking window are all applied.',
                 'tags' => ['calendar'],
-                'parameters' => array_merge([self::queryParam('service_id', 'integer', 'The service.', true)], $range, [$person]),
+                'parameters' => array_merge([self::queryParam('service_id', 'integer', 'The service. Leave out when sending `service_ids`.')], $range, [$person], self::severalServicesParams(), [self::queryParam('except_booking_id', 'integer', 'With `service_ids`: moving this booking, so its own time counts as free.')]),
                 'responses' => [
                     200 => self::jsonResponse('Free times', self::listEnvelope('CalendarSlot')),
                     404 => self::errorResponse('No such service'),
@@ -19299,6 +19339,20 @@ final class CoreApiSchemas
         return [
             401 => self::errorResponse('Missing or invalid authentication'),
             403 => self::errorResponse('Insufficient permissions'),
+        ];
+    }
+
+    /**
+     * WHIT-1173: asking for free times for several services back to back.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function severalServicesParams(): array
+    {
+        return [
+            self::queryParam('service_ids', 'string', 'Several services back to back, in order, comma-separated (4,7,9). Each slot then says who would do which in `items`. Needs the calendar setting `multi_service_booking`.'),
+            self::queryParam('profile_ids', 'string', 'With `service_ids`: the person for each service, comma-separated, 0 for anyone (11,0,12).'),
+            self::queryParam('same_person', 'boolean', 'With `service_ids`: one person who does them all.'),
         ];
     }
 

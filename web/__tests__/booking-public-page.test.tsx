@@ -9,6 +9,7 @@
 
 import React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { zonedDate, zonedInstant } from '@whity/features/datetime';
 
 jest.mock('@/components/auth/public-shell', () => ({
@@ -215,5 +216,59 @@ describe('PublicBookingScreen', () => {
     clock = 9_000;
     fireEvent.click(screen.getByTestId('book-submit'));
     expect(await screen.findByTestId('book-done')).toHaveTextContent('Request sent');
+  });
+
+  it('adds another service, shows the total and books them back to back (WHIT-1173)', async () => {
+    const salon = {
+      ...page,
+      settings: { ...page.settings, multi_service_booking: true },
+      services: [
+        ...page.services,
+        { id: 2, name: { en: 'Icing class', ar: 'درس التزيين' }, description: [], duration_minutes: 60, price_minor: 20000, currency: 'JOD', staff_profile_ids: [3] },
+      ],
+    };
+    const asked: string[] = [];
+    const posted: Record<string, unknown>[] = [];
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === '/api/v1/public/booking/example-bakery') return respond(200, { data: salon });
+      if (url.startsWith('/api/v1/public/booking/example-bakery/slots')) {
+        asked.push(url);
+        return respond(200, { data: slots });
+      }
+      if (url === '/api/v1/public/booking/example-bakery/bookings' && init?.method === 'POST') {
+        posted.push(JSON.parse(String(init.body)));
+        return respond(201, { data: booked });
+      }
+      return respond(404, {});
+    });
+    render(<PublicBookingScreen workspace="example-bakery" />);
+    fireEvent.click(await screen.findByRole('radio', { name: /Cake tasting/ }));
+    fireEvent.click(screen.getByTestId('book-add-service'));
+    await userEvent.click(screen.getByRole('combobox', { name: 'Then' }));
+    await userEvent.click(await screen.findByRole('option', { name: /Icing class/ }));
+
+    expect(screen.getByTestId('book-total')).toHaveTextContent('JOD 32.500');
+    await waitFor(() => expect(asked.some((url) => new URL(url, 'http://x').searchParams.get('service_ids') === '1,2')).toBe(true));
+    // Anyone, Lina for both, or a different person for each.
+    expect(screen.getByRole('radio', { name: 'A different person for each service' })).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: '09:00' }));
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Rana Haddad' } });
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'rana@example-bakery.com' } });
+    expect(screen.getByTestId('book-summary')).toHaveTextContent('Cake tasting + Icing class');
+    clock = 9_000;
+    fireEvent.click(screen.getByTestId('book-submit'));
+    await waitFor(() => expect(posted).toHaveLength(1));
+    expect(posted[0].services).toEqual([{ service_id: 1 }, { service_id: 2 }]);
+    expect(posted[0]).not.toHaveProperty('service_id');
+  });
+
+  it('offers no second service when the workspace has not turned it on', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url === '/api/v1/public/booking/example-bakery' ? respond(200, { data: page }) : respond(200, { data: slots })
+    );
+    render(<PublicBookingScreen workspace="example-bakery" />);
+    fireEvent.click(await screen.findByRole('radio', { name: /Cake tasting/ }));
+    expect(screen.queryByTestId('book-add-service')).toBeNull();
   });
 });
