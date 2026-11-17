@@ -303,6 +303,10 @@
     "en": "Check the result of a payment",
     "ar": "التحقق من نتيجة عملية دفع"
   },
+  "get_api_branding_host": {
+    "en": "Read your workspace's own web address",
+    "ar": "قراءة عنوان الويب الخاص بمساحة العمل"
+  },
   "get_api_calendar_availability": {
     "en": "Find free times for a service",
     "ar": "البحث عن أوقات متاحة لخدمة"
