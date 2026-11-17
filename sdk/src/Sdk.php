@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.112).
+ * SDK identity (v1.115).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1337,12 +1337,38 @@ namespace Whity\Sdk;
  * or loses a co-owner (WHIT-1170).
  *
  * Purely additive.)
+ *
+ * 1.113 (SETUP INPUTS: block forms gain `timeInput` (HH:MM), `weeklyHours` (a week of opening or
+ * working hours, open/closed per day, breaks, copy to every day, submitted as the calendar's
+ * `{weekday, start_time, end_time}` rows) and `checkboxGroup` (several choices, submitted as a
+ * list). `colorInput` takes `swatches`, and `fieldArray` takes `default` rows and an `addLabel`, so a
+ * setup screen offers a ready list to tick and edit instead of text to type (WHIT-1172).
+ *
+ * Purely additive.)
+ *
+ * 1.114 (OUTBOUND HTTP: {@see Http\Outbound\HttpClient} is the one way plugin code calls another
+ * server, and {@see Http\Outbound\StreamHttpClient} implements it over PHP streams: https only
+ * unless asked (`allowHttp`), verified TLS, no redirects, timeouts, a size cap, and failures that
+ * name the host and nothing else. {@see Testing\RecordedHttpClient} answers from a script for tests.
+ * From Whity Pay's own client (WHIT-1058).
+ *
+ * Purely additive.)
+ *
+ * 1.115 (THE DASHBOARD: {@see PluginDashboardInterface} lets a plugin add setup points to the
+ * dashboard's "Finish setting up" card, each opening one of its guided-setup steps or screens and
+ * marked done by its own status route, and widgets of four kinds (stat, list, chart, actions) built
+ * from blocks, each with a permission, the sizes it fits and one data route. Core lists them only to
+ * people holding the permission in a workspace where the plugin is on, and people hide, show, move and
+ * resize widgets on their own dashboard. {@see Manifest\DashboardValidator} checks the shape
+ * (WHIT-1177).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.112.0';
+    public const VERSION = '1.115.0';
 
     /**
      * Static identity only — never instantiated.

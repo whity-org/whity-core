@@ -5192,7 +5192,12 @@ final class CoreApiSchemas
                 'provider_key' => self::str(),
                 'display_name' => self::str(),
             ], ['provider_key', 'display_name']),
-            'SsoProviderListResponse' => self::listEnvelope('SsoProvider'),
+            // WHIT-1168: `password_sign_in` false = the server signs people in
+            // only through these providers; pages then drop the password form.
+            'SsoProviderListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('SsoProvider')],
+                'password_sign_in' => self::bool(),
+            ], ['data', 'password_sign_in']),
             // WHIT-994: GET /api/auth/sso/workspace. `suggested_name` only with
             // state=create, `workspaces` only with state=waiting.
             'SsoWorkspaceSetupResponse' => self::object([
@@ -7558,8 +7563,51 @@ final class CoreApiSchemas
                 'source' => self::str(true),
                 'value' => ['type' => 'integer', 'nullable' => true],
                 'hidden' => ['type' => 'boolean'],
+                'position' => ['type' => 'integer', 'nullable' => true, 'description' => "Its place in the person's own order, null when they never moved it (SDK 1.115)"],
             ], ['key', 'label', 'labelAr', 'hidden']),
             'HomeCardListResponse' => self::listEnvelope('HomeCard'),
+            // SDK 1.115 (WHIT-1177): what apps add to the dashboard, in the reader's language.
+            'DashboardSetupPoint' => self::object([
+                'id' => self::str(),
+                'label' => self::str(true),
+                'why' => self::str(true),
+                'action' => self::str(true),
+                'href' => self::str() + ['description' => "The plugin's guided-setup step or screen it opens"],
+                'icon' => self::str(true),
+            ], ['id', 'href']),
+            'DashboardSetup' => self::object([
+                'plugin' => self::str(),
+                'status' => self::str() + ['description' => "The plugin's GET route answering {data: {points: {<id>: bool}}}"],
+                'points' => ['type' => 'array', 'items' => SchemaBuilder::ref('DashboardSetupPoint')],
+            ], ['plugin', 'status', 'points']),
+            'DashboardWidget' => self::object([
+                'key' => self::str() + ['description' => '<plugin>:<id>'],
+                'plugin' => self::str(),
+                'kind' => ['type' => 'string', 'enum' => ['stat', 'list', 'chart', 'actions']],
+                'title' => self::str(true),
+                'description' => self::str(true),
+                'icon' => self::str(true),
+                'href' => self::str(true),
+                'source' => self::str(true),
+                'sizes' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['small', 'medium', 'large']]],
+                'size' => ['type' => 'string', 'enum' => ['small', 'medium', 'large']],
+                'hidden' => ['type' => 'boolean'],
+                'position' => ['type' => 'integer', 'nullable' => true],
+                'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]],
+            ], ['key', 'plugin', 'kind', 'sizes', 'size', 'hidden', 'blocks']),
+            'DashboardResponse' => self::object([
+                'data' => self::object([
+                    'setup' => ['type' => 'array', 'items' => SchemaBuilder::ref('DashboardSetup')],
+                    'widgets' => ['type' => 'array', 'items' => SchemaBuilder::ref('DashboardWidget')],
+                ], ['setup', 'widgets']),
+            ], ['data']),
+            'DashboardLayoutRequest' => self::object([
+                'items' => ['type' => 'array', 'items' => self::object([
+                    'key' => self::str(),
+                    'hidden' => ['type' => 'boolean'],
+                    'size' => ['type' => 'string', 'enum' => ['small', 'medium', 'large'], 'nullable' => true],
+                ], ['key'])],
+            ], ['items']),
             'RecentDocument' => self::object([
                 'kind' => ['type' => 'string', 'enum' => ['document', 'draft']],
                 'id' => self::int(),
@@ -10558,6 +10606,11 @@ final class CoreApiSchemas
                     ], ['body', 'agenda', 'decisions', 'invitations', 'attendance']),
                 ]]
             ),
+            'PublicBookingVisitor' => self::object([
+                'name' => self::str() + ['description' => 'The display name on their own profile; may be empty.'],
+                'email' => self::str() + ['description' => 'The email of their own sign-in; may be empty.'],
+                'phone' => self::str(true) + ['description' => 'Null until a profile carries a phone number.'],
+            ], ['name', 'email', 'phone']) + ['nullable' => true, 'description' => 'The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in.'],
             'PublicBookingPage' => self::object([
                 'workspace' => self::object(['name' => self::str(), 'slug' => self::str()], ['name', 'slug']),
                 'settings' => self::object([
@@ -10566,6 +10619,7 @@ final class CoreApiSchemas
                     'max_advance_days' => self::int(),
                     'week_start' => self::str(),
                     'weekend_days' => ['type' => 'array', 'items' => self::str()],
+                    'multi_service_booking' => self::bool() + ['description' => 'The customer may book several services back to back as one booking (WHIT-1173).'],
                 ], ['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days']),
                 'services' => ['type' => 'array', 'items' => self::object([
                     'id' => self::int(),
@@ -10600,8 +10654,10 @@ final class CoreApiSchemas
                 ],
             ], ['name', 'logo_wide_url', 'logo_square_url', 'main_color', 'theme']),
             'PublicBookingRequest' => self::object([
-                'service_id' => self::int() + ['description' => 'The service.'],
-                'profile_id' => self::int() + ['description' => 'One person; leave out for anyone.'],
+                'service_id' => self::int() + ['description' => 'The service. Leave out when sending `services`.'],
+                'services' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 8, 'items' => SchemaBuilder::ref('CalendarBookingServiceChoice'), 'description' => 'Several services back to back, in order, as one booking, when the page\'s `multi_service_booking` is on (WHIT-1173).'],
+                'same_person' => self::bool() + ['description' => 'With `services` and no person chosen: one person who does them all.'],
+                'profile_id' => self::int() + ['description' => 'One person; leave out for anyone. With `services`: the person for every service that names none.'],
                 'starts_at' => self::str() + ['description' => 'A free time, ISO 8601 with an offset.'],
                 'name' => self::str() + ['maxLength' => 200, 'description' => 'The customer\'s name.'],
                 'email' => self::str() + ['maxLength' => 320, 'description' => 'Where the confirmation and link go.'],
@@ -10610,7 +10666,7 @@ final class CoreApiSchemas
                 'website' => self::str() + ['description' => 'Leave empty. A hidden field people never fill.'],
                 'elapsed_ms' => self::int() + ['description' => 'Milliseconds the page was open before sending.'],
                 'bot_token' => self::str() + ['description' => 'The bot-check token, when the page shows one.'],
-            ], ['service_id', 'starts_at', 'name', 'email', 'elapsed_ms']),
+            ], ['starts_at', 'name', 'email', 'elapsed_ms']),
             'PublicBookingMoveRequest' => self::object([
                 'starts_at' => self::str() + ['description' => 'A free time, ISO 8601 with an offset.'],
             ], ['starts_at']),
@@ -10636,6 +10692,14 @@ final class CoreApiSchemas
                 'workspace' => self::object(['name' => self::str()], ['name']),
                 'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'Only on the manage link: the brand of the workspace (WHIT-1014).'],
                 'time_zone' => self::str(),
+                'services' => ['type' => 'array', 'description' => 'A booking of several services (WHIT-1173): each, in order. Empty for one service; `service` then names it. For several, `service` names them together with the whole length.', 'items' => self::object([
+                    'name' => SchemaBuilder::ref('LocalizedLabel'),
+                    'staff_name' => self::str(),
+                    'starts_at' => self::str(),
+                    'ends_at' => self::str(),
+                    'duration_minutes' => self::int(),
+                    'price_minor' => self::int(true),
+                ], ['name', 'staff_name', 'starts_at', 'ends_at', 'duration_minutes', 'price_minor'])],
             ], ['id', 'status', 'starts_at', 'ends_at', 'service', 'staff_name', 'price_minor', 'currency', 'customer']),
             'CalendarSettings' => self::object([
                 'booking_page_url' => self::str(true) + ['description' => 'The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only.'],
@@ -10650,6 +10714,7 @@ final class CoreApiSchemas
                 'weekend_days' => ['type' => 'array', 'items' => self::str()],
                 'currency' => self::str(),
                 'instant_booking' => self::bool() + ['description' => 'Off: every booking from the booking page is a request.'],
+                'multi_service_booking' => self::bool() + ['description' => 'On: one booking may hold several services back to back (WHIT-1173). Default off.'],
             ], ['time_zone', 'booking_page_enabled', 'min_notice_minutes', 'max_advance_days', 'slot_step_minutes', 'reminder_hours_before', 'payment_hold_minutes', 'week_start', 'weekend_days', 'currency']),
             'CalendarSettingsRequest' => self::object([
                 'booking_page_enabled' => self::bool() + ['description' => 'Turn the public booking page on or off.'],
@@ -10661,6 +10726,7 @@ final class CoreApiSchemas
                 'week_start' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], 'description' => 'The first day of the week in calendar views.'],
                 'weekend_days' => ['type' => 'array', 'items' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']], 'description' => 'Days shown as the weekend.'],
                 'instant_booking' => self::bool() + ['description' => 'Off turns every booking from the booking page into a request staff accept.'],
+                'multi_service_booking' => self::bool() + ['description' => 'On lets one booking hold several services back to back, on the booking page and at the desk (WHIT-1173). Default off.'],
             ], []),
             'CalendarStaff' => self::object([
                 'profile_id' => self::int(),
@@ -10756,8 +10822,32 @@ final class CoreApiSchemas
             'CalendarSlot' => self::object([
                 'starts_at' => self::str(),
                 'ends_at' => self::str(),
-                'profile_ids' => ['type' => 'array', 'items' => self::int(), 'description' => 'Who is free then.'],
+                'profile_ids' => ['type' => 'array', 'items' => self::int(), 'description' => 'Who is free then. For several services: the people this time would be with.'],
+                'items' => ['type' => 'array', 'description' => 'Only when several services were asked for (WHIT-1173): who would do each, and when.', 'items' => self::object([
+                    'service_id' => self::int(),
+                    'profile_id' => self::int(),
+                    'starts_at' => self::str(),
+                    'ends_at' => self::str(),
+                ], ['service_id', 'profile_id', 'starts_at', 'ends_at'])],
             ], ['starts_at', 'ends_at', 'profile_ids']),
+            'CalendarBookingServiceChoice' => self::object([
+                'service_id' => self::int(),
+                'profile_id' => self::int(true) + ['description' => 'Who does it; null or left out for anyone.'],
+            ], ['service_id']),
+            'CalendarBookingItem' => self::object([
+                'position' => self::int() + ['description' => '0 for the first service.'],
+                'service_id' => self::int(),
+                'service_name' => ['type' => 'object', 'additionalProperties' => self::str(), 'description' => 'Language code => text.'],
+                'profile_id' => self::int(),
+                'staff_name' => self::str(),
+                'room_id' => self::int(true),
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'blocks_from' => self::str(),
+                'blocks_until' => self::str(),
+                'duration_minutes' => self::int(),
+                'price_minor' => self::int(true),
+            ], ['position', 'service_id', 'service_name', 'profile_id', 'staff_name', 'starts_at', 'ends_at', 'duration_minutes', 'price_minor']),
             'CalendarBookingCustomer' => self::object([
                 'profile_id' => self::int() + ['description' => 'An existing customer or member of this workspace.'],
                 'name' => self::str() + ['maxLength' => 200],
@@ -10789,17 +10879,20 @@ final class CoreApiSchemas
                 'suggested_at' => self::str(true) + ['description' => 'When staff suggested this time for a request.'],
                 'reminder_sent_at' => self::str(true),
                 'room_name' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => self::str(), 'description' => 'In lists: the room\'s name, language code => text.'],
+                'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingItem'), 'description' => 'A booking of several services (WHIT-1173): each, in order, with who does it and when. Empty for one service. `service_id`, `profile_id` and `room_id` are then the first service\'s, the times span them all and `price_minor` is the total.'],
             ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
             'CalendarBookingCreateRequest' => self::object([
-                'service_id' => self::int() + ['description' => 'The service to book.'],
-                'profile_id' => self::int() + ['description' => 'Leave out for whoever is free.'],
+                'service_id' => self::int() + ['description' => 'The service to book. Leave out when sending `services`.'],
+                'services' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 8, 'items' => SchemaBuilder::ref('CalendarBookingServiceChoice'), 'description' => 'Several services back to back, in order, as one booking, when the calendar setting `multi_service_booking` is on (WHIT-1173). Each may name its own person.'],
+                'same_person' => self::bool() + ['description' => 'With `services` and nobody chosen: one person who does them all.'],
+                'profile_id' => self::int() + ['description' => 'Leave out for whoever is free. With `services`: the person for every service that names none.'],
                 'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
                 'customer' => ['allOf' => [SchemaBuilder::ref('CalendarBookingCustomer')], 'description' => 'Who the booking is for: an existing customer by profile_id, or a name with an email or phone.'],
                 'keep_to_hours' => self::bool() + ['description' => 'Refuse a time outside working hours. Always on for agents.'],
                 'notify' => self::bool() + ['description' => 'Email the customer a confirmation. Default true.'],
                 'book_anyway' => self::bool() + ['description' => 'Book even though the person is busy then (a taken room or closed hours still refuse). Never for agents.'],
                 'within_hours' => self::bool() + ['description' => 'Refuse a time outside the person\'s working hours, without the booking window\'s notice rules.'],
-            ], ['service_id', 'starts_at', 'customer']),
+            ], ['starts_at', 'customer']),
             'CalendarBookingMoveRequest' => self::object([
                 'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
                 'profile_id' => self::int() + ['description' => 'Move to another person. Default: the same one.'],
@@ -11892,9 +11985,12 @@ final class CoreApiSchemas
                 'email' => self::str(),
                 'tenant_name' => self::str(),
                 'requires_password' => self::bool(),
+                // WHIT-1168: false when the server signs people in only through
+                // its identity provider; the invitee then accepts by signing in.
+                'password_sign_in' => self::bool(),
                 'inviter_name' => self::str(true),
                 'role_name' => self::str(true),
-            ], ['email', 'tenant_name', 'requires_password', 'inviter_name', 'role_name'])),
+            ], ['email', 'tenant_name', 'requires_password', 'password_sign_in', 'inviter_name', 'role_name'])),
             // POST /api/invitations/accept — `password` is required ONLY when
             // the preview said so; supplied for an address that already has an
             // account it is ignored, never applied.
@@ -11924,7 +12020,8 @@ final class CoreApiSchemas
                 // WHIT-917: whether the email form can work here (a bot check is
                 // set up, or the operator chose to go without), said up front.
                 'email_signup' => self::bool(),
-                'email_signup_reason' => ['type' => 'string', 'enum' => ['bot_check_unavailable'], 'nullable' => true],
+                // WHIT-1168: password_sign_in_off = the server signs people up only through its providers.
+                'email_signup_reason' => ['type' => 'string', 'enum' => ['bot_check_unavailable', 'password_sign_in_off'], 'nullable' => true],
                 // The operator's sign-in providers a visitor may join with: link
                 // to GET /api/v1/auth/sso/{provider_key}/start?join={workspace_slug}.
                 'providers' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupJoinProvider')],
@@ -16521,6 +16618,44 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+            // WHIT-1177 (SDK 1.115): what apps add to the dashboard, and the
+            // caller's own arrangement of it.
+            [
+                'method' => 'GET',
+                'path' => '/api/me/dashboard',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => "The setup points and widgets the caller's apps add to their dashboard, in the caller's order",
+                    'description' => 'Only points and widgets whose permission the caller holds in this workspace, from plugins on here, '
+                        . "in the caller's language. Hidden widgets are listed too, so a client can offer Show. Each names the plugin "
+                        . "route it reads; that route applies its own permission and the caller's scope.",
+                    'tags' => ['home'],
+                    // The person's own page layout, with nothing in it an agent needs.
+                    'mcp' => ['expose' => false],
+                    'responses' => [
+                        200 => self::jsonResponse('The setup points and widgets', 'DashboardResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/dashboard/layout',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => "Arrange the caller's dashboard: the order, hidden items and widget sizes",
+                    'description' => 'Items are home cards (by plugin name) and widgets (`<plugin>:<id>`) the caller can see, in the order '
+                        . "they want them. Items left out go after, in the apps' own order. Answers with the dashboard as GET does.",
+                    'tags' => ['home'],
+                    'mcp' => ['expose' => false],
+                    'request' => 'DashboardLayoutRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('The dashboard, arranged', 'DashboardResponse'),
+                        422 => self::errorResponse("An item that is not on the caller's dashboard, listed twice, or a size it does not fit"),
+                    ] + self::authErrors(),
+                ],
+            ],
             // WHIT-920 (#1724). Routes by SUBJECT: a route on a form submission
             // has no document, so these reach any route. Session-gated with no
             // permission, like the document routes above.
@@ -18803,11 +18938,20 @@ final class CoreApiSchemas
             ]),
             $route('GET', '/api/public/booking/{workspace}/slots', [
                 'summary' => 'Free times for a service on the booking page (public)',
-                'parameters' => array_merge([$workspace, self::queryParam('service_id', 'integer', 'The service.', true), self::queryParam('profile_id', 'integer', 'One person; leave out for anyone.')], $range),
+                'parameters' => array_merge([$workspace, self::queryParam('service_id', 'integer', 'The service. Leave out when sending `service_ids`.'), self::queryParam('profile_id', 'integer', 'One person; leave out for anyone.')], $range, self::severalServicesParams()),
                 'responses' => [
                     200 => self::jsonResponse('Free times', self::listEnvelope('CalendarSlot')),
                     404 => self::errorResponse('This booking page is not available'),
                     422 => self::errorResponse('A missing or unreadable range'),
+                ] + $limits,
+            ]),
+            $route('GET', '/api/public/booking/{workspace}/me', [
+                'summary' => 'The name and email of the signed-in visitor, to fill the booking form (public)',
+                'description' => 'Reads only the session and profile of the visitor, never the contacts of this workspace or the data of another. `data` is null when nobody is signed in. Sent `Cache-Control: private, no-store`.',
+                'parameters' => [$workspace],
+                'responses' => [
+                    200 => self::jsonResponse('The visitor, or null', self::dataEnvelope(SchemaBuilder::ref('PublicBookingVisitor'))),
+                    404 => self::errorResponse('This booking page is not available'),
                 ] + $limits,
             ]),
             $route('POST', '/api/public/booking/{workspace}/bookings', [
@@ -19167,7 +19311,7 @@ final class CoreApiSchemas
                 'summary' => 'List free times for a service',
                 'description' => 'Each slot lists the people free then. Working hours, time off, existing bookings with their buffers, busy events, the minimum notice and the booking window are all applied.',
                 'tags' => ['calendar'],
-                'parameters' => array_merge([self::queryParam('service_id', 'integer', 'The service.', true)], $range, [$person]),
+                'parameters' => array_merge([self::queryParam('service_id', 'integer', 'The service. Leave out when sending `service_ids`.')], $range, [$person], self::severalServicesParams(), [self::queryParam('except_booking_id', 'integer', 'With `service_ids`: moving this booking, so its own time counts as free.')]),
                 'responses' => [
                     200 => self::jsonResponse('Free times', self::listEnvelope('CalendarSlot')),
                     404 => self::errorResponse('No such service'),
@@ -19437,6 +19581,20 @@ final class CoreApiSchemas
         return [
             401 => self::errorResponse('Missing or invalid authentication'),
             403 => self::errorResponse('Insufficient permissions'),
+        ];
+    }
+
+    /**
+     * WHIT-1173: asking for free times for several services back to back.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function severalServicesParams(): array
+    {
+        return [
+            self::queryParam('service_ids', 'string', 'Several services back to back, in order, comma-separated (4,7,9). Each slot then says who would do which in `items`. Needs the calendar setting `multi_service_booking`.'),
+            self::queryParam('profile_ids', 'string', 'With `service_ids`: the person for each service, comma-separated, 0 for anyone (11,0,12).'),
+            self::queryParam('same_person', 'boolean', 'With `service_ids`: one person who does them all.'),
         ];
     }
 

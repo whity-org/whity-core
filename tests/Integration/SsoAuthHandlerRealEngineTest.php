@@ -129,6 +129,7 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
             new \Whity\Core\Tenant\FederatedWorkspaceProvisioner($this->pdo, $this->settings),
             $this->hooks,
             $frontendUrls,
+            invitations: new \Whity\Core\Identity\InvitationService($this->pdo, new \Whity\Core\Identity\ProfileProvisioner($this->pdo)),
         );
         $this->handler = ($this->makeHandler)();
 
@@ -229,7 +230,8 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         string $email = 'alice@acme.test',
         bool $emailVerified = true,
         ?int $providerId = null,
-        ?int $tenantId = null
+        ?int $tenantId = null,
+        ?string $invite = null
     ): void {
         // Default flow is GLOBAL-TRUST (operator provider @ system tenant 0).
         $flow = $this->jwtParser->create([
@@ -239,6 +241,7 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
             'provider_id' => $providerId ?? $this->providerId,
             'tenant_id' => $tenantId ?? 0,
             'provider_key' => 'google',
+            'invite_token' => $invite,
         ], 600, 'oidc_flow');
         $_COOKIE['sso_flow_token'] = $flow;
 
@@ -296,6 +299,17 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         $this->settings->setGlobal(\Whity\Core\Settings\SettingsRegistry::SSO_ENABLED, 'false');
         $res = $this->handler->providers(new Request('GET', '/api/v1/auth/sso/providers', [], ''));
         self::assertSame([], json_decode($res->getBody(), true)['data']);
+    }
+
+    public function testProvidersSayWhetherPasswordSignInIsOn(): void
+    {
+        $on = $this->handler->providers(new Request('GET', '/api/v1/auth/sso/providers', [], ''));
+        self::assertTrue(json_decode($on->getBody(), true)['password_sign_in']);
+
+        // WHIT-1168: off, the pages show the provider and nothing else.
+        $this->settings->setGlobal(\Whity\Core\Settings\SettingsRegistry::PASSWORD_SIGN_IN, 'false');
+        $off = $this->handler->providers(new Request('GET', '/api/v1/auth/sso/providers', [], ''));
+        self::assertFalse(json_decode($off->getBody(), true)['password_sign_in']);
     }
 
     public function testProvidersOmitsDisabledProviders(): void
@@ -582,6 +596,73 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
     }
 
     // ── self-service workspace on a first global-trust sign-in ───────────────
+
+    // ── WHIT-1168: an invitation accepted by signing in ──────────────────────
+
+    /** @return array{tenant: int, token: string} */
+    private function inviteTo(string $email): array
+    {
+        $this->exec("INSERT INTO tenants (name, slug, created_at) VALUES ('Example Bakery', 'example-bakery', NOW())");
+        $tenant = (int) $this->pdo->lastInsertId();
+        $roleId = (int) $this->col('SELECT id FROM roles ORDER BY id ASC LIMIT 1');
+        $invited = (new \Whity\Core\Identity\InvitationService($this->pdo, new \Whity\Core\Identity\ProfileProvisioner($this->pdo)))
+            ->invite($tenant, $email, $roleId);
+
+        return ['tenant' => $tenant, 'token' => $invited['token']];
+    }
+
+    public function testANewPersonAcceptsAnInvitationBySigningInAndLandsInTheWorkspace(): void
+    {
+        $invite = $this->inviteTo('newbie@fresh.test');
+        $this->primeFlow(sub: 'newbie-sub', email: 'newbie@fresh.test', invite: $invite['token']);
+        $_GET = ['code' => 'authcode', 'state' => 'state-1'];
+
+        $res = $this->runCallback();
+
+        self::assertSame(self::APP_URL . '/dashboard', $this->location($res), $res->getBody());
+        $profile = $this->profileFor('newbie-sub');
+        self::assertSame(1, (int) $this->col(
+            "SELECT COUNT(*) FROM memberships WHERE profile_id = {$profile} AND tenant_id = {$invite['tenant']} AND status = 'active'"
+        ));
+        self::assertSame('accepted', (string) $this->col("SELECT status FROM invitations WHERE tenant_id = {$invite['tenant']}"));
+        // No password was ever chosen.
+        self::assertSame('', (string) $this->col("SELECT password_hash FROM profiles WHERE id = {$profile}"));
+    }
+
+    public function testAnExistingPersonAcceptsAnInvitationBySigningIn(): void
+    {
+        $this->linkIdentity();
+        $invite = $this->inviteTo('alice@acme.test');
+        $this->primeFlow(invite: $invite['token']);
+        $_GET = ['code' => 'authcode', 'state' => 'state-1'];
+
+        $res = $this->runCallback();
+
+        self::assertSame(self::APP_URL . '/dashboard', $this->location($res), $res->getBody());
+        self::assertSame(1, (int) $this->col(
+            "SELECT COUNT(*) FROM memberships WHERE profile_id = {$this->profileId} AND tenant_id = {$invite['tenant']} AND status = 'active'"
+        ));
+    }
+
+    public function testAnInvitationSentToAnotherAddressIsNotTaken(): void
+    {
+        $invite = $this->inviteTo('someone-else@fresh.test');
+        $this->primeFlow(sub: 'newbie-sub', email: 'newbie@fresh.test', invite: $invite['token']);
+        $_GET = ['code' => 'authcode', 'state' => 'state-1'];
+
+        $res = $this->runCallback();
+
+        self::assertStringContainsString('/login?sso_error=invite_other_email', $this->location($res));
+        self::assertSame('pending', (string) $this->col("SELECT status FROM invitations WHERE tenant_id = {$invite['tenant']}"));
+    }
+
+    public function testAnUnusableInvitationSaysSo(): void
+    {
+        $this->primeFlow(sub: 'newbie-sub', email: 'newbie@fresh.test', invite: 'not-a-real-token');
+        $_GET = ['code' => 'authcode', 'state' => 'state-1'];
+
+        self::assertStringContainsString('/login?sso_error=invite_invalid', $this->location($this->runCallback()));
+    }
 
     private function enableSelfProvision(): void
     {

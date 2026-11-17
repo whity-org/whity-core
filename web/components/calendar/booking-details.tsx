@@ -16,6 +16,7 @@ import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import type { ReactNode } from 'react';
 import { bookingMoney } from './booking-sheet';
+import { ServiceList } from './booking-services';
 import type { CalItem } from './time-grid';
 import { useCalendarWords } from './use-calendar-words';
 
@@ -120,6 +121,11 @@ export function BookingDetails({
         </Row>
       )}
       {withName !== '' && <Row icon="user">{t('details.with', 'With {name}', { name: withName })}</Row>}
+      {booking !== undefined && (booking.items?.length ?? 0) > 1 && (
+        <Row icon="list-numbered">
+          <ServiceList items={booking.items ?? []} timeZone={timeZone} />
+        </Row>
+      )}
       {item.where !== '' && <Row icon="store">{item.where}</Row>}
       {paid !== null && <Row icon="money">{paid}</Row>}
       {how !== null && <Row icon="clock">{how}</Row>}

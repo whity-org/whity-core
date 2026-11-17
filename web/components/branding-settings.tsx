@@ -433,7 +433,7 @@ export function BrandingSettings({ tenantOverridable = true, variant = 'tenant' 
               </p>
             </div>
           ) : (
-            <div className="space-y-6 divide-y divide-border">
+            <div className="stack-divided-6">
               <BrandingMainColour
                 scope="tenant"
                 current={effectiveBranding?.mainColor ?? null}
@@ -443,7 +443,7 @@ export function BrandingSettings({ tenantOverridable = true, variant = 'tenant' 
                 onSuccess={(message) => addToast(message, 'success')}
               />
               {ASSET_META.map((meta) => (
-                <div key={meta.key} className="pt-4 first:pt-0">
+                <div key={meta.key}>
                   <AssetUploader
                     meta={meta}
                     scope="tenant"
@@ -483,7 +483,7 @@ export function BrandingSettings({ tenantOverridable = true, variant = 'tenant' 
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-6 divide-y divide-border">
+            <div className="stack-divided-6">
               <BrandingMainColour
                 scope="global"
                 current={effectiveBranding?.mainColor ?? null}
@@ -493,7 +493,7 @@ export function BrandingSettings({ tenantOverridable = true, variant = 'tenant' 
                 onSuccess={(message) => addToast(message, 'success')}
               />
               {ASSET_META.map((meta) => (
-                <div key={meta.key} className="pt-4 first:pt-0">
+                <div key={meta.key}>
                   <AssetUploader
                     meta={meta}
                     scope="global"

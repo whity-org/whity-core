@@ -32,6 +32,7 @@ import { FieldSelect } from '@/components/field-select';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
 import { CalendarNav } from '@/components/calendar/calendar-nav';
+import { WeeklyHoursFields } from '@/components/calendar/weekly-hours-fields';
 import { useCalendarAccess, useCalendarBasics } from '@/components/calendar/use-calendar-basics';
 import { useCalendarWords } from '@/components/calendar/use-calendar-words';
 import { useFetch } from '@/hooks/useFetch';
@@ -54,14 +55,13 @@ import { useTranslation } from '@whity/features/i18n';
 import { toZonedIso, useDateDisplay, zonedDate, zonedInstant } from '@whity/features/datetime';
 import { calendarApi, type CalendarStaff, type CalendarTimeOff } from '@/lib/calendar/api';
 import { addDays, dateKey, isoWeekdayOf, parseDateKey, rangeQuery, zonedIsoFor } from '@/lib/calendar/layout';
-import { firstBadDay, rowsOf, weekOf, weekOrder, type HoursRange, type HoursWeek } from '@/lib/calendar/hours';
-import { timeOptions, timeToMinute } from '@/lib/calendar/times';
+import { firstBadDay, rowsOf, weekOf, weekOrder, type HoursWeek } from '@/lib/calendar/hours';
+import { timeOptions } from '@/lib/calendar/times';
 import { ForbiddenError } from '@/lib/forbidden';
 
 const STARTS = timeOptions(15);
 const ENDS = timeOptions(15, true);
 
-type Range = HoursRange;
 type Week = HoursWeek;
 
 export default function CalendarHoursPage() {
@@ -264,12 +264,6 @@ function HoursEditor({
   const order = weekOrder(isoWeekdayOf(weekStart));
   const dirty = saved !== null && current !== null && JSON.stringify(rowsOf(current)) !== JSON.stringify(rowsOf(saved));
 
-  const setDay = (day: number, ranges: Range[]) => {
-    if (current === null) return;
-    setDraft({ ...current, [day]: ranges });
-    setProblem(null);
-  };
-
   const save = async () => {
     if (current === null) return;
     const bad = firstBadDay(current);
@@ -310,72 +304,16 @@ function HoursEditor({
         ) : current === null || saved === null ? (
           <Skeleton className="h-72 w-full rounded-card" />
         ) : (
-          <ul className="divide-y divide-divider">
-            {order.map((day) => {
-              const ranges = current[day] ?? [];
-              return (
-                <li key={day} className="grid gap-2 py-3 sm:grid-cols-[9rem_1fr]" data-testid={`hours-day-${day}`}>
-                  <span className="pt-2 text-sm font-medium text-foreground">{words.weekday(day)}</span>
-                  <div className="space-y-2">
-                    {ranges.length === 0 && (
-                      <p className="flex min-h-10 items-center text-sm text-muted-foreground">{t('hours.closed', 'Not working')}</p>
-                    )}
-                    {ranges.map((range, index) => (
-                      <div key={index} className="flex flex-wrap items-center gap-2">
-                        <div className="w-28">
-                          <FieldSelect
-                            id={`hours-${day}-${index}-start`}
-                            value={range.start}
-                            disabled={!canChange}
-                            onChange={(start) => setDay(day, ranges.map((r, i) => (i === index ? { ...r, start } : r)))}
-                            options={STARTS.map((v) => ({ value: v, label: v }))}
-                          />
-                        </div>
-                        <span className="text-sm text-muted-foreground">{t('hours.to', 'to')}</span>
-                        <div className="w-28">
-                          <FieldSelect
-                            id={`hours-${day}-${index}-end`}
-                            value={range.end}
-                            disabled={!canChange}
-                            onChange={(end) => setDay(day, ranges.map((r, i) => (i === index ? { ...r, end } : r)))}
-                            options={ENDS.map((v) => ({ value: v, label: v }))}
-                          />
-                        </div>
-                        {canChange && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDay(day, ranges.filter((_, i) => i !== index))}
-                          >
-                            {t('hours.removeRange', 'Remove')}
-                          </Button>
-                        )}
-                      </div>
-                    ))}
-                    {canChange && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        data-testid={`hours-add-${day}`}
-                        onClick={() => {
-                          const last = ranges[ranges.length - 1];
-                          const start = last ? last.end : '09:00';
-                          const startMinute = timeToMinute(start) ?? 540;
-                          const end = ENDS[Math.min(ENDS.indexOf(start) + 16, ENDS.length - 1)] ?? '24:00';
-                          setDay(day, [...ranges, { start: startMinute >= 1440 ? '23:00' : start, end }]);
-                        }}
-                      >
-                        <Icon name="plus" />
-                        {ranges.length === 0 ? t('hours.addHours', 'Add hours') : t('hours.addRange', 'Add another range')}
-                      </Button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <WeeklyHoursFields
+            idPrefix="hours"
+            week={current}
+            order={order}
+            disabled={!canChange}
+            onChange={(week) => {
+              setDraft(week);
+              setProblem(null);
+            }}
+          />
         )}
         {problem && (
           <Alert variant="destructive" className="mt-3" data-testid="hours-problem">

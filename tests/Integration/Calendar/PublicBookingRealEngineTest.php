@@ -16,6 +16,7 @@ use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Calendar\BookingReminderJob;
 use Whity\Core\Calendar\BookingRepository;
 use Whity\Core\Calendar\BookingService;
+use Whity\Core\Calendar\BookingVisitor;
 use Whity\Core\Calendar\CalendarFeed;
 use Whity\Core\Calendar\CalendarRepository;
 use Whity\Core\Calendar\EmailBookingMessenger;
@@ -58,6 +59,8 @@ final class PublicBookingRealEngineTest extends TestCase
     /** @var list<array{to: string, subject: string, text: string}> */
     private array $sent = [];
     private int $cake;
+    /** @var array<string, mixed>|null the visitor's session claims; null: signed out */
+    private ?array $claims = null;
 
     protected function setUp(): void
     {
@@ -127,6 +130,7 @@ final class PublicBookingRealEngineTest extends TestCase
             new BotCheck($globals, new EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'), new HttpFetcher()),
             new DatabaseSharedStore($this->pdo),
             new BrandingService($this->settings),
+            new BookingVisitor(fn (): ?array => $this->claims, $this->pdo),
         );
     }
 
@@ -389,5 +393,141 @@ final class PublicBookingRealEngineTest extends TestCase
 
         $this->service->move(1, (int) $made['id'], new DateTimeImmutable('2026-11-16 12:00:00', new DateTimeZone('UTC')), null, false);
         self::assertSame(['result' => 'moved'], $reminders->handle($payload));
+    }
+
+    public function testSeveralServicesAreBookedTogetherWhenTheWorkspaceAllowsIt(): void
+    {
+        $services = new ServiceRepository($this->pdo);
+        $icing = $services->insert(1, [
+            'name' => ['en' => 'Icing class', 'ar' => 'درس التزيين'], 'description' => [],
+            'duration_minutes' => 60, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 0,
+            'price_minor' => 20000, 'currency' => 'JOD', 'bookable_online' => true, 'active' => true, 'sort_order' => 1,
+        ]);
+        $services->replaceStaff(1, $icing, [11]);
+        $page = ['workspace' => 'example-bakery'];
+        $both = [['service_id' => $this->cake], ['service_id' => $icing]];
+
+        // Off by default: the page says so, and asking for two is refused.
+        self::assertFalse(self::data($this->handler->page(self::request('GET', '/x'), $page))['data']['settings']['multi_service_booking']);
+        $off = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['services' => $both])), $page);
+        self::assertSame(422, $off->getStatusCode());
+
+        $this->settings->setTenant(1, 'calendar.multi_service_booking', 'true');
+        self::assertTrue(self::data($this->handler->page(self::request('GET', '/x'), $page))['data']['settings']['multi_service_booking']);
+
+        $_GET = ['service_ids' => $this->cake . ',' . $icing, 'from' => '2026-11-16T10:00:00+03:00', 'to' => '2026-11-16T11:00:00+03:00'];
+        try {
+            $slots = self::data($this->handler->slots(self::request('GET', '/x'), $page))['data'];
+        } finally {
+            $_GET = [];
+        }
+        self::assertSame(['2026-11-16T07:00:00Z', '2026-11-16T07:30:00Z'], array_column($slots, 'starts_at'));
+        self::assertSame('2026-11-16T08:30:00Z', $slots[0]['ends_at'], '30 + 60 minutes');
+
+        $response = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['services' => $both])), $page);
+        self::assertSame(201, $response->getStatusCode(), $response->getBody());
+        $booking = self::data($response)['data'];
+        self::assertSame('2026-11-16T08:30:00Z', $booking['ends_at']);
+        self::assertSame(32500, $booking['price_minor']);
+        self::assertSame(['ar' => 'تذوق الكعك + درس التزيين', 'en' => 'Cake tasting + Icing class'], $booking['service']['name']);
+        self::assertSame(90, $booking['service']['duration_minutes']);
+        self::assertSame([30, 60], array_column($booking['services'], 'duration_minutes'));
+        self::assertStringContainsString('Booked: Cake tasting + Icing class', $this->sent[count($this->sent) - 1]['subject']);
+
+        // The customer's link moves both together.
+        $token = (string) $booking['manage_token'];
+        $_GET = ['from' => '2026-11-16T13:00:00+03:00', 'to' => '2026-11-16T14:00:00+03:00'];
+        try {
+            $free = self::data($this->handler->manageSlots(self::request('GET', '/x', [], '198.51.100.1'), ['token' => $token]))['data'];
+        } finally {
+            $_GET = [];
+        }
+        self::assertSame(['2026-11-16T10:00:00Z', '2026-11-16T10:30:00Z'], array_column($free, 'starts_at'));
+        $moved = self::data($this->handler->move(self::request('POST', '/x', ['starts_at' => '2026-11-16T13:00:00+03:00'], '198.51.100.1'), ['token' => $token]))['data'];
+        self::assertSame('2026-11-16T11:30:00Z', $moved['ends_at']);
+        self::assertSame(['2026-11-16T10:00:00Z', '2026-11-16T10:30:00Z'], array_column($moved['services'], 'starts_at'));
+    }
+
+    // ── WHIT-1179: a signed-in visitor's own details ───────────────────
+
+    private function visitor(string $workspace = 'example-bakery'): Response
+    {
+        return $this->handler->visitor(self::request('GET', '/api/v1/public/booking/' . $workspace . '/me'), ['workspace' => $workspace]);
+    }
+
+    private static function assertNeverCached(Response $response): void
+    {
+        $headers = array_change_key_case($response->getHeaders());
+        self::assertSame('private, no-store', $headers['cache-control'] ?? null, 'the details of a person are never kept by a cache');
+        self::assertSame('Cookie', $headers['vary'] ?? null);
+    }
+
+    public function testASignedOutVisitorGetsNothingToFill(): void
+    {
+        $response = $this->visitor();
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(['data' => null], self::data($response));
+        self::assertNeverCached($response);
+    }
+
+    public function testASignedInPersonWithNoTiesHereGetsOnlyTheirOwnAccount(): void
+    {
+        // Baker 21 belongs only to Other Bakery, which has them as a contact
+        // with another name and a phone. None of that may reach this page.
+        $this->pdo->exec("INSERT INTO contacts (tenant_id, name, email, mobile, phone, profile_id) VALUES (2, 'Contact Name At Other', 'other@example.com', '+962 79 000 0000', '+962 6 000 0000', 21)");
+        $this->claims = ['type' => 'access', 'profile_id' => 21, 'active_tenant_id' => 2, 'email' => 'Ahmad.Khalil@Example.com'];
+
+        $response = $this->visitor();
+        self::assertSame(200, $response->getStatusCode(), $response->getBody());
+        self::assertSame(['name' => 'Baker 21', 'email' => 'ahmad.khalil@example.com', 'phone' => null], self::data($response)['data']);
+        self::assertNeverCached($response);
+        self::assertStringNotContainsString('Other', $response->getBody());
+        self::assertStringNotContainsString('000 0000', $response->getBody());
+        self::assertSame(0, (int) $this->scalar('SELECT COUNT(*) FROM contacts WHERE tenant_id = 1'), 'looking adds nothing to the workspace');
+    }
+
+    public function testAMemberOrContactOfTheWorkspaceGetsTheSameAnswerFromTheirOwnAccount(): void
+    {
+        $this->pdo->exec("INSERT INTO contacts (tenant_id, name, email, phone, profile_id) VALUES (1, 'Saved As Something Else', 'saved@example.com', '+962 6 111 1111', 11)");
+        $this->claims = ['type' => 'access', 'profile_id' => 11, 'active_tenant_id' => 1, 'email' => 'baker11@example.com'];
+
+        self::assertSame(['name' => 'Baker 11', 'email' => 'baker11@example.com', 'phone' => null], self::data($this->visitor())['data']);
+    }
+
+    public function testNoAnswerForAPageThatIsOffOrATokenWithoutAPerson(): void
+    {
+        $this->claims = ['type' => 'access', 'profile_id' => 21, 'active_tenant_id' => 2, 'email' => 'ahmad@example.com'];
+        $off = $this->visitor('other-bakery');
+        self::assertSame(404, $off->getStatusCode());
+        self::assertNeverCached($off);
+
+        $this->claims = ['type' => 'access', 'profile_id' => 0, 'email' => 'nobody@example.com'];
+        self::assertSame(['data' => null], self::data($this->visitor()));
+    }
+
+    public function testWhatThePersonSendsIsWhatSeveralServicesAreBookedWith(): void
+    {
+        $services = new ServiceRepository($this->pdo);
+        $icing = $services->insert(1, [
+            'name' => ['en' => 'Icing class', 'ar' => 'درس التزيين'], 'description' => [],
+            'duration_minutes' => 60, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 0,
+            'price_minor' => 20000, 'currency' => 'JOD', 'bookable_online' => true, 'active' => true, 'sort_order' => 1,
+        ]);
+        $services->replaceStaff(1, $icing, [11]);
+        $this->settings->setTenant(1, 'calendar.multi_service_booking', 'true');
+        $this->claims = ['type' => 'access', 'profile_id' => 21, 'active_tenant_id' => 2, 'email' => 'ahmad@example.com'];
+        self::assertSame('Baker 21', self::data($this->visitor())['data']['name']);
+
+        // The person changed the filled-in name and email before booking.
+        $response = $this->handler->book(self::request('POST', '/x', $this->bookingBody([
+            'services' => [['service_id' => $this->cake], ['service_id' => $icing]],
+            'name' => 'Ahmad Khalil',
+            'email' => 'ahmad.k@example.com',
+            'phone' => '+962 79 555 0142',
+        ])), ['workspace' => 'example-bakery']);
+        self::assertSame(201, $response->getStatusCode(), $response->getBody());
+        self::assertSame('Ahmad Khalil', $this->scalar('SELECT customer_name FROM calendar_bookings WHERE tenant_id = 1'));
+        self::assertSame('ahmad.k@example.com', $this->scalar('SELECT customer_email FROM calendar_bookings WHERE tenant_id = 1'));
+        self::assertSame('+962 79 555 0142', $this->scalar('SELECT customer_phone FROM calendar_bookings WHERE tenant_id = 1'));
     }
 }
