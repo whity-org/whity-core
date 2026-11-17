@@ -47,8 +47,8 @@ final class TemplateSetupTest extends TestCase
 
         $offer = json_encode($setup['steps'][7]['blocks'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         self::assertIsString($offer);
-        self::assertStringContainsString('/api/v1/workspace/code-plugins/FrontOffice/trial', $offer);
-        self::assertStringContainsString('Start your 14-day free trial', $offer);
+        self::assertStringContainsString('/api/v1/workspace/templates/bakery/setup/offer/trial', $offer);
+        self::assertStringContainsString('Start your 30-day free trial', $offer);
         self::assertStringContainsString('✓ الطلبات عند الكاونتر برمز QR', $offer);
         self::assertStringContainsString('/api/v1/workspace/templates/bakery/setup/offer/close', $offer);
     }

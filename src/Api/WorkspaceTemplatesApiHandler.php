@@ -214,7 +214,43 @@ final class WorkspaceTemplatesApiHandler
         }
         $paid = $this->activation->paidAccessOf((string) $offer['plugin']);
 
-        return $paid === null ? null : $offer + ['trialDays' => $paid['trialDays']];
+        return $paid === null ? null : ['trialDays' => self::trialDays($offer, $paid['trialDays'])] + $offer;
+    }
+
+    /** @var (\Closure(int, ?int, string, ?int): Response)|null */
+    private ?\Closure $trialStarter = null;
+
+    /**
+     * How a trial starts: the Plugins page's own path, with every rule it
+     * applies ({@see WorkspaceCodePluginsApiHandler::startTrialFor()}).
+     *
+     * @param \Closure(int, ?int, string, ?int): Response $starter (workspace, person, plugin, days)
+     */
+    public function useTrialStarter(\Closure $starter): void
+    {
+        $this->trialStarter = $starter;
+    }
+
+    /**
+     * POST /api/workspace/templates/{key}/setup/offer/trial (plugins:enable):
+     * start the offered plugin's trial for the template's own length.
+     *
+     * @param array<string, string> $params
+     */
+    public function startOfferTrial(Request $request, array $params = []): Response
+    {
+        return $this->withSetup($request, $params, function (TemplateSetup $setup, array $template, int $tenantId, int $profileId): Response {
+            $offer = $this->rawOffer($template);
+            if ($offer === null || $this->trialStarter === null) {
+                return Response::error('This template offers no plugin here.', 404);
+            }
+            $days = (int) $offer['trialDays'];
+            if ($days <= 0) {
+                return Response::error('This workspace has already had its trial, or the plugin offers none', 409, ['reason' => 'trial_unavailable']);
+            }
+
+            return ($this->trialStarter)($tenantId, $profileId, (string) $offer['plugin'], $days);
+        });
     }
 
     public function list(Request $request): Response

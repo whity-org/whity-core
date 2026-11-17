@@ -1854,6 +1854,10 @@
     "en": "Close the template's plugin offer",
     "ar": "إغلاق عرض الإضافة في القالب"
   },
+  "post_api_workspace_templates_key_setup_offer_trial": {
+    "en": "Start the free trial a template offers",
+    "ar": "بدء التجربة المجانية التي يعرضها القالب"
+  },
   "put_api_calendar_my_view": {
     "en": "Change your own calendar choices",
     "ar": "تغيير اختياراتك في التقويم"

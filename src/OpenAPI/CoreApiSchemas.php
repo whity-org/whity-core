@@ -19953,6 +19953,17 @@ final class CoreApiSchemas
                     404 => self::errorResponse('This workspace did not start from that template'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/offer/trial', 'plugins:enable', [
+                'summary' => 'Start the free trial of the plugin a template offers',
+                'description' => 'For the template\'s own trial length (30 days on Whity Cloud), once per workspace, no card. The same rules as Settings › Plugins: dependencies are turned on and it is audited.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('The trial and when it ends', 'WorkspaceCodePluginTrialResponse'),
+                    404 => self::errorResponse('This workspace did not start from that template, or it offers no plugin here'),
+                    409 => self::errorResponse('This workspace has already had its trial, or the plugin offers none'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/{kind:business|hours|services|team|booking}', 'settings:write', [
                 'summary' => 'Save a step of a template\'s guided setup, as the caller',
                 'description' => 'Through core\'s own routes with the caller\'s permissions. Writes only what differs, adds and never removes.',

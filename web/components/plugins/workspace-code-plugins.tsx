@@ -226,6 +226,16 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
             'Your platform installs these once. Turn on the ones this workspace needs. Turning one off hides it and keeps its data.',
           )}
         </p>
+        {canEnable ? (
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <p className="text-sm text-muted-foreground">
+              {t('plugins.workspaceCode.templateHint', 'A template sets up the basics for your kind of business. It only adds what is missing.')}
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/setup/template">{t('plugins.workspaceCode.template', 'Start from a template')}</Link>
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {error ? (

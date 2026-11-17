@@ -21,7 +21,8 @@ type Template = components['schemas']['WorkspaceTemplateCard'];
 
 /**
  * Start from a template (WHIT-1195, SDK 1.116): offered right after a
- * workspace is created. Each card says what the template sets up and, when it
+ * workspace is created, and from Settings › Plugins any time after (owner,
+ * 2026-11-17: adopt mode, it only adds what is missing). Each card says what the template sets up and, when it
  * comes with a paid plugin, that the plugin can be tried free. Choosing one
  * asks once (examples on or off), applies it as the person, and opens its
  * guided setup. Start blank is always last.
@@ -73,7 +74,7 @@ export default function TemplatePickerPage() {
         title={t('templates.title', 'How will you use Whity?')}
         description={t(
           'templates.description',
-          'Pick the one closest to your business. It sets up the basics in a minute, free, and you can change everything later.',
+          'Pick the one closest to your business. It sets up the basics in a minute, free. It only adds what is missing, and you can change everything later.',
         )}
       />
       <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

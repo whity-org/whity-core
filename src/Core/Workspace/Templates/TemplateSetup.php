@@ -487,7 +487,7 @@ final class TemplateSetup
                 'label' => ['en' => "Start your {$days}-day free trial", 'ar' => "ابدأ تجربة مجانية لمدة {$days} يوماً"],
                 'variant' => 'primary',
                 'requiredPermission' => 'plugins:enable',
-                'action' => ['method' => 'POST', 'endpoint' => '/api/v1/workspace/code-plugins/' . $plugin . '/trial'],
+                'action' => ['method' => 'POST', 'endpoint' => $api . '/offer/trial'],
             ];
             $blocks[] = ['type' => 'text', 'tone' => 'muted', 'value' => [
                 'en' => 'No card needed. When the trial ends, you choose whether to keep it.',

@@ -200,28 +200,41 @@ final class WorkspaceCodePluginsApiHandler
             if ($name === null) {
                 return self::notFound();
             }
-            if (!$this->activation->trialAvailable($name, $tenantId)) {
-                return Response::error('This workspace has already had its trial, or the plugin offers none', 409, ['reason' => 'trial_unavailable']);
-            }
-            $blocked = $this->dependencyRefusal($name, $tenantId);
-            if ($blocked !== null) {
-                return $blocked;
-            }
 
-            $profileId = self::profileId($request);
-            $this->turnOnDependencies($name, $tenantId, $profileId);
-            $this->activation->startTrial($tenantId, $name, $profileId);
-            $state = $this->activation->stateFor($name, $tenantId);
-            $this->audit?->record(self::AUDIT_TRIAL, [
-                'tenant_id' => $tenantId,
-                'actor_user_id' => $profileId,
-                'target_type' => 'code_plugin',
-                'metadata' => ['plugin' => $name, 'until' => $state['trialEndsAt']],
-            ]);
-            $this->loader->notifyWorkspaceSwitch($name, $tenantId, true);
-
-            return Response::json(['data' => ['name' => $name, 'enabled' => true, 'trialEndsAt' => $state['trialEndsAt']]]);
+            return $this->startTrialFor($tenantId, self::profileId($request), $name);
         });
+    }
+
+    /**
+     * Start a plugin's trial in this workspace, with every rule the Plugins
+     * page applies: once per workspace, dependencies turned on, audited.
+     * `$days` is a workspace template's own trial length (WHIT-1195).
+     */
+    public function startTrialFor(int $tenantId, ?int $profileId, string $name, ?int $days = null): Response
+    {
+        if ($this->visiblePlugin($name) === null) {
+            return self::notFound();
+        }
+        if (!$this->activation->trialAvailable($name, $tenantId)) {
+            return Response::error('This workspace has already had its trial, or the plugin offers none', 409, ['reason' => 'trial_unavailable']);
+        }
+        $blocked = $this->dependencyRefusal($name, $tenantId);
+        if ($blocked !== null) {
+            return $blocked;
+        }
+
+        $this->turnOnDependencies($name, $tenantId, $profileId);
+        $this->activation->startTrial($tenantId, $name, $profileId, $days);
+        $state = $this->activation->stateFor($name, $tenantId);
+        $this->audit?->record(self::AUDIT_TRIAL, [
+            'tenant_id' => $tenantId,
+            'actor_user_id' => $profileId,
+            'target_type' => 'code_plugin',
+            'metadata' => array_filter(['plugin' => $name, 'until' => $state['trialEndsAt'], 'days' => $days], static fn (mixed $v): bool => $v !== null),
+        ]);
+        $this->loader->notifyWorkspaceSwitch($name, $tenantId, true);
+
+        return Response::json(['data' => ['name' => $name, 'enabled' => true, 'trialEndsAt' => $state['trialEndsAt']]]);
     }
 
     /** @param array<string, string> $params */
