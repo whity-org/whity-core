@@ -1,7 +1,7 @@
 {
   "name": "@whity/tokens",
-  "version": "1.0.0",
-  "description": "Design tokens (colors, typography, spacing, radius) for Whity products — generated from src/design/tokens/base.json. No React/Next dependency: a plain JSON bundle plus standalone importable Tailwind v4 theme CSS, a shadcn/Tailwind base-reset layer, and self-hosted @font-face CSS.",
+  "version": "1.1.0",
+  "description": "Design tokens (colors, typography, spacing, radius), fonts and logos for Whity products — generated from src/design/tokens/base.json and the brand handoff. No React/Next dependency: a plain JSON bundle, standalone importable Tailwind v4 theme CSS, a shadcn/Tailwind base-reset layer, self-hosted @font-face CSS, the websites' plain token CSS and the logo set.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -13,14 +13,21 @@
     "./css": "./generated/theme.css",
     "./base.css": "./generated/base.css",
     "./fonts.css": "./generated/fonts.css",
-    "./fonts/*": "./fonts/*"
+    "./fonts/*": "./fonts/*",
+    "./site.css": "./generated/site.css",
+    "./logos/*": "./logos/*"
   },
   "files": [
     "generated",
-    "fonts"
+    "fonts",
+    "logos",
+    "bin"
   ],
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org"
+  },
+  "bin": {
+    "whity-tokens": "./bin/whity-tokens.js"
   }
 }
