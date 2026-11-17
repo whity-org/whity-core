@@ -299,7 +299,7 @@ final class WorkspaceOwnership
      */
     public function openForPerson(int $profileId): array
     {
-        // @tenant-guard-ignore: the person's OWN offers across their workspaces, like their memberships at sign-in
+        // The person's OWN offers across their workspaces, like their memberships at sign-in.
         $stmt = $this->db->prepare(
             self::SELECT . " WHERE o.to_profile_id = :p AND o.status = 'open' AND o.expires_at > NOW()
                ORDER BY o.created_at DESC, o.id DESC"
@@ -316,7 +316,7 @@ final class WorkspaceOwnership
      */
     public function find(int $offerId): ?array
     {
-        // @tenant-guard-ignore: looked up by id for the person it names; every caller checks to/from against the caller
+        // Looked up by id for the person it names; every caller checks to/from against the caller.
         $stmt = $this->db->prepare(self::SELECT . ' WHERE o.id = :id');
         $stmt->execute([':id' => $offerId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -374,6 +374,7 @@ final class WorkspaceOwnership
         return $stmt->fetchColumn() !== false;
     }
 
+    // @tenant-guard-ignore: the shared column list; every use appends its own predicate (tenant_id, or the person's own to_profile_id / id)
     private const SELECT = 'SELECT o.id, o.tenant_id, o.kind, o.from_profile_id, o.to_profile_id, o.leave_after, o.status,
                 o.expires_at, o.created_at, o.decided_at, t.name AS tenant_name,
                 pf.display_name AS from_name, pt.display_name AS to_name
