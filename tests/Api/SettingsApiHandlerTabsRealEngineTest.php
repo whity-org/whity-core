@@ -185,13 +185,14 @@ final class SettingsApiHandlerTabsRealEngineTest extends TestCase
         $this->assertSame([], $this->tabIds($response));
     }
 
-    public function testSettingsReadSeesGeneralAndBrandingOnlyInATenant(): void
+    public function testSettingsReadSeesGeneralBrandingAndOwnersOnlyInATenant(): void
     {
         $profileId = $this->seedProfileWithPermissions($this->tenantId, [CorePermissions::SETTINGS_READ]);
 
         $tabs = $this->tabIds($this->handler->tabs($this->requestAs($profileId, $this->tenantId)));
 
-        $this->assertSame(['general', 'branding'], $tabs);
+        // Owners (WHIT-1170) is a workspace page, never the system tenant's.
+        $this->assertSame(['general', 'branding', 'owners'], $tabs);
     }
 
     public function testAuthProvidersManageAloneShowsOnlySsoEvenWithoutSettingsRead(): void
@@ -213,7 +214,7 @@ final class SettingsApiHandlerTabsRealEngineTest extends TestCase
         $tabs = $this->tabIds($this->handler->tabs($this->requestAs($profileId, $this->tenantId)));
 
         $this->assertSame(
-            ['general', 'branding'],
+            ['general', 'branding', 'owners'],
             $tabs,
             'settings:manage in a non-system tenant must not reveal Sign-up/Email/Storage.'
         );

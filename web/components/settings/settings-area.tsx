@@ -56,6 +56,7 @@ const PERSONAL_GROUPS: readonly GroupId[] = ['mine', 'here'];
 const GROUP_OF: Readonly<Record<string, GroupId>> = {
   general: 'workspace',
   branding: 'workspace',
+  owners: 'workspace',
   'document-themes': 'workspace',
   billing: 'workspace',
   plugins: 'workspace',
@@ -159,6 +160,7 @@ const ROW_ICON: Readonly<Record<string, IconName>> = {
   role: 'role',
   general: 'settings',
   branding: 'branding',
+  owners: 'role',
   security: 'shield',
   sso: 'key',
   signup: 'user',

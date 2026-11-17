@@ -1331,6 +1331,13 @@ namespace Whity\Sdk;
  *
  * Purely additive.)
  *
+ * 1.112 (WORKSPACE OWNERS: {@see Hooks\Events::WORKSPACE_OWNER_ADDED},
+ * {@see Hooks\Events::WORKSPACE_OWNER_REMOVED} and
+ * {@see Hooks\Events::WORKSPACE_OWNERSHIP_TRANSFERRED}, when a workspace changes hands or gains
+ * or loses a co-owner (WHIT-1170).
+ *
+ * Purely additive.)
+ *
  * 1.113 (SETUP INPUTS: block forms gain `timeInput` (HH:MM), `weeklyHours` (a week of opening or
  * working hours, open/closed per day, breaks, copy to every day, submitted as the calendar's
  * `{weekday, start_time, end_time}` rows) and `checkboxGroup` (several choices, submitted as a

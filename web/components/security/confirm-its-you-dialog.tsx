@@ -46,7 +46,10 @@ export const IDENTITY_CHECK_FAILED = 'identity_check_failed';
 
 /** True when an approval was refused only because the check failed. */
 export function isIdentityCheckFailure(body: unknown): boolean {
-  return typeof body === 'object' && body !== null && (body as { reason?: unknown }).reason === IDENTITY_CHECK_FAILED;
+  if (typeof body !== 'object' || body === null) return false;
+  // The server sends it under `details` (Response::error); older answers had it on top.
+  const { reason, details } = body as { reason?: unknown; details?: { reason?: unknown } };
+  return reason === IDENTITY_CHECK_FAILED || details?.reason === IDENTITY_CHECK_FAILED;
 }
 
 /**
