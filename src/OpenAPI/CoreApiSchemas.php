@@ -19948,6 +19948,70 @@ final class CoreApiSchemas
                 'tags' => ['platform-ops'],
                 'responses' => [200 => self::jsonResponse('How many were removed', 'RemoveWorkspaceTemplateExamplesResponse')] + self::authErrors(),
             ]),
+            // WHIT-1195: a chosen template's guided setup.
+            self::permissionRoute('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/status', 'settings:write', [
+                'summary' => 'Which steps of a template\'s guided setup are done',
+                'description' => 'Worked out from what the workspace holds, so a step done elsewhere counts too. `points` repeats `steps` for the dashboard\'s setup points.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('Each step and whether it is done', 'WorkspaceTemplateSetupStatusResponse'),
+                    404 => self::errorResponse('This workspace did not start from that template'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/current/{kind:business|hours|booking}', 'settings:write', [
+                'summary' => 'What a step of a template\'s guided setup opens with',
+                'description' => 'The business details, the caller\'s week, or the booking rules as saved.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']], ['name' => 'kind', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string', 'enum' => ['business', 'hours', 'booking']]]],
+                'responses' => [
+                    200 => self::jsonResponse('The saved values', 'WorkspaceTemplateSetupValuesResponse'),
+                    404 => self::errorResponse('This workspace did not start from that template'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/services', 'settings:write', [
+                'summary' => 'The template\'s services to tick, priced in the workspace\'s currency',
+                'description' => 'Services the workspace already has are left out.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('The rows', 'WorkspaceTemplateServiceRowsResponse'),
+                    404 => self::errorResponse('This workspace did not start from that template'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/offer/close', 'settings:write', [
+                'summary' => '"Not now" on the template\'s plugin offer',
+                'description' => 'The offer step counts as done; the plugin can still be tried from Settings › Plugins.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('Closed', 'WorkspaceTemplateSetupSavedResponse'),
+                    404 => self::errorResponse('This workspace did not start from that template'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/offer/trial', 'plugins:enable', [
+                'summary' => 'Start the free trial of the plugin a template offers',
+                'description' => 'For the template\'s own trial length (30 days on Whity Cloud), once per workspace, no card. The same rules as Settings › Plugins: dependencies are turned on and it is audited.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('The trial and when it ends', 'WorkspaceCodePluginTrialResponse'),
+                    404 => self::errorResponse('This workspace did not start from that template, or it offers no plugin here'),
+                    409 => self::errorResponse('This workspace has already had its trial, or the plugin offers none'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/{kind:business|hours|services|team|booking}', 'settings:write', [
+                'summary' => 'Save a step of a template\'s guided setup, as the caller',
+                'description' => 'Through core\'s own routes with the caller\'s permissions. Writes only what differs, adds and never removes.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']], ['name' => 'kind', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string', 'enum' => ['business', 'hours', 'services', 'team', 'booking']]]],
+                'request' => 'WorkspaceTemplateSetupStepRequest',
+                'responses' => [
+                    200 => self::jsonResponse('What was saved', 'WorkspaceTemplateSetupSavedResponse'),
+                    404 => self::errorResponse('This workspace did not start from that template, or the template has no such step'),
+                    422 => self::errorResponse('What is wrong with the form, in plain words'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/plugins/workspace-access', 'plugins:read', [
                 'summary' => 'List who can use each installed plugin',
                 'description' => 'Operator only (the system workspace).',
@@ -20076,8 +20140,9 @@ final class CoreApiSchemas
                 'data' => self::object([
                     'templates' => ['type' => 'array', 'items' => SchemaBuilder::ref('WorkspaceTemplateCard')],
                     'chosen' => ['type' => 'array', 'items' => self::str(), 'description' => 'Keys of the templates this workspace applied'],
+                    'offerPicker' => self::bool() + ['description' => 'No template yet and the workspace is under 14 days old: send its owner to the picker'],
                     'examples' => self::int() + ['description' => 'Example contacts and bookings still in the workspace'],
-                ], ['templates', 'chosen', 'examples']),
+                ], ['templates', 'chosen', 'offerPicker', 'examples']),
             ], ['data']),
             'ApplyWorkspaceTemplateRequest' => self::object([
                 'examples' => self::bool() + ['description' => 'Add the template\'s example contacts and bookings. Default true.'],
@@ -20088,6 +20153,53 @@ final class CoreApiSchemas
                     'made' => ['type' => 'object', 'additionalProperties' => self::int(), 'description' => 'How many of each part were made'],
                     'skipped' => ['type' => 'array', 'items' => self::object(['part' => self::str(), 'key' => self::str(), 'reason' => self::str()], ['part', 'key', 'reason'])],
                 ], ['template', 'made', 'skipped']),
+            ], ['data']),
+            'WorkspaceTemplateSetupStatusResponse' => self::object([
+                'data' => self::object([
+                    'steps' => ['type' => 'object', 'additionalProperties' => self::bool()],
+                    'points' => ['type' => 'object', 'additionalProperties' => self::bool()],
+                ], ['steps', 'points']),
+            ], ['data']),
+            'WorkspaceTemplateSetupValuesResponse' => self::object([
+                'data' => ['type' => 'object', 'additionalProperties' => true],
+            ], ['data']),
+            'WorkspaceTemplateServiceRowsResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => self::object([
+                    'include' => self::bool(),
+                    'name_en' => self::str(),
+                    'name_ar' => self::str(),
+                    'minutes' => self::str(),
+                    'price' => self::str() + ['description' => 'In normal units of the workspace\'s currency; empty when the template has no price in it'],
+                ], ['include', 'name_en', 'name_ar', 'minutes', 'price'])],
+            ], ['data']),
+            // Each step reads only its own fields: business (name_en to colour),
+            // hours (hours), services (services), team (people), booking (the rest).
+            'WorkspaceTemplateSetupStepRequest' => self::object([
+                'name_en' => self::str() + ['description' => 'business: the business name in English'],
+                'name_ar' => self::str() + ['description' => 'business: the business name in Arabic'],
+                'phone' => self::str() + ['description' => 'business'],
+                'address' => self::str() + ['description' => 'business'],
+                'colour' => self::str() + ['description' => 'business: the main colour, #rrggbb'],
+                'hours' => ['type' => 'array', 'description' => 'hours: the caller\'s opening hours', 'items' => self::object([
+                    'weekday' => self::int() + ['description' => '0 Sunday to 6 Saturday'],
+                    'start_time' => self::str() + ['description' => 'HH:MM'],
+                    'end_time' => self::str() + ['description' => 'HH:MM'],
+                ], ['weekday', 'start_time', 'end_time'])],
+                'services' => ['type' => 'array', 'description' => 'services: the rows to add; names that exist are skipped', 'items' => self::object([
+                    'include' => self::bool(),
+                    'name_en' => self::str(),
+                    'name_ar' => self::str(),
+                    'minutes' => self::int(),
+                    'price' => self::str() + ['description' => 'In normal units of the workspace currency (49.000)'],
+                ], ['name_en'])],
+                'people' => ['type' => 'array', 'description' => 'team: people to invite', 'items' => self::object(['email' => self::str()], ['email'])],
+                'min_notice_minutes' => self::int() + ['description' => 'booking'],
+                'max_advance_days' => self::int() + ['description' => 'booking'],
+                'reminder_hours_before' => self::int() + ['description' => 'booking'],
+                'instant_booking' => self::bool() + ['description' => 'booking'],
+            ], []),
+            'WorkspaceTemplateSetupSavedResponse' => self::object([
+                'data' => ['type' => 'object', 'additionalProperties' => true],
             ], ['data']),
             'RemoveWorkspaceTemplateExamplesResponse' => self::object([
                 'data' => self::object(['removed' => self::int(), 'failed' => self::int()], ['removed', 'failed']),

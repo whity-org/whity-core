@@ -7,6 +7,7 @@ namespace Tests\Core\Workspace\Templates;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
+use Whity\Api\WorkspaceCodePluginsApiHandler;
 use Whity\Api\WorkspaceTemplatesApiHandler;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Plugin\Workspace\CodePluginActivation;
@@ -18,6 +19,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Core\Workspace\Templates\TemplateApplier;
 use Whity\Core\Workspace\Templates\TemplateCatalogue;
 use Whity\Core\Workspace\Templates\TemplateRuns;
+use Whity\Core\Workspace\Templates\TemplateSetup;
 
 /**
  * WHIT-1194 (SDK 1.116): a plugin's templates are checked one by one, listed
@@ -133,6 +135,7 @@ PHP);
         self::assertNull($data['templates'][1]['plugin']);
         self::assertNull($data['templates'][1]['offer']);
         self::assertSame([], $data['chosen']);
+        self::assertTrue($data['offerPicker'], 'A new workspace with no template goes to the picker');
     }
 
     public function testATemplateIsOnlyOfferedWhereItsPluginIsOn(): void
@@ -152,7 +155,49 @@ PHP);
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame(['blank'], $this->list('en')['chosen']);
+        self::assertFalse($this->list('en')['offerPicker'], 'Once chosen, never again');
         self::assertSame(404, $this->handler('en')->apply($request, ['key' => 'nowhere'])->getStatusCode());
+    }
+
+    public function testAChosenTemplatesSetupJoinsTheOnboardingsAndTheDashboard(): void
+    {
+        TenantContext::setTenantId(self::BAKERY);
+        $handler = $this->handler('en');
+        self::assertSame([], $handler->onboardings(self::BAKERY), 'Nothing before a template is chosen');
+
+        $request = new Request('POST', '/api/v1/workspace/templates/bakery/apply', ['content-type' => 'application/json'], '{"examples":false}');
+        $request->user = (object) ['profile_id' => self::AMRO];
+        self::assertSame(200, $handler->apply($request, ['key' => 'bakery'])->getStatusCode());
+
+        $onboardings = $handler->onboardings(self::BAKERY);
+        self::assertSame(['template-bakery'], array_column($onboardings, 'plugin'));
+        self::assertSame('settings:write', $onboardings[0]['permission']);
+        self::assertSame(['hours', 'menu', 'logo', 'offer'], array_column($onboardings[0]['steps'], 'id'), 'The offer of the installed paid plugin comes last');
+
+        $points = $handler->dashboardSetup(self::BAKERY);
+        self::assertSame(['hours', 'menu', 'offer'], array_column($points[0]['points'], 'id'), 'A screen step has nothing to say it is done, so it is not a point');
+        self::assertSame('/api/v1/workspace/templates/bakery/setup/status', $points[0]['status']);
+    }
+
+    public function testTheOfferedTrialRunsForTheTemplatesLengthOnce(): void
+    {
+        TenantContext::setTenantId(self::BAKERY);
+        $handler = $this->handler('en');
+        $plugins = new WorkspaceCodePluginsApiHandler($this->loader, $this->activation, $this->pdo);
+        $handler->useTrialStarter(static fn (int $tenantId, ?int $profileId, string $plugin, ?int $days): \Whity\Core\Response => $plugins->startTrialFor($tenantId, $profileId, $plugin, $days));
+        $request = new Request('POST', '/api/v1/workspace/templates/bakery/apply', ['content-type' => 'application/json'], '{"examples":false}');
+        $request->user = (object) ['profile_id' => self::AMRO];
+
+        self::assertSame(404, $handler->startOfferTrial($request, ['key' => 'bakery'])->getStatusCode(), 'Only for a template the workspace chose');
+        $handler->apply($request, ['key' => 'bakery']);
+
+        $started = $handler->startOfferTrial($request, ['key' => 'bakery']);
+        self::assertSame(200, $started->getStatusCode());
+        $ends = json_decode($started->getBody(), true)['data']['trialEndsAt'];
+        $days = (int) round((strtotime($ends . ' UTC') - time()) / 86400);
+        self::assertSame(30, $days, 'The template\'s 30 days, not the plugin\'s 21');
+        self::assertSame('on', $this->activation->stateFor('WsCounter', self::BAKERY)['state']);
+        self::assertSame(409, $handler->startOfferTrial($request, ['key' => 'bakery'])->getStatusCode(), 'One trial per workspace');
     }
 
     /** @return array<string, mixed> */
@@ -180,6 +225,7 @@ PHP);
             $this->activation,
             null,
             static fn (): string => $language,
+            static fn (): TemplateSetup => new TemplateSetup(new FakeSetup()),
         );
     }
 }

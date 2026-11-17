@@ -262,13 +262,16 @@ final class CodePluginActivation
     /**
      * Start the workspace's one trial and turn the plugin on. False when the
      * plugin offers none or the workspace already had it.
+     *
+     * `$days` is a workspace template's own length (WHIT-1195, 1 to 90); the
+     * plugin's when null. It never creates a trial the plugin doesn't offer.
      */
-    public function startTrial(int $tenantId, string $pluginName, ?int $profileId = null): bool
+    public function startTrial(int $tenantId, string $pluginName, ?int $profileId = null, ?int $days = null): bool
     {
         if (!$this->trialAvailable($pluginName, $tenantId)) {
             return false;
         }
-        $days = $this->paidAccessOf($pluginName)['trialDays'] ?? 0;
+        $days = $days !== null ? max(1, min(90, $days)) : ($this->paidAccessOf($pluginName)['trialDays'] ?? 0);
         $now = ($this->clock)();
 
         $stmt = $this->db->prepare(

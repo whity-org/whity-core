@@ -7,6 +7,7 @@ import { api } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth-context';
 import { useNavigation } from '@/lib/navigation-context';
 import { invalidateWorkspaceCreateState, useWorkspaceCreateState } from '@/lib/use-workspace-create';
+import { templatePickerPath } from '@/lib/workspace-template';
 import { Button } from '@whity/ui/button';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Card, CardContent } from '@whity/ui/card';
@@ -93,7 +94,8 @@ export default function NewWorkspacePage() {
         await refreshNav();
         // After the switch, so the fresh answer is read with the new session.
         invalidateWorkspaceCreateState();
-        router.push('/dashboard');
+        // WHIT-1195: a new workspace starts from a template.
+        router.push((await templatePickerPath()) ?? '/dashboard');
         return;
       }
       if (response.status === 422) {

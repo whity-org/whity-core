@@ -64,7 +64,7 @@ final class TemplateCatalogue
                 'en' => 'An empty workspace. Add what you need when you need it.',
                 'ar' => 'مساحة عمل فارغة. أضف ما تحتاجه عندما تحتاجه.',
             ],
-            'icon' => 'square-dashed',
+            'icon' => 'square',
             'setsUp' => [
                 ['en' => 'Nothing set up yet', 'ar' => 'لا شيء معدّ بعد'],
                 ['en' => 'Every free part of Whity, ready to turn on', 'ar' => 'كل أجزاء Whity المجانية جاهزة للتشغيل'],

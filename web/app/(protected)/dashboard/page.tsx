@@ -15,6 +15,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useCapabilitiesContext } from '@/lib/capabilities-context';
 import { AgentsToday } from './agents-today';
 import { FinishSettingUp } from './finish-setting-up';
+import { TemplateExamples } from './template-examples';
 import { HomeApps } from './home-apps';
 import { PlatformCards } from './platform-cards';
 import { RecentDocuments } from './recent-documents';
@@ -67,6 +68,8 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-semibold text-foreground">{greeting}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{[date, workspace].filter((part) => part).join(' · ')}</p>
       </header>
+
+      {capabilities.has('settings:write') && <TemplateExamples />}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="grid gap-6">

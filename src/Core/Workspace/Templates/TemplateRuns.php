@@ -44,6 +44,28 @@ final class TemplateRuns
         return $out;
     }
 
+    /**
+     * Is the workspace new enough to be offered the picker: created within
+     * the last `$days` days. A workspace that has been running for longer is
+     * never sent there on sign-in; its owner can still open it.
+     */
+    public function isNew(int $tenantId, int $days, ?\DateTimeImmutable $now = null): bool
+    {
+        $stmt = $this->db->prepare('SELECT created_at FROM tenants WHERE id = ?');
+        $stmt->execute([$tenantId]);
+        $created = $stmt->fetchColumn();
+        if (!is_string($created) || $created === '') {
+            return false;
+        }
+        try {
+            $at = new \DateTimeImmutable($created, new \DateTimeZone('UTC'));
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return $at > ($now ?? new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify("-{$days} days");
+    }
+
     /** @return array{id: int, template_key: string, plugin_name: ?string, version: int, applied_at: string, setup_closed_at: ?string, offer_closed_at: ?string}|null */
     public function find(int $tenantId, string $templateKey): ?array
     {

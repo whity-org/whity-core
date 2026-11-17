@@ -32,7 +32,7 @@ Checked by `Whity\Sdk\Manifest\WorkspaceTemplateValidator::errors()`. A template
 | `key` | yes | Lowercase letters, digits and hyphens (`bakery`) |
 | `version` | yes | A whole number from 1. Bump it on every change |
 | `name`, `summary` | yes | The card's title (40) and one line (160) |
-| `icon` | no | An icon name |
+| `icon` | no | One of Whity's icon names (`appointment`, `recipe`, `kanban`, `key`...); another shows the template icon |
 | `setsUp` | yes | 1 to 8 lines the card lists: what choosing it sets up |
 | `settings` | no | Workspace defaults: `billing.default_currency`, `timezone`, `locale` (`en` or `ar`), `calendar.week_start`, `calendar.weekend_days` |
 | `calendar` | no | `settings` (booking rules, as `PUT /api/calendar/settings` takes them) and `hours` (a week of `{weekday 1-7, start_time, end_time}`) |

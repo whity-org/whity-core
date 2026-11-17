@@ -15,7 +15,7 @@ namespace Whity\Sdk\Manifest;
  *     'version' => 1,
  *     'name' => ['en' => 'Bakery or café', 'ar' => 'مخبز أو مقهى'],
  *     'summary' => ['en' => 'Orders, a menu and opening hours.', 'ar' => 'الطلبات وقائمة الأصناف وساعات العمل.'],
- *     'icon' => 'cake',
+ *     'icon' => 'recipe',
  *     'setsUp' => [['en' => 'Your menu with prices', 'ar' => 'قائمتك بالأسعار']],
  *     'settings' => ['billing.default_currency' => 'JOD', 'timezone' => 'Asia/Amman', 'locale' => 'ar'],
  *     'calendar' => ['settings' => ['min_notice_minutes' => 60], 'hours' => [['weekday' => 6, 'start_time' => '07:00', 'end_time' => '15:00']]],

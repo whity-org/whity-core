@@ -42,6 +42,20 @@ final class DashboardApiHandler
     ) {
     }
 
+    /** @var (Closure(int): list<array<string, mixed>>)|null */
+    private ?Closure $templateSetup = null;
+
+    /**
+     * WHIT-1195: the template's guided setup steps, as setup points by
+     * workspace, text still `{en, ar}`.
+     *
+     * @param Closure(int): list<array<string, mixed>> $templateSetup
+     */
+    public function useTemplateSetup(Closure $templateSetup): void
+    {
+        $this->templateSetup = $templateSetup;
+    }
+
     /** @param array<string, string> $params */
     public function show(Request $request, array $params = []): Response
     {
@@ -72,6 +86,24 @@ final class DashboardApiHandler
                 ];
             }
             $setup[] = ['plugin' => $dashboard['plugin'], 'status' => $part['status'], 'points' => $points];
+        }
+        // WHIT-1195: the steps of the template the workspace started from.
+        foreach ($this->templateSetup !== null ? ($this->templateSetup)($tenantId) : [] as $part) {
+            if (!$this->may($profileId, (string) $part['permission'], $tenantId)) {
+                continue;
+            }
+            $points = [];
+            foreach ($part['points'] as $point) {
+                $points[] = [
+                    'id' => $point['id'],
+                    'label' => self::text($point['label'], $language),
+                    'why' => self::text($point['why'] ?? null, $language),
+                    'action' => null,
+                    'href' => '/admin/setup/' . rawurlencode((string) $part['plugin']) . '?step=' . rawurlencode((string) $point['id']),
+                    'icon' => null,
+                ];
+            }
+            $setup[] = ['plugin' => $part['plugin'], 'status' => $part['status'], 'points' => $points];
         }
 
         $rows = $this->layout->rowsFor($tenantId, $profileId);
