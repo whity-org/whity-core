@@ -77,7 +77,11 @@ final class RecordedHttpClient implements HttpClient
         ));
     }
 
-    /** The decoded JSON or form body of the last request to a URL. @return array<mixed> */
+    /**
+     * The decoded JSON or form body of the last request to a URL.
+     *
+     * @return array<mixed>
+     */
     public function lastBody(string $method, string $urlPrefix): array
     {
         $requests = $this->to($method, $urlPrefix);

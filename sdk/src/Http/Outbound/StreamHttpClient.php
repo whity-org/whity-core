@@ -106,7 +106,7 @@ final class StreamHttpClient implements HttpClient
             }
         }
 
-        if (($meta['timed_out'] ?? false) === true) {
+        if ($meta['timed_out']) {
             throw new HttpFailure("The request to {$host} timed out.");
         }
         if ($answer === false) {
@@ -117,7 +117,7 @@ final class StreamHttpClient implements HttpClient
         }
 
         $status = 0;
-        $wrapperData = $meta['wrapper_data'] ?? [];
+        $wrapperData = $meta['wrapper_data'];
         foreach (is_array($wrapperData) ? $wrapperData : [] as $line) {
             if (is_string($line) && preg_match('#^HTTP/\S+\s+(\d{3})#', $line, $m) === 1) {
                 $status = (int) $m[1];
