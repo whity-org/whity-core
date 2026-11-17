@@ -1190,7 +1190,26 @@ class AuthHandler
                     // Every role held here, the primary one first.
                     'roles'       => $role === '' ? [] : [$role],
                     'kind'        => $kind,
+                    'is_owner'    => false,
                 ];
+            }
+
+            // Which of these workspaces the person owns (WHIT-1169), so the app
+            // can show "Owner" and owner-only actions. Their OWN rows only; a
+            // failed read costs the badge, never the sign-in.
+            if ($out !== []) {
+                try {
+                    // @tenant-guard-ignore: the person's own ownership rows across their workspaces, as at sign-in (ADR 0005 §6)
+                    $owned = $this->db->prepare('SELECT tenant_id FROM workspace_owners WHERE profile_id = ?');
+                    $owned->execute([$profileId]);
+                    foreach ($owned->fetchAll(PDO::FETCH_COLUMN) as $ownedTenantId) {
+                        if (isset($out[(int) $ownedTenantId])) {
+                            $out[(int) $ownedTenantId]['is_owner'] = true;
+                        }
+                    }
+                } catch (\Exception) {
+                    // Before migration 300: nobody is recorded as an owner.
+                }
             }
             return array_values($out);
         } catch (\Exception) {

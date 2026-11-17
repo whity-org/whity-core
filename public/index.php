@@ -6132,6 +6132,16 @@ $ssoWorkspaceSetupHandler = new \Whity\Api\SsoWorkspaceSetupHandler(
 );
 $router->register('GET', '/api/auth/sso/workspace', [$ssoWorkspaceSetupHandler, 'show'], null);
 $router->register('POST', '/api/auth/sso/workspace', [$ssoWorkspaceSetupHandler, 'create'], null);
+// WHIT-1169: a signed-in person creates another workspace and owns it.
+// Self-authenticating like /api/me/identities; gated in WorkspaceCreator by
+// workspaces.self_create_enabled and workspaces.max_owned_per_person.
+$workspacesHandler = new \Whity\Api\WorkspacesApiHandler(
+    $tokenValidator,
+    new \Whity\Core\Tenant\WorkspaceCreator($db->getPdo(), $settingsService, $hookManager),
+    $settingsService,
+);
+$router->register('GET', '/api/workspaces/new', [$workspacesHandler, 'state'], null);
+$router->register('POST', '/api/workspaces', [$workspacesHandler, 'create'], null);
 
 // 13g. Authenticated "connected accounts" management (WC-f3b17bd2): the caller
 // lists / unlinks their own federated identities. Self-authenticating via the

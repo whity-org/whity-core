@@ -324,6 +324,20 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Give a person who signs in through an operator identity provider, and belongs to no workspace, a new workspace of their own.'
       ),
     },
+    'workspaces.self_create_enabled': {
+      label: t('settings.meta.workspaces.self_create_enabled.label', 'People create their own workspaces'),
+      help: t(
+        'settings.meta.workspaces.self_create_enabled.help',
+        'Let anyone signed in create another workspace from the workspace switcher and own it. It starts on the default plan.'
+      ),
+    },
+    'workspaces.max_owned_per_person': {
+      label: t('settings.meta.workspaces.max_owned_per_person.label', 'Workspaces one person may own'),
+      help: t(
+        'settings.meta.workspaces.max_owned_per_person.help',
+        'The most workspaces one person may own, counting ones they co-own. 0 means no limit.'
+      ),
+    },
     'storage.driver': {
       label: t('settings.meta.storage.driver.label', 'Storage driver'),
       help: t(
@@ -537,7 +551,13 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'settings.section.signup.description',
         'Control whether and how new people can create accounts on this instance.'
       ),
-      keys: ['auth.self_registration_enabled', 'auth.registration_approval_required'],
+      keys: [
+        'auth.self_registration_enabled',
+        'auth.registration_approval_required',
+        // Creating more workspaces while signed in (WHIT-1169).
+        'workspaces.self_create_enabled',
+        'workspaces.max_owned_per_person',
+      ],
     },
     {
       id: 'i18n',

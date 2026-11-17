@@ -7,7 +7,6 @@ namespace Whity\Core\Tenant;
 use PDO;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\FederatedProviderContext;
-use Whity\Core\Plan\DefaultPlanAssigner;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 
@@ -78,7 +77,8 @@ use Whity\Core\Settings\SettingsService;
  *    BRANDING_BASE_DOMAIN, and a display name an outsider chose must never be
  *    able to claim `app.` or `admin.` or a future customer's brand.
  *  - An ACTIVE, primary membership with the base `admin` role, the same owner
- *    role self-registration grants.
+ *    role self-registration grants, and the owner row (WHIT-1169), written by
+ *    {@see WorkspaceFounder}.
  *  - THE PAYMENT GATE, in the same transaction, exactly as registration writes
  *    it: with `auth.registration_payment_required` on, the tenant starts
  *    `expired` / `block_all` and stays closed until billing says otherwise. A
@@ -88,7 +88,7 @@ use Whity\Core\Settings\SettingsService;
 final class FederatedWorkspaceProvisioner
 {
     /** The base (global, NULL-tenant) role the workspace owner is granted. */
-    public const OWNER_ROLE = 'admin';
+    public const OWNER_ROLE = WorkspaceFounder::OWNER_ROLE;
 
     /** May create a workspace: every gate holds (WHIT-994). */
     public const STATE_CREATE = 'create';
@@ -98,12 +98,6 @@ final class FederatedWorkspaceProvisioner
     public const STATE_NEEDS_INVITE = 'needs_invite';
     /** Deactivated, gone, or not this instance's own provider: nothing to offer. */
     public const STATE_REFUSED = 'refused';
-
-    /** How many "Name 2", "Name 3"… to try before giving up on a free name. */
-    private const NAME_ATTEMPTS = 50;
-
-    /** Longest a sign-in waits on somebody else holding the profile row. */
-    private const LOCK_TIMEOUT = '5s';
 
     public function __construct(
         private readonly PDO $db,
@@ -215,50 +209,21 @@ final class FederatedWorkspaceProvisioner
 
         $this->db->beginTransaction();
         try {
-            $this->setLockTimeout();
-            $profile = $this->lockProfile($profileId);
+            $founder = new WorkspaceFounder($this->db, $this->hooks);
+            $profile = $founder->lockProfile($profileId);
             if ($profile === null || $profile['status'] === 'inactive' || $this->hasAnyMembership($profileId)) {
                 $this->db->rollBack();
                 return null;
             }
 
-            $roleId = $this->ownerRoleId();
+            $roleId = $founder->ownerRoleId();
             if ($roleId === null) {
                 error_log('[sso-workspace] base "' . self::OWNER_ROLE . '" role missing; platform not seeded');
                 $this->db->rollBack();
                 return null;
             }
 
-            $name = $this->freeName(self::cleanName($name ?? $profile['display_name']));
-            $slug = $this->freeSlug();
-
-            $tenantId = TenantProvisioner::withCoreSteps($this->db, $this->hooks)->create($name, $slug);
-
-            // is_primary: this is the person's first and only membership.
-            // Written as a boolean literal, not 1 — PostgreSQL rejects the integer.
-            $this->db->prepare(
-                "INSERT INTO memberships (profile_id, tenant_id, role_id, ou_id, is_primary, status, created_at)
-                 VALUES (:profile_id, :tenant_id, :role_id, NULL, true, 'active', NOW())"
-            )->execute([
-                ':profile_id' => $profileId,
-                ':tenant_id'  => $tenantId,
-                ':role_id'    => $roleId,
-            ]);
-            $membershipId = (int) $this->db->lastInsertId();
-
-            // The payment gate, written exactly as RegisterApiHandler writes it
-            // and for the same reason: a tenant with no plan row is "not billed,
-            // never block", so creating it and closing it are one act or neither.
-            if ($paymentRequired) {
-                $this->db->prepare(
-                    'INSERT INTO tenant_plan (tenant_id, status, enforcement_mode, assigned_at)
-                     VALUES (:tenant_id, :status, :mode, NOW())'
-                )->execute([
-                    ':tenant_id' => $tenantId,
-                    ':status'    => 'expired',
-                    ':mode'      => 'block_all',
-                ]);
-            }
+            $founded = $founder->found($profileId, $name ?? $profile['display_name'], $roleId, $paymentRequired);
 
             $this->db->commit();
         } catch (\Throwable $e) {
@@ -268,51 +233,18 @@ final class FederatedWorkspaceProvisioner
             throw $e;
         }
 
-        // After the commit: applying a plan opens its own transaction. A closed
-        // payment gate is a plan row already, so it stays closed.
-        DefaultPlanAssigner::forDatabase($this->db)->assign($tenantId);
-
         // Post-commit, and only because this method owned the transaction: an
         // assertion for an append-only trail must not be made before the write
-        // it describes is durable. Best-effort — a listener failure must not
-        // undo a workspace that now exists.
-        if ($this->hooks !== null) {
-            try {
-                $this->hooks->dispatch('user.membership.added', [
-                    'profile_id'    => $profileId,
-                    'tenant_id'     => $tenantId,
-                    'membership_id' => $membershipId,
-                    'role_id'       => $roleId,
-                    'role_name'     => self::OWNER_ROLE,
-                    'ou_id'         => null,
-                    'status'        => 'active',
-                    'is_primary'    => true,
-                    'via'           => 'sso_self_provision',
-                ]);
-                $this->hooks->dispatchAsync('tenant.created.async', ['id' => $tenantId, 'name' => $name]);
-            } catch (\Throwable $e) {
-                error_log('[sso-workspace] post-commit hooks failed for tenant ' . $tenantId . ': ' . $e->getMessage());
-            }
-        }
+        // it describes is durable.
+        $founder->afterCommit($founded, $profileId, 'sso_self_provision');
 
-        return $tenantId;
+        return $founded['tenant_id'];
     }
 
-    /**
-     * A display name fit to be a tenant name: control characters, bidi
-     * overrides/isolates/marks and zero-width characters removed, so one
-     * workspace cannot visually impersonate another in an operator's list.
-     */
+    /** {@see WorkspaceFounder::cleanName()}; kept for existing callers. */
     public static function cleanName(string $displayName): string
     {
-        // \p{Cc} control, \p{Cf} format (bidi controls, zero-width, BOM).
-        $clean = (string) preg_replace('/[\p{Cc}\p{Cf}]+/u', '', $displayName);
-        $clean = trim((string) preg_replace('/\s+/u', ' ', $clean));
-        if ($clean === '') {
-            $clean = 'Workspace';
-        }
-        // Leave room for a " 50" suffix inside the VARCHAR(255) column.
-        return mb_substr($clean, 0, 240);
+        return WorkspaceFounder::cleanName($displayName);
     }
 
     private function globalFlag(string $key, string $default): bool
@@ -321,76 +253,11 @@ final class FederatedWorkspaceProvisioner
         return ($global[$key] ?? $default) === 'true';
     }
 
-    private function setLockTimeout(): void
-    {
-        if ($this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
-            $this->db->exec("SET LOCAL lock_timeout = '" . self::LOCK_TIMEOUT . "'");
-        }
-    }
-
-    /**
-     * Lock the profile row for the duration of the transaction.
-     *
-     * @return array{display_name: string, status: string}|null
-     */
-    private function lockProfile(int $profileId): ?array
-    {
-        $forUpdate = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql' ? ' FOR UPDATE' : '';
-        // Profiles is a sanctioned GLOBAL table (ADR 0005 §1)
-        $stmt = $this->db->prepare('SELECT display_name, status FROM profiles WHERE id = :id' . $forUpdate);
-        $stmt->execute([':id' => $profileId]);
-        $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if ($row === false) {
-            return null;
-        }
-        return [
-            'display_name' => trim((string) ($row['display_name'] ?? '')),
-            'status'       => (string) ($row['status'] ?? 'active'),
-        ];
-    }
-
     private function hasAnyMembership(int $profileId): bool
     {
         // @tenant-guard-ignore: the question is "a member of ANY tenant?", which is cross-tenant by definition
         $stmt = $this->db->prepare('SELECT 1 FROM memberships WHERE profile_id = :id LIMIT 1');
         $stmt->execute([':id' => $profileId]);
         return $stmt->fetchColumn() !== false;
-    }
-
-    private function ownerRoleId(): ?int
-    {
-        // Base roles are global (NULL tenant_id); looked up by unique name
-        $stmt = $this->db->prepare('SELECT id FROM roles WHERE name = :name AND tenant_id IS NULL LIMIT 1');
-        $stmt->execute([':name' => self::OWNER_ROLE]);
-        $id = $stmt->fetchColumn();
-        return $id === false ? null : (int) $id;
-    }
-
-    /** $base, or "$base 2", "$base 3"… whichever no tenant holds yet. */
-    private function freeName(string $base): string
-    {
-        // The tenants table is the tenant registry itself, not a tenant-scoped resource
-        $stmt = $this->db->prepare('SELECT 1 FROM tenants WHERE name = :name LIMIT 1');
-        for ($n = 1; $n <= self::NAME_ATTEMPTS; $n++) {
-            $name = $n === 1 ? $base : $base . ' ' . $n;
-            $stmt->execute([':name' => $name]);
-            if ($stmt->fetchColumn() === false) {
-                return $name;
-            }
-        }
-        // Fifty workspaces of the same name: stop counting and make it unique.
-        return $base . ' ' . bin2hex(random_bytes(3));
-    }
-
-    /** An opaque slug no tenant holds: `ws-` and twelve hex digits. */
-    private function freeSlug(): string
-    {
-        // The tenants table is the tenant registry itself, not a tenant-scoped resource
-        $stmt = $this->db->prepare('SELECT 1 FROM tenants WHERE slug = :slug LIMIT 1');
-        do {
-            $slug = 'ws-' . bin2hex(random_bytes(6));
-            $stmt->execute([':slug' => $slug]);
-        } while ($stmt->fetchColumn() !== false);
-        return $slug;
     }
 }

@@ -138,6 +138,19 @@ final class SettingsRegistry
     // Default 'false': a sovereign instance is operator-provisioned.
     public const SSO_SELF_PROVISION_WORKSPACE = 'auth.sso_self_provision_workspace';
 
+    // Creating more workspaces while signed in (WHIT-1169). Global/operator-level.
+    // When 'true', any signed-in person may create another workspace from the
+    // workspace switcher or Ctrl+K and becomes its owner; it starts on the
+    // default plan, behind the payment gate when registration requires payment.
+    // Default 'false': a sovereign instance is operator-provisioned. On
+    // app.whity.dev the operator turns it on.
+    public const WORKSPACES_SELF_CREATE_ENABLED = 'workspaces.self_create_enabled';
+
+    // How many workspaces one person may own (WHIT-1169). Global/operator-level.
+    // Counted over workspace_owners, so co-owned workspaces count for each owner.
+    // '0' means no limit (the self-hosted default); app.whity.dev uses 3.
+    public const WORKSPACES_MAX_OWNED_PER_PERSON = 'workspaces.max_owned_per_person';
+
     // Desktop-client login TTL (WC-desktop-ttl). The maximum wall-clock a
     // native/desktop client's cached login (its device credential) stays valid
     // before the app must re-authenticate ONLINE — even offline, the client
@@ -919,6 +932,8 @@ final class SettingsRegistry
         self::SELF_2FA_RECOVERY_ENABLED,
         self::SSO_ENABLED,
         self::SSO_SELF_PROVISION_WORKSPACE,
+        self::WORKSPACES_SELF_CREATE_ENABLED,
+        self::WORKSPACES_MAX_OWNED_PER_PERSON,
         self::STORAGE_DRIVER,
         self::STORAGE_S3_ENDPOINT,
         self::STORAGE_S3_REGION,
@@ -1002,6 +1017,7 @@ final class SettingsRegistry
         self::SELF_2FA_RECOVERY_ENABLED,
         self::SSO_ENABLED,
         self::SSO_SELF_PROVISION_WORKSPACE,
+        self::WORKSPACES_SELF_CREATE_ENABLED,
         self::STORAGE_S3_PATH_STYLE,
         self::MAIL_EVENT_WELCOME,
         self::MAIL_EVENT_APPROVAL,
@@ -1075,6 +1091,7 @@ final class SettingsRegistry
         self::SELF_2FA_RECOVERY_ENABLED,
         self::SSO_ENABLED,
         self::SSO_SELF_PROVISION_WORKSPACE,
+        self::WORKSPACES_SELF_CREATE_ENABLED,
         self::PLUGINS_STORE_ENABLED,
         self::DOCUMENTS_RENDER_ENABLED,
         self::I18N_ENABLED,
@@ -1163,6 +1180,8 @@ final class SettingsRegistry
         self::SELF_2FA_RECOVERY_ENABLED => 'true',
         self::SSO_ENABLED => 'true',
         self::SSO_SELF_PROVISION_WORKSPACE => 'false',
+        self::WORKSPACES_SELF_CREATE_ENABLED => 'false',
+        self::WORKSPACES_MAX_OWNED_PER_PERSON => '0',
         // 72 hours (3 days). A native client offline longer than this must
         // re-authenticate online before it will work again.
         self::AUTH_DESKTOP_LOGIN_MAX_HOURS => '72',
@@ -1717,6 +1736,8 @@ final class SettingsRegistry
             self::SELF_2FA_RECOVERY_ENABLED => self::validateBoolean($value, self::SELF_2FA_RECOVERY_ENABLED),
             self::SSO_ENABLED => self::validateBoolean($value, self::SSO_ENABLED),
             self::SSO_SELF_PROVISION_WORKSPACE => self::validateBoolean($value, self::SSO_SELF_PROVISION_WORKSPACE),
+            self::WORKSPACES_SELF_CREATE_ENABLED => self::validateBoolean($value, self::WORKSPACES_SELF_CREATE_ENABLED),
+            self::WORKSPACES_MAX_OWNED_PER_PERSON => self::validateWholeNumberBetween($value, self::WORKSPACES_MAX_OWNED_PER_PERSON, 0, 1000),
             self::AUTH_DESKTOP_LOGIN_MAX_HOURS => self::validateDesktopLoginMaxHours($value),
             self::STORAGE_DRIVER => self::validateStorageDriver($value),
             self::STORAGE_S3_PATH_STYLE => self::validateBoolean($value, self::STORAGE_S3_PATH_STYLE),

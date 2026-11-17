@@ -4700,6 +4700,8 @@ final class CoreApiSchemas
             'role' => self::str(),
             'roles' => ['type' => 'array', 'items' => ['type' => 'string']],
             'kind' => ['type' => 'string', 'enum' => ['member', 'customer']],
+            // True when the person owns this workspace (WHIT-1169).
+            'is_owner' => self::bool(),
         ], ['tenant_id', 'tenant_name', 'role']);
 
         // Token mode (`X-Auth-Mode: token`, WC-ddcd16ad): every endpoint that
@@ -5210,6 +5212,22 @@ final class CoreApiSchemas
                 'locale' => self::str(),
                 'main_color' => self::str(),
             ], ['name']),
+            // Creating another workspace while signed in (WHIT-1169).
+            'WorkspaceCreateRequest' => self::object([
+                'name' => self::str(),
+                'locale' => self::str(),
+                'main_color' => self::str(),
+            ], ['name']),
+            'WorkspaceCreateResponse' => self::dataEnvelope(self::object([
+                'tenant_id' => self::int(),
+                'name' => self::str(),
+            ], ['tenant_id', 'name'])),
+            'WorkspaceCreateStateResponse' => self::dataEnvelope(self::object([
+                'allowed' => self::bool(),
+                'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['disabled', 'limit_reached', null]],
+                'owned' => self::int(),
+                'limit' => self::int(),
+            ], ['allowed', 'reason', 'owned', 'limit'])),
             // A caller's linked external identity (connected account). `email` and
             // `last_login_at` may be null (asserted-at-link email; never-since-linked).
             'MeIdentity' => self::object([
@@ -12606,9 +12624,48 @@ final class CoreApiSchemas
             ],
         ];
 
+        // WHIT-1169: creating another workspace while signed in. Cookie or
+        // Bearer authenticated by the handler — it is about the person, not a
+        // permission in the current workspace.
+        $workspaceCreateState = [
+            'method' => 'GET',
+            'path' => '/api/workspaces/new',
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => [
+                'summary' => 'Whether the caller may create another workspace now, and why not',
+                'tags' => ['tenants'],
+                'responses' => [
+                    200 => self::jsonResponse('Allowed, or the reason and their count against the limit', 'WorkspaceCreateStateResponse'),
+                    401 => self::errorResponse('Authentication required'),
+                ],
+            ],
+        ];
+        $workspaceCreate = [
+            'method' => 'POST',
+            'path' => '/api/workspaces',
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => [
+                'summary' => 'Create a workspace the caller owns',
+                'tags' => ['tenants'],
+                'request' => 'WorkspaceCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The new workspace; switch into it with switch-tenant', 'WorkspaceCreateResponse'),
+                    401 => self::errorResponse('Authentication required'),
+                    403 => self::errorResponse('Creating workspaces is switched off, or the caller may not create one'),
+                    409 => self::errorResponse('The caller already owns as many workspaces as allowed'),
+                    422 => self::errorResponse('Name missing or too long, or an invalid language or colour'),
+                    503 => self::errorResponse('Could not be created right now; nothing was created'),
+                ],
+            ],
+        ];
+
         return [
             $ssoWorkspaceShow,
             $ssoWorkspaceCreate,
+            $workspaceCreateState,
+            $workspaceCreate,
             self::permissionRoute('GET', '/api/identity-providers', 'auth_providers:manage', [
                 'summary' => 'List the tenant\'s configured identity providers',
                 'tags' => ['sso'],
