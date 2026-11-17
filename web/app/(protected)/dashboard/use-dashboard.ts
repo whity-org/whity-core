@@ -43,12 +43,29 @@ export interface DashboardWidget {
   blocks: Block[];
 }
 
+/**
+ * One entry of `offers` (WHIT-1202): a paid plugin the workspace's template
+ * offers and it can try now, shown as a locked card.
+ */
+export interface DashboardOffer {
+  key: string;
+  template: string;
+  plugin: string;
+  pluginName: string;
+  lines: string[];
+  trialDays: number;
+  hidden: boolean;
+  position?: number | null;
+}
+
 export interface Dashboard {
   setup: DashboardSetup[];
   widgets: DashboardWidget[];
+  /** Absent from a server older than WHIT-1202. */
+  offers?: DashboardOffer[];
 }
 
-const EMPTY: Dashboard = { setup: [], widgets: [] };
+const EMPTY: Dashboard = { setup: [], widgets: [], offers: [] };
 
 export function useDashboard() {
   return useFetch<Dashboard>(async () => {

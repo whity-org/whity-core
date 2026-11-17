@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api/client';
@@ -63,6 +63,15 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
     const { data: response } = await api.GET('/api/v1/workspace/code-plugins');
     return response?.data ?? [];
   }, []);
+
+  // WHIT-1202: a link to /admin/plugins#plugin-{name} (a locked card's "See
+  // what's included") lands on that plugin's row once the list has loaded.
+  useEffect(() => {
+    if (!data || typeof window === 'undefined' || !window.location.hash.startsWith('#plugin-')) return;
+    const row = document.getElementById(window.location.hash.slice(1));
+    row?.scrollIntoView({ block: 'center' });
+    row?.focus({ preventScroll: true });
+  }, [data]);
 
   // WHIT-1127: what a paid plugin costs, from the deployment's add-on plans.
   const { hasPermission } = useCapabilities();
@@ -259,7 +268,12 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
             const offerBuy =
               plugin.paid && canPay && price !== null && (needsPurchase || plugin.reason === 'trial' || plugin.reason === 'grace' || plugin.reason === 'lapsed');
             return (
-              <li key={plugin.name} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+              <li
+                key={plugin.name}
+                id={`plugin-${encodeURIComponent(plugin.name)}`}
+                tabIndex={-1}
+                className="flex scroll-mt-24 flex-wrap items-center justify-between gap-3 p-4 text-sm outline-none transition-colors focus:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-medium text-foreground">{plugin.displayName}</p>

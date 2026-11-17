@@ -6551,6 +6551,8 @@ $dashboardHandler = new \Whity\Api\DashboardApiHandler(
     static fn (): string => $serverLabels->languageCode(),
 );
 // WHIT-1195: the template's steps join Finish setting up.
+// WHIT-1202: locked cards for the paid plugins a workspace's template offers.
+$dashboardHandler->useTemplateOffers(static fn (int $tenantId): array => $workspaceTemplatesHandler->lockedOffers($tenantId));
 $dashboardHandler->useTemplateSetup(static fn (int $tenantId): array => $workspaceTemplatesHandler->dashboardSetup($tenantId));
 $router->register('GET', '/api/me/dashboard', [$dashboardHandler, 'show'], null);
 $router->register('PUT', '/api/me/dashboard/layout', [$dashboardHandler, 'saveLayout'], null);

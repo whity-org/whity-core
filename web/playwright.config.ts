@@ -114,6 +114,15 @@ export default defineConfig({
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], storageState: adminStatePath },
     },
+    // WHIT-1202: a template's locked card starts its paid plugin's trial. It
+    // uploads two throwaway plugins as the operator (in the spec), then works
+    // in the admin's workspace.
+    {
+      name: 'templates-locked',
+      testMatch: /template-locked-card\.spec\.ts/,
+      dependencies: ['setup'],
+      use: { ...devices['Desktop Chrome'], storageState: adminStatePath },
+    },
     // #964: the plugin screen-override mechanism, proven in a real browser.
     // Runs admin-authenticated (DemoCatalog's migration grants
     // demo_catalog:view to admin). It needs a browser specifically: the
