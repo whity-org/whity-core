@@ -29,6 +29,9 @@ import type {
   CheckboxBlock,
   CodeBlock,
   ColorInputBlock,
+  TimeInputBlock,
+  WeeklyHoursBlock,
+  CheckboxGroupBlock,
   DataListBlock,
   DataRecordBlock,
   DataStatBlock,
@@ -87,6 +90,11 @@ import { DocumentViewer } from '@/components/plugin/blocks/document-viewer';
 import { Chart } from '@whity/ui/chart';
 import { DataTable as SharedDataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
+import { FieldSelect } from '@/components/field-select';
+import { WeeklyHoursFields, WeeklyHoursProblem } from '@/components/calendar/weekly-hours-fields';
+import { firstBadDay, rowsOf, weekOf, weekOrder } from '@/lib/calendar/hours';
+import { timeOptions } from '@/lib/calendar/times';
+import { Checkbox } from '@whity/ui/checkbox';
 import { BilingualInput } from '@whity/ui/bilingual-input';
 import { MathText } from '@whity/ui/math-text';
 import { renderMarkdown } from '@/lib/safe-markdown';
@@ -3061,6 +3069,7 @@ function seedFieldArrayRow(
       case 'slider':
       case 'dateInput':
       case 'colorInput':
+      case 'timeInput':
       case 'referenceSelect':
       case 'richTextInput':
         // `null` is how every one of these arrives when unset, and `String(null)`
@@ -3198,7 +3207,8 @@ function FieldArrayRenderer({ block }: { block: FieldArrayBlock }) {
   if (ctx === null) return <UnsupportedBlock type="fieldArray" />;
 
   const raw = ctx.values[block.name];
-  const rows: FieldArrayValue = Array.isArray(raw) ? raw : [];
+  // Only a list of row records is rows; a checkboxGroup's list of strings never shares a name with an array here.
+  const rows: FieldArrayValue = Array.isArray(raw) ? (raw as unknown[]).filter((r): r is FieldArrayValue[number] => r !== null && typeof r === 'object' && !Array.isArray(r)) : [];
   const min = typeof block.min === 'number' && block.min > 0 ? block.min : 0;
   const max = typeof block.max === 'number' && block.max > 0 ? block.max : Infinity;
   // The plugin's own noun for a row wins; only our default is keyed. Every
@@ -3320,7 +3330,7 @@ function FieldArrayRenderer({ block }: { block: FieldArrayBlock }) {
 
       {seeded && (
         <Button type="button" variant="outline" size="sm" disabled={rows.length >= max} onClick={add}>
-          <IconPlus className="me-1 size-4" aria-hidden />{t('blocks.fieldArray.add', 'Add {item}', { item: itemLabel.toLowerCase() })}
+          <IconPlus className="me-1 size-4" aria-hidden />{block.addLabel ?? t('blocks.fieldArray.add', 'Add {item}', { item: itemLabel.toLowerCase() })}
         </Button>
       )}
     </div>
@@ -3611,16 +3621,124 @@ function FileInputRenderer({ block }: { block: FileInputBlock }) {
 }
 
 function ColorInputRenderer({ block }: { block: ColorInputBlock }) {
+  const t = useTranslation('plugin');
   const ctx = useFormBlockContext();
   if (ctx === null) return <UnsupportedBlock type="colorInput" />;
   const inputId = `block-input-${block.name}`;
   const value = ctx.values[block.name];
-  const strValue = typeof value === 'string' ? value : (block.default ?? '#000000');
+  const strValue = typeof value === 'string' && value !== '' ? value : (block.default ?? '#000000');
+  const swatches = (block.swatches ?? []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c));
+  const selected = strValue.toLowerCase();
+  // SDK 1.113: with swatches, a person picks a colour (TplAdminBranding's row
+  // of swatches, then Custom) and the code is shown, never asked for.
   return (
     <div className="space-y-1.5">
       <InputLabel inputId={inputId} label={block.label} error={ctx.errors[block.name]} />
-      <Input id={inputId} type="color" value={strValue} onChange={(e) => ctx.setValue(block.name, e.target.value)} aria-label={block.label} className="h-9 w-16 cursor-pointer p-0.5" />
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label={block.label}>
+        {swatches.map((swatch) => (
+          <button
+            key={swatch}
+            type="button"
+            aria-label={swatch}
+            aria-pressed={selected === swatch.toLowerCase()}
+            onClick={() => ctx.setValue(block.name, swatch.toLowerCase())}
+            className="size-10 rounded-lg border border-border outline-offset-2 aria-pressed:outline aria-pressed:outline-2 aria-pressed:outline-foreground"
+            style={{ background: swatch }}
+            data-slot="color-swatch"
+          />
+        ))}
+        <label className={cn('flex items-center gap-2 text-sm text-muted-foreground', swatches.length > 0 && 'ms-2')}>
+          <Input id={inputId} type="color" value={strValue} onChange={(e) => ctx.setValue(block.name, e.target.value.toLowerCase())} aria-label={block.label} className="h-10 w-14 cursor-pointer p-0.5" />
+          {swatches.length > 0 && t('blocks.color.custom', 'Custom')}
+        </label>
+        <span dir="ltr" className="ms-auto font-mono text-sm text-foreground">{strValue}</span>
+      </div>
     </div>
+  );
+}
+
+// SDK 1.113: a time of day from a list of times, `HH:MM`, so nobody types a
+// clock format. The list is the calendar's own (15-minute steps by default).
+function TimeInputRenderer({ block }: { block: TimeInputBlock }) {
+  const ctx = useFormBlockContext();
+  if (ctx === null) return <UnsupportedBlock type="timeInput" />;
+  const inputId = `block-input-${block.name}`;
+  const value = ctx.values[block.name];
+  const strValue = typeof value === 'string' ? value : '';
+  const options = timeOptions(block.step ?? 15, block.allowEndOfDay === true);
+  if (strValue !== '' && !options.includes(strValue)) options.push(strValue);
+  return (
+    <div className="space-y-1.5">
+      <InputLabel inputId={inputId} label={block.label} required={block.required} error={ctx.errors[block.name]} />
+      <div className="w-32">
+        <FieldSelect id={inputId} value={strValue} onChange={(v) => ctx.setValue(block.name, v)} options={options.map((v) => ({ value: v, label: v }))} />
+      </div>
+    </div>
+  );
+}
+
+// SDK 1.113: a week of hours with the calendar's own editor, open/closed per
+// day, breaks, copy to every open day. The value is the calendar API's rows.
+function WeeklyHoursRenderer({ block }: { block: WeeklyHoursBlock }) {
+  const ctx = useFormBlockContext();
+  if (ctx === null) return <UnsupportedBlock type="weeklyHours" />;
+  const raw = ctx.values[block.name];
+  const rows = (Array.isArray(raw) ? (raw as unknown[]) : []).filter(
+    (r): r is { weekday: number; start_time: string; end_time: string } =>
+      r !== null && typeof r === 'object' && typeof (r as { weekday?: unknown }).weekday === 'number'
+  );
+  const week = weekOf(rows);
+  const order = weekOrder(block.firstDay ?? 1);
+  const bad = firstBadDay(week);
+  return (
+    <div className="space-y-1.5" data-slot="weekly-hours">
+      <InputLabel inputId={`block-input-${block.name}`} label={block.label} required={block.required} error={ctx.errors[block.name]} />
+      <WeeklyHoursFields
+        idPrefix={`block-input-${block.name}`}
+        week={week}
+        order={order}
+        withDayToggles
+        onChange={(next) => ctx.setValue(block.name, rowsOf(next))}
+      />
+      {bad !== null && <WeeklyHoursProblem day={bad} />}
+    </div>
+  );
+}
+
+// SDK 1.113: several choices as checkboxes (the Choices card), submitting the
+// chosen values in the options' order.
+function CheckboxGroupRenderer({ block }: { block: CheckboxGroupBlock }) {
+  const ctx = useFormBlockContext();
+  if (ctx === null) return <UnsupportedBlock type="checkboxGroup" />;
+  const raw = ctx.values[block.name];
+  const chosen = new Set(Array.isArray(raw) ? (raw as unknown[]).filter((v): v is string => typeof v === 'string') : []);
+  const toggle = (value: string, on: boolean) => {
+    const next = new Set(chosen);
+    if (on) next.add(value);
+    else next.delete(value);
+    ctx.setValue(block.name, block.options.map((o) => o.value).filter((v) => next.has(v)));
+  };
+  return (
+    <fieldset className="space-y-1.5">
+      <legend className="text-sm font-medium">
+        {block.label}
+        {block.required ? <span className="ms-0.5 text-destructive" aria-hidden>*</span> : null}
+      </legend>
+      <div className="space-y-1">
+        {block.options.map((option) => {
+          const id = `block-input-${block.name}-${option.value}`;
+          return (
+            <label key={option.value} htmlFor={id} className="flex min-h-10 cursor-pointer items-center gap-2 text-sm">
+              <Checkbox id={id} checked={chosen.has(option.value)} onCheckedChange={(on) => toggle(option.value, on === true)} />
+              {option.label}
+            </label>
+          );
+        })}
+      </div>
+      {ctx.errors[block.name] !== undefined && (
+        <p className="text-xs text-destructive" role="alert">{ctx.errors[block.name]}</p>
+      )}
+    </fieldset>
   );
 }
 
@@ -4199,7 +4317,7 @@ function ActionButtonRenderer({ block }: { block: ActionButtonBlock }) {
  * `equals: 5` matches a form field holding the string `'5'`. Missing → `''`.
  */
 function normalizeVisibilityOperand(
-  value: string | number | boolean | LocalizedTextValue | FieldArrayValue | OuScopeValue | undefined
+  value: string | number | boolean | LocalizedTextValue | FieldArrayValue | OuScopeValue | string[] | undefined
 ): string {
   if (typeof value === 'boolean') {
     return value ? 'true' : 'false';
@@ -4606,6 +4724,12 @@ function BlockNode({ block }: { block: Block }): React.ReactElement | null {
       return isNonEmptyString(block.name) && isNonEmptyString(block.label) ? <FileInputRenderer block={block} /> : <UnsupportedBlock type="fileInput" />;
     case 'colorInput':
       return isNonEmptyString(block.name) && isNonEmptyString(block.label) ? <ColorInputRenderer block={block} /> : <UnsupportedBlock type="colorInput" />;
+    case 'timeInput':
+      return isNonEmptyString(block.name) && isNonEmptyString(block.label) ? <TimeInputRenderer block={block} /> : <UnsupportedBlock type="timeInput" />;
+    case 'weeklyHours':
+      return isNonEmptyString(block.name) && isNonEmptyString(block.label) ? <WeeklyHoursRenderer block={block} /> : <UnsupportedBlock type="weeklyHours" />;
+    case 'checkboxGroup':
+      return isNonEmptyString(block.name) && isNonEmptyString(block.label) && Array.isArray(block.options) ? <CheckboxGroupRenderer block={block} /> : <UnsupportedBlock type="checkboxGroup" />;
     case 'bilingualText':
       return isNonEmptyString(block.name) && isNonEmptyString(block.label) ? <BilingualTextRenderer block={block} /> : <UnsupportedBlock type="bilingualText" />;
     case 'referenceSelect':

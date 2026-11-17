@@ -150,6 +150,7 @@ final class BlockValidator
         'textInput', 'textArea', 'numberInput', 'select',
         'checkbox', 'slider', 'dateInput', 'fileInput', 'colorInput',
         'bilingualText', 'referenceSelect', 'richTextInput', 'ouScopePicker',
+        'timeInput', 'weeklyHours', 'checkboxGroup',
     ];
 
     /**
@@ -160,6 +161,7 @@ final class BlockValidator
         'textInput', 'textArea', 'numberInput', 'select',
         'checkbox', 'slider', 'dateInput', 'fileInput', 'colorInput',
         'bilingualText', 'referenceSelect', 'richTextInput', 'ouScopePicker',
+        'timeInput', 'weeklyHours', 'checkboxGroup',
         'submitButton', 'fieldArray',
         // WC-532 item 3. `variant` selects on a sibling input's value, so a
         // form is the only place its discriminator can exist. `variantCase` is
@@ -355,6 +357,20 @@ final class BlockValidator
             self::validateFlow($node, $path, $errors);
         }
 
+        // SDK 1.113: the values the new inputs carry must be ones they can
+        // show — a swatch that is not `#RRGGBB`, or a default time the picker
+        // does not offer, would render blank and submit nothing.
+        if ($type === 'colorInput' && \is_array($node['swatches'] ?? null)) {
+            foreach ($node['swatches'] as $i => $swatch) {
+                if (!\is_string($swatch) || preg_match('/^#[0-9A-Fa-f]{6}$/', $swatch) !== 1) {
+                    $errors[] = "{$path}: 'colorInput.swatches[{$i}]' must be a colour written #RRGGBB";
+                }
+            }
+        }
+        if ($type === 'timeInput' && \is_string($node['default'] ?? null) && !self::isClockTime($node['default'], true)) {
+            $errors[] = "{$path}: 'timeInput.default' must be a time written HH:MM";
+        }
+
         // #883: `record` is the host's binding for the record a ROUTE is about
         // (see self::PAGE_RECORD_BINDING). A selector publishing under that name
         // would shadow it for every block on the screen, and the symptom — a
@@ -475,7 +491,7 @@ final class BlockValidator
      * Validate every declared prop of a node against the type's prop rules.
      *
      * @param array<mixed>  $node
-     * @param array<string, array{type: 'string'|'int'|'bool'|'enum'|'intEnum'|'kvList'|'stringList'|'columnList'|'dataColumnList'|'rowList'|'chartSeriesList'|'relPath'|'apiPath'|'inputName'|'selectOptions'|'submitSpec'|'visibilityRule'|'rowActionList'|'sourceParamList'|'blockId'|'contextPath'|'itemActionList'|'ouScopeList'|'ouTypeKey'|'recordPath'|'recordFactList'|'accessCheck'|'preloadSpec', required: bool, values?: list<string|int>}> $propRules
+     * @param array<string, array{type: 'string'|'int'|'bool'|'enum'|'intEnum'|'kvList'|'stringList'|'columnList'|'dataColumnList'|'rowList'|'chartSeriesList'|'relPath'|'apiPath'|'inputName'|'selectOptions'|'submitSpec'|'visibilityRule'|'rowActionList'|'sourceParamList'|'blockId'|'contextPath'|'itemActionList'|'ouScopeList'|'ouTypeKey'|'recordPath'|'recordFactList'|'accessCheck'|'preloadSpec'|'hoursList', required: bool, values?: list<string|int>}> $propRules
      * @param list<string>  $errors by reference
      */
     private static function validateProps(
@@ -504,7 +520,7 @@ final class BlockValidator
      * Validate a single present prop value against its rule.
      *
      * @param mixed $value
-     * @param array{type: 'string'|'int'|'bool'|'enum'|'intEnum'|'kvList'|'stringList'|'columnList'|'dataColumnList'|'rowList'|'chartSeriesList'|'relPath'|'apiPath'|'inputName'|'selectOptions'|'submitSpec'|'visibilityRule'|'rowActionList'|'sourceParamList'|'blockId'|'contextPath'|'itemActionList'|'ouScopeList'|'ouTypeKey'|'recordPath'|'recordFactList'|'accessCheck'|'preloadSpec', values?: list<string|int>, required: bool} $rule
+     * @param array{type: 'string'|'int'|'bool'|'enum'|'intEnum'|'kvList'|'stringList'|'columnList'|'dataColumnList'|'rowList'|'chartSeriesList'|'relPath'|'apiPath'|'inputName'|'selectOptions'|'submitSpec'|'visibilityRule'|'rowActionList'|'sourceParamList'|'blockId'|'contextPath'|'itemActionList'|'ouScopeList'|'ouTypeKey'|'recordPath'|'recordFactList'|'accessCheck'|'preloadSpec'|'hoursList', values?: list<string|int>, required: bool} $rule
      * @param list<string> $errors by reference
      */
     private static function validatePropValue(
@@ -719,6 +735,12 @@ final class BlockValidator
                 // #883: `dataRecord.source` — an owned apiPath that may carry
                 // `{token}` segments in the master-detail addressing.
                 self::validateRecordPath($value, $type, $prop, $path, $errors);
+
+                break;
+
+            case 'hoursList':
+                // SDK 1.113: `weeklyHours.default`, the calendar's own rows.
+                self::validateHoursList($value, $type, $prop, $path, $errors);
 
                 break;
 
@@ -2006,6 +2028,51 @@ final class BlockValidator
      *
      * @phpstan-assert-if-true list<string> $value
      */
+    /**
+     * SDK 1.113: a list of `{weekday: 1-7, start_time: HH:MM, end_time: HH:MM}`
+     * rows, each ending after it starts — the shape the calendar's hours API
+     * takes, so a plugin can hand a submitted week straight to it.
+     *
+     * @param list<string> $errors by reference
+     */
+    private static function validateHoursList(
+        mixed $value,
+        string $type,
+        string $prop,
+        string $path,
+        array &$errors,
+    ): void {
+        if (!\is_array($value) || !array_is_list($value)) {
+            $errors[] = "{$path}: '{$type}.{$prop}' must be a list of {weekday, start_time, end_time} rows";
+
+            return;
+        }
+        foreach ($value as $i => $row) {
+            $weekday = \is_array($row) ? ($row['weekday'] ?? null) : null;
+            $start = \is_array($row) ? ($row['start_time'] ?? null) : null;
+            $end = \is_array($row) ? ($row['end_time'] ?? null) : null;
+            if (
+                !\is_int($weekday) || $weekday < 1 || $weekday > 7
+                || !\is_string($start) || !self::isClockTime($start, false)
+                || !\is_string($end) || !self::isClockTime($end, true)
+                || strcmp($end, $start) <= 0
+            ) {
+                $errors[] = "{$path}[{$i}]: each '{$type}.{$prop}' row needs a weekday from 1 to 7 and a start_time "
+                    . 'before its end_time, both written HH:MM';
+            }
+        }
+    }
+
+    /** `HH:MM` on a 24-hour clock; `24:00` only when it may close a day. */
+    private static function isClockTime(string $value, bool $endOfDay): bool
+    {
+        if ($endOfDay && $value === '24:00') {
+            return true;
+        }
+
+        return preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $value) === 1;
+    }
+
     private static function isStringList(mixed $value): bool
     {
         if (!\is_array($value) || !array_is_list($value)) {

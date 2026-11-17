@@ -19,6 +19,7 @@
         "action.toast.completed": "Completed successfully",
         "action.toast.downloaded": "Generated successfully — your download has started",
         "action.toast.requestFailed": "Request failed",
+        "blocks.color.custom": "Custom",
         "blocks.data.empty": "No data available.",
         "blocks.data.loadError": "Failed to load data.",
         "blocks.data.refresh": "Refresh",
