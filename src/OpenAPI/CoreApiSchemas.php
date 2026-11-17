@@ -20149,7 +20149,32 @@ final class CoreApiSchemas
                     'price' => self::str() + ['description' => 'In normal units of the workspace\'s currency; empty when the template has no price in it'],
                 ], ['include', 'name_en', 'name_ar', 'minutes', 'price'])],
             ], ['data']),
-            'WorkspaceTemplateSetupStepRequest' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The step\'s form, as its blocks submit it'],
+            // Each step reads only its own fields: business (name_en to colour),
+            // hours (hours), services (services), team (people), booking (the rest).
+            'WorkspaceTemplateSetupStepRequest' => self::object([
+                'name_en' => self::str() + ['description' => 'business: the business name in English'],
+                'name_ar' => self::str() + ['description' => 'business: the business name in Arabic'],
+                'phone' => self::str() + ['description' => 'business'],
+                'address' => self::str() + ['description' => 'business'],
+                'colour' => self::str() + ['description' => 'business: the main colour, #rrggbb'],
+                'hours' => ['type' => 'array', 'description' => 'hours: the caller\'s opening hours', 'items' => self::object([
+                    'weekday' => self::int() + ['description' => '0 Sunday to 6 Saturday'],
+                    'start_time' => self::str() + ['description' => 'HH:MM'],
+                    'end_time' => self::str() + ['description' => 'HH:MM'],
+                ], ['weekday', 'start_time', 'end_time'])],
+                'services' => ['type' => 'array', 'description' => 'services: the rows to add; names that exist are skipped', 'items' => self::object([
+                    'include' => self::bool(),
+                    'name_en' => self::str(),
+                    'name_ar' => self::str(),
+                    'minutes' => self::int(),
+                    'price' => self::str() + ['description' => 'In normal units of the workspace currency (49.000)'],
+                ], ['name_en'])],
+                'people' => ['type' => 'array', 'description' => 'team: people to invite', 'items' => self::object(['email' => self::str()], ['email'])],
+                'min_notice_minutes' => self::int() + ['description' => 'booking'],
+                'max_advance_days' => self::int() + ['description' => 'booking'],
+                'reminder_hours_before' => self::int() + ['description' => 'booking'],
+                'instant_booking' => self::bool() + ['description' => 'booking'],
+            ], []),
             'WorkspaceTemplateSetupSavedResponse' => self::object([
                 'data' => ['type' => 'object', 'additionalProperties' => true],
             ], ['data']),

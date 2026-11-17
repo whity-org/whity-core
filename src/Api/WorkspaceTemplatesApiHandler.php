@@ -162,8 +162,13 @@ final class WorkspaceTemplatesApiHandler
 
             try {
                 return Response::json(['data' => $setup->save($kind, $profileId, JsonBody::parsed($request))]);
+            } catch (\Whity\Core\Workspace\Templates\StepNotSaved $e) {
+                // Our own reason, written for the person filling the step in.
+                return Response::error($e->words, 422, ['reason' => 'unreadable']);
             } catch (\InvalidArgumentException $e) {
-                return Response::error($e->getMessage(), 422, ['reason' => 'unreadable']);
+                error_log('[WorkspaceTemplatesApiHandler] setup step: ' . $e->getMessage());
+
+                return Response::error('That step could not be saved. Check what you entered and try again.', 422, ['reason' => 'unreadable']);
             }
         });
     }

@@ -21167,9 +21167,47 @@ export interface components {
                 };
             };
         };
-        /** @description The step's form, as its blocks submit it */
         WorkspaceTemplateSetupStepRequest: {
-            [key: string]: unknown;
+            /** @description business: the business name in English */
+            name_en?: string;
+            /** @description business: the business name in Arabic */
+            name_ar?: string;
+            /** @description business */
+            phone?: string;
+            /** @description business */
+            address?: string;
+            /** @description business: the main colour, #rrggbb */
+            colour?: string;
+            /** @description hours: the caller's opening hours */
+            hours?: {
+                /** @description 0 Sunday to 6 Saturday */
+                weekday: number;
+                /** @description HH:MM */
+                start_time: string;
+                /** @description HH:MM */
+                end_time: string;
+            }[];
+            /** @description services: the rows to add; names that exist are skipped */
+            services?: {
+                include?: boolean;
+                name_en: string;
+                name_ar?: string;
+                minutes?: number;
+                /** @description In normal units of the workspace currency (49.000) */
+                price?: string;
+            }[];
+            /** @description team: people to invite */
+            people?: {
+                email: string;
+            }[];
+            /** @description booking */
+            min_notice_minutes?: number;
+            /** @description booking */
+            max_advance_days?: number;
+            /** @description booking */
+            reminder_hours_before?: number;
+            /** @description booking */
+            instant_booking?: boolean;
         };
         WorkspaceTemplateSetupValuesResponse: {
             data: {

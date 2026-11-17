@@ -112310,8 +112310,113 @@
             },
             "WorkspaceTemplateSetupStepRequest": {
                 "type": "object",
-                "additionalProperties": true,
-                "description": "The step's form, as its blocks submit it"
+                "properties": {
+                    "name_en": {
+                        "type": "string",
+                        "description": "business: the business name in English"
+                    },
+                    "name_ar": {
+                        "type": "string",
+                        "description": "business: the business name in Arabic"
+                    },
+                    "phone": {
+                        "type": "string",
+                        "description": "business"
+                    },
+                    "address": {
+                        "type": "string",
+                        "description": "business"
+                    },
+                    "colour": {
+                        "type": "string",
+                        "description": "business: the main colour, #rrggbb"
+                    },
+                    "hours": {
+                        "type": "array",
+                        "description": "hours: the caller's opening hours",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "weekday": {
+                                    "type": "integer",
+                                    "description": "0 Sunday to 6 Saturday"
+                                },
+                                "start_time": {
+                                    "type": "string",
+                                    "description": "HH:MM"
+                                },
+                                "end_time": {
+                                    "type": "string",
+                                    "description": "HH:MM"
+                                }
+                            },
+                            "required": [
+                                "weekday",
+                                "start_time",
+                                "end_time"
+                            ]
+                        }
+                    },
+                    "services": {
+                        "type": "array",
+                        "description": "services: the rows to add; names that exist are skipped",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "include": {
+                                    "type": "boolean"
+                                },
+                                "name_en": {
+                                    "type": "string"
+                                },
+                                "name_ar": {
+                                    "type": "string"
+                                },
+                                "minutes": {
+                                    "type": "integer"
+                                },
+                                "price": {
+                                    "type": "string",
+                                    "description": "In normal units of the workspace currency (49.000)"
+                                }
+                            },
+                            "required": [
+                                "name_en"
+                            ]
+                        }
+                    },
+                    "people": {
+                        "type": "array",
+                        "description": "team: people to invite",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "email": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "email"
+                            ]
+                        }
+                    },
+                    "min_notice_minutes": {
+                        "type": "integer",
+                        "description": "booking"
+                    },
+                    "max_advance_days": {
+                        "type": "integer",
+                        "description": "booking"
+                    },
+                    "reminder_hours_before": {
+                        "type": "integer",
+                        "description": "booking"
+                    },
+                    "instant_booking": {
+                        "type": "boolean",
+                        "description": "booking"
+                    }
+                }
             },
             "WorkspaceTemplateSetupValuesResponse": {
                 "type": "object",
