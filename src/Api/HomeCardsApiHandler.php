@@ -7,6 +7,7 @@ namespace Whity\Api;
 use PDO;
 use Throwable;
 use Whity\Auth\RoleChecker;
+use Whity\Core\Dashboard\DashboardLayoutRepository;
 use Whity\Core\Plugin\Tenant\TenantManifestHost;
 use Whity\Core\Plugin\Tenant\TenantRecordRepository;
 use Whity\Core\PluginLoader;
@@ -30,8 +31,10 @@ use Whity\Core\Tenant\TenantContext;
  * route to ask, so the host answers, for this workspace only and after the same
  * permission check.
  *
- * Cards come in install order as far as the host knows it: code plugins in the order
- * they load, then this workspace's plugins by key. People can't rearrange them (H.4).
+ * Cards come in the person's own order (SDK 1.115, H.5), then in install order as far
+ * as the host knows it: code plugins in the order they load, then this workspace's
+ * plugins by key. Hidden, order and size are kept in `dashboard_layout`, shared with
+ * the widgets ({@see DashboardApiHandler}).
  */
 final class HomeCardsApiHandler
 {
@@ -54,13 +57,14 @@ final class HomeCardsApiHandler
         }
         [$tenantId, $profileId] = $caller;
 
-        $hidden = $this->hiddenKeys($tenantId, $profileId);
+        $rows = $this->layout()->rowsFor($tenantId, $profileId);
         $data = [];
         foreach ($this->visibleCards($tenantId, $profileId) as $card) {
-            $data[] = $card + ['hidden' => isset($hidden[$card['key']])];
+            $row = $rows[$card['key']] ?? null;
+            $data[] = $card + ['hidden' => (bool) ($row['hidden'] ?? false), 'position' => $row['position'] ?? null];
         }
 
-        return Response::json(['data' => $data], 200);
+        return Response::json(['data' => DashboardLayoutRepository::ordered($data, $rows)], 200);
     }
 
     /** @param array<string, string> $params */
@@ -85,18 +89,7 @@ final class HomeCardsApiHandler
             return Response::error('Card not found', 404);
         }
 
-        if ($body['hidden']) {
-            $stmt = $this->db->prepare(
-                'INSERT INTO home_card_hidden (tenant_id, profile_id, card_key)
-                 VALUES (:tenant_id, :profile_id, :card_key)
-                 ON CONFLICT (tenant_id, profile_id, card_key) DO NOTHING'
-            );
-        } else {
-            $stmt = $this->db->prepare(
-                'DELETE FROM home_card_hidden WHERE tenant_id = :tenant_id AND profile_id = :profile_id AND card_key = :card_key'
-            );
-        }
-        $stmt->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId, ':card_key' => $key]);
+        $this->layout()->setHidden($tenantId, $profileId, $key, $body['hidden']);
 
         return Response::json(['data' => ['key' => $key, 'hidden' => $body['hidden']]], 200);
     }
@@ -165,13 +158,21 @@ final class HomeCardsApiHandler
         ];
     }
 
-    /** @return array<string, true> */
-    private function hiddenKeys(int $tenantId, int $profileId): array
+    /**
+     * The keys of the cards the caller may see in this workspace (SDK 1.115:
+     * the dashboard layout orders them with the widgets).
+     *
+     * @return list<string>
+     */
+    public function visibleKeys(int $tenantId, int $profileId): array
     {
-        $stmt = $this->db->prepare('SELECT card_key FROM home_card_hidden WHERE tenant_id = :tenant_id AND profile_id = :profile_id');
-        $stmt->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId]);
+        return array_map(static fn (array $card): string => (string) $card['key'], $this->visibleCards($tenantId, $profileId));
+    }
 
-        return array_fill_keys(array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN)), true);
+    /** Hidden, order and size live with the widgets' (SDK 1.115). */
+    private function layout(): DashboardLayoutRepository
+    {
+        return new DashboardLayoutRepository($this->db);
     }
 
     /** @return array{0: int, 1: int}|null */

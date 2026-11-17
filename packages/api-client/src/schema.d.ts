@@ -6027,6 +6027,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The setup points and widgets the caller's apps add to their dashboard, in the caller's order
+         * @description Only points and widgets whose permission the caller holds in this workspace, from plugins on here, in the caller's language. Hidden widgets are listed too, so a client can offer Show. Each names the plugin route it reads; that route applies its own permission and the caller's scope.
+         */
+        get: operations["get_api_v1_me_dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/dashboard/layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Arrange the caller's dashboard: the order, hidden items and widget sizes
+         * @description Items are home cards (by plugin name) and widgets (`<plugin>:<id>`) the caller can see, in the order they want them. Items left out go after, in the apps' own order. Answers with the dashboard as GET does.
+         */
+        put: operations["put_api_v1_me_dashboard_layout"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/display-preferences": {
         parameters: {
             query?: never;
@@ -13182,6 +13222,55 @@ export interface components {
         CustomerMessageResponse: {
             data: components["schemas"]["CustomerMessage"] | null;
         };
+        DashboardLayoutRequest: {
+            items: {
+                key: string;
+                hidden?: boolean;
+                /** @enum {string|null} */
+                size?: "small" | "medium" | "large" | null;
+            }[];
+        };
+        DashboardResponse: {
+            data: {
+                setup: components["schemas"]["DashboardSetup"][];
+                widgets: components["schemas"]["DashboardWidget"][];
+            };
+        };
+        DashboardSetup: {
+            plugin: string;
+            /** @description The plugin's GET route answering {data: {points: {<id>: bool}}} */
+            status: string;
+            points: components["schemas"]["DashboardSetupPoint"][];
+        };
+        DashboardSetupPoint: {
+            id: string;
+            label?: string | null;
+            why?: string | null;
+            action?: string | null;
+            /** @description The plugin's guided-setup step or screen it opens */
+            href: string;
+            icon?: string | null;
+        };
+        DashboardWidget: {
+            /** @description <plugin>:<id> */
+            key: string;
+            plugin: string;
+            /** @enum {string} */
+            kind: "stat" | "list" | "chart" | "actions";
+            title?: string | null;
+            description?: string | null;
+            icon?: string | null;
+            href?: string | null;
+            source?: string | null;
+            sizes: ("small" | "medium" | "large")[];
+            /** @enum {string} */
+            size: "small" | "medium" | "large";
+            hidden: boolean;
+            position?: number | null;
+            blocks: {
+                [key: string]: unknown;
+            }[];
+        };
         DataType: {
             key: string;
             source: string;
@@ -15946,6 +16035,8 @@ export interface components {
             source?: string | null;
             value?: number | null;
             hidden: boolean;
+            /** @description Its place in the person's own order, null when they never moved it (SDK 1.115) */
+            position?: number | null;
         };
         HomeCardHiddenRequest: {
             hidden: boolean;
@@ -52433,6 +52524,158 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_me_dashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The setup points and widgets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_me_dashboard_layout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardLayoutRequest"];
+            };
+        };
+        responses: {
+            /** @description The dashboard, arranged */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description An item that is not on the caller's dashboard, listed twice, or a size it does not fit */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

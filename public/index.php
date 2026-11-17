@@ -6457,6 +6457,18 @@ $meHomeHandler = new \Whity\Api\MeHomeApiHandler($db->getPdo());
 $router->register('GET', '/api/me/recent-documents', [$meHomeHandler, 'recentDocuments'], null);
 $router->register('GET', '/api/me/setup-steps', [$meHomeHandler, 'setupSteps'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('PUT', '/api/me/home-cards/{key:[A-Za-z][A-Za-z0-9_]*}/hidden', [$homeCardsHandler, 'setHidden'], null);
+// WHIT-1177 (SDK 1.115, H.5): setup points and widgets the caller's apps add to
+// the dashboard, and the caller's own order, sizes and hidden items. Session-gated
+// and self-scoped; each point and widget is listed only under its own permission.
+$dashboardHandler = new \Whity\Api\DashboardApiHandler(
+    $roleChecker,
+    $pluginLoader,
+    new \Whity\Core\Dashboard\DashboardLayoutRepository($db->getPdo()),
+    $homeCardsHandler,
+    static fn (): string => $serverLabels->languageCode(),
+);
+$router->register('GET', '/api/me/dashboard', [$dashboardHandler, 'show'], null);
+$router->register('PUT', '/api/me/dashboard/layout', [$dashboardHandler, 'saveLayout'], null);
 // WHIT-815: workspace agents (persona, toolsets, starting grant) and the
 // presets they start from. Gated on agents:manage, which migration 180 grants
 // to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.

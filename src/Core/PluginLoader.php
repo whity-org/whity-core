@@ -730,6 +730,190 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         ];
     }
 
+    /**
+     * Each plugin's validated dashboard part (SDK 1.115), by plugin key.
+     *
+     * @var array<string, array{setup: array<string, mixed>|null, widgets: list<array<string, mixed>>}|null>
+     */
+    private array $dashboards = [];
+
+    /**
+     * Setup points and widgets of the plugins on in the current workspace
+     * (SDK 1.115), in load order. Who may see each is the caller's business:
+     * {@see \Whity\Api\DashboardApiHandler} checks the permissions.
+     *
+     * @return list<array{plugin: string, setup: array<string, mixed>|null, widgets: list<array<string, mixed>>}>
+     */
+    public function getDashboards(): array
+    {
+        $out = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $dashboard = $this->dashboards[$pluginKey] ?? null;
+            if ($dashboard === null || isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive() || $this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+            $out[] = ['plugin' => $info['plugin']->getName(), 'setup' => $dashboard['setup'], 'widgets' => $dashboard['widgets']];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Validate a plugin's dashboard part (SDK 1.115). The setup part needs one
+     * of the plugin's own permissions and a GET status route of its own under
+     * it; each point must open one of its guided-setup steps or screens. Each
+     * widget needs one of its own permissions, a source that is its own GET
+     * route under that permission, and blocks that pass as a blocks screen.
+     * A bad point or widget is dropped alone, with a logged reason.
+     *
+     * @param array<string, string|null> $registeredGetRoutes
+     * @param array<string, string|null> $registeredWriteRoutes
+     * @param list<string> $screenIds
+     * @return array{setup: array<string, mixed>|null, widgets: list<array<string, mixed>>}|null
+     */
+    private function collectDashboard(PluginInterface $plugin, string $pluginKey, array $registeredGetRoutes, array $registeredWriteRoutes, array $screenIds): ?array
+    {
+        if (!$plugin instanceof \Whity\Sdk\PluginDashboardInterface) {
+            return null;
+        }
+        try {
+            // Read untyped: a plugin's array is runtime data whatever its
+            // declared shape, so every field is checked here.
+            /** @var array<string, mixed> $declared */
+            $declared = $plugin->getDashboard();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'getDashboard');
+
+            return null;
+        }
+        $name = $plugin->getName();
+        $ownPermissions = $plugin->getPermissions();
+        $ownRoute = static fn (mixed $path, mixed $permission): bool => is_string($path)
+            && array_key_exists($path, $registeredGetRoutes)
+            && $registeredGetRoutes[$path] === $permission;
+
+        $setup = null;
+        $rawSetup = $declared['setup'] ?? null;
+        if (is_array($rawSetup)) {
+            $permission = $rawSetup['permission'] ?? null;
+            $status = $rawSetup['status'] ?? null;
+            if (!is_string($permission) || !in_array($permission, $ownPermissions, true) || !$ownRoute($status, $permission)) {
+                $this->logWarning("[Plugin:{$pluginKey}] getDashboard(): setup needs one of its own permissions and one of its own GET routes under it as status; no setup points added.");
+            } else {
+                $onboarding = $this->onboardings[$pluginKey] ?? null;
+                $steps = is_array($onboarding) ? array_column((array) $onboarding['steps'], 'id') : [];
+                $points = [];
+                $rawPoints = $rawSetup['points'] ?? [];
+                foreach (is_array($rawPoints) ? $rawPoints : [] as $i => $point) {
+                    $errors = \Whity\Sdk\Manifest\DashboardValidator::pointErrors($point, "setup.points[{$i}]");
+                    if ($errors === [] && is_array($point)) {
+                        if (isset($point['step']) && !in_array($point['step'], $steps, true)) {
+                            $errors[] = "setup.points[{$i}].step: not a step of this plugin's guided setup";
+                        }
+                        if (isset($point['screen']) && !in_array($point['screen'], $screenIds, true)) {
+                            $errors[] = "setup.points[{$i}].screen: not a screen of this plugin";
+                        }
+                        if (in_array($point['id'], array_column($points, 'id'), true)) {
+                            $errors[] = "setup.points[{$i}].id: used twice";
+                        }
+                        if (count($points) >= \Whity\Sdk\Manifest\DashboardValidator::MAX_POINTS) {
+                            $errors[] = "setup.points[{$i}]: at most " . \Whity\Sdk\Manifest\DashboardValidator::MAX_POINTS . ' points';
+                        }
+                    }
+                    if ($errors !== [] || !is_array($point)) {
+                        $this->logWarning("[Plugin:{$pluginKey}] getDashboard(): a setup point dropped: " . implode('; ', $errors));
+                        continue;
+                    }
+                    $points[] = [
+                        'id' => (string) $point['id'],
+                        'label' => $point['label'],
+                        'why' => $point['why'] ?? null,
+                        'action' => $point['action'] ?? null,
+                        'step' => $point['step'] ?? null,
+                        'screen' => $point['screen'] ?? null,
+                        'icon' => $point['icon'] ?? null,
+                    ];
+                }
+                if ($points !== []) {
+                    $setup = [
+                        'permission' => $permission,
+                        'status' => $this->router->versionedPath((string) $status),
+                        'points' => $points,
+                    ];
+                }
+            }
+        } elseif ($rawSetup !== null) {
+            $this->logWarning("[Plugin:{$pluginKey}] getDashboard(): setup must be an object; no setup points added.");
+        }
+
+        $slug = \Whity\Sdk\PluginNamespace::slug($name) ?? 'plugin';
+        $widgets = [];
+        $rawWidgets = $declared['widgets'] ?? [];
+        foreach (is_array($rawWidgets) ? $rawWidgets : [] as $i => $widget) {
+            $errors = \Whity\Sdk\Manifest\DashboardValidator::widgetErrors($widget, "widgets[{$i}]");
+            if ($errors === [] && is_array($widget)) {
+                $permission = $widget['permission'];
+                if (!in_array($permission, $ownPermissions, true)) {
+                    $errors[] = "widgets[{$i}].permission: not one of this plugin's permissions";
+                }
+                if (isset($widget['source']) && !$ownRoute($widget['source'], $permission)) {
+                    $errors[] = "widgets[{$i}].source: not a GET route of this plugin gated on the widget's permission";
+                }
+                if (isset($widget['screen']) && !in_array($widget['screen'], $screenIds, true)) {
+                    $errors[] = "widgets[{$i}].screen: not a screen of this plugin";
+                }
+                if (in_array($widget['id'], array_column($widgets, 'id'), true)) {
+                    $errors[] = "widgets[{$i}].id: used twice";
+                }
+                if (count($widgets) >= \Whity\Sdk\Manifest\DashboardValidator::MAX_WIDGETS) {
+                    $errors[] = "widgets[{$i}]: at most " . \Whity\Sdk\Manifest\DashboardValidator::MAX_WIDGETS . ' widgets';
+                }
+            }
+            if ($errors !== [] || !is_array($widget)) {
+                $this->logWarning("[Plugin:{$pluginKey}] getDashboard(): a widget dropped: " . implode('; ', $errors));
+                continue;
+            }
+            // The blocks pass exactly as a blocks screen's would: owned
+            // endpoints, versioned sources. Checked as a pseudo screen, never
+            // registered as one.
+            $dropped = [];
+            $normalized = $this->validateFrontendFeature(
+                ['id' => $slug . '-widget-' . $widget['id'], 'label' => $widget['title'], 'screen' => 'blocks', 'requiredPermission' => $widget['permission'], 'blocks' => $widget['blocks']],
+                $name,
+                $pluginKey,
+                $ownPermissions,
+                $registeredGetRoutes,
+                $registeredWriteRoutes,
+                $dropped,
+            );
+            if ($normalized === null) {
+                continue;
+            }
+            $widgets[] = [
+                'id' => (string) $widget['id'],
+                'kind' => $widget['kind'],
+                'title' => $widget['title'],
+                'description' => $widget['description'] ?? null,
+                'permission' => $widget['permission'],
+                'source' => isset($widget['source']) ? $this->router->versionedPath((string) $widget['source']) : null,
+                'sizes' => \Whity\Sdk\Manifest\DashboardValidator::sizesOf($widget),
+                'blocks' => $normalized['blocks'] ?? [],
+                'screen' => $widget['screen'] ?? null,
+                'icon' => $widget['icon'] ?? null,
+            ];
+        }
+
+        if ($setup === null && $widgets === []) {
+            return null;
+        }
+
+        return ['setup' => $setup, 'widgets' => $widgets];
+    }
+
     private string $paidAccessFingerprint = '';
 
     /**
@@ -4492,6 +4676,17 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         //     checked exactly like a blocks screen, so its forms may only post
         //     to the plugin's own routes.
         $this->onboardings[$pluginKey] = $this->collectOnboarding($plugin, $pluginKey, $registeredGetRoutes, $registeredWriteRoutes);
+
+        // 4c. What the plugin adds to the dashboard (SDK 1.115, WHIT-1177):
+        //     setup points and widgets, checked against its own routes,
+        //     screens and guided-setup steps.
+        $screenIds = [];
+        foreach ($collected['features'] as $feature) {
+            if (is_string($feature['id'] ?? null)) {
+                $screenIds[] = $feature['id'];
+            }
+        }
+        $this->dashboards[$pluginKey] = $this->collectDashboard($plugin, $pluginKey, $registeredGetRoutes, $registeredWriteRoutes, $screenIds);
 
         // 5. Collect the plugin's optional theme-override route (WC-242),
         //    same error-boundary + ownership-verification philosophy as (4).

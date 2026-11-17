@@ -41218,6 +41218,180 @@
                 }
             }
         },
+        "/api/v1/me/dashboard": {
+            "get": {
+                "operationId": "get_api_v1_me_dashboard",
+                "summary": "The setup points and widgets the caller's apps add to their dashboard, in the caller's order",
+                "tags": [
+                    "home"
+                ],
+                "description": "Only points and widgets whose permission the caller holds in this workspace, from plugins on here, in the caller's language. Hidden widgets are listed too, so a client can offer Show. Each names the plugin route it reads; that route applies its own permission and the caller's scope.",
+                "responses": {
+                    "200": {
+                        "description": "The setup points and widgets",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DashboardResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/me/dashboard/layout": {
+            "put": {
+                "operationId": "put_api_v1_me_dashboard_layout",
+                "summary": "Arrange the caller's dashboard: the order, hidden items and widget sizes",
+                "tags": [
+                    "home"
+                ],
+                "description": "Items are home cards (by plugin name) and widgets (`<plugin>:<id>`) the caller can see, in the order they want them. Items left out go after, in the apps' own order. Answers with the dashboard as GET does.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DashboardLayoutRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The dashboard, arranged",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DashboardResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "An item that is not on the caller's dashboard, listed twice, or a size it does not fit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/me/display-preferences": {
             "get": {
                 "operationId": "get_api_v1_me_display_preferences",
@@ -83119,6 +83293,207 @@
                     "data"
                 ]
             },
+            "DashboardLayoutRequest": {
+                "type": "object",
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "key": {
+                                    "type": "string"
+                                },
+                                "hidden": {
+                                    "type": "boolean"
+                                },
+                                "size": {
+                                    "type": "string",
+                                    "enum": [
+                                        "small",
+                                        "medium",
+                                        "large"
+                                    ],
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "key"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "items"
+                ]
+            },
+            "DashboardResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "setup": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/DashboardSetup"
+                                }
+                            },
+                            "widgets": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/DashboardWidget"
+                                }
+                            }
+                        },
+                        "required": [
+                            "setup",
+                            "widgets"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DashboardSetup": {
+                "type": "object",
+                "properties": {
+                    "plugin": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "The plugin's GET route answering {data: {points: {<id>: bool}}}"
+                    },
+                    "points": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DashboardSetupPoint"
+                        }
+                    }
+                },
+                "required": [
+                    "plugin",
+                    "status",
+                    "points"
+                ]
+            },
+            "DashboardSetupPoint": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "why": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "action": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "href": {
+                        "type": "string",
+                        "description": "The plugin's guided-setup step or screen it opens"
+                    },
+                    "icon": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "href"
+                ]
+            },
+            "DashboardWidget": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "<plugin>:<id>"
+                    },
+                    "plugin": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "stat",
+                            "list",
+                            "chart",
+                            "actions"
+                        ]
+                    },
+                    "title": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "icon": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "href": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "source": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "sizes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "small",
+                                "medium",
+                                "large"
+                            ]
+                        }
+                    },
+                    "size": {
+                        "type": "string",
+                        "enum": [
+                            "small",
+                            "medium",
+                            "large"
+                        ]
+                    },
+                    "hidden": {
+                        "type": "boolean"
+                    },
+                    "position": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "blocks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                },
+                "required": [
+                    "key",
+                    "plugin",
+                    "kind",
+                    "sizes",
+                    "size",
+                    "hidden",
+                    "blocks"
+                ]
+            },
             "DataType": {
                 "type": "object",
                 "properties": {
@@ -92204,6 +92579,11 @@
                     },
                     "hidden": {
                         "type": "boolean"
+                    },
+                    "position": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Its place in the person's own order, null when they never moved it (SDK 1.115)"
                     }
                 },
                 "required": [
