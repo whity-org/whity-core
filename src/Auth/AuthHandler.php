@@ -1314,6 +1314,8 @@ class AuthHandler
                 'email'     => $email,
                 // WHIT-872: the home greets a person by name.
                 'display_name' => $this->profileDisplayName($profileId),
+                // WHIT-1181: the person's own phone, E.164, or null.
+                'phone'     => (new \Whity\Core\Identity\PersonalPhone($this->db))->of($profileId),
                 'role'      => $role,
                 'tenant_id' => $activeTenantId,
             ],

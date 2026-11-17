@@ -1291,6 +1291,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/branding/host": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read your own workspace's custom web address
+         * @description Scoped by the session: a workspace reads only its own address. Setting one is PUT /api/tenants/{id}/branding-host, system tenant only.
+         */
+        get: operations["get_api_v1_branding_host"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/availability": {
         parameters: {
             query?: never;
@@ -6752,6 +6772,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/phone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your own phone number (WHIT-1181) */
+        get: operations["get_api_v1_me_phone"];
+        /**
+         * Set or remove your own phone number (WHIT-1181)
+         * @description Stored as E.164 on your profile, across every workspace. A number you set here is never replaced by one from a sign-in.
+         */
+        put: operations["put_api_v1_me_phone"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/push-subscriptions": {
         parameters: {
             query?: never;
@@ -11316,6 +11357,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspace/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the workspace templates on offer
+         * @description Core's Blank and the templates of the plugins on in this workspace, in the caller's language: what each sets up, whether it has examples and a guided setup, the paid plugin it offers with its trial, and which ones this workspace chose.
+         */
+        get: operations["get_api_v1_workspace_templates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/templates/examples": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove the example contacts and bookings a template added
+         * @description Cancels the example bookings and archives the example contacts still in the workspace, as the caller. Nothing else is touched.
+         */
+        delete: operations["delete_api_v1_workspace_templates_examples"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/templates/{key}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply a workspace template as the caller
+         * @description Sets the workspace up through core's own routes with the caller's permissions, adding only what is missing and never overwriting what the workspace changed. Each part that could not be done is listed with why. Free; the plugin it offers starts only through its own trial.
+         */
+        post: operations["post_api_v1_workspace_templates_key_apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces": {
         parameters: {
             query?: never;
@@ -11840,6 +11941,24 @@ export interface components {
                 revokedCredentials: number;
             };
         };
+        ApplyWorkspaceTemplateRequest: {
+            /** @description Add the template's example contacts and bookings. Default true. */
+            examples?: boolean;
+        };
+        ApplyWorkspaceTemplateResponse: {
+            data: {
+                template: string;
+                /** @description How many of each part were made */
+                made: {
+                    [key: string]: number;
+                };
+                skipped: {
+                    part: string;
+                    key: string;
+                    reason: string;
+                }[];
+            };
+        };
         ApprovalStatusResponse: {
             data: {
                 id: number;
@@ -12072,6 +12191,14 @@ export interface components {
             builtOnWhity?: boolean;
             /** @description The workspace currency as an ISO 4217 code (billing.default_currency; USD by default). Amounts with a currency of their own show in that one. */
             currency?: string;
+        };
+        BrandingHostReadResponse: {
+            data: {
+                /** @description The workspace's own web address, or null when none is set. */
+                branding_host: string | null;
+                /** @description Whether the workspace's plan includes its own web address (WHIT-932). Absent for the system tenant. */
+                included_in_plan?: boolean;
+            };
         };
         BrandingHostRequest: {
             host?: string | null;
@@ -16548,6 +16675,8 @@ export interface components {
             user?: {
                 id: number;
                 email: string;
+                /** @description Your own phone number in E.164, or null (WHIT-1181). */
+                phone?: string | null;
                 role: string;
                 tenant_id: number;
             } | null;
@@ -16672,6 +16801,8 @@ export interface components {
             user: {
                 id: number;
                 email: string;
+                /** @description Your own phone number in E.164, or null (WHIT-1181). */
+                phone?: string | null;
                 role: string;
                 tenant_id: number;
             };
@@ -17202,6 +17333,16 @@ export interface components {
                 conversation_id?: number;
                 message?: components["schemas"]["CustomerMessage"];
             } | null;
+        };
+        MyPhoneRequest: {
+            /** @description With its country code; spaces, dashes and Arabic-Indic digits are accepted and stored as E.164. Null or empty removes it. */
+            phone: string | null;
+        };
+        MyPhoneResponse: {
+            data: {
+                /** @description E.164, such as +962791234567, or null when none is set. */
+                phone: string | null;
+            };
         };
         NavigationItem: {
             id: string;
@@ -18089,7 +18230,7 @@ export interface components {
             name: string;
             /** @description The email of their own sign-in; may be empty. */
             email: string;
-            /** @description Null until a profile carries a phone number. */
+            /** @description Their own phone in E.164, or null. */
             phone: string | null;
         } | null;
         PublicChatInfoResponse: {
@@ -18510,6 +18651,12 @@ export interface components {
         };
         RelationshipTypeListResponse: {
             data: components["schemas"]["RelationshipType"][];
+        };
+        RemoveWorkspaceTemplateExamplesResponse: {
+            data: {
+                removed: number;
+                failed: number;
+            };
         };
         ResolvedDocumentTheme: {
             /** @description The theme actually used, after falling back past any that isn't available */
@@ -19156,6 +19303,8 @@ export interface components {
             user: {
                 id: number;
                 email: string;
+                /** @description Your own phone number in E.164, or null (WHIT-1181). */
+                phone?: string | null;
                 role: string;
                 tenant_id: number;
             };
@@ -20868,6 +21017,42 @@ export interface components {
         };
         WorkspacePluginVersionResponse: {
             data: components["schemas"]["WorkspacePluginVersion"];
+        };
+        WorkspaceTemplateCard: {
+            key: string;
+            /** @description The plugin that offers it; null for core's Blank */
+            plugin?: string | null;
+            version: number;
+            name: string;
+            summary: string;
+            icon?: string | null;
+            setsUp: string[];
+            hasExamples: boolean;
+            hasSetup: boolean;
+            offer?: components["schemas"]["WorkspaceTemplateOffer"] | null;
+            chosen: boolean;
+        };
+        WorkspaceTemplateListResponse: {
+            data: {
+                templates: components["schemas"]["WorkspaceTemplateCard"][];
+                /** @description Keys of the templates this workspace applied */
+                chosen: string[];
+                /** @description Example contacts and bookings still in the workspace */
+                examples: number;
+            };
+        };
+        WorkspaceTemplateOffer: {
+            plugin: string;
+            /** @description What the workspace can do free in Whity */
+            free: string[];
+            /** @description What the plugin adds */
+            paid: string[];
+            trialDays: number;
+            trialAvailable: boolean;
+            /** @enum {string} */
+            state: "on" | "read_only" | "off";
+            reason?: string | null;
+            trialEndsAt?: string | null;
         };
     };
     responses: never;
@@ -27023,6 +27208,71 @@ export interface operations {
                 };
             };
             /** @description Unknown branding key */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_branding_host: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workspace's address, or null */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrandingHostReadResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -56332,6 +56582,158 @@ export interface operations {
             };
         };
     };
+    get_api_v1_me_phone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your phone */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPhoneResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_me_phone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MyPhoneRequest"];
+            };
+        };
+        responses: {
+            /** @description Your phone */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyPhoneResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a phone number with its country code */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_me_push_subscriptions: {
         parameters: {
             query?: never;
@@ -81267,6 +81669,217 @@ export interface operations {
             };
             /** @description Confirming it is you is not available */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_workspace_templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The templates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceTemplateListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_workspace_templates_examples: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many were removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RemoveWorkspaceTemplateExamplesResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_templates_key_apply: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The template's key (bakery) */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyWorkspaceTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description What was made and what was skipped */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyWorkspaceTemplateResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description There is no such template */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

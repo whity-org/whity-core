@@ -293,6 +293,15 @@ describe('PublicBookingScreen', () => {
       });
     }
 
+    it('fills their own phone too when their account has one (WHIT-1181)', async () => {
+      serve({ ...me, phone: '+962791234567' });
+      render(<PublicBookingScreen workspace="example-bakery" />);
+      fireEvent.click(await screen.findByRole('radio', { name: /Cake tasting/ }));
+      fireEvent.click(await screen.findByRole('button', { name: '09:00' }));
+      await waitFor(() => expect(screen.getByLabelText('Phone (optional)')).toHaveValue('+962791234567'));
+      expect(screen.getByLabelText('Your name')).toHaveValue('Ahmad Khalil');
+    });
+
     it('fills the name and email from their own account, never cached, and says so', async () => {
       const seen: RequestInit[] = [];
       serve(me, page, [], seen);

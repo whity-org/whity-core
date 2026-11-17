@@ -2880,6 +2880,33 @@ final class CoreApiSchemas
             ]),
             [
                 'method' => 'GET',
+                'path' => '/api/me/phone',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Your own phone number (WHIT-1181)',
+                    'tags' => ['me'],
+                    'responses' => [200 => self::jsonResponse('Your phone', 'MyPhoneResponse')] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/phone',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Set or remove your own phone number (WHIT-1181)',
+                    'description' => 'Stored as E.164 on your profile, across every workspace. A number you set here is never replaced by one from a sign-in.',
+                    'tags' => ['me'],
+                    'request' => 'MyPhoneRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('Your phone', 'MyPhoneResponse'),
+                        422 => self::errorResponse('Not a phone number with its country code'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
                 'path' => '/api/me/away',
                 'requiredRole' => null,
                 'requiredPermission' => null,
@@ -4358,6 +4385,14 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Unknown branding key'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/branding/host', 'settings:read', [
+                'summary' => 'Read your own workspace\'s custom web address',
+                'description' => 'Scoped by the session: a workspace reads only its own address. Setting one is PUT /api/tenants/{id}/branding-host, system tenant only.',
+                'tags' => ['branding'],
+                'responses' => [
+                    200 => self::jsonResponse('The workspace\'s address, or null', 'BrandingHostReadResponse'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('PUT', '/api/tenants/{id}/branding-host', 'settings:manage', [
                 'summary' => 'Set or clear a tenant\'s custom branding hostname',
                 'tags' => ['branding'],
@@ -4677,6 +4712,7 @@ final class CoreApiSchemas
         $sessionUser = self::object([
             'id' => self::int(),
             'email' => self::str(),
+            'phone' => self::str(true) + ['description' => 'Your own phone number in E.164, or null (WHIT-1181).'],
             'role' => self::str(),
             'tenant_id' => self::int(),
         ], ['id', 'email', 'role', 'tenant_id']);
@@ -5069,6 +5105,16 @@ final class CoreApiSchemas
             'MeResponse' => self::object([
                 'user' => $selfUser,
             ] + $tokenPair, ['user']),
+
+            // GET and PUT /api/me/phone (WHIT-1181)
+            'MyPhoneResponse' => self::object([
+                'data' => self::object([
+                    'phone' => self::str(true) + ['description' => 'E.164, such as +962791234567, or null when none is set.'],
+                ], ['phone']),
+            ], ['data']),
+            'MyPhoneRequest' => self::object([
+                'phone' => self::str(true) + ['description' => 'With its country code; spaces, dashes and Arabic-Indic digits are accepted and stored as E.164. Null or empty removes it.'],
+            ], ['phone']),
 
             // PATCH /api/me — request body
             'MeUpdateRequest' => self::object([
@@ -10609,7 +10655,7 @@ final class CoreApiSchemas
             'PublicBookingVisitor' => self::object([
                 'name' => self::str() + ['description' => 'The display name on their own profile; may be empty.'],
                 'email' => self::str() + ['description' => 'The email of their own sign-in; may be empty.'],
-                'phone' => self::str(true) + ['description' => 'Null until a profile carries a phone number.'],
+                'phone' => self::str(true) + ['description' => 'Their own phone in E.164, or null.'],
             ], ['name', 'email', 'phone']) + ['nullable' => true, 'description' => 'The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in.'],
             'PublicBookingPage' => self::object([
                 'workspace' => self::object(['name' => self::str(), 'slug' => self::str()], ['name', 'slug']),
@@ -11871,6 +11917,11 @@ final class CoreApiSchemas
             'BrandingResponse' => self::dataEnvelope(SchemaBuilder::ref('Branding')),
             // PUT /api/tenants/{id}/branding-host request body.
             'BrandingHostRequest' => self::object(['host' => self::str(true)], []),
+            // GET /api/branding/host response body: the caller's own workspace's address.
+            'BrandingHostReadResponse' => self::dataEnvelope(self::object([
+                'branding_host' => self::str(true) + ['description' => 'The workspace\'s own web address, or null when none is set.'],
+                'included_in_plan' => ['type' => 'boolean', 'description' => 'Whether the workspace\'s plan includes its own web address (WHIT-932). Absent for the system tenant.'],
+            ], ['branding_host'])),
             // PUT /api/tenants/{id}/branding-host response body.
             'BrandingHostResponse' => self::dataEnvelope(self::object([
                 'branding_host' => self::str(true),
@@ -19873,6 +19924,30 @@ final class CoreApiSchemas
                 'tags' => ['platform-ops'],
                 'responses' => [200 => self::jsonResponse('The guided setups', 'WorkspaceOnboardingListResponse')] + self::authErrors(),
             ]),
+            // WHIT-1194 (SDK 1.116): workspace templates.
+            self::permissionRoute('GET', '/api/workspace/templates', 'settings:write', [
+                'summary' => 'List the workspace templates on offer',
+                'description' => 'Core\'s Blank and the templates of the plugins on in this workspace, in the caller\'s language: what each sets up, whether it has examples and a guided setup, the paid plugin it offers with its trial, and which ones this workspace chose.',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('The templates', 'WorkspaceTemplateListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', 'settings:write', [
+                'summary' => 'Apply a workspace template as the caller',
+                'description' => 'Sets the workspace up through core\'s own routes with the caller\'s permissions, adding only what is missing and never overwriting what the workspace changed. Each part that could not be done is listed with why. Free; the plugin it offers starts only through its own trial.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'request' => 'ApplyWorkspaceTemplateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('What was made and what was skipped', 'ApplyWorkspaceTemplateResponse'),
+                    404 => self::errorResponse('There is no such template'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/workspace/templates/examples', 'settings:write', [
+                'summary' => 'Remove the example contacts and bookings a template added',
+                'description' => 'Cancels the example bookings and archives the example contacts still in the workspace, as the caller. Nothing else is touched.',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('How many were removed', 'RemoveWorkspaceTemplateExamplesResponse')] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/plugins/workspace-access', 'plugins:read', [
                 'summary' => 'List who can use each installed plugin',
                 'description' => 'Operator only (the system workspace).',
@@ -19974,6 +20049,49 @@ final class CoreApiSchemas
                 ], ['id', 'blocks'])],
             ], ['plugin', 'status', 'steps']),
             'WorkspaceOnboardingListResponse' => self::listEnvelope('WorkspaceOnboarding'),
+            'WorkspaceTemplateOffer' => self::object([
+                'plugin' => self::str(),
+                'free' => ['type' => 'array', 'items' => self::str(), 'description' => 'What the workspace can do free in Whity'],
+                'paid' => ['type' => 'array', 'items' => self::str(), 'description' => 'What the plugin adds'],
+                'trialDays' => self::int(),
+                'trialAvailable' => self::bool(),
+                'state' => ['type' => 'string', 'enum' => ['on', 'read_only', 'off']],
+                'reason' => ['type' => 'string', 'nullable' => true],
+                'trialEndsAt' => ['type' => 'string', 'nullable' => true],
+            ], ['plugin', 'free', 'paid', 'trialDays', 'trialAvailable', 'state']),
+            'WorkspaceTemplateCard' => self::object([
+                'key' => self::str(),
+                'plugin' => ['type' => 'string', 'nullable' => true, 'description' => 'The plugin that offers it; null for core\'s Blank'],
+                'version' => self::int(),
+                'name' => self::str(),
+                'summary' => self::str(),
+                'icon' => ['type' => 'string', 'nullable' => true],
+                'setsUp' => ['type' => 'array', 'items' => self::str()],
+                'hasExamples' => self::bool(),
+                'hasSetup' => self::bool(),
+                'offer' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('WorkspaceTemplateOffer')]],
+                'chosen' => self::bool(),
+            ], ['key', 'version', 'name', 'summary', 'setsUp', 'hasExamples', 'hasSetup', 'chosen']),
+            'WorkspaceTemplateListResponse' => self::object([
+                'data' => self::object([
+                    'templates' => ['type' => 'array', 'items' => SchemaBuilder::ref('WorkspaceTemplateCard')],
+                    'chosen' => ['type' => 'array', 'items' => self::str(), 'description' => 'Keys of the templates this workspace applied'],
+                    'examples' => self::int() + ['description' => 'Example contacts and bookings still in the workspace'],
+                ], ['templates', 'chosen', 'examples']),
+            ], ['data']),
+            'ApplyWorkspaceTemplateRequest' => self::object([
+                'examples' => self::bool() + ['description' => 'Add the template\'s example contacts and bookings. Default true.'],
+            ], []),
+            'ApplyWorkspaceTemplateResponse' => self::object([
+                'data' => self::object([
+                    'template' => self::str(),
+                    'made' => ['type' => 'object', 'additionalProperties' => self::int(), 'description' => 'How many of each part were made'],
+                    'skipped' => ['type' => 'array', 'items' => self::object(['part' => self::str(), 'key' => self::str(), 'reason' => self::str()], ['part', 'key', 'reason'])],
+                ], ['template', 'made', 'skipped']),
+            ], ['data']),
+            'RemoveWorkspaceTemplateExamplesResponse' => self::object([
+                'data' => self::object(['removed' => self::int(), 'failed' => self::int()], ['removed', 'failed']),
+            ], ['data']),
             'WorkspaceCodePluginTrialResponse' => self::object([
                 'data' => self::object(['name' => self::str(), 'enabled' => self::bool(), 'trialEndsAt' => ['type' => 'string', 'nullable' => true]], ['name', 'enabled']),
             ], ['data']),

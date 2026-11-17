@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@whit
 import { Input } from "@whity/ui/input"
 import { LockedScreen } from "@whity/ui/locked-screen"
 import { RadioGroup, RadioGroupItem } from "@whity/ui/radio-group"
+import { RoleSummary } from "@whity/ui/role-summary"
 import { useSyncStatus } from "@whity/features/sync"
 
 import { authClient, type AuthStatus, type EnrollResult, type TenantMembership } from "./auth-client"
@@ -406,14 +407,17 @@ function TenantPicker({
                     value={String(membership.tenantId)}
                     className="mt-0.5"
                   />
-                  <span className="grid gap-0.5">
+                  <span className="grid min-w-0 gap-0.5">
                     <span dir="auto" className="text-sm font-medium">
                       {tenantLabel(membership)}
                     </span>
                     {rolesOf(membership).length > 0 ? (
-                      <span dir="auto" className="text-xs text-muted-foreground">
-                        {rolesOf(membership).join(", ")}
-                      </span>
+                      // First role and "+N more" on one line (WHIT-1175).
+                      <RoleSummary
+                        roles={rolesOf(membership)}
+                        labels={{ more: (count) => appT("enroll.tenant.moreRoles").replace("{count}", String(count)) }}
+                        className="text-xs text-muted-foreground"
+                      />
                     ) : null}
                   </span>
                 </label>

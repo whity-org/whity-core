@@ -731,6 +731,79 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     }
 
     /**
+     * Each plugin's validated workspace templates (SDK 1.116), by plugin key.
+     *
+     * @var array<string, list<array<string, mixed>>>
+     */
+    private array $workspaceTemplates = [];
+
+    /**
+     * The workspace templates of the plugins on in the current workspace
+     * (SDK 1.116, WHIT-1194), each with the plugin that contributed it. A key
+     * offered by two plugins is kept from the first loaded.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getWorkspaceTemplates(): array
+    {
+        $out = [];
+        $seen = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $templates = $this->workspaceTemplates[$pluginKey] ?? [];
+            if ($templates === [] || isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive() || $this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+            foreach ($templates as $template) {
+                $key = (string) $template['key'];
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $out[] = $template + ['plugin' => $info['plugin']->getName()];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Validate a plugin's workspace templates (SDK 1.116): each one alone, so a
+     * bad template is dropped with its reasons and the rest are kept.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function collectWorkspaceTemplates(PluginInterface $plugin, string $pluginKey): array
+    {
+        if (!$plugin instanceof \Whity\Sdk\PluginWorkspaceTemplatesInterface) {
+            return [];
+        }
+        try {
+            // A plugin's array is runtime data whatever its declared shape:
+            // each template is checked on its own below.
+            $declared = $plugin->getWorkspaceTemplates();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'getWorkspaceTemplates');
+
+            return [];
+        }
+        $out = [];
+        foreach ($declared as $i => $template) {
+            $errors = \Whity\Sdk\Manifest\WorkspaceTemplateValidator::errors($template);
+            if ($errors !== []) {
+                $this->logWarning("[Plugin:{$pluginKey}] getWorkspaceTemplates(): template {$i} dropped: " . implode('; ', array_slice($errors, 0, 5)));
+                continue;
+            }
+            $out[] = $template;
+        }
+
+        return $out;
+    }
+
+    /**
      * Each plugin's validated dashboard part (SDK 1.115), by plugin key.
      *
      * @var array<string, array{setup: array<string, mixed>|null, widgets: list<array<string, mixed>>}|null>
@@ -4687,6 +4760,10 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             }
         }
         $this->dashboards[$pluginKey] = $this->collectDashboard($plugin, $pluginKey, $registeredGetRoutes, $registeredWriteRoutes, $screenIds);
+
+        // 4d. Workspace templates (SDK 1.116, WHIT-1194): data only, each
+        //     checked alone.
+        $this->workspaceTemplates[$pluginKey] = $this->collectWorkspaceTemplates($plugin, $pluginKey);
 
         // 5. Collect the plugin's optional theme-override route (WC-242),
         //    same error-boundary + ownership-verification philosophy as (4).

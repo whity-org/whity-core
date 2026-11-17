@@ -49,6 +49,8 @@ const STRINGS: Record<string, string> = {
   "enroll.tenant.back": "Use a different account",
   "enroll.tenant.empty":
     "The server asked for a tenant but listed none to choose from. Try signing in again.",
+  // A tenant row's roles: the first, then this (WHIT-1175).
+  "enroll.tenant.moreRoles": "+{count} more",
   "enroll.tenant.lapsed":
     "That sign-in step expired before a tenant was chosen, or the membership changed. Please sign in again.",
   // DemoCatalog strings USED to live here, injected through the `t` prop.

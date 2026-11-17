@@ -56,6 +56,16 @@ final class TenantHostRepository
         return $name === false || $name === null ? null : (string) $name;
     }
 
+    /** The tenant's own web address, or null when none is set. */
+    public function findBrandingHostById(int $tenantId): ?string
+    {
+        $stmt = $this->db->prepare('SELECT branding_host FROM tenants WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $tenantId]);
+        $host = $stmt->fetchColumn();
+
+        return is_string($host) && $host !== '' ? $host : null;
+    }
+
     public function brandingHostExists(string $host, int $exceptTenantId): bool
     {
         // Uniqueness check across the tenants registry.

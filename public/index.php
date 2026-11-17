@@ -2915,7 +2915,23 @@ $entitlementService->usePluginPacks(static fn (int $tenantId): array => $pluginL
 $invitationsHandler->useSeats(new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService));
 // WHIT-1129 (SDK 1.108): packs set a workspace up through core's own routes,
 // as the person acting there, limited to WorkspaceSetup::ROUTES.
-\Whity\register_service(\Whity\Sdk\Setup\WorkspaceSetup::class, new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker)); // @phpstan-ignore-line
+$hostWorkspaceSetup = new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker);
+\Whity\register_service(\Whity\Sdk\Setup\WorkspaceSetup::class, $hostWorkspaceSetup); // @phpstan-ignore-line
+// WHIT-1194 (SDK 1.116): workspace templates, applied as the person choosing
+// one, through the same gates plus the template-only routes (roles,
+// documents, removing examples).
+$templateRuns = new \Whity\Core\Workspace\Templates\TemplateRuns($db->getPdo());
+$workspaceTemplatesHandler = new \Whity\Api\WorkspaceTemplatesApiHandler(
+    new \Whity\Core\Workspace\Templates\TemplateCatalogue($pluginLoader),
+    $templateRuns,
+    static fn (): \Whity\Core\Workspace\Templates\TemplateApplier => new \Whity\Core\Workspace\Templates\TemplateApplier($hostWorkspaceSetup->forTemplates(), $templateRuns, static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId)),
+    $codePluginActivation,
+    $auditLogger,
+    static fn (): string => $serverLabels->languageCode(),
+);
+$router->register('GET', '/api/workspace/templates', [$workspaceTemplatesHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', [$workspaceTemplatesHandler, 'apply'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('DELETE', '/api/workspace/templates/examples', [$workspaceTemplatesHandler, 'removeExamples'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 // EM.1: workspace emails carry the workspace's brand, and white-label by plan.
 $brandedEmailSender->useBranding(new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService));
 $tenantEntitlementsHandler = new \Whity\Api\TenantEntitlementsApiHandler(
@@ -5596,6 +5612,12 @@ $displayPreferencesHandler = new \Whity\Api\DisplayPreferencesApiHandler($tokenV
 $router->register('GET', '/api/me/display-preferences', [$displayPreferencesHandler, 'get'], null);
 $router->register('PUT', '/api/me/display-preferences', [$displayPreferencesHandler, 'update'], null);
 
+// WHIT-1181: a person's own phone number, E.164 on their profile. Self-scoped,
+// session-gated, no RBAC permission, no current password.
+$myPhoneHandler = new \Whity\Api\MyPhoneApiHandler($tokenValidator, new \Whity\Core\Identity\PersonalPhone($db->getPdo()));
+$router->register('GET', '/api/me/phone', [$myPhoneHandler, 'get'], null);
+$router->register('PUT', '/api/me/phone', [$myPhoneHandler, 'update'], null);
+
 // Per-tenant notification SENDER configuration (WC-notifications, d70c6083). A
 // tenant admin manages their OWN tenant's per-channel sender (from/reply-to,
 // transport, encrypted creds). settings:manage gated; creds are write-only.
@@ -5741,6 +5763,7 @@ $router->register('POST',   '/api/branding/assets/{key}',           [$brandingHa
 $router->register('DELETE', '/api/branding/assets/{key}',           [$brandingHandler, 'clearTenant'],   null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('POST',   '/api/branding/global/assets/{key}',    [$brandingHandler, 'uploadGlobal'],  null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('DELETE', '/api/branding/global/assets/{key}',    [$brandingHandler, 'clearGlobal'],   null, null, CorePermissions::SETTINGS_MANAGE);
+$router->register('GET',    '/api/branding/host',                   [$brandingHandler, 'getBrandingHost'], null, null, CorePermissions::SETTINGS_READ);
 $router->register('PUT',    '/api/tenants/{id}/branding-host',      [$brandingHandler, 'setBrandingHost'], null, null, CorePermissions::SETTINGS_MANAGE);
 
 // WHIT-915: workspace-controlled customer sign-up. Platform sign-up
@@ -6131,6 +6154,8 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     $signingChallengeRepository,
     // WHIT-1168: accept an invitation by signing in with the identity provider.
     $invitationService,
+    // WHIT-1181: a verified phone_number fills the person's own phone.
+    new \Whity\Core\Identity\PersonalPhone($db->getPdo()),
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).
