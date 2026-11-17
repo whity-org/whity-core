@@ -150,6 +150,13 @@ final class SettingsRegistry
     // Counted over workspace_owners, so co-owned workspaces count for each owner.
     // '0' means no limit (the self-hosted default); app.whity.dev uses 3.
     public const WORKSPACES_MAX_OWNED_PER_PERSON = 'workspaces.max_owned_per_person';
+    // Password sign-in on this server (WHIT-1168). Global/operator-level. When
+    // 'false', people sign in and sign up only through the operator's identity
+    // provider (app.whity.dev: Whity ID): password sign-in, reset, registration
+    // with a password and local two-step set-up refuse. Default 'true': a
+    // self-hosted core keeps its own sign-in (ADR 0019). Break-glass:
+    // WHITY_PASSWORD_SIGN_IN=force, see Core\Identity\PasswordSignIn.
+    public const PASSWORD_SIGN_IN = 'auth.password_sign_in';
 
     // Desktop-client login TTL (WC-desktop-ttl). The maximum wall-clock a
     // native/desktop client's cached login (its device credential) stays valid
@@ -940,6 +947,7 @@ final class SettingsRegistry
         self::SSO_SELF_PROVISION_WORKSPACE,
         self::WORKSPACES_SELF_CREATE_ENABLED,
         self::WORKSPACES_MAX_OWNED_PER_PERSON,
+        self::PASSWORD_SIGN_IN,
         self::STORAGE_DRIVER,
         self::STORAGE_S3_ENDPOINT,
         self::STORAGE_S3_REGION,
@@ -1024,6 +1032,7 @@ final class SettingsRegistry
         self::SSO_ENABLED,
         self::SSO_SELF_PROVISION_WORKSPACE,
         self::WORKSPACES_SELF_CREATE_ENABLED,
+        self::PASSWORD_SIGN_IN,
         self::STORAGE_S3_PATH_STYLE,
         self::MAIL_EVENT_WELCOME,
         self::MAIL_EVENT_APPROVAL,
@@ -1189,6 +1198,7 @@ final class SettingsRegistry
         self::SSO_SELF_PROVISION_WORKSPACE => 'false',
         self::WORKSPACES_SELF_CREATE_ENABLED => 'false',
         self::WORKSPACES_MAX_OWNED_PER_PERSON => '0',
+        self::PASSWORD_SIGN_IN => 'true',
         // 72 hours (3 days). A native client offline longer than this must
         // re-authenticate online before it will work again.
         self::AUTH_DESKTOP_LOGIN_MAX_HOURS => '72',
@@ -1746,6 +1756,7 @@ final class SettingsRegistry
             self::SSO_SELF_PROVISION_WORKSPACE => self::validateBoolean($value, self::SSO_SELF_PROVISION_WORKSPACE),
             self::WORKSPACES_SELF_CREATE_ENABLED => self::validateBoolean($value, self::WORKSPACES_SELF_CREATE_ENABLED),
             self::WORKSPACES_MAX_OWNED_PER_PERSON => self::validateWholeNumberBetween($value, self::WORKSPACES_MAX_OWNED_PER_PERSON, 0, 1000),
+            self::PASSWORD_SIGN_IN => self::validateBoolean($value, self::PASSWORD_SIGN_IN),
             self::AUTH_DESKTOP_LOGIN_MAX_HOURS => self::validateDesktopLoginMaxHours($value),
             self::STORAGE_DRIVER => self::validateStorageDriver($value),
             self::STORAGE_S3_PATH_STYLE => self::validateBoolean($value, self::STORAGE_S3_PATH_STYLE),

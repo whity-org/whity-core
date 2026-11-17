@@ -69,6 +69,8 @@ import { localizedText } from '@whity/ui/localized-text';
  *   sso.error.noMembership = Your account has no active workspace yet. Ask an administrator for access.
  *   sso.error.stateMismatch = Your sign-in session could not be verified. Please try again.
  *   sso.error.expired = Your sign-in attempt timed out. Please try again.
+ *   sso.error.inviteInvalid = That invitation can no longer be used. Ask the workspace to send a new one.
+ *   sso.error.inviteOtherEmail = That invitation was sent to another email address. Sign in with that address, or ask for a new invitation.
  *   sso.error.denied = Sign-in was cancelled.
  *   sso.error.failed = Sign-in failed. Please try again.
  */
@@ -110,6 +112,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [loginError, setLoginError] = useState<string | null>(null);
+  // WHIT-1168: false when this server signs people in only through its
+  // identity provider; then the page shows the provider and nothing else.
+  const [passwordSignIn, setPasswordSignIn] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [requires2fa, setRequires2fa] = useState(false);
@@ -473,7 +478,21 @@ export default function LoginPage() {
           email and password. */}
       {!requiresEnrollment && !requires2fa && !pendingMemberships && (
         <div className="space-y-4">
-          <SsoLoginButtons />
+          {!passwordSignIn && loginError && (
+            <Alert variant="destructive">
+              <AlertDescription>{loginError}</AlertDescription>
+            </Alert>
+          )}
+          <SsoLoginButtons onLoaded={(info) => setPasswordSignIn(info.passwordSignIn)} />
+          {!passwordSignIn && (
+            <p className="text-center text-sm text-muted-foreground" data-testid="provider-only-note">
+              {t(
+                'login.providerOnly.note',
+                'New here? The same button creates your account and your workspace.'
+              )}
+            </p>
+          )}
+          {passwordSignIn && (
           <form onSubmit={handleSubmit} className="space-y-4">
             {loginError && (
               <Alert variant="destructive">
@@ -562,6 +581,7 @@ export default function LoginPage() {
               </Link>
             </p>
           </form>
+          )}
         </div>
       )}
 

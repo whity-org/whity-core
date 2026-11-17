@@ -16133,6 +16133,7 @@ export interface components {
                 email: string;
                 tenant_name: string;
                 requires_password: boolean;
+                password_sign_in: boolean;
                 inviter_name: string | null;
                 role_name: string | null;
             };
@@ -17986,7 +17987,7 @@ export interface components {
                 } | null;
                 email_signup: boolean;
                 /** @enum {string|null} */
-                email_signup_reason: "bot_check_unavailable" | null;
+                email_signup_reason: "bot_check_unavailable" | "password_sign_in_off" | null;
                 providers: components["schemas"]["SignupJoinProvider"][];
                 /** @description The workspace logo and colour for the page (WHIT-1044). */
                 brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
@@ -19055,6 +19056,7 @@ export interface components {
         };
         SsoProviderListResponse: {
             data: components["schemas"]["SsoProvider"][];
+            password_sign_in: boolean;
         };
         SsoWorkspaceCreateRequest: {
             name: string;

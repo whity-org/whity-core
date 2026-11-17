@@ -92849,6 +92849,9 @@
                             "requires_password": {
                                 "type": "boolean"
                             },
+                            "password_sign_in": {
+                                "type": "boolean"
+                            },
                             "inviter_name": {
                                 "type": "string",
                                 "nullable": true
@@ -92862,6 +92865,7 @@
                             "email",
                             "tenant_name",
                             "requires_password",
+                            "password_sign_in",
                             "inviter_name",
                             "role_name"
                         ]
@@ -99957,7 +99961,8 @@
                             "email_signup_reason": {
                                 "type": "string",
                                 "enum": [
-                                    "bot_check_unavailable"
+                                    "bot_check_unavailable",
+                                    "password_sign_in_off"
                                 ],
                                 "nullable": true
                             },
@@ -103705,10 +103710,14 @@
                         "items": {
                             "$ref": "#/components/schemas/SsoProvider"
                         }
+                    },
+                    "password_sign_in": {
+                        "type": "boolean"
                     }
                 },
                 "required": [
-                    "data"
+                    "data",
+                    "password_sign_in"
                 ]
             },
             "SsoWorkspaceCreateRequest": {
