@@ -73,7 +73,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
         self::assertNull($second['paid_plan'] ?? null);
         self::assertNull($this->planRow($first));
         self::assertNull($this->planRow((int) $second['tenant_id']));
-        self::assertNull($this->creator->stateFor($pid)['starts_on']);
+        self::assertNull($this->creator->stateFor($pid)['next_plan']);
     }
 
     public function testTheFirstOwnedWorkspaceIsOnTheDefaultPlanAndTheSecondStartsATrialOfTheAdditionalPlan(): void
@@ -82,7 +82,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
         $pid = $this->profile('Amro Saleh', 'amro@example.test');
 
         // Before the first: no notice, it is free.
-        self::assertNull($this->creator->stateFor($pid)['starts_on']);
+        self::assertNull($this->creator->stateFor($pid)['next_plan']);
         $first = $this->creator->createFor($pid, 'Example Bakery');
         self::assertNull($first['paid_plan'] ?? null);
         $firstRow = $this->planRow((int) $first['tenant_id']);
@@ -98,7 +98,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
                 'trial_days' => 30,
                 'price' => ['unit_amount' => 6900, 'currency' => 'USD', 'billing_period' => 'month'],
             ],
-            $this->creator->stateFor($pid)['starts_on']
+            $this->creator->stateFor($pid)['next_plan']
         );
 
         $before = time();
@@ -176,7 +176,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
         $this->member($coOwner, $shared);
         $this->owners->add($shared, $coOwner, $owner);
 
-        self::assertSame('team', $this->creator->stateFor($coOwner)['starts_on']['plan_key'] ?? null);
+        self::assertSame('team', $this->creator->stateFor($coOwner)['next_plan']['plan_key'] ?? null);
         $created = $this->creator->createFor($coOwner, 'Emad Studio');
         self::assertSame('team', $created['paid_plan'] ?? null);
     }
@@ -190,7 +190,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
             $this->member($staff, (int) $this->creator->createFor($owner, $name)['tenant_id']);
         }
 
-        self::assertNull($this->creator->stateFor($staff)['starts_on']);
+        self::assertNull($this->creator->stateFor($staff)['next_plan']);
         $own = $this->creator->createFor($staff, 'Awss Shop');
         self::assertNull($own['paid_plan'] ?? null);
         self::assertSame($this->freeId, (int) ($this->planRow((int) $own['tenant_id'])['plan_id'] ?? 0));
@@ -220,7 +220,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
         $pid = $this->profile('Amro Saleh', 'amro@example.test');
         $this->creator->createFor($pid, 'Example Bakery');
 
-        self::assertNull($this->creator->stateFor($pid)['starts_on']);
+        self::assertNull($this->creator->stateFor($pid)['next_plan']);
         $second = $this->creator->createFor($pid, 'Example Cafe');
         self::assertNull($second['paid_plan'] ?? null);
         self::assertSame($this->freeId, (int) ($this->planRow((int) $second['tenant_id'])['plan_id'] ?? 0));
@@ -239,7 +239,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
         $this->settings->setGlobal(SettingsRegistry::BILLING_DEFAULT_CURRENCY, 'JOD');
         self::assertSame(
             ['unit_amount' => 49000, 'currency' => 'JOD', 'billing_period' => 'month'],
-            $this->creator->stateFor($pid)['starts_on']['price'] ?? null
+            $this->creator->stateFor($pid)['next_plan']['price'] ?? null
         );
     }
 
@@ -250,7 +250,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
         $pid = $this->profile('Amro Saleh', 'amro@example.test');
         $this->creator->createFor($pid, 'Example Bakery');
 
-        $state = $this->creator->stateFor($pid)['starts_on'];
+        $state = $this->creator->stateFor($pid)['next_plan'];
         self::assertIsArray($state);
         self::assertSame(30, $state['trial_days']);
         self::assertNull($state['price']);
@@ -265,7 +265,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
 
         $state = $this->creator->stateFor($pid);
         self::assertSame(WorkspaceCreator::LIMIT_REACHED, $state['reason']);
-        self::assertNull($state['starts_on']);
+        self::assertNull($state['next_plan']);
         self::assertSame(WorkspaceCreator::LIMIT_REACHED, $this->creator->createFor($pid, 'Example Cafe')['status']);
     }
 

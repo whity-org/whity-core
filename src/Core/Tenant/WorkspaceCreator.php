@@ -60,11 +60,11 @@ final class WorkspaceCreator
     /**
      * What this person may do now, to show or hide "Create workspace".
      *
-     * `starts_on` is null for the default plan, else the paid plan this one
+     * `next_plan` is null for the default plan, else the paid plan this one
      * would start on, its trial and its monthly price (WHIT-1203).
      *
      * @return array{allowed: bool, reason: ?string, owned: int, limit: int,
-     *               starts_on: array{plan_key: string, plan_name: string, trial_days: int,
+     *               next_plan: array{plan_key: string, plan_name: string, trial_days: int,
      *                                price: array{unit_amount: int, currency: string, billing_period: string}|null}|null}
      */
     public function stateFor(int $profileId): array
@@ -82,7 +82,7 @@ final class WorkspaceCreator
             'reason'    => $reason,
             'owned'     => $owned,
             'limit'     => $limit,
-            'starts_on' => $reason === null ? $this->additional()->noticeFor($owned) : null,
+            'next_plan' => $reason === null ? $this->additional()->noticeFor($owned) : null,
         ];
     }
 

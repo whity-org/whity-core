@@ -31,7 +31,8 @@ final class SettingsRegistryTest extends TestCase
              'auth.password_reset_approval_required',
              'auth.self_2fa_recovery_enabled',
              'auth.sso_enabled', 'auth.sso_self_provision_workspace',
-             'workspaces.self_create_enabled', 'workspaces.max_owned_per_person', 'auth.password_sign_in',
+             'workspaces.self_create_enabled', 'workspaces.max_owned_per_person',
+             'workspaces.additional_plan', 'workspaces.additional_trial_days', 'auth.password_sign_in',
              'auth.desktop_login_max_hours',
              'storage.driver', 'storage.s3.endpoint', 'storage.s3.region', 'storage.s3.bucket',
              'storage.s3.access_key', 'storage.s3.path_style', 'storage.s3.public_base_url',
@@ -480,7 +481,8 @@ final class SettingsRegistryTest extends TestCase
         // 131 since WHIT-1169: workspaces.self_create_enabled and max_owned_per_person.
         // 132 since WHIT-1173: calendar.multi_service_booking.
         // 133 since WHIT-1168: auth.password_sign_in.
-        self::assertCount(133, $describe);
+        // 135 since WHIT-1203: workspaces.additional_plan and additional_trial_days.
+        self::assertCount(135, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

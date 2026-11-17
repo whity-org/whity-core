@@ -21037,7 +21037,7 @@ export interface components {
                 reason: "disabled" | "limit_reached" | null;
                 owned: number;
                 limit: number;
-                starts_on: {
+                next_plan: {
                     plan_key: string;
                     plan_name: string;
                     trial_days: number;

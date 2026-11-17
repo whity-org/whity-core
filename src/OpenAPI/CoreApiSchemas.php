@@ -5321,7 +5321,7 @@ final class CoreApiSchemas
                 // WHIT-1203: null = the default plan; else the paid plan a second
                 // or later owned workspace starts on, its trial, and its monthly
                 // price in minor units (null when the plan has no such price).
-                'starts_on' => [
+                'next_plan' => [
                     'type' => 'object',
                     'nullable' => true,
                     'properties' => [
@@ -5341,7 +5341,7 @@ final class CoreApiSchemas
                     ],
                     'required' => ['plan_key', 'plan_name', 'trial_days', 'price'],
                 ],
-            ], ['allowed', 'reason', 'owned', 'limit', 'starts_on'])),
+            ], ['allowed', 'reason', 'owned', 'limit', 'next_plan'])),
             // A caller's linked external identity (connected account). `email` and
             // `last_login_at` may be null (asserted-at-link email; never-since-linked).
             'MeIdentity' => self::object([

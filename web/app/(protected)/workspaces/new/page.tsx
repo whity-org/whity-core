@@ -31,13 +31,13 @@ import type { components } from '@whity/api-client';
  *
  * WHIT-1203: a person's first owned workspace is on the default plan; when the
  * operator has set `workspaces.additional_plan`, every further one starts a
- * trial of that plan. `starts_on` says so before they create it, with the
+ * trial of that plan. `next_plan` says so before they create it, with the
  * plan's monthly price (CU.1-4).
  */
 
 type FieldError = 'name_required' | 'name_too_long' | null;
 
-type StartsOn = NonNullable<NonNullable<ReturnType<typeof useWorkspaceCreateState>>['starts_on']>;
+type NextPlan = NonNullable<NonNullable<ReturnType<typeof useWorkspaceCreateState>>['next_plan']>;
 
 /**
  * "Your first workspace is free. This one starts a 30-day trial of Team, then
@@ -46,10 +46,10 @@ type StartsOn = NonNullable<NonNullable<ReturnType<typeof useWorkspaceCreateStat
  * so the amount is isolated (`<bdi>`, left to right) inside Arabic text.
  * Unpaid means read-only, never closed (owner 2026-11-17).
  */
-function PaidWorkspaceNotice({ t, startsOn }: { t: TranslateFn; startsOn: StartsOn }) {
-  const plan = startsOn.plan_name;
-  const days = startsOn.trial_days;
-  const price = startsOn.price;
+function PaidWorkspaceNotice({ t, nextPlan }: { t: TranslateFn; nextPlan: NextPlan }) {
+  const plan = nextPlan.plan_name;
+  const days = nextPlan.trial_days;
+  const price = nextPlan.price;
   const lead = t('workspaceNew.paid.first', 'Your first workspace is free.');
 
   let sentence: string;
@@ -296,8 +296,8 @@ export default function NewWorkspacePage() {
               </div>
             </fieldset>
 
-            {state?.starts_on ? (
-              <PaidWorkspaceNotice t={t} startsOn={state.starts_on} />
+            {state?.next_plan ? (
+              <PaidWorkspaceNotice t={t} nextPlan={state.next_plan} />
             ) : (
               <p className="text-sm text-muted-foreground">
                 {t('workspaceNew.plan', 'It starts on the plan every new workspace gets here. You stay in your other workspaces.')}

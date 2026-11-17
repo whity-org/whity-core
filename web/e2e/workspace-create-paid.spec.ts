@@ -79,8 +79,8 @@ test.describe('Create a further workspace on a paid plan (WHIT-1203)', () => {
 
       // Their first own workspace is free: no notice yet.
       const before = await page.request.get('/api/v1/workspaces/new');
-      const beforeState = (await before.json()) as { data: { owned: number; starts_on: unknown } };
-      expect(beforeState.data).toMatchObject({ owned: 0, starts_on: null });
+      const beforeState = (await before.json()) as { data: { owned: number; next_plan: unknown } };
+      expect(beforeState.data).toMatchObject({ owned: 0, next_plan: null });
       const first = await page.request.post('/api/v1/workspaces', { data: { name: `E2E first ${run}` }, headers });
       expect(first.status()).toBe(201);
 

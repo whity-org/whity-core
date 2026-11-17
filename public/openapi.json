@@ -111953,7 +111953,7 @@
                             "limit": {
                                 "type": "integer"
                             },
-                            "starts_on": {
+                            "next_plan": {
                                 "type": "object",
                                 "nullable": true,
                                 "properties": {
@@ -112000,7 +112000,7 @@
                             "reason",
                             "owned",
                             "limit",
-                            "starts_on"
+                            "next_plan"
                         ]
                     }
                 },
