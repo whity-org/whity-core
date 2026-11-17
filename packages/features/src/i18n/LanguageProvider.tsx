@@ -100,6 +100,15 @@ export function LanguageProvider({
   // the identity of a new array on every render.
   const [requestedDomains, setRequestedDomains] = useState<string[]>([])
 
+  // The language bundles are being loaded FOR. Written wherever the language is
+  // chosen, before the state update, so a bundle that arrives after a switch
+  // can tell it belongs to a language no longer shown.
+  const languageRef = useRef<string | null>(null)
+  const chooseLanguage = useCallback((code: string) => {
+    languageRef.current = code
+    setCurrentLanguage(code)
+  }, [])
+
   // Resolve the language on mount, and again whenever the signed-in identity
   // changes (sign-in, sign-out, account switch) — see `identityKey`.
   useEffect(() => {
@@ -121,7 +130,7 @@ export function LanguageProvider({
         // language exactly as they left it. The preference fetch is skipped
         // outright rather than fetched-then-ignored.
         if (!enabled) {
-          setCurrentLanguage(defaultLanguage)
+          chooseLanguage(defaultLanguage)
           setIsLoading(false)
           return
         }
@@ -138,20 +147,20 @@ export function LanguageProvider({
           languageCode = defaultLanguage
         }
 
-        setCurrentLanguage(languageCode)
+        chooseLanguage(languageCode)
         setIsLoading(false)
       } catch (err) {
         // Degraded, not broken: the app renders in defaultLanguage with keys
         // as fallbacks. warn, not error — see fetchTranslations for why.
         console.warn('Language provider fell back to the default language:', err)
         setError(err instanceof Error ? err : new Error('Failed to initialize languages'))
-        setCurrentLanguage(defaultLanguage)
+        chooseLanguage(defaultLanguage)
         setIsLoading(false)
       }
     }
 
     initialize()
-  }, [defaultLanguage, identityKey])
+  }, [defaultLanguage, identityKey, chooseLanguage])
 
   // Remember the resolved language for the next signed-out visit, and reflect
   // it onto <html lang> for screen readers, hyphenation and font selection.
@@ -182,57 +191,67 @@ export function LanguageProvider({
     setRequestedDomains((prev) => (prev.includes(domain) ? prev : [...prev, domain]))
   }, [])
 
-  // Which (language, domain) pairs have already been fetched this session, so a
-  // re-render or a newly-registered domain does not refetch the others.
+  // Which (language, domain) pairs are already in `translations`, and which are
+  // on their way, so a re-render or a newly-registered domain neither refetches
+  // the others nor waits on them.
   const loadedRef = useRef<Set<string>>(new Set())
+  const inFlightRef = useRef<Set<string>>(new Set())
   const domainKey = [...requestedDomains].sort().join(',')
 
   // Fetch the bundles for every requested domain in the current language.
+  //
+  // EACH BUNDLE IS APPLIED ON ITS OWN, AS IT ARRIVES (WHIT-1205). This effect
+  // used to fetch the domains one after another, apply them together at the
+  // end, and drop the whole batch when it re-ran — which it does whenever a
+  // component registers a domain. The pairs were already marked loaded, so the
+  // next run skipped them, and the dropped bundles never reached the screen. A
+  // domain registering mid-load is ordinary: the dashboard's app widgets mount
+  // their blocks (domain 'plugin') only after each widget's route answers, so
+  // an Arabic dashboard kept 'common' and 'admin' — the sidebar, the buttons,
+  // "From your apps" — in English while the plugin text turned Arabic.
   useEffect(() => {
     if (!currentLanguage || requestedDomains.length === 0) {
       return
     }
 
-    let cancelled = false
+    const language = currentLanguage
 
-    const loadTranslations = async () => {
-      try {
-        const fresh: CachedTranslations = {}
+    for (const domain of requestedDomains) {
+      const pair = `${language}:${domain}`
+      if (loadedRef.current.has(pair) || inFlightRef.current.has(pair)) {
+        continue
+      }
+      inFlightRef.current.add(pair)
 
-        for (const domain of requestedDomains) {
-          const pair = `${currentLanguage}:${domain}`
-          if (loadedRef.current.has(pair)) {
-            continue
+      // localStorage first (24h TTL), network second.
+      const cached = getCachedTranslations(language, domain)
+      const bundle = cached
+        ? Promise.resolve(cached)
+        : fetchTranslations(language, domain).then((fetched) => {
+            if (Object.keys(fetched).length > 0) {
+              setCachedTranslations(language, domain, fetched)
+            }
+            return fetched
+          })
+
+      bundle
+        .then((loaded) => {
+          inFlightRef.current.delete(pair)
+          // The person switched language while this was on its way: not loaded,
+          // so coming back to `language` loads it again.
+          if (languageRef.current !== language) {
+            return
           }
           loadedRef.current.add(pair)
-
-          // localStorage first (24h TTL), network second.
-          const cached = getCachedTranslations(currentLanguage, domain)
-          if (cached) {
-            fresh[domain] = cached
-            continue
+          if (Object.keys(loaded).length > 0) {
+            setTranslations((prev) => ({ ...prev, [domain]: loaded }))
           }
-
-          const fetched = await fetchTranslations(currentLanguage, domain)
-          if (Object.keys(fetched).length > 0) {
-            fresh[domain] = fetched
-            setCachedTranslations(currentLanguage, domain, fetched)
-          }
-        }
-
-        if (!cancelled && Object.keys(fresh).length > 0) {
-          setTranslations((prev) => ({ ...prev, ...fresh }))
-        }
-      } catch (err) {
-        console.warn('Translations unavailable; falling back to keys:', err)
-        setError(err instanceof Error ? err : new Error('Failed to load translations'))
-      }
-    }
-
-    loadTranslations()
-
-    return () => {
-      cancelled = true
+        })
+        .catch((err: unknown) => {
+          inFlightRef.current.delete(pair)
+          console.warn('Translations unavailable; falling back to keys:', err)
+          setError(err instanceof Error ? err : new Error('Failed to load translations'))
+        })
     }
     // `domainKey` stands in for requestedDomains' CONTENTS (see above).
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -290,14 +309,14 @@ export function LanguageProvider({
 
         // Update local state (which triggers the translation fetch, and the
         // direction change with it).
-        setCurrentLanguage(code)
+        chooseLanguage(code)
       } catch (err) {
         console.error('Failed to change language:', err)
         setError(err instanceof Error ? err : new Error('Failed to change language'))
         throw err
       }
     },
-    [availableLanguages, currentLanguage, i18nEnabled]
+    [availableLanguages, currentLanguage, i18nEnabled, chooseLanguage]
   )
 
   // Helper to get a translation
