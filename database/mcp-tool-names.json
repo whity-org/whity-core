@@ -198,6 +198,10 @@
   "delete_api_users_id_memberships_membershipid": {
     "ar": "سحب دور إضافي من مستخدم"
   },
+  "delete_api_workspace_templates_examples": {
+    "en": "Remove the template's example customers and bookings",
+    "ar": "حذف الزبائن والحجوزات التجريبية من القالب"
+  },
   "document_agent_request_update": {
     "en": "Report how a document request is going",
     "ar": "الإبلاغ عن سير طلب مستند"
@@ -1031,6 +1035,22 @@
   "get_api_workspace_plugins_plugin_versions_id": {
     "ar": "عرض إصدار من إضافة"
   },
+  "get_api_workspace_templates": {
+    "en": "List the workspace templates on offer",
+    "ar": "عرض قوالب مساحة العمل المتاحة"
+  },
+  "get_api_workspace_templates_key_setup_current_kind": {
+    "en": "Read what a template setup step opens with",
+    "ar": "قراءة ما تبدأ به خطوة إعداد القالب"
+  },
+  "get_api_workspace_templates_key_setup_services": {
+    "en": "List the template's services to choose from",
+    "ar": "عرض خدمات القالب للاختيار منها"
+  },
+  "get_api_workspace_templates_key_setup_status": {
+    "en": "See which template setup steps are done",
+    "ar": "عرض خطوات إعداد القالب المكتملة"
+  },
   "patch_api_2fa_policies_id": {
     "en": "Change how long people have to set up two-step sign-in",
     "ar": "تغيير مهلة تفعيل التحقق بخطوتين"
@@ -1821,6 +1841,18 @@
   "post_api_workspace_plugins_validate": {
     "en": "Check a workspace plugin's definition",
     "ar": "التحقق من تعريف إضافة"
+  },
+  "post_api_workspace_templates_key_apply": {
+    "en": "Apply a workspace template",
+    "ar": "تطبيق قالب على مساحة العمل"
+  },
+  "post_api_workspace_templates_key_setup_kind": {
+    "en": "Save a template setup step",
+    "ar": "حفظ خطوة من إعداد القالب"
+  },
+  "post_api_workspace_templates_key_setup_offer_close": {
+    "en": "Close the template's plugin offer",
+    "ar": "إغلاق عرض الإضافة في القالب"
   },
   "put_api_calendar_my_view": {
     "en": "Change your own calendar choices",
