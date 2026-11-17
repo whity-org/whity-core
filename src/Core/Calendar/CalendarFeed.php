@@ -7,6 +7,7 @@ namespace Whity\Core\Calendar;
 use DateTimeImmutable;
 use PDO;
 use Whity\Core\i18n\LocalizedText;
+use Whity\Core\Security\PublicToken;
 
 /**
  * A person's calendar as an ICS feed at a secret URL (ADR 0017, section 6).
@@ -29,9 +30,9 @@ final class CalendarFeed
     public function issue(int $tenantId, int $profileId): string
     {
         $this->calendar->ensureStaff($tenantId, $profileId);
-        $raw = bin2hex(random_bytes(32));
+        $raw = PublicToken::make(32);
         $this->db->prepare('UPDATE calendar_staff SET feed_token_hash = :hash WHERE tenant_id = :tenant_id AND profile_id = :profile_id')
-            ->execute([':hash' => hash('sha256', $raw), ':tenant_id' => $tenantId, ':profile_id' => $profileId]);
+            ->execute([':hash' => PublicToken::hash($raw), ':tenant_id' => $tenantId, ':profile_id' => $profileId]);
 
         return $raw;
     }
@@ -50,7 +51,7 @@ final class CalendarFeed
         }
         // @tenant-guard-ignore: a staff member's ICS feed — this read is what RESOLVES the tenant, from a 256-bit token stored only as its hash under a global unique index (migration 247), fetched by a calendar app with no session. The feed is then built only from rows that bind the tenant_id it returns.
         $stmt = $this->db->prepare('SELECT tenant_id, profile_id FROM calendar_staff WHERE feed_token_hash = :hash LIMIT 1');
-        $stmt->execute([':hash' => hash('sha256', $raw)]);
+        $stmt->execute([':hash' => PublicToken::hash($raw)]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
         return is_array($row) ? [(int) $row['tenant_id'], (int) $row['profile_id']] : null;
@@ -63,10 +64,21 @@ final class CalendarFeed
         $events = [];
         foreach ($this->bookings->list($tenantId, [$profileId], $from, $to) as $row) {
             $service = LocalizedText::resolve(LocalizedText::decode((string) $row['service_name'], languages: LocalizedText::BILINGUAL));
+            $start = Interval::fromDb((string) $row['starts_at']);
+            $end = Interval::fromDb((string) $row['ends_at']);
+            // WHIT-1173: of a booking of several services, this person's own
+            // services, from the first of theirs to the end of the last.
+            $mine = array_values(array_filter(is_array($row['items'] ?? null) ? $row['items'] : [], static fn (array $i): bool => (int) $i['profile_id'] === $profileId));
+            if ($mine !== []) {
+                $apiItems = array_map([BookingRepository::class, 'itemToApi'], $mine);
+                $service = LocalizedText::resolve(BookingRepository::joinedNames($apiItems));
+                $start = Interval::fromDb((string) $mine[0]['starts_at']);
+                $end = Interval::fromDb((string) $mine[count($mine) - 1]['ends_at']);
+            }
             $events[] = [
                 'uid' => 'booking-' . (int) $row['id'] . '-' . $tenantId . '@whity',
-                'start' => Interval::fromDb((string) $row['starts_at']),
-                'end' => Interval::fromDb((string) $row['ends_at']),
+                'start' => $start,
+                'end' => $end,
                 'summary' => trim($service . ' · ' . (string) $row['customer_name'], ' ·'),
                 'description' => (string) $row['customer_note'],
                 'status' => $row['status'] === BookingRepository::STATUS_CONFIRMED ? 'CONFIRMED' : 'TENTATIVE',

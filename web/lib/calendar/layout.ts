@@ -29,7 +29,22 @@ import {
 
 export type { CalendarDate };
 
-export type CalendarView = 'day' | 'week' | 'month';
+/**
+ * Design 3.5 (CV.7): Day, 4 days, Week, Month and Year on a computer; the
+ * phone has Day, 3 days and Month (CV.11). 4 days and 3 days start from the
+ * day in view, like Google's custom view.
+ */
+export type CalendarView = 'day' | 'three_days' | 'four_days' | 'week' | 'month' | 'year';
+
+/** How many days a run-of-days view shows; null for Week, Month and Year. */
+export function runLength(view: CalendarView): number | null {
+  return view === 'day' ? 1 : view === 'three_days' ? 3 : view === 'four_days' ? 4 : null;
+}
+
+/** Whether a view is drawn on the time grid (hours down the side). */
+export function isTimeView(view: CalendarView): boolean {
+  return view === 'day' || view === 'three_days' || view === 'four_days' || view === 'week';
+}
 
 /** The API's weekday names, in ISO order (index + 1 is the ISO weekday). */
 export const WEEKDAY_NAMES = [
@@ -142,8 +157,14 @@ export interface ViewRange {
 }
 
 export function viewRange(view: CalendarView, anchor: CalendarDate, weekStart: string): ViewRange {
-  if (view === 'day') {
-    return { days: [anchor], first: anchor, end: addDays(anchor, 1) };
+  const run = runLength(view);
+  if (run !== null) {
+    const days = Array.from({ length: run }, (_, i) => addDays(anchor, i));
+    return { days, first: anchor, end: addDays(anchor, run) };
+  }
+  if (view === 'year') {
+    const first = { year: anchor.year, month: 1, day: 1 };
+    return { days: [], first, end: { year: anchor.year + 1, month: 1, day: 1 } };
   }
   if (view === 'week') {
     const days = weekDays(anchor, weekStart);
@@ -155,8 +176,10 @@ export function viewRange(view: CalendarView, anchor: CalendarDate, weekStart: s
 
 /** The anchor one step back or forward in a view. */
 export function stepAnchor(view: CalendarView, anchor: CalendarDate, direction: 1 | -1): CalendarDate {
-  if (view === 'day') return addDays(anchor, direction);
+  const run = runLength(view);
+  if (run !== null) return addDays(anchor, run * direction);
   if (view === 'week') return addDays(anchor, 7 * direction);
+  if (view === 'year') return { year: anchor.year + direction, month: anchor.month, day: Math.min(anchor.day, 28) };
   const moved = addMonths(anchor, direction);
   // Keep the day of month where the month has it, so Week after Month lands near.
   const lastOfMonth = addDays(addMonths(moved, 1), -1).day;

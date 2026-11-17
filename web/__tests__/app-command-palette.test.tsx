@@ -9,12 +9,12 @@
  */
 
 import React from 'react';
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 
 const push = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
-let mockNav: { id: string; href: string; label: string; icon?: string }[] = [];
+let mockNav: { id: string; href: string; label: string; icon?: string; group?: string }[] = [];
 jest.mock('@/lib/navigation-context', () => ({ useNavigation: () => ({ items: mockNav, refresh: jest.fn(async () => undefined) }) }));
 const setPreference = jest.fn();
 jest.mock('@/lib/theme-mode-context', () => ({
@@ -22,6 +22,7 @@ jest.mock('@/lib/theme-mode-context', () => ({
 }));
 const setLanguage = jest.fn();
 jest.mock('@whity/features/i18n', () => ({
+  useLanguageCode: () => 'en',
   useTranslation: () => (_key: string, fallback: string, vars?: Record<string, string | number>) =>
     vars ? fallback.replace(/\{(\w+)\}/g, (_m, k: string) => String(vars[k])) : fallback,
   useCurrentLanguage: () => ({
@@ -246,7 +247,7 @@ describe('AppCommandPalette commands', () => {
     expect(push).toHaveBeenCalledWith('/admin/users');
   });
 
-  it('goes to the notifications settings by name (WHIT-1078)', () => {
+  it('goes to the notifications settings by name (WHIT-1078, now through the settings index)', () => {
     const input = openWith('/go notif');
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(push).toHaveBeenCalledWith('/settings/notifications');
@@ -381,5 +382,46 @@ describe('TopBar', () => {
     );
     fireEvent.click(screen.getByTestId('top-bar-search'));
     expect(screen.getByTestId('command-palette')).toBeInTheDocument();
+  });
+});
+
+describe('AppCommandPalette: every setting by name (WHIT-1084)', () => {
+  function type(text: string) {
+    render(<AppCommandPalette />);
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    fireEvent.change(screen.getByTestId('command-palette-input'), { target: { value: text } });
+  }
+
+  it('finds Notifications from an Arabic word on an English screen, with where it applies', () => {
+    type('إشعارات');
+    const row = screen.getByText('Notifications', { selector: '[data-testid="command-palette"] *' });
+    expect(row.closest('[role="option"]')?.textContent).toContain('Example Bakery');
+    fireEvent.click(row);
+    expect(push).toHaveBeenCalledWith('/settings/notifications');
+  });
+
+  it('finds a thing on a page, not only the page: text size opens Language and display', () => {
+    type('text size');
+    fireEvent.click(screen.getByText('Text size'));
+    expect(push).toHaveBeenCalledWith('/settings/display');
+  });
+
+  it('folds Arabic letter forms, so a hamza typed differently still matches', () => {
+    type('اشعارات');
+    expect(screen.getByText('Notifications', { selector: '[data-testid="command-palette"] *' })).toBeInTheDocument();
+  });
+
+  it('shows the Settings area as one place in Go to, not its pages one by one', () => {
+    mockNav = [
+      { id: 'users', href: '/admin/users', label: 'Users' },
+      { id: 'website-settings', href: '/admin/settings', label: 'Workspace settings', group: 'settings' },
+      { id: 'tags', href: '/admin/tags', label: 'Tags' },
+    ];
+    render(<AppCommandPalette />);
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    const palette = screen.getByTestId('command-palette');
+    expect(within(palette).getByText('Settings')).toBeInTheDocument();
+    expect(within(palette).queryByText('Workspace settings')).toBeNull();
+    expect(within(palette).queryByText('Tags')).toBeNull();
   });
 });

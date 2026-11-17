@@ -92,7 +92,6 @@ final class ToolArgumentDescriptionsTest extends TestCase
         'patch_api_tags_id' => ['name'],
         'post_api_entity_tags' => ['entity_type', 'entity_id', 'tag_id'],
         'delete_api_entity_tags' => ['entity_type', 'entity_id', 'tag_id'],
-        'post_api_2fa_recovery_force_reset' => ['profile_id'],
         'post_api_data_types_type_bulk' => ['action'],
         'post_api_resource_role_grants' => ['resource_type', 'resource_id', 'role_id', 'profile_id'],
         'post_api_licensing_devices' => ['serial_numbers'],

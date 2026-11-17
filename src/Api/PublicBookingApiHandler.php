@@ -10,16 +10,20 @@ use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Calendar\BookingRepository;
 use Whity\Core\Calendar\BookingService;
+use Whity\Core\Calendar\BookingVisitor;
 use Whity\Core\Calendar\CalendarFeed;
 use Whity\Core\Calendar\CalendarRejectedException;
 use Whity\Core\Calendar\CalendarRepository;
 use Whity\Core\Calendar\Ics;
 use Whity\Core\Calendar\Interval;
 use Whity\Core\Calendar\ManageLinks;
+use Whity\Core\Calendar\ServiceChoices;
 use Whity\Core\Calendar\ServiceRepository;
 use Whity\Core\i18n\LocalizedText;
 use Whity\Core\Plugin\PublicForm\BotCheck;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimitRule;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
@@ -32,6 +36,7 @@ use Whity\Http\JsonBody;
  *
  *   GET  /api/v1/public/booking/{workspace}                 services, staff, settings
  *   GET  /api/v1/public/booking/{workspace}/slots           free times
+ *   GET  /api/v1/public/booking/{workspace}/me              the visitor's own name and email
  *   POST /api/v1/public/booking/{workspace}/bookings        book
  *   GET  /api/v1/public/bookings/{token}                    the customer's booking
  *   GET  /api/v1/public/bookings/{token}/slots              free times to move to
@@ -55,14 +60,6 @@ use Whity\Http\JsonBody;
  */
 final class PublicBookingApiHandler
 {
-    private const HOUR = 3600;
-    private const DAY = 86400;
-    private const IP_INFO_MAX = 120;
-    private const IP_SLOTS_MAX = 240;
-    private const IP_BOOK_MAX = 10;
-    private const IP_MANAGE_MAX = 60;
-    private const IP_FEED_MAX = 120;
-    private const WORKSPACE_DAY_MAX = 200;
     private const OPEN_PER_EMAIL_MAX = 3;
     private const MIN_FILL_MS = 3000;
     private const MAX_RANGE_DAYS = 14;
@@ -83,6 +80,8 @@ final class PublicBookingApiHandler
         private readonly SharedStoreInterface $store,
         // WHIT-1014: the workspace's own brand on its public pages. Null: none sent.
         private readonly ?BrandingService $branding = null,
+        // WHIT-1179: the signed-in visitor's own account. Null: never prefilled.
+        private readonly ?BookingVisitor $visitor = null,
     ) {
     }
 
@@ -91,7 +90,7 @@ final class PublicBookingApiHandler
     /** @param array<string, string> $params */
     public function page(Request $request, array $params): Response
     {
-        return $this->guard($request, 'cal:info:', self::IP_INFO_MAX, function () use ($request, $params): Response {
+        return $this->guard($request, 'cal:info:', RateLimits::publicBookingInfoPerAddress(), function () use ($request, $params): Response {
             $workspace = $this->workspace($request, $params) ?? throw CalendarRejectedException::notFound('Booking page');
             $tenantId = $workspace['id'];
             $settings = $this->booking->settingsFor($tenantId);
@@ -121,7 +120,8 @@ final class PublicBookingApiHandler
                 // WHIT-1014: on a shared host the page's own branding is the
                 // instance's, so the workspace's brand comes with the page.
                 'brand' => $this->brandFor($tenantId, $workspace['name']),
-                'settings' => array_intersect_key($settings->toApi(), array_flip(['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days'])),
+                // WHIT-1173: `multi_service_booking` lets the customer add more services.
+                'settings' => array_intersect_key($settings->toApi(), array_flip(['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days', 'multi_service_booking'])),
                 'services' => $services,
                 'staff' => array_map(static fn (array $s): array => ['profile_id' => $s['profile_id'], 'display_name' => $s['display_name']], $staff),
                 'bot_check' => $this->bot->isRequired() && $this->bot->provider() !== null
@@ -134,11 +134,19 @@ final class PublicBookingApiHandler
     /** @param array<string, string> $params */
     public function slots(Request $request, array $params): Response
     {
-        return $this->guard($request, 'cal:slots:', self::IP_SLOTS_MAX, function () use ($request, $params): Response {
+        return $this->guard($request, 'cal:slots:', RateLimits::publicBookingSlotsPerAddress(), function () use ($request, $params): Response {
             $workspace = $this->workspace($request, $params) ?? throw CalendarRejectedException::notFound('Booking page');
             $q = self::query($request);
-            $serviceId = self::intOrNull($q['service_id'] ?? null) ?? throw new CalendarRejectedException('service_id is required', 422);
-            $profileId = self::intOrNull($q['profile_id'] ?? null);
+            $many = ServiceChoices::fromQuery($q);
+            if ($many !== null && count($many) > 1) {
+                // WHIT-1173: times when all of them fit back to back, each
+                // with who would do which (only people the page offers).
+                [$from, $to] = self::range($q);
+
+                return Response::json(['data' => $this->booking->availabilityForMany($workspace['id'], $many, ServiceChoices::samePerson($q['same_person'] ?? null), $from, $to, true)]);
+            }
+            $serviceId = $many[0]['service_id'] ?? self::intOrNull($q['service_id'] ?? null) ?? throw new CalendarRejectedException('service_id is required', 422);
+            $profileId = $many[0]['profile_id'] ?? self::intOrNull($q['profile_id'] ?? null);
             [$from, $to] = self::range($q);
             $slots = $this->booking->availability($workspace['id'], $serviceId, $profileId, $from, $to, true);
             $bookable = array_map(static fn (array $s): int => $s['profile_id'], array_filter($this->calendar->listStaff($workspace['id']), static fn (array $s): bool => $s['bookable']));
@@ -151,10 +159,38 @@ final class PublicBookingApiHandler
         });
     }
 
+    /**
+     * The signed-in visitor's own name and email, so the page can fill its
+     * details for them (WHIT-1179). `data` is null when nobody is signed in.
+     * Only the person's own account is read (see {@see BookingVisitor}); the
+     * workspace learns nothing until they book. Never cached: the answer is
+     * the person's, so it is `private, no-store` and varies by cookie.
+     *
+     * @param array<string, string> $params
+     */
+    public function visitor(Request $request, array $params): Response
+    {
+        $answer = $this->guard($request, 'cal:me:', RateLimits::publicBookingInfoPerAddress(), function () use ($request, $params): Response {
+            $this->workspace($request, $params) ?? throw CalendarRejectedException::notFound('Booking page');
+            $me = null;
+            if ($this->visitor !== null) {
+                try {
+                    $me = $this->visitor->current();
+                } catch (\Throwable $e) {
+                    error_log('[PublicBookingApiHandler] visitor: ' . $e->getMessage());
+                }
+            }
+
+            return Response::json(['data' => $me]);
+        });
+
+        return $answer->withHeaders(['Cache-Control' => 'private, no-store', 'Vary' => 'Cookie']);
+    }
+
     /** @param array<string, string> $params */
     public function book(Request $request, array $params): Response
     {
-        return $this->guard($request, 'cal:book:', self::IP_BOOK_MAX, function () use ($request, $params): Response {
+        return $this->guard($request, 'cal:book:', RateLimits::publicBookingBookPerAddress(), function () use ($request, $params): Response {
             $workspace = $this->workspace($request, $params) ?? throw CalendarRejectedException::notFound('Booking page');
             $tenantId = $workspace['id'];
             $body = JsonBody::parsed($request);
@@ -166,7 +202,8 @@ final class PublicBookingApiHandler
                 return Response::error('We could not take this booking. Please try again.', 422);
             }
 
-            $limited = $this->count('cal:ws-day:' . $tenantId, self::WORKSPACE_DAY_MAX);
+            // Checked here, counted only once a booking is made.
+            $limited = RateLimits::publicBookingPerWorkspaceDay()->blocked($this->store, 'cal:ws-day:' . $tenantId);
             if ($limited !== null) {
                 return $limited;
             }
@@ -184,7 +221,9 @@ final class PublicBookingApiHandler
             if ($phone !== '' && preg_match('/^\+?[0-9 ()-]{6,40}$/', $phone) !== 1) {
                 return Response::error('Your phone number does not look right', 422, ['field' => 'phone']);
             }
-            $serviceId = is_int($body['service_id'] ?? null) ? $body['service_id'] : throw new CalendarRejectedException('Choose a service', 422);
+            // WHIT-1173: `services` books several back to back, when the workspace allows it.
+            $many = ServiceChoices::fromBody($body);
+            $serviceId = $many[0]['service_id'] ?? (is_int($body['service_id'] ?? null) ? $body['service_id'] : throw new CalendarRejectedException('Choose a service', 422));
             $start = Interval::fromApi($body['starts_at'] ?? null) ?? throw new CalendarRejectedException('Choose a time', 422);
             $profileId = is_int($body['profile_id'] ?? null) ? $body['profile_id'] : null;
 
@@ -203,6 +242,8 @@ final class PublicBookingApiHandler
             }
 
             $booking = $this->booking->book($tenantId, [
+                'items' => $many ?? [],
+                'same_person' => ServiceChoices::samePerson($body['same_person'] ?? null),
                 'service_id' => $serviceId,
                 'profile_id' => $profileId,
                 'starts_at' => $start,
@@ -216,7 +257,7 @@ final class PublicBookingApiHandler
                 'enforce_hours' => true,
                 'public' => true,
             ]);
-            $this->store->increment('cal:ws-day:' . $tenantId, self::DAY);
+            RateLimits::publicBookingPerWorkspaceDay()->record($this->store, 'cal:ws-day:' . $tenantId);
 
             // With a payment step (SDK 1.98) the booking is held and the page
             // sends the customer to `payment.url`; they come back to the manage page.
@@ -252,6 +293,16 @@ final class PublicBookingApiHandler
         return $this->withLink($request, $params, function (int $tenantId, int $bookingId) use ($request): Response {
             $booking = $this->booking->bookingOrFail($tenantId, $bookingId);
             [$from, $to] = self::range(self::query($request));
+            if (count($booking['items']) > 1) {
+                // WHIT-1173: every service moves together, each with its own person.
+                $items = [];
+                foreach ($booking['items'] as $i) {
+                    $items[] = ['service_id' => (int) $i['service_id'], 'profile_id' => (int) $i['profile_id']];
+                }
+                $slots = $this->booking->availabilityForMany($tenantId, $items, false, $from, $to, true, $bookingId, false);
+
+                return Response::json(['data' => array_map(static fn (array $s): array => ['starts_at' => $s['starts_at'], 'ends_at' => $s['ends_at']], $slots)]);
+            }
             $slots = $this->booking->availability($tenantId, (int) $booking['service_id'], (int) $booking['profile_id'], $from, $to, true);
 
             return Response::json(['data' => array_map(static fn (array $s): array => ['starts_at' => $s['starts_at'], 'ends_at' => $s['ends_at']], $slots)]);
@@ -326,7 +377,7 @@ final class PublicBookingApiHandler
     /** @param array<string, string> $params */
     public function feed(Request $request, array $params): Response
     {
-        return $this->guard($request, 'cal:feed:', self::IP_FEED_MAX, function () use ($params): Response {
+        return $this->guard($request, 'cal:feed:', RateLimits::publicBookingFeedPerAddress(), function () use ($params): Response {
             $token = preg_replace('/\.ics$/', '', (string) ($params['token'] ?? '')) ?? '';
             $owner = $this->feed->find($token) ?? throw CalendarRejectedException::notFound('Calendar');
             [$tenantId, $profileId] = $owner;
@@ -369,6 +420,15 @@ final class PublicBookingApiHandler
             'price_minor' => $booking['price_minor'],
             'currency' => $booking['currency'],
             'customer' => ['name' => $booking['customer']['name'] ?? '', 'email' => $booking['customer']['email'] ?? ''],
+            // WHIT-1173: each service of a booking of several, in order; empty for one.
+            'services' => count($booking['items'] ?? []) > 1 ? array_map(static fn (array $i): array => [
+                'name' => $i['service_name'],
+                'staff_name' => $i['staff_name'],
+                'starts_at' => $i['starts_at'],
+                'ends_at' => $i['ends_at'],
+                'duration_minutes' => $i['duration_minutes'],
+                'price_minor' => $i['price_minor'],
+            ], $booking['items']) : [],
         ];
     }
 
@@ -378,7 +438,7 @@ final class PublicBookingApiHandler
      */
     private function withLink(Request $request, array $params, callable $work): Response
     {
-        return $this->guard($request, 'cal:manage:', self::IP_MANAGE_MAX, function () use ($params, $work): Response {
+        return $this->guard($request, 'cal:manage:', RateLimits::publicBookingManagePerAddress(), function () use ($params, $work): Response {
             $found = $this->links->find((string) ($params['token'] ?? ''), $this->booking->now());
             if ($found === null) {
                 return Response::error(self::LINK_INVALID, 404);
@@ -390,16 +450,15 @@ final class PublicBookingApiHandler
     }
 
     /** @param callable(): Response $work */
-    private function guard(Request $request, string $prefix, int $max, callable $work): Response
+    private function guard(Request $request, string $prefix, RateLimitRule $rule, callable $work): Response
     {
         try {
             $ip = ClientIp::fromRequest($request);
             if ($ip !== null && $ip !== '') {
-                $limited = $this->count($prefix . $ip, $max);
+                $limited = $rule->take($this->store, $prefix . $ip);
                 if ($limited !== null) {
                     return $limited;
                 }
-                $this->store->increment($prefix . $ip, self::HOUR);
             }
 
             return $work();
@@ -413,16 +472,6 @@ final class PublicBookingApiHandler
 
             return Response::error('Something went wrong. Please try again.', 500);
         }
-    }
-
-    private function count(string $key, int $max): ?Response
-    {
-        if ($this->store->count($key) >= $max) {
-            return Response::error('Too many attempts. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) max($this->store->ttl($key), 1)]);
-        }
-
-        return null;
     }
 
     /**

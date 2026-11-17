@@ -6,10 +6,13 @@ namespace Whity\Api;
 
 use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Identity\InvitationService;
+use Whity\Core\Identity\PasswordSignIn;
 use Whity\Core\PasswordPolicy;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
+use Whity\Core\Settings\SettingsService;
 use Whity\Core\Store\SharedStoreInterface;
 use Whity\Http\JsonBody;
 
@@ -42,10 +45,6 @@ use Whity\Http\JsonBody;
  */
 final class InvitationAcceptHandler
 {
-    /** Throttle: fixed window, per-IP. Defence in depth behind a 256-bit token. */
-    private const WINDOW_SECONDS = 3600;
-    private const IP_MAX = 30;
-
     private const SYSTEM_TENANT_ID = 0;
 
     /**
@@ -58,6 +57,7 @@ final class InvitationAcceptHandler
         private readonly InvitationService $service,
         private readonly SharedStoreInterface $store,
         private readonly AuditLogger $audit,
+        private readonly ?SettingsService $settings = null,
     ) {}
 
     /**
@@ -89,6 +89,9 @@ final class InvitationAcceptHandler
             'email' => $preview['email'],
             'tenant_name' => $preview['tenant_name'],
             'requires_password' => $preview['requires_password'],
+            // WHIT-1168: off means a new invitee accepts by signing in with the
+            // identity provider, never by choosing a password.
+            'password_sign_in' => PasswordSignIn::allowed($this->settings),
             'inviter_name' => $preview['inviter_name'],
             'role_name' => $preview['role_name'],
         ]], 200);
@@ -116,8 +119,9 @@ final class InvitationAcceptHandler
             return Response::error('An invitation token is required', 422);
         }
 
+        $passwordAllowed = PasswordSignIn::allowed($this->settings);
         $passwordHash = null;
-        if ($password !== '') {
+        if ($password !== '' && $passwordAllowed) {
             try {
                 PasswordPolicy::validate($password);
             } catch (\InvalidArgumentException) {
@@ -143,10 +147,11 @@ final class InvitationAcceptHandler
 
             // The token is still good — the invitee simply has to pick a
             // password. Safe to say plainly: they already hold a valid token.
-            InvitationService::ACCEPT_PASSWORD_REQUIRED => Response::error(
-                'Choose a password to finish setting up your account',
-                422
-            ),
+            InvitationService::ACCEPT_PASSWORD_REQUIRED => $passwordAllowed
+                ? Response::error('Choose a password to finish setting up your account', 422)
+                // No account yet and no passwords here: the invitee signs in
+                // with the identity provider, which brings them back to accept.
+                : PasswordSignIn::refusal(),
 
             // An administrator suspended this account. Say so rather than
             // pretending the link is broken, so the invitee knows who to ask.
@@ -205,15 +210,7 @@ final class InvitationAcceptHandler
             return null;
         }
 
-        $key = 'invite:accept:ip:' . $ip;
-        if ($this->store->count($key) >= self::IP_MAX) {
-            return Response::error('Too many attempts. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) max($this->store->ttl($key), 1)]);
-        }
-
-        $this->store->increment($key, self::WINDOW_SECONDS);
-
-        return null;
+        return RateLimits::invitationAcceptPerAddress()->take($this->store, 'invite:accept:ip:' . $ip);
     }
 
     /**

@@ -31,8 +31,8 @@ final class RouteStepInputsTest extends TestCase
         ]);
 
         self::assertSame([
-            ['key' => 'meeting_no', 'label' => 'Committee meeting number', 'label_ar' => 'رقم جلسة اللجنة', 'required' => true, 'max_length' => 100],
-            ['key' => 'file_no', 'label' => 'File number', 'label_ar' => null, 'required' => false, 'max_length' => 20],
+            ['key' => 'meeting_no', 'label' => 'Committee meeting number', 'label_ar' => 'رقم جلسة اللجنة', 'required' => true, 'max_length' => 100, 'type' => 'text'],
+            ['key' => 'file_no', 'label' => 'File number', 'label_ar' => null, 'required' => false, 'max_length' => 20, 'type' => 'text'],
         ], $inputs);
         self::assertSame([], RouteStepInputs::parse(null));
         self::assertSame([], RouteStepInputs::parse([]));
@@ -59,6 +59,7 @@ final class RouteStepInputsTest extends TestCase
         yield 'required as text' => [[['key' => 'meeting_no', 'label' => 'Meeting', 'required' => 'yes']]];
         yield 'a length of 0' => [[['key' => 'meeting_no', 'label' => 'Meeting', 'max_length' => 0]]];
         yield 'a length of 201' => [[['key' => 'meeting_no', 'label' => 'Meeting', 'max_length' => 201]]];
+        yield 'an unknown type' => [[['key' => 'meeting_no', 'label' => 'Meeting', 'type' => 'date']]];
         yield 'the same key twice' => [[['key' => 'a', 'label' => 'A'], ['key' => 'a', 'label' => 'B']]];
         yield 'six values' => [array_map(
             static fn (int $i): array => ['key' => 'v' . $i, 'label' => 'Value ' . $i],
@@ -114,6 +115,80 @@ final class RouteStepInputsTest extends TestCase
             } catch (InvalidArgumentException) {
             }
         }
+    }
+
+    public function testAPersonInputIsParsedWithItsType(): void
+    {
+        $inputs = RouteStepInputs::parse([['key' => 'supervisor', 'label' => 'Supervisor', 'type' => 'person']]);
+
+        self::assertSame([
+            ['key' => 'supervisor', 'label' => 'Supervisor', 'label_ar' => null, 'required' => true, 'max_length' => 100, 'type' => 'person'],
+        ], $inputs);
+        self::assertSame($inputs, RouteStepInputs::decode(RouteStepInputs::encode($inputs)));
+    }
+
+    public function testAnUnknownTypeIsRefusedInPlainWords(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("'type' is text, person or choice.");
+        RouteStepInputs::parse([['key' => 'supervisor', 'label' => 'Supervisor', 'type' => 'date']]);
+    }
+
+    public function testAPersonValueIsTheirNumber(): void
+    {
+        $inputs = RouteStepInputs::parse([['key' => 'supervisor', 'label' => 'Supervisor', 'type' => 'person']]);
+
+        self::assertSame(['supervisor' => '42'], RouteStepInputs::accept($inputs, ['supervisor' => ' 42 ']));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Choose a person for “Supervisor”.');
+        RouteStepInputs::accept($inputs, ['supervisor' => 'Amro Saleh']);
+    }
+
+    /** WHIT-1163: a decision picked from a list, stored as its value, printed as its label. */
+    public function testAChoiceKeepsItsOptionsAndAcceptsOnlyOne(): void
+    {
+        $decision = [
+            'key' => 'irb_decision', 'label' => 'IRB decision', 'type' => 'choice',
+            'options' => [
+                ['value' => 'approved', 'label' => 'Approved', 'label_ar' => 'تمت الموافقة'],
+                ['value' => 'conditional', 'label' => 'Conditionally approved'],
+                ['value' => 'revisions', 'label' => 'Revisions required'],
+                ['value' => 'not_approved', 'label' => 'Not approved'],
+            ],
+        ];
+        $inputs = RouteStepInputs::parse([$decision]);
+
+        self::assertSame('choice', $inputs[0]['type']);
+        self::assertSame(['value' => 'conditional', 'label' => 'Conditionally approved', 'label_ar' => null], ($inputs[0]['options'] ?? [])[1] ?? null);
+        self::assertSame($inputs, RouteStepInputs::decode(RouteStepInputs::encode($inputs)));
+        self::assertSame(['irb_decision' => 'conditional'], RouteStepInputs::accept($inputs, ['irb_decision' => 'conditional']));
+        self::assertSame('Conditionally approved', RouteStepInputs::display($inputs[0], 'conditional'));
+        self::assertSame('تمت الموافقة', RouteStepInputs::display($inputs[0], 'approved', 'ar'));
+        self::assertSame('Revisions required', RouteStepInputs::display($inputs[0], 'revisions', 'ar'), 'English when no Arabic label');
+        self::assertSame('gone', RouteStepInputs::display($inputs[0], 'gone'), 'a value no option has prints as it is');
+        self::assertArrayNotHasKey('options', RouteStepInputs::parse([['key' => 'meeting', 'label' => 'Meeting']])[0]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Choose one of the options for “IRB decision”.');
+        RouteStepInputs::accept($inputs, ['irb_decision' => 'Approved']);
+    }
+
+    /** @return iterable<string, array{mixed, string}> */
+    public static function badChoices(): iterable
+    {
+        yield 'no options' => [['key' => 'd', 'label' => 'D', 'type' => 'choice'], 'a choice needs 2 to 12 options'];
+        yield 'one option' => [['key' => 'd', 'label' => 'D', 'type' => 'choice', 'options' => [['value' => 'a', 'label' => 'A']]], 'a choice needs 2 to 12 options'];
+        yield 'a bad value' => [['key' => 'd', 'label' => 'D', 'type' => 'choice', 'options' => [['value' => 'A b', 'label' => 'A'], ['value' => 'b', 'label' => 'B']]], "each option needs a 'value'"];
+        yield 'a repeated value' => [['key' => 'd', 'label' => 'D', 'type' => 'choice', 'options' => [['value' => 'a', 'label' => 'A'], ['value' => 'a', 'label' => 'B']]], "two options use the value 'a'"];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('badChoices')]
+    public function testABadChoiceIsRefusedInPlainWords(mixed $input, string $message): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage($message);
+        RouteStepInputs::parse([$input]);
     }
 
     public function testTheValuesObjectIsShapedAtTheBoundary(): void

@@ -14,8 +14,8 @@ import { useTranslation } from "../i18n"
 import { useFormLanguages } from "./form-languages"
 import { BannerPicker } from "./banner-picker"
 import { useCurrentLanguage } from "./language"
-import { pickText } from "./text"
 import type { FinalTemplateOption, FormBannerValue, FormRow, FormSectionDef, LocalizedMap } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 /** The parts of a form the Settings tab edits, held together so one save bar covers them. */
 export interface FormSettings {
@@ -69,7 +69,7 @@ export function FormSettingsTab({
   const { enabled, setEnabled } = useFormLanguages()
   const { currentLanguage } = useCurrentLanguage()
   const shownTitle =
-    pickText(settings.title, currentLanguage) || pickText(settings.name, currentLanguage) || t("builder.untitled", "Untitled form")
+    localizedText(settings.title, currentLanguage) || localizedText(settings.name, currentLanguage) || t("builder.untitled", "Untitled form")
 
   function setSection(index: number, patch: Partial<FormSectionDef>) {
     onChange({ ...settings, sections: settings.sections.map((s, i) => (i === index ? { ...s, ...patch } : s)) })
@@ -122,7 +122,7 @@ export function FormSettingsTab({
           <BannerPicker
             value={settings.banner}
             title={shownTitle}
-            description={pickText(settings.description, currentLanguage)}
+            description={localizedText(settings.description, currentLanguage)}
             readOnly={readOnly}
             onChange={(banner) => onChange({ ...settings, banner })}
             onUpload={onUploadBanner}

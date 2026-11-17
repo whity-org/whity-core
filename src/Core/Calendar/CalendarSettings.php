@@ -28,6 +28,8 @@ final class CalendarSettings
         public readonly array $weekendDays,
         public readonly string $currency,
         public readonly bool $instantBooking = true,
+        /** WHIT-1173: one booking may hold several services back to back. */
+        public readonly bool $multiServiceBooking = false,
     ) {
     }
 
@@ -56,6 +58,7 @@ final class CalendarSettings
             self::weekdays($effective[SettingsRegistry::CALENDAR_WEEKEND_DAYS] ?? 'friday,saturday'),
             $effective[SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? 'USD',
             ($effective[SettingsRegistry::CALENDAR_INSTANT_BOOKING] ?? 'true') !== 'false',
+            ($effective[SettingsRegistry::CALENDAR_MULTI_SERVICE_BOOKING] ?? 'false') === 'true',
         );
     }
 
@@ -98,6 +101,7 @@ final class CalendarSettings
             'weekend_days' => array_map(static fn (int $d): string => self::WEEKDAYS[$d - 1], $this->weekendDays),
             'currency' => $this->currency,
             'instant_booking' => $this->instantBooking,
+            'multi_service_booking' => $this->multiServiceBooking,
         ];
     }
 }

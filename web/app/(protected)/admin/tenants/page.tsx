@@ -24,7 +24,6 @@ import {
 } from '@whity/ui/dropdown-menu';
 import { IconMenu2, IconPlus } from '@tabler/icons-react';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
-import { localizedName } from '@/lib/localized-name';
 import { useDateDisplay } from '@whity/features/datetime';
 import { CreateTenantModal } from './create-modal';
 import { DeleteTenantModal } from './delete-modal';
@@ -38,6 +37,7 @@ import { DeleteTenantModal } from './delete-modal';
  * null, and the delete dialog read the first of those straight into a sentence.
  */
 import type { Tenant } from './record-screen';
+import { localizedText } from '@whity/ui/localized-text';
 
 const SYSTEM_TENANT_ID = 0;
 
@@ -144,7 +144,7 @@ export default function TenantsPage() {
           className="text-start font-medium text-primary underline-offset-4 hover:underline"
         >
           {/* #821: the reader's language, else the original name. */}
-          {localizedName(tenant.names, currentLanguage, tenant.nameLanguage, tenant.name)}
+          {localizedText(tenant.names, currentLanguage, tenant.nameLanguage, tenant.name)}
         </button>
       ),
     },

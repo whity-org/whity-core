@@ -30,7 +30,9 @@ final class SettingsRegistryTest extends TestCase
              'maintenance.active', 'maintenance.until',
              'auth.password_reset_approval_required',
              'auth.self_2fa_recovery_enabled',
-             'auth.sso_enabled', 'auth.sso_self_provision_workspace', 'auth.desktop_login_max_hours',
+             'auth.sso_enabled', 'auth.sso_self_provision_workspace',
+             'workspaces.self_create_enabled', 'workspaces.max_owned_per_person', 'auth.password_sign_in',
+             'auth.desktop_login_max_hours',
              'storage.driver', 'storage.s3.endpoint', 'storage.s3.region', 'storage.s3.bucket',
              'storage.s3.access_key', 'storage.s3.path_style', 'storage.s3.public_base_url',
              'mail.transport', 'mail.smtp.host', 'mail.smtp.port', 'mail.smtp.encryption',
@@ -131,13 +133,14 @@ final class SettingsRegistryTest extends TestCase
              'calendar.week_start',
              'calendar.weekend_days',
              'calendar.instant_booking',
+             'calendar.multi_service_booking',
              'app.installable',
              'website.plans',
              'website.contact_workspace',
              // WHIT-1035: customer sign-up, moved from workspace_signup_settings.
              'signup.mode', 'signup.role_id', 'signup.allowed_domains', 'signup.customer_invites',
              // WHIT-1043.
-             'signup.invites_per_customer'],
+             'signup.invites_per_customer', 'signup.route_template_id', 'messaging.webchat_enabled', 'messaging.webchat_greeting', 'messaging.inbound_email_address'],
             SettingsRegistry::keys()
         );
     }
@@ -305,7 +308,8 @@ final class SettingsRegistryTest extends TestCase
         // 51 since WHIT-941: eight calendar.* keys.
         // 52 since WHIT-966: calendar.instant_booking.
         // 54 since design 3.4 (P1): company.name_ar and company.address_ar.
-        self::assertCount(54, SettingsRegistry::tenantTextKeys());
+        // 55 since WHIT-1173: calendar.multi_service_booking.
+        self::assertCount(55, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -471,7 +475,12 @@ final class SettingsRegistryTest extends TestCase
         // 117 since WHIT-960: website.plans and website.contact_workspace.
         // 120 since design 3.4 (P1): company.name_ar and company.address_ar.
         // 124 since WHIT-1035: the four signup.* keys; 125 since WHIT-1043.
-        self::assertCount(125, $describe);
+        // 126 since merge map A4: signup.route_template_id.
+        // 129 with migration 294's three messaging.* keys.
+        // 131 since WHIT-1169: workspaces.self_create_enabled and max_owned_per_person.
+        // 132 since WHIT-1173: calendar.multi_service_booking.
+        // 133 since WHIT-1168: auth.password_sign_in.
+        self::assertCount(133, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

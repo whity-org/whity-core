@@ -32,7 +32,6 @@ import { useCalendarAccess, useCalendarBasics, type CalendarUnit } from '@/compo
 import { useCalendarWords } from '@/components/calendar/use-calendar-words';
 import { useLocalizedUnits } from '@/hooks/useLocalizedUnits';
 import { useToast } from '@/lib/toast-context';
-import { cleanNames } from '@/lib/localized-name';
 import { calendarApi, type CalendarRoom, type CalendarStaff } from '@/lib/calendar/api';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Avatar } from '@whity/ui/avatar';
@@ -44,6 +43,7 @@ import { EmptyFirstTime, ReadOnlyNotice } from '@whity/ui/page-states';
 import { Skeleton } from '@whity/ui/skeleton';
 import { Switch } from '@whity/ui/switch';
 import { useTranslation } from '@whity/features/i18n';
+import { cleanLocalizedText } from '@whity/ui/localized-text';
 
 const NO_BRANCH = 'none';
 
@@ -293,7 +293,7 @@ function RoomForm({
   const [problem, setProblem] = useState<string | null>(null);
 
   const save = async () => {
-    const names = cleanNames(name);
+    const names = cleanLocalizedText(name);
     if (Object.keys(names).length === 0) {
       setProblem(t('rooms.error.name', 'Give the room a name.'));
       return;

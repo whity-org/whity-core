@@ -110,11 +110,15 @@ final class RouteVerdictVocabularyTest extends TestCase
         $inPhp = RouteQuorum::all();
         sort($inPhp);
 
+        // Migration 119 made the CHECK; migration 295 widened it with `first`
+        // and is now where its list lives.
+        self::verbsIn(self::source(), "/CHECK \(decision_quorum IS NULL OR decision_quorum IN \(([^)]*)\)\)/");
+        require_once __DIR__ . '/../../../../database/migrations/295_first_answer_decides.php';
+        $inCheck = \Database\Migrations\FirstAnswerDecides::QUORUMS;
+        sort($inCheck);
+
         self::assertSame(
-            self::verbsIn(
-                self::source(),
-                "/CHECK \(decision_quorum IS NULL OR decision_quorum IN \(([^)]*)\)\)/"
-            ),
+            $inCheck,
             $inPhp,
             'RouteQuorum::all() and the CHECK on document_route_steps.decision_quorum have drifted.'
         );

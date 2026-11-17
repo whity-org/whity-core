@@ -18,8 +18,9 @@ import { useDateDisplay } from "../datetime"
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
 import { createFormsApi, fieldBody } from "./api"
-import { asMap, keyFrom, pickText, statusVariant } from "./text"
+import { asMap, keyFrom, statusVariant } from "./text"
 import type { FormRow, FormStatus, FormsScreenEnv } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 export function useStatusLabel() {
   const t = useTranslation("forms")
@@ -92,7 +93,7 @@ export function FormsListScreen({
     void load()
   }, [load])
 
-  const nameOf = useCallback((form: FormRow) => pickText(form.name, currentLanguage) || form.form_key, [currentLanguage])
+  const nameOf = useCallback((form: FormRow) => localizedText(form.name, currentLanguage) || form.form_key, [currentLanguage])
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -250,8 +251,8 @@ export function FormsListScreen({
                   cell: (row) => (
                     <div className="min-w-0">
                       <div className="truncate font-medium">{nameOf(row)}</div>
-                      {pickText(row.description_i18n, currentLanguage) !== "" && (
-                        <div className="truncate text-xs text-muted-foreground">{pickText(row.description_i18n, currentLanguage)}</div>
+                      {localizedText(row.description_i18n, currentLanguage) !== "" && (
+                        <div className="truncate text-xs text-muted-foreground">{localizedText(row.description_i18n, currentLanguage)}</div>
                       )}
                     </div>
                   ),

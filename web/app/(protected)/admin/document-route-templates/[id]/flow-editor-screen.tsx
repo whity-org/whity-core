@@ -77,6 +77,7 @@ import {
   resolveTransitions,
   type RouteFlowAudience,
   type RouteFlowGraph,
+  type RouteFlowStepInputOption,
   type RouteFlowOrientation,
   type RouteFlowQuorum,
   type RouteFlowStep,
@@ -149,7 +150,7 @@ const GROUP_KIND = 'group';
  */
 const NEW_STAGE_KIND_PREFERENCE = ['role', 'group', 'role_below_actor'];
 
-const QUORUMS: RouteFlowQuorum[] = ['all', 'any', 'majority'];
+const QUORUMS: RouteFlowQuorum[] = ['all', 'any', 'majority', 'first'];
 
 export function RouteFlowEditorScreen({
   templateId,
@@ -654,6 +655,7 @@ function RouteFlowBody({
             quorumAll: t('routeTemplates.quorum.all', 'all must approve'),
             quorumAny: t('routeTemplates.quorum.any', 'any one may approve'),
             quorumMajority: t('routeTemplates.quorum.majority', 'a majority must approve'),
+            quorumFirst: t('routeTemplates.quorum.first', 'the first answer decides'),
             tooManyNodes: t(
               'routeTemplates.canvas.tooMany',
               'This flow is larger than the canvas will draw. Showing the first stages only.'
@@ -866,7 +868,7 @@ function StageValuesEditor({
     if (label === '') return;
     onChange([
       ...inputs,
-      { key: stageValueKey(label, inputs.map((input) => input.key)), label, labelAr: null, required: true, maxLength: 100 },
+      { key: stageValueKey(label, inputs.map((input) => input.key)), label, labelAr: null, required: true, maxLength: 100, type: 'text' },
     ]);
     setDraft('');
   };
@@ -903,6 +905,36 @@ function StageValuesEditor({
               onChange={(e) => update(index, { labelAr: e.target.value === '' ? null : e.target.value })}
             />
           </label>
+          <label className="block space-y-1">
+            <span className="text-xs font-medium">{t('routeTemplates.inspector.valueKind', 'What is filled in')}</span>
+            <Select
+              value={input.type ?? 'text'}
+              disabled={readOnly}
+              onValueChange={(kind) =>
+                update(index, {
+                  type: kind as 'text' | 'person' | 'choice',
+                  options: kind === 'choice' ? (input.options?.length ? input.options : defaultChoiceOptions(t)) : undefined,
+                })
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="text">{t('routeTemplates.inspector.valueKindText', 'A line of text')}</SelectItem>
+                <SelectItem value="person">{t('routeTemplates.inspector.valuePerson', 'A person in the workspace')}</SelectItem>
+                <SelectItem value="choice">{t('routeTemplates.inspector.valueKindChoice', 'One of a list')}</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          {input.type === 'choice' && (
+            <ChoiceOptionsEditor
+              options={input.options ?? []}
+              readOnly={readOnly}
+              onChange={(options) => update(index, { options })}
+              t={t}
+            />
+          )}
           <div className="flex items-center justify-between gap-2">
             <label className="flex items-center gap-2 text-sm">
               <Switch
@@ -951,6 +983,100 @@ function StageValuesEditor({
   );
 }
 
+/** WHIT-1163: a choice offers 2 to this many options; the server refuses more. */
+const MAX_CHOICE_OPTIONS = 12;
+
+/** A new choice starts as a decision a reviewer can edit. */
+function defaultChoiceOptions(t: ReturnType<typeof useTranslation>): RouteFlowStepInputOption[] {
+  return [
+    { value: 'approved', label: t('routeTemplates.inspector.choiceApproved', 'Approved'), labelAr: null },
+    { value: 'not_approved', label: t('routeTemplates.inspector.choiceNotApproved', 'Not approved'), labelAr: null },
+  ];
+}
+
+/**
+ * The options of a choice a stage asks for (WHIT-1163), in English and Arabic.
+ * The stored value is made from the English label when the option is added
+ * and is not shown, as for the stage's values themselves.
+ */
+function ChoiceOptionsEditor({
+  options,
+  readOnly,
+  onChange,
+  t,
+}: {
+  options: RouteFlowStepInputOption[];
+  readOnly: boolean;
+  onChange: (options: RouteFlowStepInputOption[]) => void;
+  t: ReturnType<typeof useTranslation>;
+}) {
+  const [draft, setDraft] = useState('');
+  const update = (index: number, patch: Partial<RouteFlowStepInputOption>) =>
+    onChange(options.map((option, i) => (i === index ? { ...option, ...patch } : option)));
+  const add = () => {
+    const label = draft.trim();
+    if (label === '') return;
+    onChange([...options, { value: stageValueKey(label, options.map((o) => o.value)), label, labelAr: null }]);
+    setDraft('');
+  };
+
+  return (
+    <fieldset className="space-y-2">
+      <legend className="text-xs font-medium">{t('routeTemplates.inspector.choiceOptions', 'Options')}</legend>
+      {options.map((option, index) => (
+        <div key={option.value} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
+          <Input
+            aria-label={t('routeTemplates.inspector.choiceOptionLabel', 'Option')}
+            value={option.label}
+            maxLength={80}
+            disabled={readOnly}
+            onChange={(e) => update(index, { label: e.target.value })}
+          />
+          <Input
+            dir="rtl"
+            aria-label={t('routeTemplates.inspector.choiceOptionLabelAr', 'Option in Arabic')}
+            value={option.labelAr ?? ''}
+            maxLength={80}
+            disabled={readOnly}
+            onChange={(e) => update(index, { labelAr: e.target.value === '' ? null : e.target.value })}
+          />
+          {!readOnly && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={options.length <= 2}
+              onClick={() => onChange(options.filter((_, i) => i !== index))}
+            >
+              {t('routeTemplates.inspector.valueRemove', 'Remove')}
+            </Button>
+          )}
+        </div>
+      ))}
+      {!readOnly && options.length < MAX_CHOICE_OPTIONS && (
+        <div className="flex items-end gap-2">
+          <Input
+            aria-label={t('routeTemplates.inspector.choiceNew', 'New option')}
+            value={draft}
+            maxLength={80}
+            placeholder={t('routeTemplates.inspector.choiceNewPlaceholder', 'For example: Conditionally approved')}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                add();
+              }
+            }}
+          />
+          <Button type="button" variant="outline" disabled={draft.trim() === ''} onClick={add}>
+            {t('routeTemplates.inspector.valueAdd', 'Add')}
+          </Button>
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
 /** WHIT-1018: the most questions one stage may leave people out by; the server refuses more. */
 const MAX_STAGE_EXCLUSIONS = 10;
 
@@ -984,12 +1110,12 @@ function StageExclusionsEditor({
   return (
     <section className="space-y-2" aria-labelledby="stage-exclusions-heading">
       <h3 id="stage-exclusions-heading" className="text-sm font-medium">
-        {t('routeTemplates.inspector.exclusions', 'Leave out people named on the form')}
+        {t('routeTemplates.inspector.exclusions', 'Leave out people named on the form or at an earlier stage')}
       </h3>
       <p className="text-xs text-muted-foreground">
         {t(
           'routeTemplates.inspector.exclusionsHelp',
-          'People picked in these questions, such as the supervisor, are not asked here, are not counted towards approval and are not printed among the approvals.'
+          'People picked in these questions or stage values, such as the supervisor, are not asked here, are not counted towards approval and are not printed among the approvals.'
         )}
       </p>
       {keys.length > 0 && (
@@ -1375,7 +1501,9 @@ function StageInspector({
                     ? t('routeTemplates.quorum.all', 'all must approve')
                     : q === 'any'
                       ? t('routeTemplates.quorum.any', 'any one may approve')
-                      : t('routeTemplates.quorum.majority', 'a majority must approve')}
+                      : q === 'first'
+                        ? t('routeTemplates.quorum.first', 'the first answer decides')
+                        : t('routeTemplates.quorum.majority', 'a majority must approve')}
                 </SelectItem>
               ))}
             </SelectContent>

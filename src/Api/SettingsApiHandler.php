@@ -74,7 +74,9 @@ final class SettingsApiHandler
     public function __construct(
         SettingsService $settings,
         RoleChecker $roleChecker,
-        ServerLabels $labels
+        ServerLabels $labels,
+        // WHIT-1168: checks that turning password sign-in off leaves a way in.
+        private readonly ?\PDO $pdo = null,
     ) {
         $this->settings = $settings;
         $this->roleChecker = $roleChecker;
@@ -97,13 +99,14 @@ final class SettingsApiHandler
      * @i18n-keys admin
      *   settings.tab.general = General
      *   settings.tab.branding = Branding
+     *   settings.tab.owners = Owners
      *   settings.tab.signup = Sign-up
      *   settings.tab.customer_signup = Sign-up
      *   settings.tab.sso = Single sign-on
      *   settings.tab.email = Email
      *   settings.tab.email_domains = Email domains
      *   settings.tab.public_forms = Public forms
-     *   settings.tab.messages = Messages
+     *   settings.tab.messages = Chat
      *   settings.tab.storage = Storage
      *   settings.tab.feature_flags = Feature flags
      *   settings.tab.security = Security
@@ -154,6 +157,10 @@ final class SettingsApiHandler
     private const TABS = [
         ['id' => 'general', 'href' => '/admin/settings', 'label' => 'General', 'requiredPermission' => CorePermissions::SETTINGS_READ],
         ['id' => 'branding', 'href' => '/admin/settings/branding', 'label' => 'Branding', 'requiredPermission' => CorePermissions::SETTINGS_READ],
+        // WHIT-1170: who owns the workspace, and handing it over. The system
+        // workspace has no owners. Owners hold admin roles, so settings:read
+        // shows it to them; the page itself checks who may act.
+        ['id' => 'owners', 'href' => '/admin/settings/owners', 'label' => 'Owners', 'requiredPermission' => CorePermissions::SETTINGS_READ, 'workspaceOnly' => true],
         ['id' => 'signup', 'href' => '/admin/settings/signup', 'label' => 'Sign-up', 'requiredPermission' => CorePermissions::SETTINGS_MANAGE, 'systemTenantOnly' => true],
         // WHIT-915: a workspace's own customer sign-up. The platform's sign-up
         // above is the operator's and system-tenant only; this one is every other
@@ -164,8 +171,9 @@ final class SettingsApiHandler
         // Email-domain policy (WC-ac35b6cf): follows the route's own permission,
         // so a deployment with a renamed administrative role still sees it.
         ['id' => 'public-forms', 'href' => '/admin/settings/public-forms', 'label' => 'Public forms', 'requiredPermission' => CorePermissions::PUBLIC_FORM_KEYS_MANAGE],
-        // Messages (ADR 0016): web chat on or off, and where email replies come back.
-        ['id' => 'messages', 'href' => '/admin/settings/messages', 'label' => 'Messages', 'requiredPermission' => CorePermissions::MESSAGES_MANAGE, 'workspaceOnly' => true],
+        // Settings › Chat (design 3.5, UC.4, UC.12; was Messages, ADR 0016): web chat,
+        // where email replies come back, the workspace's bots, and who it blocked.
+        ['id' => 'messages', 'href' => '/admin/settings/messages', 'label' => 'Chat', 'requiredPermission' => CorePermissions::MESSAGES_MANAGE, 'workspaceOnly' => true],
         ['id' => 'email-domains', 'href' => '/admin/settings/email-domains', 'label' => 'Email domains', 'requiredPermission' => CorePermissions::EMAIL_DOMAINS_MANAGE],
         ['id' => 'storage', 'href' => '/admin/settings/storage', 'label' => 'Storage', 'requiredPermission' => CorePermissions::SETTINGS_MANAGE, 'systemTenantOnly' => true],
         // Feature Flags (WC-feature-flags-settings-page): a generic admin
@@ -405,6 +413,16 @@ final class SettingsApiHandler
         $elsewhere = self::writtenElsewhere(JsonBody::parsed($request)['settings'] ?? null);
         if ($elsewhere !== null) {
             return $elsewhere;
+        }
+
+        // WHIT-1168: never let the switch lock everybody, or its operator, out.
+        $written = JsonBody::parsed($request)['settings'] ?? null;
+        $wanted = is_array($written) ? ($written[\Whity\Core\Identity\PasswordSignIn::SETTING] ?? null) : null;
+        if ($this->pdo !== null && ($wanted === false || $wanted === 'false')) {
+            $problem = \Whity\Core\Identity\PasswordSignIn::cannotTurnOff($this->pdo, $context['userId']);
+            if ($problem !== null) {
+                return Response::error($problem, 422, [\Whity\Core\Identity\PasswordSignIn::SETTING => $problem]);
+            }
         }
 
         return $this->applyWrites(

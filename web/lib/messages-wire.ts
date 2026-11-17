@@ -52,6 +52,10 @@ export interface Message {
   send_after: string | null;
   sent_at: string | null;
   created_at: string;
+  /** One chat (UC.5): booking times, a form or a payment link the team sent; staff only. */
+  block?: import('./chat-wire').CustomerBlock | null;
+  /** The channel this message came or went on; one conversation can span channels (C5). */
+  channel?: string | null;
 }
 
 export interface ConversationList {
@@ -63,6 +67,8 @@ export interface ConversationList {
 
 export interface ConversationDetail extends Conversation {
   messages: Message[];
+  /** "Send by" (UC.3): the channels this customer wrote on, the one they last used first. */
+  send_by?: { channel: string; address: string }[];
 }
 
 export interface MessagingSettings {

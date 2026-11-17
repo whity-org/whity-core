@@ -7,6 +7,8 @@
 
 export interface AuditLogEntry {
   id: number;
+  /** Which record it is: the audit log, an agent's action, or a decision on a route. */
+  source?: 'audit' | 'agents' | 'routes';
   tenantId: number | null;
   actorUserId: number | null;
   action: string;

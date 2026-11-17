@@ -16,7 +16,7 @@ use Whity\Sdk\I18n\LocalizedText;
  *
  * That covers the descriptor's own `label`, and `label`, `title`,
  * `placeholder`, `emptyText`, `description`, `confirm`, `trigger` and
- * `itemLabel` anywhere in the tree (block props, columns, options, row
+ * `itemLabel`, `addLabel` anywhere in the tree (block props, columns, options, row
  * actions), plus `value` on a `text` block, `text` on a `heading` and
  * `body` on an `alert`.
  *
@@ -47,6 +47,7 @@ final class BlockText
         'arLabel',
         'trigger',
         'itemLabel',
+        'addLabel',
     ];
 
     /**

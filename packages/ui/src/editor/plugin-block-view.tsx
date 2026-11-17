@@ -11,8 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Textarea } from "../textarea"
 import { cn } from "../utils"
 import { fill, type EditorLabels } from "./labels"
-import { fieldValues, fillView, findPluginBlock, localized } from "./plugin-blocks"
+import { fieldValues, fillView, findPluginBlock } from "./plugin-blocks"
 import { useEditorServices, type PluginBlockDefinition } from "./services"
+import { localizedText } from "../localized-text"
 
 /**
  * A plugin's block in a document (EditorCustomBlocks; E.17–E.20). Whity's
@@ -44,7 +45,7 @@ export function PluginBlockView(props: ReactNodeViewProps) {
   }
 
   const { source, definition } = found
-  const name = localized(definition.label, lang)
+  const name = localizedText(definition.label, lang)
   const view = fillView(definition.view, fieldValues(definition, data, lang), lang)
   return (
     <NodeViewWrapper
@@ -52,13 +53,13 @@ export function PluginBlockView(props: ReactNodeViewProps) {
       data-block-id={props.node.attrs.id ?? undefined}
       className={cn("wy-rich wy-plugin", props.selected && "is-selected")}
       role="group"
-      aria-label={fill(labels.pluginBlockLabel, { name, plugin: localized(source.label, lang) })}
+      aria-label={fill(labels.pluginBlockLabel, { name, plugin: localizedText(source.label, lang) })}
     >
       <div className="wy-saved-src" contentEditable={false}>
         <span className="wy-plugin-tile" aria-hidden="true">
-          {localized(source.label, lang).slice(0, 1).toUpperCase()}
+          {localizedText(source.label, lang).slice(0, 1).toUpperCase()}
         </span>
-        <b dir="auto">{localized(source.label, lang)}</b>
+        <b dir="auto">{localizedText(source.label, lang)}</b>
         {source.verified ? (
           <span className="wy-plugin-mark">
             <Icon name="check" size={12} /> {labels.pluginVerified}
@@ -102,7 +103,7 @@ function PluginOff({ plugin }: { plugin: string }) {
   const { services, labels } = useEditorServices()
   const lang = services.language ?? "en"
   const off = services.pluginBlocks?.off.find((p) => p.plugin === plugin)
-  const name = off ? localized(off.label, lang) : plugin
+  const name = off ? localizedText(off.label, lang) : plugin
   const canEnable = !!off && !!services.pluginBlocks?.canEnable && !!services.enablePlugin
   const [busy, setBusy] = React.useState(false)
   const [failed, setFailed] = React.useState(false)
@@ -176,11 +177,11 @@ function PluginBlockForm({
           }}
         >
           <DialogHeader>
-            <DialogTitle>{fill(labels.pluginEditTitle, { name: localized(definition.label, lang) })}</DialogTitle>
+            <DialogTitle>{fill(labels.pluginEditTitle, { name: localizedText(definition.label, lang) })}</DialogTitle>
           </DialogHeader>
           {definition.fields.map((field) => {
             const fieldId = `${id}-${field.key}`
-            const label = localized(field.label, lang)
+            const label = localizedText(field.label, lang)
             return (
               <div key={field.key} className="grid gap-1.5">
                 <label htmlFor={fieldId} className="text-sm font-medium">
@@ -196,7 +197,7 @@ function PluginBlockForm({
                     <SelectContent>
                       {(field.options ?? []).map((o) => (
                         <SelectItem key={o.value} value={o.value}>
-                          {localized(o.label, lang)}
+                          {localizedText(o.label, lang)}
                         </SelectItem>
                       ))}
                     </SelectContent>

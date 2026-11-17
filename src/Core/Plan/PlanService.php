@@ -552,10 +552,13 @@ final class PlanService
         if (strlen($key) > 64) {
             throw new PlanValidationException('plan_key', 'plan_key must be 64 characters or fewer');
         }
-        if (preg_match('/^[a-z0-9][a-z0-9_-]*$/', $key) !== 1) {
+        // Dot-separated segments too: a paid plugin's add-on plans are
+        // `plugin.<slug>.<plan>` (`plugin.salons.monthly`), the key every
+        // add-on reader in core matches on (WHIT-1156).
+        if (preg_match('/^[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)*$/', $key) !== 1) {
             throw new PlanValidationException(
                 'plan_key',
-                'plan_key must be lowercase alphanumeric, starting with a letter or digit (hyphens/underscores allowed)'
+                'plan_key must be lowercase alphanumeric, starting with a letter or digit (hyphens/underscores allowed, and dots between parts, as in plugin.salons.monthly)'
             );
         }
     }

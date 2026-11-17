@@ -9,6 +9,8 @@ use Whity\Core\Messaging\MessagingException;
 use Whity\Core\Messaging\MessagingService;
 use Whity\Core\Messaging\WebChat\WebChatChannel;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimitRule;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Settings\GlobalSettingsRepository;
@@ -57,11 +59,6 @@ final class PublicContactApiHandler
         'other' => 'Something else',
     ];
 
-    private const WINDOW = 3600;
-    private const PER_ADDRESS = 5;
-    private const PER_UNKNOWN_ADDRESS = 30;
-    private const PER_FORM = 200;
-
     private const MAX_NAME = 120;
     private const MAX_COMPANY = 200;
     private const MAX_CONTACT = 200;
@@ -84,8 +81,8 @@ final class PublicContactApiHandler
 
         $address = self::addressKey(ClientIp::fromRequest($request));
         $limited = $address === null
-            ? $this->limit('contact:ip:', 'unknown', self::PER_UNKNOWN_ADDRESS)
-            : $this->limit('contact:ip:', $address, self::PER_ADDRESS);
+            ? $this->limit('contact:ip:', 'unknown', RateLimits::publicContactPerUnknownAddress())
+            : $this->limit('contact:ip:', $address, RateLimits::publicContactPerAddress());
         if ($limited !== null) {
             return $form ? $this->back($lang, false) : $limited;
         }
@@ -108,7 +105,7 @@ final class PublicContactApiHandler
                 ? $this->back($lang, false)
                 : Response::error('Messages can\'t be received here right now.', 503);
         }
-        if (($limited = $this->limit('contact:all:', 'form', self::PER_FORM)) !== null) {
+        if (($limited = $this->limit('contact:all:', 'form', RateLimits::publicContactPerForm())) !== null) {
             return $form ? $this->back($lang, false) : $limited;
         }
 
@@ -236,16 +233,15 @@ final class PublicContactApiHandler
         return trim($ip);
     }
 
-    private function limit(string $prefix, string $subject, int $max): ?Response
+    private function limit(string $prefix, string $subject, RateLimitRule $rule): ?Response
     {
         $key = $prefix . hash('sha256', $subject);
-        if ($this->store->increment($key, self::WINDOW) > $max) {
+        $limited = $rule->hit($this->store, $key);
+        if ($limited !== null) {
+            // A refused message gives its place back.
             $this->store->decrement($key);
-
-            return Response::error('Too many messages. Please try again later.', 429)
-                ->withHeaders(['Retry-After' => (string) max($this->store->ttl($key), 1)]);
         }
 
-        return null;
+        return $limited;
     }
 }

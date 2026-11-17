@@ -19,7 +19,7 @@ final class FormPrintoutTest extends TestCase
         $f = static fn (string $key, string $type, string $label, ?string $section, array $extra = []): array => $extra + [
             'field_key' => $key, 'field_type' => $type, 'label' => ['en' => $label, 'ar' => $label . ' (ar)'],
             'help_text' => null, 'help_text_i18n' => [], 'is_required' => true, 'options' => [], 'validation' => [],
-            'section_key' => $section, 'visible_when' => null, 'audience' => 'applicant',
+            'section_key' => $section, 'visible_when' => null,
         ];
         $yn = [['value' => 'yes', 'label' => ['en' => 'Yes']], ['value' => 'no', 'label' => ['en' => 'No']], ['value' => 'na', 'label' => ['en' => 'N/A']]];
 
@@ -38,16 +38,16 @@ final class FormPrintoutTest extends TestCase
             // An "if yes" follow-up left empty does not stop the section collapsing.
             $f('drug_identify', 'textarea', 'Identify the drugs', 'regulated', ['is_required' => false]),
             $f('pi_sign', 'signature', 'Principal investigator', 'declaration'),
-            $f('dean', 'select', 'Dean’s recommendation', null, ['audience' => 'staff', 'options' => [['value' => 'recommend', 'label' => ['en' => 'Recommend approval']]]]),
         ];
     }
 
     /**
      * @param array<string, mixed> $style
      * @param array<string, mixed> $answers
+     * @param list<array<string, mixed>> $extraFields
      * @return array<string, mixed>
      */
-    private function build(array $style = [], array $answers = [], string $lang = 'en', bool $custom = true): array
+    private function build(array $style = [], array $answers = [], string $lang = 'en', bool $custom = true, array $extraFields = []): array
     {
         return (new FormPrintout())->build([
             'lang' => $lang,
@@ -62,7 +62,7 @@ final class FormPrintoutTest extends TestCase
                     ['key' => 'regulated', 'title' => ['en' => 'Regulated substances'], 'description' => []],
                     ['key' => 'declaration', 'title' => ['en' => 'Declaration and signatures'], 'description' => []],
                 ],
-                'fields' => self::fields(),
+                'fields' => [...self::fields(), ...$extraFields],
             ],
             'answers' => $answers + [
                 'title' => 'Sleep and exams',
@@ -71,7 +71,8 @@ final class FormPrintoutTest extends TestCase
                 'drugs' => 'na', 'devices' => 'na', 'samples' => 'na',
                 'pi_sign' => ['name' => 'Dr Ahmad Khalil', 'signed_at' => '2026-11-02T09:12:00Z', 'drawing' => ['viewBox' => [200, 60], 'paths' => ['M0 0 L10 10']]],
             ],
-            'office' => ['dean' => ['value' => 'recommend', 'by' => 'Prof. Ahmad Odeh', 'at' => '2026-11-06 10:00:00']],
+            // Merge map A3: what the office entered at a route step.
+            'office' => [['label' => ['en' => 'Dean’s recommendation'], 'value' => 'Recommend approval', 'by' => 'Prof. Ahmad Odeh', 'at' => '2026-11-06 10:00:00']],
             'submission' => ['reference' => 'REC-EU 14/3/2026-27', 'submittedAt' => '2026-11-02 09:00:00', 'submittedBy' => 'Dr Ahmad Khalil'],
             'decision' => [
                 'status' => 'approved', 'decidedAt' => '2026-11-12 10:14:00',
@@ -80,6 +81,7 @@ final class FormPrintoutTest extends TestCase
             ],
             'verify' => ['url' => 'https://app.whity.dev/verify/abc', 'reference' => 'ABC-123'],
             'marks' => [['src' => 'data:image/png;base64,iVBORw0KGgo=', 'alt' => 'ISO 9001:2015']],
+            'names' => static fn (string $type, int $id): ?string => $type === 'profile' ? [13 => 'Ahmad Khalil', 12 => 'Awss Haddad'][$id] ?? null : null,
         ]);
     }
 
@@ -132,6 +134,36 @@ final class FormPrintoutTest extends TestCase
         self::assertSame(['kind' => 'empty', 'text' => 'Not answered'], $reviewed['answer']);
         self::assertSame('Optional.', $reviewed['guidance']);
         self::assertSame('1.1', $byText['Project title']['number']);
+    }
+
+    public function testAPersonColumnPrintsThePersonsNameInTheTable(): void
+    {
+        // WHIT-1162: the other researchers, a table with a person column.
+        $researchers = [
+            'field_key' => 'researchers', 'field_type' => 'repeating', 'label' => ['en' => 'Other researchers'],
+            'help_text' => null, 'help_text_i18n' => [], 'is_required' => false, 'options' => [],
+            'validation' => ['columns' => [
+                ['key' => 'person', 'type' => 'profile_ref', 'label' => ['en' => 'Researcher']],
+                ['key' => 'role', 'type' => 'text', 'label' => ['en' => 'Role']],
+            ]],
+            'section_key' => 'project', 'visible_when' => null,
+        ];
+        $payload = $this->build(answers: ['researchers' => [
+            ['person' => 13, 'role' => 'Co-researcher'],
+            ['person' => 12],
+            ['person' => 99, 'role' => 'Left the workspace'],
+        ]], extraFields: [$researchers]);
+
+        $table = null;
+        foreach (self::blocks($payload, 'formQuestion') as $q) {
+            if ($q['text'] === 'Other researchers') {
+                $table = $q['answer'];
+            }
+        }
+        self::assertNotNull($table);
+        self::assertSame('table', $table['kind']);
+        self::assertSame(['Researcher', 'Role'], $table['columns']);
+        self::assertSame([['Ahmad Khalil', 'Co-researcher'], ['Awss Haddad', ''], ['—', 'Left the workspace']], $table['rows']);
     }
 
     public function testASectionAnsweredNaThroughoutIsOneLine(): void
@@ -280,5 +312,107 @@ final class FormPrintoutTest extends TestCase
         self::assertSame('Project details', self::blocks($out, 'formSection')[0]['title']);
         $q = self::blocks($out, 'formQuestion')[0];
         self::assertSame(['1.1', 'Project title'], [$q['number'], $q['text']]);
+    }
+
+    /**
+     * WHIT-1164: questions sharing a print group read as one; a checklist's
+     * files fold into its rows, numbered through the printout; an optional
+     * signature slot nobody signed is left out.
+     */
+    public function testPrintGroupsChecklistsAndEmptySignatureSlots(): void
+    {
+        $f = static fn (string $key, string $type, string $label, array $extra = []): array => $extra + [
+            'field_key' => $key, 'field_type' => $type, 'label' => ['en' => $label], 'is_required' => true,
+            'options' => [], 'validation' => [], 'section_key' => 's', 'visible_when' => null,
+        ];
+        $yn = [['value' => 'yes', 'label' => ['en' => 'Yes']], ['value' => 'no', 'label' => ['en' => 'No']], ['value' => 'na', 'label' => ['en' => 'N/A']]];
+        $applicant = ['printGroup' => ['en' => 'Applicant']];
+        $checklist = ['printGroup' => 'Attachments'];
+        $fields = [
+            $f('a_name', 'text', '1.3a Title and name', ['validation' => $applicant]),
+            $f('a_email', 'text', '1.3b Email', ['validation' => $applicant]),
+            $f('a_quals', 'textarea', '1.3c Qualifications', ['validation' => $applicant]),
+            $f('d1', 'select', '9.1a Research proposal', ['options' => $yn, 'validation' => $checklist]),
+            $f('d1_file', 'file', 'File', ['validation' => $checklist, 'visible_when' => ['field' => 'd1', 'equals' => 'yes']]),
+            $f('d2', 'select', '9.1b Consent form', ['options' => $yn, 'validation' => $checklist]),
+            $f('d2_file', 'file', 'File', ['validation' => $checklist, 'visible_when' => ['field' => 'd2', 'equals' => 'yes']]),
+            $f('d3', 'select', '9.1c Budget', ['options' => $yn, 'validation' => $checklist]),
+            $f('d3_file', 'file', 'File', ['validation' => $checklist, 'visible_when' => ['field' => 'd3', 'equals' => 'yes']]),
+            $f('sign_1', 'signature', 'Applicant'),
+            $f('sign_2', 'signature', 'Student 1', ['is_required' => false]),
+        ];
+        $out = (new FormPrintout())->build([
+            'lang' => 'en', 'style' => FormPrintStyle::resolve(null, true), 'workspace' => ['name' => 'W'],
+            'form' => ['title' => 'F', 'sections' => [['key' => 's', 'title' => ['en' => 'S'], 'description' => []]], 'fields' => $fields],
+            'answers' => [
+                'a_name' => 'Dr Ahmad Khalil', 'a_email' => 'a.khalil@example.edu', 'a_quals' => str_repeat('Eleven years of research. ', 12),
+                'd1' => 'yes', 'd1_file' => ['k1', 'k2'], 'd2' => 'yes', 'd2_file' => 'k3', 'd3' => 'na',
+                'sign_1' => ['name' => 'Dr Ahmad Khalil', 'signed_at' => '2026-11-16T09:00:00Z'],
+            ],
+            'submission' => [],
+        ]);
+        $questions = self::blocks($out, 'formQuestion');
+
+        $group = $questions[0];
+        self::assertSame(['1.3', 'Applicant', 'facts'], [$group['number'], $group['text'], $group['answer']['kind']]);
+        self::assertSame([['label' => 'Title and name', 'value' => 'Dr Ahmad Khalil'], ['label' => 'Email', 'value' => 'a.khalil@example.edu']], $group['answer']['items']);
+        self::assertSame('Qualifications', $questions[1]['text'], 'a long answer prints after the facts');
+        self::assertSame('', $questions[1]['number']);
+
+        $list = $questions[2];
+        self::assertSame(['9.1', 'Attachments', 'yesNoRows'], [$list['number'], $list['text'], $list['answer']['kind']]);
+        self::assertSame(['Yes · Attachment 1, Attachment 2', 'Yes · Attachment 3', 'N/A'], array_column($list['answer']['rows'], 'word'));
+
+        self::assertSame(['Dr Ahmad Khalil'], array_column(self::blocks($out, 'signatureRow'), 'name'), 'the unsigned optional slot is left out');
+    }
+
+    /** WHIT-1164: a table's choice column prints its option's label. */
+    public function testATableChoiceCellPrintsItsLabel(): void
+    {
+        $out = (new FormPrintout())->build([
+            'lang' => 'en', 'style' => FormPrintStyle::resolve(null, true), 'workspace' => ['name' => 'W'],
+            'form' => ['title' => 'F', 'fields' => [[
+                'field_key' => 'students', 'field_type' => 'repeating', 'label' => '1.4 Students', 'is_required' => false, 'section_key' => null,
+                'validation' => ['columns' => [
+                    ['key' => 'name', 'label' => ['en' => 'Name'], 'kind' => 'text'],
+                    ['key' => 'level', 'label' => ['en' => 'Program level'], 'kind' => 'select', 'options' => [['value' => 'master', 'label' => ['en' => 'Master']]]],
+                ]],
+            ]]],
+            'answers' => ['students' => [['name' => 'Ibrahim Mansour', 'level' => 'master']]],
+            'submission' => [],
+        ]);
+        self::assertSame([['Ibrahim Mansour', 'Master']], self::blocks($out, 'formQuestion')[0]['answer']['rows']);
+    }
+
+    /** WHIT-1164: "For official use" is one block per stage, and the stage's decision word leads. */
+    public function testOfficialUseIsGroupedByStageAndTheDecisionWordIsTheStages(): void
+    {
+        $payload = (new FormPrintout())->build([
+            'lang' => 'en', 'style' => FormPrintStyle::resolve(null, true), 'workspace' => ['name' => 'W'],
+            'form' => ['title' => 'F', 'fields' => []], 'answers' => [], 'submission' => ['reference' => 'IRB-AAU 1/3/2026-2027'],
+            'office' => [
+                ['label' => ['en' => 'Recommendation'], 'value' => 'Recommend approval', 'by' => 'Prof. Awss Qasem', 'at' => '2026-11-18 10:00:00', 'stage' => 'Faculty committee'],
+                ['label' => ['en' => 'Meeting number'], 'value' => '3', 'by' => 'Prof. Amro Saleh', 'at' => '2026-11-24 12:00:00', 'stage' => 'IRB'],
+                ['label' => ['en' => 'IRB decision'], 'value' => 'Conditionally approved', 'by' => 'Prof. Amro Saleh', 'at' => '2026-11-24 12:00:00', 'stage' => 'IRB'],
+            ],
+            'decision' => ['status' => 'conditional', 'word' => 'Conditionally approved', 'decidedAt' => '2026-11-24 12:00:00', 'approvals' => []],
+        ]);
+        $office = array_values(array_filter(self::blocks($payload, 'formQuestion'), static fn (array $q): bool => in_array($q['text'], ['Faculty committee', 'IRB'], true)));
+        self::assertSame(['Faculty committee', 'IRB'], array_column($office, 'text'));
+        self::assertSame(['Meeting number', 'IRB decision', 'By', 'Date'], array_column($office[1]['answer']['items'], 'label'));
+        $block = self::blocks($payload, 'decisionBlock')[0];
+        self::assertSame(['conditional', 'Conditionally approved'], [$block['status'], $block['word']]);
+        self::assertSame('Conditionally approved', self::blocks($payload, 'decisionLine')[0]['word']);
+    }
+
+    public function testADecisionChoiceMapsToAPrintedStatus(): void
+    {
+        self::assertSame('conditional', \Whity\Core\Form\Print\FormPrintoutService::statusOf('conditionally_approved', 'approved'));
+        self::assertSame('revisions', \Whity\Core\Form\Print\FormPrintoutService::statusOf('revisions_required', 'approved'));
+        self::assertSame('rejected', \Whity\Core\Form\Print\FormPrintoutService::statusOf('not_approved', 'approved'));
+        self::assertSame('approved', \Whity\Core\Form\Print\FormPrintoutService::statusOf('approved', 'rejected'));
+        self::assertSame('approved', \Whity\Core\Form\Print\FormPrintoutService::statusOf('noted', 'approved'));
+        self::assertTrue(\Whity\Core\Form\Print\FormPrintoutService::isDecisionKey('irb_decision'));
+        self::assertFalse(\Whity\Core\Form\Print\FormPrintoutService::isDecisionKey('decisions_count'));
     }
 }

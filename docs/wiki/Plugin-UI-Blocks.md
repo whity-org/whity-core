@@ -152,7 +152,11 @@ standalone one-click mutation. Inputs and `submitButton` are valid **only inside
 | `slider` | `name`, `label`, `min`, `max`, `step?`, `default?` | |
 | `dateInput` | `name`, `label`, `required?`, `default?` | |
 | `fileInput` | `name`, `label`, `accept?`, `required?` | read as TEXT into the JSON property |
-| `colorInput` | `name`, `label`, `default?` | |
+| `colorInput` | `name`, `label`, `default?`, `swatches?: string[]` | `#rrggbb`. `swatches` (1.113) are ready colours shown before the free picker, so nobody types a code |
+| `timeInput` | `name`, `label`, `step?: 5\|10\|15\|30\|60`, `allowEndOfDay?`, `required?`, `default?` | 1.113. Picked from a list of times; submits `HH:MM` (`24:00` only with `allowEndOfDay`) |
+| `weeklyHours` | `name`, `label`, `firstDay?: 1-7`, `required?`, `default?: {weekday, start_time, end_time}[]` | 1.113. A week of opening or working hours: a switch per day, from–to times, "Add a break", "Copy to every open day". Submits the calendar's own rows (ISO weekday 1 Monday … 7 Sunday; a closed day has none), so a plugin passes them straight to `PUT /api/calendar/staff/{id}/hours` |
+| `checkboxGroup` | `name`, `label`, `options: { value, label }[]`, `required?`, `default?: string[]` | 1.113. Several choices; submits the ticked values as a list, in the options' order |
+| `fieldArray` | `name`, `label`, `itemLabel?`, `addLabel?`, `min?`, `max?`, `default?: {…}[]`, `source?`, `params?`; children are the row's inputs | A repeating group with an "Add" button; submits a list of row objects. `default` (1.113) is the rows it starts with, keyed by the row inputs' names (a checkbox as `'true'`/`'false'`), for a ready list to tick and edit; ignored with `source`, which edits stored rows instead |
 | `submitButton` | `label`, `requiredPermission?`, `variant?` | the form's trigger; only inside a `form` |
 | `actionButton` | `label`, `action: { method, endpoint }`, `requiredPermission?`, `confirm?`, `variant?` | standalone |
 

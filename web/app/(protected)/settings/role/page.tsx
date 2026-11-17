@@ -11,8 +11,10 @@ import { TenantLogo } from '@whity/ui/tenant-logo';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import { roleLabel } from '@whity/features/roles/role-label';
 import { useAuth } from '@/lib/auth-context';
-import { localizedName } from '@/lib/localized-name';
+import { localizedText } from '@whity/ui/localized-text';
 import { roleNames } from '@/lib/workspace-memberships';
+import { RoleSummary } from '@whity/ui/role-summary';
+import { useRoleSummaryLabels } from '@/hooks/useRoleSummaryLabels';
 import { MySettingsHeader, useCurrentWorkspace } from '@/components/settings/scope';
 
 export default function RoleSettingsPage() {
@@ -20,6 +22,7 @@ export default function RoleSettingsPage() {
   const language = useLanguageCode() ?? 'en';
   const { user, memberships } = useAuth();
   const { id: currentId, name: workspace } = useCurrentWorkspace();
+  const roleSummaryLabels = useRoleSummaryLabels();
 
   // A person may hold several roles in one workspace (WHIT-1079): `roles`
   // lists them, and an older answer may still send one entry per role.
@@ -30,7 +33,7 @@ export default function RoleSettingsPage() {
   for (const m of memberships) {
     if (m.tenant_id === currentId) continue;
     const entry = others.get(m.tenant_id) ?? {
-      name: localizedName(m.tenant_names, language, m.tenant_name_language, m.tenant_name),
+      name: localizedText(m.tenant_names, language, m.tenant_name_language, m.tenant_name),
       roles: [],
     };
     for (const name of roleNames(m)) if (!entry.roles.includes(name)) entry.roles.push(name);
@@ -81,7 +84,13 @@ export default function RoleSettingsPage() {
               {[...others.entries()].map(([id, entry]) => (
                 <li key={id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
                   <TenantLogo name={entry.name} size={24} />
-                  <span className="text-muted-foreground">{entry.roles.map((role) => roleLabel(role)).join(' · ')}</span>
+                  {/* First role and a focusable "+N more" with the full list (WHIT-1175). */}
+                  <RoleSummary
+                    roles={entry.roles.map((role) => roleLabel(role))}
+                    labels={roleSummaryLabels}
+                    interactive
+                    className="justify-end text-muted-foreground"
+                  />
                 </li>
               ))}
             </ul>

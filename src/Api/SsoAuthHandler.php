@@ -108,6 +108,12 @@ final class SsoAuthHandler
         private readonly ?\Whity\Auth\TokenValidator $sessions = null,
         private readonly ?\Whity\Core\Identity\ExternalIdentityRepository $identities = null,
         private readonly ?\Whity\Core\Document\Signing\SigningChallengeRepository $signingChallenges = null,
+        // WHIT-1168: accepting an invitation by signing in, for servers that
+        // sign people in only through their identity provider.
+        private readonly ?\Whity\Core\Identity\InvitationService $invitations = null,
+        // WHIT-1181: a verified phone_number from the operator's provider fills
+        // the person's own phone, never one they set themselves.
+        private readonly ?\Whity\Core\Identity\PersonalPhone $phones = null,
     ) {
     }
 
@@ -140,6 +146,32 @@ final class SsoAuthHandler
     }
 
     /**
+     * The signed-in person asking to sign in again to confirm a gated approval (WHIT-1147): the
+     * approval's purpose ("password-reset:12") and the page to come back to.
+     *
+     * @return array{profile_id: int, tenant_id: int, purpose: string, return_to: string}|null
+     */
+    private function reauthGateTarget(): ?array
+    {
+        if ($this->sessions === null || $this->identities === null || $this->signingChallenges === null) {
+            return null;
+        }
+        $claims = $this->sessions->validateAccessToken();
+        $profileId = $claims['profile_id'] ?? null;
+        $tenantId = $claims['tenant_id'] ?? null;
+        $returnTo = (string) ($this->query('return_to') ?? '');
+        $purpose = (string) ($this->query('purpose') ?? '');
+        if (!is_int($profileId) || !is_int($tenantId) || $tenantId <= 0
+            || preg_match('/^(2fa-recovery|password-reset|agent-proposal):[A-Za-z0-9_\-]{1,64}$/', $purpose) !== 1
+            || preg_match('#^/(?!/)[A-Za-z0-9/_\-.~%]{0,500}$#', $returnTo) !== 1
+        ) {
+            return null;
+        }
+
+        return ['profile_id' => $profileId, 'tenant_id' => $tenantId, 'purpose' => $purpose, 'return_to' => $returnTo];
+    }
+
+    /**
      * Finish a sign-in made to confirm a signature (WHIT-922). No session is
      * minted or changed: the provider's answer only records that this person
      * signed in again, now. It must be the same person, and the provider must
@@ -152,13 +184,14 @@ final class SsoAuthHandler
         $profileId = (int) $flow['reauth_profile_id'];
         $signingTenantId = (int) ($flow['reauth_tenant_id'] ?? 0);
         $routeId = (int) ($flow['reauth_route_id'] ?? 0);
+        $purpose = is_string($flow['reauth_purpose'] ?? null) ? $flow['reauth_purpose'] : null;
         $returnTo = (string) ($flow['reauth_return_to'] ?? '/');
         $base = rtrim(($this->frontendUrls ?? new \Whity\Core\Http\FrontendUrls(['APP_URL' => $this->appUrl]))->base(), '/');
         $back = static fn (string $outcome): Response => new Response(302, '', [
-            'Location' => $base . $returnTo . '?signing=' . rawurlencode($outcome),
+            'Location' => $base . $returnTo . ($purpose !== null ? '?identity_check=' : '?signing=') . rawurlencode($outcome),
         ]);
 
-        if ($this->identities === null || $this->signingChallenges === null || $signingTenantId <= 0 || $routeId <= 0) {
+        if ($this->identities === null || $this->signingChallenges === null || $signingTenantId <= 0 || ($routeId <= 0 && $purpose === null)) {
             return $back('sign_in_failed');
         }
 
@@ -178,7 +211,11 @@ final class SsoAuthHandler
             return $back('sign_in_not_fresh');
         }
 
-        $this->signingChallenges->recordFreshSignIn($signingTenantId, $profileId, $routeId);
+        if ($purpose !== null) {
+            $this->signingChallenges->recordGateFreshSignIn($signingTenantId, $profileId, \Whity\Core\Security\IdentityCheck::key($purpose));
+        } else {
+            $this->signingChallenges->recordFreshSignIn($signingTenantId, $profileId, $routeId);
+        }
 
         return $back('signed_in');
     }
@@ -263,6 +300,12 @@ final class SsoAuthHandler
             if ($reauth === null) {
                 return $this->fail('reauth_unavailable');
             }
+        } elseif ($this->query('reauth') === 'gate') {
+            // Confirming a gated approval (WHIT-1147).
+            $reauth = $this->reauthGateTarget();
+            if ($reauth === null) {
+                return $this->fail('reauth_unavailable');
+            }
         }
 
         $joinSlug = $reauth === null ? strtolower(trim((string) ($this->query('join') ?? ''))) : '';
@@ -272,6 +315,16 @@ final class SsoAuthHandler
             if ($joinTenantId === null) {
                 return $this->joinOutcome($joinSlug, 'closed');
             }
+        }
+
+        // WHIT-1168: an invitation accepted by signing in. The token rides in
+        // the signed flow cookie and is checked at the callback, where the
+        // invited address must belong to the person who signed in.
+        $inviteToken = $reauth === null && $joinTenantId === null
+            ? trim((string) ($this->query('invite') ?? ''))
+            : '';
+        if ($inviteToken !== '' && ($this->invitations === null || strlen($inviteToken) > 256)) {
+            $inviteToken = '';
         }
 
         $tenantId = $joinTenantId !== null ? 0 : $this->resolveTenantId($request);
@@ -316,10 +369,12 @@ final class SsoAuthHandler
             'provider_key'  => $providerKey,
             'join_tenant_id' => $joinTenantId,
             'join_slug'     => $joinTenantId !== null ? $joinSlug : null,
+            'invite_token'  => $inviteToken !== '' ? $inviteToken : null,
             'reauth_profile_id' => $reauth['profile_id'] ?? null,
             'reauth_tenant_id'  => $reauth['tenant_id'] ?? null,
             'reauth_return_to'  => $reauth['return_to'] ?? null,
             'reauth_route_id'   => $reauth['route_id'] ?? null,
+            'reauth_purpose'    => $reauth['purpose'] ?? null,
         ], 600, 'oidc_flow');
         CookieManager::setSsoFlowToken($flowToken, 600);
 
@@ -481,8 +536,32 @@ final class SsoAuthHandler
             return $joinTenantId !== null ? $this->joinOutcome($joinSlug, 'failed') : $this->fail('failed');
         }
 
+        // WHIT-1181: only a global-trust (operator) provider speaks for the
+        // person's own account; a workspace's own provider never writes to a
+        // detail every other workspace sees. A failure here never blocks sign-in.
+        if ($this->phones !== null && $ctx->isGlobalTrust()) {
+            try {
+                $this->phones->fillFromSignIn($profileId, $identity->claims);
+            } catch (\Throwable $e) {
+                error_log('[SsoAuthHandler] phone from sign-in: ' . $e->getMessage());
+            }
+        }
+
         if ($joinTenantId !== null) {
             return $this->completeJoin($request, $joinTenantId, $joinSlug, $profileId, $identity, $ctx, $providerKey);
+        }
+
+        // WHIT-1168: accept the invitation this sign-in was started from, then
+        // sign straight into the workspace that sent it.
+        $inviteTenantId = null;
+        if (is_string($flow['invite_token'] ?? null) && $flow['invite_token'] !== '' && $ctx->isGlobalTrust()) {
+            $inviteTenantId = $this->acceptInvitation((string) $flow['invite_token'], $profileId);
+            if ($inviteTenantId === null) {
+                return $this->fail('invite_invalid');
+            }
+            if ($inviteTenantId === -1) {
+                return $this->fail('invite_other_email');
+            }
         }
         // last_login_at is stamped inside the linker on the resolved link.
         //
@@ -525,9 +604,47 @@ final class SsoAuthHandler
             $profileId,
             $email,
             $request,
-            $ctx->isGlobalTrust() ? null : $tenantId,
+            $inviteTenantId ?? ($ctx->isGlobalTrust() ? null : $tenantId),
         );
         return $this->redirectForLoginResult($result, $profileId, $email, $ctx);
+    }
+
+    /**
+     * Accept an invitation for the person who just signed in (WHIT-1168). The
+     * invited address must already be one of theirs: the provider verified the
+     * address they signed in with, and an invitation sent to an address they
+     * don't hold is not theirs to take.
+     *
+     * @return int|null the workspace joined; -1 when the invitation went to
+     *         another address; null when it can't be used.
+     */
+    private function acceptInvitation(string $token, int $profileId): ?int
+    {
+        if ($this->invitations === null) {
+            return null;
+        }
+
+        try {
+            $preview = $this->invitations->preview($token);
+            if ($preview === null) {
+                return null;
+            }
+            $owner = $this->emails->findByEmail(strtolower(trim($preview['email'])));
+            if ($owner === null || (int) ($owner['profile_id'] ?? 0) !== $profileId) {
+                return -1;
+            }
+
+            $accepted = $this->invitations->accept($token, null);
+        } catch (\Throwable $e) {
+            error_log('[sso] accepting an invitation failed for profile ' . $profileId . ': ' . $e->getMessage());
+
+            return null;
+        }
+
+        return in_array($accepted['result'], [
+            \Whity\Core\Identity\InvitationService::ACCEPT_JOINED,
+            \Whity\Core\Identity\InvitationService::ACCEPT_ALREADY_MEMBER,
+        ], true) && is_int($accepted['tenant_id']) ? $accepted['tenant_id'] : null;
     }
 
     /**
@@ -611,8 +728,10 @@ final class SsoAuthHandler
      */
     public function providers(Request $request): Response
     {
+        // WHIT-1168: whether the page may still offer email and password.
+        $passwordSignIn = \Whity\Core\Identity\PasswordSignIn::allowed($this->settings);
         if (!$this->ssoEnabled()) {
-            return Response::json(['data' => []]);
+            return Response::json(['data' => [], 'password_sign_in' => $passwordSignIn]);
         }
 
         $tenantId = $this->resolveTenantId($request);
@@ -626,7 +745,7 @@ final class SsoAuthHandler
             }
         }
 
-        return Response::json(['data' => $out]);
+        return Response::json(['data' => $out, 'password_sign_in' => $passwordSignIn]);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

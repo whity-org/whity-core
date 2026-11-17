@@ -41,7 +41,7 @@ import { Skeleton } from '@whity/ui/skeleton';
 import { Switch } from '@whity/ui/switch';
 import { useTranslation } from '@whity/features/i18n';
 import { calendarApi, type CalendarService, type CalendarServiceRequest } from '@/lib/calendar/api';
-import { cleanNames, sameNames } from '@/lib/localized-name';
+import { cleanLocalizedText, sameLocalizedText } from '@whity/ui/localized-text';
 
 interface Draft {
   name: BilingualValue;
@@ -114,8 +114,8 @@ export default function CalendarServicePage() {
 
   const changes: string[] = [];
   if (saved && current) {
-    if (!sameNames(current.name, saved.name)) changes.push(t('services.field.name', 'Name'));
-    if (!sameNames(current.description, saved.description)) changes.push(t('services.field.description', 'Description'));
+    if (!sameLocalizedText(current.name, saved.name)) changes.push(t('services.field.name', 'Name'));
+    if (!sameLocalizedText(current.description, saved.description)) changes.push(t('services.field.description', 'Description'));
     if (current.duration !== saved.duration || current.before !== saved.before || current.after !== saved.after)
       changes.push(t('services.field.time', 'Time'));
     if (current.price !== saved.price || current.currency !== saved.currency) changes.push(t('services.field.price', 'Price'));
@@ -133,7 +133,7 @@ export default function CalendarServicePage() {
 
   const save = async () => {
     if (current === null) return;
-    const names = cleanNames(current.name);
+    const names = cleanLocalizedText(current.name);
     if (Object.keys(names).length === 0) {
       setProblem(t('services.error.name', 'Give the service a name.'));
       return;
@@ -170,7 +170,7 @@ export default function CalendarServicePage() {
 
     const body: CalendarServiceRequest = {
       name: names,
-      description: cleanNames(current.description),
+      description: cleanLocalizedText(current.description),
       duration_minutes: duration,
       buffer_before_minutes: before,
       buffer_after_minutes: after,
@@ -237,7 +237,7 @@ export default function CalendarServicePage() {
                 <CardTitle>{t('services.card.about', 'About the service')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <ChangedField changed={!sameNames(current.name, saved.name)}>
+                <ChangedField changed={!sameLocalizedText(current.name, saved.name)}>
                   <BilingualInput
                     id="service-name"
                     label={t('services.field.name', 'Name')}
@@ -248,7 +248,7 @@ export default function CalendarServicePage() {
                     disabled={readOnly}
                   />
                 </ChangedField>
-                <ChangedField changed={!sameNames(current.description, saved.description)}>
+                <ChangedField changed={!sameLocalizedText(current.description, saved.description)}>
                   <BilingualInput
                     id="service-description"
                     label={t('services.field.description', 'Description')}

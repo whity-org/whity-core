@@ -7,9 +7,9 @@
  * own route and its own access state. A section the person can't use is not
  * offered; the page behind it still says so if it is opened directly.
  *
- * From 768px the sections are underlined tabs, Bookings first
- * (TplCalendarStaff, WHIT-1044); the bookings page puts them under its
- * toolbar. `part` lets a page place the phone's button and the tabs apart.
+ * From 768px the setup pages are underlined tabs after a link back to the
+ * calendar; the calendar itself reaches them from the gear in its bar (design
+ * 3.5, CV.3). `part` lets a page place the phone's button and the tabs apart.
  */
 
 import Link from 'next/link';
@@ -121,8 +121,20 @@ export function CalendarNav({
       // than three ragged rows; it wraps from 768px as before.
       className="mb-6 hidden w-full gap-1 border-b border-border md:flex md:flex-wrap"
     >
+      {/* Design 3.5 (CV.3): the calendar's gear opens these pages, so the
+          calendar itself is a way back rather than a tab. */}
+      {active !== 'calendar' && (
+        <Link
+          href="/calendar"
+          data-testid="calendar-nav-back"
+          className="-mb-px me-2 inline-flex min-h-10 items-center gap-1 border-e border-border pe-3 text-sm whitespace-nowrap text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Icon name="chevron-left" className="rtl:-scale-x-100" />
+          {t('nav.calendar', 'Calendar')}
+        </Link>
+      )}
       {tabs
-        .filter((tab) => tab.show)
+        .filter((tab) => tab.show && tab.id !== 'calendar')
         .map((tab) => {
           const isActive = tab.id === active;
           return (

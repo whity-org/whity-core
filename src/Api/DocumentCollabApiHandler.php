@@ -11,6 +11,7 @@ use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Core\Document\Collab\DocumentCollab;
 use Whity\Core\Document\Suggestion\DocumentSuggestionRepository;
 use Whity\Core\Document\Suggestion\SuggestionPatch;
+use Whity\Core\Mention\Mentions;
 use Whity\Core\Notification\NotificationDispatcher;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\RBAC\ScopedPermissionSet;
@@ -528,17 +529,14 @@ final class DocumentCollabApiHandler
         }
         $mentions = [];
         if (array_key_exists('mentions', $body) && $body['mentions'] !== null) {
-            $list = $body['mentions'];
-            if (!is_array($list) || !array_is_list($list) || count($list) > self::MAX_MENTIONS) {
-                return Response::error('mentions must be a list of at most ' . self::MAX_MENTIONS . ' profile ids', 422);
+            // N4: one mention shape with chat ({type, id}); bare ids still read as people.
+            $parsed = Mentions::parse($body['mentions'], self::MAX_MENTIONS);
+            if ($parsed === null) {
+                return Response::error('mentions must be a list of at most ' . self::MAX_MENTIONS . ' people, as profile ids or {"type": "person", "id": …}', 422);
             }
-            foreach ($list as $id) {
-                if (!is_int($id) || $id <= 0) {
-                    return Response::error('mentions must be a list of profile ids', 422);
-                }
-            }
-            $members = $this->collab->memberNames($tenantId, $list);
-            $mentions = array_values(array_filter(array_values(array_unique($list)), static fn (int $id): bool => isset($members[$id])));
+            $people = Mentions::people($parsed);
+            $members = $this->collab->memberNames($tenantId, $people);
+            $mentions = array_values(array_filter($people, static fn (int $id): bool => isset($members[$id])));
         }
 
         return ['body' => $inlines, 'mentions' => $mentions];

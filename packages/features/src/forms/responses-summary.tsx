@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@whity/ui/card"
 
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
-import { pickText } from "./text"
 import type { ResponsesSummary } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 /** A row of horizontal bars: a label, how many, and a bar as long as its share. */
 function Bars({ rows, max }: { rows: Array<{ label: string; count: number }>; max: number }) {
@@ -81,12 +81,12 @@ export function ResponsesSummaryCards({ summary }: { summary: ResponsesSummary }
       {choice.map((question) => {
         const shown = question.options.slice(0, OPTIONS_SHOWN)
         const rest = question.options.slice(OPTIONS_SHOWN).reduce((sum, o) => sum + o.count, 0)
-        const rows = shown.map((o) => ({ label: pickText(o.label, currentLanguage) || o.value, count: o.count }))
+        const rows = shown.map((o) => ({ label: localizedText(o.label, currentLanguage) || o.value, count: o.count }))
         if (rest > 0) rows.push({ label: t("summary.other", "Other"), count: rest })
         return (
           <Card key={question.field_key}>
             <CardHeader>
-              <CardTitle className="text-base">{pickText(question.label, currentLanguage) || question.field_key}</CardTitle>
+              <CardTitle className="text-base">{localizedText(question.label, currentLanguage) || question.field_key}</CardTitle>
             </CardHeader>
             <CardContent>
               <Bars max={Math.max(...rows.map((r) => r.count))} rows={rows} />

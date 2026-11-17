@@ -138,6 +138,26 @@ final class SettingsRegistry
     // Default 'false': a sovereign instance is operator-provisioned.
     public const SSO_SELF_PROVISION_WORKSPACE = 'auth.sso_self_provision_workspace';
 
+    // Creating more workspaces while signed in (WHIT-1169). Global/operator-level.
+    // When 'true', any signed-in person may create another workspace from the
+    // workspace switcher or Ctrl+K and becomes its owner; it starts on the
+    // default plan, behind the payment gate when registration requires payment.
+    // Default 'false': a sovereign instance is operator-provisioned. On
+    // app.whity.dev the operator turns it on.
+    public const WORKSPACES_SELF_CREATE_ENABLED = 'workspaces.self_create_enabled';
+
+    // How many workspaces one person may own (WHIT-1169). Global/operator-level.
+    // Counted over workspace_owners, so co-owned workspaces count for each owner.
+    // '0' means no limit (the self-hosted default); app.whity.dev uses 3.
+    public const WORKSPACES_MAX_OWNED_PER_PERSON = 'workspaces.max_owned_per_person';
+    // Password sign-in on this server (WHIT-1168). Global/operator-level. When
+    // 'false', people sign in and sign up only through the operator's identity
+    // provider (app.whity.dev: Whity ID): password sign-in, reset, registration
+    // with a password and local two-step set-up refuse. Default 'true': a
+    // self-hosted core keeps its own sign-in (ADR 0019). Break-glass:
+    // WHITY_PASSWORD_SIGN_IN=force, see Core\Identity\PasswordSignIn.
+    public const PASSWORD_SIGN_IN = 'auth.password_sign_in';
+
     // Desktop-client login TTL (WC-desktop-ttl). The maximum wall-clock a
     // native/desktop client's cached login (its device credential) stays valid
     // before the app must re-authenticate ONLINE — even offline, the client
@@ -811,6 +831,12 @@ final class SettingsRegistry
     public const CALENDAR_WEEKEND_DAYS = 'calendar.weekend_days';
     /** Design 3.3: off turns every booking from the booking page into a request staff accept. */
     public const CALENDAR_INSTANT_BOOKING = 'calendar.instant_booking';
+    /**
+     * WHIT-1173: on lets one booking hold several services back to back
+     * (a haircut, a colour and a blow-dry), on the booking page and at the
+     * desk. Off by default; the Salons plugin turns it on.
+     */
+    public const CALENDAR_MULTI_SERVICE_BOOKING = 'calendar.multi_service_booking';
 
     /**
      * Whether the web app offers itself as an installable app (#1733): the web
@@ -843,6 +869,22 @@ final class SettingsRegistry
     //   - invites_per_customer: how many people one customer may invite (open,
     //     accepted and not sent count); 0 is no limit (WHIT-1043, SC.11).
     public const SIGNUP_INVITES_PER_CUSTOMER = 'signup.invites_per_customer';
+    //   - route_template_id: the route a join request travels on (merge map
+    //     A4); 0 is the default, one step for everyone with signup:manage.
+    public const SIGNUP_ROUTE_TEMPLATE_ID = 'signup.route_template_id';
+
+    // A workspace's Messages settings (ADR 0016 §4-5), kept in the
+    // messaging_settings table until migration 294 folded them in here (merge
+    // map, plumbing). Set on the workspace's own Messages screen, so these are
+    // OWN-SCREEN keys too. The inbound email secret is not a setting: it is
+    // kept encrypted under an unregistered key, so no settings read returns it
+    // ({@see \Whity\Core\Messaging\MessagingSettings}).
+    //   - webchat_enabled: whether the web chat bubble is on.
+    //   - webchat_greeting: the line it opens with; '' for none.
+    //   - inbound_email_address: where replies to email come back; '' for none.
+    public const MESSAGING_WEBCHAT_ENABLED = 'messaging.webchat_enabled';
+    public const MESSAGING_WEBCHAT_GREETING = 'messaging.webchat_greeting';
+    public const MESSAGING_INBOUND_EMAIL_ADDRESS = 'messaging.inbound_email_address';
 
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
@@ -858,6 +900,10 @@ final class SettingsRegistry
         self::SIGNUP_ALLOWED_DOMAINS,
         self::SIGNUP_CUSTOMER_INVITES,
         self::SIGNUP_INVITES_PER_CUSTOMER,
+        self::SIGNUP_ROUTE_TEMPLATE_ID,
+        self::MESSAGING_WEBCHAT_ENABLED,
+        self::MESSAGING_WEBCHAT_GREETING,
+        self::MESSAGING_INBOUND_EMAIL_ADDRESS,
     ];
 
     /**
@@ -899,6 +945,9 @@ final class SettingsRegistry
         self::SELF_2FA_RECOVERY_ENABLED,
         self::SSO_ENABLED,
         self::SSO_SELF_PROVISION_WORKSPACE,
+        self::WORKSPACES_SELF_CREATE_ENABLED,
+        self::WORKSPACES_MAX_OWNED_PER_PERSON,
+        self::PASSWORD_SIGN_IN,
         self::STORAGE_DRIVER,
         self::STORAGE_S3_ENDPOINT,
         self::STORAGE_S3_REGION,
@@ -969,6 +1018,7 @@ final class SettingsRegistry
      */
     private const BOOL_KEYS = [
         self::SIGNUP_CUSTOMER_INVITES,
+        self::MESSAGING_WEBCHAT_ENABLED,
         self::MAINTENANCE_ACTIVE,
         self::ERROR_TRACKING_ENABLED,
         self::ERROR_TRACKING_NOTIFY_ADMINS,
@@ -981,6 +1031,8 @@ final class SettingsRegistry
         self::SELF_2FA_RECOVERY_ENABLED,
         self::SSO_ENABLED,
         self::SSO_SELF_PROVISION_WORKSPACE,
+        self::WORKSPACES_SELF_CREATE_ENABLED,
+        self::PASSWORD_SIGN_IN,
         self::STORAGE_S3_PATH_STYLE,
         self::MAIL_EVENT_WELCOME,
         self::MAIL_EVENT_APPROVAL,
@@ -998,6 +1050,7 @@ final class SettingsRegistry
         self::UI_HIDE_DATES,
         self::CALENDAR_BOOKING_PAGE_ENABLED,
         self::CALENDAR_INSTANT_BOOKING,
+        self::CALENDAR_MULTI_SERVICE_BOOKING,
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
         self::AFFILIATE_CLAWBACK_ON_REFUND,
@@ -1054,6 +1107,7 @@ final class SettingsRegistry
         self::SELF_2FA_RECOVERY_ENABLED,
         self::SSO_ENABLED,
         self::SSO_SELF_PROVISION_WORKSPACE,
+        self::WORKSPACES_SELF_CREATE_ENABLED,
         self::PLUGINS_STORE_ENABLED,
         self::DOCUMENTS_RENDER_ENABLED,
         self::I18N_ENABLED,
@@ -1142,6 +1196,9 @@ final class SettingsRegistry
         self::SELF_2FA_RECOVERY_ENABLED => 'true',
         self::SSO_ENABLED => 'true',
         self::SSO_SELF_PROVISION_WORKSPACE => 'false',
+        self::WORKSPACES_SELF_CREATE_ENABLED => 'false',
+        self::WORKSPACES_MAX_OWNED_PER_PERSON => '0',
+        self::PASSWORD_SIGN_IN => 'true',
         // 72 hours (3 days). A native client offline longer than this must
         // re-authenticate online before it will work again.
         self::AUTH_DESKTOP_LOGIN_MAX_HOURS => '72',
@@ -1333,6 +1390,7 @@ final class SettingsRegistry
         self::CALENDAR_WEEK_START => 'saturday',
         self::CALENDAR_WEEKEND_DAYS => 'friday,saturday',
         self::CALENDAR_INSTANT_BOOKING => 'true',
+        self::CALENDAR_MULTI_SERVICE_BOOKING => 'false',
         // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
         self::APP_INSTALLABLE => 'true',
         // Empty: the plans page shows the active plans as they are, and the
@@ -1347,6 +1405,10 @@ final class SettingsRegistry
         self::SIGNUP_CUSTOMER_INVITES => 'false',
         // No limit, as before the setting existed.
         self::SIGNUP_INVITES_PER_CUSTOMER => '0',
+        self::SIGNUP_ROUTE_TEMPLATE_ID => '0',
+        self::MESSAGING_WEBCHAT_ENABLED => 'false',
+        self::MESSAGING_WEBCHAT_GREETING => '',
+        self::MESSAGING_INBOUND_EMAIL_ADDRESS => '',
     ];
 
     /**
@@ -1692,6 +1754,9 @@ final class SettingsRegistry
             self::SELF_2FA_RECOVERY_ENABLED => self::validateBoolean($value, self::SELF_2FA_RECOVERY_ENABLED),
             self::SSO_ENABLED => self::validateBoolean($value, self::SSO_ENABLED),
             self::SSO_SELF_PROVISION_WORKSPACE => self::validateBoolean($value, self::SSO_SELF_PROVISION_WORKSPACE),
+            self::WORKSPACES_SELF_CREATE_ENABLED => self::validateBoolean($value, self::WORKSPACES_SELF_CREATE_ENABLED),
+            self::WORKSPACES_MAX_OWNED_PER_PERSON => self::validateWholeNumberBetween($value, self::WORKSPACES_MAX_OWNED_PER_PERSON, 0, 1000),
+            self::PASSWORD_SIGN_IN => self::validateBoolean($value, self::PASSWORD_SIGN_IN),
             self::AUTH_DESKTOP_LOGIN_MAX_HOURS => self::validateDesktopLoginMaxHours($value),
             self::STORAGE_DRIVER => self::validateStorageDriver($value),
             self::STORAGE_S3_PATH_STYLE => self::validateBoolean($value, self::STORAGE_S3_PATH_STYLE),
@@ -1800,6 +1865,7 @@ final class SettingsRegistry
             self::CALENDAR_WEEK_START => in_array($value, self::ENUM_OPTIONS[self::CALENDAR_WEEK_START], true) ? null : 'calendar.week_start must be a day of the week.',
             self::CALENDAR_WEEKEND_DAYS => self::validateWeekdayList($value),
             self::CALENDAR_INSTANT_BOOKING => self::validateBoolean($value, self::CALENDAR_INSTANT_BOOKING),
+            self::CALENDAR_MULTI_SERVICE_BOOKING => self::validateBoolean($value, self::CALENDAR_MULTI_SERVICE_BOOKING),
             self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the
@@ -1833,6 +1899,16 @@ final class SettingsRegistry
             self::SIGNUP_ALLOWED_DOMAINS => self::validateSignupDomains($value),
             self::SIGNUP_CUSTOMER_INVITES => self::validateBoolean($value, self::SIGNUP_CUSTOMER_INVITES),
             self::SIGNUP_INVITES_PER_CUSTOMER => self::validateWholeNumberBetween($value, self::SIGNUP_INVITES_PER_CUSTOMER, 0, 1000),
+            self::SIGNUP_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
+                ? null
+                : self::SIGNUP_ROUTE_TEMPLATE_ID . ' must be a route template id, or 0 for the default.',
+            self::MESSAGING_WEBCHAT_ENABLED => self::validateBoolean($value, self::MESSAGING_WEBCHAT_ENABLED),
+            self::MESSAGING_WEBCHAT_GREETING => mb_strlen($value) <= 500
+                ? null
+                : self::MESSAGING_WEBCHAT_GREETING . ' must be 500 characters or fewer.',
+            self::MESSAGING_INBOUND_EMAIL_ADDRESS => $value === '' || (strlen($value) <= 320 && filter_var($value, FILTER_VALIDATE_EMAIL) !== false)
+                ? null
+                : self::MESSAGING_INBOUND_EMAIL_ADDRESS . ' must be an email address, or empty for none.',
             default => "Unknown setting key: {$key}",
         };
     }

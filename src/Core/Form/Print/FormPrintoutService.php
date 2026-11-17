@@ -9,6 +9,8 @@ use Whity\Core\Document\Print\SourceDocumentPrinter;
 use Whity\Core\Document\Routing\RouteApprovals;
 use Whity\Core\Document\Routing\RouteLeftOut;
 use Whity\Core\Document\Routing\RouteRepository;
+use Whity\Core\Document\Routing\RouteStepInputs;
+use Whity\Core\Document\Routing\RouteStepRepository;
 use Whity\Core\Document\Routing\RouteStepValueRepository;
 use Whity\Core\Document\Theme\FormPrintStyle;
 use Whity\Core\Entitlement\EntitlementRegistry;
@@ -16,7 +18,6 @@ use Whity\Core\Entitlement\EntitlementService;
 use Whity\Core\Form\FormFieldRepository;
 use Whity\Core\Form\FormRepository;
 use Whity\Core\Form\FormSubmissionRepository;
-use Whity\Core\Form\FormSubmissionReviewRepository;
 use Whity\Core\Form\FormSubmissionRouteSubject;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
@@ -113,7 +114,7 @@ final class FormPrintoutService
                 'fields' => $fields,
             ],
             'answers' => $answers,
-            'office' => $this->office($tenantId, $submissionId),
+            'office' => $routeId === null ? [] : $this->office($tenantId, $routeId, (string) $lang),
             'submission' => [
                 'reference' => isset($submission['reference']) ? (string) $submission['reference'] : null,
                 'submittedAt' => isset($submission['submitted_at']) ? (string) $submission['submitted_at'] : null,
@@ -136,7 +137,7 @@ final class FormPrintoutService
 
     /**
      * @param list<array<string, mixed>> $fields
-     * @return array{status: string, decidedAt: ?string, approvals: list<array{name: string, role: ?string, at: string}>, notCounted: list<array{name: string, question: ?string}>, conditions?: string}
+     * @return array{status: string, decidedAt: ?string, approvals: list<array{name: string, role: ?string, at: string}>, notCounted: list<array{name: string, question: ?string}>, conditions?: string, word?: string}
      */
     private function decision(int $tenantId, int $routeId, string $state, bool $approved, array $fields, string $lang): array
     {
@@ -144,6 +145,10 @@ final class FormPrintoutService
         $questions = [];
         foreach ($fields as $field) {
             $questions[(string) $field['field_key']] = $labels->pick($field['label'] ?? null);
+        }
+        // Merge map A3: a person the office named at a step (the supervisor).
+        foreach ($this->stepInputs($tenantId, $routeId) as $key => $input) {
+            $questions[$key] ??= $labels->pick(array_filter(['en' => (string) $input['label'], 'ar' => (string) ($input['label_ar'] ?? '')], static fn (string $l): bool => $l !== ''));
         }
         $status = $approved ? 'approved' : match ($state) {
             'completed' => 'approved',
@@ -173,25 +178,101 @@ final class FormPrintoutService
                 break;
             }
         }
+        // WHIT-1164: a stage's decision picked from a list (WHIT-1163), such as
+        // "Conditionally approved", is the word the printout carries. Only once
+        // the route has decided: a choice made before then is not the outcome.
+        if (in_array($status, ['approved', 'rejected'], true)) {
+            foreach ($this->stepInputs($tenantId, $routeId) as $key => $input) {
+                $chosen = $values[$key] ?? null;
+                if (($input['type'] ?? null) !== RouteStepInputs::TYPE_CHOICE || !self::isDecisionKey($key) || !is_string($chosen) || $chosen === '') {
+                    continue;
+                }
+                $decision['word'] = RouteStepInputs::display($input, $chosen, $lang);
+                $decision['status'] = self::statusOf($chosen, $status);
+            }
+        }
 
         return $decision;
     }
 
     /**
-     * The office's answers, the latest for each question, with who gave it.
+     * "For official use" (merge map A3): what the office entered at the route's
+     * steps, the latest for each value, with who entered it and when. A person
+     * prints as their name. The decision's conditions print with the decision.
      *
-     * @return array<string, array{value: mixed, by: ?string, at: ?string}>
+     * @return list<array{label: array<string, string>, value: string, by: ?string, at: ?string, stage: string}>
      */
-    private function office(int $tenantId, int $submissionId): array
+    private function office(int $tenantId, int $routeId, string $lang = 'en'): array
+    {
+        $labels = $this->stepInputs($tenantId, $routeId);
+        $stages = [];
+        foreach ((new RouteStepRepository($this->db))->listForRoute($routeId, $tenantId) as $step) {
+            $stages[(int) $step['id']] = ['label' => trim((string) ($step['label'] ?? '')), 'position' => (int) $step['position']];
+        }
+        $out = [];
+        foreach ((new RouteStepValueRepository($this->db))->currentForRoute($tenantId, $routeId) as $key => $entry) {
+            if (in_array($key, self::CONDITIONS_KEYS, true) || trim($entry['value']) === '') {
+                continue;
+            }
+            $input = $labels[$key] ?? null;
+            $value = $entry['value'];
+            if (($input['type'] ?? RouteStepInputs::TYPE_TEXT) === RouteStepInputs::TYPE_PERSON && ctype_digit($value)) {
+                $value = $this->name($tenantId, 'profile', (int) $value) ?? '—';
+            } elseif ($input !== null) {
+                $value = RouteStepInputs::display($input, $value, $lang);
+            }
+            $out[] = [
+                'label' => array_filter(['en' => (string) ($input['label'] ?? $key), 'ar' => (string) ($input['label_ar'] ?? '')], static fn (string $l): bool => $l !== ''),
+                'value' => $value,
+                'by' => $entry['entered_by'] !== null ? $this->name($tenantId, 'profile', $entry['entered_by']) : null,
+                'at' => $entry['entered_at'],
+                'stage' => $stages[$entry['step_id']]['label'] ?? '',
+                'position' => $stages[$entry['step_id']]['position'] ?? 0,
+            ];
+        }
+        // In the order the stages come, so the faculty prints before the dean.
+        usort($out, static fn (array $a, array $b): int => $a['position'] <=> $b['position']);
+
+        return array_map(static function (array $e): array {
+            unset($e['position']);
+
+            return $e;
+        }, $out);
+    }
+
+    /** A stage value that records the decision: `decision`, or a key ending `_decision`. */
+    public static function isDecisionKey(string $key): bool
+    {
+        return $key === 'decision' || str_ends_with($key, '_decision');
+    }
+
+    /**
+     * The printed status of a decision picked from a list, read from the
+     * option's value: approved, conditionally approved, revisions required or
+     * not approved. Anything else keeps the route's own outcome.
+     */
+    public static function statusOf(string $value, string $fallback): string
+    {
+        return match (true) {
+            str_contains($value, 'condition') => 'conditional',
+            str_contains($value, 'revision') => 'revisions',
+            str_starts_with($value, 'not_') || str_contains($value, 'reject') => 'rejected',
+            $value === 'approved' || str_starts_with($value, 'approve') => 'approved',
+            default => $fallback,
+        };
+    }
+
+    /**
+     * The values the route's steps ask for, by key.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function stepInputs(int $tenantId, int $routeId): array
     {
         $out = [];
-        foreach ((new FormSubmissionReviewRepository($this->db))->listForSubmission($tenantId, $submissionId) as $review) {
-            $data = is_array($review['data']) ? $review['data'] : [];
-            foreach ($data as $key => $value) {
-                if (!isset($out[(string) $key])) {
-                    $by = $review['recorded_by_profile_id'] !== null ? $this->name($tenantId, 'profile', (int) $review['recorded_by_profile_id']) : null;
-                    $out[(string) $key] = ['value' => $value, 'by' => $by, 'at' => (string) $review['recorded_at']];
-                }
+        foreach ((new RouteStepRepository($this->db))->listForRoute($routeId, $tenantId) as $step) {
+            foreach (RouteStepInputs::decode($step['inputs'] ?? []) as $input) {
+                $out[$input['key']] = $input;
             }
         }
 

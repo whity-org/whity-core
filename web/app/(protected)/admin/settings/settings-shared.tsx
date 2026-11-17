@@ -88,12 +88,13 @@ export function isPluginKey(key: string): boolean {
 export type SettingsMap = Record<string, string>;
 
 /** The General tab's tenant-overridable key set. */
-export type GeneralSettingKey = 'site_name' | 'timezone' | 'support_email';
+export type GeneralSettingKey = 'support_email' | 'timezone' | 'locale';
 
-// The General tab's tenant-overridable keys, kept in display order. `locale`
-// lives on the Branding tab instead (grouped with logos/colors as the
-// instance's "identity & language" surface) — see branding/page.tsx.
-export const GENERAL_SETTING_KEYS: readonly GeneralSettingKey[] = ['site_name', 'timezone', 'support_email'];
+// The General tab's tenant-overridable keys, in the order of its card
+// (TplSettingsGeneral, section 25: support email, time zone, language). The
+// product name (`site_name`) is on Branding with the logo and colour
+// (TplAdminBranding).
+export const GENERAL_SETTING_KEYS: readonly GeneralSettingKey[] = ['support_email', 'timezone', 'locale'];
 
 /**
  * Per-tenant DISPLAY preferences, rendered on the General tab beneath the four
@@ -119,6 +120,9 @@ export const COMPANY_SETTING_KEYS: readonly string[] = [
   'company.email',
   'company.name_ar',
   'company.address_ar',
+  // The workspace currency (CU.4): USD for a new workspace, the currency it
+  // already used for one made before design 3.5.1.
+  'billing.default_currency',
 ];
 
 /**
@@ -134,6 +138,7 @@ const COMPANY_INPUT_DIR: Readonly<Record<string, 'ltr' | 'rtl' | 'auto'>> = {
   'company.email': 'ltr',
   'company.name_ar': 'rtl',
   'company.address_ar': 'rtl',
+  'billing.default_currency': 'ltr',
 };
 
 /**
@@ -149,7 +154,7 @@ export function generalFieldLabels(t: TranslateFn): Record<SettingKey, string> {
   return {
     site_name: t('settings.field.site_name', 'Site name'),
     timezone: t('settings.field.timezone', 'Timezone'),
-    locale: t('settings.field.locale', 'Locale'),
+    locale: t('settings.field.locale', 'Main language'),
     support_email: t('settings.field.support_email', 'Support email'),
   };
 }
@@ -246,6 +251,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
       label: t('settings.meta.company.address_ar.label', 'Address in Arabic'),
       help: t('settings.meta.company.address_ar.help', 'Printed under the Arabic name on a letterhead in English and Arabic.'),
     },
+    'billing.default_currency': {
+      label: t('settings.meta.billing.default_currency.label', 'Currency'),
+      help: t(
+        'settings.meta.billing.default_currency.help',
+        'New prices, services and documents start in this currency, as a three-letter code such as USD or JOD. Amounts already saved keep their own currency.'
+      ),
+    },
     site_name: {
       label: t('settings.meta.site_name.label', 'Site name'),
       help: t(
@@ -311,6 +323,27 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
       help: t(
         'settings.meta.auth.sso_self_provision_workspace.help',
         'Give a person who signs in through an operator identity provider, and belongs to no workspace, a new workspace of their own.'
+      ),
+    },
+    'workspaces.self_create_enabled': {
+      label: t('settings.meta.workspaces.self_create_enabled.label', 'People create their own workspaces'),
+      help: t(
+        'settings.meta.workspaces.self_create_enabled.help',
+        'Let anyone signed in create another workspace from the workspace switcher and own it. It starts on the default plan.'
+      ),
+    },
+    'workspaces.max_owned_per_person': {
+      label: t('settings.meta.workspaces.max_owned_per_person.label', 'Workspaces one person may own'),
+      help: t(
+        'settings.meta.workspaces.max_owned_per_person.help',
+        'The most workspaces one person may own, counting ones they co-own. 0 means no limit.'
+      ),
+    },
+    'auth.password_sign_in': {
+      label: t('settings.meta.auth.password_sign_in.label', 'Password sign-in'),
+      help: t(
+        'settings.meta.auth.password_sign_in.help',
+        'Off: people sign in and sign up only with the identity provider. Password sign-in, reset and two-step set-up stop. The server can turn it back on with whity-cli auth password-sign-in on.'
       ),
     },
     'storage.driver': {
@@ -526,7 +559,13 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'settings.section.signup.description',
         'Control whether and how new people can create accounts on this instance.'
       ),
-      keys: ['auth.self_registration_enabled', 'auth.registration_approval_required'],
+      keys: [
+        'auth.self_registration_enabled',
+        'auth.registration_approval_required',
+        // Creating more workspaces while signed in (WHIT-1169).
+        'workspaces.self_create_enabled',
+        'workspaces.max_owned_per_person',
+      ],
     },
     {
       id: 'i18n',
@@ -544,7 +583,7 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'settings.section.signin.description',
         'Federated sign-in across the whole instance.'
       ),
-      keys: ['auth.sso_enabled'],
+      keys: ['auth.sso_enabled', 'auth.password_sign_in'],
     },
     {
       id: 'integrations',

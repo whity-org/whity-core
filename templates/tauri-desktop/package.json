@@ -5,8 +5,9 @@
   "description": "Boilerplate Tauri v2 desktop app consuming @whity/ui + @whity/features. Start here, then add crates for native capabilities (see src-tauri/src/commands/printer.rs for a worked example).",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "dev": "node scripts/copy-sdk.mjs && vite",
+    "build": "node scripts/copy-sdk.mjs && tsc && vite build",
+    "copy-sdk": "node scripts/copy-sdk.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "tauri": "tauri"

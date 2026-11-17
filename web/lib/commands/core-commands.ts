@@ -99,6 +99,8 @@ export interface CommandContext {
   agents: readonly ChatAgent[] | null;
   /** Where to connect an agent, for someone who may; null otherwise. */
   connectAgentHref: string | null;
+  /** The person may create another workspace (WHIT-1169); absent means no. */
+  canCreateWorkspace?: boolean;
 }
 
 interface Kind {
@@ -135,7 +137,18 @@ export function buildCoreCommands(t: TranslateFn, ctx: CommandContext): PaletteC
   const now = t('palette.option.current', 'Now');
 
   const available = kinds(t, ctx);
-  if (available.length > 0) {
+  // "Create workspace" (WHIT-1169): about the person, not this workspace, so it
+  // isn't a NewKind; it opens the create page.
+  const workspaceNames = ['workspace', 'company', 'مساحة', 'شركة'];
+  const newWorkspace = (): CommandOption => ({
+    id: 'new-workspace',
+    label: t('palette.new.workspace', 'Create a workspace'),
+    hint: t('palette.new.workspaceHint', 'You’ll own it'),
+    icon: 'tenant',
+    complete: '/new workspace',
+    run: () => ctx.go('/workspaces/new'),
+  });
+  if (available.length > 0 || ctx.canCreateWorkspace === true) {
     commands.push({
       name: 'new',
       names: ['new', 'create', 'add', 'جديد', 'إنشاء', 'أضف'],
@@ -144,15 +157,22 @@ export function buildCoreCommands(t: TranslateFn, ctx: CommandContext): PaletteC
       options: (rest) => {
         const { first, after, moved } = words(rest);
         const exact = moved ? available.filter((k) => k.names.some((n) => fold(n) === fold(first))) : [];
+        if (ctx.canCreateWorkspace === true && moved && workspaceNames.some((n) => fold(n) === fold(first))) {
+          return [newWorkspace()];
+        }
         const shown = exact.length > 0 ? exact : rank(first, available, (k) => k.names);
         const text = exact.length > 0 ? after : '';
-        return shown.map((k) => ({
+        const workspaceRow =
+          ctx.canCreateWorkspace === true && exact.length === 0 && (first === '' || rank(first, [workspaceNames], (n) => n).length > 0)
+            ? [newWorkspace()]
+            : [];
+        return [...shown.map((k) => ({
           id: `new-${k.kind}`,
           label: text !== '' ? `${k.label}: ${text}` : k.label,
           icon: k.icon,
           complete: `/new ${k.names[0]} `,
           run: () => ctx.newThing(k.kind, text, k.href),
-        }));
+        })), ...workspaceRow];
       },
     });
   }
@@ -194,19 +214,22 @@ export function buildCoreCommands(t: TranslateFn, ctx: CommandContext): PaletteC
   }
 
   const others = ctx.workspaces.filter((w) => w.id !== ctx.activeWorkspaceId);
-  if (others.length > 0) {
+  if (others.length > 0 || ctx.canCreateWorkspace === true) {
     commands.push({
       name: 'switch',
       names: ['switch', 'workspace', 'تبديل', 'بدل', 'مساحة'],
       description: t('palette.command.switch', 'Switch to another workspace'),
       icon: 'tenant',
-      options: (rest) =>
-        rank(rest.trim(), others, (w) => [w.name]).map((w) => ({
+      options: (rest) => [
+        ...rank(rest.trim(), others, (w) => [w.name]).map((w): CommandOption => ({
           id: `switch-${w.id}`,
           label: w.name,
           icon: 'tenant',
           run: () => ctx.switchWorkspace(w.id),
         })),
+        // Last, as at the foot of the workspace switcher (TenantSwitcher card).
+        ...(ctx.canCreateWorkspace === true && rest.trim() === '' ? [newWorkspace()] : []),
+      ],
     });
   }
 

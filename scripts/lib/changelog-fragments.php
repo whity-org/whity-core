@@ -18,8 +18,10 @@ declare(strict_types=1);
  *     changelog.d/WHIT-789.added.md
  *     changelog.d/WHIT-732.changed.md
  *
- * `release-prepare.yml` folds them into [Unreleased] (scripts/changelog-assemble.php)
- * just before it dates the section, and deletes them in the release commit.
+ * At release they are folded into [Unreleased] (scripts/changelog-assemble.php;
+ * whity-core's `release-prepare.yml`, other repositories' release steps) just
+ * before the section is dated, and deleted in the release commit. Any ticket
+ * prefix works (WHIT-, WID-, ...).
  * Entries written straight into [Unreleased] keep working: they stay where they
  * are and the fragments join them.
  */

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useNavigation } from '@/lib/navigation-context';
 import type { Membership } from '@/lib/auth-context';
@@ -28,8 +28,10 @@ import { TenantSwitcher as WorkspaceSwitcher } from '@whity/ui/tenant-switcher';
 import { AppSidebar, useForcedRail } from '@whity/ui/app-sidebar';
 import { useCurrentLanguage, useLanguageCode, useI18nEnabled, useTranslation } from '@whity/features/i18n';
 import { roleLabel } from '@whity/features/roles/role-label';
-import { localizedName } from '@/lib/localized-name';
-import { rolesLabel } from '@/lib/workspace-memberships';
+import { RoleSummary } from '@whity/ui/role-summary';
+import { roleLabels } from '@/lib/workspace-memberships';
+import { useRoleSummaryLabels } from '@/hooks/useRoleSummaryLabels';
+import { useCanOfferWorkspaceCreate } from '@/lib/use-workspace-create';
 import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
 import {
   IconLogout,
@@ -42,6 +44,8 @@ import {
 } from '@tabler/icons-react';
 import { useState, useCallback, useMemo } from 'react';
 import { useShellNav } from '@/components/shell/use-shell-nav';
+import { localizedText } from '@whity/ui/localized-text';
+import { useCalendarSidebarOpen } from '@/lib/calendar/choices';
 
 /** Settings stays at the foot with the account row on short windows (PW.10). */
 const PINNED_GROUP_IDS = ['settings'];
@@ -67,21 +71,27 @@ function capitalise(text: string): string {
 
 export function TenantSwitcher({ memberships, activeTenantId, collapsed }: TenantSwitcherProps) {
   const { switchTenant } = useAuth();
+  const router = useRouter();
+  const canCreate = useCanOfferWorkspaceCreate();
   const { refresh: refreshNav } = useNavigation();
   const { addToast } = useToast();
   const t = useTranslation('common');
   const currentLanguage = useLanguageCode();
   const [isSwitching, setIsSwitching] = useState(false);
+  const roleSummaryLabels = useRoleSummaryLabels();
 
   const workspaces = useMemo(
     () =>
       memberships.map((m) => ({
         id: String(m.tenant_id),
         // #821: the reader's language, else the original name.
-        name: localizedName(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
-        role: capitalise(rolesLabel(m)) || undefined,
+        name: localizedText(m.tenant_names, currentLanguage, m.tenant_name_language, m.tenant_name),
+        // "Owner" first when they own it (WHIT-1169), then the first role and
+        // "+N more" on one line (WHIT-1175).
+        roleBefore: m.is_owner ? t('sidebar.tenantSwitcher.owner', 'Owner') : undefined,
+        roles: roleLabels(m).map(capitalise),
       })),
-    [memberships, currentLanguage],
+    [memberships, currentLanguage, t],
   );
 
   const handleSwitch = useCallback(
@@ -116,10 +126,13 @@ export function TenantSwitcher({ memberships, activeTenantId, collapsed }: Tenan
       onChange={handleSwitch}
       collapsed={collapsed}
       disabled={isSwitching}
+      onCreate={canCreate ? () => router.push('/workspaces/new') : undefined}
       labels={{
+        create: t('sidebar.tenantSwitcher.create', 'Create workspace'),
         trigger: t('sidebar.tenantSwitcher.trigger', 'Switch workspace, current: {name}'),
         find: t('sidebar.tenantSwitcher.find', 'Find a workspace'),
         noResults: t('sidebar.tenantSwitcher.noResults', 'No workspace matches'),
+        roles: roleSummaryLabels,
       }}
     />
   );
@@ -154,7 +167,17 @@ export function Sidebar() {
   // Between 768 and 1023px the sidebar is the rail whatever the toggle says
   // (register 4.5); the logo, switcher and footer follow the same state.
   const forcedRail = useForcedRail();
-  const collapsed = (isCollapsed || forcedRail) && !isMobileOpen;
+  // Calendar screens start as the 56px rail so the grid gets the room; a
+  // person who opens the sidebar there keeps it open on their calendar (CV.1).
+  const pathname = usePathname();
+  const onCalendar = pathname === '/calendar' || (pathname?.startsWith('/calendar/') ?? false);
+  const [calendarOpen, setCalendarOpen] = useCalendarSidebarOpen();
+  const chosenRail = onCalendar ? !calendarOpen : isCollapsed;
+  const collapsed = (chosenRail || forcedRail) && !isMobileOpen;
+  const onCollapsedChange = useCallback(
+    (next: boolean) => (onCalendar ? setCalendarOpen(!next) : setIsCollapsed(next)),
+    [onCalendar, setCalendarOpen]
+  );
 
 
   const handleLogout = () => {
@@ -207,7 +230,11 @@ export function Sidebar() {
   // what the old foot showed as four stacked controls.
   const displayName = user?.display_name || user?.email || '';
   const activeMembership = memberships.find((membership) => membership.tenant_id === user?.tenant_id);
-  const activeRole = (activeMembership ? rolesLabel(activeMembership) : '') || user?.role || '';
+  // Every role held here, in words; the row shows the first and "+N more"
+  // (WHIT-1175) and the menu it opens lists them all.
+  const activeRoles = activeMembership ? roleLabels(activeMembership) : [];
+  if (activeRoles.length === 0 && user?.role) activeRoles.push(roleLabel(user.role));
+  const roleSummaryLabels = useRoleSummaryLabels();
   const footer = (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -223,9 +250,11 @@ export function Sidebar() {
               <span className="block truncate text-sm font-medium" data-testid="account-name">
                 {displayName}
               </span>
-              {activeRole && (
-                <span className="block truncate text-xs text-muted-foreground">{roleLabel(activeRole)}</span>
-              )}
+              <RoleSummary
+                roles={activeRoles}
+                labels={roleSummaryLabels}
+                className="text-xs text-muted-foreground"
+              />
             </span>
             <IconSelector size={16} className="shrink-0 text-muted-foreground" aria-hidden />
           </>
@@ -236,6 +265,13 @@ export function Sidebar() {
           <span className="block truncate text-sm font-medium text-foreground">{displayName}</span>
           {user?.email && user.email !== displayName && (
             <span className="block truncate text-xs text-muted-foreground">{user.email}</span>
+          )}
+          {activeRoles.length > 1 && (
+            // The row shows the first role and "+N more"; the menu names them all,
+            // wrapping, so keyboard users reach the list too (WHIT-1175).
+            <span className="mt-1 block text-xs text-muted-foreground" data-testid="account-roles">
+              {activeRoles.join(roleSummaryLabels.separator ?? ', ')}
+            </span>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -327,7 +363,7 @@ export function Sidebar() {
       }
       footer={footer}
       collapsed={collapsed}
-      onCollapsedChange={setIsCollapsed}
+      onCollapsedChange={onCollapsedChange}
       mobileOpen={isMobileOpen}
       onMobileOpenChange={setIsMobileOpen}
       linkComponent={Link}

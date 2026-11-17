@@ -21,6 +21,7 @@ import { FieldSelect } from '@/components/field-select';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
 import { CalendarNav } from '@/components/calendar/calendar-nav';
+import { BookingLinkCard } from '@/components/calendar/booking-link';
 import { useCalendarAccess } from '@/components/calendar/use-calendar-basics';
 import { useCalendarWords } from '@/components/calendar/use-calendar-words';
 import { useFetch } from '@/hooks/useFetch';
@@ -39,6 +40,8 @@ import { weekOrder } from '@/lib/calendar/hours';
 interface Draft {
   bookingPage: boolean;
   instantBooking: boolean;
+  /** WHIT-1173: one booking may hold several services back to back. */
+  multiService: boolean;
   minNotice: string;
   maxAdvance: string;
   slotStep: string;
@@ -52,6 +55,7 @@ function draftOf(s: CalendarSettings): Draft {
   return {
     bookingPage: s.booking_page_enabled,
     instantBooking: s.instant_booking ?? true,
+    multiService: s.multi_service_booking ?? false,
     minNotice: String(s.min_notice_minutes),
     maxAdvance: String(s.max_advance_days),
     slotStep: String(s.slot_step_minutes),
@@ -91,6 +95,7 @@ export default function CalendarSettingsPage() {
   if (saved && current) {
     if (current.bookingPage !== saved.bookingPage) changes.push(t('settings.bookingPage', 'Booking page'));
     if (current.instantBooking !== saved.instantBooking) changes.push(t('settings.instantBooking', 'Instant booking'));
+    if (current.multiService !== saved.multiService) changes.push(t('settings.multiService', 'Several services in one booking'));
     if (current.minNotice !== saved.minNotice) changes.push(t('settings.minNotice', 'Least notice'));
     if (current.maxAdvance !== saved.maxAdvance) changes.push(t('settings.maxAdvance', 'How far ahead'));
     if (current.slotStep !== saved.slotStep) changes.push(t('settings.slotStep', 'Free times every'));
@@ -118,6 +123,7 @@ export default function CalendarSettingsPage() {
     const body: CalendarSettingsRequest = {
       booking_page_enabled: current.bookingPage,
       instant_booking: current.instantBooking,
+      multi_service_booking: current.multiService,
       min_notice_minutes: minNotice,
       max_advance_days: maxAdvance,
       slot_step_minutes: Number(current.slotStep),
@@ -165,6 +171,14 @@ export default function CalendarSettingsPage() {
         </div>
       ) : (
         <>
+          {/* The address customers book at, to share (WHIT-1117). */}
+          <BookingLinkCard
+            link={data.booking_page_url ?? null}
+            enabled={saved.bookingPage}
+            canManage={access.canManage}
+            onEnabled={refetch}
+            shareOnOpen={typeof window !== 'undefined' && window.location.hash === '#share'}
+          />
           <Card>
             <CardHeader>
               <CardTitle>{t('settings.card.booking', 'Booking')}</CardTitle>
@@ -200,6 +214,23 @@ export default function CalendarSettingsPage() {
                     onCheckedChange={(instantBooking) => update({ instantBooking })}
                     aria-label={t('settings.instantBooking', 'Instant booking')}
                     data-testid="settings-instant-booking"
+                  />
+                </label>
+              </ChangedField>
+
+              <ChangedField changed={current.multiService !== saved.multiService}>
+                <label className="flex min-h-10 items-start justify-between gap-3">
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium text-foreground">{t('settings.multiService', 'Several services in one booking')}</span>
+                    <span className="block text-sm text-muted-foreground">
+                      {t('settings.multiServiceHint', 'On: one booking can hold several services back to back, such as a cut, a colour and a blow-dry, with one person or a different person for each.')}
+                    </span>
+                  </span>
+                  <Switch
+                    checked={current.multiService}
+                    onCheckedChange={(multiService) => update({ multiService })}
+                    aria-label={t('settings.multiService', 'Several services in one booking')}
+                    data-testid="settings-multi-service"
                   />
                 </label>
               </ChangedField>

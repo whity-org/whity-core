@@ -226,6 +226,14 @@ final class ConversationRepository
         $this->db->prepare($sql)->execute([':tid' => $tenantId, ':id' => $id]);
     }
 
+    /** C5: the channel and address last written on, for the list's badge and older readers. */
+    public function useChannel(int $tenantId, int $id, string $channel, string $address): void
+    {
+        $this->db->prepare(
+            'UPDATE conversations SET channel = :channel, contact_address = :address, updated_at = NOW() WHERE tenant_id = :tid AND id = :id'
+        )->execute([':channel' => $channel, ':address' => mb_substr($address, 0, 320), ':tid' => $tenantId, ':id' => $id]);
+    }
+
     public function setStatus(int $tenantId, int $id, string $status): bool
     {
         $stmt = $this->db->prepare(

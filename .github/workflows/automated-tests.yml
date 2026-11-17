@@ -168,16 +168,11 @@ jobs:
               - 'phpunit.xml'
               - 'infection.json5'
               - '.github/workflows/automated-tests.yml'
-            # The Tauri desktop template ships its own vendored copy of the
-            # plugin SDK, and the parity guard that compares it against sdk/src
-            # lives in `static-analysis`. Its own filter, because the OTHER
-            # half of what that guard reads is not under any path `backend`
-            # matches: an edit that touches only the device's copy is exactly
-            # the drift being guarded against, and under `backend` alone it
-            # would skip the entire job and merge unchecked. Scoped to
-            # php-host/ rather than the whole template — the Rust and TS sides
-            # cannot move this guard, and pulling them in would run PHP static
-            # analysis for every icon change.
+            # The Tauri desktop template's offline PHP host. Its SDK is copied
+            # from sdk/src at every desktop build (WHIT-1054), but the host's
+            # own PHP still runs the static-analysis guards. Scoped to
+            # php-host/ rather than the whole template, so the Rust and TS
+            # sides don't run PHP static analysis for every icon change.
             # The external watchdog is a standalone Cloudflare Worker with its
             # own `node --test` suite and no dependency on anything else here,
             # so it gets its own filter rather than riding on `backend`.
@@ -713,23 +708,6 @@ jobs:
           echo "phpunit --list-tests reports ${count} tests"
           php scripts/ci-readme-test-counts.php --phpunit="${count}"
 
-      # Vendored-SDK parity guard (#849): the Tauri desktop template carries its
-      # own copy of sdk/src, because a device boots from a hand-rolled PSR-4
-      # autoloader with no Composer behind it. Re-vendoring that copy was a
-      # manual step verified in a commit message, and it silently fell three SDK
-      # releases behind — so the reference plugin, which is also the exact
-      # source bin/desktop-plugin-release packages, could not be declared on a
-      # device at all. The guard compares the two trees AND boots every in-tree
-      # plugin against the device's copy; see the script header for why one
-      # check does not subsume the other.
-      #
-      # Runs whenever `desktop_host` OR `backend` changed — the drift is
-      # introduced by an edit to EITHER side, and a guard that watched only the
-      # side it happens to live next to would have missed #849 entirely (which
-      # was three commits to sdk/**, not one to templates/**).
-      - name: Vendored-SDK parity (desktop template)
-        run: php scripts/ci-vendored-sdk-parity.php
-
   # SDK version-collision guard (#873). The parity gate above is HORIZONTAL —
   # source tree versus the desktop template's vendored copy, at one commit. A
   # version collision is VERTICAL, and no horizontal check can see it: #871 and
@@ -784,6 +762,26 @@ jobs:
 
       - name: Changelog fragment guard
         run: php scripts/changelog-assemble.php --check
+
+  # WHIT-1167: no AI attribution in commits, PR titles or PR descriptions.
+  # Every PR and merge group, whatever paths it touches: a docs-only PR can
+  # carry a co-author trailer as easily as a code one. v0.2.29 shipped seven.
+  no-ai-attribution:
+    name: No AI attribution in commits or PR text
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v7
+        with:
+          # The base commit must be present, or the range reads as empty and
+          # passes. The script refuses to answer from a shallow clone.
+          fetch-depth: 0
+
+      - name: The check catches what it should (self-test)
+        run: bash scripts/ci-no-ai-attribution.sh --self-test
+
+      - name: No AI attribution
+        run: bash scripts/ci-no-ai-attribution.sh
 
   # The English translation catalogue must stay a faithful projection of the
   # t() calls that produce it. A converted screen whose keys were never
@@ -2039,6 +2037,7 @@ jobs:
       - coverage
       - static-analysis
       - history-guards
+      - no-ai-attribution
       - sdk-coverage
       - i18n-catalogue
       - date-display

@@ -24,7 +24,8 @@ export function useNavItemLabels(): Record<string, string> {
       boards: t('sidebar.item.boards', 'Boards'),
       contacts: t('sidebar.item.contacts', 'Contacts'),
       approvals: t('sidebar.item.approvals', 'Approvals'),
-      messages: t('sidebar.item.messages', 'Messages'),
+      // Settings › Chat (design 3.5): Messages became part of Chat.
+      messages: t('sidebar.item.messages', 'Chat'),
       'my-messages': t('sidebar.item.myMessages', 'Messages'),
       chat: t('sidebar.item.chat', 'Chat'),
       users: t('sidebar.item.users', 'Users'),

@@ -15,6 +15,7 @@ export interface WorkspaceMembershipLike {
   role: string;
   roles?: string[];
   kind?: 'member' | 'customer';
+  is_owner?: boolean;
 }
 
 /** Every role the person holds in this workspace, the primary one first. */
@@ -24,7 +25,16 @@ export function roleNames(membership: Pick<WorkspaceMembershipLike, 'role' | 'ro
   return all.filter((name, index) => name !== '' && all.indexOf(name) === index);
 }
 
-/** The roles as one label, e.g. "admin, Hello viewer". Empty when there are none. */
+/** Every role held here in words, the primary one first, for `RoleSummary` (WHIT-1175). */
+export function roleLabels(membership: Pick<WorkspaceMembershipLike, 'role' | 'roles'>): string[] {
+  return roleNames(membership).map(roleLabel);
+}
+
+/**
+ * The roles as one label, e.g. "admin, Hello viewer". Empty when there are none.
+ * For text that may hold every role (an accessible name, a tooltip); a line
+ * under a name uses `RoleSummary` with `roleLabels` so it never grows.
+ */
 export function rolesLabel(membership: Pick<WorkspaceMembershipLike, 'role' | 'roles'>): string {
   return roleNames(membership).map(roleLabel).join(', ');
 }
@@ -45,6 +55,9 @@ export function oneEntryPerWorkspace<T extends WorkspaceMembershipLike>(membersh
     const merged: T = { ...seen, roles: roleNames({ role: seen.role, roles: [...roleNames(seen), ...roleNames(membership)] }) };
     if (seen.kind === 'customer' && membership.kind !== 'customer') {
       merged.kind = membership.kind ?? 'member';
+    }
+    if (membership.is_owner === true) {
+      merged.is_owner = true;
     }
     byTenant.set(membership.tenant_id, merged);
   }

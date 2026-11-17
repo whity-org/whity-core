@@ -97,11 +97,21 @@ final class RouteQuorum
      */
     public const ALL = 'all';
 
-    /** One approval carries the step. The first answer decides. */
+    /**
+     * One approval carries the step; it is refused only once nobody left could
+     * approve it, so one "no" leaves it with the others.
+     */
     public const ANY = 'any';
 
     /** More than half of the cohort — `intdiv(n, 2) + 1`, so 2 of 3, 3 of 4. */
     public const MAJORITY = 'majority';
+
+    /**
+     * The first answer decides, either way (owner, 2026-11-16, for join
+     * requests): the first approval carries the step and the first rejection
+     * refuses it. The others' items close with it.
+     */
+    public const FIRST = 'first';
 
     /**
      * Every quorum, in the order a reader meets them.
@@ -115,7 +125,7 @@ final class RouteQuorum
      */
     public static function all(): array
     {
-        return [self::ALL, self::ANY, self::MAJORITY];
+        return [self::ALL, self::ANY, self::MAJORITY, self::FIRST];
     }
 
     public static function isValid(string $quorum): bool
@@ -142,7 +152,7 @@ final class RouteQuorum
         }
 
         return match ($quorum) {
-            self::ANY => 1,
+            self::ANY, self::FIRST => 1,
             self::MAJORITY => intdiv($cohortSize, 2) + 1,
             default => $cohortSize,
         };
@@ -165,6 +175,10 @@ final class RouteQuorum
             // top would open a second destination for one act.
             return false;
         }
+        if ($quorum === self::FIRST) {
+            // The first answer was an approval: one approval and nobody said no.
+            return $approvals >= 1 && $cohortSize - $approvals - $outstanding === 0;
+        }
 
         return $approvals >= self::required($quorum, $cohortSize);
     }
@@ -181,6 +195,11 @@ final class RouteQuorum
     {
         if ($cohortSize <= 0) {
             return false;
+        }
+        if ($quorum === self::FIRST) {
+            // Anyone who answered and didn't approve said no: under `first`,
+            // that answer is the decision.
+            return $cohortSize - $approvals - $outstanding > 0;
         }
 
         return $approvals + $outstanding < self::required($quorum, $cohortSize);

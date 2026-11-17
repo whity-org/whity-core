@@ -12,6 +12,8 @@ use Whity\Core\Identity\ProfileEmailRepository;
 use Whity\Core\Identity\RequestReason;
 use Whity\Core\PasswordPolicy;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimited;
+use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Settings\SettingsRegistry;
@@ -42,11 +44,6 @@ use Whity\Http\JsonBody;
 final class PasswordResetHandler
 {
     private const SYSTEM_TENANT_ID = 0;
-
-    /** Resend throttle: fixed window + per-email and per-IP ceilings. */
-    private const WINDOW_SECONDS = 3600;
-    private const EMAIL_MAX      = 5;
-    private const IP_MAX         = 20;
 
     public function __construct(
         private readonly PasswordResetService $service,
@@ -83,19 +80,15 @@ final class PasswordResetHandler
         $emailKey = 'pwreset:req:email:' . hash('sha256', $email);
         $ipKey    = $ip !== null ? 'pwreset:req:ip:' . $ip : null;
 
-        if ($this->store->count($emailKey) >= self::EMAIL_MAX
-            || ($ipKey !== null && $this->store->count($ipKey) >= self::IP_MAX)
+        $emailRule = RateLimits::passwordResetPerEmail();
+        $ipRule    = RateLimits::passwordResetPerAddress();
+        if ($emailRule->blocked($this->store, $emailKey) !== null
+            || ($ipKey !== null && $ipRule->blocked($this->store, $ipKey) !== null)
         ) {
-            $retryAfter = max(
+            return RateLimited::response(max(
                 $this->store->ttl($emailKey),
-                $ipKey !== null ? $this->store->ttl($ipKey) : 0,
-                1
-            );
-
-            return Response::error(
-                'Too many password-reset requests. Please try again later.',
-                429
-            )->withHeaders(['Retry-After' => (string) $retryAfter]);
+                $ipKey !== null ? $this->store->ttl($ipKey) : 0
+            ));
         }
 
         // Count this attempt against both windows before doing any work — same
@@ -104,9 +97,9 @@ final class PasswordResetHandler
         // whether self-service reset is even enabled). This ordering is
         // load-bearing: anything that decides whether to count AFTER looking the
         // address up turns the 429 boundary into an existence oracle.
-        $emailCount = $this->store->increment($emailKey, self::WINDOW_SECONDS);
+        $emailCount = $emailRule->record($this->store, $emailKey);
         if ($ipKey !== null) {
-            $this->store->increment($ipKey, self::WINDOW_SECONDS);
+            $ipRule->record($this->store, $ipKey);
         }
 
         if ($this->selfServiceEnabled()) {

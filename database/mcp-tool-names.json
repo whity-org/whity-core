@@ -198,6 +198,10 @@
   "delete_api_users_id_memberships_membershipid": {
     "ar": "سحب دور إضافي من مستخدم"
   },
+  "delete_api_workspace_templates_examples": {
+    "en": "Remove the template's example customers and bookings",
+    "ar": "حذف الزبائن والحجوزات التجريبية من القالب"
+  },
   "document_agent_request_update": {
     "en": "Report how a document request is going",
     "ar": "الإبلاغ عن سير طلب مستند"
@@ -271,6 +275,10 @@
     "en": "List who is away and who decides for them",
     "ar": "عرض الغائبين ومن يقرر نيابةً عنهم"
   },
+  "get_api_billing_cash_payments": {
+    "en": "List a workspace's cash payments",
+    "ar": "عرض الدفعات النقدية لمساحة عمل"
+  },
   "get_api_billing_invoices": {
     "en": "List your workspace's invoices",
     "ar": "عرض الفواتير"
@@ -299,6 +307,10 @@
     "en": "Check the result of a payment",
     "ar": "التحقق من نتيجة عملية دفع"
   },
+  "get_api_branding_host": {
+    "en": "Read your workspace's own web address",
+    "ar": "قراءة عنوان الويب الخاص بمساحة العمل"
+  },
   "get_api_calendar_availability": {
     "en": "Find free times for a service",
     "ar": "البحث عن أوقات متاحة لخدمة"
@@ -311,9 +323,21 @@
     "en": "Get a booking",
     "ar": "عرض حجز"
   },
+  "get_api_calendar_day_counts": {
+    "en": "Count bookings a day",
+    "ar": "عدّ الحجوزات في كل يوم"
+  },
   "get_api_calendar_events": {
     "en": "List calendar events",
     "ar": "عرض أحداث التقويم"
+  },
+  "get_api_calendar_items": {
+    "en": "List everything on the calendar",
+    "ar": "عرض كل ما في التقويم"
+  },
+  "get_api_calendar_my_view": {
+    "en": "Read your own calendar choices",
+    "ar": "عرض اختياراتك في التقويم"
   },
   "get_api_calendar_rooms": {
     "en": "List rooms",
@@ -370,6 +394,10 @@
   "get_api_contacts_id": {
     "en": "Get a customer or supplier",
     "ar": "عرض عميل أو مورد"
+  },
+  "get_api_contacts_id_activity": {
+    "en": "See what a customer did: bookings, chats, forms and join requests",
+    "ar": "عرض نشاط العميل: الحجوزات والمحادثات والنماذج وطلبات الانضمام"
   },
   "get_api_contacts_imports": {
     "en": "List contact imports",
@@ -585,9 +613,6 @@
     "en": "Print a form response in the automatic layout",
     "ar": "طباعة ردّ على نموذج بالتخطيط التلقائي"
   },
-  "get_api_form_submissions_id_review": {
-    "ar": "عرض ما سجّله المكتب عن إجابة"
-  },
   "get_api_forms": {
     "en": "List the forms in your workspace",
     "ar": "عرض النماذج"
@@ -654,6 +679,10 @@
   "get_api_me_notification_preferences": {
     "en": "See your notification preferences",
     "ar": "عرض تفضيلات إشعاراتك"
+  },
+  "get_api_me_notification_summary": {
+    "en": "See your notifications in each of your workspaces",
+    "ar": "عرض إشعاراتك في كل مساحات عملك"
   },
   "get_api_me_notifications": {
     "en": "See your notifications",
@@ -803,6 +832,10 @@
   "get_api_plugins_store_licences_slug": {
     "en": "See a store plugin's licence",
     "ar": "عرض ترخيص إضافة من المتجر"
+  },
+  "get_api_plugins_workspace_access": {
+    "en": "List who can use each installed plugin",
+    "ar": "عرض من يمكنه استخدام كل إضافة مثبتة"
   },
   "get_api_profiles_id_relations": {
     "en": "See a user's person record and relationships",
@@ -978,6 +1011,18 @@
     "en": "See the roles a user holds",
     "ar": "عرض أدوار مستخدم"
   },
+  "get_api_workspace_code_plugins": {
+    "en": "List the installed plugins this workspace can use",
+    "ar": "عرض الإضافات المثبتة التي يمكن لمساحة العمل استخدامها"
+  },
+  "get_api_workspace_code_plugins_plugin_history": {
+    "en": "See who turned a plugin on or off, and when",
+    "ar": "معرفة من شغّل الإضافة أو أوقفها ومتى"
+  },
+  "get_api_workspace_onboarding": {
+    "en": "List the guided setups of the plugins on in this workspace",
+    "ar": "عرض الإعداد الموجَّه للإضافات العاملة في مساحة العمل"
+  },
   "get_api_workspace_plugins": {
     "ar": "عرض إضافات مساحة العمل"
   },
@@ -993,6 +1038,22 @@
   },
   "get_api_workspace_plugins_plugin_versions_id": {
     "ar": "عرض إصدار من إضافة"
+  },
+  "get_api_workspace_templates": {
+    "en": "List the workspace templates on offer",
+    "ar": "عرض قوالب مساحة العمل المتاحة"
+  },
+  "get_api_workspace_templates_key_setup_current_kind": {
+    "en": "Read what a template setup step opens with",
+    "ar": "قراءة ما تبدأ به خطوة إعداد القالب"
+  },
+  "get_api_workspace_templates_key_setup_services": {
+    "en": "List the template's services to choose from",
+    "ar": "عرض خدمات القالب للاختيار منها"
+  },
+  "get_api_workspace_templates_key_setup_status": {
+    "en": "See which template setup steps are done",
+    "ar": "عرض خطوات إعداد القالب المكتملة"
   },
   "patch_api_2fa_policies_id": {
     "en": "Change how long people have to set up two-step sign-in",
@@ -1182,6 +1243,14 @@
   "post_api_agents_id_resume": {
     "ar": "استئناف عمل وكيل"
   },
+  "post_api_billing_cash_payments": {
+    "en": "Record a cash payment for a paid plugin plan",
+    "ar": "تسجيل دفعة نقدية لخطة إضافة مدفوعة"
+  },
+  "post_api_billing_cash_payments_id_void": {
+    "en": "Void a cash payment, saying why",
+    "ar": "إلغاء دفعة نقدية مع ذكر السبب"
+  },
   "post_api_billing_checkout": {
     "en": "Start a payment for your workspace",
     "ar": "بدء دفع لمساحة العمل"
@@ -1232,6 +1301,10 @@
   "post_api_calendar_events": {
     "en": "Add a calendar event",
     "ar": "إضافة حدث إلى التقويم"
+  },
+  "post_api_calendar_events_id_answer": {
+    "en": "Answer an event invitation",
+    "ar": "الرد على دعوة إلى حدث"
   },
   "post_api_calendar_rooms": {
     "en": "Add a room",
@@ -1453,9 +1526,6 @@
   "post_api_entity_tags": {
     "en": "Put a tag on an item",
     "ar": "وضع وسم على عنصر"
-  },
-  "post_api_form_submissions_id_review": {
-    "ar": "تسجيل قرار المكتب في إجابة"
   },
   "post_api_forms": {
     "en": "Create a new form",
@@ -1745,6 +1815,18 @@
     "en": "Send a user a password reset link",
     "ar": "إرسال رابط إعادة تعيين كلمة المرور لمستخدم"
   },
+  "post_api_workspace_code_plugins_plugin_disable": {
+    "en": "Turn an installed plugin off for this workspace",
+    "ar": "إيقاف إضافة مثبتة لمساحة العمل"
+  },
+  "post_api_workspace_code_plugins_plugin_enable": {
+    "en": "Turn an installed plugin on for this workspace",
+    "ar": "تشغيل إضافة مثبتة لمساحة العمل"
+  },
+  "post_api_workspace_code_plugins_plugin_trial": {
+    "en": "Start this workspace's free trial of a paid plugin",
+    "ar": "بدء الفترة التجريبية المجانية لإضافة مدفوعة في مساحة العمل"
+  },
   "post_api_workspace_plugins": {
     "ar": "نشر إصدار من إضافة مساحة العمل"
   },
@@ -1763,6 +1845,26 @@
   "post_api_workspace_plugins_validate": {
     "en": "Check a workspace plugin's definition",
     "ar": "التحقق من تعريف إضافة"
+  },
+  "post_api_workspace_templates_key_apply": {
+    "en": "Apply a workspace template",
+    "ar": "تطبيق قالب على مساحة العمل"
+  },
+  "post_api_workspace_templates_key_setup_kind": {
+    "en": "Save a template setup step",
+    "ar": "حفظ خطوة من إعداد القالب"
+  },
+  "post_api_workspace_templates_key_setup_offer_close": {
+    "en": "Close the template's plugin offer",
+    "ar": "إغلاق عرض الإضافة في القالب"
+  },
+  "post_api_workspace_templates_key_setup_offer_trial": {
+    "en": "Start the free trial a template offers",
+    "ar": "بدء التجربة المجانية التي يعرضها القالب"
+  },
+  "put_api_calendar_my_view": {
+    "en": "Change your own calendar choices",
+    "ar": "تغيير اختياراتك في التقويم"
   },
   "put_api_calendar_settings": {
     "en": "Change the calendar settings",
@@ -1829,6 +1931,10 @@
   "put_api_plans_id_entitlements": {
     "en": "Set what a plan includes",
     "ar": "تعيين ما تتضمنه باقة"
+  },
+  "put_api_plugins_plugin_workspace_access": {
+    "en": "Choose who can use an installed plugin",
+    "ar": "اختيار من يمكنه استخدام إضافة مثبتة"
   },
   "put_api_signup_settings": {
     "en": "Change your workspace's customer sign-up settings",

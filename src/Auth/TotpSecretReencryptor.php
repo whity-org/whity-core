@@ -23,7 +23,6 @@ final class TotpSecretReencryptor
 {
     public function __construct(
         private readonly TotpService $totpService,
-        private readonly string $encryptionKey,
     ) {
     }
 
@@ -65,42 +64,12 @@ final class TotpSecretReencryptor
                 }
                 continue;
             } catch (\Throwable) {
-                // Not readable by the key ring; fall through to the legacy path.
-            }
-
-            $plaintext = $this->legacyDecrypt($stored);
-            if ($plaintext === null) {
+                // Not readable by the key ring: counted, and left exactly as it
+                // is, never destroyed.
                 $failed++;
-                continue;
             }
-
-            $update->execute([$this->totpService->encryptSecret($plaintext), $row['id']]);
-            $migrated++;
         }
 
         return ['migrated' => $migrated, 'skipped' => $skipped, 'failed' => $failed];
-    }
-
-    /**
-     * Decrypt a secret stored under the legacy unauthenticated AES-256-CBC scheme.
-     *
-     * @return string|null The plaintext secret, or null if the blob is not legacy ciphertext.
-     */
-    private function legacyDecrypt(string $encrypted): ?string
-    {
-        $algorithm = 'aes-256-cbc';
-        $key = hash('sha256', $this->encryptionKey, true);
-        $ivLength = (int) openssl_cipher_iv_length($algorithm);
-
-        $data = base64_decode($encrypted, true);
-        if ($data === false || strlen($data) <= $ivLength) {
-            return null;
-        }
-
-        $iv = substr($data, 0, $ivLength);
-        $ciphertext = substr($data, $ivLength);
-        $decrypted = openssl_decrypt($ciphertext, $algorithm, $key, OPENSSL_RAW_DATA, $iv);
-
-        return $decrypted === false ? null : $decrypted;
     }
 }

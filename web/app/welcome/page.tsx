@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api/client';
+import { continueSignupPlugin } from '@/lib/signup-plugin';
+import { templatePickerPath } from '@/lib/workspace-template';
 import { Button } from '@whity/ui/button';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';
@@ -157,8 +159,10 @@ export default function WelcomePage() {
 
       if (response.ok && body.user) {
         // The session cookies are set: load them, as sign-in does, and go in.
+        // A plugin sign-up link (/register?plugin=salons) started this, through
+        // the identity provider: start its trial as registering does (WHIT-1168).
         await refreshAuth();
-        router.push('/dashboard');
+        router.push((await continueSignupPlugin()) ?? (await templatePickerPath()) ?? '/dashboard');
         return;
       }
       if (response.ok && body.requires_tenant_selection) {

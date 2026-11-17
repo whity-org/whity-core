@@ -8,6 +8,7 @@ use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Identity\AuthMethod;
 use Whity\Core\PasswordPolicy;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimited;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Settings\SettingsRegistry;
@@ -265,7 +266,7 @@ class AuthHandler
         // WC-0abcc29f: check IP throttle before touching the DB — a heavily
         // throttled IP must not learn whether an email is registered.
         if ($this->loginThrottle !== null && $this->loginThrottle->isThrottled(null, $ip)) {
-            return Response::error('Too many attempts', 429);
+            return RateLimited::response(60);
         }
 
         // ── Step 1: resolve profile from the globally-unique verified email ────
@@ -330,7 +331,7 @@ class AuthHandler
 
         // WC-0abcc29f: throttle check keyed on the profile id.
         if ($this->loginThrottle !== null && $this->loginThrottle->isThrottled($profileId, null)) {
-            return Response::error('Too many attempts', 429);
+            return RateLimited::response(60);
         }
 
         // ── Step 2: load the profile and verify credentials ──────────────────
@@ -1189,7 +1190,26 @@ class AuthHandler
                     // Every role held here, the primary one first.
                     'roles'       => $role === '' ? [] : [$role],
                     'kind'        => $kind,
+                    'is_owner'    => false,
                 ];
+            }
+
+            // Which of these workspaces the person owns (WHIT-1169), so the app
+            // can show "Owner" and owner-only actions. Their OWN rows only; a
+            // failed read costs the badge, never the sign-in.
+            if ($out !== []) {
+                try {
+                    // @tenant-guard-ignore: the person's own ownership rows across their workspaces, as at sign-in (ADR 0005 §6)
+                    $owned = $this->db->prepare('SELECT tenant_id FROM workspace_owners WHERE profile_id = ?');
+                    $owned->execute([$profileId]);
+                    foreach ($owned->fetchAll(PDO::FETCH_COLUMN) as $ownedTenantId) {
+                        if (isset($out[(int) $ownedTenantId])) {
+                            $out[(int) $ownedTenantId]['is_owner'] = true;
+                        }
+                    }
+                } catch (\Exception) {
+                    // Before migration 300: nobody is recorded as an owner.
+                }
             }
             return array_values($out);
         } catch (\Exception) {
@@ -1294,6 +1314,8 @@ class AuthHandler
                 'email'     => $email,
                 // WHIT-872: the home greets a person by name.
                 'display_name' => $this->profileDisplayName($profileId),
+                // WHIT-1181: the person's own phone, E.164, or null.
+                'phone'     => (new \Whity\Core\Identity\PersonalPhone($this->db))->of($profileId),
                 'role'      => $role,
                 'tenant_id' => $activeTenantId,
             ],
@@ -1468,6 +1490,13 @@ class AuthHandler
 
         if (!$emailProvided && !$passwordProvided) {
             return Response::error('No changes provided', 400);
+        }
+
+        // WHIT-1168: both changes are proved with the current password, and with
+        // password sign-in off the address and the credential live with the
+        // identity provider, so neither changes here.
+        if (!\Whity\Core\Identity\PasswordSignIn::allowed($this->settingsService)) {
+            return \Whity\Core\Identity\PasswordSignIn::refusal();
         }
 
         // Load the profile row (global identity table).
@@ -1997,7 +2026,7 @@ class AuthHandler
 
         // WC-0abcc29f: check IP throttle before touching the token.
         if ($this->loginThrottle !== null && $this->loginThrottle->isThrottled(null, $ip)) {
-            return Response::error('Too many attempts', 429);
+            return RateLimited::response(60);
         }
 
         $tokenMode = self::isTokenMode($request);
@@ -2191,7 +2220,7 @@ class AuthHandler
 
         // Throttle by IP before touching the credential (mirrors handleRefresh).
         if ($this->loginThrottle !== null && $this->loginThrottle->isThrottled(null, $ip)) {
-            return Response::error('Too many attempts', 429);
+            return RateLimited::response(60);
         }
 
         // Resolve the device credential: Authorization: Bearer, else body field.
@@ -2417,7 +2446,7 @@ class AuthHandler
 
         $ip = $this->clientIp($request);
         if ($this->loginThrottle !== null && $this->loginThrottle->isThrottled($throttleId, $ip)) {
-            return Response::error('Too many attempts', 429);
+            return RateLimited::response(60);
         }
 
         // Parse request body to get 2FA code (envelope validated upstream, WC-189).

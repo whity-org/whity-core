@@ -32,6 +32,7 @@ import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import type { components } from '@whity/api-client';
 import { MY_SETTINGS_PAGES, SETTINGS_HOME_HREF, WORKSPACE_SETTINGS_ANCHOR } from '@/lib/settings/my-settings';
 import { useNavItemLabels } from '@/lib/nav-item-labels';
+import { searchSettings, useSettingsIndex } from '@/components/settings/settings-index';
 import { useBranding } from '@/lib/branding-context';
 import { TenantLogo } from '@whity/ui/tenant-logo';
 import { CALENDAR_MANAGE } from '@/lib/calendar/api';
@@ -55,6 +56,7 @@ const PERSONAL_GROUPS: readonly GroupId[] = ['mine', 'here'];
 const GROUP_OF: Readonly<Record<string, GroupId>> = {
   general: 'workspace',
   branding: 'workspace',
+  owners: 'workspace',
   'document-themes': 'workspace',
   billing: 'workspace',
   plugins: 'workspace',
@@ -69,11 +71,11 @@ const GROUP_OF: Readonly<Record<string, GroupId>> = {
   'email-domains': 'email',
   'notification-log': 'email',
   storage: 'data',
-  fields: 'data',
   tags: 'data',
   'tag-groups': 'data',
   languages: 'data',
   translations: 'data',
+  fields: 'data',
   'public-forms': 'data',
   bookings: 'data',
   'feature-flags': 'advanced',
@@ -158,6 +160,7 @@ const ROW_ICON: Readonly<Record<string, IconName>> = {
   role: 'role',
   general: 'settings',
   branding: 'branding',
+  owners: 'role',
   security: 'shield',
   sso: 'key',
   signup: 'user',
@@ -211,17 +214,44 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SettingsArea({ children }: { children: ReactNode }) {
+/**
+ * Whether a navigation item is one of the Settings area's pages, so lists that
+ * show the area as one entry (the palette's Go to) leave it out.
+ */
+export function isInSettingsArea(item: { id: string; group?: string }, isSystemTenant: boolean): boolean {
+  return (
+    item.id === 'settings' ||
+    item.group === 'settings' ||
+    (SETTINGS_AREA_NAV_IDS as readonly string[]).includes(item.id) ||
+    (!isSystemTenant && item.id in WORKSPACE_PAGE_NAV_IDS)
+  );
+}
+
+export interface SettingsAreaGroup {
+  id: GroupId;
+  label: string;
+  links: SettingsAreaLink[];
+}
+
+/** Whether a group holds your own settings (My settings, You in [workspace]). */
+export function isPersonalGroup(id: GroupId): boolean {
+  return PERSONAL_GROUPS.includes(id);
+}
+
+/**
+ * Every page in the Settings area this person may open, grouped and ordered
+ * as the sub-nav shows them. The one list behind the sub-nav, the phone menu
+ * and the settings search (WHIT-1084), so they can never disagree.
+ */
+export function useSettingsGroups({ enabled = true }: { enabled?: boolean } = {}): SettingsAreaGroup[] {
   const t = useTranslation('admin');
   const tc = useTranslation('common');
   const ta = useTranslation('auth');
   const { id: workspaceId, name: workspaceName } = useCurrentWorkspace();
   // The system tenant runs the install: its workspace-wide pages stay in Platform.
   const isSystemTenant = workspaceId === SYSTEM_TENANT_ID;
-  const pathname = usePathname() ?? '';
   const { items: navItems } = useNavigation();
   const navLabels = useNavItemLabels();
-  const { logoSquareUrl } = useBranding();
   const { has } = useCapabilities();
   const canSeeDevices = has(LICENSING_VIEW);
   // WHIT-955: the workspace's own fields on its records (A9).
@@ -231,10 +261,12 @@ export function SettingsArea({ children }: { children: ReactNode }) {
   const language = useLanguageCode();
 
   // The server words the tabs in the caller's language, so a switch needs them again.
+  // `enabled: false` (the palette while closed) asks nothing.
   const { data: tabs } = useFetch<SettingsTab[]>(async () => {
+    if (!enabled) return [];
     const { data: body } = await api.GET('/api/v1/settings/tabs');
     return body?.data ?? [];
-  }, [language]);
+  }, [language, enabled]);
 
   const groups = useMemo(() => {
     const groupLabels: Record<GroupId, string> = {
@@ -320,6 +352,17 @@ export function SettingsArea({ children }: { children: ReactNode }) {
     })).filter((group) => group.links.length > 0);
   }, [tabs, navItems, navLabels, canSeeDevices, canManageFields, canEditThemes, canManageBookings, isSystemTenant, t, tc, ta, workspaceName]);
 
+  return groups;
+}
+
+export function SettingsArea({ children }: { children: ReactNode }) {
+  const t = useTranslation('admin');
+  const tc = useTranslation('common');
+  const { name: workspaceName } = useCurrentWorkspace();
+  const pathname = usePathname() ?? '';
+  const { logoSquareUrl } = useBranding();
+  const groups = useSettingsGroups();
+
   const onMenu = pathname === SETTINGS_MENU_HREF;
   // Read when the menu opens; the page you leave it for is written back below.
   const lastOpened = useMemo(() => (onMenu ? readLastOpened() : null), [onMenu]);
@@ -351,11 +394,15 @@ export function SettingsArea({ children }: { children: ReactNode }) {
     if (lastOpened) lastRef.current?.scrollIntoView?.({ block: 'center' });
   }, [onMenu, lastOpened, groups]);
 
-  const needle = query.trim().toLowerCase();
+  // The menu's search reads the settings index (WHIT-1084): names, what is on
+  // each page and words in both languages, so "إشعارات" or "push" finds
+  // Notifications on an English screen too.
+  const index = useSettingsIndex(groups);
+  const matched = query.trim() ? new Set(searchSettings(index, query, index.length).map((entry) => entry.pageId)) : null;
   const menuGroups = groups
     .map((group) => ({
       ...group,
-      links: needle ? group.links.filter((link) => link.label.toLowerCase().includes(needle)) : group.links,
+      links: matched ? group.links.filter((link) => matched.has(link.id)) : group.links,
     }))
     .filter((group) => group.links.length > 0);
 
@@ -375,16 +422,36 @@ export function SettingsArea({ children }: { children: ReactNode }) {
     : t('settingsArea.workspaceSectionNoName', 'Workspace settings');
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[200px_minmax(0,1fr)] md:gap-8">
+    <div className="grid gap-4">
+      {/* The cards' frame (TplSettings*): "Settings › Page" above both columns,
+          then the sub-nav beside the page. Each page keeps its own title. */}
+      {current && (
+        <nav
+          aria-label={t('settingsArea.breadcrumb', 'You are here')}
+          data-testid="settings-breadcrumb"
+          className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground max-sm:hidden"
+        >
+          <Link
+            href={SETTINGS_HOME_HREF}
+            className="rounded-sm outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {t('settingsArea.title', 'Settings')}
+          </Link>
+          <Icon name="chevron-right" size={14} className="rtl:-scale-x-100" />
+          <span aria-current="page" className="text-foreground">
+            {current.label}
+          </span>
+        </nav>
+      )}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 md:grid-cols-[220px_minmax(0,1fr)] md:gap-8">
       {/* One shrinkable column on phones: without it the grid track sizes to the
           sideways-scrolling nav row's full width and the whole page scrolls sideways. */}
       {/* From 640px up: today's sub-nav. Under it the menu is its own page. */}
       <nav
         aria-label={t('settingsArea.navLabel', 'Settings')}
         data-testid="settings-area-nav"
-        className="max-sm:hidden md:sticky md:top-0 md:self-start"
+        className="max-sm:hidden md:sticky md:top-4 md:self-start"
       >
-        <p className="mb-2 px-2 text-lg font-semibold">{t('settingsArea.title', 'Settings')}</p>
         {/* Under 768px the groups sit in a row that scrolls sideways, so the page stays first. */}
         <div className="flex gap-4 overflow-x-auto pb-2 md:grid md:gap-3 md:overflow-visible md:pb-0">
           {groups.map((group) => (
@@ -394,7 +461,11 @@ export function SettingsArea({ children }: { children: ReactNode }) {
                   {workspaceSectionLabel}
                 </p>
               )}
-              <p data-settings-group className="px-2 py-1 text-xs font-medium text-muted-foreground">
+              {/* The cards' group label: small, semibold, uppercase in Latin scripts. */}
+              <p
+                data-settings-group
+                className="px-2.5 pt-3 pb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase first:pt-0"
+              >
                 {group.label}
               </p>
               {group.links.map((link) => {
@@ -406,9 +477,9 @@ export function SettingsArea({ children }: { children: ReactNode }) {
                     data-testid={`settings-area-link-${link.id}`}
                     aria-current={active ? 'page' : undefined}
                     className={cn(
-                      'flex items-center rounded-md px-2 py-[7px] text-sm font-medium whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:min-h-11',
+                      'flex items-center rounded-control px-2.5 py-2 text-sm whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:min-h-11',
                       active
-                        ? 'bg-primary-tint text-primary-tint-foreground'
+                        ? 'bg-primary-tint font-medium text-primary-tint-foreground'
                         : 'text-foreground hover:bg-muted',
                     )}
                   >
@@ -532,6 +603,7 @@ export function SettingsArea({ children }: { children: ReactNode }) {
           </p>
         )}
         {children}
+      </div>
       </div>
     </div>
   );

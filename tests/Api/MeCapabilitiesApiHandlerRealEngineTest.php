@@ -92,7 +92,7 @@ final class MeCapabilitiesApiHandlerRealEngineTest extends TestCase
         $this->service()->delegate(
             self::TENANT_ID,
             $adminUserId,
-            DelegationRepository::GRANTEE_USER,
+            DelegationRepository::GRANTEE_PROFILE,
             $delegateUserId,
             [CorePermissions::RELATIONS_READ],
             null
@@ -125,7 +125,7 @@ final class MeCapabilitiesApiHandlerRealEngineTest extends TestCase
         $ids = $service->delegate(
             self::TENANT_ID,
             $adminUserId,
-            DelegationRepository::GRANTEE_USER,
+            DelegationRepository::GRANTEE_PROFILE,
             $delegateUserId,
             [CorePermissions::RELATIONS_READ],
             null

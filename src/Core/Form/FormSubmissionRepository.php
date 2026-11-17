@@ -49,6 +49,15 @@ final class FormSubmissionRepository
     }
 
     /**
+     * A fresh name lookup for the people a submission's answers name
+     * (WHIT-1162), for printing and exporting them by name.
+     */
+    public function profileNames(): ProfileNames
+    {
+        return new ProfileNames($this->db);
+    }
+
+    /**
      * Insert a submission. Called only from inside
      * {@see SubmissionIssuer::submit()}'s transaction — a submission that exists
      * without the document it was supposed to produce is the one torn state this
@@ -294,10 +303,6 @@ final class FormSubmissionRepository
               WHERE tenant_id = :tenant_id AND id = :id
                 AND submitted_by_profile_id = :profile_id
                 AND withdrawn_at IS NULL
-                AND NOT EXISTS (
-                    SELECT 1 FROM form_submission_reviews r
-                     WHERE r.submission_id = form_submissions.id AND r.tenant_id = form_submissions.tenant_id
-                )
                 AND NOT (
                     EXISTS (
                         SELECT 1 FROM document_routes dr

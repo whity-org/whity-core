@@ -64,6 +64,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             'auth.self_2fa_recovery_enabled',
             'auth.sso_enabled',
             'auth.sso_self_provision_workspace',
+            'workspaces.self_create_enabled',
+            'workspaces.max_owned_per_person',
+            'auth.password_sign_in',
             'auth.desktop_login_max_hours',
             'storage.driver',
             'storage.s3.endpoint',
@@ -194,6 +197,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.weekend_days',
             // Design 3.3: off makes booking-page bookings requests.
             'calendar.instant_booking',
+            // WHIT-1173: one booking, several services back to back.
+            'calendar.multi_service_booking',
             // #1733. Whether the web app can be installed (instance-wide).
             'app.installable',
             // WS.5, WS.19: the operator's website (global-only).
@@ -206,6 +211,12 @@ final class SettingsRegistryCorePinTest extends TestCase
             'signup.customer_invites',
             // WHIT-1043: how many people one customer may invite.
             'signup.invites_per_customer',
+            // Merge map A4: the route a join request travels on.
+            'signup.route_template_id',
+            // Migration 294: Messages settings, moved from messaging_settings.
+            'messaging.webchat_enabled',
+            'messaging.webchat_greeting',
+            'messaging.inbound_email_address',
         ];
     }
 
@@ -273,6 +284,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             'auth.self_2fa_recovery_enabled' => 'true',
             'auth.sso_enabled' => 'true',
             'auth.sso_self_provision_workspace' => 'false',
+            'workspaces.self_create_enabled' => 'false',
+            'workspaces.max_owned_per_person' => '0',
+            'auth.password_sign_in' => 'true',
             'auth.desktop_login_max_hours' => '72',
             'storage.driver' => 'local',
             'storage.s3.endpoint' => '',
@@ -423,6 +437,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.week_start' => 'saturday',
             'calendar.weekend_days' => 'friday,saturday',
             'calendar.instant_booking' => 'true',
+            'calendar.multi_service_booking' => 'false',
             // #1733: on, which is what app.whity.dev wants; an operator turns
             // it off here or with PWA_ENABLED.
             'app.installable' => 'true',
@@ -433,6 +448,10 @@ final class SettingsRegistryCorePinTest extends TestCase
             'signup.allowed_domains' => '[]',
             'signup.customer_invites' => 'false',
             'signup.invites_per_customer' => '0',
+            'signup.route_template_id' => '0',
+            'messaging.webchat_enabled' => 'false',
+            'messaging.webchat_greeting' => '',
+            'messaging.inbound_email_address' => '',
         ];
     }
 

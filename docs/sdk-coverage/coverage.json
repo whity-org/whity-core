@@ -1,8 +1,8 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.106.0",
-    "core_version": "0.2.28",
-    "updated": "2026-11-12",
+    "sdk_version": "1.116.0",
+    "core_version": "0.2.29",
+    "updated": "2026-11-17",
     "ratings": {
         "full": "A plugin can read, change, react to and extend this area through a published SDK contract.",
         "partial": "Some of it is in the SDK; the rest is missing or reachable only through internal core classes.",
@@ -121,6 +121,10 @@
                 {
                     "what": "Owned tables cascade on workspace deletion (PluginTablesInterface)",
                     "since": "1.20"
+                },
+                {
+                    "what": "workspace.owner_added, workspace.owner_removed and workspace.ownership_transferred when a workspace changes hands or gains or loses a co-owner",
+                    "since": "1.112"
                 }
             ],
             "missing": [
@@ -420,6 +424,10 @@
                 {
                     "what": "Render and issue from queue jobs and CLI commands",
                     "since": "1.76"
+                },
+                {
+                    "what": "QR codes as SVG or a data URI for a printout, without a vendor package (Print\\QrCode)",
+                    "since": "1.111"
                 }
             ],
             "missing": [
@@ -862,10 +870,17 @@
                 {
                     "what": "One home card per plugin",
                     "since": "1.62"
+                },
+                {
+                    "what": "PluginDashboardInterface: setup points on Finish setting up, done by the plugin's own status route",
+                    "since": "1.115"
+                },
+                {
+                    "what": "Dashboard widgets (stat, list, chart, actions) built from blocks, several per plugin, with actions; people hide, move and resize them",
+                    "since": "1.115"
                 }
             ],
             "missing": [
-                "More than one card, and actions on cards",
                 "Contributing to Waiting for you"
             ],
             "security": null,
@@ -980,6 +995,10 @@
                 {
                     "what": "Whether a paid Whity store plugin is licensed here: licensed, grace with an until date, or unlicensed, from the store's signed statement with a 7-day offline window (Licensing\\StoreLicence)",
                     "since": "1.85"
+                },
+                {
+                    "what": "Plugins sold per seat (getAccess seats) and QuantityCheckout for a checkout of several",
+                    "since": "1.110"
                 }
             ],
             "missing": [
@@ -1004,11 +1023,14 @@
                 {
                     "what": "Core version constraint",
                     "since": "1.4"
+                },
+                {
+                    "what": "PluginAccessInterface and PluginWorkspaceLifecycleInterface: paid plugins switched on per workspace, with trials, grace and read-only; WorkspaceAddons for billing plugins",
+                    "since": "1.107"
                 }
             ],
             "missing": [
                 "Enabled, installed and upgraded callbacks",
-                "Knowing whether the plugin is on for the current workspace",
                 "The running core version"
             ],
             "security": "Installing and enabling stay operator-only. A lifecycle callback must not let a plugin enable others.",
@@ -1196,6 +1218,14 @@
                 {
                     "what": "Labels and other visible text in English and Arabic ({en, ar}), served in the reader's language",
                     "since": "1.101"
+                },
+                {
+                    "what": "PluginOnboardingInterface: a guided, step-by-step setup drawn by core as a stepper",
+                    "since": "1.109"
+                },
+                {
+                    "what": "Setup inputs: time, weekly hours, checkbox group, colour swatches, prefilled repeating rows",
+                    "since": "1.113"
                 }
             ],
             "missing": [
@@ -1364,11 +1394,15 @@
             "id": "webhooks",
             "group": "agents",
             "name": "Outbound webhooks and connectors",
-            "rating": "none",
-            "has": [],
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "One outbound HTTP client for calling other servers: https only unless asked, verified TLS, no redirects, timeouts and a size cap, with recorded answers for tests (Http\\Outbound\\HttpClient, StreamHttpClient, Testing\\RecordedHttpClient)",
+                    "since": "1.114"
+                }
+            ],
             "missing": [
                 "Subscribing external URLs to events, with signing, retries and a delivery log",
-                "An outbound HTTP client",
                 "Admin-registered connectors"
             ],
             "security": "Outbound calls need a guard against private addresses, signing secrets kept in PluginSecrets, a workspace check per event and id-only payloads.",
@@ -1398,6 +1432,14 @@
                 {
                     "what": "calendar.event.created|updated|deleted and booking.created|confirmed|rescheduled|cancelled|expired events with ids only",
                     "since": "1.98"
+                },
+                {
+                    "what": "Setup\\WorkspaceSetup: set up booking rules, services, staff and hours through core routes, as the acting person (for packs)",
+                    "since": "1.108"
+                },
+                {
+                    "what": "PluginWorkspaceTemplatesInterface: ready starts for one kind of business, offered after a workspace is created and applied by core as the person choosing them",
+                    "since": "1.116"
                 }
             ],
             "missing": [

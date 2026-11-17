@@ -68,6 +68,15 @@ export const SSO_ERROR_KEYS: Record<string, { key: string; fallback: string }> =
     key: 'sso.error.expired',
     fallback: 'Your sign-in attempt timed out. Please try again.',
   },
+  // WHIT-1168: an invitation accepted by signing in.
+  invite_invalid: {
+    key: 'sso.error.inviteInvalid',
+    fallback: 'That invitation can no longer be used. Ask the workspace to send a new one.',
+  },
+  invite_other_email: {
+    key: 'sso.error.inviteOtherEmail',
+    fallback: 'That invitation was sent to another email address. Sign in with that address, or ask for a new invitation.',
+  },
   denied: { key: 'sso.error.denied', fallback: 'Sign-in was cancelled.' },
   failed: { key: 'sso.error.failed', fallback: 'Sign-in failed. Please try again.' },
 };

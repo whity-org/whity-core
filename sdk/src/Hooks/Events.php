@@ -208,6 +208,40 @@ final class Events
      */
     public const MEMBERSHIP_CUSTOMER_INVITING = 'membership.customer_inviting';
 
+    // ---- workspace owners (SDK 1.112, WHIT-1170) ----
+    // A workspace has one or more owners, all equal. Ownership changes when the
+    // person offered it accepts (after confirming it is them). Ids only, fired
+    // after the change committed; the return value is ignored and a listener
+    // cannot undo it.
+
+    /**
+     * Someone became an owner of a workspace: they accepted an offer to take it
+     * over or to co-own it.
+     *
+     * Payload: `tenant_id`, `profile_id`, `added_by` (the owner who offered),
+     * `offer_id`.
+     */
+    public const WORKSPACE_OWNER_ADDED = 'workspace.owner_added';
+
+    /**
+     * Someone stopped being an owner of a workspace.
+     *
+     * Payload: `tenant_id`, `profile_id`, `removed_by` (who caused it: the new
+     * owner on a hand-over, another owner, or themselves), `via` (`transfer`,
+     * `removed` or `left`).
+     */
+    public const WORKSPACE_OWNER_REMOVED = 'workspace.owner_removed';
+
+    /**
+     * A workspace was handed over: fired after {@see self::WORKSPACE_OWNER_ADDED}
+     * and {@see self::WORKSPACE_OWNER_REMOVED} for the same change.
+     *
+     * Payload: `tenant_id`, `from_profile_id`, `to_profile_id`, `offer_id`,
+     * `from_left` (true when the old owner chose to leave the workspace; they
+     * stay an admin otherwise).
+     */
+    public const WORKSPACE_OWNERSHIP_TRANSFERRED = 'workspace.ownership_transferred';
+
     // ---- documents (SDK 1.49; DOCUMENT-AUTOMATION.md) ----
     // Before a document is issued: a listener may veto with HookVetoException,
     // and nothing is written. Payload: tenant_id, source_id, version, record,

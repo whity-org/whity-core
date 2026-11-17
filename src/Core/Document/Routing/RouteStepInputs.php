@@ -44,6 +44,30 @@ final class RouteStepInputs
 
     private const KEY = '/^[a-z][a-z0-9_]{0,39}$/';
 
+    /** A line of text: a meeting number, a reference. */
+    public const TYPE_TEXT = 'text';
+
+    /**
+     * A person in the workspace, stored as their user id (merge map A3). The
+     * office names a form's supervisor this way at pre-check, and a later step's
+     * recusal reads it ({@see RouteStepExclusions}).
+     */
+    public const TYPE_PERSON = 'person';
+
+    /**
+     * One of a list the step defines: a recommendation, or a decision such as
+     * Approved, Conditionally approved, Revisions required, Not approved.
+     * Stored as the option's value; printed as its label.
+     */
+    public const TYPE_CHOICE = 'choice';
+
+    public const TYPES = [self::TYPE_TEXT, self::TYPE_PERSON, self::TYPE_CHOICE];
+
+    /** A choice offers 2 to this many options. */
+    public const MAX_OPTIONS = 12;
+
+    private const OPTION_VALUE = '/^[a-z][a-z0-9_]{0,39}$/';
+
     /**
      * Static helper only — never instantiated.
      */
@@ -54,7 +78,7 @@ final class RouteStepInputs
     /**
      * Validate a step's declared inputs from a request body.
      *
-     * @return list<array{key: string, label: string, label_ar: ?string, required: bool, max_length: int}>
+     * @return list<array{key: string, label: string, label_ar: ?string, required: bool, max_length: int, type: string, options?: list<array{value: string, label: string, label_ar: ?string}>}>
      *
      * @throws InvalidArgumentException With a sentence naming what is wrong.
      */
@@ -108,6 +132,11 @@ final class RouteStepInputs
                     "Value {$nth}: 'max_length' must be a whole number from 1 to " . self::MAX_LENGTH . '.'
                 );
             }
+            $type = $input['type'] ?? self::TYPE_TEXT;
+            if (!is_string($type) || !in_array($type, self::TYPES, true)) {
+                throw new InvalidArgumentException("Value {$nth}: 'type' is text, person or choice.");
+            }
+            $options = $type === self::TYPE_CHOICE ? self::options($input['options'] ?? null, $nth) : null;
 
             $out[] = [
                 'key' => $key,
@@ -115,10 +144,64 @@ final class RouteStepInputs
                 'label_ar' => $labelAr,
                 'required' => $required,
                 'max_length' => $maxLength,
-            ];
+                'type' => $type,
+            ] + ($options !== null ? ['options' => $options] : []);
         }
 
         return $out;
+    }
+
+    /**
+     * A choice's options: 2 to {@see MAX_OPTIONS}, each a stable value and a
+     * label in English and, optionally, Arabic.
+     *
+     * @return list<array{value: string, label: string, label_ar: ?string}>
+     *
+     * @throws InvalidArgumentException
+     */
+    private static function options(mixed $raw, int $nth): array
+    {
+        if (!is_array($raw) || !array_is_list($raw) || count($raw) < 2 || count($raw) > self::MAX_OPTIONS) {
+            throw new InvalidArgumentException("Value {$nth}: a choice needs 2 to " . self::MAX_OPTIONS . ' options.');
+        }
+        $out = [];
+        $seen = [];
+        foreach ($raw as $option) {
+            $value = is_array($option) ? ($option['value'] ?? null) : null;
+            $label = is_array($option) ? self::text($option['label'] ?? null) : null;
+            if (!is_string($value) || preg_match(self::OPTION_VALUE, $value) !== 1 || $label === null) {
+                throw new InvalidArgumentException(
+                    "Value {$nth}: each option needs a 'value' (small letters, digits and _) and a 'label'."
+                );
+            }
+            if (isset($seen[$value])) {
+                throw new InvalidArgumentException("Value {$nth}: two options use the value '{$value}'.");
+            }
+            $seen[$value] = true;
+            $out[] = ['value' => $value, 'label' => $label, 'label_ar' => self::text($option['label_ar'] ?? null)];
+        }
+
+        return $out;
+    }
+
+    /**
+     * What a stored value reads as: a choice's option label (Arabic when asked
+     * and present), anything else as it was entered.
+     *
+     * @param array<string, mixed> $input One step input, as {@see decode()} returns it.
+     */
+    public static function display(array $input, string $value, string $lang = 'en'): string
+    {
+        if (($input['type'] ?? self::TYPE_TEXT) !== self::TYPE_CHOICE) {
+            return $value;
+        }
+        foreach (is_array($input['options'] ?? null) ? $input['options'] : [] as $option) {
+            if (($option['value'] ?? null) === $value) {
+                return $lang === 'ar' && is_string($option['label_ar'] ?? null) && $option['label_ar'] !== '' ? $option['label_ar'] : (string) $option['label'];
+            }
+        }
+
+        return $value;
     }
 
     /**
@@ -160,7 +243,7 @@ final class RouteStepInputs
      * the safe direction: the step then asks for nothing rather than for
      * something nobody can see.
      *
-     * @return list<array{key: string, label: string, label_ar: ?string, required: bool, max_length: int}>
+     * @return list<array{key: string, label: string, label_ar: ?string, required: bool, max_length: int, type: string, options?: list<array{value: string, label: string, label_ar: ?string}>}>
      */
     public static function decode(mixed $stored): array
     {
@@ -181,7 +264,7 @@ final class RouteStepInputs
     /**
      * Check the values sent with an act against what the step asks for.
      *
-     * @param list<array{key: string, label: string, label_ar: ?string, required: bool, max_length: int}> $inputs
+     * @param list<array{key: string, label: string, label_ar: ?string, required: bool, max_length: int, type: string, options?: list<array{value: string, label: string, label_ar: ?string}>}> $inputs
      * @param array<string, string> $values Already shaped by {@see parseValues()}.
      * @return array<string, string> The values to keep, blanks dropped.
      *
@@ -208,7 +291,17 @@ final class RouteStepInputs
                 }
                 continue;
             }
-            if (mb_strlen($value) > $input['max_length']) {
+            if ($input['type'] === self::TYPE_CHOICE) {
+                if (!in_array($value, array_column($input['options'] ?? [], 'value'), true)) {
+                    throw new InvalidArgumentException("Choose one of the options for “{$input['label']}”.");
+                }
+            } elseif ($input['type'] === self::TYPE_PERSON) {
+                // A person is their user id. Whether they belong to this
+                // workspace is the router's check, which can read it.
+                if (preg_match('/^[1-9][0-9]{0,18}$/', $value) !== 1) {
+                    throw new InvalidArgumentException("Choose a person for “{$input['label']}”.");
+                }
+            } elseif (mb_strlen($value) > $input['max_length']) {
                 throw new InvalidArgumentException(
                     "“{$input['label']}” must be {$input['max_length']} characters or fewer."
                 );

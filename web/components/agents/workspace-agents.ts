@@ -88,12 +88,6 @@ export function startOfToday(now: Date = new Date()): string {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 }
 
-/** A text in the reader's language, or English when it has no Arabic. */
-export function localized(english: string | null, arabic: string | null, inArabic: boolean): string {
-  const translated = arabic?.trim();
-  return inArabic && translated ? translated : (english ?? '');
-}
-
 /** A read is a permission whose action is `read` or `view`, as `AgentDefinition` decides. */
 export function isReadPermission(permission: string): boolean {
   const action = permission.split(':').pop();

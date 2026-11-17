@@ -20,6 +20,13 @@ export type PublicStaff = PublicBookingPage['staff'][number];
 export type PublicBooking = Schemas['PublicBooking'];
 export type PublicBookingRequest = Schemas['PublicBookingRequest'];
 
+/** WHIT-1179: the signed-in visitor's own name and email, to fill the form. */
+export interface BookingVisitor {
+  name: string;
+  email: string;
+  phone: string | null;
+}
+
 /** A free time. The manage link's slots carry no `profile_ids`. */
 export interface FreeTime {
   starts_at: string;
@@ -124,6 +131,16 @@ export interface BookingDraft {
   /** Milliseconds since the page loaded. */
   elapsedMs: number;
   botToken: string | null;
+  /** WHIT-1173: several services back to back, in order; null or one for a single service. */
+  several?: ServicePick[] | null;
+  /** With `several` and nobody chosen: one person who does them all. */
+  samePerson?: boolean;
+}
+
+/** One service of a booking of several, and who does it (null: anyone). */
+export interface ServicePick {
+  service_id: number;
+  profile_id: number | null;
 }
 
 /**
@@ -141,6 +158,12 @@ export function bookingRequestBody(draft: BookingDraft): PublicBookingRequest {
     elapsed_ms: Math.max(0, Math.round(draft.elapsedMs)),
   };
   if (draft.profileId !== null) body.profile_id = draft.profileId;
+  if (draft.several && draft.several.length > 1) {
+    delete body.service_id;
+    delete body.profile_id;
+    body.services = draft.several.map((s) => (s.profile_id !== null ? { service_id: s.service_id, profile_id: s.profile_id } : { service_id: s.service_id }));
+    if (draft.samePerson) body.same_person = true;
+  }
   if (draft.phone.trim() !== '') body.phone = draft.phone.trim();
   if (draft.note.trim() !== '') body.note = draft.note.trim();
   if (draft.botToken) body.bot_token = draft.botToken;
@@ -179,12 +202,49 @@ export const publicBookingApi = {
     return (await send<{ data: PublicBookingPage }>(PAGE(workspace))).data;
   },
 
+  /**
+   * WHIT-1179: the signed-in visitor's own name and email, or null when
+   * nobody is signed in. Never cached (the server sends `no-store`), and the
+   * cookie goes only to this same-origin route. Any failure is "nothing to
+   * fill": the form simply stays empty, as it is for a signed-out visitor.
+   */
+  async visitor(workspace: string): Promise<BookingVisitor | null> {
+    try {
+      const res = await fetch(`${PAGE(workspace)}/me`, {
+        headers: { Accept: 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      if (!res.ok) return null;
+      const body = (await res.json()) as { data?: unknown };
+      const data = body.data;
+      if (data === null || typeof data !== 'object') return null;
+      const v = data as Record<string, unknown>;
+      const name = typeof v.name === 'string' ? v.name : '';
+      const email = typeof v.email === 'string' ? v.email : '';
+      const phone = typeof v.phone === 'string' && v.phone !== '' ? v.phone : null;
+      return name === '' && email === '' && phone === null ? null : { name, email, phone };
+    } catch {
+      return null;
+    }
+  },
+
   async slots(
     workspace: string,
-    query: { serviceId: number; profileId: number | null; from: string; to: string }
+    query: { serviceId: number; profileId: number | null; from: string; to: string; several?: ServicePick[] | null; samePerson?: boolean }
   ): Promise<FreeTime[]> {
     const params = new URLSearchParams({ service_id: String(query.serviceId), from: query.from, to: query.to });
     if (query.profileId !== null) params.set('profile_id', String(query.profileId));
+    // WHIT-1173: several services back to back.
+    if (query.several && query.several.length > 1) {
+      params.delete('service_id');
+      params.delete('profile_id');
+      params.set('service_ids', query.several.map((s) => s.service_id).join(','));
+      if (query.several.some((s) => s.profile_id !== null)) {
+        params.set('profile_ids', query.several.map((s) => s.profile_id ?? 0).join(','));
+      }
+      if (query.samePerson) params.set('same_person', 'true');
+    }
     return (await send<{ data: FreeTime[] }>(`${PAGE(workspace)}/slots?${params.toString()}`)).data;
   },
 

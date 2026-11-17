@@ -22,8 +22,8 @@ use PDO;
  *
  * Removal happens only through the parent: `ON DELETE CASCADE` from `documents`
  * and from `tenants` (migration 108). Note what that does NOT reclaim — the
- * OBJECT in storage outlives the row, which is why `storage_key` is recorded
- * here at all: an operator sweep needs to read the keys before the rows go.
+ * OBJECT in storage outlives the row, which is why its `stored_files` row
+ * (with the storage key) is kept: an operator sweep needs to read the keys before the rows go.
  *
  * TENANT-OWNED. Every statement binds a literal `tenant_id` predicate (the CI
  * tenant-predicate guard reads this source), and every artifact lookup ALSO
@@ -32,6 +32,11 @@ use PDO;
  */
 final class DocumentArtifactRepository
 {
+    /** The file's own details come from `stored_files` (WHIT-1159, migration 299). */
+    private const COLUMNS = 'a.id, a.tenant_id, a.document_id, f.storage_key, f.content_type, f.byte_size, f.checksum_sha256, a.rendered_by, a.pages, a.rendered_at';
+
+    private const FROM = 'document_artifacts a JOIN stored_files f ON f.id = a.stored_file_id AND f.tenant_id = a.tenant_id';
+
     private PDO $db;
 
     public function __construct(PDO $db)
@@ -42,9 +47,9 @@ final class DocumentArtifactRepository
     /**
      * Record one stored artifact and return its id.
      *
-     * `storage_key` carries a UNIQUE constraint, so a caller that somehow
-     * derived a key already in use gets an integrity error rather than a second
-     * row silently claiming the same object. {@see DocumentArtifactStore} mints
+     * `stored_file_id` carries a UNIQUE index (migration 299), so a caller that
+     * somehow derived a key already recorded as an artifact gets an integrity
+     * error rather than a second row silently claiming the same object. {@see DocumentArtifactStore} mints
      * a fresh random key per write and refuses to overwrite an existing object,
      * so the two halves of the immutability guarantee fail independently.
      *
@@ -53,20 +58,27 @@ final class DocumentArtifactRepository
      */
     public function create(int $tenantId, array $rec): int
     {
+        // WHIT-1159: the file's own row in the one file store (shared with the
+        // upload it came from, when it was claimed from a form).
+        $storedFileId = \Whity\Core\Storage\StoredFiles::remember(
+            $this->db,
+            $tenantId,
+            \Whity\Core\Storage\StoredFiles::DOCUMENT_ARTIFACT,
+            $rec,
+            null,
+            $rec['rendered_by'] ?? null,
+        );
         $stmt = $this->db->prepare(
             'INSERT INTO document_artifacts
-                 (tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, pages, rendered_at)
-             VALUES (:tenant_id, :document_id, :storage_key, :content_type, :byte_size, :checksum_sha256, :rendered_by, :pages, NOW())'
+                 (tenant_id, document_id, rendered_by, pages, stored_file_id, rendered_at)
+             VALUES (:tenant_id, :document_id, :rendered_by, :pages, :stored_file_id, NOW())'
         );
         $stmt->execute([
             ':tenant_id'       => $tenantId,
             ':document_id'     => $rec['document_id'],
-            ':storage_key'     => $rec['storage_key'],
-            ':content_type'    => $rec['content_type'],
-            ':byte_size'       => $rec['byte_size'],
-            ':checksum_sha256' => $rec['checksum_sha256'],
             ':rendered_by'     => $rec['rendered_by'] ?? null,
             ':pages'           => $rec['pages'] ?? null,
+            ':stored_file_id'  => $storedFileId,
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -85,10 +97,10 @@ final class DocumentArtifactRepository
     public function listForDocument(int $documentId, int $tenantId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, pages, rendered_at
-             FROM document_artifacts
-             WHERE tenant_id = :tenant_id AND document_id = :document_id
-             ORDER BY id DESC'
+            'SELECT ' . self::COLUMNS . '
+             FROM ' . self::FROM . '
+             WHERE a.tenant_id = :tenant_id AND a.document_id = :document_id
+             ORDER BY a.id DESC'
         );
         $stmt->execute([':tenant_id' => $tenantId, ':document_id' => $documentId]);
 
@@ -110,10 +122,10 @@ final class DocumentArtifactRepository
     public function findLatestForDocument(int $documentId, int $tenantId): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, pages, rendered_at
-             FROM document_artifacts
-             WHERE tenant_id = :tenant_id AND document_id = :document_id
-             ORDER BY id DESC LIMIT 1'
+            'SELECT ' . self::COLUMNS . '
+             FROM ' . self::FROM . '
+             WHERE a.tenant_id = :tenant_id AND a.document_id = :document_id
+             ORDER BY a.id DESC LIMIT 1'
         );
         $stmt->execute([':tenant_id' => $tenantId, ':document_id' => $documentId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -133,9 +145,9 @@ final class DocumentArtifactRepository
     public function findById(int $id, int $documentId, int $tenantId): ?array
     {
         $stmt = $this->db->prepare(
-            'SELECT id, tenant_id, document_id, storage_key, content_type, byte_size, checksum_sha256, rendered_by, pages, rendered_at
-             FROM document_artifacts
-             WHERE id = :id AND document_id = :document_id AND tenant_id = :tenant_id'
+            'SELECT ' . self::COLUMNS . '
+             FROM ' . self::FROM . '
+             WHERE a.id = :id AND a.document_id = :document_id AND a.tenant_id = :tenant_id'
         );
         $stmt->execute([':id' => $id, ':document_id' => $documentId, ':tenant_id' => $tenantId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);

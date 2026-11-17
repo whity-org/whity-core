@@ -95,23 +95,56 @@ final class RoomRepository
      */
     public function busy(int $tenantId, int $roomId, DateTimeImmutable $from, DateTimeImmutable $to, DateTimeImmutable $now, ?int $exceptBookingId = null): array
     {
+        // A booking of several services (WHIT-1173) holds a room only for the
+        // services that need it, read from its services.
         $stmt = $this->db->prepare(
-            "SELECT blocks_from AS s, blocks_until AS e FROM calendar_bookings
-              WHERE tenant_id = :tenant_id AND room_id = :room_id
-                AND blocks_from < :to AND blocks_until > :from
-                AND id <> :except
-                AND (status IN ('confirmed', 'requested') OR (status = 'pending_payment' AND hold_expires_at > :now))"
+            "SELECT b.blocks_from AS s, b.blocks_until AS e FROM calendar_bookings b
+              WHERE b.tenant_id = :tenant_id AND b.room_id = :room_id
+                AND b.blocks_from < :to AND b.blocks_until > :from
+                AND b.id <> :except
+                AND (b.status IN ('confirmed', 'requested') OR (b.status = 'pending_payment' AND b.hold_expires_at > :now))
+                AND NOT EXISTS (SELECT 1 FROM calendar_booking_services i WHERE i.tenant_id = b.tenant_id AND i.booking_id = b.id)"
         );
-        $stmt->execute([
+        $params = [
             ':tenant_id' => $tenantId,
             ':room_id' => $roomId,
             ':from' => Interval::toDb($from),
             ':to' => Interval::toDb($to),
             ':except' => $exceptBookingId ?? 0,
             ':now' => Interval::toDb($now),
-        ]);
+        ];
+        $stmt->execute($params);
         $busy = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $busy[] = new Interval(Interval::fromDb((string) $r['s']), Interval::fromDb((string) $r['e']));
+        }
+        $items = $this->db->prepare(
+            "SELECT i.blocks_from AS s, i.blocks_until AS e FROM calendar_booking_services i
+               JOIN calendar_bookings b ON b.id = i.booking_id AND b.tenant_id = i.tenant_id
+              WHERE i.tenant_id = :tenant_id AND i.room_id = :room_id
+                AND i.blocks_from < :to AND i.blocks_until > :from
+                AND b.id <> :except
+                AND (b.status IN ('confirmed', 'requested') OR (b.status = 'pending_payment' AND b.hold_expires_at > :now))"
+        );
+        $items->execute($params);
+        foreach ($items->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $busy[] = new Interval(Interval::fromDb((string) $r['s']), Interval::fromDb((string) $r['e']));
+        }
+
+        // ADR 0018: an event (a meeting, say) held in the room blocks it too.
+        $events = $this->db->prepare(
+            "SELECT starts_at AS s, ends_at AS e FROM calendar_events
+              WHERE tenant_id = :tenant_id AND room_id = :room_id
+                AND starts_at < :to AND ends_at > :from
+                AND busy = :busy AND status = 'confirmed'"
+        );
+        $events->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $events->bindValue(':room_id', $roomId, PDO::PARAM_INT);
+        $events->bindValue(':from', Interval::toDb($from));
+        $events->bindValue(':to', Interval::toDb($to));
+        $events->bindValue(':busy', true, PDO::PARAM_BOOL);
+        $events->execute();
+        foreach ($events->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $busy[] = new Interval(Interval::fromDb((string) $r['s']), Interval::fromDb((string) $r['e']));
         }
 

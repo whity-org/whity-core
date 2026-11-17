@@ -116,6 +116,7 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';
 import { Textarea } from '@whity/ui/textarea';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { IconCheck, IconX } from '@tabler/icons-react';
 import { useLanguageDirection, useTranslation } from '@whity/features/i18n';
 import { api, apiFetch } from '@/lib/api/client';
@@ -131,6 +132,7 @@ import {
   type RouteVerdictName,
 } from './routing-wire';
 import { SignPanel } from './sign-panel';
+import { RoutePersonValue } from './route-person-value';
 import { Lottie } from '@whity/ui/lottie';
 
 /**
@@ -693,6 +695,11 @@ export function RouteActPanel({
                   'routing.act.quorum.any',
                   'One approval from any of them carries it, so yours may settle it on its own. A rejection decides nothing while anybody is still able to approve.'
                 )
+              : quorum === 'first'
+                ? t(
+                    'routing.act.quorum.first',
+                    'The first of them to answer decides, approve or reject. Once someone has answered, nothing more is needed from the others.'
+                  )
               : quorum === 'majority'
                 ? t(
                     'routing.act.quorum.majority',
@@ -729,13 +736,39 @@ export function RouteActPanel({
                   <span className="ms-1 text-muted-foreground">{t('routing.act.values.optional', '(optional)')}</span>
                 )}
               </label>
-              <Input
-                id={`route-value-${route.id}-${input.key}`}
-                value={values[input.key] ?? ''}
-                maxLength={input.max_length}
-                aria-required={input.required}
-                onChange={(e) => setValues((current) => ({ ...current, [input.key]: e.target.value }))}
-              />
+              {input.type === 'choice' ? (
+                // WHIT-1163: one of the stage's options, such as the decision.
+                <Select
+                  value={values[input.key] ?? ''}
+                  onValueChange={(value) => setValues((current) => ({ ...current, [input.key]: value }))}
+                >
+                  <SelectTrigger id={`route-value-${route.id}-${input.key}`} aria-required={input.required}>
+                    <SelectValue placeholder={t('routing.act.values.choose', 'Choose one')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(input.options ?? []).map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {(dir === 'rtl' && option.label_ar) || option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : input.type === 'person' ? (
+                <RoutePersonValue
+                  id={`route-value-${route.id}-${input.key}`}
+                  value={values[input.key] ?? ''}
+                  required={input.required}
+                  onChange={(value) => setValues((current) => ({ ...current, [input.key]: value }))}
+                />
+              ) : (
+                <Input
+                  id={`route-value-${route.id}-${input.key}`}
+                  value={values[input.key] ?? ''}
+                  maxLength={input.max_length}
+                  aria-required={input.required}
+                  onChange={(e) => setValues((current) => ({ ...current, [input.key]: e.target.value }))}
+                />
+              )}
             </div>
           ))}
         </fieldset>

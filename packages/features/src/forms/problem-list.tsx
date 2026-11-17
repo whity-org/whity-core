@@ -4,9 +4,9 @@ import { Button } from "@whity/ui/button"
 
 import { useTranslation } from "../i18n"
 import { useCurrentLanguage } from "./language"
-import { pickText } from "./text"
 import type { Problem } from "./builder-model"
 import type { FieldDraft } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 /** The words for one problem, naming the question. */
 export function useProblemText(fields: readonly FieldDraft[]): (problem: Problem) => string {
@@ -16,7 +16,7 @@ export function useProblemText(fields: readonly FieldDraft[]): (problem: Problem
     if (problem.index === null) return t("builder.problem.noName", "The form has no name.")
     const field = fields[problem.index]
     const number = problem.index + 1
-    const title = pickText(field?.label, currentLanguage)
+    const title = localizedText(field?.label, currentLanguage)
     const which = title === "" ? t("builder.problem.question", "Question {number}", { number }) : t("builder.problem.questionNamed", "Question {number}, “{title}”", { number, title })
     switch (problem.code) {
       case "noWording":

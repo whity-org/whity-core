@@ -1,5 +1,6 @@
-import { keyFrom, pickText } from "./text"
-import type { FieldCondition, FieldDraft, FieldKind, FieldOption, LocalizedMap } from "./types"
+import { keyFrom } from "./text"
+import type { ConditionOperator, FieldCondition, FieldDraft, FieldKind, FieldOption, LocalizedMap } from "./types"
+import { localizedText } from "@whity/ui/localized-text"
 
 /** Kinds that carry choices the author writes. */
 export const CHOICE_KINDS: readonly string[] = ["select", "multiselect"]
@@ -20,9 +21,15 @@ export const KIND_ORDER: readonly FieldKind[] = [
   "signature",
 ]
 
-/** Kinds a condition can read: the answer is one of a short, known list. */
+/** Kinds a condition can compare with: the answer is one of a short, known list. */
 export function canControl(field: Pick<FieldDraft, "field_type">): boolean {
   return field.field_type === "select" || field.field_type === "multiselect" || field.field_type === "checkbox"
+}
+
+/** The operator a stored rule is edited as. */
+export function conditionOperator(rule: FieldCondition): ConditionOperator {
+  if (rule.answered === true) return "answered"
+  return rule.notEquals !== undefined ? "notEquals" : "equals"
 }
 
 export function newField(kind: FieldKind, fields: readonly FieldDraft[], sectionKey: string | null): FieldDraft {
@@ -56,7 +63,7 @@ export function blankOption(existing: readonly FieldOption[]): FieldOption {
 
 /** The value an option is stored under, from the words the author wrote for it. */
 export function optionValueFrom(label: LocalizedMap, existing: readonly FieldOption[], self: string): string {
-  const words = (label.en ?? "").trim() || (label.ar ?? "").trim() || pickText(label, null).trim()
+  const words = (label.en ?? "").trim() || (label.ar ?? "").trim() || localizedText(label, null).trim()
   const taken = new Set(existing.filter((o) => o.value !== self).map((o) => o.value))
   if (words === "") return self
   let candidate = words.slice(0, 120)
@@ -91,9 +98,12 @@ export function relabel(fields: readonly FieldDraft[], index: number, label: Loc
   )
 }
 
-/** Questions before this one that a condition may read. */
+/**
+ * Questions before this one that a condition may read. Any of them can be asked
+ * whether it is answered; only those {@link canControl} accepts compare a value.
+ */
 export function controllersFor(fields: readonly FieldDraft[], index: number): FieldDraft[] {
-  return fields.slice(0, index).filter(canControl)
+  return fields.slice(0, index)
 }
 
 /** Remove a question, and any rule that read it. */

@@ -6,11 +6,12 @@ import userEvent from '@testing-library/user-event';
  * Unit/behaviour tests for the settings pages under
  * `app/(protected)/admin/settings/`.
  *
- * The settings area was reorganized (WC-tabs-nav follow-up): General (site
- * name / timezone / support email), Branding (locale + logos/colors), Sign-up
+ * The settings area was reorganized (WC-tabs-nav follow-up): General (support
+ * email / timezone / main language), Branding (product name, logos, colour), Sign-up
  * governance, Storage, Single sign-on, and Email are now separate routes
  * sharing a tab bar, replacing the old Website Settings / Global Settings
- * split. Locale moved from General to Branding; "Global defaults" is gone —
+ * split. The product name is on Branding and the language on General
+ * (TplAdminBranding, TplSettingsGeneral); "Global defaults" is gone —
  * its General/Integrations fields fold into a "Platform defaults" card on
  * the General page itself (system-tenant + settings:manage only), and its
  * Sign-up/Storage sections became their own top-level pages.
@@ -60,9 +61,12 @@ jest.mock('@/hooks/useCapabilities', () => ({
 // REGULAR tenant admin who also holds settings:manage (WC-235's target case)
 // without a whole separate mock module per scenario.
 let mockTenantId = 0;
+const mockRefreshAuth = jest.fn(() => Promise.resolve());
 jest.mock('@/lib/auth-context', () => ({
   useAuth: () => ({
     user: { id: 1, email: 'admin@example.com', role: 'admin', tenant_id: mockTenantId },
+    memberships: [{ tenant_id: 5, tenant_name: 'Example Bakery' }],
+    refreshAuth: mockRefreshAuth,
   }),
 }));
 
@@ -79,6 +83,13 @@ beforeAll(() => {
 });
 
 import AdminSettingsPage from '@/app/(protected)/admin/settings/page';
+// The Branding page only decides who edits which layer; the form has its own
+// tests (branding-settings.test.tsx).
+jest.mock('@/components/branding-settings', () => ({
+  BrandingSettings: ({ scope, canWrite }: { scope: string; canWrite: boolean }) => (
+    <div data-testid="branding-form" data-scope={scope} data-can-write={String(canWrite)} />
+  ),
+}));
 import BrandingSettingsPage from '@/app/(protected)/admin/settings/branding/page';
 import SignupSettingsPage from '@/app/(protected)/admin/settings/signup/page';
 import FeatureFlagsSettingsPage from '@/app/(protected)/admin/settings/feature-flags/page';
@@ -192,14 +203,30 @@ describe('AdminSettingsPage (General) — RBAC gating', () => {
     expect(mockApiGet).not.toHaveBeenCalledWith('/api/v1/settings/global');
   });
 
-  it('renders the tenant form for a settings:read caller (site name, timezone, support email — not locale)', async () => {
+  it('renders the tenant form for a settings:read caller (support email, timezone, main language — not the product name)', async () => {
     grant('settings:read');
     render(<AdminSettingsPage />);
-    expect(await screen.findByLabelText(/^site name$/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^support email$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^timezone$/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^support email$/i)).toBeInTheDocument();
-    // Locale moved to the Branding tab.
-    expect(screen.queryByLabelText(/^locale$/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/^main language$/i)).toBeInTheDocument();
+    // The product name (site_name) is on Branding with the logo and colour.
+    expect(document.getElementById('tenant-site_name')).not.toBeInTheDocument();
+  });
+
+  it('saves the main language with the rest of the tenant form', async () => {
+    setTenant(5);
+    grant('settings:read', 'settings:write');
+    render(<AdminSettingsPage />);
+    const language = await screen.findByLabelText(/^main language$/i);
+    await userEvent.click(language);
+    await userEvent.click(screen.getByRole('option', { name: /fr/i }));
+    fireEvent.click(screen.getByRole('button', { name: /save tenant settings/i }));
+    await waitFor(() =>
+      expect(mockApiPatch).toHaveBeenCalledWith(
+        '/api/v1/settings',
+        expect.objectContaining({ body: { settings: expect.objectContaining({ locale: 'fr' }) } })
+      )
+    );
   });
 
   it('links a workspace admin to their own workspace record', async () => {
@@ -212,31 +239,87 @@ describe('AdminSettingsPage (General) — RBAC gating', () => {
   it('gives no workspace record link to the system tenant or without tenants:read', async () => {
     grant('settings:read', 'tenants:read');
     const { unmount } = render(<AdminSettingsPage />);
-    await screen.findByLabelText(/^site name$/i).catch(() => undefined);
+    await screen.findByLabelText(/^support email$/i).catch(() => undefined);
     expect(screen.queryByRole('link', { name: 'Open workspace record' })).not.toBeInTheDocument();
     unmount();
 
     mockTenantId = 5;
     grant('settings:read');
     render(<AdminSettingsPage />);
-    expect(await screen.findByLabelText(/^site name$/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^support email$/i)).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Open workspace record' })).not.toBeInTheDocument();
   });
 
   it('makes the tenant form read-only without settings:write', async () => {
     grant('settings:read');
     render(<AdminSettingsPage />);
-    const siteName = await screen.findByLabelText(/^site name$/i);
-    expect(siteName).toBeDisabled();
+    const supportEmail = await screen.findByLabelText(/^support email$/i);
+    expect(supportEmail).toBeDisabled();
     expect(screen.queryByRole('button', { name: /save tenant settings/i })).not.toBeInTheDocument();
   });
 
   it('enables the tenant form and save with settings:write', async () => {
     grant('settings:read', 'settings:write');
     render(<AdminSettingsPage />);
-    const siteName = await screen.findByLabelText(/^site name$/i);
-    expect(siteName).toBeEnabled();
+    const supportEmail = await screen.findByLabelText(/^support email$/i);
+    expect(supportEmail).toBeEnabled();
     expect(screen.getByRole('button', { name: /save tenant settings/i })).toBeInTheDocument();
+  });
+});
+
+describe('AdminSettingsPage — Workspace name (WHIT-1189)', () => {
+  it('owners and admins (tenants:write) rename the workspace from General, audited by the server', async () => {
+    setTenant(5);
+    grant('settings:read', 'settings:write', 'tenants:write');
+    render(<AdminSettingsPage />);
+    const name = await screen.findByLabelText(/^workspace name$/i);
+    expect(name).toHaveValue('Example Bakery');
+
+    fireEvent.change(name, { target: { value: 'Example Bakery Amman' } });
+    fireEvent.click(screen.getByRole('button', { name: /save tenant settings/i }));
+
+    await waitFor(() =>
+      expect(mockApiPatch).toHaveBeenCalledWith('/api/v1/tenants/{id}', {
+        params: { path: { id: 5 } },
+        body: { name: 'Example Bakery Amman' },
+      })
+    );
+    await waitFor(() => expect(mockRefreshAuth).toHaveBeenCalled());
+  });
+
+  it('does not rename when the name is unchanged', async () => {
+    setTenant(5);
+    grant('settings:read', 'settings:write', 'tenants:write');
+    render(<AdminSettingsPage />);
+    await screen.findByLabelText(/^workspace name$/i);
+    fireEvent.click(screen.getByRole('button', { name: /save tenant settings/i }));
+    await waitFor(() => expect(mockApiPatch).toHaveBeenCalledWith('/api/v1/settings', expect.anything()));
+    expect(mockApiPatch).not.toHaveBeenCalledWith('/api/v1/tenants/{id}', expect.anything());
+  });
+
+  it('refuses an empty name before anything is sent', async () => {
+    setTenant(5);
+    grant('settings:read', 'settings:write', 'tenants:write');
+    render(<AdminSettingsPage />);
+    fireEvent.change(await screen.findByLabelText(/^workspace name$/i), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: /save tenant settings/i }));
+    expect(addToast).toHaveBeenCalledWith('The workspace name cannot be empty.', 'error');
+    expect(mockApiPatch).not.toHaveBeenCalled();
+  });
+
+  it('is not offered without tenants:write, or to the system tenant', async () => {
+    setTenant(5);
+    grant('settings:read', 'settings:write');
+    const { unmount } = render(<AdminSettingsPage />);
+    await screen.findByLabelText(/^support email$/i);
+    expect(screen.queryByLabelText(/^workspace name$/i)).not.toBeInTheDocument();
+    unmount();
+
+    setTenant(0);
+    grant('settings:read', 'settings:write', 'tenants:write');
+    render(<AdminSettingsPage />);
+    await screen.findByLabelText(/^support email$/i);
+    expect(screen.queryByLabelText(/^workspace name$/i)).not.toBeInTheDocument();
   });
 });
 
@@ -245,7 +328,7 @@ describe('AdminSettingsPage — Platform defaults (WC-235 successor)', () => {
     setTenant(5); // a regular tenant's own admin can hold settings:manage
     grant('settings:read', 'settings:write', 'settings:manage');
     render(<AdminSettingsPage />);
-    await screen.findByLabelText(/^site name$/i);
+    await screen.findByLabelText(/^support email$/i);
     expect(screen.queryByRole('heading', { name: /platform defaults/i })).not.toBeInTheDocument();
     expect(mockApiGet).not.toHaveBeenCalledWith('/api/v1/settings/global');
   });
@@ -254,7 +337,7 @@ describe('AdminSettingsPage — Platform defaults (WC-235 successor)', () => {
     setTenant(0);
     grant('settings:read', 'settings:write');
     render(<AdminSettingsPage />);
-    await screen.findByLabelText(/^site name$/i);
+    await screen.findByLabelText(/^support email$/i);
     expect(screen.queryByRole('heading', { name: /platform defaults/i })).not.toBeInTheDocument();
     expect(mockApiGet).not.toHaveBeenCalledWith('/api/v1/settings/global');
   });
@@ -263,7 +346,7 @@ describe('AdminSettingsPage — Platform defaults (WC-235 successor)', () => {
     setTenant(0);
     grant('settings:read', 'settings:write', 'settings:manage');
     render(<AdminSettingsPage />);
-    await screen.findByLabelText(/^site name$/i, { selector: '#tenant-site_name' });
+    await screen.findByLabelText(/^support email$/i, { selector: '#tenant-support_email' });
     expect(await screen.findByRole('heading', { name: /platform defaults/i })).toBeInTheDocument();
     expect(mockApiGet).toHaveBeenCalledWith('/api/v1/settings/global');
   });
@@ -449,10 +532,10 @@ describe('AdminSettingsPage — trusted plugin stores', () => {
 describe('AdminSettingsPage — overridden vs inherited indicator', () => {
   it('marks overridden keys distinctly from inherited ones', async () => {
     grant('settings:read', 'settings:write');
-    routeGet(['site_name']); // only site_name is overridden
+    routeGet(['support_email']); // only support_email is overridden
     render(<AdminSettingsPage />);
-    await screen.findByLabelText(/^site name$/i);
-    expect(screen.getByTestId('status-site_name')).toHaveTextContent(/overridden/i);
+    await screen.findByLabelText(/^support email$/i);
+    expect(screen.getByTestId('status-support_email')).toHaveTextContent(/overridden/i);
     expect(screen.getByTestId('status-timezone')).toHaveTextContent(/inherited/i);
   });
 });
@@ -461,15 +544,15 @@ describe('AdminSettingsPage — save flow', () => {
   it('PATCHes /api/v1/settings with the changed value and refetches', async () => {
     grant('settings:read', 'settings:write');
     render(<AdminSettingsPage />);
-    const siteName = await screen.findByLabelText(/^site name$/i);
+    const supportEmail = await screen.findByLabelText(/^support email$/i);
 
-    fireEvent.change(siteName, { target: { value: 'New Name' } });
+    fireEvent.change(supportEmail, { target: { value: 'help@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /save tenant settings/i }));
 
     await waitFor(() => expect(mockApiPatch).toHaveBeenCalled());
     expect(mockApiPatch).toHaveBeenCalledWith(
       '/api/v1/settings',
-      expect.objectContaining({ body: { settings: expect.objectContaining({ site_name: 'New Name' }) } })
+      expect.objectContaining({ body: { settings: expect.objectContaining({ support_email: 'help@example.com' }) } })
     );
 
     await waitFor(() =>
@@ -484,14 +567,14 @@ describe('AdminSettingsPage — save flow', () => {
   it('sends an empty string to clear an overridden field', async () => {
     grant('settings:read', 'settings:write');
     render(<AdminSettingsPage />);
-    const siteName = await screen.findByLabelText(/^site name$/i);
+    const supportEmail = await screen.findByLabelText(/^support email$/i);
 
-    fireEvent.change(siteName, { target: { value: '' } });
+    fireEvent.change(supportEmail, { target: { value: '' } });
     fireEvent.click(screen.getByRole('button', { name: /save tenant settings/i }));
 
     await waitFor(() => expect(mockApiPatch).toHaveBeenCalled());
     const body = mockApiPatch.mock.calls[0][1].body as { settings: Record<string, string | null> };
-    expect(body.settings.site_name === '' || body.settings.site_name === null).toBe(true);
+    expect(body.settings.support_email === '' || body.settings.support_email === null).toBe(true);
   });
 
   it('blocks save and surfaces a validation error for a malformed email', async () => {
@@ -512,9 +595,9 @@ describe('AdminSettingsPage — save flow', () => {
     grant('settings:read', 'settings:write');
     mockApiPatch.mockResolvedValue({ data: undefined, error: { error: 'Validation failed' } });
     render(<AdminSettingsPage />);
-    const siteName = await screen.findByLabelText(/^site name$/i);
+    const supportEmail = await screen.findByLabelText(/^support email$/i);
 
-    fireEvent.change(siteName, { target: { value: 'Another' } });
+    fireEvent.change(supportEmail, { target: { value: 'other@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /save tenant settings/i }));
 
     await waitFor(() =>
@@ -531,8 +614,8 @@ describe('AdminSettingsPage — system-tenant gating (WC-224)', () => {
 
     expect(await screen.findByTestId('tenant-no-override-notice')).toBeInTheDocument();
     // Scoped to the tenant field's id: settings:manage is also granted here,
-    // so the (correctly-shown) Platform defaults card has its own "Site name".
-    expect(document.getElementById('tenant-site_name')).not.toBeInTheDocument();
+    // so the (correctly-shown) Platform defaults card has its own fields.
+    expect(document.getElementById('tenant-support_email')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /save tenant settings/i })
     ).not.toBeInTheDocument();
@@ -543,7 +626,7 @@ describe('AdminSettingsPage — system-tenant gating (WC-224)', () => {
     routeGet(['site_name'], true);
     render(<AdminSettingsPage />);
 
-    expect(await screen.findByLabelText(/^site name$/i)).toBeEnabled();
+    expect(await screen.findByLabelText(/^support email$/i)).toBeEnabled();
     expect(
       screen.getByRole('button', { name: /save tenant settings/i })
     ).toBeInTheDocument();
@@ -559,14 +642,14 @@ describe('AdminSettingsPage — errorMessage details fallback (WC-224)', () => {
       error: {
         error: 'Validation failed',
         details: {
-          site_name: 'The system tenant has no per-tenant override layer; edit the global default instead.',
+          support_email: 'The system tenant has no per-tenant override layer; edit the global default instead.',
         },
       },
     });
     render(<AdminSettingsPage />);
-    const siteName = await screen.findByLabelText(/^site name$/i);
+    const supportEmail = await screen.findByLabelText(/^support email$/i);
 
-    fireEvent.change(siteName, { target: { value: 'Another' } });
+    fireEvent.change(supportEmail, { target: { value: 'other@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: /save tenant settings/i }));
 
     await waitFor(() =>
@@ -583,44 +666,40 @@ describe('AdminSettingsPage — errorMessage details fallback (WC-224)', () => {
 // Branding (app/(protected)/admin/settings/branding/page.tsx)
 // ---------------------------------------------------------------------------
 
-describe('BrandingSettingsPage — RBAC gating and locale', () => {
+describe('BrandingSettingsPage — gating', () => {
   it('renders Access Denied when the caller lacks settings:read', () => {
     grant();
     render(<BrandingSettingsPage />);
     expect(screen.getByText('You don’t have access to branding')).toBeInTheDocument();
   });
 
-  it('renders the locale field for a settings:read caller', async () => {
-    grant('settings:read');
-    render(<BrandingSettingsPage />);
-    expect(await screen.findByLabelText(/^locale$/i)).toBeInTheDocument();
-  });
-
-  it('PATCHes /api/v1/settings with only locale', async () => {
-    setTenant(5); // a regular tenant so the tenant form (not the no-override notice) renders
+  it('a workspace edits its own branding with settings:write', () => {
+    setTenant(5);
     grant('settings:read', 'settings:write');
     render(<BrandingSettingsPage />);
-    const locale = await screen.findByLabelText(/^locale$/i);
-
-    await userEvent.click(locale);
-    await userEvent.click(screen.getByRole('option', { name: /fr/i }));
-    fireEvent.click(screen.getByRole('button', { name: /save language/i }));
-
-    await waitFor(() =>
-      expect(mockApiPatch).toHaveBeenCalledWith(
-        '/api/v1/settings',
-        expect.objectContaining({ body: { settings: { locale: 'fr' } } })
-      )
-    );
+    const form = screen.getByTestId('branding-form');
+    expect(form).toHaveAttribute('data-scope', 'tenant');
+    expect(form).toHaveAttribute('data-can-write', 'true');
   });
 
-  it('does not render the global branding surface for a non-system tenant', async () => {
+  it('is read-only without settings:write', () => {
     setTenant(5);
     grant('settings:read');
     render(<BrandingSettingsPage />);
-    await screen.findByLabelText(/^locale$/i);
-    // The global BrandingSettings variant is system-tenant only.
-    expect(screen.queryByRole('heading', { name: /global branding defaults/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId('branding-form')).toHaveAttribute('data-can-write', 'false');
+  });
+
+  it('the system tenant edits the platform defaults, which takes settings:manage', () => {
+    setTenant(0);
+    grant('settings:read', 'settings:write');
+    const { unmount } = render(<BrandingSettingsPage />);
+    expect(screen.getByTestId('branding-form')).toHaveAttribute('data-scope', 'global');
+    expect(screen.getByTestId('branding-form')).toHaveAttribute('data-can-write', 'false');
+    unmount();
+
+    grant('settings:read', 'settings:write', 'settings:manage');
+    render(<BrandingSettingsPage />);
+    expect(screen.getByTestId('branding-form')).toHaveAttribute('data-can-write', 'true');
   });
 });
 
@@ -826,6 +905,7 @@ describe('AdminSettingsPage - the company details', () => {
     { key: 'company.tax_id', type: 'string', default: '' },
     { key: 'company.phone', type: 'string', default: '' },
     { key: 'company.email', type: 'string', default: '' },
+    { key: 'billing.default_currency', type: 'string', default: 'USD' },
   ];
 
   it('lists them on the tenant card, in their own group', async () => {
@@ -851,6 +931,17 @@ describe('AdminSettingsPage - the company details', () => {
     expect(within(group).getByLabelText(/^Tax number/)).toHaveAttribute('dir', 'ltr');
     expect(within(group).getByLabelText(/^Email/)).toHaveAttribute('type', 'email');
     expect(within(group).getByLabelText(/^Company name/)).toHaveAttribute('dir', 'auto');
+  });
+
+  // CU.4: the workspace currency sits with the company details, a code left to right.
+  it('offers the workspace currency', async () => {
+    grant('settings:read');
+    setTenant(5);
+    routeGet(['site_name'], true, COMPANY_REGISTRY);
+    render(<AdminSettingsPage />);
+
+    const group = await screen.findByTestId('tenant-company-settings');
+    expect(within(group).getByLabelText(/^Currency/)).toHaveAttribute('dir', 'ltr');
   });
 
   it('writes only the field the person changed', async () => {

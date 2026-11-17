@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Form;
 
+use Whity\Core\Storage\StoredFiles;
 use Whity\Storage\StorageDriverInterface;
 use Whity\Storage\StorageException;
 use Whity\Storage\StorageKey;
@@ -59,8 +60,6 @@ final class FormUploadStore
     public const STORAGE_SEGMENT = 'form-uploads';
 
     /** Bytes of randomness in an upload's file name (32 hex characters). */
-    private const KEY_ENTROPY_BYTES = 16;
-
     public function __construct(
         private readonly StorageDriverInterface $storage,
         private readonly FormUploadRepository $uploads,
@@ -91,31 +90,23 @@ final class FormUploadStore
         ?string $clientFilename,
         ?int $uploaderProfileId,
     ): array {
-        $key = $this->mintKey($tenantId, $formId, FormUploadPolicy::extensionFor($contentType));
+        // The one file store (WHIT-1159): fresh key, never overwritten, the
+        // checksum over the bytes actually written.
+        $stored = StoredFiles::store($this->storage, $tenantId, self::STORAGE_SEGMENT, (string) $formId, $bytes, $contentType, FormUploadPolicy::extensionFor($contentType));
+        $key = $stored['storage_key'];
 
-        if ($this->storage->exists($key)) {
-            // Unreachable short of a broken random source, and loud rather than
-            // a silent overwrite — an attachment somebody is about to submit as
-            // evidence is the last thing that should be quietly replaced.
-            throw new StorageException(
-                'Refusing to overwrite an existing form upload; a stored upload is immutable.'
-            );
-        }
-
-        $this->storage->put($key, $bytes, ['ContentType' => $contentType]);
-
-        $filename = self::safeFilename($clientFilename);
+        $filename = StoredFiles::safeFilename($clientFilename);
 
         $this->uploads->record($tenantId, [
             'form_id'                => $formId,
             'storage_key'            => $key,
             'content_type'           => $contentType,
             'byte_size'              => strlen($bytes),
-            // Computed here, over the bytes actually stored. It travels onto
-            // `document_artifacts.checksum_sha256` when the upload is claimed,
+            // Computed here, over the bytes actually stored. It is kept on the
+            // file's `stored_files` row, which the artifact shares when the upload is claimed,
             // so "is this the file the applicant sent" is answerable later
             // without trusting anything the applicant's client said.
-            'checksum_sha256'        => hash('sha256', $bytes),
+            'checksum_sha256'        => $stored['checksum_sha256'],
             'client_filename'        => $filename,
             'uploaded_by_profile_id' => $uploaderProfileId,
         ]);
@@ -124,7 +115,7 @@ final class FormUploadStore
             'storage_key'     => $key,
             'content_type'    => $contentType,
             'byte_size'       => strlen($bytes),
-            'checksum_sha256' => hash('sha256', $bytes),
+            'checksum_sha256' => $stored['checksum_sha256'],
             'filename'        => $filename,
         ];
     }
@@ -137,42 +128,4 @@ final class FormUploadStore
      * same shape {@see \Whity\Core\Document\DocumentArtifactStore} uses for a
      * document's history, for the same reason.
      */
-    private function mintKey(int $tenantId, int $formId, string $extension): string
-    {
-        $suffix = preg_replace('/[^a-z0-9]/', '', strtolower($extension)) ?? '';
-        $name = bin2hex(random_bytes(self::KEY_ENTROPY_BYTES)) . ($suffix !== '' ? '.' . $suffix : '');
-
-        return StorageKey::build($tenantId, self::STORAGE_SEGMENT . '/' . $formId, $name);
-    }
-
-    /**
-     * The client's file name, reduced to something safe to store and show.
-     *
-     * It NEVER reaches the storage key — the key's file name is minted here from
-     * randomness, so no part of the address is attacker-influenced and
-     * {@see StorageKey}'s traversal defences are never the only thing standing
-     * between a caller and another prefix. This value exists so a reader can be
-     * shown "smith-2024.pdf" instead of a hex string, which is the whole of its
-     * job.
-     *
-     * Reduced to its basename, stripped of control characters, and truncated to
-     * the column's 255. Null when nothing usable is left, because an empty
-     * string would render as a file with no name rather than as no name at all.
-     */
-    private static function safeFilename(?string $raw): ?string
-    {
-        if ($raw === null) {
-            return null;
-        }
-
-        $name = basename(str_replace('\\', '/', $raw));
-        $name = preg_replace('/[\x00-\x1f\x7f]/', '', $name) ?? '';
-        $name = trim($name);
-
-        if ($name === '' || $name === '.' || $name === '..') {
-            return null;
-        }
-
-        return mb_substr($name, 0, 255);
-    }
 }

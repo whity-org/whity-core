@@ -175,13 +175,6 @@ jobs:
       - name: Plugin frontend-feature registration guard
         run: php scripts/ci-plugin-frontend-features.php
 
-      # A core release ships templates/tauri-desktop/ as the source an operator
-      # builds their desktop app from, so a release cutting with a stale
-      # vendored SDK hands every device a plugin contract older than the one
-      # this same tag publishes to plugin authors (#849).
-      - name: Vendored-SDK parity (desktop template)
-        run: php scripts/ci-vendored-sdk-parity.php
-
   postgres-integration:
     name: Migrations + seed on real PostgreSQL
     runs-on: ubuntu-latest
@@ -433,20 +426,47 @@ jobs:
           # by this point, so a re-run after fixing the CHANGELOG picks up
           # from here rather than burning a version number.
           if [ ! -s "$SECTION" ]; then
-            echo "::error::CHANGELOG.md has no content under '## [${VERSION}]'. Write the release notes there, then re-run this job."
+            echo "::error::CHANGELOG.md has no content under '## [${VERSION}]' (the section was not found or is empty). Write the release notes there, then re-run this job."
             exit 1
           fi
 
-          cp "$SECTION" "$NOTES"
+          # WHIT-1166: GitHub refuses a release body over 125,000 characters
+          # (HTTP 422). v0.2.29's section alone was 117k, so the PR list on
+          # top failed the job. Keep a margin below the limit: when the section
+          # itself is too long, cut it at a line and point to CHANGELOG.md;
+          # when the PR list would push it over, link the compare view instead.
+          LIMIT=120000
+          # The newest release before this one is still "latest" here, since
+          # this one isn't created yet.
+          PREV_TAG=$(gh release list --repo "${GITHUB_REPOSITORY}" --limit 1 --exclude-drafts --json tagName --jq '.[0].tagName' 2>/dev/null || true)
+          if [ -n "$PREV_TAG" ]; then
+            COMPARE_LINK="Every merged pull request in this release: https://github.com/${GITHUB_REPOSITORY}/compare/${PREV_TAG}...${RELEASE_TAG}"
+          else
+            COMPARE_LINK="Every merged pull request in this release: https://github.com/${GITHUB_REPOSITORY}/commits/${RELEASE_TAG}"
+          fi
+          if [ "$(wc -c < "$SECTION")" -gt "$LIMIT" ]; then
+            echo "::warning::The CHANGELOG section is over ${LIMIT} characters; the release page shows the start and links to CHANGELOG.md."
+            head -c "$LIMIT" "$SECTION" | sed '$d' > "$NOTES"
+            printf '\n\n---\n\nThe full notes are in CHANGELOG.md: https://github.com/%s/blob/%s/CHANGELOG.md\n' "${GITHUB_REPOSITORY}" "${RELEASE_TAG}" >> "$NOTES"
+          else
+            cp "$SECTION" "$NOTES"
 
-          # --notes-file and --generate-notes are mutually exclusive, so the
-          # generated list is fetched through the API and appended.
-          {
-            printf '\n\n---\n\n<details>\n<summary>Every merged pull request in this release</summary>\n\n'
-            gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
-              -f tag_name="${RELEASE_TAG}" --jq .body
-            printf '\n\n</details>\n'
-          } >> "$NOTES"
+            # --notes-file and --generate-notes are mutually exclusive, so the
+            # generated list is fetched through the API and appended, unless
+            # it would take the body over the limit.
+            PRS="${RUNNER_TEMP}/prs.md"
+            {
+              printf '\n\n---\n\n<details>\n<summary>Every merged pull request in this release</summary>\n\n'
+              gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" \
+                -f tag_name="${RELEASE_TAG}" --jq .body
+              printf '\n\n</details>\n'
+            } > "$PRS"
+            if [ $(( $(wc -c < "$NOTES") + $(wc -c < "$PRS") )) -gt "$LIMIT" ]; then
+              printf '\n\n---\n\n%s\n' "$COMPARE_LINK" >> "$NOTES"
+            else
+              cat "$PRS" >> "$NOTES"
+            fi
+          fi
 
           # The compose file of this version, which `whity install` and
           # `whity update` (@whity/cli) download by this name.

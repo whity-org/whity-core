@@ -66,6 +66,24 @@ final class ContactsApiSchemas
                 'tags' => $tags,
                 'responses' => [200 => self::json('The contact', $one)] + $notFound + self::auth(),
             ]),
+            self::route('GET', '/api/contacts/{id:\d+}/activity', 'contacts:read', [
+                'summary' => 'What a customer did here: their bookings, chats, forms and requests to join',
+                'description' => 'Newest first, up to 50 of each. A section shows only to someone who may read that kind of record '
+                    . '(bookings: calendar:read; chats: messages:reply; forms: forms:read; join requests: signup:manage). '
+                    . 'A service\'s or form\'s name comes in both languages.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The activity', self::object([
+                    'data' => self::object(array_fill_keys(['bookings', 'chats', 'forms', 'join_requests'], [
+                        'type' => 'array',
+                        'items' => self::object([
+                            'id' => self::int(),
+                            'title' => ['oneOf' => [self::str(), ['type' => 'object', 'additionalProperties' => ['type' => 'string']]]],
+                            'status' => self::str(),
+                            'at' => self::str(),
+                        ], ['id', 'title', 'status', 'at']),
+                    ]), []),
+                ], ['data']))] + $notFound + self::auth(),
+            ]),
             self::route('PATCH', '/api/contacts/{id:\d+}', 'contacts:write', [
                 'summary' => 'Change a customer or supplier; fields left out keep their value',
                 'description' => '`tags`, when sent, replaces the contact\'s tags.',

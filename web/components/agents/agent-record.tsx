@@ -34,16 +34,9 @@ import { useFetch } from '@/hooks/useFetch';
 import { api, apiFetch } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import {
-  localized,
-  refusalText,
-  startOfToday,
-  templateGroups,
-  toolsetsFromSplits,
-  type AgentLanguage,
-  type AgentPersona,
-  type AgentTone,
-  type WorkspaceAgent,
+  refusalText, startOfToday, templateGroups, toolsetsFromSplits, type AgentLanguage, type AgentPersona, type AgentTone, type WorkspaceAgent
 } from './workspace-agents';
+import { localizedText } from '@whity/ui/localized-text';
 
 const NAME_MAX = 60;
 const ROLE_MAX = 200;
@@ -131,7 +124,7 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
       addToast(refusalText(error, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
       return;
     }
-    const name = localized(saved.name, saved.nameAr, arabic);
+    const name = localizedText({ en: saved.name, ar: saved.nameAr }, arabic ? 'ar' : 'en');
     addToast(
       archived ? t('agents.archived', '{name} archived. Everyone using it has stopped.', { name }) : t('agents.restored', '{name} restored.', { name }),
       'success',
@@ -150,7 +143,7 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
       addToast(refusalText(error, t('agents.error.save', 'This agent could not be saved. Try again.')), 'error');
       return;
     }
-    const name = localized(saved.name, saved.nameAr, arabic);
+    const name = localizedText({ en: saved.name, ar: saved.nameAr }, arabic ? 'ar' : 'en');
     addToast(
       paused
         ? t('agents.paused', '{name} is paused. It can’t do anything until it is resumed.', { name })
@@ -162,7 +155,7 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
     onChanged();
   };
 
-  const displayName = localized(saved.name, saved.nameAr, arabic);
+  const displayName = localizedText({ en: saved.name, ar: saved.nameAr }, arabic ? 'ar' : 'en');
   const people = initial.worksFor.map((who) => who.name ?? t('agents.worksFor.unknown', 'Someone'));
   const since = dates.date(initial.createdAt);
   const changedOn = dates.date(initial.updatedAt);
@@ -273,7 +266,7 @@ export function AgentRecord({ agent: initial, onChanged }: { agent: WorkspaceAge
         <TabsContent value="overview" className="mt-6 grid gap-4 md:grid-cols-[2fr_1fr]">
           <section className="space-y-3 rounded-card border border-border bg-card p-5">
             <h2 className="text-base font-semibold">{t('agentRecord.does', 'What it does')}</h2>
-            <p className="text-sm">{localized(saved.role, saved.roleAr, arabic) || t('agentRecord.does.empty', 'No description yet. Add one in Instructions.')}</p>
+            <p className="text-sm">{localizedText({ en: saved.role, ar: saved.roleAr }, arabic ? 'ar' : 'en') || t('agentRecord.does.empty', 'No description yet. Add one in Instructions.')}</p>
           </section>
           <section className="space-y-3 rounded-card border border-border bg-card p-5">
             <h2 className="text-base font-semibold">{t('agentRecord.onItsOwn', 'On its own')}</h2>

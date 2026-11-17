@@ -3,7 +3,7 @@
 [العربية](Whity-CLI-ar.md)
 
 `whity` installs and updates a self-hosted Whity on Docker. It comes from the npm package
-`@whity/cli` and runs on Windows (PowerShell 5.1 and newer), Linux and macOS.
+`@whity/cli` and runs on Linux, macOS and Windows (PowerShell 5.1 and newer).
 
 It is not `bin/whity-cli`. That is the PHP tool that runs on the server against the database
 ([CLI Reference](CLI_REFERENCE.md)). `whity` runs on your machine and calls `bin/whity-cli`
@@ -11,47 +11,83 @@ inside the containers, so migrations and seeding always use the code of the inst
 
 ## What you need
 
+- A Linux server with a domain pointing at it (an A record), and ports 80 and 443 free. To try
+  Whity on your own computer instead, skip the domain (see below).
 - Node 20 or newer
-- Docker with Compose v2 (Docker Desktop on Windows and macOS)
-
-```bash
-npm install -g @whity/cli
-```
+- Docker with Compose v2. On a Linux server: `curl -fsSL https://get.docker.com | sh`
 
 ## Install
 
 ```bash
+npm install -g @whity/cli
 whity install
 ```
 
-This installs the latest release into `./whity`. Name a version with `whity install v0.2.22`.
-The oldest release it supports is v0.2.21.
+Or in one line, which checks for Node and runs those two:
 
-It checks Docker and the ports, writes the files below with generated secrets, pulls the images,
-starts the database, runs migrations and seed, starts everything and checks it. Then it prints
-the address and the administrator's email. The password stays in `.env`, as
-`INITIAL_SYSTEM_ADMIN_PASSWORD`, so it doesn't end up in your terminal history. Change it after
-you sign in.
+```bash
+curl -fsSL https://whity.dev/install.sh | sh
+```
+
+It asks two questions: the web address for Whity (for example `office.example.jo`) and your email,
+which becomes the first owner. Then, one line per step:
+
+```
+Whity Core installer  ·  free and open source (AGPL-3.0)
+
+✓ Checked this server   Ubuntu 24.04 · 4 CPUs · 8 GB · 61 GB free
+✓ Docker found   27.3.1
+? Web address for Whity › office.examplebakery.jo
+? Your email (first owner) › amro@examplebakery.jo
+
+✓ Downloaded Whity Core 0.2.29
+✓ Started the database and the app
+✓ Got a certificate for office.examplebakery.jo
+✓ Made your owner account
+
+Whity is ready.
+  Open   https://office.examplebakery.jo
+  Sign in as amro@examplebakery.jo with the INITIAL_SYSTEM_ADMIN_PASSWORD in /root/whity/.env, ...
+  Update later with: whity update
+```
+
+Before it changes anything it checks Docker, the ports and that the domain resolves; if one is
+missing it says what to do and "Nothing was changed". It installs the latest release into
+`./whity` (name one with `whity install v0.2.29`; the oldest it supports is v0.2.21), writes the
+files below with generated secrets, starts the database, runs migrations and seed, starts
+everything and checks it. [Caddy](https://caddyserver.com) sits in front and gets the certificate
+from Let's Encrypt; the step only shows ✓ once the address answers over HTTPS. If Let's Encrypt
+can't reach the server yet, it says what to check (the A record, ports 80 and 443) and how to try
+again, and finishes the rest.
+
+The password stays in `.env`, as `INITIAL_SYSTEM_ADMIN_PASSWORD`, so it doesn't end up in your
+terminal history. Change it after you sign in.
 
 | Option | Default | |
 |---|---|---|
+| `--domain <name>` | asked | The web address. The installer puts Caddy in front and gets its certificate. |
+| `--email <address>` | asked | The first owner's email (`--admin-email` also works). |
+| `--port <port>` | `443` | The HTTPS port, when 443 is taken. Port 80 is still needed for the certificate. |
 | `--dir <path>` | `./whity` | Install folder. Its name also names the Compose project. |
-| `--url <url>` | `http://localhost:<web port>` | The address people will use. |
+| `--verbose` | | Show each Docker command's own output. |
+| `--url <url>` | `http://localhost:<web port>` | Instead of `--domain`: the address, behind a proxy you run yourself. |
 | `--web-port <port>` | `3100` | Port for the web app. |
 | `--api-port <port>` | `8100` | Port for the API. |
 | `--bind <address>` | `127.0.0.1` | Address the ports are published on. |
-| `--admin-email <email>` | `system@whity.local` | The administrator's address. |
+
+Given `--domain` and `--email`, or run without a terminal, it asks nothing. Leaving the web address
+empty installs for this computer only, at `http://localhost:3100`.
 
 If an install fails, fix the cause and run the same command again. It carries on with the same
 secrets.
 
-### Using a real address
+### Your own proxy instead of Caddy
 
 Outside development the API marks its session cookies `Secure`, and browsers keep those only over
 HTTPS or on localhost. So `whity install` refuses a plain `http://` address other than localhost:
 the login page would load, but nobody could stay signed in.
 
-Put a reverse proxy with a certificate in front of the web port, and install with its address:
+To run your own reverse proxy with a certificate in front of the web port, install with its address:
 
 ```bash
 whity install --url https://app.example.com
@@ -66,7 +102,8 @@ Also set `TRUSTED_PROXY_HOPS` in `.env` so the API sees each client's real addre
 |---|---|
 | `.env` | Settings and secrets. Keep it private, and back it up: a database backup can't decrypt what `ENCRYPTION_KEY` protects without it. Every setting here reaches the app and the workers. |
 | `docker-compose.yml` | The compose file of the installed release. `whity update` replaces it. |
-| `docker-compose.override.yml` | Optional, and yours. Compose merges it in and the tool never touches it. Use it for changes such as mounting a plugin. |
+| `docker-compose.override.yml` | Compose merges it in and `whity update` never touches it. With `--domain` the installer writes it with the Caddy service; after that it is yours. Use it for changes such as mounting a plugin. |
+| `Caddyfile` | With `--domain`: the address Caddy serves and gets the certificate for. |
 | `backups/` | One folder per update. |
 
 Run the usual Compose commands in this folder: `docker compose ps`, `docker compose logs -f web`.
@@ -130,10 +167,12 @@ to carry on without restoring, add `--force`.
 
 ## Language
 
-The tool's own messages are English only. This is a deliberate exception to the rule that every
-user-facing string has English and Arabic: Windows PowerShell 5.1's console garbles Arabic and doesn't
-lay it out right to left. The install and update guide is in both languages instead. All messages live
-in `packages/cli/src/messages.js`, so Arabic can be added there later (WHIT-840).
+The install speaks Arabic when the system language is Arabic (`LANG=ar_JO.UTF-8` and the like) and
+the console can show it: Linux, macOS and Windows Terminal. Commands, addresses and versions stay
+in Latin. Windows PowerShell 5.1's classic console garbles Arabic and doesn't lay it out right to
+left, so there the tool stays in English with plain marks (`ok`, `x`) instead of ✓ and ✗ (WHIT-840).
+The update's messages are English for now. All messages live in `packages/cli/src/messages.js`, the
+Arabic in `messages-ar.js`.
 
 ## Troubleshooting
 

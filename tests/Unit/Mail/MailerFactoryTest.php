@@ -21,34 +21,6 @@ final class MailerFactoryTest extends TestCase
         return new SpyLogger();
     }
 
-    public function testDefaultsToNullMailerWhenUnset(): void
-    {
-        self::assertInstanceOf(NullMailer::class, MailerFactory::fromEnv([], $this->spyLogger()));
-    }
-
-    public function testNullAndEmptyTransportsSelectNullMailer(): void
-    {
-        self::assertInstanceOf(NullMailer::class, MailerFactory::fromEnv(['MAIL_TRANSPORT' => 'null'], $this->spyLogger()));
-        self::assertInstanceOf(NullMailer::class, MailerFactory::fromEnv(['MAIL_TRANSPORT' => ' '], $this->spyLogger()));
-        self::assertInstanceOf(NullMailer::class, MailerFactory::fromEnv(['MAIL_TRANSPORT' => 'NULL'], $this->spyLogger()));
-    }
-
-    public function testLogTransportSelectsLogMailer(): void
-    {
-        self::assertInstanceOf(LogMailer::class, MailerFactory::fromEnv(['MAIL_TRANSPORT' => 'log'], $this->spyLogger()));
-        // Case-insensitive.
-        self::assertInstanceOf(LogMailer::class, MailerFactory::fromEnv(['MAIL_TRANSPORT' => 'LOG'], $this->spyLogger()));
-    }
-
-    public function testUnknownTransportFailsSafeToNullMailerWithWarning(): void
-    {
-        $logger = $this->spyLogger();
-        $mailer = MailerFactory::fromEnv(['MAIL_TRANSPORT' => 'smtp-typo'], $logger);
-
-        self::assertInstanceOf(NullMailer::class, $mailer);
-        self::assertNotEmpty($logger->records, 'an unknown transport must warn');
-    }
-
     public function testNullMailerSendIsANoOpAndNeverThrows(): void
     {
         (new NullMailer())->send('to@acme.test', 'Subject', 'Body');

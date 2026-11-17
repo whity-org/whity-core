@@ -250,7 +250,7 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
         $this->fakeRender->pdfBytes = "%PDF-1.4\nsecond\n%%EOF";
         $this->call('rerender', self::OWNER, ['id' => (string) $documentId]);
 
-        $stmt = $this->pdo->prepare('SELECT storage_key FROM document_artifacts');
+        $stmt = $this->pdo->prepare('SELECT f.storage_key FROM document_artifacts a JOIN stored_files f ON f.id = a.stored_file_id AND f.tenant_id = a.tenant_id');
         $stmt->execute();
         $keys = $stmt->fetchAll(PDO::FETCH_COLUMN);
         self::assertCount(2, $keys);

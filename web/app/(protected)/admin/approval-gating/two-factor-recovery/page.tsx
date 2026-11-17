@@ -15,17 +15,14 @@ import { Icon } from '@whity/ui/icon';
 import { Input } from '@whity/ui/input';
 import { AccessDenied } from '@/components/ui/access-denied';
 import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
-import { OtpInput } from '@whity/ui/otp-input';
 import { EmptyState } from '@whity/ui/empty-state';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@whity/ui/dialog';
+  ConfirmItsYouDialog,
+  isIdentityCheckFailure,
+  startIdentityCheck,
+  type IdentityCheck,
+} from '@/components/security/confirm-its-you-dialog';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
 import { cn } from '@whity/ui/utils';
@@ -67,11 +64,6 @@ interface PendingTwoFactorRecovery {
   first_approval: { profile_id: number; display_name: string; at: string; method: string } | null;
 }
 
-interface IdentityCheck {
-  method: 'totp' | 'email_code';
-  email_hint: string | null;
-}
-
 /** A response body whose shape the screen reads field by field. */
 type Loose = { error?: string; reason?: string; data?: any }; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -92,7 +84,6 @@ export default function TwoFactorRecoveryApprovalsPage() {
   const [checkText, setCheckText] = useState('');
   // The "confirm it's you" step before an approval.
   const [confirming, setConfirming] = useState<IdentityCheck | null>(null);
-  const [code, setCode] = useState('');
   const [codeError, setCodeError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -136,17 +127,15 @@ export default function TwoFactorRecoveryApprovalsPage() {
     if (selected === null) return;
     setBusy(true);
     try {
-      const { data, error, response: res } = await api.POST('/api/v1/2fa-recovery/identity-check', {
-        body: { request_id: selected.id },
-      });
-      const body = (data ?? error ?? {}) as Loose;
-      if (!res.ok) {
-        addToast(body?.error ?? t('twoStep.identity.failed', 'We could not start the check. Try again in a few minutes.'), 'error');
+      const started = await startIdentityCheck(() =>
+        api.POST('/api/v1/2fa-recovery/identity-check', { body: { request_id: selected.id } }),
+      );
+      if ('error' in started) {
+        addToast(started.error ?? t('twoStep.identity.failed', 'We could not start the check. Try again in a few minutes.'), 'error');
         return;
       }
-      setCode('');
       setCodeError(null);
-      setConfirming(body.data as IdentityCheck);
+      setConfirming(started.check);
     } finally {
       setBusy(false);
     }
@@ -163,7 +152,7 @@ export default function TwoFactorRecoveryApprovalsPage() {
       });
       const body = (data ?? error ?? {}) as Loose;
       if (!res.ok) {
-        if (body?.reason === 'identity_check_failed') {
+        if (isIdentityCheckFailure(body)) {
           setCodeError(t('twoStep.identity.wrong', 'That code is not right or has expired.'));
           return;
         }
@@ -437,38 +426,14 @@ export default function TwoFactorRecoveryApprovalsPage() {
         </div>
       )}
 
-      <Dialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('twoStep.identity.title', 'Confirm it’s you')}</DialogTitle>
-            <DialogDescription>
-              {confirming?.method === 'totp'
-                ? t('twoStep.identity.totp', 'Enter the code from your authenticator app.')
-                : t('twoStep.identity.email', 'We sent a code to {email}. Enter it here.', { email: confirming?.email_hint ?? '' })}
-            </DialogDescription>
-          </DialogHeader>
-          <OtpInput
-            label={t('twoStep.identity.code', 'Code')}
-            value={code}
-            onChange={(value) => {
-              setCode(value);
-              setCodeError(null);
-            }}
-            onComplete={(value) => void approve(value)}
-            errorText={codeError ?? undefined}
-            disabled={busy}
-            autoFocus
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirming(null)}>
-              {t('twoStep.identity.cancel', 'Cancel')}
-            </Button>
-            <Button disabled={busy || code.length < 6} onClick={() => void approve(code)}>
-              {t('twoStep.identity.approve', 'Approve')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmItsYouDialog
+        check={confirming}
+        busy={busy}
+        error={codeError}
+        onCancel={() => setConfirming(null)}
+        onClearError={() => setCodeError(null)}
+        onConfirm={(value) => void approve(value)}
+      />
     </div>
   );
 }
