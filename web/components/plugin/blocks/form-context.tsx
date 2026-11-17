@@ -466,6 +466,27 @@ function unwrapEnvelope(body: unknown): Record<string, FormValue> | null {
   return data as Record<string, FormValue>;
 }
 
+/**
+ * A preloaded record as the inputs read it. A field's value in JSON may be a
+ * number (`chairs: 3`), but every text, number and select input holds a
+ * string and shows nothing for anything else, so a saved number appeared as an
+ * empty field and a person re-typed what was already stored (WHIT-1176).
+ * Numbers become their digits; lists, objects and booleans are left as they
+ * are, for the inputs that hold those (`weeklyHours`, `checkboxGroup`,
+ * `fieldArray`, `bilingualText`, `checkbox`).
+ */
+export function seedableRecord(record: Record<string, unknown>): Record<string, FormValue> {
+  const out: Record<string, FormValue> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (typeof value === 'number') {
+      if (Number.isFinite(value)) out[key] = String(value);
+    } else if (value !== null && value !== undefined) {
+      out[key] = value as FormValue;
+    }
+  }
+  return out;
+}
+
 export function FormProvider({
   block,
   children,
@@ -568,7 +589,7 @@ export function FormProvider({
         // while the other failed loudly.
         const record = unwrapEnvelope(body);
         if (record !== null) {
-          setValues((prev) => ({ ...prev, ...record }));
+          setValues((prev) => ({ ...prev, ...seedableRecord(record) }));
         }
         setIsLoading(false);
       })
