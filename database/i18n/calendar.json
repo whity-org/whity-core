@@ -530,6 +530,9 @@
         "year.hint": "Click a day to open it",
         "year.legend": "Bookings a day:",
         "year.many": "7 or more",
-        "year.none": "none"
+        "year.none": "none",
+        "hours.closedDay": "Closed",
+        "hours.addBreak": "Add a break",
+        "hours.copyToAll": "Copy to every open day"
     }
 }

@@ -52,7 +52,7 @@ namespace Whity\Sdk\Frontend\Blocks;
  * array{
  *   container: bool,                          // may carry child blocks (see childSlots())
  *   props: array<string, array{              // prop name => its rule
- *     type: 'string'|'int'|'bool'|'enum'|'intEnum'|'kvList'|'stringList'|'columnList'|'dataColumnList'|'rowList'|'chartSeriesList'|'relPath'|'apiPath'|'inputName'|'selectOptions'|'submitSpec'|'visibilityRule'|'rowActionList'|'sourceParamList'|'itemActionList'|'blockId'|'contextPath'|'ouScopeList'|'ouTypeKey'|'recordPath'|'recordFactList'|'accessCheck'|'preloadSpec',
+ *     type: 'string'|'int'|'bool'|'enum'|'intEnum'|'kvList'|'stringList'|'columnList'|'dataColumnList'|'rowList'|'chartSeriesList'|'relPath'|'apiPath'|'inputName'|'selectOptions'|'submitSpec'|'visibilityRule'|'rowActionList'|'sourceParamList'|'itemActionList'|'blockId'|'contextPath'|'ouScopeList'|'ouTypeKey'|'recordPath'|'recordFactList'|'accessCheck'|'preloadSpec'|'hoursList',
  *     required: bool,
  *     values?: list<string|int>,             // allowed set for enum / intEnum
  *   }>,
@@ -60,7 +60,7 @@ namespace Whity\Sdk\Frontend\Blocks;
  * ```
  *
  * @phpstan-type PropRule array{
- *   type: 'string'|'int'|'bool'|'enum'|'intEnum'|'kvList'|'stringList'|'columnList'|'dataColumnList'|'rowList'|'chartSeriesList'|'relPath'|'apiPath'|'inputName'|'selectOptions'|'submitSpec'|'visibilityRule'|'rowActionList'|'sourceParamList'|'itemActionList'|'blockId'|'contextPath'|'ouScopeList'|'ouTypeKey'|'recordPath'|'recordFactList'|'accessCheck'|'preloadSpec',
+ *   type: 'string'|'int'|'bool'|'enum'|'intEnum'|'kvList'|'stringList'|'columnList'|'dataColumnList'|'rowList'|'chartSeriesList'|'relPath'|'apiPath'|'inputName'|'selectOptions'|'submitSpec'|'visibilityRule'|'rowActionList'|'sourceParamList'|'itemActionList'|'blockId'|'contextPath'|'ouScopeList'|'ouTypeKey'|'recordPath'|'recordFactList'|'accessCheck'|'preloadSpec'|'hoursList',
  *   required: bool,
  *   values?: list<string|int>,
  * }
@@ -858,6 +858,13 @@ final class BlockContract
                 'max'       => ['type' => 'int',       'required' => false],
                 'source'    => ['type' => 'apiPath',        'required' => false],
                 'params'    => ['type' => 'sourceParamList', 'required' => false],
+                // SDK 1.113: the rows it starts with, each keyed by the
+                // template's input names (a checkbox as 'true'/'false'), so a
+                // setup screen can offer a ready list to tick and edit. Ignored
+                // when `source` is set: a sourced array starts from what is
+                // stored. `addLabel` names the "Add another" button.
+                'default'   => ['type' => 'rowList',        'required' => false],
+                'addLabel'  => ['type' => 'string',         'required' => false],
             ]],
             // WC-532 item 3: a form region whose SHAPE depends on the value of
             // another field — a discriminated union. `discriminator` names a
@@ -985,11 +992,51 @@ final class BlockContract
                 'accept'      => ['type' => 'string',    'required' => false],
                 'required'    => ['type' => 'bool',      'required' => false],
             ]],
+            // `swatches` (SDK 1.113): a few ready colours, `#RRGGBB`, shown
+            // before the free picker, so a person picks a colour instead of
+            // remembering a code. The submitted value is always `#RRGGBB`.
             'colorInput' => ['container' => false, 'props' => [
                 'name'        => ['type' => 'inputName', 'required' => true],
                 'label'       => ['type' => 'string',    'required' => true],
                 'default'     => ['type' => 'string',    'required' => false],
                 'defaultFrom' => ['type' => 'contextPath', 'required' => false],
+                'swatches'    => ['type' => 'stringList', 'required' => false],
+            ]],
+            // SDK 1.113: a time of day, submitted as `HH:MM` (24-hour, Western
+            // digits). `step` is the minutes between the offered times (default
+            // 15); `allowEndOfDay` adds `24:00` for a closing time.
+            'timeInput' => ['container' => false, 'props' => [
+                'name'          => ['type' => 'inputName', 'required' => true],
+                'label'         => ['type' => 'string',    'required' => true],
+                'step'          => ['type' => 'intEnum',   'required' => false, 'values' => [5, 10, 15, 30, 60]],
+                'allowEndOfDay' => ['type' => 'bool',      'required' => false],
+                'required'      => ['type' => 'bool',      'required' => false],
+                'default'       => ['type' => 'string',    'required' => false],
+                'defaultFrom'   => ['type' => 'contextPath', 'required' => false],
+            ]],
+            // SDK 1.113: opening or working hours for a week. One row per day,
+            // open or closed, with one or more from–to ranges (a second range is
+            // a break), and "Copy to every day". Submits the calendar's own
+            // shape, a list of `{weekday, start_time, end_time}` with ISO
+            // weekdays (1 Monday … 7 Sunday) — a closed day has no rows.
+            // `firstDay` is the ISO weekday the week is drawn from (6 for a
+            // Saturday week); `default` is the prefilled week in the same shape.
+            'weeklyHours' => ['container' => false, 'props' => [
+                'name'     => ['type' => 'inputName', 'required' => true],
+                'label'    => ['type' => 'string',    'required' => true],
+                'firstDay' => ['type' => 'intEnum',   'required' => false, 'values' => [1, 2, 3, 4, 5, 6, 7]],
+                'required' => ['type' => 'bool',      'required' => false],
+                'default'  => ['type' => 'hoursList', 'required' => false],
+            ]],
+            // SDK 1.113: several choices from a short list, as checkboxes.
+            // Submits a list of the chosen option values (possibly empty);
+            // `default` is the values ticked at the start.
+            'checkboxGroup' => ['container' => false, 'props' => [
+                'name'     => ['type' => 'inputName',     'required' => true],
+                'label'    => ['type' => 'string',        'required' => true],
+                'options'  => ['type' => 'selectOptions', 'required' => true],
+                'required' => ['type' => 'bool',          'required' => false],
+                'default'  => ['type' => 'stringList',    'required' => false],
             ]],
             // WC-532 A4: a paired Arabic/English bilingual text input. Submits a
             // `{ar?, en?}` LocalizedText object under `name` (matching the

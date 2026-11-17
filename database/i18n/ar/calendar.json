@@ -531,6 +531,9 @@
         "year.hint": "انقر يوماً لفتحه",
         "year.legend": "الحجوزات في اليوم:",
         "year.many": "7 أو أكثر",
-        "year.none": "لا شيء"
+        "year.none": "لا شيء",
+        "hours.closedDay": "مغلق",
+        "hours.addBreak": "إضافة استراحة",
+        "hours.copyToAll": "نسخ إلى كل أيام العمل"
     }
 }

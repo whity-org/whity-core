@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.111).
+ * SDK identity (v1.113).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1330,12 +1330,20 @@ namespace Whity\Sdk;
  * receipt (WHIT-1060).
  *
  * Purely additive.)
+ *
+ * 1.113 (SETUP INPUTS: block forms gain `timeInput` (HH:MM), `weeklyHours` (a week of opening or
+ * working hours, open/closed per day, breaks, copy to every day, submitted as the calendar's
+ * `{weekday, start_time, end_time}` rows) and `checkboxGroup` (several choices, submitted as a
+ * list). `colorInput` takes `swatches`, and `fieldArray` takes `default` rows and an `addLabel`, so a
+ * setup screen offers a ready list to tick and edit instead of text to type (WHIT-1172).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.111.0';
+    public const VERSION = '1.113.0';
 
     /**
      * Static identity only — never instantiated.

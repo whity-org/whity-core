@@ -211,6 +211,7 @@
         "record.noRecord.description": "هذا العنوان ينقصه السجل الذي يتعلّق به.",
         "record.noRecord.title": "لم يُسمَّ أي سجل",
         "record.noRecordPage.description": "الميزة '{id}' لا تصف سجلات مفردة، فلا يوجد شيء على هذا العنوان.",
-        "record.noRecordPage.title": "لا توجد صفحة سجل"
+        "record.noRecordPage.title": "لا توجد صفحة سجل",
+        "blocks.color.custom": "لون آخر"
     }
 }
