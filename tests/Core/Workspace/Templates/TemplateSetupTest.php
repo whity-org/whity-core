@@ -97,6 +97,21 @@ final class TemplateSetupTest extends TestCase
         self::assertSame(20000, $api->body('POST /api/calendar/services')['price_minor']);
     }
 
+    public function testTheBusinessStepOpensWithWhatTheWorkspaceHas(): void
+    {
+        $api = new FakeSetup();
+        self::assertSame(['name_en' => 'Example Bakery'], (new TemplateSetup($api, static fn (): string => 'Example Bakery'))->current('business', self::AMRO), 'The name it was created with');
+        self::assertSame(['name_ar' => 'مخبز المثال'], (new TemplateSetup($api, static fn (): string => 'مخبز المثال'))->current('business', self::AMRO), 'An Arabic name goes in the Arabic field');
+
+        $api->effective = ['company.name' => 'Example Bakery Ltd', 'company.phone' => '+962 6 000 0000', 'branding_main_color' => '#A67C00'];
+        $api->overridden = ['branding_main_color'];
+        self::assertSame(
+            ['name_en' => 'Example Bakery Ltd', 'phone' => '+962 6 000 0000', 'colour' => '#a67c00'],
+            (new TemplateSetup($api, static fn (): string => 'Example Bakery'))->current('business', self::AMRO),
+            'What the workspace saved wins over its first name',
+        );
+    }
+
     public function testAStepSavesOnlyWhatChangedAndSaysWhatIsWrong(): void
     {
         $api = new FakeSetup();
