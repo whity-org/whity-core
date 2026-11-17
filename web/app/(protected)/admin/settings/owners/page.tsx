@@ -2,8 +2,8 @@
 
 /**
  * Settings › Owners (WHIT-1170, WHIT-1171): who owns this workspace, the offers
- * waiting for an answer, and for owners: hand ownership over or add a
- * co-owner.
+ * waiting for an answer, and for owners: hand ownership over, add a
+ * co-owner, remove another owner or stop being one (never the last owner).
  *
  * Owners are equal (owner, 2026-11-16). Only an owner pays and changes the
  * plan, and decides who else owns the workspace. Handing over and adding a
@@ -74,19 +74,16 @@ interface OwnersData {
   is_owner: boolean;
 }
 
-/** The offer waiting for "Confirm it's you". */
-interface Pending {
-  kind: Kind;
-  to: number;
-  leaveAfter: boolean;
-  check: IdentityCheck;
-}
+/** What waits for "Confirm it's you": an offer, or removing an owner. */
+type Pending =
+  | { action: 'offer'; kind: Kind; to: number; leaveAfter: boolean; check: IdentityCheck }
+  | { action: 'remove'; profileId: number; check: IdentityCheck };
 
 export default function OwnersSettingsPage() {
   const t = useTranslation('admin');
   const refusalText = useRefusalText();
   const { addToast } = useToast();
-  const { user } = useAuth();
+  const { user, refreshAuth } = useAuth();
   const dates = useDateDisplay();
   const formatDate = (value: string): string => dates.date(value) ?? '';
   const [version, setVersion] = useState(0);
@@ -133,8 +130,20 @@ export default function OwnersSettingsPage() {
       setProblem(started.error ?? failed);
       return;
     }
-    setPending({ kind: dialog, to, leaveAfter: dialog === 'transfer' && leaveAfter, check: started.check });
+    setPending({ action: 'offer', kind: dialog, to, leaveAfter: dialog === 'transfer' && leaveAfter, check: started.check });
     setDialog(null);
+  };
+
+  /** Remove another owner, or stop being one (WHIT-1171): "Confirm it's you" first. */
+  const startRemove = async (profileId: number) => {
+    const started = await startIdentityCheck(() =>
+      api.POST('/api/v1/workspace/owners/{profileId}/identity-check', { params: { path: { profileId } } }),
+    );
+    if ('error' in started) {
+      addToast(started.error ?? failed, 'error');
+      return;
+    }
+    setPending({ action: 'remove', profileId, check: started.check });
   };
 
   /** Step 2: the code, then the change itself. */
@@ -143,20 +152,38 @@ export default function OwnersSettingsPage() {
     setBusy(true);
     setCodeError(null);
     try {
-      const { error: err, response } = await api.POST('/api/v1/workspace/owners/offers', {
-        body: { to_profile_id: pending.to, kind: pending.kind, leave_after: pending.leaveAfter, code },
-      });
+      const { error: err, response } =
+        pending.action === 'offer'
+          ? await api.POST('/api/v1/workspace/owners/offers', {
+              body: { to_profile_id: pending.to, kind: pending.kind, leave_after: pending.leaveAfter, code },
+            })
+          : await api.DELETE('/api/v1/workspace/owners/{profileId}', {
+              params: { path: { profileId: pending.profileId } },
+              body: { code },
+            });
       if (!response.ok && isIdentityCheckFailure(err)) {
         setCodeError(t('twoStep.identity.wrong', 'That code is not right or has expired.'));
         return;
       }
+      const done = pending;
       setPending(null);
       if (!response.ok) {
         const body = (err ?? {}) as { details?: { code?: string }; error?: string };
         addToast(refusalText(body.details?.code, body.error ?? failed), 'error');
         return;
       }
-      addToast(t('owners.offer.sent', 'Offer sent. They have 7 days to accept.'), 'success');
+      if (done.action === 'offer') {
+        addToast(t('owners.offer.sent', 'Offer sent. They have 7 days to accept.'), 'success');
+      } else {
+        addToast(
+          done.profileId === user?.id
+            ? t('owners.left', 'You’re no longer an owner. You keep your roles here.')
+            : t('owners.removed', 'They’re no longer an owner. They keep their roles here.'),
+          'success',
+        );
+        // My own owner flag changed: the switcher and owner-only actions follow.
+        if (done.profileId === user?.id) await refreshAuth();
+      }
       reload();
     } catch {
       addToast(failed, 'error');
@@ -213,6 +240,7 @@ export default function OwnersSettingsPage() {
   }
 
   const isOwner = data.is_owner;
+  const several = data.owners.length > 1;
 
   return (
     <div className="space-y-6">
@@ -254,10 +282,20 @@ export default function OwnersSettingsPage() {
                     </p>
                   </div>
                   <Badge variant="outline">{t('owners.badge', 'Owner')}</Badge>
+                  {isOwner && several && (
+                    <Button variant="outline" size="sm" onClick={() => void startRemove(o.profile_id)}>
+                      {me ? t('owners.stepDown', 'Stop being an owner') : t('owners.remove', 'Remove as owner')}
+                    </Button>
+                  )}
                 </li>
               );
             })}
           </ul>
+          {isOwner && !several && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              {t('owners.onlyOwner', 'You’re the only owner. To stop being one, hand ownership over or add a co-owner first.')}
+            </p>
+          )}
         </CardContent>
       </Card>
 

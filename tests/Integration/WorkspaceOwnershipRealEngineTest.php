@@ -188,6 +188,79 @@ final class WorkspaceOwnershipRealEngineTest extends TestCase
         self::assertSame([$offer['id']], array_column($this->ownership->openForPerson($awss), 'id'));
     }
 
+    public function testTheLastOwnerStays(): void
+    {
+        [$tenantId, $amro] = $this->workspace('Amro Saleh');
+
+        $this->assertRefused(OwnershipException::LAST_OWNER, fn () => $this->ownership->removeOwner($tenantId, $amro, $amro));
+        self::assertTrue($this->ownership->owners()->isOwner($tenantId, $amro));
+    }
+
+    public function testAnOwnerRemovesACoOwnerWhoKeepsTheirRoles(): void
+    {
+        [$tenantId, $amro] = $this->workspace('Amro Saleh');
+        $awss = $this->coOwner($tenantId, $amro, 'Awss Haddad');
+        $ahmad = $this->memberOf($tenantId, 'Ahmad Khalil');
+        $this->events = [];
+
+        $this->assertRefused(OwnershipException::NOT_OWNER, fn () => $this->ownership->removeOwner($tenantId, $ahmad, $awss));
+        $this->assertRefused(OwnershipException::NOT_FOUND, fn () => $this->ownership->removeOwner($tenantId, $amro, $ahmad));
+
+        $this->ownership->removeOwner($tenantId, $amro, $awss);
+
+        self::assertFalse($this->ownership->owners()->isOwner($tenantId, $awss));
+        self::assertTrue($this->ownership->isStaff($tenantId, $awss));
+        self::assertSame(
+            [[Events::WORKSPACE_OWNER_REMOVED, ['tenant_id' => $tenantId, 'profile_id' => $awss, 'removed_by' => $amro, 'via' => 'removed']]],
+            $this->events
+        );
+        // Now the only owner, Amro can't step down.
+        $this->assertRefused(OwnershipException::LAST_OWNER, fn () => $this->ownership->removeOwner($tenantId, $amro, $amro));
+    }
+
+    public function testAnOwnerStepsDownAndTheirOpenOffersAreVoid(): void
+    {
+        [$tenantId, $amro] = $this->workspace('Amro Saleh');
+        $awss = $this->coOwner($tenantId, $amro, 'Awss Haddad');
+        $ahmad = $this->memberOf($tenantId, 'Ahmad Khalil');
+        $offer = $this->ownership->offer($tenantId, $awss, $ahmad, WorkspaceOwnership::KIND_CO_OWNER);
+        $this->events = [];
+
+        $this->ownership->removeOwner($tenantId, $awss, $awss);
+
+        self::assertSame([$amro], array_column($this->ownership->owners()->list($tenantId), 'profile_id'));
+        $removed = $this->eventsNamed(Events::WORKSPACE_OWNER_REMOVED);
+        self::assertCount(1, $removed);
+        self::assertSame('left', $removed[0][1]['via']);
+        self::assertSame('void', $this->ownership->find($offer['id'])['status'] ?? null);
+        $this->assertRefused(OwnershipException::NOT_OPEN, fn () => $this->ownership->accept($offer['id'], $ahmad));
+    }
+
+    public function testRemovalStaysInItsWorkspace(): void
+    {
+        [$tenantA, $amro] = $this->workspace('Amro Saleh');
+        $awss = $this->coOwner($tenantA, $amro, 'Awss Haddad');
+        [$tenantB, $emad] = $this->workspace('Emad Nasser');
+
+        $this->assertRefused(OwnershipException::NOT_OWNER, fn () => $this->ownership->removeOwner($tenantA, $emad, $awss));
+        $this->assertRefused(OwnershipException::NOT_FOUND, fn () => $this->ownership->removeOwner($tenantB, $emad, $awss));
+        self::assertTrue($this->ownership->owners()->isOwner($tenantA, $awss));
+    }
+
+    /** @return list<array{0: string, 1: array<string, mixed>}> */
+    private function eventsNamed(string $event): array
+    {
+        return array_values(array_filter($this->events, static fn (array $e): bool => $e[0] === $event));
+    }
+
+    private function coOwner(int $tenantId, int $owner, string $name): int
+    {
+        $profileId = $this->memberOf($tenantId, $name);
+        $offer = $this->ownership->offer($tenantId, $owner, $profileId, WorkspaceOwnership::KIND_CO_OWNER);
+        $this->ownership->accept($offer['id'], $profileId);
+        return $profileId;
+    }
+
     /** @return array{0: int, 1: int} tenant id and its owner */
     private function workspace(string $ownerName): array
     {

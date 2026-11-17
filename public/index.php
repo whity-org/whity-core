@@ -6203,6 +6203,9 @@ $router->register('GET',    '/api/workspace/owners',                         [$w
 $router->register('POST',   '/api/workspace/owners/offers/identity-check',   [$workspaceOwnersHandler, 'offerIdentityCheck'], null);
 $router->register('POST',   '/api/workspace/owners/offers',                  [$workspaceOwnersHandler, 'offer'], null);
 $router->register('DELETE', '/api/workspace/owners/offers/{id:\d+}',         [$workspaceOwnersHandler, 'cancel'], null);
+// WHIT-1171: remove an owner, or stop being one; never the last owner.
+$router->register('POST',   '/api/workspace/owners/{profileId:\d+}/identity-check', [$workspaceOwnersHandler, 'removeIdentityCheck'], null);
+$router->register('DELETE', '/api/workspace/owners/{profileId:\d+}',         [$workspaceOwnersHandler, 'removeOwner'], null);
 $router->register('GET',    '/api/me/ownership-offers',                      [$workspaceOwnersHandler, 'mine'], null);
 $router->register('GET',    '/api/me/ownership-offers/{id:\d+}',             [$workspaceOwnersHandler, 'showMine'], null);
 $router->register('POST',   '/api/me/ownership-offers/{id:\d+}/identity-check', [$workspaceOwnersHandler, 'acceptIdentityCheck'], null);

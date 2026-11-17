@@ -12900,6 +12900,29 @@ final class CoreApiSchemas
                     409 => self::errorResponse('No longer open'),
                 ] + self::authErrors(),
             ]),
+            $ownerRoute('POST', '/api/workspace/owners/{profileId:\d+}/identity-check', [
+                'summary' => 'Start "confirm it is you" before removing an owner, or stopping being one',
+                'parameters' => [['name' => 'profileId', 'in' => 'path', 'required' => true, 'description' => 'The owner to remove (yourself to step down).', 'schema' => ['type' => 'integer']]],
+                'responses' => [
+                    200 => self::jsonResponse('The check to make', 'IdentityCheckResponse'),
+                    403 => self::errorResponse('Only an owner can remove an owner'),
+                    404 => self::errorResponse('Not an owner of this workspace'),
+                    409 => self::errorResponse('A workspace always keeps at least one owner'),
+                    429 => self::errorResponse('Too many codes were sent lately'),
+                    503 => self::errorResponse('Confirming it is you is not available'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('DELETE', '/api/workspace/owners/{profileId:\d+}', [
+                'summary' => 'Remove an owner, or stop being one; they keep their roles. Never the last owner.',
+                'parameters' => [['name' => 'profileId', 'in' => 'path', 'required' => true, 'description' => 'The owner to remove (yourself to step down).', 'schema' => ['type' => 'integer']]],
+                'request' => 'GatedApprovalRequest',
+                'responses' => [
+                    204 => ['description' => 'No longer an owner'],
+                    403 => self::errorResponse('Only an owner can remove an owner, or the identity check failed'),
+                    404 => self::errorResponse('Not an owner of this workspace'),
+                    409 => self::errorResponse('A workspace always keeps at least one owner'),
+                ] + self::authErrors(),
+            ]),
             $ownerRoute('GET', '/api/me/ownership-offers', [
                 'summary' => 'Open offers of ownership made to me, in any workspace',
                 'responses' => [200 => self::jsonResponse('My open offers', 'OwnershipOfferListResponse')] + self::authErrors(),

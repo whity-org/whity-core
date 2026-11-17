@@ -136,6 +136,13 @@ export default function UsersPage() {
     );
     return result.complete ? result.items : [];
   }, [canReadRoles]);
+  // Who owns this workspace (WHIT-1171), for the "Owner" mark on their row.
+  // Read by any staff member; the system workspace has none.
+  const owners = useFetch(async () => {
+    const { data: body, response } = await api.GET('/api/v1/workspace/owners', { cache: 'no-store' });
+    if (!response.ok) return [] as number[];
+    return ((body as { data?: { owners?: { profile_id: number }[] } } | undefined)?.data?.owners ?? []).map((o) => o.profile_id);
+  }, []);
   const unitOptions = useFetch(async () => {
     if (!canReadUnits) return [];
     const result = await fetchAllPagesTyped<{ id: number } & UnitNames>((query) =>
@@ -336,7 +343,17 @@ export default function UsersPage() {
       accessorKey: 'role',
       header: t('users.table.role', 'Role'),
       enableSorting: true,
-      cell: (user) => roleLabel(user.role),
+      cell: (user) =>
+        // Outside the system workspace this list is this workspace's people,
+        // and the owners endpoint answers nothing in the system workspace.
+        (owners.data ?? []).includes(user.id) ? (
+          <span className="inline-flex flex-wrap items-center gap-2">
+            {roleLabel(user.role)}
+            <Badge variant="outline">{t('users.owner', 'Owner')}</Badge>
+          </span>
+        ) : (
+          roleLabel(user.role)
+        ),
     },
     {
       accessorKey: 'ouName',
