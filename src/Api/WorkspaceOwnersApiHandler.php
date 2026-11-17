@@ -22,6 +22,8 @@ use Whity\Http\JsonBody;
  *   POST   /api/v1/workspace/owners/offers/identity-check  → { to_profile_id, kind }: start "Confirm it's you"
  *   POST   /api/v1/workspace/owners/offers                 → { to_profile_id, kind, leave_after?, code }
  *   DELETE /api/v1/workspace/owners/offers/{id}            → withdraw an open offer
+ *   POST   /api/v1/workspace/owners/{profileId}/identity-check
+ *   DELETE /api/v1/workspace/owners/{profileId}            → { code }: remove an owner, or stop being one
  *
  * The person offered, in whichever workspace they are signed in to (the
  * question is about them, so these are self-authenticating, like
@@ -140,6 +142,61 @@ final class WorkspaceOwnersApiHandler
         return $done
             ? Response::json([], 204)
             : Response::error('That offer is no longer open', 409, ['code' => OwnershipException::NOT_OPEN]);
+    }
+
+    /** @param array<string, string> $params */
+    public function removeIdentityCheck(Request $request, array $params = []): Response
+    {
+        $caller = $this->caller($request);
+        if ($caller instanceof Response) {
+            return $caller;
+        }
+        [$tenantId, $profileId] = $caller;
+        $target = (int) ($params['profileId'] ?? 0);
+        $owners = array_column($this->ownership->owners()->list($tenantId), 'profile_id');
+        if (!in_array($profileId, $owners, true)) {
+            return self::refused(new OwnershipException(OwnershipException::NOT_OWNER));
+        }
+        if (!in_array($target, $owners, true)) {
+            return self::refused(new OwnershipException(OwnershipException::NOT_FOUND));
+        }
+        if (count($owners) <= 1) {
+            return self::refused(new OwnershipException(OwnershipException::LAST_OWNER));
+        }
+        return GatedApprovalHttp::start($this->gate, $tenantId, $profileId, GatedApproval::WORKSPACE_OWNERSHIP, self::removeSubject($tenantId, $target));
+    }
+
+    /**
+     * Remove an owner, or stop being one (WHIT-1171). Body: { code }.
+     *
+     * @param array<string, string> $params
+     */
+    public function removeOwner(Request $request, array $params = []): Response
+    {
+        $caller = $this->caller($request);
+        if ($caller instanceof Response) {
+            return $caller;
+        }
+        [$tenantId, $profileId] = $caller;
+        $target = (int) ($params['profileId'] ?? 0);
+        if (!$this->ownership->owners()->isOwner($tenantId, $profileId)) {
+            return self::refused(new OwnershipException(OwnershipException::NOT_OWNER));
+        }
+        $method = GatedApprovalHttp::confirm($this->gate, $tenantId, $profileId, GatedApproval::WORKSPACE_OWNERSHIP, self::removeSubject($tenantId, $target), JsonBody::parsed($request));
+        if ($method instanceof Response) {
+            return $method;
+        }
+        try {
+            $this->ownership->removeOwner($tenantId, $profileId, $target);
+        } catch (OwnershipException $e) {
+            return self::refused($e);
+        }
+        return Response::json([], 204);
+    }
+
+    public static function removeSubject(int $tenantId, int $profileId): string
+    {
+        return 'remove-' . $tenantId . '-' . $profileId;
     }
 
     public function mine(Request $request): Response

@@ -7,11 +7,13 @@ namespace Tests\Integration;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
+use Whity\Api\UsersApiHandler;
 use Whity\Api\WorkspaceOwnersApiHandler;
 use Whity\Auth\JwtParser;
 use Whity\Auth\RoleChecker;
 use Whity\Auth\TokenValidator;
 use Whity\Core\Document\Signing\SigningChallengeRepository;
+use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\ProfileEmailRepository;
 use Whity\Core\Request;
 use Whity\Core\Security\GatedApproval;
@@ -158,6 +160,40 @@ final class WorkspaceOwnersApiRealEngineTest extends TestCase
         self::assertCount(1, $asOwner['offers']);
         // Awss has an offer waiting, so only Ahmad can be offered now.
         self::assertSame([$this->ahmad], array_column($asOwner['candidates'], 'profile_id'));
+    }
+
+    public function testRemovingAnOwnerNeedsTheCodeAndNeverTheLastOne(): void
+    {
+        $refused = $this->api->removeIdentityCheck($this->as($this->amro), ['profileId' => (string) $this->amro]);
+        self::assertSame(409, $refused->getStatusCode());
+        self::assertSame('last_owner', $this->json($refused)['details']['code'] ?? null);
+
+        $offerId = $this->offer($this->awss, 'co_owner');
+        $this->api->accept($this->as($this->awss, ['code' => self::GOOD_CODE]), ['id' => (string) $offerId]);
+
+        self::assertSame(403, $this->api->removeIdentityCheck($this->as($this->ahmad), ['profileId' => (string) $this->awss])->getStatusCode());
+        self::assertSame(200, $this->api->removeIdentityCheck($this->as($this->amro), ['profileId' => (string) $this->awss])->getStatusCode());
+        self::assertSame(403, $this->api->removeOwner($this->as($this->amro, ['code' => '000000']), ['profileId' => (string) $this->awss])->getStatusCode());
+        self::assertSame(204, $this->api->removeOwner($this->as($this->amro, ['code' => self::GOOD_CODE]), ['profileId' => (string) $this->awss])->getStatusCode());
+        self::assertContains(
+            $this->amro . '@' . GatedApproval::purpose(GatedApproval::WORKSPACE_OWNERSHIP, 'remove-' . $this->tenantId . '-' . $this->awss),
+            $this->verified
+        );
+        self::assertSame([$this->amro], array_column($this->json($this->api->list($this->as($this->amro)))['data']['owners'], 'profile_id'));
+    }
+
+    public function testPeopleWontRemoveAnOwner(): void
+    {
+        $users = new UsersApiHandler($this->pdo, new HookManager());
+        $request = $this->as($this->ahmad);
+
+        $res = $users->delete($request, ['id' => (string) $this->amro]);
+
+        self::assertSame(409, $res->getStatusCode());
+        self::assertSame('is_owner', $this->json($res)['details']['code'] ?? null);
+        self::assertTrue((new WorkspaceOwnership($this->pdo))->isStaff($this->tenantId, $this->amro));
+        // Anyone else can still be removed.
+        self::assertSame(200, $users->delete($request, ['id' => (string) $this->awss])->getStatusCode());
     }
 
     public function testTheSystemWorkspaceHasNoOwners(): void

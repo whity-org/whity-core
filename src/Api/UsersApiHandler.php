@@ -1282,6 +1282,18 @@ class UsersApiHandler
             }
             $ownerTenantId = (int)$membership['tenant_id'];
 
+            // An owner is not removed from under the workspace (WHIT-1171): they
+            // stop being an owner first, in Settings › Owners, where the last
+            // owner can't be removed. Otherwise a workspace could lose every
+            // owner through People.
+            if ((new \Whity\Core\Tenant\WorkspaceOwners($this->db))->isOwner($ownerTenantId, $profileId)) {
+                return Response::error(
+                    'This person owns the workspace. Remove them as an owner in Settings › Owners first.',
+                    409,
+                    ['code' => 'is_owner']
+                );
+            }
+
             // Read every row about to go, BEFORE it goes (#889).
             //
             // This DELETE is predicated on (profile_id, tenant_id), so it takes
