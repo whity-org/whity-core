@@ -7641,11 +7641,22 @@ final class CoreApiSchemas
                 'position' => ['type' => 'integer', 'nullable' => true],
                 'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]],
             ], ['key', 'plugin', 'kind', 'sizes', 'size', 'hidden', 'blocks']),
+            'DashboardOffer' => self::object([
+                'key' => self::str() + ['description' => '`offer:{plugin}`, its key in the dashboard layout'],
+                'template' => self::str() + ['description' => 'The template that offers it; its trial starts at POST /api/workspace/templates/{key}/setup/offer/trial'],
+                'plugin' => self::str(),
+                'pluginName' => self::str() + ['description' => 'The plugin\'s display name in the reader\'s language (SDK 1.117)'],
+                'lines' => ['type' => 'array', 'items' => self::str(), 'description' => 'What the plugin adds, at most three lines'],
+                'trialDays' => self::int(),
+                'hidden' => self::bool(),
+                'position' => self::int(true),
+            ], ['key', 'template', 'plugin', 'pluginName', 'lines', 'trialDays', 'hidden']),
             'DashboardResponse' => self::object([
                 'data' => self::object([
                     'setup' => ['type' => 'array', 'items' => SchemaBuilder::ref('DashboardSetup')],
                     'widgets' => ['type' => 'array', 'items' => SchemaBuilder::ref('DashboardWidget')],
-                ], ['setup', 'widgets']),
+                    'offers' => ['type' => 'array', 'items' => SchemaBuilder::ref('DashboardOffer'), 'description' => 'WHIT-1202: locked cards for paid plugins the workspace\'s template offers and it can try now'],
+                ], ['setup', 'widgets', 'offers']),
             ], ['data']),
             'DashboardLayoutRequest' => self::object([
                 'items' => ['type' => 'array', 'items' => self::object([
@@ -16700,7 +16711,7 @@ final class CoreApiSchemas
                 'requiredRole' => null,
                 'requiredPermission' => null,
                 'schema' => [
-                    'summary' => "The setup points and widgets the caller's apps add to their dashboard, in the caller's order",
+                    'summary' => "The setup points and widgets the caller's apps add to their dashboard, and locked cards for plugins its template offers, in the caller's order",
                     'description' => 'Only points and widgets whose permission the caller holds in this workspace, from plugins on here, '
                         . "in the caller's language. Hidden widgets are listed too, so a client can offer Show. Each names the plugin "
                         . "route it reads; that route applies its own permission and the caller's scope.",

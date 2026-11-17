@@ -6055,7 +6055,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The setup points and widgets the caller's apps add to their dashboard, in the caller's order
+         * The setup points and widgets the caller's apps add to their dashboard, and locked cards for plugins its template offers, in the caller's order
          * @description Only points and widgets whose permission the caller holds in this workspace, from plugins on here, in the caller's language. Hidden widgets are listed too, so a client can offer Show. Each names the plugin route it reads; that route applies its own permission and the caller's scope.
          */
         get: operations["get_api_v1_me_dashboard"];
@@ -13684,10 +13684,26 @@ export interface components {
                 size?: "small" | "medium" | "large" | null;
             }[];
         };
+        DashboardOffer: {
+            /** @description `offer:{plugin}`, its key in the dashboard layout */
+            key: string;
+            /** @description The template that offers it; its trial starts at POST /api/workspace/templates/{key}/setup/offer/trial */
+            template: string;
+            plugin: string;
+            /** @description The plugin's display name in the reader's language (SDK 1.117) */
+            pluginName: string;
+            /** @description What the plugin adds, at most three lines */
+            lines: string[];
+            trialDays: number;
+            hidden: boolean;
+            position?: number | null;
+        };
         DashboardResponse: {
             data: {
                 setup: components["schemas"]["DashboardSetup"][];
                 widgets: components["schemas"]["DashboardWidget"][];
+                /** @description WHIT-1202: locked cards for paid plugins the workspace's template offers and it can try now */
+                offers: components["schemas"]["DashboardOffer"][];
             };
         };
         DashboardSetup: {

@@ -225,6 +225,60 @@ PHP);
         self::assertSame(409, $handler->startOfferTrial($request, ['key' => 'bakery'])->getStatusCode(), 'One trial per workspace');
     }
 
+    public function testALockedCardIsOfferedUntilTheWorkspaceHasAccess(): void
+    {
+        TenantContext::setTenantId(self::BAKERY);
+        $handler = $this->handler('en');
+        self::assertSame([], $handler->lockedOffers(self::BAKERY), 'Nothing before a template is chosen');
+
+        $request = new Request('POST', '/api/v1/workspace/templates/bakery/apply', ['content-type' => 'application/json'], '{"examples":false}');
+        $request->user = (object) ['profile_id' => self::AMRO];
+        $handler->apply($request, ['key' => 'bakery']);
+
+        $offers = $handler->lockedOffers(self::BAKERY);
+        self::assertCount(1, $offers);
+        self::assertSame('offer:WsCounter', $offers[0]['key'], 'Its key in the dashboard layout');
+        self::assertSame('bakery', $offers[0]['template'], 'Whose trial route starts it');
+        self::assertSame(['en' => 'Whity for Counters', 'ar' => 'Whity للكاونترات'], $offers[0]['pluginName']);
+        self::assertSame(30, $offers[0]['trialDays'], 'The template\'s 30 days');
+        self::assertNotSame([], $offers[0]['lines']);
+        self::assertLessThanOrEqual(WorkspaceTemplatesApiHandler::LOCKED_CARD_LINES, count($offers[0]['lines']));
+        self::assertSame([], $handler->lockedOffers(0), 'Never for the system workspace');
+
+        // Access by a plan: no card.
+        $this->activation->useEntitlements(static fn (int $tenantId, string $entitlement): bool => $entitlement === 'ws_counter.access');
+        $this->activation->resetRequest();
+        self::assertSame([], $handler->lockedOffers(self::BAKERY), 'A workspace that already has it');
+        $this->activation->useEntitlements(static fn (): bool => false);
+        $this->activation->resetRequest();
+
+        // Offered only to the operator: no card.
+        $this->activation->setAccess('WsCounter', CodePluginActivation::OPERATOR);
+        self::assertSame([], $handler->lockedOffers(self::BAKERY), 'Not offered to workspaces');
+        $this->activation->setAccess('WsCounter', CodePluginActivation::CHOOSE);
+
+        // The trial started: the card goes, for good.
+        $this->activation->startTrial(self::BAKERY, 'WsCounter', self::AMRO, 30);
+        $this->activation->resetRequest();
+        self::assertSame([], $handler->lockedOffers(self::BAKERY), 'Once the trial starts');
+    }
+
+    public function testNoLockedCardWithoutAPaidPluginToOffer(): void
+    {
+        TenantContext::setTenantId(self::BAKERY);
+        $handler = $this->handler('en');
+        $request = new Request('POST', '/api/v1/workspace/templates/blank/apply', ['content-type' => 'application/json'], '{"examples":false}');
+        $request->user = (object) ['profile_id' => self::AMRO];
+        $handler->apply($request, ['key' => 'blank']);
+        self::assertSame([], $handler->lockedOffers(self::BAKERY), 'Blank offers nothing');
+
+        $request = new Request('POST', '/api/v1/workspace/templates/bakery/apply', ['content-type' => 'application/json'], '{"examples":false}');
+        $request->user = (object) ['profile_id' => self::AMRO];
+        $handler->apply($request, ['key' => 'bakery']);
+        $this->activation->usePaidAccess(static fn (): array => []);
+        self::assertSame([], $handler->lockedOffers(self::BAKERY), 'The offered plugin is not installed (or not paid) here');
+    }
+
     public function testDisplayNamesFallBackToTheId(): void
     {
         $names = $this->loader->getDisplayNames();

@@ -74,6 +74,16 @@ The offer names the plugin by its display name (SDK 1.117, `PluginDisplayNameInt
 
 `GET /api/workspace/templates` shows a template's `offer` only when the plugin it names is installed and paid (`PluginAccessInterface`). It carries the plugin's `trialDays`, whether this workspace can still start a trial, and the plugin's state here. The trial itself starts through `POST /api/workspace/code-plugins/{plugin}/trial` (`plugins:enable`), the same one-click, no-card trial as Settings › Plugins.
 
+### Locked cards on the dashboard (WHIT-1202)
+
+The offer also waits on the dashboard. `GET /api/me/dashboard` lists `offers`: one locked card per paid plugin the workspace's templates offer, while
+
+- the plugin is installed, paid and offered to workspaces (not operator-only);
+- the workspace has no access to it (no plan, no cash payment, no running trial) and has never had its trial;
+- the workspace is not the system workspace, and the reader holds `plugins:enable`.
+
+Each card carries its layout key `offer:{plugin}`, the template that offers it, the plugin's display name, at most three lines of the offer's `paid` text and the template's trial length. The web draws it dashed and locked, first under From your apps, with Start your {n}-day free trial (`POST /api/workspace/templates/{key}/setup/offer/trial`) and See what's included (`/admin/plugins#plugin-{name}`). It hides, shows and moves through `PUT /api/me/dashboard/layout` like any card; hiding it never withdraws the offer elsewhere. Once the trial starts the card is gone for good.
+
 ## Example data
 
 Example rows use made-up names only: Example Bakery and friends for companies, the Whity team for people (Amro Saleh, Awss Haddad, Ahmad Khalil, Ibrahim Mansour, Emad Nasser), and `@example.com` addresses. Never real customers.

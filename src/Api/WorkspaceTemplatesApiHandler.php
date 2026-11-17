@@ -107,6 +107,58 @@ final class WorkspaceTemplatesApiHandler
         return $out;
     }
 
+    /** At most this many lines of what the plugin adds, on its locked card. */
+    public const LOCKED_CARD_LINES = 3;
+
+    /**
+     * WHIT-1202: the paid plugins this workspace's templates offer and it can
+     * try now, for locked cards on the dashboard. Text still `{en, ar}`.
+     *
+     * An offer is listed only when its plugin is installed and paid, offered to
+     * workspaces, and this workspace has no access to it (no plan, no cash, no
+     * running trial) and has never had its trial. Never for the system
+     * workspace. One card per plugin, however many templates name it.
+     *
+     * @return list<array{key: string, template: string, plugin: string, pluginName: array{en: string, ar: string}, lines: list<array<string, mixed>>, trialDays: int}>
+     *
+     * @phpstan-impure it reads what the workspace chose and has
+     */
+    public function lockedOffers(int $tenantId): array
+    {
+        if ($tenantId === 0 || $this->activation === null) {
+            return [];
+        }
+        $out = [];
+        foreach ($this->runs->forTenant($tenantId) as $run) {
+            $template = $this->catalogue->find($run['template_key']);
+            $offer = $template !== null ? $this->rawOffer($template) : null;
+            if ($template === null || $offer === null) {
+                continue;
+            }
+            $plugin = (string) $offer['plugin'];
+            if (isset($out[$plugin])
+                || (int) $offer['trialDays'] <= 0
+                || $this->activation->accessOf($plugin) === \Whity\Core\Plugin\Workspace\CodePluginActivation::OPERATOR
+                || !$this->activation->trialAvailable($plugin, $tenantId)
+                || $this->activation->mayTurnOn($plugin, $tenantId)
+                || $this->activation->stateFor($plugin, $tenantId)['state'] === \Whity\Core\Plugin\Workspace\CodePluginActivation::STATE_ON
+            ) {
+                continue;
+            }
+            $paid = is_array($offer['paid'] ?? null) ? array_values(array_filter($offer['paid'], 'is_array')) : [];
+            $out[$plugin] = [
+                'key' => 'offer:' . $plugin,
+                'template' => (string) $template['key'],
+                'plugin' => $plugin,
+                'pluginName' => $offer['pluginName'],
+                'lines' => array_slice($paid, 0, self::LOCKED_CARD_LINES),
+                'trialDays' => (int) $offer['trialDays'],
+            ];
+        }
+
+        return array_values($out);
+    }
+
     /** @param array<string, mixed> $entry */
     private function isScreenStep(array $entry, string $stepId): bool
     {

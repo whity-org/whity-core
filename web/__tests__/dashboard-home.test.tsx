@@ -43,6 +43,8 @@ jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));
 jest.mock('@/lib/capabilities-context', () => ({ useCapabilitiesContext: () => ({ has: () => true }) }));
 const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }));
+const mockRefreshNavigation = jest.fn();
+jest.mock('@/lib/navigation-context', () => ({ useNavigation: () => ({ refresh: mockRefreshNavigation }) }));
 jest.mock('@/components/plugin/blocks/block-renderer', () => ({
   BlockRenderer: ({ blocks }: { blocks: Array<{ type: string; value?: string }> }) => {
     if (blocks.some((b) => b.type === 'boom')) throw new Error('bad block');
@@ -347,6 +349,94 @@ describe('HomeApps', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Large' }));
     await waitFor(() => expect(mockApiClient).toHaveBeenCalledWith('/api/v1/me/dashboard/layout', expect.objectContaining({ body: expect.stringContaining('"size":"large"') })));
+  });
+});
+
+/** WHIT-1202: a paid plugin the workspace's template offers, as a locked card. */
+const offer = (over: Record<string, unknown> = {}) => ({
+  key: 'offer:Salons',
+  template: 'salon',
+  plugin: 'Salons',
+  pluginName: 'Whity for Salons',
+  lines: ['Walk-in queue with a ticket number', 'Commission for each stylist', 'A chair map for the day'],
+  trialDays: 30,
+  hidden: false,
+  position: null,
+  ...over,
+});
+
+describe('HomeApps locked cards (WHIT-1202)', () => {
+  it('shows the plugin by its name, what it adds, and one filled trial button, dashed', async () => {
+    mockApiClient.mockImplementation(() => json({ data: [] }));
+    render(<HomeApps dashboard={{ setup: [], widgets: [], offers: [offer()] }} onDashboardChange={jest.fn()} />);
+
+    expect(await screen.findByRole('heading', { name: 'Whity for Salons' })).toBeInTheDocument();
+    expect(screen.queryByText('Salons')).not.toBeInTheDocument();
+    expect(screen.getByText('Commission for each stylist')).toBeInTheDocument();
+    const card = screen.getByRole('heading', { name: 'Whity for Salons' }).closest('[data-slot="locked-card"]');
+    expect(card).toHaveClass('border-dashed');
+    const start = screen.getByRole('button', { name: 'Start your 30-day free trial' });
+    expect(start).toHaveAttribute('data-variant', 'default');
+    expect(screen.getByRole('link', { name: "See what's included" })).toHaveAttribute('href', '/admin/plugins#plugin-Salons');
+  });
+
+  it("starts the template's trial, then hands over to the plugin", async () => {
+    mockApiClient.mockImplementation((url: string) =>
+      url === '/api/v1/workspace/templates/salon/setup/offer/trial'
+        ? json({ data: { name: 'Salons', enabled: true, trialEndsAt: '2026-12-17 10:00:00' } })
+        : json({ data: [] })
+    );
+    const changed = jest.fn();
+    render(<HomeApps dashboard={{ setup: [], widgets: [], offers: [offer()] }} onDashboardChange={changed} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Start your 30-day free trial' }));
+    await waitFor(() =>
+      expect(mockApiClient).toHaveBeenCalledWith('/api/v1/workspace/templates/salon/setup/offer/trial', expect.objectContaining({ method: 'POST' }))
+    );
+    expect(addToast).toHaveBeenCalledWith('Your 30-day trial of Whity for Salons has started.', 'success');
+    expect(changed).toHaveBeenCalled();
+    expect(mockRefreshNavigation).toHaveBeenCalled();
+  });
+
+  it('says so in plain words when the trial cannot start', async () => {
+    mockApiClient.mockImplementation((url: string) =>
+      url.endsWith('/offer/trial') ? json({ error: 'This workspace has already had its trial, or the plugin offers none' }, 409) : json({ data: [] })
+    );
+    const changed = jest.fn();
+    render(<HomeApps dashboard={{ setup: [], widgets: [], offers: [offer()] }} onDashboardChange={changed} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Start your 30-day free trial' }));
+    await waitFor(() =>
+      expect(addToast).toHaveBeenCalledWith('This workspace has already had its trial, or the plugin offers none', 'error', 6000)
+    );
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it('hides from its menu like any card, and Show brings it back', async () => {
+    mockApiClient.mockImplementation(() => json({ data: [] }));
+    render(<HomeApps dashboard={{ setup: [], widgets: [], offers: [offer()] }} onDashboardChange={jest.fn()} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Options for Whity for Salons' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Hide from home' }));
+    await waitFor(() =>
+      expect(mockApiClient).toHaveBeenCalledWith(
+        '/api/v1/me/dashboard/layout',
+        expect.objectContaining({ method: 'PUT', body: JSON.stringify({ items: [{ key: 'offer:Salons', hidden: true, size: null }] }) })
+      )
+    );
+  });
+
+  it('gives only the first locked card the filled button', async () => {
+    mockApiClient.mockImplementation(() => json({ data: [] }));
+    render(
+      <HomeApps
+        dashboard={{ setup: [], widgets: [], offers: [offer(), offer({ key: 'offer:Clinics', plugin: 'Clinics', pluginName: 'Whity for Clinics', template: 'clinic' })] }}
+        onDashboardChange={jest.fn()}
+      />
+    );
+
+    const buttons = await screen.findAllByRole('button', { name: 'Start your 30-day free trial' });
+    expect(buttons.map((b) => b.getAttribute('data-variant'))).toEqual(['default', 'outline']);
   });
 });
 

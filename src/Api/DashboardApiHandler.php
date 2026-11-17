@@ -56,6 +56,35 @@ final class DashboardApiHandler
         $this->templateSetup = $templateSetup;
     }
 
+    /** @var (Closure(int): list<array<string, mixed>>)|null */
+    private ?Closure $templateOffers = null;
+
+    /**
+     * WHIT-1202: the paid plugins the workspace's templates offer and it can
+     * try now, by workspace ({@see WorkspaceTemplatesApiHandler::lockedOffers()}).
+     *
+     * @param Closure(int): list<array<string, mixed>> $templateOffers
+     */
+    public function useTemplateOffers(Closure $templateOffers): void
+    {
+        $this->templateOffers = $templateOffers;
+    }
+
+    /**
+     * The locked cards the caller may see: only someone who can start the
+     * trial (plugins:enable), since the card's one action is that.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function visibleOffers(int $tenantId, int $profileId): array
+    {
+        if ($this->templateOffers === null || !$this->may($profileId, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE, $tenantId)) {
+            return [];
+        }
+
+        return ($this->templateOffers)($tenantId);
+    }
+
     /** @param array<string, string> $params */
     public function show(Request $request, array $params = []): Response
     {
@@ -128,9 +157,26 @@ final class DashboardApiHandler
             ];
         }
 
+        // WHIT-1202: locked cards for the paid plugins its template offers.
+        $offers = [];
+        foreach ($this->visibleOffers($tenantId, $profileId) as $offer) {
+            $row = $rows[$offer['key']] ?? null;
+            $offers[] = [
+                'key' => $offer['key'],
+                'template' => $offer['template'],
+                'plugin' => $offer['plugin'],
+                'pluginName' => self::text($offer['pluginName'], $language) ?? $offer['plugin'],
+                'lines' => array_values(array_filter(array_map(static fn (mixed $line): ?string => self::text($line, $language), $offer['lines']), static fn (?string $line): bool => $line !== null && $line !== '')),
+                'trialDays' => $offer['trialDays'],
+                'hidden' => $row['hidden'] ?? false,
+                'position' => $row['position'] ?? null,
+            ];
+        }
+
         return Response::json(['data' => [
             'setup' => $setup,
             'widgets' => DashboardLayoutRepository::ordered($widgets, $rows),
+            'offers' => DashboardLayoutRepository::ordered($offers, $rows),
         ]], 200);
     }
 
@@ -157,6 +203,10 @@ final class DashboardApiHandler
         }
         foreach ($this->visibleWidgets($tenantId, $profileId) as $widget) {
             $sizes[$widget['key']] = $widget['sizes'];
+        }
+        // WHIT-1202: a locked card hides and moves like a home card.
+        foreach ($this->visibleOffers($tenantId, $profileId) as $offer) {
+            $sizes[(string) $offer['key']] = [];
         }
 
         $clean = [];

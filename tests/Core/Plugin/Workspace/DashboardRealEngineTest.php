@@ -44,6 +44,9 @@ final class DashboardRealEngineTest extends TestCase
     /** @var array<string, list<string>> "tenant:profile" => permissions held */
     private array $grants = [];
 
+    /** @var (\Closure(int): list<array<string, mixed>>)|null WHIT-1202: what the templates offer, by workspace */
+    private ?\Closure $offers = null;
+
     public static function setUpBeforeClass(): void
     {
         self::$dir = sys_get_temp_dir() . '/whity_ws_dashboard_' . uniqid();
@@ -234,6 +237,46 @@ PHP);
         self::assertSame(422, $this->saveLayout(self::BAKERY, self::AMRO, ['items' => 'all'])[0]);
     }
 
+    public function testALockedCardIsForWhoeverCanStartItsTrialAndHidesLikeACard(): void
+    {
+        $this->grants[self::BAKERY . ':' . self::AMRO][] = 'plugins:enable';
+        $this->offers = static fn (int $tenantId): array => $tenantId !== self::BAKERY ? [] : [[
+            'key' => 'offer:WsCounter',
+            'template' => 'bakery',
+            'plugin' => 'WsCounter',
+            'pluginName' => ['en' => 'Whity for Counters', 'ar' => 'Whity للكاونترات'],
+            'lines' => [['en' => 'QR orders at the counter', 'ar' => 'الطلبات عند الكاونتر برمز QR'], ['en' => '', 'ar' => '']],
+            'trialDays' => 30,
+        ]];
+
+        $offers = $this->dashboard(self::BAKERY, self::AMRO, 'ar')['offers'];
+        self::assertSame([[
+            'key' => 'offer:WsCounter',
+            'template' => 'bakery',
+            'plugin' => 'WsCounter',
+            'pluginName' => 'Whity للكاونترات',
+            'lines' => ['الطلبات عند الكاونتر برمز QR'],
+            'trialDays' => 30,
+            'hidden' => false,
+            'position' => null,
+        ]], $offers, 'In the reader\'s language, empty lines dropped');
+        self::assertSame([], $this->dashboard(self::BAKERY, self::AWSS, 'en')['offers'], 'Only someone who can start the trial sees it');
+        self::assertSame(422, $this->saveLayout(self::BAKERY, self::AWSS, ['items' => [['key' => 'offer:WsCounter', 'hidden' => true]]])[0]);
+
+        $saved = $this->saveLayout(self::BAKERY, self::AMRO, ['items' => [['key' => 'offer:WsCounter', 'hidden' => true], ['key' => 'WsDash:walk-in']]]);
+        self::assertSame(200, $saved[0]);
+        self::assertTrue($saved[1]['data']['offers'][0]['hidden'], 'Hidden from its menu, like any card');
+        self::assertSame(422, $this->saveLayout(self::BAKERY, self::AMRO, ['items' => [['key' => 'offer:WsCounter', 'size' => 'large']]])[0], 'A locked card has no sizes');
+
+        $this->offers = static fn (): array => [];
+        self::assertSame([], $this->dashboard(self::BAKERY, self::AMRO, 'en')['offers'], 'Gone once the workspace can use the plugin');
+    }
+
+    public function testNoLockedCardsWithoutTemplates(): void
+    {
+        self::assertSame([], $this->dashboard(self::BAKERY, self::AMRO, 'en')['offers']);
+    }
+
     public function testAnUnauthenticatedCallerIsRefused(): void
     {
         TenantContext::setTenantId(self::BAKERY);
@@ -288,6 +331,11 @@ PHP);
             $this->router,
         );
 
-        return new DashboardApiHandler($roles, $this->loader, new DashboardLayoutRepository($this->pdo), $cards, static fn (): string => $language);
+        $handler = new DashboardApiHandler($roles, $this->loader, new DashboardLayoutRepository($this->pdo), $cards, static fn (): string => $language);
+        if ($this->offers !== null) {
+            $handler->useTemplateOffers($this->offers);
+        }
+
+        return $handler;
     }
 }

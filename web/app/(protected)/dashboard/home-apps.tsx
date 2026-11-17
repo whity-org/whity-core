@@ -9,6 +9,9 @@
  * Customise turns on Move earlier and Move later, and a size choice for widgets.
  * Each ⋯ menu has Hide from home and Open. Hidden items are listed at the foot
  * with Show, so hiding is never a dead end. With nothing, nothing appears at all.
+ *
+ * Locked cards (WHIT-1202) come first: a paid plugin the workspace's template
+ * offers and it can try now. They hide and move like the rest.
  */
 
 import { useCallback, useMemo, useState } from 'react';
@@ -25,8 +28,10 @@ import { useFormattingLocale, useTranslation } from '@whity/features/i18n';
 import { api, apiFetch } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
+import { useNavigation } from '@/lib/navigation-context';
 import { AppWidgetBody } from './app-widget';
-import type { Dashboard, DashboardWidget, WidgetSize } from './use-dashboard';
+import { LockedCard } from './locked-card';
+import type { Dashboard, DashboardOffer, DashboardWidget, WidgetSize } from './use-dashboard';
 
 /** One entry of `GET /api/me/home-cards`. */
 export interface HomeCard {
@@ -53,7 +58,8 @@ interface HomeCardData {
 
 type Item =
   | { key: string; kind: 'card'; hidden: boolean; size: null; card: HomeCard }
-  | { key: string; kind: 'widget'; hidden: boolean; size: WidgetSize; widget: DashboardWidget };
+  | { key: string; kind: 'widget'; hidden: boolean; size: WidgetSize; widget: DashboardWidget }
+  | { key: string; kind: 'offer'; hidden: boolean; size: null; offer: DashboardOffer };
 
 const MAX_LINES = 5;
 const MAX_CHART_POINTS = 12;
@@ -69,11 +75,12 @@ const SPAN: Record<WidgetSize, string> = {
  * The apps' own order (each app's card, then its widgets; then widgets of apps
  * with no card), then the person's positions over it. Stable, like the server's.
  */
-export function mergeItems(cards: HomeCard[], widgets: DashboardWidget[]): Item[] {
+export function mergeItems(cards: HomeCard[], widgets: DashboardWidget[], offers: DashboardOffer[] = []): Item[] {
   const fromCards: Item[] = cards.map((card) => ({ key: card.key, kind: 'card', hidden: card.hidden, size: null, card }));
   const asItem = (widget: DashboardWidget): Item => ({ key: widget.key, kind: 'widget', hidden: widget.hidden, size: widget.size, widget });
   const placed = new Set<string>();
-  const apps: Item[] = [];
+  // Locked cards first: what the workspace's template offers to try.
+  const apps: Item[] = offers.map((offer) => ({ key: offer.key, kind: 'offer', hidden: offer.hidden, size: null, offer }));
   for (const card of fromCards) {
     apps.push(card);
     for (const widget of widgets.filter((w) => w.plugin === card.key)) {
@@ -83,7 +90,8 @@ export function mergeItems(cards: HomeCard[], widgets: DashboardWidget[]): Item[
   }
   for (const widget of widgets) if (!placed.has(widget.key)) apps.push(asItem(widget));
 
-  const positionOf = (item: Item) => (item.kind === 'card' ? item.card.position : item.widget.position) ?? Number.MAX_SAFE_INTEGER;
+  const positionOf = (item: Item) =>
+    (item.kind === 'card' ? item.card.position : item.kind === 'offer' ? item.offer.position : item.widget.position) ?? Number.MAX_SAFE_INTEGER;
   return apps
     .map((item, index) => ({ item, index }))
     .sort((a, b) => positionOf(a.item) - positionOf(b.item) || a.index - b.index)
@@ -94,6 +102,7 @@ export function HomeApps({ dashboard, onDashboardChange }: { dashboard: Dashboar
   const t = useTranslation('common');
   const locale = useFormattingLocale();
   const { addToast } = useToast();
+  const { refresh: refreshNavigation } = useNavigation();
   const [customising, setCustomising] = useState(false);
   // Set while a change is saving, so the order shown is the one just chosen.
   const [pending, setPending] = useState<Item[] | null>(null);
@@ -107,11 +116,24 @@ export function HomeApps({ dashboard, onDashboardChange }: { dashboard: Dashboar
     return ((body as { data?: HomeCard[] } | undefined)?.data) ?? [];
   }, []);
 
-  const merged = useMemo(() => mergeItems(cards.data ?? [], dashboard?.widgets ?? []), [cards.data, dashboard]);
+  const merged = useMemo(() => mergeItems(cards.data ?? [], dashboard?.widgets ?? [], dashboard?.offers ?? []), [cards.data, dashboard]);
   const all = (pending ?? merged).filter((item) => !denied.has(item.key));
 
   const name = (item: Item) =>
-    item.kind === 'card' ? (locale === 'ar' ? item.card.labelAr : item.card.label) : (item.widget.title ?? item.widget.plugin);
+    item.kind === 'card'
+      ? locale === 'ar'
+        ? item.card.labelAr
+        : item.card.label
+      : item.kind === 'offer'
+        ? item.offer.pluginName
+        : (item.widget.title ?? item.widget.plugin);
+
+  // The trial is on: the plugin's own cards, widgets and screens take over.
+  const trialStarted = () => {
+    cards.refetch();
+    onDashboardChange();
+    void refreshNavigation();
+  };
 
   const save = async (next: Item[]) => {
     setPending(next);
@@ -146,6 +168,8 @@ export function HomeApps({ dashboard, onDashboardChange }: { dashboard: Dashboar
   const onDenied = useCallback((key: string) => setDenied((keys) => new Set(keys).add(key)), []);
 
   const shown = all.filter((item) => !item.hidden);
+  // The view's one filled button is the first locked card's trial.
+  const firstOffer = shown.find((item) => item.kind === 'offer')?.key;
   const hidden = all.filter((item) => item.hidden);
   if (all.length === 0) return null;
 
@@ -171,7 +195,14 @@ export function HomeApps({ dashboard, onDashboardChange }: { dashboard: Dashboar
           <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {shown.map((item, index) => (
               <div key={item.key} className={item.kind === 'widget' ? SPAN[item.size] : ''}>
-                {item.kind === 'card' ? (
+                {item.kind === 'offer' ? (
+                  <LockedCard
+                    offer={item.offer}
+                    primary={item.key === firstOffer}
+                    onHide={() => change(item.key, { hidden: true })}
+                    onStarted={trialStarted}
+                  />
+                ) : item.kind === 'card' ? (
                   <AppCard card={item.card} name={name(item)} onHide={() => change(item.key, { hidden: true })} />
                 ) : (
                   <WidgetCard widget={item.widget} name={name(item)} onHide={() => change(item.key, { hidden: true })} onDenied={onDenied} />

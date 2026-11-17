@@ -214,11 +214,14 @@ export function Sidebar() {
       ) : branding.siteName === DEFAULT_SITE_NAME ? (
         // The Whity lockup, as on every 3.3 card; a renamed installation keeps
         // its own name in text.
-        <h1 className="m-0">
+        // Not a heading: each page's own title is its one h1 (WHIT-1202).
+        <p className="m-0" data-slot="sidebar-brand">
           <Lockup size={24} />
-        </h1>
+        </p>
       ) : (
-        <h1 className="text-xl font-semibold">{branding.siteName}</h1>
+        <p className="text-xl font-semibold" data-slot="sidebar-brand">
+          {branding.siteName}
+        </p>
       )}
     </>
   );

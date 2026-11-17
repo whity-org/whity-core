@@ -41298,7 +41298,7 @@
         "/api/v1/me/dashboard": {
             "get": {
                 "operationId": "get_api_v1_me_dashboard",
-                "summary": "The setup points and widgets the caller's apps add to their dashboard, in the caller's order",
+                "summary": "The setup points and widgets the caller's apps add to their dashboard, and locked cards for plugins its template offers, in the caller's order",
                 "tags": [
                     "home"
                 ],
@@ -85841,6 +85841,52 @@
                     "items"
                 ]
             },
+            "DashboardOffer": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "`offer:{plugin}`, its key in the dashboard layout"
+                    },
+                    "template": {
+                        "type": "string",
+                        "description": "The template that offers it; its trial starts at POST /api/workspace/templates/{key}/setup/offer/trial"
+                    },
+                    "plugin": {
+                        "type": "string"
+                    },
+                    "pluginName": {
+                        "type": "string",
+                        "description": "The plugin's display name in the reader's language (SDK 1.117)"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "What the plugin adds, at most three lines"
+                    },
+                    "trialDays": {
+                        "type": "integer"
+                    },
+                    "hidden": {
+                        "type": "boolean"
+                    },
+                    "position": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "key",
+                    "template",
+                    "plugin",
+                    "pluginName",
+                    "lines",
+                    "trialDays",
+                    "hidden"
+                ]
+            },
             "DashboardResponse": {
                 "type": "object",
                 "properties": {
@@ -85858,11 +85904,19 @@
                                 "items": {
                                     "$ref": "#/components/schemas/DashboardWidget"
                                 }
+                            },
+                            "offers": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/DashboardOffer"
+                                },
+                                "description": "WHIT-1202: locked cards for paid plugins the workspace's template offers and it can try now"
                             }
                         },
                         "required": [
                             "setup",
-                            "widgets"
+                            "widgets",
+                            "offers"
                         ]
                     }
                 },
