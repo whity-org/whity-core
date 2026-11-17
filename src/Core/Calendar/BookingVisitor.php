@@ -62,7 +62,7 @@ final class BookingVisitor
 
     private function displayName(int $profileId): string
     {
-        // @tenant-guard-ignore: profiles is a sanctioned GLOBAL identity table (ADR 0005 §1, SanctionedGlobalTables); the id is the caller's own, from their validated session token.
+        // profiles is a sanctioned GLOBAL identity table (ADR 0005 §1, SanctionedGlobalTables); the id is the caller's own, from their validated session token.
         $stmt = $this->db->prepare('SELECT display_name FROM profiles WHERE id = ?');
         $stmt->execute([$profileId]);
         $name = $stmt->fetchColumn();
