@@ -2430,7 +2430,12 @@ class AuthHandler
         // Parse temp token
         $claims = $this->jwtParser->parse($tempToken);
 
-        if ($claims === null) {
+        // Only the 5-minute token the password step minted (type 'temp') may
+        // finish a sign-in here. Every token type shares the signing key, so
+        // without this an access, tenant-select or sign-in-flow token carrying a
+        // profile_id was accepted as well (WHIT-1248). The TOTP code was still
+        // required, but the step should not trust tokens minted for other jobs.
+        if ($claims === null || ($claims['type'] ?? null) !== 'temp') {
             return Response::error('Invalid or expired temporary token', 401);
         }
 
