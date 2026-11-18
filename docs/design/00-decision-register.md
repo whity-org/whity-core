@@ -13,7 +13,7 @@ The brand is being rebuilt one stage at a time. A stage is locked before the nex
 8. Files and templates: locked 28 Oct 2026
 9. Final guideline: locked 28 Oct 2026
 
-Later versions: 2.1 P2 components · 2.2 Document editor · 2.3 Plugin store (locked 31 Oct 2026; S.9–S.12 added 2 Nov) · 2.4 Home (locked 2 Nov 2026) · 2.5 Page patterns and People (locked 2 Nov 2026) · 2.6 Forms (locked 2 Nov 2026) · 2.7 Ease of use and Documents and routing (locked 2 Nov 2026) · 2.8 AI and agents (locked 2 Nov 2026) · 2.9 Workspace, billing and settings (locked 2 Nov 2026)
+Later versions: 2.1 P2 components · 2.2 Document editor · 2.3 Plugin store (locked 31 Oct 2026; S.9–S.12 added 2 Nov) · 2.4 Home (locked 2 Nov 2026) · 2.5 Page patterns and People (locked 2 Nov 2026) · 2.6 Forms (locked 2 Nov 2026) · 2.7 Ease of use and Documents and routing (locked 2 Nov 2026) · 2.8 AI and agents (locked 2 Nov 2026) · 2.9 Workspace, billing and settings (locked 2 Nov 2026) · 3.6 Themes (decided 19 Nov 2026)
 
 ## Stage 1 · Logo (locked 28 Oct 2026)
 
@@ -111,7 +111,7 @@ Overall ratio: side 8, offset 3, radius 2, edge 1.
 ### Faces
 | # | Decision | Locked value |
 | --- | --- | --- |
-| 3.1 | Brand headlines | Readex Pro 600 for the site, slides, document titles and social posts. Body text stays in Noto Sans. The product's own screens never use Readex Pro. Arabic document titles use its Arabic design (E.35). |
+| 3.1 | Brand headlines | Readex Pro 600 for the site, slides, document titles and social posts. Body text stays in Noto Sans. The product's own screens use Readex Pro only when the workspace's theme chooses it (TH.6, 19 Nov 2026); the Whity default keeps Noto Sans. Arabic document titles use its Arabic design (E.35). |
 | 3.2 | Product, English | Noto Sans. |
 | 3.3 | Product, Arabic | Noto Sans Arabic. |
 | 3.4 | Codes, IDs, keys and code | Geist Mono. |
@@ -914,6 +914,27 @@ Owner's answer: use US dollars everywhere. Every card, sample, document, email, 
 | CU.3 | Amount in words | Follows the document's currency: “Three hundred and one US dollars and sixty cents”, “ثلاثمئة وواحد دولاراً أمريكياً وستون سنتاً”. Dinars keep 1,000 fils; dollars, euros, riyals and dirhams have 100 sub-units |
 | CU.4 | Components | `Money`, `MoneyInput`, `Doc`, `DocAmount` and the document tables read the workspace's currency (default USD) for the symbol, decimals and words; `Whity.currencies`, `Whity.moneyText` and `Whity.amountInWords(amount, lang, currency)` are exported. MoneyInput's decimals error names the currency's own count |
 | CU.5 | What changed | 130 cards, 20 component notes, the generators, `bundle.js` and `bundle.css`, and docs 04, 07, 12, 13, 16, 17, 23, 25 and 29. Three-decimal sample amounts were rounded to cents, so receipts and invoices still add up |
+
+## Themes (version 3.6, decided 19 November 2026)
+
+Owner's direction (19 Nov 2026): themes are tokens only, in the spirit of Material 3 Expressive and the shadcn/ui customizer; applying a theme is free, the visual editor is paid and part of Whity Studio. The spec is `30-themes.md` (WHIT-1225). Proposed and answered by the owner on 19 Nov 2026; 3.1 and 09 "What stays" are updated to match.
+
+| # | Decision | Decided |
+| --- | --- | --- |
+| TH.1 | What a theme is | A versioned JSON file with a schema in the repo, never CSS: choices for colour, type, shape, density, elevation and motion, compiled by core into the existing CSS variables. No logo, name, URLs or images (30 §4) |
+| TH.2 | Reach | Widens 09 "What stays" from one colour to these six token groups. Status colours, layout, components, icons and the rules that protect people stay (30 §6.4, §7) |
+| TH.3 | Seeds | One to three seed colours (primary, secondary, tertiary) and a neutral setting (pure, warm, cool, tinted) give every colour role in light and dark, in OKLCH; any role can be overridden per mode. The main colour (2.8) is the primary seed |
+| TH.4 | Schemes | Calm (default, today's look and exactly `TenantTheme`'s output), Tonal, Vibrant, Expressive, Monochrome; contrast Standard or High. **Owner:** accepted as recommended. |
+| TH.5 | New colour roles | Add `surface-1`…`surface-5`, primary and secondary containers, and tertiary with its container, to `base.json` |
+| TH.6 | Fonts | An allowed list of Latin and Arabic pairs, self-hosted and bundled in the phone app: Noto (default), IBM Plex, Cairo, Tajawal, Almarai, Readex Pro, and Noto Sans with Noto Kufi Arabic. **Owner: headings and body** (against the recommendation of headings only): a theme may set the whole pair, heading and body, on product screens, which changes 3.1. Body 15, 16 or 17px; the A.1 and M.5 minimums hold; title weight 500 or 600; no 700; Arabic at 100%; Geist Mono stays for codes; fonts never reach print (TH.11) |
+| TH.7 | Status colours | Fixed in every theme (2.5). **Owner:** accepted as recommended. |
+| TH.8 | Shape and density | Shape presets Square, Crisp, Whity (¼ rule, default), Soft, Round, with optional press morphing; density Compact (36px controls), Standard, Comfortable, never below A.1 |
+| TH.9 | Elevation | Plane (default), Soft shadow or Flat border in the places 4.3 names; a waiting proposal always looks different from approved work. **Owner:** allowed, as recommended. |
+| TH.10 | Motion | Calm (default, 06-motion), Standard springs, Expressive springs with a small overshoot (relaxes "without bounce" for themes that choose it). The person's Animations setting and reduce motion always win. **Owner:** allowed, as recommended. |
+| TH.11 | Documents | Print stays under E.44–E.47; a theme sets only the document theme's defaults and the accent comes from its primary; theme fonts don't reach print. **Owner:** accepted as recommended. |
+| TH.12 | Inheritance and the person | Whity default, installation theme, chosen theme, workspace adjustments (primary seed and overrides), then the person: light or dark, text size, animations, and a new Higher contrast (7:1). Guard rails last: 4.5:1 text and 3:1 non-text with automatic fallback, A.1 and M.5 minimums, Arabic and RTL. **Owner:** accepted as recommended, with Higher contrast. |
+| TH.13 | Plugins and the store | Plugins ship theme files through a new SDK interface (the route-based `PluginThemeInterface` is deprecated); store themes are signed packages; publishers may sell themes through Whity Pay; applying is free. **Owner:** yes, through Whity Pay, as recommended. |
+| TH.14 | Free and paid | Free in core: apply any installed theme, set the primary seed and overrides, import a theme file. Whity Studio (paid): live editor, seeds from the logo, presets, import from shadcn and Material Theme Builder, export, preview across key screens, documents and the phone, versions, publishing to the store. **Owner:** accepted as recommended. |
 
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.
