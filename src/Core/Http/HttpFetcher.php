@@ -166,14 +166,46 @@ final class HttpFetcher implements HttpClient
         }
 
         foreach ($ips as $ip) {
-            // FILTER_FLAG_NO_PRIV_RANGE | NO_RES_RANGE returns false for private
-            // (10/8, 172.16/12, 192.168/16, fc00::/7) AND reserved/loopback/
-            // link-local (127/8, 169.254/16, ::1, 0.0.0.0/8, 240/4, …).
-            if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            if (!self::isGlobalIp($ip)) {
                 return false;
             }
         }
         return true;
+    }
+
+    /**
+     * Whether one IP literal is on the public internet (WHIT-1248).
+     *
+     * FILTER_FLAG_GLOBAL_RANGE (RFC 6890) refuses everything the older
+     * NO_PRIV_RANGE | NO_RES_RANGE pair did (private, loopback, link-local,
+     * 0/8, 240/4) and also the ranges that pair let through: 100.64.0.0/10
+     * (carrier-grade NAT, where some clouds put their metadata service),
+     * 198.18.0.0/15, 192.0.0.0/24 and the documentation ranges.
+     *
+     * Two IPv6 forms carry an IPv4 address inside, and are judged by it:
+     * IPv4-mapped (::ffff:127.0.0.1) and NAT64 (64:ff9b::/96, 64:ff9b:1::/48),
+     * which RFC 6890 lists as global but which a NAT64 gateway turns back
+     * into whatever IPv4 address they embed.
+     */
+    public static function isGlobalIp(string $ip): bool
+    {
+        $packed = @inet_pton($ip);
+        if ($packed === false) {
+            return false;
+        }
+        if (strlen($packed) === 16) {
+            $mapped = str_repeat("\0", 10) . "\xff\xff";
+            if (str_starts_with($packed, $mapped)) {
+                return self::isGlobalIp((string) inet_ntop(substr($packed, 12)));
+            }
+            if (str_starts_with($packed, "\x00\x64\xff\x9b")) {
+                // 64:ff9b::/96 and the local-use 64:ff9b:1::/48: never fetch
+                // through a translator, whatever it embeds.
+                return false;
+            }
+        }
+
+        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_GLOBAL_RANGE) !== false;
     }
 
     /**
