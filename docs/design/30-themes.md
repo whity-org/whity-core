@@ -1,6 +1,6 @@
 # Themes: the Whity UI theme standard
 
-Status: **PROPOSED, waiting for the owner** (WHIT-1225, 19 Nov 2026). Nothing here is decided until the owner answers section 13; the register rows are in `00-decision-register.md` under "Themes (proposed)". No product code is written until then.
+Status: **decided by the owner on 19 Nov 2026** (WHIT-1225). Register: "Themes (version 3.6)", TH.1–TH.14. Every recommendation in section 13 was accepted except TH.6, where the owner chose **headings and body**: a theme may set the whole font pair on product screens.
 
 Owner's direction, 19 Nov 2026: themes are **tokens only**, in the spirit of Material 3 Expressive and the shadcn/ui theme customizer. **Applying a theme is free** in core, whether it comes from Whity, a plugin or the store. **The visual theme editor is paid** and is part of **Whity Studio**.
 
@@ -96,7 +96,7 @@ A theme sets **choices**. The engine turns choices into **tokens**. Tokens are w
 | Key | Values | Default |
 | --- | --- | --- |
 | `type.family` | an id from the allowed font list (below) | `noto` |
-| `type.headingFamily` | an id from the list, or `same` | `same` |
+| `type.headingFamily` | an id from the list, or `same` (TH.6: a theme may set heading and body) | `same` |
 | `type.scale` | `standard` (15) · `roomy` (16) · `large` (17): the body size in px; the rest of the scale moves with it. Nothing below 15 (A.1) | `standard` |
 | `type.titleWeight` | `500` · `600` | `600` |
 | `type.emphasis` | `quiet` · `expressive`: expressive gives page titles and key numbers one scale step more and tighter tracking (−1%) | `quiet` |
@@ -107,7 +107,7 @@ A theme sets **choices**. The engine turns choices into **tokens**. Tokens are w
 | --- | --- | --- | --- |
 | `noto` | Noto Sans | Noto Sans Arabic | Whity default (3.2, 3.3) |
 | `plex` | IBM Plex Sans | IBM Plex Sans Arabic | Corporate, banks and government |
-| `readex` | Readex Pro | Readex Pro | Headings only (`headingFamily`), see TH.6 |
+| `readex` | Readex Pro | Readex Pro | For headings and body since TH.6 (3.1 updated) |
 | `cairo` | Cairo | Cairo | Rounded, friendly; popular in Jordan and the Gulf |
 | `tajawal` | Tajawal | Tajawal | Light, modern |
 | `almarai` | Almarai | Almarai | Bold, retail |
@@ -264,7 +264,7 @@ Guard rails run after every layer and can't be turned off. When one changes a va
 
 ## 7. How this reconciles with "What stays" in 09-white-label
 
-`09-white-label.md` says a tenant changes one colour, and greys, status colours, type, shape, layout and components stay. The owner has widened this to tokens. Proposed new wording for 09 (applied only after approval):
+`09-white-label.md` says a tenant changes one colour, and greys, status colours, type, shape, layout and components stay. The owner has widened this to tokens. The owner approved this on 19 Nov 2026, and 09 now says:
 
 > **What a theme changes:** colour (from one to three seed colours, with overrides), type (from the allowed font list), shape, density, elevation and motion. See `30-themes.md`.
 >
@@ -322,16 +322,18 @@ Free engine in core, one PR per step where it helps review:
 
 Studio, store theme listings and the SDK interface follow as their own pieces of work.
 
-## 13. Decisions for the owner
+## 13. Owner's decisions (19 Nov 2026)
 
-The register's "Themes (proposed)" section has one row per question, TH.1–TH.14. The ones that most need an answer:
+| # | Question | Answer |
+| --- | --- | --- |
+| TH.4 | Five schemes, Calm as the default | Accepted as recommended |
+| TH.6 | Fonts on product screens | **Headings and body** (not the recommendation of headings only). A theme may set the whole Latin and Arabic pair from the allowed list; 3.1 is updated. The A.1 and M.5 minimums hold, and fonts stay out of print |
+| TH.7 | Status colours fixed | Accepted as recommended |
+| TH.9 | Soft and flat elevation | Allowed, as recommended; agent marks stay |
+| TH.10 | Expressive springs | Allowed, as recommended; a person's Calm or Off wins |
+| TH.11 | Theme fonts in print | No, as recommended (E.46 stays) |
+| TH.12 | Higher contrast per person | Yes, as recommended |
+| TH.13 | Selling themes | Yes, through Whity Pay, as recommended |
+| TH.14 | What the free picker does | Choose a theme, set the primary seed and overrides; the rest is Studio. As recommended |
 
-1. **TH.4 Schemes.** Five schemes, with `calm` (today's look) as the default? Recommended: yes.
-2. **TH.6 Product fonts.** The allowed list in 3.2, which lets themes use Readex Pro for headings on screens (today 3.1 keeps it off product screens)? Recommended: allow it as `headingFamily` only.
-3. **TH.7 Status colours.** Fixed in every theme? Recommended: fixed. Alternative: let themes shift their hue a little within tested limits.
-4. **TH.9 Elevation.** Can a theme turn the plane into a soft shadow or a border (`soft`, `flat`)? The plane is Whity's signature, and partners selling under their own name may want it gone. Recommended: yes, with the agent marks kept.
-5. **TH.10 Motion.** Allow `expressive` springs with a small overshoot? 06-motion says "without bounce". Recommended: allow it as a theme choice; Calm and Off still win for each person.
-6. **TH.12 Higher contrast.** Add a per-person "Higher contrast" preference (7:1)? Recommended: yes.
-7. **TH.11 Print fonts.** Should a theme's font reach printed documents? Recommended: no, keep E.46.
-8. **TH.13 Selling themes.** Can store publishers sell themes? Recommended: yes, through Whity Pay like paid plugins.
-9. **TH.14 What the free picker can do.** Pick a theme and set the primary seed and overrides, but no other fine controls without Studio? Recommended: yes.
+TH.1–TH.3, TH.5 and TH.8 were decided as written in this spec.

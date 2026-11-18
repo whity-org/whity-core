@@ -54,7 +54,7 @@ You're updating Whity's design in `docs/design/` from 3.4 to 3.5 and folding the
 | Build chat | `docs/design/27-work-and-operations.md`, the `TplChat*` cards |
 | See what changed since 3.4 | `docs/design/HANDOFF.md` |
 | Build the websites | `docs/design/29-websites.md`, `docs/design/sites/` |
-| Themes (proposed, not decided yet) | `docs/design/30-themes.md`, register "Themes (PROPOSED)" |
+| Themes | `docs/design/30-themes.md`, register "Themes (version 3.6)" |
 | Build the emails | `docs/design/handoff/emails/` (25 emails, English and Arabic) |
 | Add the animations | `docs/design/handoff/motion/` (31 Lottie files, the web player, Flutter code) and `06-motion.md` |
 | Read it all as one document | `docs/design/Whity-Brand-Guidelines-v3.5.pdf` |
