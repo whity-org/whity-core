@@ -6544,7 +6544,7 @@ $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnl
 ))->registerOn($proposalDiffs);
 // WHIT-812: what an agent did that its person can still undo.
 $agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters);
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters, callKeys: new \Whity\Mcp\Tools\McpCallKeys($db->getPdo()));
 $mcpToolsCallHandler->setWorkspaceGate($pluginLoader);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:

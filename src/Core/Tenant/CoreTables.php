@@ -120,6 +120,8 @@ final class CoreTables
         'plugin_role_approvals' => '221_track_plugin_role_grants.php',
         'plugin_agent_context_grants' => '227_create_plugin_agent_context_grants.php',
         'agent_proposals' => '176_create_agent_proposals.php',
+        // MCP idempotency keys (WHIT-931).
+        'mcp_call_keys' => '308_create_mcp_call_keys.php',
         'plugin_secrets' => '187_create_plugin_secrets.php',
         'public_form_keys' => '217_create_public_form_keys.php',
         'workspace_signup_settings' => '222_create_workspace_signup.php',

@@ -637,6 +637,9 @@ final class TenantOwnedTables
         'meeting_attendees' => '134_create_meeting_attendance.php',
         // Web push: one browser per person per workspace (WHIT-1073).
         'push_subscriptions' => '276_create_push_subscriptions.php',
+        // MCP idempotency keys (WHIT-931). Its one cross-tenant statement is
+        // the retention prune, marked for the guard.
+        'mcp_call_keys' => '308_create_mcp_call_keys.php',
     ];
 
     /**
