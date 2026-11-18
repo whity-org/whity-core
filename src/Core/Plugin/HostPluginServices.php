@@ -40,16 +40,21 @@ final class HostPluginServices
     {
         // SDK 1.125 (WHIT-1225): the workspace's theme, read-only, for plugin
         // code everywhere it runs. The workspace comes from the context (D2).
-        $settings = new \Whity\Core\Settings\SettingsService(
-            new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
-            new \Whity\Core\Settings\TenantSettingsRepository($pdo),
-        );
-        $themes = new \Whity\Core\Theme\ThemeRepository($pdo);
-        \Whity\register_service(\Whity\Sdk\Theme\WorkspaceTheme::class, new \Whity\Core\Theme\HostWorkspaceTheme(
-            new \Whity\Core\Branding\BrandingService($settings, themes: $themes, pluginThemes: $pluginThemes),
-            $settings,
-            new \Whity\Core\Theme\ThemeLibrary($themes, $pluginThemes),
-        ));
+        // A later call without the plugin themes (an entry point that boots
+        // the web wiring first, then registers again) keeps the binding that
+        // has them, so jobs and commands see the same themes as the web.
+        if ($pluginThemes !== null || !isset($GLOBALS['whity_services'][\Whity\Sdk\Theme\WorkspaceTheme::class])) {
+            $settings = new \Whity\Core\Settings\SettingsService(
+                new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+                new \Whity\Core\Settings\TenantSettingsRepository($pdo),
+            );
+            $themes = new \Whity\Core\Theme\ThemeRepository($pdo);
+            \Whity\register_service(\Whity\Sdk\Theme\WorkspaceTheme::class, new \Whity\Core\Theme\HostWorkspaceTheme(
+                new \Whity\Core\Branding\BrandingService($settings, themes: $themes, pluginThemes: $pluginThemes),
+                $settings,
+                new \Whity\Core\Theme\ThemeLibrary($themes, $pluginThemes),
+            ));
+        }
         // SDK 1.124 (D3): the one entry point; it reaches the factories below
         // and the ones each entry point binds itself, at call time.
         \Whity\register_service(\Whity\Sdk\PluginContext::class, new HostPluginContext());
