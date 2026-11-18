@@ -35,6 +35,7 @@ use Whity\Storage\LocalStorageDriver;
  *
  * Task 3.3 tests: uploadTenant, clearTenant, uploadGlobal, clearGlobal
  * Task 3.4 tests: setBrandingHost
+ * WHIT-1189 tests: getBrandingHost (a workspace reads its own address)
  */
 final class BrandingWriteRealEngineTest extends TestCase
 {
@@ -42,7 +43,7 @@ final class BrandingWriteRealEngineTest extends TestCase
     private const SYSTEM_TENANT = 0;
     private const USER_FULL = 10;
     private const USER_READ_ONLY = 11;
-    private const USER_NONE = 12; // @phpstan-ignore classConstant.unused
+    private const USER_NONE = 12;
     private const USER_WRITE_NO_MANAGE = 13;
 
     private PDO $pdo;
@@ -259,6 +260,43 @@ final class BrandingWriteRealEngineTest extends TestCase
         $res = $this->handler->setBrandingHost($req, ['id' => '1']);
         self::assertSame(403, $res->getStatusCode());
         self::assertSame('settings:manage', json_decode($res->getBody(), true)['details']['required'] ?? null);
+    }
+
+    // ==================== WHIT-1189: read your own address ====================
+
+    public function testAWorkspaceReadsItsOwnAddress(): void
+    {
+        $this->pdo->exec("UPDATE tenants SET branding_host = 'office.example.com' WHERE id = 1");
+        TenantContext::setTenantId(self::TENANT_A);
+        $res = $this->handler->getBrandingHost($this->plainReq('GET', '/api/v1/branding/host', self::USER_READ_ONLY));
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        self::assertSame('office.example.com', json_decode($res->getBody(), true)['data']['branding_host']);
+    }
+
+    public function testAWorkspaceWithoutAnAddressReadsNull(): void
+    {
+        TenantContext::setTenantId(self::TENANT_A);
+        $res = $this->handler->getBrandingHost($this->plainReq('GET', '/api/v1/branding/host', self::USER_READ_ONLY));
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        self::assertNull(json_decode($res->getBody(), true)['data']['branding_host']);
+    }
+
+    /** The session decides whose address is read; nothing in the request can point at another workspace. */
+    public function testAWorkspaceNeverReadsAnotherWorkspacesAddress(): void
+    {
+        $this->pdo->exec("INSERT INTO tenants (id, name, slug, branding_host) VALUES (2, 'Other', 'other', 'other.example.com')");
+        TenantContext::setTenantId(self::TENANT_A);
+        $res = $this->handler->getBrandingHost($this->plainReq('GET', '/api/v1/branding/host?tenant_id=2', self::USER_READ_ONLY));
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        self::assertNull(json_decode($res->getBody(), true)['data']['branding_host']);
+    }
+
+    public function testReadingTheAddressNeedsSettingsRead(): void
+    {
+        TenantContext::setTenantId(self::TENANT_A);
+        $res = $this->handler->getBrandingHost($this->plainReq('GET', '/api/v1/branding/host', self::USER_NONE));
+        self::assertSame(403, $res->getStatusCode());
+        self::assertSame('settings:read', json_decode($res->getBody(), true)['details']['required'] ?? null);
     }
 
     // ==================== helpers ====================

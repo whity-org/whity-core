@@ -10,6 +10,7 @@ use Whity\Core\Document\Routing\RouteApprovals;
 use Whity\Core\Document\Routing\RouteLeftOut;
 use Whity\Core\Document\Routing\RouteRepository;
 use Whity\Core\Document\Routing\RouteStepInputs;
+use Whity\Core\Document\Routing\RouteStepKind;
 use Whity\Core\Document\Routing\RouteStepRepository;
 use Whity\Core\Document\Routing\RouteStepValueRepository;
 use Whity\Core\Document\Theme\FormPrintStyle;
@@ -66,9 +67,12 @@ final class FormPrintoutService
      *   verify?: ?array{url: string, reference?: ?string},
      *   theme?: ?array<string, mixed>,
      *   preview?: bool,
+     *   certificate?: bool,
      * } $options `answers` are the approved version's when a route finishes;
      *            `theme` the tokens to use instead of the workspace's (a preview
-     *            of unsaved settings).
+     *            of unsaved settings); `certificate` prints the approval
+     *            certificate in front when the route approved it (a final
+     *            document).
      * @return array<string, mixed>|null
      */
     public function payload(int $tenantId, int $submissionId, array $options = []): ?array
@@ -124,7 +128,42 @@ final class FormPrintoutService
             'verify' => $options['verify'] ?? null,
             'marks' => $style['marks'],
             'names' => fn (string $type, int $id): ?string => $this->name($tenantId, $type, $id),
+            'timezone' => $this->timezone($tenantId),
+            'certificate' => ($options['certificate'] ?? false) === true && $routeId !== null ? $this->certificate($tenantId, $routeId) : null,
         ]);
+    }
+
+    /**
+     * The certificate's options, from the route's final document stage
+     * (`rule_config.certificate`); every option has a default, so a route
+     * whose stage sets none still prints one. Options that no longer pass
+     * the check are dropped rather than costing the document.
+     *
+     * @return array<string, mixed>
+     */
+    private function certificate(int $tenantId, int $routeId): array
+    {
+        foreach ((new RouteStepRepository($this->db))->listForRoute($routeId, $tenantId) as $step) {
+            if (($step['kind'] ?? null) !== RouteStepKind::FINALISE) {
+                continue;
+            }
+            $config = is_array($step['rule_config'] ?? null) ? $step['rule_config'] : [];
+            try {
+                return ApprovalCertificate::config($config['certificate'] ?? null);
+            } catch (\InvalidArgumentException) {
+                return [];
+            }
+        }
+
+        return [];
+    }
+
+    /** The workspace's time zone: printed moments are in its time (setting `timezone`). */
+    private function timezone(int $tenantId): ?string
+    {
+        $zone = $this->settings?->effective($tenantId)[SettingsRegistry::TIMEZONE] ?? null;
+
+        return is_string($zone) && $zone !== '' ? $zone : null;
     }
 
     /** The newest route on the submission. */
@@ -137,7 +176,7 @@ final class FormPrintoutService
 
     /**
      * @param list<array<string, mixed>> $fields
-     * @return array{status: string, decidedAt: ?string, approvals: list<array{name: string, role: ?string, at: string}>, notCounted: list<array{name: string, question: ?string}>, conditions?: string}
+     * @return array{status: string, decidedAt: ?string, approvals: list<array{name: string, role: ?string, at: string, outcome?: string}>, notCounted: list<array{name: string, question: ?string}>, conditions?: string, word?: string}
      */
     private function decision(int $tenantId, int $routeId, string $state, bool $approved, array $fields, string $lang): array
     {
@@ -156,13 +195,26 @@ final class FormPrintoutService
             'sent back' => 'revisions',
             default => 'waiting',
         };
+        $values = (new RouteStepValueRepository($this->db))->valuesForRoute($tenantId, $routeId);
+        // What each stage decided, when it picked a decision or a
+        // recommendation from a list ("Recommend approval"): the
+        // certificate's approvals print it.
+        $outcomes = [];
+        foreach ((new RouteStepRepository($this->db))->listForRoute($routeId, $tenantId) as $step) {
+            foreach (RouteStepInputs::decode($step['inputs'] ?? []) as $input) {
+                $chosen = $values[$input['key']] ?? null;
+                if ($input['type'] === RouteStepInputs::TYPE_CHOICE && (self::isDecisionKey($input['key']) || str_ends_with($input['key'], 'recommendation')) && is_string($chosen) && $chosen !== '') {
+                    $outcomes[(int) $step['position']] = RouteStepInputs::display($input, $chosen, $lang);
+                }
+            }
+        }
         $approvals = [];
         $last = null;
         foreach ((new RouteApprovals($this->db))->forRoute($tenantId, $routeId) as $a) {
-            $approvals[] = ['name' => $a['name'] !== '' ? $a['name'] : '—', 'role' => $a['step'], 'at' => $a['at']];
+            $approvals[] = ['name' => $a['name'] !== '' ? $a['name'] : '—', 'role' => $a['step'], 'at' => $a['at']]
+                + (isset($outcomes[$a['position']]) ? ['outcome' => $outcomes[$a['position']]] : []);
             $last = $a['at'];
         }
-        $values = (new RouteStepValueRepository($this->db))->valuesForRoute($tenantId, $routeId);
         $decision = [
             'status' => $status,
             'decidedAt' => $status === 'approved' || $status === 'rejected' ? ($last ?? gmdate('Y-m-d H:i:s')) : null,
@@ -178,6 +230,19 @@ final class FormPrintoutService
                 break;
             }
         }
+        // WHIT-1164: a stage's decision picked from a list (WHIT-1163), such as
+        // "Conditionally approved", is the word the printout carries. Only once
+        // the route has decided: a choice made before then is not the outcome.
+        if (in_array($status, ['approved', 'rejected'], true)) {
+            foreach ($this->stepInputs($tenantId, $routeId) as $key => $input) {
+                $chosen = $values[$key] ?? null;
+                if (($input['type'] ?? null) !== RouteStepInputs::TYPE_CHOICE || !self::isDecisionKey($key) || !is_string($chosen) || $chosen === '') {
+                    continue;
+                }
+                $decision['word'] = RouteStepInputs::display($input, $chosen, $lang);
+                $decision['status'] = self::statusOf($chosen, $status);
+            }
+        }
 
         return $decision;
     }
@@ -187,11 +252,15 @@ final class FormPrintoutService
      * steps, the latest for each value, with who entered it and when. A person
      * prints as their name. The decision's conditions print with the decision.
      *
-     * @return list<array{label: array<string, string>, value: string, by: ?string, at: ?string}>
+     * @return list<array{label: array<string, string>, value: string, by: ?string, at: ?string, stage: string}>
      */
     private function office(int $tenantId, int $routeId, string $lang = 'en'): array
     {
         $labels = $this->stepInputs($tenantId, $routeId);
+        $stages = [];
+        foreach ((new RouteStepRepository($this->db))->listForRoute($routeId, $tenantId) as $step) {
+            $stages[(int) $step['id']] = ['label' => trim((string) ($step['label'] ?? '')), 'position' => (int) $step['position']];
+        }
         $out = [];
         foreach ((new RouteStepValueRepository($this->db))->currentForRoute($tenantId, $routeId) as $key => $entry) {
             if (in_array($key, self::CONDITIONS_KEYS, true) || trim($entry['value']) === '') {
@@ -209,10 +278,40 @@ final class FormPrintoutService
                 'value' => $value,
                 'by' => $entry['entered_by'] !== null ? $this->name($tenantId, 'profile', $entry['entered_by']) : null,
                 'at' => $entry['entered_at'],
+                'stage' => $stages[$entry['step_id']]['label'] ?? '',
+                'position' => $stages[$entry['step_id']]['position'] ?? 0,
             ];
         }
+        // In the order the stages come, so the faculty prints before the dean.
+        usort($out, static fn (array $a, array $b): int => $a['position'] <=> $b['position']);
 
-        return $out;
+        return array_map(static function (array $e): array {
+            unset($e['position']);
+
+            return $e;
+        }, $out);
+    }
+
+    /** A stage value that records the decision: `decision`, or a key ending `_decision`. */
+    public static function isDecisionKey(string $key): bool
+    {
+        return $key === 'decision' || str_ends_with($key, '_decision');
+    }
+
+    /**
+     * The printed status of a decision picked from a list, read from the
+     * option's value: approved, conditionally approved, revisions required or
+     * not approved. Anything else keeps the route's own outcome.
+     */
+    public static function statusOf(string $value, string $fallback): string
+    {
+        return match (true) {
+            str_contains($value, 'condition') => 'conditional',
+            str_contains($value, 'revision') => 'revisions',
+            str_starts_with($value, 'not_') || str_contains($value, 'reject') => 'rejected',
+            $value === 'approved' || str_starts_with($value, 'approve') => 'approved',
+            default => $fallback,
+        };
     }
 
     /**

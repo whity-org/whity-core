@@ -25,6 +25,7 @@ import { FieldSelect } from '@/components/field-select';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Button } from '@whity/ui/button';
 import { Textarea } from '@whity/ui/textarea';
+import { Icon } from '@whity/ui/icon';
 import { useTranslation } from '@whity/features/i18n';
 import { toZonedIso, zonedDate } from '@whity/features/datetime';
 import {
@@ -34,12 +35,23 @@ import {
   type CalendarService,
   type CalendarSlot,
   type CalendarStaff,
+  type ServiceChoice,
 } from '@/lib/calendar/api';
 import type { CalendarDate } from '@/lib/calendar/layout';
+import { bookingMoney } from './booking-sheet';
 import { SlotPicker } from './slot-picker';
 import { useCalendarWords } from './use-calendar-words';
 
 const ANYONE = 'anyone';
+/** At most this many services in one booking (the server's limit). */
+const MAX_SERVICES = 8;
+
+/** One more service after the first, and who does it (WHIT-1173). */
+interface MoreService {
+  key: number;
+  serviceId: string;
+  person: string;
+}
 
 export interface BookingDialogProps {
   open: boolean;
@@ -51,6 +63,8 @@ export interface BookingDialogProps {
   initialDate?: CalendarDate | null;
   /** Start with this person chosen. */
   initialProfileId?: number | null;
+  /** The calendar setting `multi_service_booking` (WHIT-1173): offer "Add another service". */
+  multiService?: boolean;
   onBooked: (booking: CalendarBooking) => void;
 }
 
@@ -70,6 +84,7 @@ function BookingForm({
   timeZone,
   initialDate = null,
   initialProfileId = null,
+  multiService = false,
   onBooked,
 }: BookingDialogProps) {
   const t = useTranslation('calendar');
@@ -96,20 +111,48 @@ function BookingForm({
     : staff;
   const profileId = person === ANYONE ? null : Number(person);
 
+  // WHIT-1173: more services after the first, back to back.
+  const [more, setMore] = useState<MoreService[]>([]);
+  const [nextKey, setNextKey] = useState(1);
+  const moreServices = more.map((row) => bookable.find((s) => String(s.id) === row.serviceId) ?? null);
+  const moreMissing = more.some((_, i) => moreServices[i] === null);
+  const several: ServiceChoice[] | null =
+    service !== null && more.length > 0 && !moreMissing
+      ? [
+          { service_id: service.id, profile_id: profileId },
+          ...more.map((row, i) => ({ service_id: (moreServices[i] as CalendarService).id, profile_id: row.person === ANYONE ? null : Number(row.person) })),
+        ]
+      : null;
+  const chosen = [service, ...moreServices].filter((s): s is CalendarService => s !== null);
+  const totalMinutes = chosen.reduce((sum, s) => sum + s.duration_minutes, 0);
+  const priced = chosen.filter((s) => s.price_minor !== null && s.price_minor !== undefined);
+  const totalPrice = priced.length > 0 ? priced.reduce((sum, s) => sum + (s.price_minor ?? 0), 0) : null;
+  const providersOf = (s: CalendarService | null) =>
+    s && s.staff_profile_ids.length > 0 ? staff.filter((p) => s.staff_profile_ids.includes(p.profile_id)) : staff;
+  const changeMore = (key: number, patch: Partial<MoreService>) => {
+    setMore((rows) => rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+    setSlot(null);
+  };
+
   const nameMissing = name.trim() === '';
   const contactMissing = email.trim() === '' && phone.trim() === '';
 
   const submit = async () => {
     setShowErrors(true);
     setProblem(null);
-    if (service === null || slot === null || nameMissing || contactMissing) return;
+    if (service === null || moreMissing || slot === null || nameMissing || contactMissing) return;
     setSaving(true);
     try {
       const booking = await calendarApi.createBooking({
-        service_id: service.id,
-        // A person chosen, or the first of those free at that time; the server
-        // re-checks under the lock either way.
-        ...(profileId !== null ? { profile_id: profileId } : {}),
+        // Several services: each with its person or anyone, back to back.
+        ...(several !== null
+          ? { services: several }
+          : {
+              service_id: service.id,
+              // A person chosen, or the first of those free at that time; the
+              // server re-checks under the lock either way.
+              ...(profileId !== null ? { profile_id: profileId } : {}),
+            }),
         starts_at: toZonedIso(new Date(slot.starts_at), timeZone),
         customer: {
           name: name.trim(),
@@ -190,6 +233,87 @@ function BookingForm({
           </div>
         </div>
 
+        {more.map((row, i) => {
+          const rowService = moreServices[i];
+          return (
+            <div key={row.key} className="grid gap-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end" data-testid="booking-more-service">
+              <div className="space-y-1">
+                <label htmlFor={`booking-service-${row.key}`} className="text-sm font-medium text-foreground">
+                  {t('booking.field.nextService', 'Then')}
+                </label>
+                <FieldSelect
+                  id={`booking-service-${row.key}`}
+                  value={row.serviceId}
+                  onChange={(value) => changeMore(row.key, { serviceId: value, person: ANYONE })}
+                  placeholder={t('booking.field.servicePlaceholder', 'Choose a service')}
+                  invalid={showErrors && rowService === null}
+                  options={bookable.map((s) => ({
+                    value: String(s.id),
+                    label: `${words.serviceName(s)} · ${words.minutes(s.duration_minutes)}`,
+                  }))}
+                />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor={`booking-person-${row.key}`} className="text-sm font-medium text-foreground">
+                  {t('booking.field.person', 'With')}
+                </label>
+                <FieldSelect
+                  id={`booking-person-${row.key}`}
+                  value={row.person}
+                  onChange={(value) => changeMore(row.key, { person: value })}
+                  options={[
+                    { value: ANYONE, label: t('booking.field.anyone', 'Anyone who is free') },
+                    ...providersOf(rowService).map((s) => ({ value: String(s.profile_id), label: s.display_name })),
+                  ]}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setMore((rows) => rows.filter((r) => r.key !== row.key));
+                  setSlot(null);
+                }}
+                data-testid="booking-remove-service"
+              >
+                <Icon name="close" />
+                {t('booking.field.removeService', 'Remove')}
+              </Button>
+            </div>
+          );
+        })}
+
+        {multiService && service !== null && (
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {more.length + 1 < MAX_SERVICES && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setMore((rows) => [...rows, { key: nextKey, serviceId: '', person: ANYONE }]);
+                  setNextKey((k) => k + 1);
+                  setSlot(null);
+                }}
+                data-testid="booking-add-service"
+              >
+                <Icon name="plus" />
+                {t('booking.field.addService', 'Add another service')}
+              </Button>
+            )}
+            {more.length > 0 && (
+              <p className="text-sm text-muted-foreground" data-testid="booking-total">
+                {totalPrice !== null && service.currency
+                  ? t('booking.total', 'In all: {time} · {price}', {
+                      time: words.minutes(totalMinutes),
+                      price: bookingMoney(totalPrice, service.currency),
+                    })
+                  : t('booking.totalTime', 'In all: {time}', { time: words.minutes(totalMinutes) })}
+              </p>
+            )}
+          </div>
+        )}
+
         <fieldset className="space-y-2">
           <legend className="mb-1 text-sm font-medium text-foreground">{t('booking.field.time', 'Time')}</legend>
           <SlotPicker
@@ -202,6 +326,7 @@ function BookingForm({
             selected={slot}
             onSelect={setSlot}
             reloadKey={reloadKey}
+            several={several}
           />
           {showErrors && slot === null && service !== null && (
             <p className="text-sm text-error-text">{t('booking.field.timeMissing', 'Choose a free time.')}</p>

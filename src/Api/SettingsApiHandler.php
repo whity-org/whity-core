@@ -74,7 +74,9 @@ final class SettingsApiHandler
     public function __construct(
         SettingsService $settings,
         RoleChecker $roleChecker,
-        ServerLabels $labels
+        ServerLabels $labels,
+        // WHIT-1168: checks that turning password sign-in off leaves a way in.
+        private readonly ?\PDO $pdo = null,
     ) {
         $this->settings = $settings;
         $this->roleChecker = $roleChecker;
@@ -97,6 +99,7 @@ final class SettingsApiHandler
      * @i18n-keys admin
      *   settings.tab.general = General
      *   settings.tab.branding = Branding
+     *   settings.tab.owners = Owners
      *   settings.tab.signup = Sign-up
      *   settings.tab.customer_signup = Sign-up
      *   settings.tab.sso = Single sign-on
@@ -154,6 +157,10 @@ final class SettingsApiHandler
     private const TABS = [
         ['id' => 'general', 'href' => '/admin/settings', 'label' => 'General', 'requiredPermission' => CorePermissions::SETTINGS_READ],
         ['id' => 'branding', 'href' => '/admin/settings/branding', 'label' => 'Branding', 'requiredPermission' => CorePermissions::SETTINGS_READ],
+        // WHIT-1170: who owns the workspace, and handing it over. The system
+        // workspace has no owners. Owners hold admin roles, so settings:read
+        // shows it to them; the page itself checks who may act.
+        ['id' => 'owners', 'href' => '/admin/settings/owners', 'label' => 'Owners', 'requiredPermission' => CorePermissions::SETTINGS_READ, 'workspaceOnly' => true],
         ['id' => 'signup', 'href' => '/admin/settings/signup', 'label' => 'Sign-up', 'requiredPermission' => CorePermissions::SETTINGS_MANAGE, 'systemTenantOnly' => true],
         // WHIT-915: a workspace's own customer sign-up. The platform's sign-up
         // above is the operator's and system-tenant only; this one is every other
@@ -406,6 +413,16 @@ final class SettingsApiHandler
         $elsewhere = self::writtenElsewhere(JsonBody::parsed($request)['settings'] ?? null);
         if ($elsewhere !== null) {
             return $elsewhere;
+        }
+
+        // WHIT-1168: never let the switch lock everybody, or its operator, out.
+        $written = JsonBody::parsed($request)['settings'] ?? null;
+        $wanted = is_array($written) ? ($written[\Whity\Core\Identity\PasswordSignIn::SETTING] ?? null) : null;
+        if ($this->pdo !== null && ($wanted === false || $wanted === 'false')) {
+            $problem = \Whity\Core\Identity\PasswordSignIn::cannotTurnOff($this->pdo, $context['userId']);
+            if ($problem !== null) {
+                return Response::error($problem, 422, [\Whity\Core\Identity\PasswordSignIn::SETTING => $problem]);
+            }
         }
 
         return $this->applyWrites(

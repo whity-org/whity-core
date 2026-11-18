@@ -457,6 +457,9 @@ final class SubmissionIssuer
      * tenant is that they hold an active membership in it, which is a stronger
      * and more accurate question than "does this profile id exist".
      *
+     * A table's person cells (WHIT-1162) are checked the same way, and a refusal
+     * names the row and column in `params`, as the validator does for a cell.
+     *
      * @param list<array<string, mixed>> $fields
      * @param array<string, mixed>       $values
      *
@@ -466,32 +469,85 @@ final class SubmissionIssuer
     {
         foreach ($fields as $field) {
             $type = (string) ($field['field_type'] ?? '');
-            if (!FieldType::isReference($type)) {
-                continue;
-            }
             $key = (string) ($field['field_key'] ?? '');
             $value = $values[$key] ?? null;
-            if (!is_int($value)) {
+
+            if ($type === FieldType::REPEATING) {
+                $this->assertCellReferencesExist($tenantId, $field, $value);
+                continue;
+            }
+            if (!FieldType::isReference($type) || !is_int($value)) {
                 continue;
             }
 
-            $exists = $type === FieldType::PROFILE_REF
-                ? $this->profileIsMember($tenantId, $value)
-                : $this->ouExists($tenantId, $value);
-
-            if (!$exists) {
-                /** @var array<string, string> $label */
-                $label = is_array($field['label'] ?? null) ? $field['label'] : [];
-                $name = LocalizedText::resolve($label);
-                throw new FormRejectedException(
-                    ($name !== '' ? $name : $key) . ' must name a record in this tenant',
-                    '',
-                    null,
-                    'bad_reference',
-                    $key,
-                );
+            if (!$this->referenceExists($tenantId, $type, $value)) {
+                throw self::badReference($field, $key);
             }
         }
+    }
+
+    /**
+     * @param array<string, mixed> $field
+     *
+     * @throws FormRejectedException
+     */
+    private function assertCellReferencesExist(int $tenantId, array $field, mixed $rows): void
+    {
+        if (!is_array($rows)) {
+            return;
+        }
+        $columns = array_values(array_filter(
+            FieldType::columnsOf($field),
+            static fn (array $column): bool => FieldType::isReference($column['type']),
+        ));
+        if ($columns === []) {
+            return;
+        }
+
+        foreach (array_values($rows) as $index => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            foreach ($columns as $column) {
+                $cell = $row[$column['key']] ?? null;
+                if (is_int($cell) && !$this->referenceExists($tenantId, $column['type'], $cell)) {
+                    $refusal = self::badReference($field, (string) ($field['field_key'] ?? ''));
+                    throw new FormRejectedException(
+                        $refusal->clientMessage . ' (row ' . ($index + 1) . ')',
+                        '',
+                        null,
+                        'bad_reference',
+                        $refusal->fieldKey,
+                        ['row' => $index + 1, 'column' => $column['key']],
+                    );
+                }
+            }
+        }
+    }
+
+    private function referenceExists(int $tenantId, string $type, int $id): bool
+    {
+        return $type === FieldType::PROFILE_REF
+            ? $this->profileIsMember($tenantId, $id)
+            : $this->ouExists($tenantId, $id);
+    }
+
+    /**
+     * @param array<string, mixed> $field
+     */
+    private static function badReference(array $field, string $key): FormRejectedException
+    {
+        /** @var array<string, string> $label */
+        $label = is_array($field['label'] ?? null) ? $field['label'] : [];
+        $name = LocalizedText::resolve($label);
+
+        return new FormRejectedException(
+            ($name !== '' ? $name : $key) . ' must name a record in this tenant',
+            '',
+            null,
+            'bad_reference',
+            $key,
+        );
     }
 
     private function profileIsMember(int $tenantId, int $profileId): bool

@@ -59,6 +59,7 @@ final class CoreTables
         'audit_log' => '016_create_audit_log.php',
         'away_periods' => '251_add_two_admin_resets_and_away.php',
         'backup_codes' => '007_add_two_factor_support.php',
+        'calendar_booking_services' => '302_create_calendar_booking_services.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',
         'calendar_events' => '247_create_calendar.php',
         'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
@@ -76,6 +77,7 @@ final class CoreTables
         'core_schema_migrations' => '003_create_core_schema_migrations.php',
         'custom_field_definitions' => '263_create_custom_fields.php',
         'custom_field_values' => '263_create_custom_fields.php',
+        'dashboard_layout' => '303_create_dashboard_layout.php',
         'data_type_restore_states' => '089_create_data_type_restore_states.php',
         'deployments' => '004_create_deployment_tables.php',
         'desktop_app_releases' => '099_create_desktop_app_releases.php',
@@ -118,6 +120,8 @@ final class CoreTables
         'plugin_role_approvals' => '221_track_plugin_role_grants.php',
         'plugin_agent_context_grants' => '227_create_plugin_agent_context_grants.php',
         'agent_proposals' => '176_create_agent_proposals.php',
+        // MCP idempotency keys (WHIT-931).
+        'mcp_call_keys' => '308_create_mcp_call_keys.php',
         'plugin_secrets' => '187_create_plugin_secrets.php',
         'public_form_keys' => '217_create_public_form_keys.php',
         'workspace_signup_settings' => '222_create_workspace_signup.php',
@@ -149,7 +153,6 @@ final class CoreTables
         'instance_signing_keys' => '232_add_route_signatures.php',
         'invoice_lines' => '142_create_invoices.php',
         'invoices' => '142_create_invoices.php',
-        'home_card_hidden' => '200_add_home_card_hidden.php',
         'invitations' => '096_create_invitations.php',
         'jobs' => '065_create_jobs.php',
         'languages' => '081_create_language_tables.php',
@@ -221,6 +224,12 @@ final class CoreTables
         // Files, photos and voice sent in Chat (UC.10).
         'chat_attachments' => '279_create_chat_attachments.php',
         'stored_files' => '298_create_stored_files.php',
+        // Who owns each workspace (WHIT-1169).
+        'workspace_owners' => '300_create_workspace_owners.php',
+        // Offers to hand a workspace over or co-own it (WHIT-1170).
+        'workspace_ownership_offers' => '301_create_workspace_ownership_offers.php',
+        'workspace_template_items' => '305_create_workspace_templates.php',
+        'workspace_template_runs' => '305_create_workspace_templates.php',
         // Votes in chat polls (UC.5).
         'chat_poll_votes' => '280_create_chat_poll_votes.php',
         // Bots and blocked senders (UC.4, UC.12).

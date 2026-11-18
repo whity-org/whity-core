@@ -200,6 +200,8 @@ final class MigrationSchemaTest extends TestCase
             254 => 'unused in the 0.2.29 numbering (chat took 253, emails 257)',
             255 => 'unused in the 0.2.29 numbering',
             256 => 'unused in the 0.2.29 numbering',
+            // Confirmed by the orchestrator (2026-11-18): never used by any lane.
+            297 => 'permanently skipped in the 0.2.30 numbering',
         ];
 
         $deleted = array_values(array_filter(

@@ -15,6 +15,8 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useRichTranslation, useTranslation } from '@whity/features/i18n';
 import { clearReferral, readReferralCode } from '@/lib/referral';
 import { continueSignupPlugin, rememberSignupPlugin, signupPluginFrom } from '@/lib/signup-plugin';
+import { templatePickerPath } from '@/lib/workspace-template';
+import { SsoLoginButtons } from '@/components/sso-login-buttons';
 
 /**
  * Self-service registration (WC-235). Provisions a NEW workspace (tenant) with
@@ -62,6 +64,26 @@ export default function RegisterPage() {
   const [referralCode, setReferralCode] = useState<string | null>(null);
   // WHIT-1156: a sign-up link for a plugin, such as ?plugin=salons.
   const [signupPlugin, setSignupPlugin] = useState<string | null>(null);
+  // WHIT-1168: false when this server signs people up only through its
+  // identity provider. The plugin from the link is remembered above either
+  // way, and the welcome step starts its trial once the workspace exists.
+  const [passwordSignIn, setPasswordSignIn] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { data } = await api.GET('/api/v1/auth/sso/providers');
+        const off = (data as { password_sign_in?: unknown } | undefined)?.password_sign_in === false;
+        if (!cancelled && off) setPasswordSignIn(false);
+      } catch {
+        // Unknown: keep the form, which is what the server enforces anyway.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Match the login page's SSR-safe "enabled until mounted" timing so the
   // server markup matches hydration; focus the first field on mount. The flag
@@ -196,7 +218,7 @@ export default function RegisterPage() {
         if (loginRes.ok) {
           await refreshAuth();
           addToast(t('register.toast.welcome', 'Welcome! Your workspace is ready.'), 'success');
-          router.push((await continueSignupPlugin()) ?? '/dashboard');
+          router.push((await continueSignupPlugin()) ?? (await templatePickerPath()) ?? '/dashboard');
         } else {
           // Account exists but auto-login did not complete (unexpected for a
           // fresh single-membership owner) — send them to the login page.
@@ -326,6 +348,24 @@ export default function RegisterPage() {
               <p className="text-sm text-center text-muted-foreground">
                 <Link href="/login" className="font-medium text-primary hover:underline">
                   {t('register.backToSignIn', 'Back to sign in')}
+                </Link>
+              </p>
+            </div>
+          </CardContent>
+        ) : !passwordSignIn ? (
+          <CardContent>
+            <div className="space-y-4" data-testid="register-provider-only">
+              <SsoLoginButtons />
+              <p className="text-center text-sm text-muted-foreground">
+                {t(
+                  'register.providerOnly.note',
+                  'Your account and your workspace are made in one go after you continue.'
+                )}
+              </p>
+              <p className="text-center text-sm text-muted-foreground">
+                {t('register.signIn.prompt', 'Already have an account?')}{' '}
+                <Link href="/login" className="font-medium text-primary hover:underline">
+                  {t('register.signIn.link', 'Sign in')}
                 </Link>
               </p>
             </div>

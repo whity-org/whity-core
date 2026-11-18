@@ -261,6 +261,47 @@ final class CalendarRepository
         return is_array($row) ? ['id' => (int) $row['id'], 'profile_id' => (int) $row['profile_id']] : null;
     }
 
+    /**
+     * Confirmed time off (kind `time_off` only) for the SDK's
+     * {@see \Whity\Sdk\Calendar\TimeOff}: by id, by a plugin's reference, or
+     * for one person touching `[from, to)`. The reason is the note.
+     *
+     * @return list<array{id: int, profile_id: int, interval: Interval, note: string, external_ref: ?string}>
+     */
+    public function timeOff(int $tenantId, ?int $profileId = null, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null, ?int $id = null, ?string $externalRef = null): array
+    {
+        $sql = "SELECT id, profile_id, starts_at, ends_at, notes, external_ref FROM calendar_events
+                 WHERE tenant_id = :tenant_id AND status = 'confirmed' AND kind = 'time_off'";
+        $params = [':tenant_id' => $tenantId];
+        if ($profileId !== null) {
+            $sql .= ' AND profile_id = :profile_id';
+            $params[':profile_id'] = $profileId;
+        }
+        if ($from !== null && $to !== null) {
+            $sql .= ' AND starts_at < :to AND ends_at > :from';
+            $params[':from'] = Interval::toDb($from);
+            $params[':to'] = Interval::toDb($to);
+        }
+        if ($id !== null) {
+            $sql .= ' AND id = :id';
+            $params[':id'] = $id;
+        }
+        if ($externalRef !== null) {
+            $sql .= ' AND external_ref = :ref';
+            $params[':ref'] = $externalRef;
+        }
+        $stmt = $this->db->prepare($sql . ' ORDER BY starts_at, id');
+        $stmt->execute($params);
+
+        return array_values(array_map(static fn (array $r): array => [
+            'id' => (int) $r['id'],
+            'profile_id' => (int) $r['profile_id'],
+            'interval' => new Interval(Interval::fromDb((string) $r['starts_at']), Interval::fromDb((string) $r['ends_at'])),
+            'note' => (string) $r['notes'],
+            'external_ref' => $r['external_ref'] !== null ? (string) $r['external_ref'] : null,
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC)));
+    }
+
     public function deleteException(int $tenantId, int $id): void
     {
         $this->cancelEvent($tenantId, $id);
@@ -275,23 +316,39 @@ final class CalendarRepository
      */
     public function busy(int $tenantId, int $profileId, DateTimeImmutable $from, DateTimeImmutable $to, DateTimeImmutable $now, ?int $exceptBookingId = null): array
     {
+        // A booking of several services (WHIT-1173) is read from its services
+        // instead: each person is busy only for the ones they do.
         $stmt = $this->db->prepare(
-            "SELECT blocks_from AS s, blocks_until AS e FROM calendar_bookings
-              WHERE tenant_id = :tenant_id AND profile_id = :profile_id
-                AND blocks_from < :to AND blocks_until > :from
-                AND id <> :except
-                AND (status IN ('confirmed', 'requested') OR (status = 'pending_payment' AND hold_expires_at > :now))"
+            "SELECT b.blocks_from AS s, b.blocks_until AS e FROM calendar_bookings b
+              WHERE b.tenant_id = :tenant_id AND b.profile_id = :profile_id
+                AND b.blocks_from < :to AND b.blocks_until > :from
+                AND b.id <> :except
+                AND (b.status IN ('confirmed', 'requested') OR (b.status = 'pending_payment' AND b.hold_expires_at > :now))
+                AND NOT EXISTS (SELECT 1 FROM calendar_booking_services i WHERE i.tenant_id = b.tenant_id AND i.booking_id = b.id)"
         );
-        $stmt->execute([
+        $params = [
             ':tenant_id' => $tenantId,
             ':profile_id' => $profileId,
             ':from' => Interval::toDb($from),
             ':to' => Interval::toDb($to),
             ':except' => $exceptBookingId ?? 0,
             ':now' => Interval::toDb($now),
-        ]);
+        ];
+        $stmt->execute($params);
         $busy = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $busy[] = new Interval(Interval::fromDb((string) $r['s']), Interval::fromDb((string) $r['e']));
+        }
+        $items = $this->db->prepare(
+            "SELECT i.blocks_from AS s, i.blocks_until AS e FROM calendar_booking_services i
+               JOIN calendar_bookings b ON b.id = i.booking_id AND b.tenant_id = i.tenant_id
+              WHERE i.tenant_id = :tenant_id AND i.profile_id = :profile_id
+                AND i.blocks_from < :to AND i.blocks_until > :from
+                AND b.id <> :except
+                AND (b.status IN ('confirmed', 'requested') OR (b.status = 'pending_payment' AND b.hold_expires_at > :now))"
+        );
+        $items->execute($params);
+        foreach ($items->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $busy[] = new Interval(Interval::fromDb((string) $r['s']), Interval::fromDb((string) $r['e']));
         }
 

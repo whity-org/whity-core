@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.110).
+ * SDK identity (v1.121).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1324,12 +1324,98 @@ namespace Whity\Sdk;
  * and contacts (list, create), for a salon's walk-ins and commission (WHIT-1154).
  *
  * Purely additive.)
+ *
+ * 1.111 (QR CODES: {@see Print\QrCode} encodes bytes as a QR code and draws it as SVG or a data
+ * URI, so a plugin prints a code without a vendor package. It moved here from Front Office's
+ * receipt (WHIT-1060).
+ *
+ * Purely additive.)
+ *
+ * 1.112 (WORKSPACE OWNERS: {@see Hooks\Events::WORKSPACE_OWNER_ADDED},
+ * {@see Hooks\Events::WORKSPACE_OWNER_REMOVED} and
+ * {@see Hooks\Events::WORKSPACE_OWNERSHIP_TRANSFERRED}, when a workspace changes hands or gains
+ * or loses a co-owner (WHIT-1170).
+ *
+ * Purely additive.)
+ *
+ * 1.113 (SETUP INPUTS: block forms gain `timeInput` (HH:MM), `weeklyHours` (a week of opening or
+ * working hours, open/closed per day, breaks, copy to every day, submitted as the calendar's
+ * `{weekday, start_time, end_time}` rows) and `checkboxGroup` (several choices, submitted as a
+ * list). `colorInput` takes `swatches`, and `fieldArray` takes `default` rows and an `addLabel`, so a
+ * setup screen offers a ready list to tick and edit instead of text to type (WHIT-1172).
+ *
+ * Purely additive.)
+ *
+ * 1.114 (OUTBOUND HTTP: {@see Http\Outbound\HttpClient} is the one way plugin code calls another
+ * server, and {@see Http\Outbound\StreamHttpClient} implements it over PHP streams: https only
+ * unless asked (`allowHttp`), verified TLS, no redirects, timeouts, a size cap, and failures that
+ * name the host and nothing else. {@see Testing\RecordedHttpClient} answers from a script for tests.
+ * From Whity Pay's own client (WHIT-1058).
+ *
+ * Purely additive.)
+ *
+ * 1.115 (THE DASHBOARD: {@see PluginDashboardInterface} lets a plugin add setup points to the
+ * dashboard's "Finish setting up" card, each opening one of its guided-setup steps or screens and
+ * marked done by its own status route, and widgets of four kinds (stat, list, chart, actions) built
+ * from blocks, each with a permission, the sizes it fits and one data route. Core lists them only to
+ * people holding the permission in a workspace where the plugin is on, and people hide, show, move and
+ * resize widgets on their own dashboard. {@see Manifest\DashboardValidator} checks the shape
+ * (WHIT-1177).
+ *
+ * Purely additive.)
+ *
+ * 1.116 (WORKSPACE TEMPLATES: {@see PluginWorkspaceTemplatesInterface} lets a plugin offer ready
+ * starts for one kind of business, shown right after a workspace is created. A template is a
+ * versioned manifest, data only: workspace defaults, booking rules and hours, services with prices
+ * per currency, roles, forms, documents, example contacts and bookings (removed in one click), the
+ * steps of its guided setup, and the paid plugin it offers with a trial. Core applies it as the
+ * person choosing it, adding only what is missing, and grants a role only permissions that person
+ * holds. {@see Manifest\WorkspaceTemplateValidator} checks the shape (WHIT-1194).
+ *
+ * Purely additive.)
+ *
+ * 1.117 (DISPLAY NAMES: {@see PluginDisplayNameInterface} gives a plugin the name people read, in
+ * English and Arabic ("Whity for Salons", "Whity للصالونات"), shown on Settings › Plugins and in a
+ * workspace template's offer instead of its id. `getName()` stays the id. Without it, people see the
+ * id (WHIT-1198).
+ *
+ * Purely additive.)
+ *
+ * 1.118 (TRIAL CHECKOUT: {@see Billing\TrialCheckout} is the optional portal interface for a
+ * checkout that takes the card now and charges when a free trial ends. The host uses it when a
+ * workspace already in a trial of a plan adds a card, so the trial is never cut short (WHIT-1207).
+ *
+ * Purely additive.)
+ *
+ * 1.119 (CONTACTS: the host service {@see Contacts\Contacts} lists, reads, finds by a custom
+ * field, creates and updates core's customers and suppliers without HTTP, writes acting as a
+ * person who holds `contacts:write`, and {@see PluginContactFieldsInterface} declares a plugin's
+ * own fields on contacts (`keyhub.supplier_code`), checked by {@see Manifest\ContactFieldValidator},
+ * made in each workspace where the plugin is on and archived with their values kept where it is off
+ * (WHIT-1209, #2131).
+ *
+ * Purely additive.)
+ *
+ * 1.120 (TIME OFF AND AWAY: {@see Calendar\TimeOff} is the host service that puts real time off on a
+ * person's calendar (create, cancel, forPerson, byExternalRef), as the acting person with the time-off
+ * route's checks, idempotent by the plugin's own reference; refusals throw {@see Calendar\TimeOffRejected}.
+ * {@see Delegation\Away::at()} reads whether a person is away at a moment (their "I'm away" period or
+ * time off) and who stands in for them; "I'm away" gains the `plugins` cover for a plugin's own
+ * approvals (WHIT-1210, issue #2132).
+ *
+ * Purely additive.)
+ *
+ * 1.121 (SEVERAL REFERENCES: a `referenceSelect` block takes `multiple: true` to pick several rows
+ * from its `source`. Its value is then a list of `valueField` strings shown as chips, and
+ * `required` means at least one (#1437).
+ *
+ * Purely additive: without `multiple` a reference select submits one string, as before.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.110.0';
+    public const VERSION = '1.121.0';
 
     /**
      * Static identity only — never instantiated.

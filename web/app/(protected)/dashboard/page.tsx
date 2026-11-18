@@ -15,12 +15,17 @@ import { useAuth } from '@/lib/auth-context';
 import { useCapabilitiesContext } from '@/lib/capabilities-context';
 import { AgentsToday } from './agents-today';
 import { FinishSettingUp } from './finish-setting-up';
+import { TemplateExamples } from './template-examples';
 import { HomeApps } from './home-apps';
 import { PlatformCards } from './platform-cards';
 import { RecentDocuments } from './recent-documents';
 import { partOfDay } from './relative-time';
+import { useDashboard, type DashboardSetup } from './use-dashboard';
 import { WaitingForYou } from './waiting-for-you';
 import { localizedText } from '@whity/ui/localized-text';
+
+/** No app setup points yet: one array, so the card doesn't refetch every render. */
+const NO_SETUP: DashboardSetup[] = [];
 
 /** The system tenant's id: its people are the platform's operators. */
 const SYSTEM_TENANT_ID = 0;
@@ -32,6 +37,8 @@ export default function DashboardPage() {
   const capabilities = useCapabilitiesContext();
   // Bumped when a decision is made so Agents today follows Waiting for you.
   const [refreshKey, setRefreshKey] = useState(0);
+  // What apps add (SDK 1.115): setup points and widgets, shared by two parts.
+  const dashboard = useDashboard();
 
   // The first name, as the card greets: "Good morning, Rana".
   const name = user?.display_name?.trim().split(/\s+/)[0];
@@ -62,6 +69,8 @@ export default function DashboardPage() {
         <p className="mt-1 text-sm text-muted-foreground">{[date, workspace].filter((part) => part).join(' · ')}</p>
       </header>
 
+      {capabilities.has('settings:write') && <TemplateExamples />}
+
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         <div className="grid gap-6">
           <WaitingForYou onChange={() => setRefreshKey((key) => key + 1)} />
@@ -69,14 +78,14 @@ export default function DashboardPage() {
         </div>
         <div className="grid gap-6">
           <AgentsToday refreshKey={refreshKey} />
-          {capabilities.has('settings:write') && <FinishSettingUp />}
+          <FinishSettingUp canSetUp={capabilities.has('settings:write')} apps={dashboard.data?.setup ?? NO_SETUP} />
         </div>
       </div>
 
       {/* Platform cards are for operators: the system tenant, with stats:read. */}
       {user?.tenant_id === SYSTEM_TENANT_ID && capabilities.has('stats:read') && <PlatformCards />}
 
-      <HomeApps />
+      <HomeApps dashboard={dashboard.data} onDashboardChange={dashboard.refetch} />
     </div>
   );
 }

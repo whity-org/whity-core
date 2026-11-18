@@ -67,6 +67,8 @@ final class PublicSignupApiHandler
         private readonly ?\Whity\Core\Signup\JoinProviders $joinProviders = null,
         /** The workspace's logo and colour for the page (WHIT-1044); null sends none. */
         private readonly ?BrandingService $branding = null,
+        /** WHIT-1168: off, people join only through the identity provider. */
+        private readonly ?\Whity\Core\Settings\SettingsService $globalSettings = null,
     ) {
     }
 
@@ -96,6 +98,10 @@ final class PublicSignupApiHandler
      */
     private function emailSignupReady(): bool
     {
+        if (!\Whity\Core\Identity\PasswordSignIn::allowed($this->globalSettings)) {
+            return false;
+        }
+
         return $this->bot->isRequired() ? $this->bot->isReady() : $this->bot->allowsNoBotCheck();
     }
 
@@ -127,7 +133,9 @@ final class PublicSignupApiHandler
                 : null,
             // WHIT-917: whether the email form can work here, said up front.
             'email_signup' => $this->emailSignupReady(),
-            'email_signup_reason' => $this->emailSignupReady() ? null : 'bot_check_unavailable',
+            'email_signup_reason' => $this->emailSignupReady()
+                ? null
+                : (\Whity\Core\Identity\PasswordSignIn::allowed($this->globalSettings) ? 'bot_check_unavailable' : 'password_sign_in_off'),
             'providers' => $this->joinProviders(),
             'brand' => $this->brandFor((int) $workspace['id'], (string) $workspace['name']),
         ]], 200);

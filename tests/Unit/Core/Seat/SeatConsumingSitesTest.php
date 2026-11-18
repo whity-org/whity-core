@@ -67,11 +67,12 @@ final class SeatConsumingSitesTest extends TestCase
         'src/Core/Identity/InvitationService.php' => true,
         // Creating a tenant mints its first owner.
         'src/Api/TenantsApiHandler.php' => true,
-        // A first sign-in through the operator's identity provider creating its
-        // own workspace: the same first owner as above, minted by the person
+        // A person founding a workspace they own: the first sign-in through the
+        // operator's identity provider, and "Create workspace" while signed in
+        // (WHIT-1169). The same first owner as above, minted by the person
         // rather than by an operator. Always the workspace's first member, so a
         // seat limit of one or more admits it.
-        'src/Core/Tenant/FederatedWorkspaceProvisioner.php' => true,
+        'src/Core/Tenant/WorkspaceFounder.php' => true,
         // The shared repository: SSO just-in-time provisioning and email-domain
         // auto-join both arrive here.
         'src/Core/Identity/MembershipRepository.php' => true,

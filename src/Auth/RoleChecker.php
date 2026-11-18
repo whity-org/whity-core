@@ -8,6 +8,7 @@ use Psr\Log\LoggerInterface;
 use Whity\Core\Identity\CustomerSafeRole;
 use Whity\Database\Database;
 use Whity\Core\RBAC\PermissionRegistry;
+use Whity\Core\Tenant\WorkspaceOwners;
 
 /**
  * Role Checker for verifying user roles and permissions from the database.
@@ -361,9 +362,40 @@ class RoleChecker
             ));
         }
 
+        // WHIT-1169: only an owner keeps the owner-only permissions (paying and
+        // changing the plan), whatever role they come from. A workspace with no
+        // owner recorded caps nothing, so it keeps working as before.
+        if (
+            $tenantId !== 0
+            && array_intersect($resolved, WorkspaceOwners::OWNER_ONLY_PERMISSIONS) !== []
+            && !$this->keepsOwnerOnlyPermissions($profileId, $tenantId)
+        ) {
+            $resolved = array_values(array_diff($resolved, WorkspaceOwners::OWNER_ONLY_PERMISSIONS));
+        }
+
         self::$effectiveUserPermissionCache[$cacheKey] = $resolved;
 
         return $resolved;
+    }
+
+    /**
+     * True when this profile is an owner of the workspace, or the workspace has
+     * no owner recorded (WHIT-1169).
+     */
+    private function keepsOwnerOnlyPermissions(int $profileId, int $tenantId): bool
+    {
+        try {
+            $statement = $this->db->query(
+                'SELECT profile_id FROM workspace_owners WHERE tenant_id = :tenantId',
+                [':tenantId' => $tenantId]
+            );
+            $owners = array_map('intval', $statement->fetchAll(\PDO::FETCH_COLUMN));
+        } catch (\Throwable) {
+            // Only a schema from before migration 300 lacks the table.
+            return true;
+        }
+
+        return $owners === [] || in_array($profileId, $owners, true);
     }
 
     /**

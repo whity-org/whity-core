@@ -588,6 +588,7 @@ function buildFlowHtml(doc) {
     header: withQr(doc.header),
     footer: withQr(doc.footer),
     frontMatter: doc.frontMatter,
+    coverPages: doc.coverPages || 0,
     index: doc.index,
   };
 

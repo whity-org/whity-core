@@ -154,7 +154,8 @@ final class SettingsApiRealEngineTest extends TestCase
         // 51 since WHIT-941: eight calendar.* keys.
         // 52 since WHIT-966: calendar.instant_booking.
         // 54 since design 3.4 (P1): company.name_ar and company.address_ar.
-        self::assertCount(54, $data['registry']);
+        // 55 since WHIT-1173: calendar.multi_service_booking.
+        self::assertCount(55, $data['registry']);
         self::assertArrayNotHasKey('auth.self_registration_enabled', $data['effective']);
         self::assertSame([], $data['overridden']);
     }

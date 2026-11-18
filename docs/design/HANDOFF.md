@@ -45,7 +45,7 @@ Engineering's asks after 3.3 are answered one by one in `ANSWERS-3.4.md`.
 - **3.1 Work and operations** (T, MT, AP, IN, MO, SU, AA, CH, AQ, AG, FL, OR, DC, X, section 27): sixteen everyday areas on web and phone. Tasks and boards run on **Taskaat** (taskaat.dev), the task engine with done-when checks, evidence and a review gate. One **Chat** for people and agents, where agents join like teammates. Flows across everything. Cards `Tpl*` and `Tm*`.
 - **Roadmap** (R.1, R.2, section 28): the near-term low-hanging fruit and the long-term plan toward a full ERP, inventory and project tool with low-code customization.
 - **3.2 Near-term pages** (N1–N9, section 28): contacts, custom fields, spreadsheet import, receiving and supplier bills, waste and adjustments, bank reconciliation, basic reports, the 80 mm receipt, agent notifications by email and WhatsApp. Group "Templates · Near term".
-- **3.2 Business model** (BM.1–BM.11, section 11): free up to 5 staff and 500 customers a month, then plans; Whity Cloud, dedicated hosting or your own server; white-label down to the domain; partners; four public promises. Approved for now on 9 November 2026.
+- **3.2 Business model** (BM.1–BM.11, section 11): on Whity Cloud, free up to 2 staff and 100 customers a month, then plans, and no plan limits on a self-hosted installation; Whity Cloud, dedicated hosting or your own server; white-label down to the domain; partners; four public promises. Approved for now on 9 November 2026.
 - **3.2 Websites** (WS.1–WS.5, section 29): whity.dev (companies first, a door for builders), brand, health, id and docs, as cards (group Websites) and as build-ready static pages in English and Arabic in `sites/`.
 
 ## What's here

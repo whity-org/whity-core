@@ -323,6 +323,35 @@ Filtering is **soft-auth**: a missing or invalid token never throws; it simply r
 
 The authorization check reads access controls from the live `matched` route (the result of `Router::match()`), not solely from the declaration cache, so a plugin that changes its route's access requirements after worker boot is covered on the next request after `clearCache()`.
 
+### Retries and idempotency keys (WHIT-931)
+
+A client that times out and sends a write again would otherwise run it twice. To make a retry safe, send an idempotency key in the request's `_meta`, the place MCP keeps for metadata that isn't a tool argument (so it never meets the tool's `inputSchema`). The MCP spec defines no idempotency key of its own, so the key carries Whity's prefix, as the spec asks for custom `_meta` keys:
+
+```json
+{
+  "jsonrpc": "2.0", "id": 7, "method": "tools/call",
+  "params": {
+    "name": "post_api_forms",
+    "arguments": { "name": "Leave request" },
+    "_meta": { "dev.whity/idempotencyKey": "3f7c2a9e-0b1d-4c55-9a51-6f0e2d8b1c44" }
+  }
+}
+```
+
+A plain `"idempotencyKey"` in `_meta` is accepted too. Use a new random key (a UUID) for each new call and the same key for every retry of it. A key is a non-empty string of at most 255 characters.
+
+A key belongs to one workspace, one principal (the person, or the agent for its person) and one tool. Core writes the key down before the call runs, then:
+
+| A call sent again with the same key… | Answer |
+| --- | --- |
+| while the first is still running | error `-32004` (`CALL_IN_PROGRESS`): try again shortly with the same key |
+| after the first finished | the first call's result, with `_meta["dev.whity/replayed"] = true`; nothing runs again |
+| with other arguments | error `-32602` (`INVALID_PARAMS`): a key names one call |
+
+Arguments are compared after sorting object keys, so the same arguments in another order are the same call. A call that fails (a protocol error, or a result with `isError: true`) keeps nothing, so the same key can try again. A key still "running" after 15 minutes belongs to a process that died, and the next retry takes it over. Keys are kept for 24 hours: `schedule:run` queues `core.mcp.call_keys_prune` hourly, and a retry later than that runs as a new call. A replayed result counts no agent work.
+
+**Ask first without a key.** Most clients send no key. An agent's Ask-first call that matches a proposal still waiting (the same agent, person, tool and arguments) answers with that proposal, marked `alreadyWaiting: true`, instead of adding a second card to the person's approvals. Once the person decides, or the proposal expires, the same call asks again. A unique index on waiting proposals (`agent_proposals.arguments_hash`, migration 308) keeps this true when two arrive at once.
+
 ---
 
 ## Rate limiting
@@ -535,3 +564,4 @@ Defined in `src/Mcp/JsonRpc/ErrorCode.php`:
 | `UNAUTHENTICATED` | `-32001` | MCP: bearer token absent or invalid (HTTP 401) |
 | `RESOURCE_NOT_FOUND` | `-32002` | MCP: referenced resource URI not found |
 | `FORBIDDEN` | `-32003` | MCP: caller does not have the required role/permission |
+| `CALL_IN_PROGRESS` | `-32004` | MCP: a `tools/call` with this idempotency key is still running; retry with the same key |

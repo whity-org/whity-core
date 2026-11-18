@@ -1,6 +1,6 @@
 # MCP tool surface: search and call, toolsets, splits and budgets
 
-Status: **decided** (owner answers of 2026-10-31, §10). Nothing here is built yet; implementation starts when the owner says to build.
+Status: **decided** (owner answers of 2026-10-31, §10). Shipped in v0.2.18 to v0.2.22: discovery (search and call) in 0.2.18, list modes and toolset-scoped tokens in 0.2.20, plugin toolsets in 0.2.21 (SDK 1.52), splits in 0.2.22. See `CHANGELOG.md` and `src/Mcp`.
 Related: ADR-0006 and its amendments (MCP server), ADR-0015 (OAuth; the authorization server is Whity ID), `00-decision-register.md` (agent model: Scope grant, 7.5a to 7.5c), `12-engineering-handoff.md` items 10 and 11, `docs/design/DOCUMENT-THEMES.md` §6 and §7, `docs/design/DOCUMENT-AUTOMATION.md` §3.10 (both on branch `design/document-themes`), `docs/design/WHITY-BUILDER.md` (branch `design/whity-builder`).
 
 The owner's problem: "too many mcp tools in one create a disaster... and not all users have or get all the tools permissions yet get them in the context anyway in addition plugins add more and more tools... we need an sdk way to manage this correctly".

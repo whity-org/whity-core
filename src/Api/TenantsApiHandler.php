@@ -569,6 +569,14 @@ class TenantsApiHandler
                 return $tooLong;
             }
 
+            // WHIT-1189: a `name` that is present but blank is a mistake, not
+            // "leave it as it is" (LocalizedText::fromBody ignores a blank one).
+            // Settings › General sends the name the person typed; say so
+            // rather than answer 200 and keep the old one.
+            if (array_key_exists('name', $body) && (!is_scalar($body['name']) || trim((string) $body['name']) === '')) {
+                return Response::error('Validation failed', 422, ['name' => 'The workspace name cannot be empty.']);
+            }
+
             // Names (#821). `name` alone renames the original; `names` replaces
             // every language at once; `nameLanguage` says which one is the
             // original. Nothing here unless one of them was sent.
@@ -924,6 +932,10 @@ class TenantsApiHandler
             'is_primary'    => true,
             'via'           => 'tenant_bootstrap',
         ];
+
+        // The tenant's first administrator is its owner (WHIT-1169). After the
+        // membership id is read: this insert moves lastInsertId on.
+        (new \Whity\Core\Tenant\WorkspaceOwners($this->db))->add($tenantId, $profileId, null);
 
         return ['id' => $profileId, 'email' => $admin['email'], 'role' => $admin['role']];
     }

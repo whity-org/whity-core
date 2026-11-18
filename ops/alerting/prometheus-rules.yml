@@ -121,6 +121,20 @@ groups:
           summary: "whity-core {{ $labels.env }} DB backup is stale"
           description: "No successful backup in {{ $value | humanizeDuration }} (expected nightly). Check the backup cron and scripts/backup-db.sh output."
 
+      # The newest dump is empty or invalid (WHIT-1211, #1908). A backup taken
+      # while PostgreSQL was still starting is a 20-byte gzip of nothing; the
+      # marker and the file's age both look healthy, so WhityBackupStale stays
+      # green. backup-freshness-textfile.sh checks the newest dump itself
+      # (size floor, decrypt + gzip -t, complete pg_dump, table-data entries).
+      - alert: WhityBackupLatestInvalid
+        expr: whity_backup_latest_valid == 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "whity-core {{ $labels.env }} newest DB backup is empty or invalid"
+          description: "The newest dump in BACKUP_DIR on {{ $labels.instance }} fails the backup check, so it cannot be restored. The exporter logs the reason; check it with scripts/restore-db.sh --check <file>. See ops/RESTORE.md."
+
       # The backup metric is missing entirely — the exporter or cron never ran.
       - alert: WhityBackupMetricMissing
         expr: absent(whity_backup_last_success_timestamp_seconds)

@@ -16,6 +16,7 @@ import {
   IconPointFilled,
   IconRefresh,
   IconSearch,
+  IconX,
 } from '@tabler/icons-react';
 import type {
   ActionButtonBlock,
@@ -29,6 +30,9 @@ import type {
   CheckboxBlock,
   CodeBlock,
   ColorInputBlock,
+  TimeInputBlock,
+  WeeklyHoursBlock,
+  CheckboxGroupBlock,
   DataListBlock,
   DataRecordBlock,
   DataStatBlock,
@@ -87,6 +91,12 @@ import { DocumentViewer } from '@/components/plugin/blocks/document-viewer';
 import { Chart } from '@whity/ui/chart';
 import { DataTable as SharedDataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
+import { FieldSelect } from '@/components/field-select';
+import { WeeklyHoursFields, WeeklyHoursProblem } from '@/components/calendar/weekly-hours-fields';
+import { firstBadDay, rowsOf, weekOf, weekOrder } from '@/lib/calendar/hours';
+import { timeOptions } from '@/lib/calendar/times';
+import { Checkbox } from '@whity/ui/checkbox';
+import { ColorPicker } from '@whity/ui/color-picker';
 import { BilingualInput } from '@whity/ui/bilingual-input';
 import { MathText } from '@whity/ui/math-text';
 import { renderMarkdown } from '@/lib/safe-markdown';
@@ -3061,6 +3071,7 @@ function seedFieldArrayRow(
       case 'slider':
       case 'dateInput':
       case 'colorInput':
+      case 'timeInput':
       case 'referenceSelect':
       case 'richTextInput':
         // `null` is how every one of these arrives when unset, and `String(null)`
@@ -3198,7 +3209,8 @@ function FieldArrayRenderer({ block }: { block: FieldArrayBlock }) {
   if (ctx === null) return <UnsupportedBlock type="fieldArray" />;
 
   const raw = ctx.values[block.name];
-  const rows: FieldArrayValue = Array.isArray(raw) ? raw : [];
+  // Only a list of row records is rows; a checkboxGroup's list of strings never shares a name with an array here.
+  const rows: FieldArrayValue = Array.isArray(raw) ? (raw as unknown[]).filter((r): r is FieldArrayValue[number] => r !== null && typeof r === 'object' && !Array.isArray(r)) : [];
   const min = typeof block.min === 'number' && block.min > 0 ? block.min : 0;
   const max = typeof block.max === 'number' && block.max > 0 ? block.max : Infinity;
   // The plugin's own noun for a row wins; only our default is keyed. Every
@@ -3320,7 +3332,7 @@ function FieldArrayRenderer({ block }: { block: FieldArrayBlock }) {
 
       {seeded && (
         <Button type="button" variant="outline" size="sm" disabled={rows.length >= max} onClick={add}>
-          <IconPlus className="me-1 size-4" aria-hidden />{t('blocks.fieldArray.add', 'Add {item}', { item: itemLabel.toLowerCase() })}
+          <IconPlus className="me-1 size-4" aria-hidden />{block.addLabel ?? t('blocks.fieldArray.add', 'Add {item}', { item: itemLabel.toLowerCase() })}
         </Button>
       )}
     </div>
@@ -3611,16 +3623,136 @@ function FileInputRenderer({ block }: { block: FileInputBlock }) {
 }
 
 function ColorInputRenderer({ block }: { block: ColorInputBlock }) {
+  const t = useTranslation('plugin');
   const ctx = useFormBlockContext();
   if (ctx === null) return <UnsupportedBlock type="colorInput" />;
   const inputId = `block-input-${block.name}`;
   const value = ctx.values[block.name];
-  const strValue = typeof value === 'string' ? value : (block.default ?? '#000000');
+  // WHIT-1176: with nothing chosen there is no colour to name. Showing a
+  // fallback (#000000) read as "your colour is black".
+  const chosen = typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value.toLowerCase() : (block.default?.toLowerCase() ?? null);
+  const swatches = (block.swatches ?? []).filter((c) => /^#[0-9a-fA-F]{6}$/.test(c));
+  // SDK 1.113: swatches first (TplAdminBranding's row), then the design
+  // system's colour picker for any other colour. The picker names the chosen
+  // code, or says nothing is chosen; nobody types one.
   return (
     <div className="space-y-1.5">
       <InputLabel inputId={inputId} label={block.label} error={ctx.errors[block.name]} />
-      <Input id={inputId} type="color" value={strValue} onChange={(e) => ctx.setValue(block.name, e.target.value)} aria-label={block.label} className="h-9 w-16 cursor-pointer p-0.5" />
+      <div className="flex flex-wrap items-center gap-2" role="group" aria-label={block.label}>
+        {swatches.map((swatch) => (
+          <button
+            key={swatch}
+            type="button"
+            aria-label={swatch}
+            aria-pressed={chosen === swatch.toLowerCase()}
+            onClick={() => ctx.setValue(block.name, swatch.toLowerCase())}
+            className="size-10 rounded-lg border border-border outline-offset-2 aria-pressed:outline aria-pressed:outline-2 aria-pressed:outline-foreground"
+            style={{ background: swatch }}
+            data-slot="color-swatch"
+          />
+        ))}
+        <div className={cn('w-48', swatches.length > 0 && 'ms-2')}>
+          <ColorPicker
+            id={inputId}
+            value={chosen ?? undefined}
+            onChange={(next) => ctx.setValue(block.name, next === null ? undefined : next.toLowerCase())}
+            presets={swatches.length > 0 ? swatches : undefined}
+            placeholder={t('blocks.color.none', 'No colour chosen')}
+            clearLabel={t('blocks.color.clear', 'Clear the colour')}
+            clearSelectionLabel={t('blocks.color.clear', 'Clear the colour')}
+            presetsLabel={t('blocks.color.custom', 'Custom')}
+            copyHexLabel={t('blocks.color.copyHex', 'Copy the colour code')}
+            copyLabel={t('blocks.color.copy', 'Copy')}
+            copiedLabel={t('blocks.color.copied', 'Copied')}
+          />
+        </div>
+      </div>
     </div>
+  );
+}
+
+// SDK 1.113: a time of day from a list of times, `HH:MM`, so nobody types a
+// clock format. The list is the calendar's own (15-minute steps by default).
+function TimeInputRenderer({ block }: { block: TimeInputBlock }) {
+  const ctx = useFormBlockContext();
+  if (ctx === null) return <UnsupportedBlock type="timeInput" />;
+  const inputId = `block-input-${block.name}`;
+  const value = ctx.values[block.name];
+  const strValue = typeof value === 'string' ? value : '';
+  const options = timeOptions(block.step ?? 15, block.allowEndOfDay === true);
+  if (strValue !== '' && !options.includes(strValue)) options.push(strValue);
+  return (
+    <div className="space-y-1.5">
+      <InputLabel inputId={inputId} label={block.label} required={block.required} error={ctx.errors[block.name]} />
+      <div className="w-32">
+        <FieldSelect id={inputId} value={strValue} onChange={(v) => ctx.setValue(block.name, v)} options={options.map((v) => ({ value: v, label: v }))} />
+      </div>
+    </div>
+  );
+}
+
+// SDK 1.113: a week of hours with the calendar's own editor, open/closed per
+// day, breaks, copy to every open day. The value is the calendar API's rows.
+function WeeklyHoursRenderer({ block }: { block: WeeklyHoursBlock }) {
+  const ctx = useFormBlockContext();
+  if (ctx === null) return <UnsupportedBlock type="weeklyHours" />;
+  const raw = ctx.values[block.name];
+  const rows = (Array.isArray(raw) ? (raw as unknown[]) : []).filter(
+    (r): r is { weekday: number; start_time: string; end_time: string } =>
+      r !== null && typeof r === 'object' && typeof (r as { weekday?: unknown }).weekday === 'number'
+  );
+  const week = weekOf(rows);
+  const order = weekOrder(block.firstDay ?? 1);
+  const bad = firstBadDay(week);
+  return (
+    <div className="space-y-1.5" data-slot="weekly-hours">
+      <InputLabel inputId={`block-input-${block.name}`} label={block.label} required={block.required} error={ctx.errors[block.name]} />
+      <WeeklyHoursFields
+        idPrefix={`block-input-${block.name}`}
+        week={week}
+        order={order}
+        withDayToggles
+        onChange={(next) => ctx.setValue(block.name, rowsOf(next))}
+      />
+      {bad !== null && <WeeklyHoursProblem day={bad} />}
+    </div>
+  );
+}
+
+// SDK 1.113: several choices as checkboxes (the Choices card), submitting the
+// chosen values in the options' order.
+function CheckboxGroupRenderer({ block }: { block: CheckboxGroupBlock }) {
+  const ctx = useFormBlockContext();
+  if (ctx === null) return <UnsupportedBlock type="checkboxGroup" />;
+  const raw = ctx.values[block.name];
+  const chosen = new Set(Array.isArray(raw) ? (raw as unknown[]).filter((v): v is string => typeof v === 'string') : []);
+  const toggle = (value: string, on: boolean) => {
+    const next = new Set(chosen);
+    if (on) next.add(value);
+    else next.delete(value);
+    ctx.setValue(block.name, block.options.map((o) => o.value).filter((v) => next.has(v)));
+  };
+  return (
+    <fieldset className="space-y-1.5">
+      <legend className="text-sm font-medium">
+        {block.label}
+        {block.required ? <span className="ms-0.5 text-destructive" aria-hidden>*</span> : null}
+      </legend>
+      <div className="space-y-1">
+        {block.options.map((option) => {
+          const id = `block-input-${block.name}-${option.value}`;
+          return (
+            <label key={option.value} htmlFor={id} className="flex min-h-10 cursor-pointer items-center gap-2 text-sm">
+              <Checkbox id={id} checked={chosen.has(option.value)} onCheckedChange={(on) => toggle(option.value, on === true)} />
+              {option.label}
+            </label>
+          );
+        })}
+      </div>
+      {ctx.errors[block.name] !== undefined && (
+        <p className="text-xs text-destructive" role="alert">{ctx.errors[block.name]}</p>
+      )}
+    </fieldset>
   );
 }
 
@@ -3663,6 +3795,121 @@ function ReferenceSelectRenderer({ block }: { block: ReferenceSelectBlock }) {
 }
 
 function ReferenceSelectField({ block, ctx }: { block: ReferenceSelectBlock; ctx: FormBlockContextValue }) {
+  if (block.multiple === true) return <ReferenceMultiSelectField block={block} ctx={ctx} />;
+  return <ReferenceSingleSelectField block={block} ctx={ctx} />;
+}
+
+/** A source's rows as `{value, label}` options; a row without a value is skipped. */
+function referenceOptions(
+  block: ReferenceSelectBlock,
+  rows: Array<Record<string, unknown>>,
+): Array<{ value: string; label: string }> {
+  return rows.flatMap((row) => {
+    const rawValue = row[block.valueField];
+    const rawLabel = row[block.labelField];
+    if (rawValue === undefined || rawValue === null) return [];
+    return [{
+      value: String(rawValue),
+      label: rawLabel === undefined || rawLabel === null ? String(rawValue) : String(rawLabel),
+    }];
+  });
+}
+
+/**
+ * The value a multiple reference select holds, as strings. A preloaded record
+ * may carry numbers (`[3, 7]`) or a single scalar; both read as a list here so
+ * the chips show and a touched field submits strings like an untouched one.
+ */
+function referenceValues(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((v) => (typeof v === 'string' || typeof v === 'number' ? [String(v)] : []));
+  }
+  if (typeof value === 'string' && value !== '') return [value];
+  if (typeof value === 'number') return [String(value)];
+  return [];
+}
+
+// SDK 1.121 (#1437): several rows from the same `source`. The chosen ones are
+// chips, each with a labelled remove button; the dropdown below adds one more
+// and lists only the rows not chosen yet. The value is a list of `valueField`
+// strings, in the order they were chosen.
+function ReferenceMultiSelectField({ block, ctx }: { block: ReferenceSelectBlock; ctx: FormBlockContextValue }) {
+  const t = useTranslation('plugin');
+  const state = usePluginData<Array<Record<string, unknown>>>(
+    block.source,
+    (body) => (Array.isArray(body) ? (body as Array<Record<string, unknown>>) : null)
+  );
+  const inputId = `block-input-${block.name}`;
+  const chosen = referenceValues(ctx.values[block.name]);
+  const options = state.status === 'ready' ? referenceOptions(block, state.data) : [];
+  const labelOf = new Map(options.map((opt) => [opt.value, opt.label]));
+  const remaining = options.filter((opt) => !chosen.includes(opt.value));
+
+  const add = (v: string): void => {
+    if (v === '' || chosen.includes(v)) return;
+    ctx.setValue(block.name, [...chosen, v]);
+  };
+  const remove = (v: string): void => {
+    ctx.setValue(block.name, chosen.filter((existing) => existing !== v));
+  };
+
+  return (
+    <div className="space-y-1.5" data-slot="reference-multi-select">
+      <InputLabel inputId={inputId} label={block.label} required={block.required} error={ctx.errors[block.name]} />
+      <div className="flex flex-wrap gap-1.5" data-slot="reference-multi-select-chosen">
+        {chosen.length === 0 ? (
+          <span className="text-xs text-muted-foreground">{t('blocks.referenceSelect.noneChosen', 'Nothing chosen yet.')}</span>
+        ) : (
+          chosen.map((v) => {
+            // A chosen value the source no longer lists still shows, by its
+            // value, rather than vanishing from what will be saved.
+            const label = labelOf.get(v) ?? v;
+            return (
+              <Badge key={v} variant="secondary" className="gap-1 pe-1" data-slot="reference-multi-select-chip">
+                {label}
+                <button
+                  type="button"
+                  aria-label={t('blocks.referenceSelect.remove', 'Remove {label}', { label })}
+                  onClick={() => remove(v)}
+                  className="rounded-full p-0.5 outline-none hover:bg-muted-foreground/20 focus-visible:ring-2 focus-visible:ring-ring/30"
+                >
+                  <IconX className="size-3" aria-hidden />
+                </button>
+              </Badge>
+            );
+          })
+        )}
+      </div>
+      {state.status === 'error' ? (
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-2 text-xs text-muted-foreground" data-slot="reference-select-error">
+          <span>{t('blocks.options.loadError', 'Failed to load options.')}</span>
+          <Button type="button" variant="outline" size="sm" onClick={state.retry}>{t('blocks.retry', 'Retry')}</Button>
+        </div>
+      ) : (
+        // Keyed by the count so the trigger empties again after each pick: it
+        // is an "add one" control, not a holder of the value.
+        <Select key={chosen.length} value="" onValueChange={add} disabled={state.status === 'loading' || (state.status === 'ready' && remaining.length === 0)}>
+          <SelectTrigger id={inputId} aria-label={block.label} data-slot="reference-select-trigger">
+            <SelectValue
+              placeholder={
+                state.status === 'loading'
+                  ? t('blocks.loading', 'Loading…')
+                  : state.status === 'ready' && remaining.length === 0 && options.length > 0
+                    ? t('blocks.referenceSelect.allChosen', 'All chosen')
+                    : (block.placeholder ?? t('blocks.referenceSelect.add', 'Add {label}', { label: block.label }))
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {remaining.map((opt) => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      )}
+    </div>
+  );
+}
+
+function ReferenceSingleSelectField({ block, ctx }: { block: ReferenceSelectBlock; ctx: FormBlockContextValue }) {
   const t = useTranslation('plugin');
   const state = usePluginData<Array<Record<string, unknown>>>(
     block.source,
@@ -3672,18 +3919,7 @@ function ReferenceSelectField({ block, ctx }: { block: ReferenceSelectBlock; ctx
   const value = ctx.values[block.name];
   const strValue = typeof value === 'string' ? value : (block.default ?? '');
 
-  const options =
-    state.status === 'ready'
-      ? state.data.flatMap((row) => {
-          const rawValue = row[block.valueField];
-          const rawLabel = row[block.labelField];
-          if (rawValue === undefined || rawValue === null) return [];
-          return [{
-            value: String(rawValue),
-            label: rawLabel === undefined || rawLabel === null ? String(rawValue) : String(rawLabel),
-          }];
-        })
-      : [];
+  const options = state.status === 'ready' ? referenceOptions(block, state.data) : [];
 
   return (
     <div className="space-y-1.5">
@@ -4199,7 +4435,7 @@ function ActionButtonRenderer({ block }: { block: ActionButtonBlock }) {
  * `equals: 5` matches a form field holding the string `'5'`. Missing → `''`.
  */
 function normalizeVisibilityOperand(
-  value: string | number | boolean | LocalizedTextValue | FieldArrayValue | OuScopeValue | undefined
+  value: string | number | boolean | LocalizedTextValue | FieldArrayValue | OuScopeValue | string[] | undefined
 ): string {
   if (typeof value === 'boolean') {
     return value ? 'true' : 'false';
@@ -4606,6 +4842,12 @@ function BlockNode({ block }: { block: Block }): React.ReactElement | null {
       return isNonEmptyString(block.name) && isNonEmptyString(block.label) ? <FileInputRenderer block={block} /> : <UnsupportedBlock type="fileInput" />;
     case 'colorInput':
       return isNonEmptyString(block.name) && isNonEmptyString(block.label) ? <ColorInputRenderer block={block} /> : <UnsupportedBlock type="colorInput" />;
+    case 'timeInput':
+      return isNonEmptyString(block.name) && isNonEmptyString(block.label) ? <TimeInputRenderer block={block} /> : <UnsupportedBlock type="timeInput" />;
+    case 'weeklyHours':
+      return isNonEmptyString(block.name) && isNonEmptyString(block.label) ? <WeeklyHoursRenderer block={block} /> : <UnsupportedBlock type="weeklyHours" />;
+    case 'checkboxGroup':
+      return isNonEmptyString(block.name) && isNonEmptyString(block.label) && Array.isArray(block.options) ? <CheckboxGroupRenderer block={block} /> : <UnsupportedBlock type="checkboxGroup" />;
     case 'bilingualText':
       return isNonEmptyString(block.name) && isNonEmptyString(block.label) ? <BilingualTextRenderer block={block} /> : <UnsupportedBlock type="bilingualText" />;
     case 'referenceSelect':

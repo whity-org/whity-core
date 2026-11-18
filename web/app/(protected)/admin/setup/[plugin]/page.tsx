@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import { api, apiFetch } from '@/lib/api/client';
 import type { components } from '@whity/api-client';
 import { useFetch } from '@/hooks/useFetch';
@@ -22,11 +22,22 @@ type Onboarding = components['schemas']['WorkspaceOnboarding'];
  * block screen at a time. The plugin's status route says which steps are
  * done; the page opens the first that isn't. People may go back, skip ahead
  * or leave and come back: nothing forces the order.
+ *
+ * `?step=<id>` opens that step instead, as a dashboard setup point does (SDK 1.115).
  */
 export default function PluginSetupPage() {
+  return (
+    <Suspense>
+      <PluginSetup />
+    </Suspense>
+  );
+}
+
+function PluginSetup() {
   const params = useParams<{ plugin: string | string[] }>();
   const plugin = Array.isArray(params.plugin) ? params.plugin[0] : params.plugin;
   const t = useTranslation('admin');
+  const asked = useSearchParams().get('step');
 
   const { data: setup, loading, error, refetch } = useFetch(async () => {
     const { data } = await api.GET('/api/v1/workspace/onboarding');
@@ -45,9 +56,11 @@ export default function PluginSetupPage() {
   const [chosen, setChosen] = useState<number | null>(null);
   const firstOpen = useMemo(() => {
     if (!setup) return 0;
+    const named = asked === null ? -1 : setup.steps.findIndex((step) => step.id === asked);
+    if (named !== -1) return named;
     const index = setup.steps.findIndex((step) => !(done ?? {})[step.id]);
     return index === -1 ? setup.steps.length - 1 : index;
-  }, [setup, done]);
+  }, [setup, done, asked]);
   const current = chosen ?? firstOpen;
 
   if (loading) {

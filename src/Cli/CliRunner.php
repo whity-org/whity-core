@@ -22,6 +22,8 @@ class CliRunner
         'plugin'     => 'Whity\Cli\Commands\PluginsCommand',
         'tenant'     => 'Whity\Cli\Commands\TenantsCommand',
         'totp'       => 'Whity\Cli\Commands\TotpCommand',
+        // WHIT-1168: the break-glass for a server that signs in only with its identity provider.
+        'auth'       => 'Whity\Cli\Commands\AuthCommand',
         // WHIT-1047: every stored secret onto the current key after a rotation.
         'secrets'    => 'Whity\Cli\Commands\SecretsCommand',
         'queue:work' => 'Whity\Cli\Commands\QueueWorkCommand',
@@ -245,6 +247,7 @@ class CliRunner
         echo "  plugin     Manage plugins (list, enable, disable, reload)\n";
         echo "  tenant     Manage tenants (list, create, update, delete)\n";
         echo "  totp       TOTP secret maintenance (reencrypt legacy secrets)\n";
+        echo "  auth       Sign-in switches (password-sign-in status|on|off, the break-glass)\n";
         echo "  secrets    Stored secret maintenance (reencrypt after a key rotation)\n";
         echo "  queue:work Run the durable async job worker loop\n";
         echo "  schedule:run Run the cron-tick scheduler (exactly-once per minute across workers)\n";

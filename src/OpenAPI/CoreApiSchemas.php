@@ -2880,6 +2880,33 @@ final class CoreApiSchemas
             ]),
             [
                 'method' => 'GET',
+                'path' => '/api/me/phone',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Your own phone number (WHIT-1181)',
+                    'tags' => ['me'],
+                    'responses' => [200 => self::jsonResponse('Your phone', 'MyPhoneResponse')] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/phone',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Set or remove your own phone number (WHIT-1181)',
+                    'description' => 'Stored as E.164 on your profile, across every workspace. A number you set here is never replaced by one from a sign-in.',
+                    'tags' => ['me'],
+                    'request' => 'MyPhoneRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('Your phone', 'MyPhoneResponse'),
+                        422 => self::errorResponse('Not a phone number with its country code'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'GET',
                 'path' => '/api/me/away',
                 'requiredRole' => null,
                 'requiredPermission' => null,
@@ -3658,6 +3685,17 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Not found'),
                 ],
             ]),
+            self::permissionRoute('POST', '/api/plugins/{name}/roles/{role}/approve', 'plugins:install', [
+                'summary' => 'Let a plugin grant its own permissions to an existing role it did not create (tenant_id picks a workspace role)',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Approved', 'PluginRoleApprovalResponse'),
+                    400 => self::errorResponse('Plugin, role or tenant_id missing or invalid'),
+                    403 => self::errorResponse('Not the platform operator'),
+                    404 => self::errorResponse('Plugin not loaded or role not found'),
+                    422 => self::errorResponse('The plugin does not grant permissions to this role'),
+                ],
+            ]),
             self::permissionRoute('GET', '/api/plugins/trust-status', 'plugins:read', [
                 'summary' => 'Whether Verified can work here, and how fresh the signed revocation list is',
                 'tags' => ['platform-ops'],
@@ -4358,6 +4396,14 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Unknown branding key'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/branding/host', 'settings:read', [
+                'summary' => 'Read your own workspace\'s custom web address',
+                'description' => 'Scoped by the session: a workspace reads only its own address. Setting one is PUT /api/tenants/{id}/branding-host, system tenant only.',
+                'tags' => ['branding'],
+                'responses' => [
+                    200 => self::jsonResponse('The workspace\'s address, or null', 'BrandingHostReadResponse'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('PUT', '/api/tenants/{id}/branding-host', 'settings:manage', [
                 'summary' => 'Set or clear a tenant\'s custom branding hostname',
                 'tags' => ['branding'],
@@ -4677,6 +4723,7 @@ final class CoreApiSchemas
         $sessionUser = self::object([
             'id' => self::int(),
             'email' => self::str(),
+            'phone' => self::str(true) + ['description' => 'Your own phone number in E.164, or null (WHIT-1181).'],
             'role' => self::str(),
             'tenant_id' => self::int(),
         ], ['id', 'email', 'role', 'tenant_id']);
@@ -4700,6 +4747,8 @@ final class CoreApiSchemas
             'role' => self::str(),
             'roles' => ['type' => 'array', 'items' => ['type' => 'string']],
             'kind' => ['type' => 'string', 'enum' => ['member', 'customer']],
+            // True when the person owns this workspace (WHIT-1169).
+            'is_owner' => self::bool(),
         ], ['tenant_id', 'tenant_name', 'role']);
 
         // Token mode (`X-Auth-Mode: token`, WC-ddcd16ad): every endpoint that
@@ -5068,6 +5117,16 @@ final class CoreApiSchemas
                 'user' => $selfUser,
             ] + $tokenPair, ['user']),
 
+            // GET and PUT /api/me/phone (WHIT-1181)
+            'MyPhoneResponse' => self::object([
+                'data' => self::object([
+                    'phone' => self::str(true) + ['description' => 'E.164, such as +962791234567, or null when none is set.'],
+                ], ['phone']),
+            ], ['data']),
+            'MyPhoneRequest' => self::object([
+                'phone' => self::str(true) + ['description' => 'With its country code; spaces, dashes and Arabic-Indic digits are accepted and stored as E.164. Null or empty removes it.'],
+            ], ['phone']),
+
             // PATCH /api/me — request body
             'MeUpdateRequest' => self::object([
                 'email' => self::str(),
@@ -5190,7 +5249,12 @@ final class CoreApiSchemas
                 'provider_key' => self::str(),
                 'display_name' => self::str(),
             ], ['provider_key', 'display_name']),
-            'SsoProviderListResponse' => self::listEnvelope('SsoProvider'),
+            // WHIT-1168: `password_sign_in` false = the server signs people in
+            // only through these providers; pages then drop the password form.
+            'SsoProviderListResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('SsoProvider')],
+                'password_sign_in' => self::bool(),
+            ], ['data', 'password_sign_in']),
             // WHIT-994: GET /api/auth/sso/workspace. `suggested_name` only with
             // state=create, `workspaces` only with state=waiting.
             'SsoWorkspaceSetupResponse' => self::object([
@@ -5210,6 +5274,85 @@ final class CoreApiSchemas
                 'locale' => self::str(),
                 'main_color' => self::str(),
             ], ['name']),
+            // Creating another workspace while signed in (WHIT-1169).
+            'WorkspaceCreateRequest' => self::object([
+                'name' => self::str(),
+                'locale' => self::str(),
+                'main_color' => self::str(),
+            ], ['name']),
+            'WorkspaceCreateResponse' => self::dataEnvelope(self::object([
+                'tenant_id' => self::int(),
+                'name' => self::str(),
+            ], ['tenant_id', 'name'])),
+            // Owners and ownership offers (WHIT-1170).
+            'OwnershipOffer' => self::object([
+                'id' => self::int(),
+                'tenant_id' => self::int(),
+                'workspace_name' => self::str(),
+                'kind' => ['type' => 'string', 'enum' => ['transfer', 'co_owner']],
+                'from' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name']),
+                'to' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name']),
+                'leave_after' => self::bool(),
+                'status' => ['type' => 'string', 'enum' => ['open', 'accepted', 'declined', 'cancelled', 'expired', 'void']],
+                'expires_at' => self::str(),
+                'created_at' => self::str(),
+            ], ['id', 'tenant_id', 'workspace_name', 'kind', 'from', 'to', 'leave_after', 'status', 'expires_at', 'created_at']),
+            'OwnershipOfferResponse' => self::dataEnvelope(SchemaBuilder::ref('OwnershipOffer')),
+            'OwnershipOfferListResponse' => self::listEnvelope('OwnershipOffer'),
+            'WorkspaceOwnersResponse' => self::dataEnvelope(self::object([
+                'owners' => ['type' => 'array', 'items' => self::object([
+                    'profile_id' => self::int(),
+                    'name' => self::str(),
+                    'email' => self::str(),
+                    'since' => self::str(),
+                ], ['profile_id', 'name', 'email', 'since'])],
+                'offers' => ['type' => 'array', 'items' => SchemaBuilder::ref('OwnershipOffer')],
+                'candidates' => ['type' => 'array', 'items' => self::object([
+                    'profile_id' => self::int(),
+                    'name' => self::str(),
+                    'email' => self::str(),
+                ], ['profile_id', 'name', 'email'])],
+                'is_owner' => self::bool(),
+            ], ['owners', 'offers', 'candidates', 'is_owner'])),
+            'OwnershipOfferCheckRequest' => self::object([
+                'to_profile_id' => self::int(),
+                'kind' => ['type' => 'string', 'enum' => ['transfer', 'co_owner']],
+            ], ['to_profile_id', 'kind']),
+            'OwnershipOfferCreateRequest' => self::object([
+                'to_profile_id' => self::int(),
+                'kind' => ['type' => 'string', 'enum' => ['transfer', 'co_owner']],
+                'leave_after' => ['type' => 'boolean', 'description' => 'Transfer only: the giver leaves the workspace once it is accepted'],
+                'code' => ['type' => 'string', 'description' => 'The code from "Confirm it is you"; empty after a fresh sign-in'],
+            ], ['to_profile_id', 'kind', 'code']),
+            'WorkspaceCreateStateResponse' => self::dataEnvelope(self::object([
+                'allowed' => self::bool(),
+                'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['disabled', 'limit_reached', null]],
+                'owned' => self::int(),
+                'limit' => self::int(),
+                // WHIT-1203: null = the default plan; else the paid plan a second
+                // or later owned workspace starts on, its trial, and its monthly
+                // price in minor units (null when the plan has no such price).
+                'next_plan' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'plan_key' => self::str(),
+                        'plan_name' => self::str(),
+                        'trial_days' => self::int(),
+                        'price' => [
+                            'type' => 'object',
+                            'nullable' => true,
+                            'properties' => [
+                                'unit_amount' => self::int(),
+                                'currency' => self::str(),
+                                'billing_period' => self::str(),
+                            ],
+                            'required' => ['unit_amount', 'currency', 'billing_period'],
+                        ],
+                    ],
+                    'required' => ['plan_key', 'plan_name', 'trial_days', 'price'],
+                ],
+            ], ['allowed', 'reason', 'owned', 'limit', 'next_plan'])),
             // A caller's linked external identity (connected account). `email` and
             // `last_login_at` may be null (asserted-at-link email; never-since-linked).
             'MeIdentity' => self::object([
@@ -5943,13 +6086,41 @@ final class CoreApiSchemas
             'CheckoutStartRequest' => self::object([
                 'plan_key' => self::str(),
                 'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
+                // WHIT-1207: the payment step after creating a workspace comes back to /setup/pay/done.
+                'after' => ['type' => 'string', 'enum' => ['setup'], 'description' => 'Where the payer comes back to: `setup` for the payment step after creating a workspace (WHIT-1207); Billing otherwise'],
             ], ['plan_key']),
             // Only a destination. The session reference is a capability token
             // and is deliberately not returned — the browser needs somewhere to
             // go, and nothing else here has to reach it.
             'CheckoutStartResponse' => self::dataEnvelope(self::object([
                 'url' => self::str(),
+                'trial_days' => self::int() + ['description' => 'Set when the card is taken now and first charged when the trial of the workspace ends, this many days from now (WHIT-1207)'],
             ], ['url'])),
+            // WHIT-1207: where a workspace stands with its plan's trial and payment.
+            'WorkspaceTrialState' => self::object([
+                'plan_key' => self::str(),
+                'plan_name' => self::str(),
+                'status' => self::str(),
+                'trial_ends_at' => self::str(true) + ['format' => 'date-time'],
+                'days_left' => self::int(true) + ['description' => 'Whole days left in the trial, rounded up; null when not in a trial'],
+                'read_only' => self::bool() + ['description' => 'The trial ended unpaid: changes are refused until it is paid'],
+                'card_added' => self::bool() + ['description' => 'A subscription with the payment provider exists'],
+                'price' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'unit_amount' => self::int(),
+                        'currency' => self::str(),
+                        'billing_period' => self::str(),
+                    ],
+                    'required' => ['unit_amount', 'currency', 'billing_period'],
+                ],
+                'pay_online' => self::bool() + ['description' => 'This deployment takes payments online'],
+                'card_step' => self::bool() + ['description' => 'A card can be added now and first charged when the trial ends'],
+            ], ['plan_key', 'plan_name', 'status', 'trial_ends_at', 'days_left', 'read_only', 'card_added', 'price', 'pay_online', 'card_step']),
+            'WorkspaceTrialResponse' => self::object([
+                'data' => ['allOf' => [['$ref' => '#/components/schemas/WorkspaceTrialState']], 'nullable' => true],
+            ], ['data']),
             // WHAT A TENANT MAY BUY. Separate from the operator's plan catalogue,
             // which is gated on plans:manage — a permission a paying customer
             // never holds. Amounts are MINOR UNITS with a currency code; the
@@ -7500,8 +7671,62 @@ final class CoreApiSchemas
                 'source' => self::str(true),
                 'value' => ['type' => 'integer', 'nullable' => true],
                 'hidden' => ['type' => 'boolean'],
+                'position' => ['type' => 'integer', 'nullable' => true, 'description' => "Its place in the person's own order, null when they never moved it (SDK 1.115)"],
             ], ['key', 'label', 'labelAr', 'hidden']),
             'HomeCardListResponse' => self::listEnvelope('HomeCard'),
+            // SDK 1.115 (WHIT-1177): what apps add to the dashboard, in the reader's language.
+            'DashboardSetupPoint' => self::object([
+                'id' => self::str(),
+                'label' => self::str(true),
+                'why' => self::str(true),
+                'action' => self::str(true),
+                'href' => self::str() + ['description' => "The plugin's guided-setup step or screen it opens"],
+                'icon' => self::str(true),
+            ], ['id', 'href']),
+            'DashboardSetup' => self::object([
+                'plugin' => self::str(),
+                'status' => self::str() + ['description' => "The plugin's GET route answering {data: {points: {<id>: bool}}}"],
+                'points' => ['type' => 'array', 'items' => SchemaBuilder::ref('DashboardSetupPoint')],
+            ], ['plugin', 'status', 'points']),
+            'DashboardWidget' => self::object([
+                'key' => self::str() + ['description' => '<plugin>:<id>'],
+                'plugin' => self::str(),
+                'kind' => ['type' => 'string', 'enum' => ['stat', 'list', 'chart', 'actions']],
+                'title' => self::str(true),
+                'description' => self::str(true),
+                'icon' => self::str(true),
+                'href' => self::str(true),
+                'source' => self::str(true),
+                'sizes' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['small', 'medium', 'large']]],
+                'size' => ['type' => 'string', 'enum' => ['small', 'medium', 'large']],
+                'hidden' => ['type' => 'boolean'],
+                'position' => ['type' => 'integer', 'nullable' => true],
+                'blocks' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => true]],
+            ], ['key', 'plugin', 'kind', 'sizes', 'size', 'hidden', 'blocks']),
+            'DashboardOffer' => self::object([
+                'key' => self::str() + ['description' => '`offer:{plugin}`, its key in the dashboard layout'],
+                'template' => self::str() + ['description' => 'The template that offers it; its trial starts at POST /api/workspace/templates/{key}/setup/offer/trial'],
+                'plugin' => self::str(),
+                'pluginName' => self::str() + ['description' => 'The plugin\'s display name in the reader\'s language (SDK 1.117)'],
+                'lines' => ['type' => 'array', 'items' => self::str(), 'description' => 'What the plugin adds, at most three lines'],
+                'trialDays' => self::int(),
+                'hidden' => self::bool(),
+                'position' => self::int(true),
+            ], ['key', 'template', 'plugin', 'pluginName', 'lines', 'trialDays', 'hidden']),
+            'DashboardResponse' => self::object([
+                'data' => self::object([
+                    'setup' => ['type' => 'array', 'items' => SchemaBuilder::ref('DashboardSetup')],
+                    'widgets' => ['type' => 'array', 'items' => SchemaBuilder::ref('DashboardWidget')],
+                    'offers' => ['type' => 'array', 'items' => SchemaBuilder::ref('DashboardOffer'), 'description' => 'WHIT-1202: locked cards for paid plugins the workspace\'s template offers and it can try now'],
+                ], ['setup', 'widgets', 'offers']),
+            ], ['data']),
+            'DashboardLayoutRequest' => self::object([
+                'items' => ['type' => 'array', 'items' => self::object([
+                    'key' => self::str(),
+                    'hidden' => ['type' => 'boolean'],
+                    'size' => ['type' => 'string', 'enum' => ['small', 'medium', 'large'], 'nullable' => true],
+                ], ['key'])],
+            ], ['items']),
             'RecentDocument' => self::object([
                 'kind' => ['type' => 'string', 'enum' => ['document', 'draft']],
                 'id' => self::int(),
@@ -9481,7 +9706,7 @@ final class CoreApiSchemas
             ],
             'FormFieldColumn' => self::object([
                 'key' => self::str(),
-                'type' => ['type' => 'string', 'enum' => ['text', 'textarea', 'number', 'date', 'select', 'checkbox']],
+                'type' => ['type' => 'string', 'enum' => ['text', 'textarea', 'number', 'date', 'select', 'checkbox', 'profile_ref'], 'description' => 'What the cell holds. profile_ref is a person, checked against the workspace like a person question.'],
                 'label' => self::localizedText(),
                 'required' => self::bool(),
                 'options' => ['type' => 'array', 'items' => SchemaBuilder::ref('FormFieldOption')],
@@ -9502,6 +9727,8 @@ final class CoreApiSchemas
                 'columns' => ['type' => 'array', 'maxItems' => 20, 'items' => SchemaBuilder::ref('FormFieldColumn'), 'description' => 'The columns of a repeating question. Required on one.'],
                 'minRows' => self::int() + ['description' => 'Fewest rows a repeating question takes when it has any.'],
                 'maxRows' => self::int() + ['description' => 'Most rows a repeating question takes, up to 200.'],
+                'maxWords' => self::int() + ['description' => 'A long answer limit in words, 1 to 20000. Refused on submit above it; printed as "142 of 300 words" (WHIT-1164).'],
+                'printGroup' => ['description' => 'Questions that print together under one number and title, as text or {en, ar}. Consecutive questions sharing it print as one block (WHIT-1164).'],
             ], []),
             // DERIVED from the fields' `section_key`, never stored. There is no
             // `form_sections` table, so a section cannot exist with no fields and
@@ -10498,6 +10725,11 @@ final class CoreApiSchemas
                     ], ['body', 'agenda', 'decisions', 'invitations', 'attendance']),
                 ]]
             ),
+            'PublicBookingVisitor' => self::object([
+                'name' => self::str() + ['description' => 'The display name on their own profile; may be empty.'],
+                'email' => self::str() + ['description' => 'The email of their own sign-in; may be empty.'],
+                'phone' => self::str(true) + ['description' => 'Their own phone in E.164, or null.'],
+            ], ['name', 'email', 'phone']) + ['nullable' => true, 'description' => 'The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in.'],
             'PublicBookingPage' => self::object([
                 'workspace' => self::object(['name' => self::str(), 'slug' => self::str()], ['name', 'slug']),
                 'settings' => self::object([
@@ -10506,6 +10738,7 @@ final class CoreApiSchemas
                     'max_advance_days' => self::int(),
                     'week_start' => self::str(),
                     'weekend_days' => ['type' => 'array', 'items' => self::str()],
+                    'multi_service_booking' => self::bool() + ['description' => 'The customer may book several services back to back as one booking (WHIT-1173).'],
                 ], ['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days']),
                 'services' => ['type' => 'array', 'items' => self::object([
                     'id' => self::int(),
@@ -10540,8 +10773,10 @@ final class CoreApiSchemas
                 ],
             ], ['name', 'logo_wide_url', 'logo_square_url', 'main_color', 'theme']),
             'PublicBookingRequest' => self::object([
-                'service_id' => self::int() + ['description' => 'The service.'],
-                'profile_id' => self::int() + ['description' => 'One person; leave out for anyone.'],
+                'service_id' => self::int() + ['description' => 'The service. Leave out when sending `services`.'],
+                'services' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 8, 'items' => SchemaBuilder::ref('CalendarBookingServiceChoice'), 'description' => 'Several services back to back, in order, as one booking, when the page\'s `multi_service_booking` is on (WHIT-1173).'],
+                'same_person' => self::bool() + ['description' => 'With `services` and no person chosen: one person who does them all.'],
+                'profile_id' => self::int() + ['description' => 'One person; leave out for anyone. With `services`: the person for every service that names none.'],
                 'starts_at' => self::str() + ['description' => 'A free time, ISO 8601 with an offset.'],
                 'name' => self::str() + ['maxLength' => 200, 'description' => 'The customer\'s name.'],
                 'email' => self::str() + ['maxLength' => 320, 'description' => 'Where the confirmation and link go.'],
@@ -10550,7 +10785,7 @@ final class CoreApiSchemas
                 'website' => self::str() + ['description' => 'Leave empty. A hidden field people never fill.'],
                 'elapsed_ms' => self::int() + ['description' => 'Milliseconds the page was open before sending.'],
                 'bot_token' => self::str() + ['description' => 'The bot-check token, when the page shows one.'],
-            ], ['service_id', 'starts_at', 'name', 'email', 'elapsed_ms']),
+            ], ['starts_at', 'name', 'email', 'elapsed_ms']),
             'PublicBookingMoveRequest' => self::object([
                 'starts_at' => self::str() + ['description' => 'A free time, ISO 8601 with an offset.'],
             ], ['starts_at']),
@@ -10576,6 +10811,14 @@ final class CoreApiSchemas
                 'workspace' => self::object(['name' => self::str()], ['name']),
                 'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'Only on the manage link: the brand of the workspace (WHIT-1014).'],
                 'time_zone' => self::str(),
+                'services' => ['type' => 'array', 'description' => 'A booking of several services (WHIT-1173): each, in order. Empty for one service; `service` then names it. For several, `service` names them together with the whole length.', 'items' => self::object([
+                    'name' => SchemaBuilder::ref('LocalizedLabel'),
+                    'staff_name' => self::str(),
+                    'starts_at' => self::str(),
+                    'ends_at' => self::str(),
+                    'duration_minutes' => self::int(),
+                    'price_minor' => self::int(true),
+                ], ['name', 'staff_name', 'starts_at', 'ends_at', 'duration_minutes', 'price_minor'])],
             ], ['id', 'status', 'starts_at', 'ends_at', 'service', 'staff_name', 'price_minor', 'currency', 'customer']),
             'CalendarSettings' => self::object([
                 'booking_page_url' => self::str(true) + ['description' => 'The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only.'],
@@ -10590,6 +10833,7 @@ final class CoreApiSchemas
                 'weekend_days' => ['type' => 'array', 'items' => self::str()],
                 'currency' => self::str(),
                 'instant_booking' => self::bool() + ['description' => 'Off: every booking from the booking page is a request.'],
+                'multi_service_booking' => self::bool() + ['description' => 'On: one booking may hold several services back to back (WHIT-1173). Default off.'],
             ], ['time_zone', 'booking_page_enabled', 'min_notice_minutes', 'max_advance_days', 'slot_step_minutes', 'reminder_hours_before', 'payment_hold_minutes', 'week_start', 'weekend_days', 'currency']),
             'CalendarSettingsRequest' => self::object([
                 'booking_page_enabled' => self::bool() + ['description' => 'Turn the public booking page on or off.'],
@@ -10601,6 +10845,7 @@ final class CoreApiSchemas
                 'week_start' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], 'description' => 'The first day of the week in calendar views.'],
                 'weekend_days' => ['type' => 'array', 'items' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']], 'description' => 'Days shown as the weekend.'],
                 'instant_booking' => self::bool() + ['description' => 'Off turns every booking from the booking page into a request staff accept.'],
+                'multi_service_booking' => self::bool() + ['description' => 'On lets one booking hold several services back to back, on the booking page and at the desk (WHIT-1173). Default off.'],
             ], []),
             'CalendarStaff' => self::object([
                 'profile_id' => self::int(),
@@ -10696,8 +10941,32 @@ final class CoreApiSchemas
             'CalendarSlot' => self::object([
                 'starts_at' => self::str(),
                 'ends_at' => self::str(),
-                'profile_ids' => ['type' => 'array', 'items' => self::int(), 'description' => 'Who is free then.'],
+                'profile_ids' => ['type' => 'array', 'items' => self::int(), 'description' => 'Who is free then. For several services: the people this time would be with.'],
+                'items' => ['type' => 'array', 'description' => 'Only when several services were asked for (WHIT-1173): who would do each, and when.', 'items' => self::object([
+                    'service_id' => self::int(),
+                    'profile_id' => self::int(),
+                    'starts_at' => self::str(),
+                    'ends_at' => self::str(),
+                ], ['service_id', 'profile_id', 'starts_at', 'ends_at'])],
             ], ['starts_at', 'ends_at', 'profile_ids']),
+            'CalendarBookingServiceChoice' => self::object([
+                'service_id' => self::int(),
+                'profile_id' => self::int(true) + ['description' => 'Who does it; null or left out for anyone.'],
+            ], ['service_id']),
+            'CalendarBookingItem' => self::object([
+                'position' => self::int() + ['description' => '0 for the first service.'],
+                'service_id' => self::int(),
+                'service_name' => ['type' => 'object', 'additionalProperties' => self::str(), 'description' => 'Language code => text.'],
+                'profile_id' => self::int(),
+                'staff_name' => self::str(),
+                'room_id' => self::int(true),
+                'starts_at' => self::str(),
+                'ends_at' => self::str(),
+                'blocks_from' => self::str(),
+                'blocks_until' => self::str(),
+                'duration_minutes' => self::int(),
+                'price_minor' => self::int(true),
+            ], ['position', 'service_id', 'service_name', 'profile_id', 'staff_name', 'starts_at', 'ends_at', 'duration_minutes', 'price_minor']),
             'CalendarBookingCustomer' => self::object([
                 'profile_id' => self::int() + ['description' => 'An existing customer or member of this workspace.'],
                 'name' => self::str() + ['maxLength' => 200],
@@ -10729,17 +10998,20 @@ final class CoreApiSchemas
                 'suggested_at' => self::str(true) + ['description' => 'When staff suggested this time for a request.'],
                 'reminder_sent_at' => self::str(true),
                 'room_name' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => self::str(), 'description' => 'In lists: the room\'s name, language code => text.'],
+                'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingItem'), 'description' => 'A booking of several services (WHIT-1173): each, in order, with who does it and when. Empty for one service. `service_id`, `profile_id` and `room_id` are then the first service\'s, the times span them all and `price_minor` is the total.'],
             ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
             'CalendarBookingCreateRequest' => self::object([
-                'service_id' => self::int() + ['description' => 'The service to book.'],
-                'profile_id' => self::int() + ['description' => 'Leave out for whoever is free.'],
+                'service_id' => self::int() + ['description' => 'The service to book. Leave out when sending `services`.'],
+                'services' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 8, 'items' => SchemaBuilder::ref('CalendarBookingServiceChoice'), 'description' => 'Several services back to back, in order, as one booking, when the calendar setting `multi_service_booking` is on (WHIT-1173). Each may name its own person.'],
+                'same_person' => self::bool() + ['description' => 'With `services` and nobody chosen: one person who does them all.'],
+                'profile_id' => self::int() + ['description' => 'Leave out for whoever is free. With `services`: the person for every service that names none.'],
                 'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
                 'customer' => ['allOf' => [SchemaBuilder::ref('CalendarBookingCustomer')], 'description' => 'Who the booking is for: an existing customer by profile_id, or a name with an email or phone.'],
                 'keep_to_hours' => self::bool() + ['description' => 'Refuse a time outside working hours. Always on for agents.'],
                 'notify' => self::bool() + ['description' => 'Email the customer a confirmation. Default true.'],
                 'book_anyway' => self::bool() + ['description' => 'Book even though the person is busy then (a taken room or closed hours still refuse). Never for agents.'],
                 'within_hours' => self::bool() + ['description' => 'Refuse a time outside the person\'s working hours, without the booking window\'s notice rules.'],
-            ], ['service_id', 'starts_at', 'customer']),
+            ], ['starts_at', 'customer']),
             'CalendarBookingMoveRequest' => self::object([
                 'starts_at' => self::str() + ['description' => 'ISO 8601 with an offset.'],
                 'profile_id' => self::int() + ['description' => 'Move to another person. Default: the same one.'],
@@ -11485,6 +11757,15 @@ final class CoreApiSchemas
                     'state' => self::str(true),
                 ], ['message']),
             ], ['data']),
+            'PluginRoleApprovalResponse' => self::object([
+                'data' => self::object([
+                    'plugin' => self::str(),
+                    'role' => self::str(),
+                    'role_id' => self::int(),
+                    'tenant_id' => self::int(true),
+                    'already_allowed' => self::bool(),
+                ], ['plugin', 'role', 'role_id', 'tenant_id', 'already_allowed']),
+            ], ['data']),
             'PluginUpdatesResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => self::object([
                     'plugin' => self::str(),
@@ -11718,6 +11999,11 @@ final class CoreApiSchemas
             'BrandingResponse' => self::dataEnvelope(SchemaBuilder::ref('Branding')),
             // PUT /api/tenants/{id}/branding-host request body.
             'BrandingHostRequest' => self::object(['host' => self::str(true)], []),
+            // GET /api/branding/host response body: the caller's own workspace's address.
+            'BrandingHostReadResponse' => self::dataEnvelope(self::object([
+                'branding_host' => self::str(true) + ['description' => 'The workspace\'s own web address, or null when none is set.'],
+                'included_in_plan' => ['type' => 'boolean', 'description' => 'Whether the workspace\'s plan includes its own web address (WHIT-932). Absent for the system tenant.'],
+            ], ['branding_host'])),
             // PUT /api/tenants/{id}/branding-host response body.
             'BrandingHostResponse' => self::dataEnvelope(self::object([
                 'branding_host' => self::str(true),
@@ -11832,9 +12118,12 @@ final class CoreApiSchemas
                 'email' => self::str(),
                 'tenant_name' => self::str(),
                 'requires_password' => self::bool(),
+                // WHIT-1168: false when the server signs people in only through
+                // its identity provider; the invitee then accepts by signing in.
+                'password_sign_in' => self::bool(),
                 'inviter_name' => self::str(true),
                 'role_name' => self::str(true),
-            ], ['email', 'tenant_name', 'requires_password', 'inviter_name', 'role_name'])),
+            ], ['email', 'tenant_name', 'requires_password', 'password_sign_in', 'inviter_name', 'role_name'])),
             // POST /api/invitations/accept — `password` is required ONLY when
             // the preview said so; supplied for an address that already has an
             // account it is ignored, never applied.
@@ -11864,7 +12153,8 @@ final class CoreApiSchemas
                 // WHIT-917: whether the email form can work here (a bot check is
                 // set up, or the operator chose to go without), said up front.
                 'email_signup' => self::bool(),
-                'email_signup_reason' => ['type' => 'string', 'enum' => ['bot_check_unavailable'], 'nullable' => true],
+                // WHIT-1168: password_sign_in_off = the server signs people up only through its providers.
+                'email_signup_reason' => ['type' => 'string', 'enum' => ['bot_check_unavailable', 'password_sign_in_off'], 'nullable' => true],
                 // The operator's sign-in providers a visitor may join with: link
                 // to GET /api/v1/auth/sso/{provider_key}/start?join={workspace_slug}.
                 'providers' => ['type' => 'array', 'items' => SchemaBuilder::ref('SignupJoinProvider')],
@@ -12050,7 +12340,7 @@ final class CoreApiSchemas
                 'delegate' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']),
                 'startsOn' => ['type' => 'string', 'format' => 'date'],
                 'backOn' => ['type' => 'string', 'format' => 'date'],
-                'covers' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['flows', 'proposals', 'documents']]],
+                'covers' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['flows', 'proposals', 'documents', 'plugins']]],
                 'message' => self::str(true),
                 'status' => ['type' => 'string', 'enum' => ['starting', 'in_force', 'ended']],
                 'endedAt' => self::str(true),
@@ -12062,7 +12352,7 @@ final class CoreApiSchemas
                 'delegateProfileId' => self::int(),
                 'startsOn' => ['type' => 'string', 'format' => 'date'],
                 'backOn' => ['type' => 'string', 'format' => 'date', 'description' => 'The day you are back; it ends at the start of that day'],
-                'covers' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['flows', 'proposals', 'documents']], 'minItems' => 1],
+                'covers' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['flows', 'proposals', 'documents', 'plugins']], 'minItems' => 1],
                 'message' => self::str(true),
             ], ['delegateProfileId', 'startsOn', 'backOn', 'covers']),
 
@@ -12604,9 +12894,169 @@ final class CoreApiSchemas
             ],
         ];
 
+        // WHIT-1169: creating another workspace while signed in. Cookie or
+        // Bearer authenticated by the handler — it is about the person, not a
+        // permission in the current workspace.
+        $workspaceCreateState = [
+            'method' => 'GET',
+            'path' => '/api/workspaces/new',
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => [
+                'summary' => 'Whether the caller may create another workspace now, and why not',
+                'tags' => ['tenants'],
+                'responses' => [
+                    200 => self::jsonResponse('Allowed, or the reason and their count against the limit', 'WorkspaceCreateStateResponse'),
+                    401 => self::errorResponse('Authentication required'),
+                ],
+            ],
+        ];
+        $workspaceCreate = [
+            'method' => 'POST',
+            'path' => '/api/workspaces',
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => [
+                'summary' => 'Create a workspace the caller owns',
+                'tags' => ['tenants'],
+                'request' => 'WorkspaceCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The new workspace; switch into it with switch-tenant', 'WorkspaceCreateResponse'),
+                    401 => self::errorResponse('Authentication required'),
+                    403 => self::errorResponse('Creating workspaces is switched off, or the caller may not create one'),
+                    409 => self::errorResponse('The caller already owns as many workspaces as allowed'),
+                    422 => self::errorResponse('Name missing or too long, or an invalid language or colour'),
+                    503 => self::errorResponse('Could not be created right now; nothing was created'),
+                ],
+            ],
+        ];
+
+        // WHIT-1170: owners and ownership offers. Authenticated, no single
+        // permission: staff read, the handler checks who may act.
+        $offerId = [['name' => 'id', 'in' => 'path', 'required' => true, 'description' => 'ID of the offer.', 'schema' => ['type' => 'integer']]];
+        $ownerRoute = static fn (string $method, string $path, array $schema): array => [
+            'method' => $method,
+            'path' => $path,
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => $schema + ['tags' => ['tenants']],
+        ];
+        $ownershipRoutes = [
+            $ownerRoute('GET', '/api/workspace/owners', [
+                'summary' => 'Who owns this workspace; for owners, the open offers and who could be offered',
+                'responses' => [
+                    200 => self::jsonResponse('Owners, offers and candidates', 'WorkspaceOwnersResponse'),
+                    403 => self::errorResponse('Not a staff member of this workspace'),
+                    422 => self::errorResponse('The platform workspace has no owners'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('POST', '/api/workspace/owners/offers/identity-check', [
+                'summary' => 'Start "confirm it is you" before offering ownership or co-ownership',
+                'request' => 'OwnershipOfferCheckRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The check to make', 'IdentityCheckResponse'),
+                    403 => self::errorResponse('Only an owner can offer'),
+                    409 => self::errorResponse('Already an owner, or an offer is waiting'),
+                    422 => self::errorResponse('Not an active member, or the caller themselves'),
+                    429 => self::errorResponse('Too many codes were sent lately'),
+                    503 => self::errorResponse('Confirming it is you is not available'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('POST', '/api/workspace/owners/offers', [
+                'summary' => 'Offer ownership (hand over) or co-ownership to a member; they accept within 7 days',
+                'request' => 'OwnershipOfferCreateRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The offer', 'OwnershipOfferResponse'),
+                    403 => self::errorResponse('Only an owner can offer, or the identity check failed'),
+                    409 => self::errorResponse('Already an owner, or an offer is waiting'),
+                    422 => self::errorResponse('Not an active member, or the caller themselves'),
+                    503 => self::errorResponse('Confirming it is you is not available'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('DELETE', '/api/workspace/owners/offers/{id:\d+}', [
+                'summary' => 'Withdraw an open offer',
+                'parameters' => $offerId,
+                'responses' => [
+                    204 => ['description' => 'Withdrawn'],
+                    403 => self::errorResponse('Only an owner can withdraw'),
+                    409 => self::errorResponse('No longer open'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('POST', '/api/workspace/owners/{profileId:\d+}/identity-check', [
+                'summary' => 'Start "confirm it is you" before removing an owner, or stopping being one',
+                'parameters' => [['name' => 'profileId', 'in' => 'path', 'required' => true, 'description' => 'The owner to remove (yourself to step down).', 'schema' => ['type' => 'integer']]],
+                'responses' => [
+                    200 => self::jsonResponse('The check to make', 'IdentityCheckResponse'),
+                    403 => self::errorResponse('Only an owner can remove an owner'),
+                    404 => self::errorResponse('Not an owner of this workspace'),
+                    409 => self::errorResponse('A workspace always keeps at least one owner'),
+                    429 => self::errorResponse('Too many codes were sent lately'),
+                    503 => self::errorResponse('Confirming it is you is not available'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('DELETE', '/api/workspace/owners/{profileId:\d+}', [
+                'summary' => 'Remove an owner, or stop being one; they keep their roles. Never the last owner.',
+                'parameters' => [['name' => 'profileId', 'in' => 'path', 'required' => true, 'description' => 'The owner to remove (yourself to step down).', 'schema' => ['type' => 'integer']]],
+                'request' => 'GatedApprovalRequest',
+                'responses' => [
+                    204 => ['description' => 'No longer an owner'],
+                    403 => self::errorResponse('Only an owner can remove an owner, or the identity check failed'),
+                    404 => self::errorResponse('Not an owner of this workspace'),
+                    409 => self::errorResponse('A workspace always keeps at least one owner'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('GET', '/api/me/ownership-offers', [
+                'summary' => 'Open offers of ownership made to me, in any workspace',
+                'responses' => [200 => self::jsonResponse('My open offers', 'OwnershipOfferListResponse')] + self::authErrors(),
+            ]),
+            $ownerRoute('GET', '/api/me/ownership-offers/{id:\d+}', [
+                'summary' => 'One offer made to me',
+                'parameters' => $offerId,
+                'responses' => [
+                    200 => self::jsonResponse('The offer', 'OwnershipOfferResponse'),
+                    404 => self::errorResponse('No such offer made to you'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('POST', '/api/me/ownership-offers/{id:\d+}/identity-check', [
+                'summary' => 'Start "confirm it is you" before accepting an offer',
+                'parameters' => $offerId,
+                'responses' => [
+                    200 => self::jsonResponse('The check to make', 'IdentityCheckResponse'),
+                    404 => self::errorResponse('No such offer made to you'),
+                    409 => self::errorResponse('No longer open'),
+                    429 => self::errorResponse('Too many codes were sent lately'),
+                    503 => self::errorResponse('Confirming it is you is not available'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('POST', '/api/me/ownership-offers/{id:\d+}/accept', [
+                'summary' => 'Accept an offer: become an owner (on a hand-over the giver stops being one)',
+                'parameters' => $offerId,
+                'request' => 'GatedApprovalRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The accepted offer', 'OwnershipOfferResponse'),
+                    403 => self::errorResponse('The identity check failed'),
+                    404 => self::errorResponse('No such offer made to you'),
+                    409 => self::errorResponse('No longer open, or expired'),
+                    422 => self::errorResponse('No longer an active member of that workspace'),
+                ] + self::authErrors(),
+            ]),
+            $ownerRoute('POST', '/api/me/ownership-offers/{id:\d+}/decline', [
+                'summary' => 'Decline an offer',
+                'parameters' => $offerId,
+                'responses' => [
+                    204 => ['description' => 'Declined'],
+                    404 => self::errorResponse('No such offer made to you'),
+                    409 => self::errorResponse('No longer open'),
+                ] + self::authErrors(),
+            ]),
+        ];
+
         return [
             $ssoWorkspaceShow,
             $ssoWorkspaceCreate,
+            $workspaceCreateState,
+            $workspaceCreate,
+            ...$ownershipRoutes,
             self::permissionRoute('GET', '/api/identity-providers', 'auth_providers:manage', [
                 'summary' => 'List the tenant\'s configured identity providers',
                 'tags' => ['sso'],
@@ -14543,6 +14993,19 @@ final class CoreApiSchemas
                     503 => self::errorResponse('The billing service is temporarily unreachable'),
                 ] + self::authErrors(),
             ]),
+            self::ungatedRoute('GET', '/api/billing/trial', [
+                'summary' => 'Where this workspace stands with the trial and payment of its plan',
+                'description' =>
+                    'For every member (WHIT-1207): the plan, when its free trial ends, whether the '
+                    . 'workspace is read-only because the trial ended unpaid, whether a card is on '
+                    . 'file, the monthly price, and whether a card can be added now and charged when '
+                    . 'the trial ends (`card_step`). `data` is null for a workspace with no billed '
+                    . 'plan. Not behind the payment wall, so a read-only workspace can find out how to pay.',
+                'tags' => ['billing'],
+                'responses' => [
+                    200 => self::jsonResponse('The trial of this workspace','WorkspaceTrialResponse'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/billing/limits', 'billing:view', [
                 'summary' => 'Where this workspace stands against its plan\'s limits',
                 'description' =>
@@ -16321,6 +16784,44 @@ final class CoreApiSchemas
                         200 => self::jsonResponse('The card and its new state', 'HomeCardHiddenResponse'),
                         404 => self::errorResponse('No card by that name that the caller may see'),
                         422 => self::errorResponse('hidden is missing or not true or false'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            // WHIT-1177 (SDK 1.115): what apps add to the dashboard, and the
+            // caller's own arrangement of it.
+            [
+                'method' => 'GET',
+                'path' => '/api/me/dashboard',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => "The setup points and widgets the caller's apps add to their dashboard, and locked cards for plugins its template offers, in the caller's order",
+                    'description' => 'Only points and widgets whose permission the caller holds in this workspace, from plugins on here, '
+                        . "in the caller's language. Hidden widgets are listed too, so a client can offer Show. Each names the plugin "
+                        . "route it reads; that route applies its own permission and the caller's scope.",
+                    'tags' => ['home'],
+                    // The person's own page layout, with nothing in it an agent needs.
+                    'mcp' => ['expose' => false],
+                    'responses' => [
+                        200 => self::jsonResponse('The setup points and widgets', 'DashboardResponse'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'PUT',
+                'path' => '/api/me/dashboard/layout',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => "Arrange the caller's dashboard: the order, hidden items and widget sizes",
+                    'description' => 'Items are home cards (by plugin name) and widgets (`<plugin>:<id>`) the caller can see, in the order '
+                        . "they want them. Items left out go after, in the apps' own order. Answers with the dashboard as GET does.",
+                    'tags' => ['home'],
+                    'mcp' => ['expose' => false],
+                    'request' => 'DashboardLayoutRequest',
+                    'responses' => [
+                        200 => self::jsonResponse('The dashboard, arranged', 'DashboardResponse'),
+                        422 => self::errorResponse("An item that is not on the caller's dashboard, listed twice, or a size it does not fit"),
                     ] + self::authErrors(),
                 ],
             ],
@@ -18606,11 +19107,20 @@ final class CoreApiSchemas
             ]),
             $route('GET', '/api/public/booking/{workspace}/slots', [
                 'summary' => 'Free times for a service on the booking page (public)',
-                'parameters' => array_merge([$workspace, self::queryParam('service_id', 'integer', 'The service.', true), self::queryParam('profile_id', 'integer', 'One person; leave out for anyone.')], $range),
+                'parameters' => array_merge([$workspace, self::queryParam('service_id', 'integer', 'The service. Leave out when sending `service_ids`.'), self::queryParam('profile_id', 'integer', 'One person; leave out for anyone.')], $range, self::severalServicesParams()),
                 'responses' => [
                     200 => self::jsonResponse('Free times', self::listEnvelope('CalendarSlot')),
                     404 => self::errorResponse('This booking page is not available'),
                     422 => self::errorResponse('A missing or unreadable range'),
+                ] + $limits,
+            ]),
+            $route('GET', '/api/public/booking/{workspace}/me', [
+                'summary' => 'The name and email of the signed-in visitor, to fill the booking form (public)',
+                'description' => 'Reads only the session and profile of the visitor, never the contacts of this workspace or the data of another. `data` is null when nobody is signed in. Sent `Cache-Control: private, no-store`.',
+                'parameters' => [$workspace],
+                'responses' => [
+                    200 => self::jsonResponse('The visitor, or null', self::dataEnvelope(SchemaBuilder::ref('PublicBookingVisitor'))),
+                    404 => self::errorResponse('This booking page is not available'),
                 ] + $limits,
             ]),
             $route('POST', '/api/public/booking/{workspace}/bookings', [
@@ -18970,7 +19480,7 @@ final class CoreApiSchemas
                 'summary' => 'List free times for a service',
                 'description' => 'Each slot lists the people free then. Working hours, time off, existing bookings with their buffers, busy events, the minimum notice and the booking window are all applied.',
                 'tags' => ['calendar'],
-                'parameters' => array_merge([self::queryParam('service_id', 'integer', 'The service.', true)], $range, [$person]),
+                'parameters' => array_merge([self::queryParam('service_id', 'integer', 'The service. Leave out when sending `service_ids`.')], $range, [$person], self::severalServicesParams(), [self::queryParam('except_booking_id', 'integer', 'With `service_ids`: moving this booking, so its own time counts as free.')]),
                 'responses' => [
                     200 => self::jsonResponse('Free times', self::listEnvelope('CalendarSlot')),
                     404 => self::errorResponse('No such service'),
@@ -19244,6 +19754,20 @@ final class CoreApiSchemas
     }
 
     /**
+     * WHIT-1173: asking for free times for several services back to back.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function severalServicesParams(): array
+    {
+        return [
+            self::queryParam('service_ids', 'string', 'Several services back to back, in order, comma-separated (4,7,9). Each slot then says who would do which in `items`. Needs the calendar setting `multi_service_booking`.'),
+            self::queryParam('profile_ids', 'string', 'With `service_ids`: the person for each service, comma-separated, 0 for anyone (11,0,12).'),
+            self::queryParam('same_person', 'boolean', 'With `service_ids`: one person who does them all.'),
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private static function queryParam(
@@ -19495,6 +20019,94 @@ final class CoreApiSchemas
                 'tags' => ['platform-ops'],
                 'responses' => [200 => self::jsonResponse('The guided setups', 'WorkspaceOnboardingListResponse')] + self::authErrors(),
             ]),
+            // WHIT-1194 (SDK 1.116): workspace templates.
+            self::permissionRoute('GET', '/api/workspace/templates', 'settings:write', [
+                'summary' => 'List the workspace templates on offer',
+                'description' => 'Core\'s Blank and the templates of the plugins on in this workspace, in the caller\'s language: what each sets up, whether it has examples and a guided setup, the paid plugin it offers with its trial, and which ones this workspace chose.',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('The templates', 'WorkspaceTemplateListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', 'settings:write', [
+                'summary' => 'Apply a workspace template as the caller',
+                'description' => 'Sets the workspace up through core\'s own routes with the caller\'s permissions, adding only what is missing and never overwriting what the workspace changed. Each part that could not be done is listed with why. Free; the plugin it offers starts only through its own trial.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'request' => 'ApplyWorkspaceTemplateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('What was made and what was skipped', 'ApplyWorkspaceTemplateResponse'),
+                    404 => self::errorResponse('There is no such template'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/workspace/templates/examples', 'settings:write', [
+                'summary' => 'Remove the example contacts and bookings a template added',
+                'description' => 'Cancels the example bookings and archives the example contacts still in the workspace, as the caller. Nothing else is touched.',
+                'tags' => ['platform-ops'],
+                'responses' => [200 => self::jsonResponse('How many were removed', 'RemoveWorkspaceTemplateExamplesResponse')] + self::authErrors(),
+            ]),
+            // WHIT-1195: a chosen template's guided setup.
+            self::permissionRoute('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/status', 'settings:write', [
+                'summary' => 'Which steps of a template\'s guided setup are done',
+                'description' => 'Worked out from what the workspace holds, so a step done elsewhere counts too. `points` repeats `steps` for the dashboard\'s setup points.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('Each step and whether it is done', 'WorkspaceTemplateSetupStatusResponse'),
+                    404 => self::errorResponse('This workspace did not start from that template'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/current/{kind:business|hours|booking}', 'settings:write', [
+                'summary' => 'What a step of a template\'s guided setup opens with',
+                'description' => 'The business details, the caller\'s week, or the booking rules as saved.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']], ['name' => 'kind', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string', 'enum' => ['business', 'hours', 'booking']]]],
+                'responses' => [
+                    200 => self::jsonResponse('The saved values', 'WorkspaceTemplateSetupValuesResponse'),
+                    404 => self::errorResponse('This workspace did not start from that template'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/services', 'settings:write', [
+                'summary' => 'The template\'s services to tick, priced in the workspace\'s currency',
+                'description' => 'Services the workspace already has are left out.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('The rows', 'WorkspaceTemplateServiceRowsResponse'),
+                    404 => self::errorResponse('This workspace did not start from that template'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/offer/close', 'settings:write', [
+                'summary' => '"Not now" on the template\'s plugin offer',
+                'description' => 'The offer step counts as done; the plugin can still be tried from Settings › Plugins.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('Closed', 'WorkspaceTemplateSetupSavedResponse'),
+                    404 => self::errorResponse('This workspace did not start from that template'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/offer/trial', 'plugins:enable', [
+                'summary' => 'Start the free trial of the plugin a template offers',
+                'description' => 'For the template\'s own trial length (30 days on Whity Cloud), once per workspace, no card. The same rules as Settings › Plugins: dependencies are turned on and it is audited.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('The trial and when it ends', 'WorkspaceCodePluginTrialResponse'),
+                    404 => self::errorResponse('This workspace did not start from that template, or it offers no plugin here'),
+                    409 => self::errorResponse('This workspace has already had its trial, or the plugin offers none'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/{kind:business|hours|services|team|booking}', 'settings:write', [
+                'summary' => 'Save a step of a template\'s guided setup, as the caller',
+                'description' => 'Through core\'s own routes with the caller\'s permissions. Writes only what differs, adds and never removes.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']], ['name' => 'kind', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string', 'enum' => ['business', 'hours', 'services', 'team', 'booking']]]],
+                'request' => 'WorkspaceTemplateSetupStepRequest',
+                'responses' => [
+                    200 => self::jsonResponse('What was saved', 'WorkspaceTemplateSetupSavedResponse'),
+                    404 => self::errorResponse('This workspace did not start from that template, or the template has no such step'),
+                    422 => self::errorResponse('What is wrong with the form, in plain words'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/plugins/workspace-access', 'plugins:read', [
                 'summary' => 'List who can use each installed plugin',
                 'description' => 'Operator only (the system workspace).',
@@ -19544,6 +20156,7 @@ final class CoreApiSchemas
             'WorkspacePluginListResponse' => self::listEnvelope('WorkspacePlugin'),
             'WorkspaceCodePlugin' => self::object([
                 'name' => self::str() + ['description' => 'The plugin\'s name'],
+                'displayName' => self::str() + ['description' => 'The name people see, in the reader\'s language (SDK 1.117); the name when the plugin declares none'],
                 'version' => self::str(),
                 'access' => ['type' => 'string', 'enum' => ['all', 'choose'], 'description' => 'all: on for every workspace; choose: this workspace decides'],
                 'canSwitch' => self::bool(),
@@ -19571,7 +20184,7 @@ final class CoreApiSchemas
                         'units' => SchemaBuilder::ref('LocalizedLabel'),
                     ],
                 ],
-            ], ['name', 'version', 'access', 'canSwitch', 'enabled', 'state', 'paid', 'trialAvailable', 'mayTurnOn']),
+            ], ['name', 'displayName', 'version', 'access', 'canSwitch', 'enabled', 'state', 'paid', 'trialAvailable', 'mayTurnOn']),
             'WorkspaceCodePluginListResponse' => self::listEnvelope('WorkspaceCodePlugin'),
             'WorkspaceCodePluginSwitchResponse' => self::object([
                 'data' => self::object(['name' => self::str(), 'enabled' => self::bool()], ['name', 'enabled']),
@@ -19596,6 +20209,98 @@ final class CoreApiSchemas
                 ], ['id', 'blocks'])],
             ], ['plugin', 'status', 'steps']),
             'WorkspaceOnboardingListResponse' => self::listEnvelope('WorkspaceOnboarding'),
+            'WorkspaceTemplateOffer' => self::object([
+                'plugin' => self::str(),
+                'pluginName' => self::str() + ['description' => 'The plugin\'s display name in the reader\'s language (SDK 1.117)'],
+                'free' => ['type' => 'array', 'items' => self::str(), 'description' => 'What the workspace can do free in Whity'],
+                'paid' => ['type' => 'array', 'items' => self::str(), 'description' => 'What the plugin adds'],
+                'trialDays' => self::int(),
+                'trialAvailable' => self::bool(),
+                'state' => ['type' => 'string', 'enum' => ['on', 'read_only', 'off']],
+                'reason' => ['type' => 'string', 'nullable' => true],
+                'trialEndsAt' => ['type' => 'string', 'nullable' => true],
+            ], ['plugin', 'pluginName', 'free', 'paid', 'trialDays', 'trialAvailable', 'state']),
+            'WorkspaceTemplateCard' => self::object([
+                'key' => self::str(),
+                'plugin' => ['type' => 'string', 'nullable' => true, 'description' => 'The plugin that offers it; null for core\'s Blank'],
+                'version' => self::int(),
+                'name' => self::str(),
+                'summary' => self::str(),
+                'icon' => ['type' => 'string', 'nullable' => true],
+                'setsUp' => ['type' => 'array', 'items' => self::str()],
+                'hasExamples' => self::bool(),
+                'hasSetup' => self::bool(),
+                'offer' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('WorkspaceTemplateOffer')]],
+                'chosen' => self::bool(),
+            ], ['key', 'version', 'name', 'summary', 'setsUp', 'hasExamples', 'hasSetup', 'chosen']),
+            'WorkspaceTemplateListResponse' => self::object([
+                'data' => self::object([
+                    'templates' => ['type' => 'array', 'items' => SchemaBuilder::ref('WorkspaceTemplateCard')],
+                    'chosen' => ['type' => 'array', 'items' => self::str(), 'description' => 'Keys of the templates this workspace applied'],
+                    'offerPicker' => self::bool() + ['description' => 'No template yet and the workspace is under 14 days old: send its owner to the picker'],
+                    'examples' => self::int() + ['description' => 'Example contacts and bookings still in the workspace'],
+                ], ['templates', 'chosen', 'offerPicker', 'examples']),
+            ], ['data']),
+            'ApplyWorkspaceTemplateRequest' => self::object([
+                'examples' => self::bool() + ['description' => 'Add the template\'s example contacts and bookings. Default true.'],
+            ], []),
+            'ApplyWorkspaceTemplateResponse' => self::object([
+                'data' => self::object([
+                    'template' => self::str(),
+                    'made' => ['type' => 'object', 'additionalProperties' => self::int(), 'description' => 'How many of each part were made'],
+                    'skipped' => ['type' => 'array', 'items' => self::object(['part' => self::str(), 'key' => self::str(), 'reason' => self::str()], ['part', 'key', 'reason'])],
+                ], ['template', 'made', 'skipped']),
+            ], ['data']),
+            'WorkspaceTemplateSetupStatusResponse' => self::object([
+                'data' => self::object([
+                    'steps' => ['type' => 'object', 'additionalProperties' => self::bool()],
+                    'points' => ['type' => 'object', 'additionalProperties' => self::bool()],
+                ], ['steps', 'points']),
+            ], ['data']),
+            'WorkspaceTemplateSetupValuesResponse' => self::object([
+                'data' => ['type' => 'object', 'additionalProperties' => true],
+            ], ['data']),
+            'WorkspaceTemplateServiceRowsResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => self::object([
+                    'include' => self::bool(),
+                    'name_en' => self::str(),
+                    'name_ar' => self::str(),
+                    'minutes' => self::str(),
+                    'price' => self::str() + ['description' => 'In normal units of the workspace\'s currency; empty when the template has no price in it'],
+                ], ['include', 'name_en', 'name_ar', 'minutes', 'price'])],
+            ], ['data']),
+            // Each step reads only its own fields: business (name_en to colour),
+            // hours (hours), services (services), team (people), booking (the rest).
+            'WorkspaceTemplateSetupStepRequest' => self::object([
+                'name_en' => self::str() + ['description' => 'business: the business name in English'],
+                'name_ar' => self::str() + ['description' => 'business: the business name in Arabic'],
+                'phone' => self::str() + ['description' => 'business'],
+                'address' => self::str() + ['description' => 'business'],
+                'colour' => self::str() + ['description' => 'business: the main colour, #rrggbb'],
+                'hours' => ['type' => 'array', 'description' => 'hours: the caller\'s opening hours', 'items' => self::object([
+                    'weekday' => self::int() + ['description' => '0 Sunday to 6 Saturday'],
+                    'start_time' => self::str() + ['description' => 'HH:MM'],
+                    'end_time' => self::str() + ['description' => 'HH:MM'],
+                ], ['weekday', 'start_time', 'end_time'])],
+                'services' => ['type' => 'array', 'description' => 'services: the rows to add; names that exist are skipped', 'items' => self::object([
+                    'include' => self::bool(),
+                    'name_en' => self::str(),
+                    'name_ar' => self::str(),
+                    'minutes' => self::int(),
+                    'price' => self::str() + ['description' => 'In normal units of the workspace currency (49.000)'],
+                ], ['name_en'])],
+                'people' => ['type' => 'array', 'description' => 'team: people to invite', 'items' => self::object(['email' => self::str()], ['email'])],
+                'min_notice_minutes' => self::int() + ['description' => 'booking'],
+                'max_advance_days' => self::int() + ['description' => 'booking'],
+                'reminder_hours_before' => self::int() + ['description' => 'booking'],
+                'instant_booking' => self::bool() + ['description' => 'booking'],
+            ], []),
+            'WorkspaceTemplateSetupSavedResponse' => self::object([
+                'data' => ['type' => 'object', 'additionalProperties' => true],
+            ], ['data']),
+            'RemoveWorkspaceTemplateExamplesResponse' => self::object([
+                'data' => self::object(['removed' => self::int(), 'failed' => self::int()], ['removed', 'failed']),
+            ], ['data']),
             'WorkspaceCodePluginTrialResponse' => self::object([
                 'data' => self::object(['name' => self::str(), 'enabled' => self::bool(), 'trialEndsAt' => ['type' => 'string', 'nullable' => true]], ['name', 'enabled']),
             ], ['data']),

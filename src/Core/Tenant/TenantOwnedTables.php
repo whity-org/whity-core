@@ -127,6 +127,8 @@ final class TenantOwnedTables
         'calendar_services' => '248_create_calendar_bookings.php',
         'calendar_service_staff' => '248_create_calendar_bookings.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',
+        // WHIT-1173: the services of a booking of several, back to back.
+        'calendar_booking_services' => '302_create_calendar_booking_services.php',
         // Design 3.3: rooms a service needs, filtered by branch.
         'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
         // Design 3.5: each person's own calendar view choices (CV.2, CV.4).
@@ -160,6 +162,10 @@ final class TenantOwnedTables
         // Files, photos and voice sent in Chat (UC.10).
         'chat_attachments' => '279_create_chat_attachments.php',
         'stored_files' => '298_create_stored_files.php',
+        // Who owns each workspace (WHIT-1169).
+        'workspace_owners' => '300_create_workspace_owners.php',
+        // Offers to hand a workspace over or co-own it (WHIT-1170).
+        'workspace_ownership_offers' => '301_create_workspace_ownership_offers.php',
         // Votes in chat polls (UC.5).
         'chat_poll_votes' => '280_create_chat_poll_votes.php',
         // Bots and blocked senders (UC.4, UC.12).
@@ -259,8 +265,13 @@ final class TenantOwnedTables
         // WHIT-784: an agent's Ask-first calls, waiting for the person who
         // granted it (migration 176).
         'agent_proposals' => '176_create_agent_proposals.php',
-        // WHIT-872: which home cards a person hid, per workspace (migration 200).
-        'home_card_hidden' => '200_add_home_card_hidden.php',
+        // WHIT-1177: how a person arranged their dashboard, per workspace
+        // (migration 303; it replaced home_card_hidden).
+        'dashboard_layout' => '303_create_dashboard_layout.php',
+        // WHIT-1194: the template a workspace started from and what applying
+        // it made, examples marked (migration 305).
+        'workspace_template_runs' => '305_create_workspace_templates.php',
+        'workspace_template_items' => '305_create_workspace_templates.php',
         // WHIT-838: a plugin's secrets, per workspace (migration 187).
         'plugin_secrets' => '187_create_plugin_secrets.php',
 
@@ -626,6 +637,9 @@ final class TenantOwnedTables
         'meeting_attendees' => '134_create_meeting_attendance.php',
         // Web push: one browser per person per workspace (WHIT-1073).
         'push_subscriptions' => '276_create_push_subscriptions.php',
+        // MCP idempotency keys (WHIT-931). Its one cross-tenant statement is
+        // the retention prune, marked for the guard.
+        'mcp_call_keys' => '308_create_mcp_call_keys.php',
     ];
 
     /**

@@ -215,14 +215,16 @@ final class ContactsApiSchemas
             self::route('POST', '/api/custom-fields/{id:\d+}/archive', 'fields:manage', [
                 'mcp' => ['undo' => ['windowSeconds' => self::UNDO_WINDOW_SECONDS, 'operation' => 'post_api_custom_fields_id_restore', 'arguments' => ['id' => '/arguments/id']]],
                 'summary' => 'Archive a field',
-                'description' => 'It leaves records, lists and documents; its values are kept and come back if it is restored.',
+                'description' => 'It leaves records, lists and documents; its values are kept and come back if it is restored. '
+                    . 'A plugin\'s own field answers 409: it follows the plugin being on or off.',
                 'tags' => $tags,
-                'responses' => [200 => self::json('The field', $one)] + $notFound + self::auth(),
+                'responses' => [200 => self::json('The field', $one), 409 => self::error('The field belongs to a plugin')] + $notFound + self::auth(),
             ]),
             self::route('POST', '/api/custom-fields/{id:\d+}/restore', 'fields:manage', [
                 'summary' => 'Bring an archived field back',
+                'description' => 'A plugin\'s own field answers 409: it comes back when the plugin is turned on.',
                 'tags' => $tags,
-                'responses' => [200 => self::json('The field', $one)] + $notFound + self::auth(),
+                'responses' => [200 => self::json('The field', $one), 409 => self::error('The field belongs to a plugin')] + $notFound + self::auth(),
             ]),
         ];
     }
@@ -273,6 +275,8 @@ final class ContactsApiSchemas
                 'edit_permission' => self::str(true),
                 'sort_order' => self::int(),
                 'created_by_profile_id' => self::int(true),
+                'owner_plugin' => self::str(true) + ['description' => 'The plugin that added the field (SDK 1.119), or null for one the workspace added. '
+                    . 'A plugin\'s field is archived while the plugin is off and back when it is on; it can\'t be archived or restored by hand.'],
                 'archived' => self::bool(),
                 'merge_field' => self::str() + ['description' => 'How a document template uses it, such as `{{contact.preferred_branch}}`.'],
                 'used_by' => self::int() + ['description' => 'How many records have a value.'],

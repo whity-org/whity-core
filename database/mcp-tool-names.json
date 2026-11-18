@@ -198,6 +198,10 @@
   "delete_api_users_id_memberships_membershipid": {
     "ar": "سحب دور إضافي من مستخدم"
   },
+  "delete_api_workspace_templates_examples": {
+    "en": "Remove the template's example customers and bookings",
+    "ar": "حذف الزبائن والحجوزات التجريبية من القالب"
+  },
   "document_agent_request_update": {
     "en": "Report how a document request is going",
     "ar": "الإبلاغ عن سير طلب مستند"
@@ -302,6 +306,10 @@
   "get_api_billing_return": {
     "en": "Check the result of a payment",
     "ar": "التحقق من نتيجة عملية دفع"
+  },
+  "get_api_branding_host": {
+    "en": "Read your workspace's own web address",
+    "ar": "قراءة عنوان الويب الخاص بمساحة العمل"
   },
   "get_api_calendar_availability": {
     "en": "Find free times for a service",
@@ -1031,6 +1039,22 @@
   "get_api_workspace_plugins_plugin_versions_id": {
     "ar": "عرض إصدار من إضافة"
   },
+  "get_api_workspace_templates": {
+    "en": "List the workspace templates on offer",
+    "ar": "عرض قوالب مساحة العمل المتاحة"
+  },
+  "get_api_workspace_templates_key_setup_current_kind": {
+    "en": "Read what a template setup step opens with",
+    "ar": "قراءة ما تبدأ به خطوة إعداد القالب"
+  },
+  "get_api_workspace_templates_key_setup_services": {
+    "en": "List the template's services to choose from",
+    "ar": "عرض خدمات القالب للاختيار منها"
+  },
+  "get_api_workspace_templates_key_setup_status": {
+    "en": "See which template setup steps are done",
+    "ar": "عرض خطوات إعداد القالب المكتملة"
+  },
   "patch_api_2fa_policies_id": {
     "en": "Change how long people have to set up two-step sign-in",
     "ar": "تغيير مهلة تفعيل التحقق بخطوتين"
@@ -1679,6 +1703,10 @@
     "en": "Switch on a plugin and apply its pending updates",
     "ar": "تفعيل إضافة"
   },
+  "post_api_plugins_name_roles_role_approve": {
+    "en": "Let a plugin give its own permissions to an existing role",
+    "ar": "اعتماد دور موجود لإضافة"
+  },
   "post_api_plugins_reload": {
     "en": "Reload the list of plugins",
     "ar": "إعادة تحميل الإضافات"
@@ -1821,6 +1849,22 @@
   "post_api_workspace_plugins_validate": {
     "en": "Check a workspace plugin's definition",
     "ar": "التحقق من تعريف إضافة"
+  },
+  "post_api_workspace_templates_key_apply": {
+    "en": "Apply a workspace template",
+    "ar": "تطبيق قالب على مساحة العمل"
+  },
+  "post_api_workspace_templates_key_setup_kind": {
+    "en": "Save a template setup step",
+    "ar": "حفظ خطوة من إعداد القالب"
+  },
+  "post_api_workspace_templates_key_setup_offer_close": {
+    "en": "Close the template's plugin offer",
+    "ar": "إغلاق عرض الإضافة في القالب"
+  },
+  "post_api_workspace_templates_key_setup_offer_trial": {
+    "en": "Start the free trial a template offers",
+    "ar": "بدء التجربة المجانية التي يعرضها القالب"
   },
   "put_api_calendar_my_view": {
     "en": "Change your own calendar choices",

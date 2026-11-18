@@ -323,6 +323,11 @@ services:
       DB_PORT: 5432
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set (>= 32 chars) for staging}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set for staging}
+      # WHIT-1219: the public origin, for links this process makes. A route's
+      # final document is made here, and without it the verification QR is
+      # left off (DocumentQrService needs FRONTEND_URL or APP_URL).
+      APP_URL: ${APP_URL:-}
+      FRONTEND_URL: ${FRONTEND_URL:-}
       # Document-render jobs run HERE, not in the web tier, so this needs the
       # same render wiring frankenphp has or those jobs fail inside the worker.
       RENDER_SERVICE_URL: ${RENDER_SERVICE_URL:-http://render:8130}
@@ -366,6 +371,11 @@ services:
       DB_PORT: 5432
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set (>= 32 chars) for staging}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set for staging}
+      # WHIT-1219: the public origin, for links this process makes. A route's
+      # final document is made here, and without it the verification QR is
+      # left off (DocumentQrService needs FRONTEND_URL or APP_URL).
+      APP_URL: ${APP_URL:-}
+      FRONTEND_URL: ${FRONTEND_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -401,6 +411,11 @@ services:
       DB_PORT: 5432
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set (>= 32 chars) for staging}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY must be set for staging}
+      # WHIT-1219: the public origin, for links this process makes. A route's
+      # final document is made here, and without it the verification QR is
+      # left off (DocumentQrService needs FRONTEND_URL or APP_URL).
+      APP_URL: ${APP_URL:-}
+      FRONTEND_URL: ${FRONTEND_URL:-}
     depends_on:
       postgres:
         condition: service_healthy

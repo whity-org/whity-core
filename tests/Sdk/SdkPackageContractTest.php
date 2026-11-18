@@ -242,9 +242,20 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.110.0',
+            '1.121.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.110 ADDS per-seat plugins (getAccess seats) and Billing\\QuantityCheckout (WHIT-1152). '
+            'SDK 1.121 ADDS referenceSelect `multiple`: several rows from an API-backed source, as chips (#1437). '
+            . 'SDK 1.120 ADDS Calendar\\TimeOff and Delegation\\Away: a plugin puts time off on core\'s calendar and reads who is away and who stands in (WHIT-1210). '
+            . 'SDK 1.119 ADDS Contacts\\Contacts and PluginContactFieldsInterface: core contacts and a plugin\'s own contact fields (WHIT-1209). '
+            . 'SDK 1.118 ADDS Billing\\TrialCheckout: the card now, the first charge when a workspace\'s trial ends (WHIT-1207). '
+            . 'SDK 1.117 ADDS PluginDisplayNameInterface: the name people read for a plugin (WHIT-1198). '
+            . 'SDK 1.116 ADDS PluginWorkspaceTemplatesInterface and Manifest\\WorkspaceTemplateValidator: workspace templates (WHIT-1194). '
+            . 'SDK 1.115 ADDS PluginDashboardInterface and Manifest\\DashboardValidator: setup points and dashboard widgets (WHIT-1177). '
+            . 'SDK 1.114 ADDS Http\\Outbound\\HttpClient, StreamHttpClient and Testing\\RecordedHttpClient: one outbound HTTP client (WHIT-1058). '
+            . 'SDK 1.113 ADDS timeInput, weeklyHours, checkboxGroup, colorInput swatches and fieldArray default rows (WHIT-1172). '
+            . 'SDK 1.112 ADDS workspace owner events: owner_added, owner_removed, ownership_transferred (WHIT-1170). '
+            . 'SDK 1.111 ADDS Print\QrCode: the QR encoder moved from Front Office (WHIT-1060). '
+            . 'SDK 1.110 ADDS per-seat plugins (getAccess seats) and Billing\\QuantityCheckout (WHIT-1152). '
             . 'SDK 1.109 ADDS PluginOnboardingInterface and more WorkspaceSetup routes: guided setups (WHIT-1148). '
             . 'SDK 1.108 ADDS Setup\\WorkspaceSetup: packs set a workspace up through core routes as the acting person (WHIT-1129). '
             . 'SDK 1.107 ADDS PluginAccessInterface, PluginWorkspaceLifecycleInterface and Billing\\WorkspaceAddons: paid plugins switched on per workspace (WHIT-1125). '

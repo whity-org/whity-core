@@ -127,6 +127,10 @@ describe('ease of use (A.1)', () => {
     'packages/features/src/i18n/EXAMPLE.tsx',
     'packages/features/src/i18n/LanguageSwitcher.tsx',
     'packages/ui/src/editor/block-toolbar.tsx',
+    // WHIT-1181: the PhoneInput card's country picker is a transparent native
+    // select laid over the +code (docs/design/components/PhoneInput), so a
+    // phone opens its own picker; what shows is the styled +code.
+    'packages/ui/src/phone-input.tsx',
   ];
 
   const relative = (f: string) => path.relative(ROOT, f).split(path.sep).join('/');
@@ -151,5 +155,44 @@ describe('ease of use (A.1)', () => {
   it('holds native selects only in the files named, and each named file still has one', () => {
     const found = product.filter((f) => NATIVE_SELECT.test(readFileSync(f, 'utf8'))).map(relative).sort();
     expect(found).toEqual([...NATIVE_SELECT_ALLOWED].sort());
+  });
+});
+
+/**
+ * Spacing around dividers (04-layout). Tailwind v4 puts `space-y-*`'s gap and
+ * `divide-y`'s line both on the bottom of each child, so together they draw the
+ * line straight under a group's last control: a button at the end of a group
+ * sits on the line. Use `stack-divided-*` (globals.css), which keeps the gap on
+ * both sides of the line.
+ */
+describe('dividers keep their spacing', () => {
+  const product = [
+    ...walk(path.join(ROOT, 'web', 'app')),
+    ...walk(path.join(ROOT, 'web', 'components')),
+    ...walk(path.join(ROOT, 'packages', 'ui', 'src')),
+    ...walk(path.join(ROOT, 'packages', 'features', 'src')),
+    ...walk(path.join(ROOT, 'plugins')),
+  ].filter((f) => f.endsWith('.tsx'));
+
+  // One class string (quotes or backticks) holding both.
+  const SPACE_AND_DIVIDE = /["'`][^"'`]*(?:\bspace-y-[\w.[\]]+\b[^"'`]*\bdivide-y\b|\bdivide-y\b[^"'`]*\bspace-y-[\w.[\]]+)[^"'`]*["'`]/;
+
+  it('scans the product code', () => {
+    expect(product.length).toBeGreaterThan(200);
+  });
+
+  it('never puts space-y and divide-y on one element', () => {
+    const hits = product
+      .filter((f) => SPACE_AND_DIVIDE.test(readFileSync(f, 'utf8')))
+      .map((f) => path.relative(ROOT, f).split(path.sep).join('/'));
+    expect(hits).toEqual([]);
+  });
+
+  it('the scanner catches what it is meant to catch', () => {
+    expect(SPACE_AND_DIVIDE.test('className="space-y-6 divide-y divide-border"')).toBe(true);
+    expect(SPACE_AND_DIVIDE.test("cn('divide-y', 'space-y-4')")).toBe(false);
+    expect(SPACE_AND_DIVIDE.test('className="divide-y divide-border space-y-2"')).toBe(true);
+    expect(SPACE_AND_DIVIDE.test('className="stack-divided-6"')).toBe(false);
+    expect(SPACE_AND_DIVIDE.test('className="divide-y divide-border"')).toBe(false);
   });
 });

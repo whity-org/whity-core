@@ -17,7 +17,9 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { SsoLoginButtons } from '@/components/sso-login-buttons';
 import { TwoFactorSetupWizard } from '@/components/TwoFactorSettings';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
-import { oneEntryPerWorkspace, rolesLabel } from '@/lib/workspace-memberships';
+import { oneEntryPerWorkspace, roleLabels } from '@/lib/workspace-memberships';
+import { RoleSummary } from '@whity/ui/role-summary';
+import { useRoleSummaryLabels } from '@/hooks/useRoleSummaryLabels';
 import { SSO_ERROR_KEYS } from './sso-error-keys';
 import { localizedText } from '@whity/ui/localized-text';
 
@@ -69,6 +71,8 @@ import { localizedText } from '@whity/ui/localized-text';
  *   sso.error.noMembership = Your account has no active workspace yet. Ask an administrator for access.
  *   sso.error.stateMismatch = Your sign-in session could not be verified. Please try again.
  *   sso.error.expired = Your sign-in attempt timed out. Please try again.
+ *   sso.error.inviteInvalid = That invitation can no longer be used. Ask the workspace to send a new one.
+ *   sso.error.inviteOtherEmail = That invitation was sent to another email address. Sign in with that address, or ask for a new invitation.
  *   sso.error.denied = Sign-in was cancelled.
  *   sso.error.failed = Sign-in failed. Please try again.
  */
@@ -106,10 +110,14 @@ export default function LoginPage() {
   const { addToast } = useToast();
   const branding = useBranding();
   const t = useTranslation('auth');
+  const roleSummaryLabels = useRoleSummaryLabels();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [loginError, setLoginError] = useState<string | null>(null);
+  // WHIT-1168: false when this server signs people in only through its
+  // identity provider; then the page shows the provider and nothing else.
+  const [passwordSignIn, setPasswordSignIn] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [requires2fa, setRequires2fa] = useState(false);
@@ -473,7 +481,21 @@ export default function LoginPage() {
           email and password. */}
       {!requiresEnrollment && !requires2fa && !pendingMemberships && (
         <div className="space-y-4">
-          <SsoLoginButtons />
+          {!passwordSignIn && loginError && (
+            <Alert variant="destructive">
+              <AlertDescription>{loginError}</AlertDescription>
+            </Alert>
+          )}
+          <SsoLoginButtons onLoaded={(info) => setPasswordSignIn(info.passwordSignIn)} />
+          {!passwordSignIn && (
+            <p className="text-center text-sm text-muted-foreground" data-testid="provider-only-note">
+              {t(
+                'login.providerOnly.note',
+                'New here? The same button creates your account and your workspace.'
+              )}
+            </p>
+          )}
+          {passwordSignIn && (
           <form onSubmit={handleSubmit} className="space-y-4">
             {loginError && (
               <Alert variant="destructive">
@@ -562,6 +584,7 @@ export default function LoginPage() {
               </Link>
             </p>
           </form>
+          )}
         </div>
       )}
 
@@ -582,14 +605,19 @@ export default function LoginPage() {
                 key={m.tenant_id}
                 type="button"
                 variant="outline"
-                className="w-full justify-between"
+                className="w-full justify-between gap-3"
                 disabled={selectingTenant}
                 onClick={() => handleSelectTenant(m.tenant_id)}
               >
-                <span>
+                <span className="min-w-0 truncate">
                   {localizedText(m.tenant_names, readerLanguage, m.tenant_name_language, m.tenant_name)}
                 </span>
-                <span className="text-xs capitalize text-muted-foreground">{rolesLabel(m)}</span>
+                {/* First role and "+N more", never wider than its half (WHIT-1175). */}
+                <RoleSummary
+                  roles={roleLabels(m)}
+                  labels={roleSummaryLabels}
+                  className="max-w-[50%] shrink text-xs capitalize text-muted-foreground"
+                />
               </Button>
             ))}
           </div>

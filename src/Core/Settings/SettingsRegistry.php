@@ -138,6 +138,43 @@ final class SettingsRegistry
     // Default 'false': a sovereign instance is operator-provisioned.
     public const SSO_SELF_PROVISION_WORKSPACE = 'auth.sso_self_provision_workspace';
 
+    // Creating more workspaces while signed in (WHIT-1169). Global/operator-level.
+    // When 'true', any signed-in person may create another workspace from the
+    // workspace switcher or Ctrl+K and becomes its owner; it starts on the
+    // default plan, behind the payment gate when registration requires payment.
+    // Default 'false': a sovereign instance is operator-provisioned. On
+    // app.whity.dev the operator turns it on.
+    public const WORKSPACES_SELF_CREATE_ENABLED = 'workspaces.self_create_enabled';
+
+    // How many workspaces one person may own (WHIT-1169). Global/operator-level.
+    // Counted over workspace_owners, so co-owned workspaces count for each owner.
+    // '0' means no limit (the self-hosted default); app.whity.dev uses 3.
+    public const WORKSPACES_MAX_OWNED_PER_PERSON = 'workspaces.max_owned_per_person';
+
+    // The plan a person's second and later OWNED workspaces start on (WHIT-1203).
+    // Global/operator-level. A person's first owned workspace starts on
+    // `billing.default_plan` (Free on app.whity.dev); every further one they
+    // create starts on this plan in a trial, then read-only until paid, so
+    // owning more than one workspace is paid ("each new workspace pays"). Once
+    // an unpaid trial ends the workspace is read-only (block_writes), never
+    // closed, and nothing is deleted (owner 2026-11-17).
+    // Being invited into workspaces is never counted. '' (the default) means
+    // "same as the default plan": a self-hosted install pays only for paid
+    // plugins (BM.3) and is unchanged.
+    public const WORKSPACES_ADDITIONAL_PLAN = 'workspaces.additional_plan';
+
+    // How long that trial lasts, in days (WHIT-1203). Global/operator-level.
+    // Default '30' (owner 2026-11-17). '0' means no trial: the workspace is
+    // read-only until it is paid. Read only when `workspaces.additional_plan` is set.
+    public const WORKSPACES_ADDITIONAL_TRIAL_DAYS = 'workspaces.additional_trial_days';
+    // Password sign-in on this server (WHIT-1168). Global/operator-level. When
+    // 'false', people sign in and sign up only through the operator's identity
+    // provider (app.whity.dev: Whity ID): password sign-in, reset, registration
+    // with a password and local two-step set-up refuse. Default 'true': a
+    // self-hosted core keeps its own sign-in (ADR 0019). Break-glass:
+    // WHITY_PASSWORD_SIGN_IN=force, see Core\Identity\PasswordSignIn.
+    public const PASSWORD_SIGN_IN = 'auth.password_sign_in';
+
     // Desktop-client login TTL (WC-desktop-ttl). The maximum wall-clock a
     // native/desktop client's cached login (its device credential) stays valid
     // before the app must re-authenticate ONLINE — even offline, the client
@@ -811,6 +848,12 @@ final class SettingsRegistry
     public const CALENDAR_WEEKEND_DAYS = 'calendar.weekend_days';
     /** Design 3.3: off turns every booking from the booking page into a request staff accept. */
     public const CALENDAR_INSTANT_BOOKING = 'calendar.instant_booking';
+    /**
+     * WHIT-1173: on lets one booking hold several services back to back
+     * (a haircut, a colour and a blow-dry), on the booking page and at the
+     * desk. Off by default; the Salons plugin turns it on.
+     */
+    public const CALENDAR_MULTI_SERVICE_BOOKING = 'calendar.multi_service_booking';
 
     /**
      * Whether the web app offers itself as an installable app (#1733): the web
@@ -919,6 +962,11 @@ final class SettingsRegistry
         self::SELF_2FA_RECOVERY_ENABLED,
         self::SSO_ENABLED,
         self::SSO_SELF_PROVISION_WORKSPACE,
+        self::WORKSPACES_SELF_CREATE_ENABLED,
+        self::WORKSPACES_MAX_OWNED_PER_PERSON,
+        self::WORKSPACES_ADDITIONAL_PLAN,
+        self::WORKSPACES_ADDITIONAL_TRIAL_DAYS,
+        self::PASSWORD_SIGN_IN,
         self::STORAGE_DRIVER,
         self::STORAGE_S3_ENDPOINT,
         self::STORAGE_S3_REGION,
@@ -1002,6 +1050,8 @@ final class SettingsRegistry
         self::SELF_2FA_RECOVERY_ENABLED,
         self::SSO_ENABLED,
         self::SSO_SELF_PROVISION_WORKSPACE,
+        self::WORKSPACES_SELF_CREATE_ENABLED,
+        self::PASSWORD_SIGN_IN,
         self::STORAGE_S3_PATH_STYLE,
         self::MAIL_EVENT_WELCOME,
         self::MAIL_EVENT_APPROVAL,
@@ -1019,6 +1069,7 @@ final class SettingsRegistry
         self::UI_HIDE_DATES,
         self::CALENDAR_BOOKING_PAGE_ENABLED,
         self::CALENDAR_INSTANT_BOOKING,
+        self::CALENDAR_MULTI_SERVICE_BOOKING,
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
         self::AFFILIATE_CLAWBACK_ON_REFUND,
@@ -1075,6 +1126,7 @@ final class SettingsRegistry
         self::SELF_2FA_RECOVERY_ENABLED,
         self::SSO_ENABLED,
         self::SSO_SELF_PROVISION_WORKSPACE,
+        self::WORKSPACES_SELF_CREATE_ENABLED,
         self::PLUGINS_STORE_ENABLED,
         self::DOCUMENTS_RENDER_ENABLED,
         self::I18N_ENABLED,
@@ -1163,6 +1215,11 @@ final class SettingsRegistry
         self::SELF_2FA_RECOVERY_ENABLED => 'true',
         self::SSO_ENABLED => 'true',
         self::SSO_SELF_PROVISION_WORKSPACE => 'false',
+        self::WORKSPACES_SELF_CREATE_ENABLED => 'false',
+        self::WORKSPACES_MAX_OWNED_PER_PERSON => '0',
+        self::WORKSPACES_ADDITIONAL_PLAN => '',
+        self::WORKSPACES_ADDITIONAL_TRIAL_DAYS => '30',
+        self::PASSWORD_SIGN_IN => 'true',
         // 72 hours (3 days). A native client offline longer than this must
         // re-authenticate online before it will work again.
         self::AUTH_DESKTOP_LOGIN_MAX_HOURS => '72',
@@ -1354,6 +1411,7 @@ final class SettingsRegistry
         self::CALENDAR_WEEK_START => 'saturday',
         self::CALENDAR_WEEKEND_DAYS => 'friday,saturday',
         self::CALENDAR_INSTANT_BOOKING => 'true',
+        self::CALENDAR_MULTI_SERVICE_BOOKING => 'false',
         // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
         self::APP_INSTALLABLE => 'true',
         // Empty: the plans page shows the active plans as they are, and the
@@ -1717,6 +1775,11 @@ final class SettingsRegistry
             self::SELF_2FA_RECOVERY_ENABLED => self::validateBoolean($value, self::SELF_2FA_RECOVERY_ENABLED),
             self::SSO_ENABLED => self::validateBoolean($value, self::SSO_ENABLED),
             self::SSO_SELF_PROVISION_WORKSPACE => self::validateBoolean($value, self::SSO_SELF_PROVISION_WORKSPACE),
+            self::WORKSPACES_SELF_CREATE_ENABLED => self::validateBoolean($value, self::WORKSPACES_SELF_CREATE_ENABLED),
+            self::WORKSPACES_MAX_OWNED_PER_PERSON => self::validateWholeNumberBetween($value, self::WORKSPACES_MAX_OWNED_PER_PERSON, 0, 1000),
+            self::WORKSPACES_ADDITIONAL_PLAN => self::validatePlanKey($value),
+            self::WORKSPACES_ADDITIONAL_TRIAL_DAYS => self::validateWholeNumberBetween($value, self::WORKSPACES_ADDITIONAL_TRIAL_DAYS, 0, 90),
+            self::PASSWORD_SIGN_IN => self::validateBoolean($value, self::PASSWORD_SIGN_IN),
             self::AUTH_DESKTOP_LOGIN_MAX_HOURS => self::validateDesktopLoginMaxHours($value),
             self::STORAGE_DRIVER => self::validateStorageDriver($value),
             self::STORAGE_S3_PATH_STYLE => self::validateBoolean($value, self::STORAGE_S3_PATH_STYLE),
@@ -1825,6 +1888,7 @@ final class SettingsRegistry
             self::CALENDAR_WEEK_START => in_array($value, self::ENUM_OPTIONS[self::CALENDAR_WEEK_START], true) ? null : 'calendar.week_start must be a day of the week.',
             self::CALENDAR_WEEKEND_DAYS => self::validateWeekdayList($value),
             self::CALENDAR_INSTANT_BOOKING => self::validateBoolean($value, self::CALENDAR_INSTANT_BOOKING),
+            self::CALENDAR_MULTI_SERVICE_BOOKING => self::validateBoolean($value, self::CALENDAR_MULTI_SERVICE_BOOKING),
             self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the

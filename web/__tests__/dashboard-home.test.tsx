@@ -1,6 +1,7 @@
 /**
  * A01 Home: Waiting for you merges every inbox source and the person's
  * agent proposals, oldest first (H.2), and collapses to one line when empty.
+ * From your apps and Finish setting up also carry what apps add (SDK 1.115, H.5).
  */
 
 import React from 'react';
@@ -42,6 +43,14 @@ jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));
 jest.mock('@/lib/capabilities-context', () => ({ useCapabilitiesContext: () => ({ has: () => true }) }));
 const mockPush = jest.fn();
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: mockPush }) }));
+const mockRefreshNavigation = jest.fn();
+jest.mock('@/lib/navigation-context', () => ({ useNavigation: () => ({ refresh: mockRefreshNavigation }) }));
+jest.mock('@/components/plugin/blocks/block-renderer', () => ({
+  BlockRenderer: ({ blocks }: { blocks: Array<{ type: string; value?: string }> }) => {
+    if (blocks.some((b) => b.type === 'boom')) throw new Error('bad block');
+    return <div data-testid="blocks">{blocks.map((b) => b.value ?? b.type).join(',')}</div>;
+  },
+}));
 jest.mock('next/link', () => ({
   __esModule: true,
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
@@ -197,10 +206,38 @@ const card = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+const NO_APPS = { setup: [], widgets: [] };
+
+const widget = (over: Record<string, unknown> = {}) => ({
+  key: 'Salons:today',
+  plugin: 'Salons',
+  kind: 'list' as const,
+  title: "Today's bookings",
+  description: null,
+  icon: 'calendar',
+  href: null,
+  source: '/api/v1/salons/today',
+  sizes: ['medium' as const, 'large' as const],
+  size: 'medium' as const,
+  hidden: false,
+  position: null,
+  blocks: [{ type: 'dataList', source: '/api/v1/salons/today', itemField: 'line' }],
+  ...over,
+}) as never;
+
+const SALON_SETUP = {
+  plugin: 'Salons',
+  status: '/api/v1/salons/setup-points',
+  points: [
+    { id: 'chairs', label: 'Add your chairs', why: 'Bookings need a chair', action: null, href: '/admin/setup/Salons?step=chairs', icon: null },
+    { id: 'hours', label: 'Set your hours', why: null, action: 'Set', href: '/admin/setup/Salons?step=hours', icon: null },
+  ],
+};
+
 describe('HomeApps', () => {
   it('shows nothing at all with no cards', async () => {
     mockApiClient.mockImplementation(() => json({ data: [] }));
-    const { container } = render(<HomeApps />);
+    const { container } = render(<HomeApps dashboard={NO_APPS} onDashboardChange={jest.fn()} />);
     await waitFor(() => expect(mockApiClient).toHaveBeenCalled());
     await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
@@ -211,7 +248,7 @@ describe('HomeApps', () => {
         ? json({ data: [card()] })
         : json({ data: { value: '3', caption: 'items below reorder level', lines: [{ label: 'Flour', value: '4 / 6' }] } })
     );
-    render(<HomeApps />);
+    render(<HomeApps dashboard={NO_APPS} onDashboardChange={jest.fn()} />);
 
     expect(await screen.findByText('3')).toBeInTheDocument();
     expect(screen.getByText('items below reorder level')).toBeInTheDocument();
@@ -223,7 +260,7 @@ describe('HomeApps', () => {
     mockApiClient.mockImplementation((url: string) =>
       url === '/api/v1/me/home-cards' ? json({ data: [card()] }) : json({}, 403)
     );
-    render(<HomeApps />);
+    render(<HomeApps dashboard={NO_APPS} onDashboardChange={jest.fn()} />);
 
     await waitFor(() => expect(calledUrls()).toContain('/api/v1/inventory/home-card'));
     await waitFor(() => expect(screen.queryByRole('link', { name: 'Stock' })).not.toBeInTheDocument());
@@ -233,7 +270,7 @@ describe('HomeApps', () => {
     mockApiClient.mockImplementation((url: string) =>
       url === '/api/v1/me/home-cards' ? json({ data: [card()] }) : json({}, 500)
     );
-    render(<HomeApps />);
+    render(<HomeApps dashboard={NO_APPS} onDashboardChange={jest.fn()} />);
 
     expect(await screen.findByText('This card could not be loaded.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
@@ -243,16 +280,163 @@ describe('HomeApps', () => {
     mockApiClient.mockImplementation((url: string) =>
       url === '/api/v1/me/home-cards' ? json({ data: [card({ hidden: true })] }) : json({ data: { key: 'Inventory', hidden: false } })
     );
-    render(<HomeApps />);
+    render(<HomeApps dashboard={NO_APPS} onDashboardChange={jest.fn()} />);
 
     await userEvent.click(await screen.findByRole('button', { name: 'Show' }));
     await waitFor(() =>
       expect(mockApiClient).toHaveBeenCalledWith(
-        '/api/v1/me/home-cards/Inventory/hidden',
-        expect.objectContaining({ method: 'PUT', body: JSON.stringify({ hidden: false }) })
+        '/api/v1/me/dashboard/layout',
+        expect.objectContaining({ method: 'PUT', body: JSON.stringify({ items: [{ key: 'Inventory', hidden: false, size: null }] }) })
       )
     );
-    expect(calledUrls()).not.toContain('/api/v1/inventory/home-card');
+  });
+
+  it("draws an app's widget from its blocks after the card, in the apps' order", async () => {
+    mockApiClient.mockImplementation((url: string) =>
+      url === '/api/v1/me/home-cards' ? json({ data: [card()] }) : json({ data: [] })
+    );
+    render(<HomeApps dashboard={{ setup: [], widgets: [widget({ plugin: 'Inventory', key: 'Inventory:low' })] }} onDashboardChange={jest.fn()} />);
+
+    expect(await screen.findByTestId('blocks')).toHaveTextContent('dataList');
+    const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(headings).toEqual(['Stock', "Today's bookings"]);
+  });
+
+  it('shows one calm line when a widget cannot load, and leaves it out when refused', async () => {
+    mockApiClient.mockImplementation((url: string) =>
+      url === '/api/v1/me/home-cards' ? json({ data: [] }) : url === '/api/v1/salons/today' ? json({}, 500) : json({}, 403)
+    );
+    render(
+      <HomeApps
+        dashboard={{ setup: [], widgets: [widget(), widget({ key: 'Salons:money', title: 'Takings', source: '/api/v1/salons/money' })] }}
+        onDashboardChange={jest.fn()}
+      />
+    );
+
+    expect(await screen.findByText('Nothing to show here right now')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Takings')).not.toBeInTheDocument());
+  });
+
+  it('keeps a widget that breaks while drawing to itself', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockApiClient.mockImplementation((url: string) => (url === '/api/v1/me/home-cards' ? json({ data: [card()] }) : json({ data: [] })));
+    render(<HomeApps dashboard={{ setup: [], widgets: [widget({ blocks: [{ type: 'boom' }] })] }} onDashboardChange={jest.fn()} />);
+
+    expect(await screen.findByText('Nothing to show here right now')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Stock' })).toBeInTheDocument();
+  });
+
+  it('Customise moves a widget earlier and saves the whole order', async () => {
+    mockApiClient.mockImplementation((url: string) =>
+      url === '/api/v1/me/home-cards' ? json({ data: [card()] }) : json({ data: [] })
+    );
+    const changed = jest.fn();
+    render(<HomeApps dashboard={{ setup: [], widgets: [widget()] }} onDashboardChange={changed} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Customise' }));
+    await userEvent.click(screen.getByRole('button', { name: "Move Today's bookings earlier" }));
+    await waitFor(() =>
+      expect(mockApiClient).toHaveBeenCalledWith(
+        '/api/v1/me/dashboard/layout',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ items: [{ key: 'Salons:today', hidden: false, size: 'medium' }, { key: 'Inventory', hidden: false, size: null }] }),
+        })
+      )
+    );
+    expect(changed).toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Large' }));
+    await waitFor(() => expect(mockApiClient).toHaveBeenCalledWith('/api/v1/me/dashboard/layout', expect.objectContaining({ body: expect.stringContaining('"size":"large"') })));
+  });
+});
+
+/** WHIT-1202: a paid plugin the workspace's template offers, as a locked card. */
+const offer = (over: Record<string, unknown> = {}) => ({
+  key: 'offer:Salons',
+  template: 'salon',
+  plugin: 'Salons',
+  pluginName: 'Whity for Salons',
+  lines: ['Walk-in queue with a ticket number', 'Commission for each stylist', 'A chair map for the day'],
+  trialDays: 30,
+  hidden: false,
+  position: null,
+  ...over,
+});
+
+describe('HomeApps locked cards (WHIT-1202)', () => {
+  it('shows the plugin by its name, what it adds, and one filled trial button, dashed', async () => {
+    mockApiClient.mockImplementation(() => json({ data: [] }));
+    render(<HomeApps dashboard={{ setup: [], widgets: [], offers: [offer()] }} onDashboardChange={jest.fn()} />);
+
+    expect(await screen.findByRole('heading', { name: 'Whity for Salons' })).toBeInTheDocument();
+    expect(screen.queryByText('Salons')).not.toBeInTheDocument();
+    expect(screen.getByText('Commission for each stylist')).toBeInTheDocument();
+    const card = screen.getByRole('heading', { name: 'Whity for Salons' }).closest('[data-slot="locked-card"]');
+    expect(card).toHaveClass('border-dashed');
+    const start = screen.getByRole('button', { name: 'Start your 30-day free trial' });
+    expect(start).toHaveAttribute('data-variant', 'default');
+    expect(screen.getByRole('link', { name: "See what's included" })).toHaveAttribute('href', '/admin/plugins#plugin-Salons');
+  });
+
+  it("starts the template's trial, then hands over to the plugin", async () => {
+    mockApiClient.mockImplementation((url: string) =>
+      url === '/api/v1/workspace/templates/salon/setup/offer/trial'
+        ? json({ data: { name: 'Salons', enabled: true, trialEndsAt: '2026-12-17 10:00:00' } })
+        : json({ data: [] })
+    );
+    const changed = jest.fn();
+    render(<HomeApps dashboard={{ setup: [], widgets: [], offers: [offer()] }} onDashboardChange={changed} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Start your 30-day free trial' }));
+    await waitFor(() =>
+      expect(mockApiClient).toHaveBeenCalledWith('/api/v1/workspace/templates/salon/setup/offer/trial', expect.objectContaining({ method: 'POST' }))
+    );
+    expect(addToast).toHaveBeenCalledWith('Your 30-day trial of Whity for Salons has started.', 'success');
+    expect(changed).toHaveBeenCalled();
+    expect(mockRefreshNavigation).toHaveBeenCalled();
+  });
+
+  it('says so in plain words when the trial cannot start', async () => {
+    mockApiClient.mockImplementation((url: string) =>
+      url.endsWith('/offer/trial') ? json({ error: 'This workspace has already had its trial, or the plugin offers none' }, 409) : json({ data: [] })
+    );
+    const changed = jest.fn();
+    render(<HomeApps dashboard={{ setup: [], widgets: [], offers: [offer()] }} onDashboardChange={changed} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Start your 30-day free trial' }));
+    await waitFor(() =>
+      expect(addToast).toHaveBeenCalledWith('This workspace has already had its trial, or the plugin offers none', 'error', 6000)
+    );
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it('hides from its menu like any card, and Show brings it back', async () => {
+    mockApiClient.mockImplementation(() => json({ data: [] }));
+    render(<HomeApps dashboard={{ setup: [], widgets: [], offers: [offer()] }} onDashboardChange={jest.fn()} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Options for Whity for Salons' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Hide from home' }));
+    await waitFor(() =>
+      expect(mockApiClient).toHaveBeenCalledWith(
+        '/api/v1/me/dashboard/layout',
+        expect.objectContaining({ method: 'PUT', body: JSON.stringify({ items: [{ key: 'offer:Salons', hidden: true, size: null }] }) })
+      )
+    );
+  });
+
+  it('gives only the first locked card the filled button', async () => {
+    mockApiClient.mockImplementation(() => json({ data: [] }));
+    render(
+      <HomeApps
+        dashboard={{ setup: [], widgets: [], offers: [offer(), offer({ key: 'offer:Clinics', plugin: 'Clinics', pluginName: 'Whity for Clinics', template: 'clinic' })] }}
+        onDashboardChange={jest.fn()}
+      />
+    );
+
+    const buttons = await screen.findAllByRole('button', { name: 'Start your 30-day free trial' });
+    expect(buttons.map((b) => b.getAttribute('data-variant'))).toEqual(['default', 'outline']);
   });
 });
 
@@ -261,7 +445,7 @@ describe('FinishSettingUp', () => {
     mockApiClient.mockImplementation(() =>
       json({ data: { steps: [{ key: 'team', done: true }, { key: 'tax', done: false }], done: 1, total: 2 } })
     );
-    render(<FinishSettingUp />);
+    render(<FinishSettingUp canSetUp apps={[]} />);
 
     expect(await screen.findByText('1 of 2 done')).toBeInTheDocument();
     expect(screen.getByText('Invoices can’t be issued without it')).toBeInTheDocument();
@@ -270,8 +454,31 @@ describe('FinishSettingUp', () => {
 
   it('disappears when every step is done', async () => {
     mockApiClient.mockImplementation(() => json({ data: { steps: [{ key: 'team', done: true }], done: 1, total: 1 } }));
-    const { container } = render(<FinishSettingUp />);
+    const { container } = render(<FinishSettingUp canSetUp apps={[]} />);
     await waitFor(() => expect(mockApiClient).toHaveBeenCalled());
+    await waitFor(() => expect(container).toBeEmptyDOMElement());
+  });
+
+  it("adds an app's points after core's, done by the app's own route", async () => {
+    mockApiClient.mockImplementation((url: string) =>
+      url === '/api/v1/me/setup-steps'
+        ? json({ data: { steps: [{ key: 'team', done: true }], done: 1, total: 1 } })
+        : json({ data: { points: { chairs: false, hours: true } } })
+    );
+    render(<FinishSettingUp canSetUp apps={[SALON_SETUP]} />);
+
+    expect(await screen.findByText('2 of 3 done')).toBeInTheDocument();
+    expect(screen.getByText('Bookings need a chair')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Set up' })).toHaveAttribute('href', '/admin/setup/Salons?step=chairs');
+    expect(calledUrls()).toContain('/api/v1/salons/setup-points');
+  });
+
+  it("leaves out an app whose route fails, and shows only app points to people who can't change settings", async () => {
+    mockApiClient.mockImplementation(() => json({}, 500));
+    const { container } = render(<FinishSettingUp canSetUp={false} apps={[SALON_SETUP]} />);
+
+    await waitFor(() => expect(calledUrls()).toContain('/api/v1/salons/setup-points'));
+    expect(calledUrls()).not.toContain('/api/v1/me/setup-steps');
     await waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 });

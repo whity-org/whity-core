@@ -781,6 +781,8 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $router->register('POST', '/api/plugins/{name}/disable', [$pluginsHandler, 'disable'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_DISABLE);
         $router->register('POST', '/api/plugins/reload', [$pluginsHandler, 'reload'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_RELOAD);
         $router->register('POST', '/api/plugins/{id}/uninstall', [$pluginsHandler, 'uninstall'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_UNINSTALL);
+        // #1907: `plugin role-approve`, mirroring public/index.php.
+        $router->register('POST', '/api/plugins/{name}/roles/{role}/approve', [$pluginsHandler, 'approveRole'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_INSTALL);
 
         $migrationsHandler = new MigrationsApiHandler($db, $baseDir . '/database/migrations');
         // #990: gated on the `migrations:*` slugs (migration 220). The list

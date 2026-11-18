@@ -39,7 +39,8 @@ final class CustomFieldImportTargets implements ImportTargets
                 'names' => array_values(array_filter([
                     CustomFieldService::labelText($def, 'en'),
                     CustomFieldService::labelText($def, 'ar'),
-                    str_replace('_', ' ', (string) $def['field_key']),
+                    // A plugin's field also matches on its own name: `supplier code` for keyhub.supplier_code.
+                    str_replace('_', ' ', self::localKey((string) $def['field_key'])),
                 ])),
             ];
         }
@@ -80,6 +81,14 @@ final class CustomFieldImportTargets implements ImportTargets
         $this->fields->writeChecked($tenantId, $this->recordType, $contactId, $byKey);
     }
 
+    /** The key without a plugin's name in front: `supplier_code` for `keyhub.supplier_code`. */
+    private static function localKey(string $key): string
+    {
+        $dot = strrpos($key, '.');
+
+        return $dot === false ? $key : substr($key, $dot + 1);
+    }
+
     /** @return array<string, mixed>|null */
     private function definition(int $tenantId, string $target): ?array
     {
@@ -99,6 +108,7 @@ final class CustomFieldImportTargets implements ImportTargets
         if ($hit !== null && microtime(true) - $hit['at'] < 5.0) {
             return $hit['rows'];
         }
+        $this->fields->sync($tenantId, $this->recordType);
         $rows = $this->repository->definitions($tenantId, $this->recordType);
         $this->cache = [$tenantId => ['at' => microtime(true), 'rows' => $rows]];
 

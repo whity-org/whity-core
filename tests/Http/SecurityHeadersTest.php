@@ -229,4 +229,43 @@ class SecurityHeadersTest extends TestCase
 
         $this->assertSame('DENY', $merged['X-Frame-Options'] ?? null);
     }
+    /**
+     * WHIT-1217: a framable handler response (a plugin's embed page) is sent
+     * sandboxed, so it has an opaque origin even when opened on its own.
+     */
+    public function testAFramableHandlerCspIsSentSandboxed(): void
+    {
+        $merged = SecurityHeaders::respectingHandlerCsp(
+            SecurityHeaders::headers('production'),
+            ['content-security-policy' => "default-src 'self'; script-src 'unsafe-inline'; frame-ancestors 'self'"]
+        );
+
+        $this->assertSame(
+            "default-src 'self'; script-src 'unsafe-inline'; frame-ancestors 'self'; sandbox allow-scripts allow-forms",
+            $merged['Content-Security-Policy'] ?? null
+        );
+    }
+
+    public function testAHandlerCannotAskForItsOriginBackThroughItsOwnSandbox(): void
+    {
+        $merged = SecurityHeaders::respectingHandlerCsp(
+            SecurityHeaders::headers('production'),
+            ['content-security-policy' => "sandbox allow-scripts allow-same-origin allow-top-navigation; frame-ancestors 'self'"]
+        );
+
+        $csp = $merged['Content-Security-Policy'] ?? '';
+        $this->assertStringNotContainsString('allow-same-origin', $csp);
+        $this->assertStringNotContainsString('allow-top-navigation', $csp);
+        $this->assertStringEndsWith('sandbox allow-scripts allow-forms', $csp);
+    }
+
+    public function testAHandlerCspThatRefusesFramingIsLeftAsItIs(): void
+    {
+        $merged = SecurityHeaders::respectingHandlerCsp(
+            SecurityHeaders::headers('production'),
+            ['content-security-policy' => "default-src 'self'; frame-ancestors 'none'"]
+        );
+
+        $this->assertArrayNotHasKey('Content-Security-Policy', $merged);
+    }
 }

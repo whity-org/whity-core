@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api/client';
@@ -64,6 +64,15 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
     return response?.data ?? [];
   }, []);
 
+  // WHIT-1202: a link to /admin/plugins#plugin-{name} (a locked card's "See
+  // what's included") lands on that plugin's row once the list has loaded.
+  useEffect(() => {
+    if (!data || typeof window === 'undefined' || !window.location.hash.startsWith('#plugin-')) return;
+    const row = document.getElementById(window.location.hash.slice(1));
+    row?.scrollIntoView({ block: 'center' });
+    row?.focus({ preventScroll: true });
+  }, [data]);
+
   // WHIT-1127: what a paid plugin costs, from the deployment's add-on plans.
   const { hasPermission } = useCapabilities();
   const language = useLanguageCode();
@@ -123,7 +132,7 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
       return;
     }
     addToast(
-      t('plugins.paid.trialStarted', 'Your {days}-day trial of {name} has started.', { days: plugin.trialDays ?? 0, name: plugin.name }),
+      t('plugins.paid.trialStarted', 'Your {days}-day trial of {name} has started.', { days: plugin.trialDays ?? 0, name: plugin.displayName }),
       'success',
     );
     refetch();
@@ -191,9 +200,9 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
     }
     addToast(
       on
-        ? t('plugins.workspaceCode.turnedOn', '{name} is on for this workspace.', { name: plugin.name })
+        ? t('plugins.workspaceCode.turnedOn', '{name} is on for this workspace.', { name: plugin.displayName })
         : t('plugins.workspaceCode.turnedOff', '{name} is off. Its data is kept, and turning it back on brings everything back.', {
-            name: plugin.name,
+            name: plugin.displayName,
           }),
       'success',
     );
@@ -226,6 +235,16 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
             'Your platform installs these once. Turn on the ones this workspace needs. Turning one off hides it and keeps its data.',
           )}
         </p>
+        {canEnable ? (
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <p className="text-sm text-muted-foreground">
+              {t('plugins.workspaceCode.templateHint', 'A template sets up the basics for your kind of business. It only adds what is missing.')}
+            </p>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/setup/template">{t('plugins.workspaceCode.template', 'Start from a template')}</Link>
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {error ? (
@@ -249,10 +268,15 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
             const offerBuy =
               plugin.paid && canPay && price !== null && (needsPurchase || plugin.reason === 'trial' || plugin.reason === 'grace' || plugin.reason === 'lapsed');
             return (
-              <li key={plugin.name} className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+              <li
+                key={plugin.name}
+                id={`plugin-${encodeURIComponent(plugin.name)}`}
+                tabIndex={-1}
+                className="flex scroll-mt-24 flex-wrap items-center justify-between gap-3 p-4 text-sm outline-none transition-colors focus:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <div className="min-w-0 flex-1 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-foreground">{plugin.name}</p>
+                    <p className="font-medium text-foreground">{plugin.displayName}</p>
                     <span className="font-mono text-muted-foreground" dir="ltr">
                       {plugin.version}
                     </span>
@@ -318,7 +342,7 @@ export function WorkspaceCodePlugins({ canEnable, canDisable }: { canEnable: boo
                       checked={plugin.enabled}
                       disabled={!allowed || pending === plugin.name}
                       onCheckedChange={(checked) => void switchPlugin(plugin, checked)}
-                      aria-label={t('plugins.workspaceCode.switch', 'Use {name} in this workspace', { name: plugin.name })}
+                      aria-label={t('plugins.workspaceCode.switch', 'Use {name} in this workspace', { name: plugin.displayName })}
                     />
                   ) : null}
                 </div>

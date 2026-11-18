@@ -33,3 +33,13 @@ Part of the overlap is on purpose, because core can be self-hosted without Whity
 
 - Reset, verification and two-step exist in both repositories on purpose.
 - A change to one of those flows, above all a security fix, is checked against the same flow in the other repository. The pull request template asks for that.
+
+## Addendum: an operator may sign in only through an identity provider (WHIT-1168, 2026-11-16)
+
+The owner asked for app.whity.dev to sign people in and up only with Whity ID. This stays inside the decision above: it is a server setting, `auth.password_sign_in`, which is **on by default**, so a self-hosted core keeps its own sign-in unless its operator turns it off.
+
+- Off, password sign-in, password reset, registration with a password and the local two-step set-up refuse. Sign-in and sign-up pages show only the identity provider, and invitations are accepted by signing in with it.
+- Sessions, API tokens, MCP tokens and agent credentials that already exist keep working.
+- The operator keeps a way back in: `whity-cli auth password-sign-in on`, or `WHITY_PASSWORD_SIGN_IN=force` in the environment. The setting can't be turned off without an enabled server-wide provider, and an operator can't turn it off before signing in with that provider once.
+
+See `docs/wiki/Whity-ID-Only-Sign-In.md`.

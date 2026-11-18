@@ -763,6 +763,26 @@ jobs:
       - name: Changelog fragment guard
         run: php scripts/changelog-assemble.php --check
 
+  # WHIT-1167: no AI attribution in commits, PR titles or PR descriptions.
+  # Every PR and merge group, whatever paths it touches: a docs-only PR can
+  # carry a co-author trailer as easily as a code one. v0.2.29 shipped seven.
+  no-ai-attribution:
+    name: No AI attribution in commits or PR text
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with full history
+        uses: actions/checkout@v7
+        with:
+          # The base commit must be present, or the range reads as empty and
+          # passes. The script refuses to answer from a shallow clone.
+          fetch-depth: 0
+
+      - name: The check catches what it should (self-test)
+        run: bash scripts/ci-no-ai-attribution.sh --self-test
+
+      - name: No AI attribution
+        run: bash scripts/ci-no-ai-attribution.sh
+
   # The English translation catalogue must stay a faithful projection of the
   # t() calls that produce it. A converted screen whose keys were never
   # extracted degrades silently and looks successful: the fallback renders, the
@@ -1455,7 +1475,7 @@ jobs:
       # evidence rather than one following the other.
       - name: npm security audit
         working-directory: render-service
-        run: npm audit --audit-level=high
+        run: node ../scripts/npm-audit-gate.mjs --level high
 
       - name: Run unit tests (Puppeteer mocked)
         working-directory: render-service
@@ -1754,6 +1774,24 @@ jobs:
           # And each breakBefore claims a page of its own.
           test "${hinted}" -eq 3
 
+      # The approval certificate (coverPages): the largest certificate core
+      # sends must fit its one page in both directions, the pages after it
+      # must number from 1 with the running header from their own page 2,
+      # and a cover longer than a page must be refused rather than printed.
+      # Read back from the PDF, never from the renderer's own report.
+      - name: Flowing render keeps the approval certificate on one unnumbered page
+        working-directory: render-service
+        run: |
+          for dir in rtl ltr; do
+            node scripts/generate-flow-cover-fixture.js --direction "$dir" --out "/tmp/flow-cover-$dir.json"
+            curl -fsS -X POST http://127.0.0.1:18130/render/flow -H 'Content-Type: application/json' -H 'X-Render-Secret: ci_render_shared_secret_min_32_chars_zz' --data @"/tmp/flow-cover-$dir.json" -o "/tmp/flow-cover-$dir.pdf"
+            node scripts/verify-flow-cover.js --pdf "/tmp/flow-cover-$dir.pdf"
+            node scripts/generate-flow-cover-fixture.js --direction "$dir" --variant overflow --out "/tmp/flow-cover-over-$dir.json"
+            status=$(curl -sS -o /dev/null -w '%{http_code}' -X POST http://127.0.0.1:18130/render/flow -H 'Content-Type: application/json' -H 'X-Render-Secret: ci_render_shared_secret_min_32_chars_zz' --data @"/tmp/flow-cover-over-$dir.json")
+            echo "a cover longer than its page ($dir): HTTP ${status}"
+            test "${status}" -eq 422
+          done
+
       # The form blocks, the theme and a running head built from parts
       # (WHIT-673). Forty questions cannot fit one page and a question is never
       # split, so a render that returns at all placed every one whole: a unit
@@ -1878,7 +1916,7 @@ jobs:
       # raises the floor without newly failing anything today.
       - name: npm security audit
         working-directory: .
-        run: npm audit --audit-level=high
+        run: node scripts/npm-audit-gate.mjs --level high
 
       # The web app imports its types from @whity/api-client (it kept its own
       # copy until WHIT A14's clean-up), so this one gate covers both: the
@@ -2017,6 +2055,7 @@ jobs:
       - coverage
       - static-analysis
       - history-guards
+      - no-ai-attribution
       - sdk-coverage
       - i18n-catalogue
       - date-display

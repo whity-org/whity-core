@@ -53,7 +53,7 @@ export function AwayCard({ people, onChanged }: { people: AwayPerson[]; onChange
   const [startsOn, setStartsOn] = useState<string>(() => isoDay(new Date()));
   const [backOn, setBackOn] = useState<string>(() => isoDay(new Date(Date.now() + 5 * 86_400_000)));
   const [delegateId, setDelegateId] = useState<string>('');
-  const [covers, setCovers] = useState<Record<Cover, boolean>>({ flows: true, proposals: true, documents: false });
+  const [covers, setCovers] = useState<Record<Cover, boolean>>({ flows: true, proposals: true, documents: false, plugins: false });
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -122,6 +122,7 @@ export function AwayCard({ people, onChanged }: { people: AwayPerson[]; onChange
     { key: 'flows', title: t('away.cover.flows', 'Approvals in flows'), hint: t('away.cover.flowsHint', 'Purchases, leave, expense claims') },
     { key: 'proposals', title: t('away.cover.proposals', "Your agents' proposals"), hint: t('away.cover.proposalsHint', 'What your agents ask you to approve') },
     { key: 'documents', title: t('away.cover.documents', 'Documents to sign'), hint: t('away.cover.documentsHint', 'Purchase orders, letters') },
+    { key: 'plugins', title: t('away.cover.plugins', 'Approvals in plugins'), hint: t('away.cover.pluginsHint', 'Requests your plugins ask you to approve, such as leave') },
   ];
 
   return (

@@ -9,6 +9,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\MockRequestFactory;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Api\TenantsApiHandler;
+use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Request;
 use Whity\Core\Tenant\TenantContext;
@@ -727,6 +728,55 @@ final class TenantsApiHandlerRealEngineTest extends TestCase
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertSame('tenant-a-new', $this->pdo->query('SELECT slug FROM tenants WHERE id = 1')->fetchColumn());
+    }
+
+    /**
+     * WHIT-1189: a workspace's owners and admins rename it from Settings ›
+     * General. The rename lands in the audit trail as tenant.updated, against
+     * the workspace, through the real hook the production AuditLogger listens on.
+     */
+    public function testRenamingYourOwnWorkspaceIsAudited(): void
+    {
+        MockRequestFactory::setTestTenant(1);
+        $hooks = new HookManager();
+        (new AuditLogger($this->pdo))->subscribe($hooks);
+
+        $response = (new TenantsApiHandler($this->pdo, $hooks))->update(
+            new Request('PATCH', '/api/tenants/1', [], (string) json_encode(['name' => 'Example Bakery'])),
+            ['id' => 1]
+        );
+
+        $this->assertSame(200, $response->getStatusCode(), $response->getBody());
+        $this->assertSame('Example Bakery', $this->tenantName(1));
+        $audit = $this->pdo->query("SELECT action, target_type, target_id FROM audit_log WHERE action = 'tenant.updated'");
+        $this->assertNotFalse($audit);
+        $row = $audit->fetch(PDO::FETCH_ASSOC);
+        $this->assertIsArray($row, 'the rename must be audited');
+        $this->assertSame('tenant', $row['target_type']);
+        $this->assertSame('1', (string) $row['target_id']);
+    }
+
+    /** WHIT-1189: the name every other language falls back to can never be blank. */
+    public function testAWorkspaceNameCannotBeBlanked(): void
+    {
+        MockRequestFactory::setTestTenant(1);
+
+        foreach (['', '   '] as $blank) {
+            $response = $this->handler()->update(
+                new Request('PATCH', '/api/tenants/1', [], (string) json_encode(['name' => $blank])),
+                ['id' => 1]
+            );
+            $this->assertSame(422, $response->getStatusCode(), "'{$blank}' must be refused");
+        }
+        $this->assertSame('Tenant A', $this->tenantName(1));
+    }
+
+    private function tenantName(int $id): string
+    {
+        $stmt = $this->pdo->prepare('SELECT name FROM tenants WHERE id = ?');
+        $stmt->execute([$id]);
+
+        return (string) $stmt->fetchColumn();
     }
 
     /**

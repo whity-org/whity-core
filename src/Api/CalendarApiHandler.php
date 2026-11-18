@@ -16,6 +16,7 @@ use Whity\Core\Calendar\CalendarSettings;
 use Whity\Core\Calendar\EventPlace;
 use Whity\Core\Calendar\Interval;
 use Whity\Core\Calendar\RoomRepository;
+use Whity\Core\Calendar\ServiceChoices;
 use Whity\Core\Calendar\ServiceRepository;
 use Whity\Core\Form\FormRejectedException;
 use Whity\Core\i18n\LocalizedText;
@@ -155,6 +156,7 @@ final class CalendarApiHandler
                 'week_start' => SettingsRegistry::CALENDAR_WEEK_START,
                 'weekend_days' => SettingsRegistry::CALENDAR_WEEKEND_DAYS,
                 'instant_booking' => SettingsRegistry::CALENDAR_INSTANT_BOOKING,
+                'multi_service_booking' => SettingsRegistry::CALENDAR_MULTI_SERVICE_BOOKING,
             ];
             $writes = [];
             foreach ($map as $field => $key) {
@@ -383,7 +385,19 @@ final class CalendarApiHandler
     public function availability(Request $request): Response
     {
         return $this->run($request, 'availability', function (int $tenantId) use ($request): Response {
-            $serviceId = $this->optionalInt($request, 'service_id') ?? throw new CalendarRejectedException('service_id is required', 422);
+            // WHIT-1173: `service_ids` (with optional `profile_ids`, `same_person`)
+            // asks for times when several services fit back to back.
+            $q = $this->query($request);
+            $many = ServiceChoices::fromQuery($q);
+            if ($many !== null && count($many) > 1) {
+                [$from, $to] = $this->range($request);
+
+                // Moving a booking of several: its own time counts as free.
+                $except = $this->optionalInt($request, 'except_booking_id');
+
+                return Response::json(['data' => $this->booking->availabilityForMany($tenantId, $many, ServiceChoices::samePerson($q['same_person'] ?? null), $from, $to, false, $except, $except === null)]);
+            }
+            $serviceId = $many[0]['service_id'] ?? $this->optionalInt($request, 'service_id') ?? throw new CalendarRejectedException('service_id is required', 422);
             [$from, $to] = $this->range($request);
 
             return Response::json(['data' => $this->booking->availability($tenantId, $serviceId, $this->optionalInt($request, 'profile_id'), $from, $to)]);
@@ -438,12 +452,16 @@ final class CalendarApiHandler
     {
         return $this->run($request, 'bookings', function (int $tenantId, int $actor) use ($request): Response {
             $body = JsonBody::parsed($request);
-            $serviceId = is_int($body['service_id'] ?? null) ? $body['service_id'] : throw new CalendarRejectedException('service_id is required', 422);
+            // WHIT-1173: `services` books several back to back as one booking.
+            $many = ServiceChoices::fromBody($body);
+            $serviceId = $many[0]['service_id'] ?? (is_int($body['service_id'] ?? null) ? $body['service_id'] : throw new CalendarRejectedException('service_id is required', 422));
             $start = Interval::fromApi($body['starts_at'] ?? null) ?? throw new CalendarRejectedException('starts_at must be a date and time with an offset, such as 2026-11-16T09:00:00+03:00', 422);
             $profileId = is_int($body['profile_id'] ?? null) ? $body['profile_id'] : null;
             $customer = $this->customer($tenantId, $body);
             $isAgent = self::isAgent($request);
             $booking = $this->booking->book($tenantId, [
+                'items' => $many ?? [],
+                'same_person' => ServiceChoices::samePerson($body['same_person'] ?? null),
                 'service_id' => $serviceId,
                 'profile_id' => $profileId,
                 'starts_at' => $start,

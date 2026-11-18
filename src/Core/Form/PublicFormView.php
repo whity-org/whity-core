@@ -147,6 +147,18 @@ final class PublicFormView
     }
 
     /**
+     * {@see isPubliclyAnswerable()} for a whole question: a table with a person
+     * column (WHIT-1162) is the same oracle as a person question, one cell at a
+     * time, so it is left out too.
+     *
+     * @param array<string, mixed> $field
+     */
+    public static function fieldIsPubliclyAnswerable(array $field): bool
+    {
+        return !FieldType::holdsReference($field);
+    }
+
+    /**
      * The fields of a form that the public surface serves, in the given order.
      *
      * Applied to BOTH the render and the submit, from the same function, so the
@@ -163,7 +175,7 @@ final class PublicFormView
     {
         $out = [];
         foreach ($fields as $field) {
-            if (self::isPubliclyAnswerable((string) ($field['field_type'] ?? ''))) {
+            if (self::fieldIsPubliclyAnswerable($field)) {
                 $out[] = $field;
             }
         }
@@ -188,7 +200,7 @@ final class PublicFormView
     {
         $out = [];
         foreach ($fields as $field) {
-            if (!self::isPubliclyAnswerable((string) ($field['field_type'] ?? ''))) {
+            if (!self::fieldIsPubliclyAnswerable($field)) {
                 $out[] = (string) ($field['field_key'] ?? '');
             }
         }

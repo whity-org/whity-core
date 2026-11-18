@@ -40,11 +40,110 @@ final class CustomFieldService
     private const MAX_TEXT = 500;
     private const MAX_LONG_TEXT = 4000;
 
+    /**
+     * Makes sure the plugins' own fields on a record type are there before
+     * they are read or written (WHIT-1209); see {@see self::useOwnedFieldSync()}.
+     *
+     * @var (\Closure(int, string): void)|null
+     */
+    private ?\Closure $ownedSync = null;
+
     public function __construct(
         private readonly PDO $db,
         private readonly CustomFieldRepository $fields,
         private readonly CustomFieldRecordTypes $types,
     ) {
+    }
+
+    /**
+     * Plugins declare fields of their own on core's records (SDK 1.119,
+     * {@see \Whity\Core\Contacts\PluginContactFields}). The host gives the
+     * sync here, so every read and write of a record type's fields first
+     * makes sure they are there.
+     *
+     * @param \Closure(int, string): void $sync tenant id, record type
+     */
+    public function useOwnedFieldSync(\Closure $sync): void
+    {
+        $this->ownedSync = $sync;
+    }
+
+    /** Makes sure the plugins' own fields on this record type are there (WHIT-1209). */
+    public function sync(int $tenantId, string $recordType): void
+    {
+        if ($this->ownedSync !== null) {
+            ($this->ownedSync)($tenantId, $recordType);
+        }
+    }
+
+    /**
+     * Brings one plugin's declared fields into a workspace (WHIT-1209): makes
+     * those missing and restores those archived. Never changes a field the
+     * workspace already has: its label, list column and order are the
+     * workspace's to change. Plugin fields don't count toward
+     * {@see self::MAX_FIELDS}.
+     *
+     * @param list<array{key: string, label: array{en: string, ar: string}, kind: string, options: list<string>, required: bool, in_list: bool, edit_permission: ?string}> $declared
+     *        already checked, keys already under the plugin's name
+     * @return list<string> the keys made or restored
+     */
+    public function syncOwned(int $tenantId, string $recordType, string $owner, array $declared): array
+    {
+        $this->type($recordType);
+        $existing = [];
+        foreach ($this->fields->ownedDefinitions($tenantId, $recordType) as $row) {
+            $existing[(string) $row['field_key']] = $row;
+        }
+        $changed = [];
+        foreach ($declared as $field) {
+            $key = $field['key'];
+            $row = $existing[$key] ?? null;
+            if ($row !== null) {
+                if ($row['owner_plugin'] === $owner && $row['archived_at'] !== null) {
+                    $this->fields->setArchived($tenantId, (int) $row['id'], false);
+                    $changed[] = $key;
+                }
+                continue;
+            }
+            if ($this->fields->keyTaken($tenantId, $recordType, $key)) {
+                continue;
+            }
+            $this->fields->insert($tenantId, [
+                'record_type' => $recordType,
+                'field_key' => $key,
+                'label' => json_encode($field['label'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                'kind' => $field['kind'],
+                'options_json' => json_encode($field['options'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
+                'show_in_list' => $field['in_list'],
+                'is_required' => $field['required'],
+                'edit_permission' => $field['edit_permission'],
+                'owner_plugin' => $owner,
+            ], null);
+            $changed[] = $key;
+        }
+
+        return $changed;
+    }
+
+    /**
+     * Archives the live fields of plugins not in `$keep` (WHIT-1209): a plugin
+     * turned off, lapsed or removed. Values are kept; {@see self::syncOwned()}
+     * brings the fields back.
+     *
+     * @param list<string> $keep owner names whose fields stay
+     * @return list<string> the keys archived
+     */
+    public function archiveOwnedExcept(int $tenantId, string $recordType, array $keep): array
+    {
+        $archived = [];
+        foreach ($this->fields->ownedDefinitions($tenantId, $recordType) as $row) {
+            if ($row['archived_at'] === null && !in_array((string) $row['owner_plugin'], $keep, true)) {
+                $this->fields->setArchived($tenantId, (int) $row['id'], true);
+                $archived[] = (string) $row['field_key'];
+            }
+        }
+
+        return $archived;
     }
 
     public function types(): CustomFieldRecordTypes
@@ -61,6 +160,7 @@ final class CustomFieldService
     public function definitions(int $tenantId, string $recordType, bool $withArchived = false): array
     {
         $this->type($recordType);
+        $this->sync($tenantId, $recordType);
 
         return array_map(fn (array $row): array => $this->toApi($tenantId, $row), $this->fields->definitions($tenantId, $recordType, $withArchived));
     }
@@ -68,6 +168,9 @@ final class CustomFieldService
     /** @return list<array{key: string, label: string, label_ar: string, count: int}> */
     public function recordTypes(int $tenantId): array
     {
+        foreach ($this->types->all() as $type) {
+            $this->sync($tenantId, $type->key);
+        }
         $counts = $this->fields->counts($tenantId);
 
         return array_map(
@@ -89,7 +192,7 @@ final class CustomFieldService
             throw new ContactRejectedException('kind must be one of ' . implode(', ', self::KINDS), 422, ['field' => 'kind']);
         }
         $label = self::label($input['label'] ?? null);
-        if (count($this->fields->definitions($tenantId, $recordType, true)) >= self::MAX_FIELDS) {
+        if ($this->fields->workspaceFieldCount($tenantId, $recordType) >= self::MAX_FIELDS) {
             throw new ContactRejectedException('A record can have at most ' . self::MAX_FIELDS . ' fields of your own', 422);
         }
         $key = is_string($input['key'] ?? null) && $input['key'] !== '' ? $input['key'] : self::keyFrom($label['en'] !== '' ? $label['en'] : $label['ar']);
@@ -166,7 +269,14 @@ final class CustomFieldService
     /** @return array<string, mixed> */
     public function archive(int $tenantId, int $id, bool $archived): array
     {
-        $this->fields->find($tenantId, $id) ?? throw ContactRejectedException::notFound('Field');
+        $row = $this->fields->find($tenantId, $id) ?? throw ContactRejectedException::notFound('Field');
+        if ($row['owner_plugin'] !== null) {
+            throw new ContactRejectedException(
+                'This field belongs to a plugin. It is hidden when the plugin is turned off and back when it is turned on.',
+                409,
+                ['field' => 'archived', 'owner_plugin' => (string) $row['owner_plugin']],
+            );
+        }
         $this->fields->setArchived($tenantId, $id, $archived);
 
         return $this->show($tenantId, $id);
@@ -206,6 +316,7 @@ final class CustomFieldService
         if (!is_array($input) || ($input !== [] && array_is_list($input))) {
             throw new ContactRejectedException('fields must map field keys to values', 422, ['field' => 'fields']);
         }
+        $this->sync($tenantId, $recordType);
         $definitions = [];
         foreach ($this->fields->definitions($tenantId, $recordType) as $row) {
             $definitions[(string) $row['field_key']] = $row;
@@ -278,6 +389,7 @@ final class CustomFieldService
      */
     public function filters(int $tenantId, string $recordType, string $alias, array $query): array
     {
+        $this->sync($tenantId, $recordType);
         $byKey = [];
         foreach ($this->fields->definitions($tenantId, $recordType) as $row) {
             $byKey[(string) $row['field_key']] = $row;
@@ -426,6 +538,8 @@ final class CustomFieldService
             'edit_permission' => $row['edit_permission'] === null ? null : (string) $row['edit_permission'],
             'sort_order' => (int) $row['sort_order'],
             'created_by_profile_id' => $row['created_by_profile_id'] === null ? null : (int) $row['created_by_profile_id'],
+            // WHIT-1209: the plugin that declared the field, or null for the workspace's own.
+            'owner_plugin' => ($row['owner_plugin'] ?? null) === null ? null : (string) $row['owner_plugin'],
             'archived' => $row['archived_at'] !== null,
             'merge_field' => '{{' . self::mergePrefix((string) $row['record_type']) . '.' . $row['field_key'] . '}}',
             'used_by' => $this->fields->usage($tenantId, (int) $row['id']),

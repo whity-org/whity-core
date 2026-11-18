@@ -623,6 +623,8 @@ final class BlockValidatorTest extends TestCase
             'documentViewer', 'modal', 'numberInput', 'ouScopePicker', 'recordFields', 'referenceSelect', 'richTextInput', 'row', 'secretField', 'section', 'select', 'selector', 'slider', 'stat', 'submitButton',
             'tab', 'table', 'tabs', 'text', 'textArea', 'textInput', 'timeline',
             'variant', 'variantCase',
+            // SDK 1.113 (WHIT-1172): setup inputs
+            'timeInput', 'weeklyHours', 'checkboxGroup',
         ];
         sort($expected);
 
@@ -1939,6 +1941,7 @@ final class BlockValidatorTest extends TestCase
             'form', 'textInput', 'textArea', 'numberInput', 'select',
             'checkbox', 'slider', 'dateInput', 'fileInput', 'colorInput',
             'bilingualText', 'referenceSelect', 'richTextInput', 'submitButton', 'actionButton',
+            'timeInput', 'weeklyHours', 'checkboxGroup',
         ] as $expectedType) {
             $this->assertContains($expectedType, $types, "'{$expectedType}' must be in BlockContract::types()");
         }
@@ -1950,8 +1953,114 @@ final class BlockValidatorTest extends TestCase
         foreach (['textInput', 'textArea', 'numberInput', 'select', 'checkbox',
                   'slider', 'dateInput', 'fileInput', 'colorInput',
                   'bilingualText', 'referenceSelect', 'richTextInput',
+                  'timeInput', 'weeklyHours', 'checkboxGroup',
                   'submitButton', 'actionButton'] as $leaf) {
             $this->assertFalse(BlockContract::isContainer($leaf), "'{$leaf}' must be a leaf");
+        }
+    }
+
+    // ==================== SDK 1.113 (WHIT-1172): setup inputs ====================
+
+    /**
+     * @param list<array<string, mixed>> $children
+     * @return list<array<string, mixed>>
+     */
+    private static function setupForm(array $children): array
+    {
+        return [[
+            'type' => 'form',
+            'submit' => ['method' => 'POST', 'endpoint' => '/api/salons/setup'],
+            'children' => [...$children, ['type' => 'submitButton', 'label' => 'Save']],
+        ]];
+    }
+
+    public function testSetupInputsWithTheirDefaultsAreValid(): void
+    {
+        $result = BlockValidator::validate(self::setupForm([
+            ['type' => 'colorInput', 'name' => 'colour', 'label' => 'Colour', 'default' => '#a67c00', 'swatches' => ['#A67C00', '#0961bb']],
+            ['type' => 'timeInput', 'name' => 'opens', 'label' => 'Opens', 'step' => 30, 'default' => '10:00'],
+            ['type' => 'timeInput', 'name' => 'closes', 'label' => 'Closes', 'allowEndOfDay' => true, 'default' => '24:00'],
+            ['type' => 'weeklyHours', 'name' => 'hours', 'label' => 'Opening hours', 'firstDay' => 6, 'required' => true, 'default' => [
+                ['weekday' => 6, 'start_time' => '10:00', 'end_time' => '21:00'],
+                ['weekday' => 1, 'start_time' => '10:00', 'end_time' => '14:00'],
+                ['weekday' => 1, 'start_time' => '15:00', 'end_time' => '24:00'],
+            ]],
+            ['type' => 'checkboxGroup', 'name' => 'menus', 'label' => 'Menus', 'default' => ['men'], 'options' => [
+                ['value' => 'men', 'label' => 'Men'],
+                ['value' => 'women', 'label' => 'Women'],
+            ]],
+            ['type' => 'fieldArray', 'name' => 'services', 'label' => 'Services', 'addLabel' => 'Add a service',
+                'default' => [['include' => 'true', 'name_en' => 'Haircut', 'minutes' => '30', 'price' => '5.000']],
+                'children' => [
+                    ['type' => 'checkbox', 'name' => 'include', 'label' => 'Offer it'],
+                    ['type' => 'textInput', 'name' => 'name_en', 'label' => 'Name'],
+                    ['type' => 'numberInput', 'name' => 'minutes', 'label' => 'Minutes'],
+                    ['type' => 'textInput', 'name' => 'price', 'label' => 'Price'],
+                ]],
+        ]));
+
+        $this->assertTrue($result['ok'], implode(' | ', $result['errors']));
+    }
+
+    public function testASwatchMustBeAColourCode(): void
+    {
+        $result = BlockValidator::validate(self::setupForm([
+            ['type' => 'colorInput', 'name' => 'colour', 'label' => 'Colour', 'swatches' => ['gold']],
+        ]));
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('colorInput.swatches[0]', implode(' | ', $result['errors']));
+    }
+
+    public function testATimeDefaultMustBeAClockTime(): void
+    {
+        $result = BlockValidator::validate(self::setupForm([
+            ['type' => 'timeInput', 'name' => 'opens', 'label' => 'Opens', 'default' => '10am'],
+        ]));
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('timeInput.default', implode(' | ', $result['errors']));
+    }
+
+    public function testAnOddTimeStepIsRefused(): void
+    {
+        $result = BlockValidator::validate(self::setupForm([
+            ['type' => 'timeInput', 'name' => 'opens', 'label' => 'Opens', 'step' => 7],
+        ]));
+
+        $this->assertFalse($result['ok']);
+    }
+
+    /** @return iterable<string, array{mixed}> */
+    public static function badHours(): iterable
+    {
+        yield 'not a list' => [['weekday' => 1]];
+        yield 'weekday 0' => [[['weekday' => 0, 'start_time' => '10:00', 'end_time' => '12:00']]];
+        yield 'weekday 8' => [[['weekday' => 8, 'start_time' => '10:00', 'end_time' => '12:00']]];
+        yield 'ends before it starts' => [[['weekday' => 1, 'start_time' => '12:00', 'end_time' => '10:00']]];
+        yield 'not a clock time' => [[['weekday' => 1, 'start_time' => '9', 'end_time' => '12:00']]];
+        yield 'starts at end of day' => [[['weekday' => 1, 'start_time' => '24:00', 'end_time' => '24:00']]];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('badHours')]
+    public function testBadDefaultHoursAreRefused(mixed $hours): void
+    {
+        $result = BlockValidator::validate(self::setupForm([
+            ['type' => 'weeklyHours', 'name' => 'hours', 'label' => 'Hours', 'default' => $hours],
+        ]));
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString('weeklyHours.default', implode(' | ', $result['errors']));
+    }
+
+    public function testSetupInputsNeedAForm(): void
+    {
+        foreach ([
+            ['type' => 'timeInput', 'name' => 'a', 'label' => 'A'],
+            ['type' => 'weeklyHours', 'name' => 'b', 'label' => 'B'],
+            ['type' => 'checkboxGroup', 'name' => 'c', 'label' => 'C', 'options' => [['value' => 'x', 'label' => 'X']]],
+        ] as $input) {
+            $this->assertFalse(BlockValidator::validate([$input])['ok'], $input['type'] . ' outside a form');
         }
     }
 
@@ -2651,6 +2760,40 @@ final class BlockValidatorTest extends TestCase
         $joined = implode(' | ', $result['errors']);
         $this->assertStringContainsString("missing required prop 'valueField'", $joined);
         $this->assertStringContainsString("missing required prop 'labelField'", $joined);
+    }
+
+    // ==================== SDK 1.121 (#1437): referenceSelect multiple ====================
+
+    public function testReferenceSelectWithMultipleIsValid(): void
+    {
+        $tree = [[
+            'type'   => 'form',
+            'submit' => ['method' => 'POST', 'endpoint' => '/api/uikit/demo/echo'],
+            'children' => [
+                ['type' => 'referenceSelect', 'name' => 'tagIds', 'label' => 'Tags',
+                 'source' => '/api/uikit/tags', 'valueField' => 'id', 'labelField' => 'name',
+                 'multiple' => true, 'required' => true],
+                ['type' => 'submitButton', 'label' => 'Save'],
+            ],
+        ]];
+
+        $this->assertSame(['ok' => true, 'errors' => []], BlockValidator::validate($tree));
+    }
+
+    public function testReferenceSelectMultipleMustBeABool(): void
+    {
+        $result = BlockValidator::validate([[
+            'type'   => 'form',
+            'submit' => ['method' => 'POST', 'endpoint' => '/api/x/y'],
+            'children' => [
+                ['type' => 'referenceSelect', 'name' => 'x', 'label' => 'X', 'source' => '/api/x/rows',
+                 'valueField' => 'id', 'labelField' => 'name', 'multiple' => 'yes'],
+                ['type' => 'submitButton', 'label' => 'Go'],
+            ],
+        ]]);
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString("'referenceSelect.multiple' must be a boolean", implode(' | ', $result['errors']));
     }
 
     // ==================== WC-532 A1: dataTable rowActions ====================

@@ -527,6 +527,85 @@ final class RouteFinaliseRealEngineTest extends TestCase
     }
 
     /**
+     * WHIT-1162: the other researchers are a table with a person column. A
+     * step leaving out the people named in that table leaves out everyone in
+     * its rows, and the printout's "Not counted" line lists them.
+     */
+    public function testAPersonNamedInATablesRowIsLeftOutOfTheCommitteeAndRecorded(): void
+    {
+        $design = $this->routeTemplates->create(self::TENANT, 'Ethics review', null, null);
+        $this->routeTemplates->replaceGraph($design, self::TENANT, [
+            [
+                'position' => 1,
+                'rule_kind' => 'explicit',
+                'rule_config' => ['profile_ids' => [self::CLERK, self::MEMBER, self::SUPERVISOR]],
+                'label' => 'Ethics committee',
+                'decision' => true,
+                'decision_quorum' => 'all',
+                'satisfied_by' => 'act',
+                'exclude_named_in' => ['researchers'],
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+            [
+                'position' => 2,
+                'rule_kind' => RouteStepKind::FINALISE_RULE,
+                'rule_config' => [],
+                'label' => 'Certificate',
+                'decision' => false,
+                'decision_quorum' => null,
+                'satisfied_by' => 'act',
+                'allow_send_back' => false,
+                'kind' => RouteStepKind::FINALISE,
+                'final_template_id' => null,
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+        ], []);
+
+        $formId = $this->form($design, null);
+        $this->fields->create(self::TENANT, $formId, 'researchers', 'repeating', ['en' => 'Other researchers'], null, false, [], ['columns' => [
+            ['key' => 'role', 'type' => 'text', 'label' => ['en' => 'Role'], 'required' => false],
+            ['key' => 'person', 'type' => 'profile_ref', 'label' => ['en' => 'Researcher'], 'required' => true],
+        ]], null, null, null);
+
+        // A person from another workspace is refused in a cell, as in a person question.
+        $this->pdo->exec("INSERT INTO tenants (id, name) VALUES (2, 'Example Mill') ON CONFLICT DO NOTHING");
+        $now = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'sqlite' ? "datetime('now')" : 'NOW()';
+        $this->pdo->exec(
+            "INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
+             VALUES (14, 'Emad Nasser', 'x', false, 0, 0, {$now}, {$now})"
+        );
+        $this->pdo->exec(
+            "INSERT INTO memberships (id, profile_id, tenant_id, role_id, ou_id, is_primary, status, created_at) VALUES
+                (1014, 14, 2, 100, NULL, true, 'active', {$now})"
+        );
+        try {
+            $this->send($formId, ['supplier' => 'Example Mill', 'researchers' => [['role' => 'Analyst', 'person' => 14]]]);
+            self::fail('a person from another workspace was accepted in a cell');
+        } catch (\Whity\Core\Form\FormRejectedException $e) {
+            self::assertSame('bad_reference', $e->reason);
+            self::assertSame('researchers', $e->fieldKey);
+            self::assertSame(['row' => 1, 'column' => 'person'], $e->params);
+        }
+
+        $submission = $this->send($formId, ['supplier' => 'Example Mill', 'researchers' => [
+            ['role' => 'Co-researcher', 'person' => (string) self::SUPERVISOR],
+        ]]);
+        $route = $this->routeOf((int) $submission['id']);
+
+        self::assertNull($this->open((int) $route['id'], self::SUPERVISOR), 'a researcher named in a row is not asked');
+        self::assertNotNull($this->open((int) $route['id'], self::MEMBER));
+
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        $second = $this->router->act(self::TENANT, self::MEMBER, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertSame('approved', $second['decided'], 'the researcher in the table does not count');
+
+        $left = (new \Whity\Core\Document\Routing\RouteLeftOut($this->pdo))->forRoute(self::TENANT, (int) $route['id']);
+        self::assertSame([['profile_id' => self::SUPERVISOR, 'name' => 'Ahmad Khalil', 'key' => 'researchers']], $left);
+    }
+
+    /**
      * Design 3.4 (FP.1): a form whose route makes a final document with no
      * template prints the response in the automatic layout, with the decision
      * and the approvals, instead of failing for want of a template.
@@ -558,6 +637,59 @@ final class RouteFinaliseRealEngineTest extends TestCase
         }
         self::assertNotNull($answer, 'the answer is on the page');
         self::assertSame('Page {{page}} of {{pages}}', $payload['footer']['start'] === 'Page {{page}} of {{pages}}' ? $payload['footer']['start'] : substr($payload['footer']['start'], -strlen('Page {{page}} of {{pages}}')));
+    }
+
+    /**
+     * The approval certificate: an approved response's final document opens on
+     * a one-page certificate, set on the route template's final document
+     * stage, and the printout follows with its own page numbers. Approval
+     * times print in the workspace's time zone, not UTC.
+     */
+    public function testAnApprovedResponsePrintsACertificatePageInFrontOfThePrintout(): void
+    {
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::TIMEZONE, 'Asia/Amman');
+        $graph = new RouteTemplateGraph($this->rules, fn (int $tenantId): bool => $this->finaliser->isAvailable($tenantId));
+        $this->assertDesignRefused('no option', fn () => $graph->validate([
+            ['position' => 1, 'rule_kind' => 'explicit', 'rule_config' => ['profile_ids' => [self::CLERK]], 'canvas_x' => 0, 'canvas_y' => 0],
+            ['position' => 2, 'kind' => 'finalise', 'rule_config' => ['certificate' => ['colour' => 'gold']], 'canvas_x' => 0, 'canvas_y' => 0],
+        ], [], 10, self::TENANT));
+        $valid = $graph->validate([
+            ['position' => 1, 'rule_kind' => 'explicit', 'rule_config' => ['profile_ids' => [self::CLERK]], 'canvas_x' => 0, 'canvas_y' => 0],
+            ['position' => 2, 'kind' => 'finalise', 'rule_config' => ['certificate' => [
+                'title' => ['en' => 'Certificate of supplier approval'],
+                'subject' => 'supplier',
+            ]], 'canvas_x' => 0, 'canvas_y' => 0],
+        ], [], 10, self::TENANT);
+        self::assertSame(['certificate' => ['title' => ['en' => 'Certificate of supplier approval'], 'subject' => 'supplier']], $valid['steps'][1]['rule_config']);
+
+        $formId = $this->form($this->clerkThenFinalise(null, [], $valid['steps'][1]['rule_config']), null);
+        $this->approve($formId, ['supplier' => 'Example Mill']);
+
+        $payload = $this->render->flowCalls[0];
+        self::assertSame(1, $payload['coverPages']);
+        $cover = [];
+        foreach ($payload['content'] as $block) {
+            if ($block['type'] === 'pageBreak') {
+                break;
+            }
+            $cover[$block['type']][] = $block;
+        }
+        self::assertSame('Certificate of supplier approval', $cover['heading'][0]['text']);
+        self::assertSame('Example Mill', $cover['heading'][1]['text'], 'the subject is the answer the stage names');
+        self::assertArrayHasKey('qr', $cover['decisionBlock'][0], 'the workspace prints QR codes');
+        $approval = $cover['approvals'][0]['rows'][0];
+        self::assertSame(['Clerk check', 'Clerk Rana', 'Approved'], [$approval['role'], $approval['name'], $approval['word']]);
+        $events = $this->pdo->query("SELECT occurred_at FROM document_route_events WHERE verdict = 'approved' ORDER BY id DESC LIMIT 1");
+        self::assertNotFalse($events);
+        $at = (string) $events->fetchColumn();
+        $amman = (new \DateTimeImmutable($at, new \DateTimeZone('UTC')))->setTimezone(new \DateTimeZone('Asia/Amman'));
+        self::assertSame($amman->format('j M Y, H:i'), $approval['at'], 'in the workspace’s time');
+        foreach (array_slice($payload['content'], (int) array_search('pageBreak', array_column($payload['content'], 'type'), true) + 1) as $block) {
+            if ($block['type'] === 'approvals') {
+                self::assertSame($amman->format('j M Y, H:i'), $block['rows'][0]['at'], 'the printout’s approvals too');
+            }
+        }
+        self::assertSame(2, $payload['header']['fromPage'], 'the printout heads its pages as before');
     }
 
     public function testASupervisorTheOfficeNamesAtPreCheckIsLeftOutOfTheCommittee(): void
@@ -1255,9 +1387,13 @@ final class RouteFinaliseRealEngineTest extends TestCase
         }
     }
 
-    /** Stage 1: the clerk decides. Stage 2: the final document, with this template or none. */
-    /** @param list<array<string, mixed>> $clerkInputs */
-    private function clerkThenFinalise(?int $templateId, array $clerkInputs = []): int
+    /**
+     * Stage 1: the clerk decides. Stage 2: the final document, with this template or none.
+     *
+     * @param list<array<string, mixed>> $clerkInputs
+     * @param array<string, mixed> $finaliseConfig the final document stage's rule_config
+     */
+    private function clerkThenFinalise(?int $templateId, array $clerkInputs = [], array $finaliseConfig = []): int
     {
         $id = $this->routeTemplates->create(self::TENANT, 'Supplier approval ' . bin2hex(random_bytes(3)), null, null);
         $this->routeTemplates->replaceGraph($id, self::TENANT, [
@@ -1276,7 +1412,7 @@ final class RouteFinaliseRealEngineTest extends TestCase
             [
                 'position' => 2,
                 'rule_kind' => RouteStepKind::FINALISE_RULE,
-                'rule_config' => [],
+                'rule_config' => $finaliseConfig,
                 'label' => 'Approval letter',
                 'decision' => false,
                 'decision_quorum' => null,

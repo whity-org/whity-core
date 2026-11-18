@@ -1,0 +1,11 @@
+{
+  "_comment": "Advisories the npm audit gate (scripts/npm-audit-gate.mjs) lets through. Only for an advisory with NO patched version; the gate fails once a fix is published. Each entry needs the owner's decision and a reason.",
+  "advisories": [
+    {
+      "id": "GHSA-fc5q-39xc-vjpf",
+      "package": "picomatch",
+      "decided": "2026-11-17, owner: \"Allow it until patched\"",
+      "reason": "ReDoS through crafted extglob patterns; every version is affected and no fix exists yet. Whity only matches its own fixed patterns, never a pattern from outside."
+    }
+  ]
+}

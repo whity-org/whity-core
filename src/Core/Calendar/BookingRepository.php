@@ -97,8 +97,106 @@ final class BookingRepository
         $stmt = $this->db->prepare('SELECT ' . self::COLUMNS . ' FROM calendar_bookings b WHERE b.tenant_id = :tenant_id AND b.id = :id');
         $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+        $row['items'] = $this->itemsFor($tenantId, [$id])[$id] ?? [];
 
-        return is_array($row) ? $row : null;
+        return $row;
+    }
+
+    /**
+     * Store the services of a booking of several (WHIT-1173), in order.
+     *
+     * @param list<array{service_id: int, profile_id: int, room_id: ?int, starts_at: DateTimeImmutable, ends_at: DateTimeImmutable, block: Interval, price_minor: ?int}> $items
+     */
+    public function insertItems(int $tenantId, int $bookingId, array $items): void
+    {
+        $stmt = $this->db->prepare(
+            'INSERT INTO calendar_booking_services (tenant_id, booking_id, service_id, profile_id, room_id, position,
+                    starts_at, ends_at, blocks_from, blocks_until, price_minor, created_at)
+             VALUES (:tenant_id, :booking_id, :service_id, :profile_id, :room_id, :position,
+                    :starts_at, :ends_at, :blocks_from, :blocks_until, :price_minor, :now)'
+        );
+        foreach ($items as $position => $item) {
+            $stmt->execute([
+                ':tenant_id' => $tenantId,
+                ':booking_id' => $bookingId,
+                ':service_id' => $item['service_id'],
+                ':profile_id' => $item['profile_id'],
+                ':room_id' => $item['room_id'],
+                ':position' => $position,
+                ':starts_at' => Interval::toDb($item['starts_at']),
+                ':ends_at' => Interval::toDb($item['ends_at']),
+                ':blocks_from' => Interval::toDb($item['block']->start),
+                ':blocks_until' => Interval::toDb($item['block']->end),
+                ':price_minor' => $item['price_minor'],
+                ':now' => Interval::toDb(new DateTimeImmutable()),
+            ]);
+        }
+    }
+
+    /**
+     * Move the services of a booking of several: each to its new time and person.
+     *
+     * @param list<array{profile_id: int, starts_at: DateTimeImmutable, ends_at: DateTimeImmutable, block: Interval}> $items in position order
+     */
+    public function moveItems(int $tenantId, int $bookingId, array $items): void
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE calendar_booking_services
+                SET profile_id = :profile_id, starts_at = :starts_at, ends_at = :ends_at,
+                    blocks_from = :blocks_from, blocks_until = :blocks_until
+              WHERE tenant_id = :tenant_id AND booking_id = :booking_id AND position = :position'
+        );
+        foreach ($items as $position => $item) {
+            $stmt->execute([
+                ':profile_id' => $item['profile_id'],
+                ':starts_at' => Interval::toDb($item['starts_at']),
+                ':ends_at' => Interval::toDb($item['ends_at']),
+                ':blocks_from' => Interval::toDb($item['block']->start),
+                ':blocks_until' => Interval::toDb($item['block']->end),
+                ':tenant_id' => $tenantId,
+                ':booking_id' => $bookingId,
+                ':position' => $position,
+            ]);
+        }
+    }
+
+    /**
+     * The services of these bookings, by booking id, in order. A booking of
+     * one service has none.
+     *
+     * @param list<int> $bookingIds
+     * @return array<int, list<array<string, mixed>>>
+     */
+    public function itemsFor(int $tenantId, array $bookingIds): array
+    {
+        if ($bookingIds === []) {
+            return [];
+        }
+        $in = [];
+        $params = [':tenant_id' => $tenantId];
+        foreach (array_values(array_unique($bookingIds)) as $i => $id) {
+            $in[] = ':b' . $i;
+            $params[':b' . $i] = $id;
+        }
+        $stmt = $this->db->prepare(
+            'SELECT i.booking_id, i.position, i.service_id, i.profile_id, i.room_id, i.starts_at, i.ends_at,
+                    i.blocks_from, i.blocks_until, i.price_minor, s.name AS service_name, p.display_name AS staff_name
+               FROM calendar_booking_services i
+               LEFT JOIN calendar_services s ON s.id = i.service_id AND s.tenant_id = i.tenant_id
+               LEFT JOIN profiles p ON p.id = i.profile_id
+              WHERE i.tenant_id = :tenant_id AND i.booking_id IN (' . implode(', ', $in) . ')
+              ORDER BY i.booking_id, i.position'
+        );
+        $stmt->execute($params);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $out[(int) $row['booking_id']][] = $row;
+        }
+
+        return $out;
     }
 
     /**
@@ -130,7 +228,16 @@ final class BookingRepository
                 $in[] = ':p' . $i;
                 $params[':p' . $i] = $id;
             }
-            $sql .= ' AND b.profile_id IN (' . implode(', ', $in) . ')';
+            // WHIT-1173: and bookings where one of them does one of the services.
+            $inItems = [];
+            foreach ($profileIds as $i => $id) {
+                $inItems[] = ':ip' . $i;
+                $params[':ip' . $i] = $id;
+            }
+            $sql .= ' AND (b.profile_id IN (' . implode(', ', $in) . ')
+                       OR EXISTS (SELECT 1 FROM calendar_booking_services i
+                                   WHERE i.tenant_id = b.tenant_id AND i.booking_id = b.id
+                                     AND i.profile_id IN (' . implode(', ', $inItems) . ')))';
         }
         $statuses = $statuses !== [] ? $statuses : self::LIVE;
         $in = [];
@@ -141,8 +248,16 @@ final class BookingRepository
         $sql .= ' AND b.status IN (' . implode(', ', $in) . ') ORDER BY b.starts_at, b.id';
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
+        /** @var list<array<string, mixed>> $rows */
+        $rows = array_values($stmt->fetchAll(PDO::FETCH_ASSOC));
+        $items = $this->itemsFor($tenantId, array_map(static fn (array $r): int => (int) $r['id'], $rows));
+        $out = [];
+        foreach ($rows as $row) {
+            $row['items'] = $items[(int) $row['id']] ?? [];
+            $out[] = $row;
+        }
 
-        return array_values($stmt->fetchAll(PDO::FETCH_ASSOC));
+        return $out;
     }
 
     /**
@@ -375,12 +490,93 @@ final class BookingRepository
             // The calendar file's revision (E2): raised by every move and the cancel.
             'ics_sequence' => (int) ($r['ics_sequence'] ?? 0),
         ];
+        // WHIT-1173: the services of a booking of several, in order; empty
+        // for a booking of one service (its service_id and profile_id say it).
+        $items = is_array($r['items'] ?? null) ? array_values($r['items']) : [];
+        $out['items'] = array_map(static fn (array $i): array => self::itemToApi($i), $items);
         if (array_key_exists('service_name', $r)) {
             $out['service_name'] = LocalizedText::decode((string) $r['service_name'], languages: LocalizedText::BILINGUAL);
             $out['staff_name'] = (string) $r['staff_name'];
             $out['room_name'] = isset($r['room_name']) ? LocalizedText::decode((string) $r['room_name'], languages: LocalizedText::BILINGUAL) : null;
+            if (count($out['items']) > 1) {
+                $out['service_name'] = self::joinedNames($out['items']);
+                $out['staff_name'] = self::joinedStaff($out['items']);
+            }
         }
 
         return $out;
+    }
+
+    /**
+     * One service of a booking of several, for the API.
+     *
+     * @param array<string, mixed> $i a row from {@see self::itemsFor()}
+     * @return array{position: int, service_id: int, service_name: array<string, string>, profile_id: int, staff_name: string, room_id: ?int, starts_at: string, ends_at: string, blocks_from: string, blocks_until: string, duration_minutes: int, price_minor: ?int}
+     */
+    public static function itemToApi(array $i): array
+    {
+        $starts = Interval::fromDb((string) $i['starts_at']);
+        $ends = Interval::fromDb((string) $i['ends_at']);
+
+        return [
+            'position' => (int) $i['position'],
+            'service_id' => (int) $i['service_id'],
+            'service_name' => LocalizedText::decode((string) ($i['service_name'] ?? ''), languages: LocalizedText::BILINGUAL),
+            'profile_id' => (int) $i['profile_id'],
+            'staff_name' => (string) ($i['staff_name'] ?? ''),
+            'room_id' => isset($i['room_id']) ? (int) $i['room_id'] : null,
+            'starts_at' => Interval::toApi($starts),
+            'ends_at' => Interval::toApi($ends),
+            'blocks_from' => Interval::toApi(Interval::fromDb((string) $i['blocks_from'])),
+            'blocks_until' => Interval::toApi(Interval::fromDb((string) $i['blocks_until'])),
+            // The length it was booked for; a later change to the service does not alter it.
+            'duration_minutes' => (int) round(($ends->getTimestamp() - $starts->getTimestamp()) / 60),
+            'price_minor' => $i['price_minor'] !== null ? (int) $i['price_minor'] : null,
+        ];
+    }
+
+    /**
+     * The services' names joined in each language ("Haircut + Colour"), so
+     * everything that shows one service's name shows them all.
+     *
+     * @param list<array<string, mixed>> $items as {@see self::itemToApi()} gives them
+     * @return array<string, string>
+     */
+    public static function joinedNames(array $items): array
+    {
+        $out = [];
+        foreach (LocalizedText::BILINGUAL as $language) {
+            $parts = [];
+            foreach ($items as $item) {
+                $name = is_array($item['service_name'] ?? null) ? $item['service_name'] : [];
+                $label = $name[$language] ?? $name['en'] ?? reset($name);
+                if (is_string($label) && $label !== '') {
+                    $parts[] = $label;
+                }
+            }
+            if ($parts !== []) {
+                $out[$language] = implode(' + ', $parts);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The people doing the services, each once, in order ("Amro Saleh, Awss Haddad").
+     *
+     * @param list<array<string, mixed>> $items as {@see self::itemToApi()} gives them
+     */
+    public static function joinedStaff(array $items): string
+    {
+        $names = [];
+        foreach ($items as $item) {
+            $name = trim((string) ($item['staff_name'] ?? ''));
+            if ($name !== '' && !in_array($name, $names, true)) {
+                $names[] = $name;
+            }
+        }
+
+        return implode(', ', $names);
     }
 }

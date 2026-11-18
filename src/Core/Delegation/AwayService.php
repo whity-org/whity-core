@@ -14,7 +14,9 @@ use PDO;
  * back, who decides for them, and what goes to that person:
  *  - `flows`: approvals in flows (purchases, leave, expense claims);
  *  - `proposals`: their agents' proposals;
- *  - `documents`: documents to sign.
+ *  - `documents`: documents to sign;
+ *  - `plugins`: a plugin's own approvals, which plugins read through the
+ *    SDK's {@see \Whity\Sdk\Delegation\Away} (SDK 1.120, WHIT-1210).
  * A message tells people who write to them. Coming back early ends it at once.
  *
  * It is in force from the start day up to (not including) the day they are
@@ -29,7 +31,8 @@ final class AwayService
     public const FLOWS = 'flows';
     public const PROPOSALS = 'proposals';
     public const DOCUMENTS = 'documents';
-    public const COVERS = [self::FLOWS, self::PROPOSALS, self::DOCUMENTS];
+    public const PLUGINS = 'plugins';
+    public const COVERS = [self::FLOWS, self::PROPOSALS, self::DOCUMENTS, self::PLUGINS];
 
     public const STARTING = 'starting';
     public const IN_FORCE = 'in_force';
@@ -62,6 +65,29 @@ final class AwayService
         $stmt->closeCursor();
 
         return is_array($row) ? $this->present($row, $today) : null;
+    }
+
+    /**
+     * The person's period in force on `$day` (from its start day up to, not
+     * including, the day they are back; not ended), or null.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function inForceOn(int $tenantId, int $profileId, string $day): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT ' . self::COLUMNS . '
+               FROM away_periods a
+               JOIN profiles d ON d.id = a.delegate_profile_id
+              WHERE a.tenant_id = :tenant_id AND a.profile_id = :profile_id
+                AND a.ended_at IS NULL AND a.starts_on <= :day AND a.back_on > :day
+              ORDER BY a.id DESC LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId, ':day' => $day]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        $stmt->closeCursor();
+
+        return is_array($row) ? $this->present($row, $day) : null;
     }
 
     /**

@@ -6,6 +6,12 @@
 # (seeded rows present) and migration-consistent (`migrate run` is a no-op and
 # `migrate status` is clean). It also prints the restore duration (RTO signal).
 #
+# WHIT-1211 (#1908): it then proves the guard against empty and invalid dumps.
+# backup-db.sh must fail without a marker when the database is missing or has
+# no tables; restore-db.sh must refuse an empty (20-byte) and a damaged dump;
+# with no file named it must skip both for the real dump; and the freshness
+# exporter must report the newest dump as invalid.
+#
 # Uses only a throwaway local backup (no S3, no real secrets), so it runs in CI
 # unattended: on a weekly schedule, on manual dispatch, and on any PR that
 # touches the backup/restore scripts (so a change to them is proven before merge).
@@ -19,6 +25,9 @@ on:
     paths:
       - 'scripts/backup-db.sh'
       - 'scripts/restore-db.sh'
+      - 'scripts/lib/backup-check.sh'
+      - 'ops/alerting/backup-freshness-textfile.sh'
+      - 'ops/alerting/prometheus-rules.yml'
       - '.github/workflows/backup-restore-drill.yml'
 
 permissions:
@@ -64,8 +73,27 @@ jobs:
           extensions: mbstring, pdo, pdo_pgsql, pgsql
           coverage: none
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      # The client must match the server's major version (the pg15 service
+      # above). The runner's default postgresql-client is newer (18): its
+      # pg_dump writes `SET transaction_timeout`, which a 15 server rejects on
+      # restore. A real deployment dumps with its own server's client, so the
+      # drill does too. Keep this in step with the service image.
+      - name: Install PostgreSQL client (same major as the server)
+        env:
+          PG_MAJOR: '15'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y "postgresql-client-${PG_MAJOR}"
+          echo "/usr/lib/postgresql/${PG_MAJOR}/bin" >> "$GITHUB_PATH"
+
+      - name: Client and server major versions match
+        run: |
+          client="$(pg_dump --version | grep -oE '[0-9]+' | head -1)"
+          server="$(psql -d whity_core -tAc 'SHOW server_version_num' | cut -c1-2)"
+          echo "pg_dump ${client}, server ${server}"
+          [ "$client" = "$server" ] || { echo "::error::pg_dump ${client} does not match the server ${server}; the dump would not restore."; exit 1; }
 
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
@@ -136,3 +164,102 @@ jobs:
             exit 1
           fi
           echo "Restore verified: seeded data present and migration-consistent."
+
+      # ── WHIT-1211 (#1908): empty and invalid dumps ─────────────────────────
+      - name: Backup of a missing or empty database fails without a marker
+        env:
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          DB_USER: whity
+          DB_PASSWORD: whity_dev
+          BACKUP_WAIT_FOR_DB_SECONDS: '4'
+        run: |
+          set -u
+          marker_before="$(cat ./backups/.last-success)"
+          count_before="$(ls -1 ./backups/whity_* | grep -vc '\.invalid$' || true)"
+
+          if DB_NAME=whity_missing bash scripts/backup-db.sh; then
+            echo "::error::backup-db.sh reported success for a database that does not exist."
+            exit 1
+          fi
+
+          createdb whity_empty
+          if DB_NAME=whity_empty bash scripts/backup-db.sh; then
+            echo "::error::backup-db.sh reported success for a dump with no tables."
+            exit 1
+          fi
+          ls ./backups/whity_whity_empty_*.sql.gz.invalid
+
+          [ "$(cat ./backups/.last-success)" = "$marker_before" ] || { echo "::error::The marker moved after a failed backup."; exit 1; }
+          count_after="$(ls -1 ./backups/whity_* | grep -vc '\.invalid$' || true)"
+          [ "$count_after" = "$count_before" ] || { echo "::error::A failed backup left a file that looks like a dump."; exit 1; }
+          if ls ./backups/.partial_* 2>/dev/null; then echo "::error::A .partial_ file was left behind."; exit 1; fi
+          echo "Failed backups left no dump and no marker update."
+
+      - name: Plant an empty and a damaged dump, newer than the real one
+        run: |
+          real="$(ls -1 ./backups/whity_whity_core_*.sql.gz.enc | head -1)"
+          # The #1908 case: a gzip of nothing (20 bytes), encrypted like the rest.
+          printf '' | gzip -9 > /tmp/empty.sql.gz
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in /tmp/empty.sql.gz             -out ./backups/whity_whity_core_29990101T000000Z.sql.gz.enc -pass "pass:${BACKUP_ENCRYPTION_KEY}"
+          # A dump cut short: the first half of the real gzip, encrypted.
+          openssl enc -d -aes-256-cbc -pbkdf2 -in "$real" -pass "pass:${BACKUP_ENCRYPTION_KEY}" > /tmp/real.sql.gz
+          head -c "$(( $(stat -c %s /tmp/real.sql.gz) / 2 ))" /tmp/real.sql.gz > /tmp/cut.sql.gz
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in /tmp/cut.sql.gz             -out ./backups/whity_whity_core_29990102T000000Z.sql.gz.enc -pass "pass:${BACKUP_ENCRYPTION_KEY}"
+          touch -d '+1 hour' ./backups/whity_whity_core_29990101T000000Z.sql.gz.enc
+          touch -d '+2 hour' ./backups/whity_whity_core_29990102T000000Z.sql.gz.enc
+          ls -lt ./backups
+
+      - name: restore-db.sh refuses the empty and the damaged dump
+        env:
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          DB_NAME: whity_restore_guard
+          DB_USER: whity
+          DB_PASSWORD: whity_dev
+        run: |
+          createdb whity_restore_guard
+          for f in ./backups/whity_whity_core_29990101T000000Z.sql.gz.enc ./backups/whity_whity_core_29990102T000000Z.sql.gz.enc; do
+            if bash scripts/restore-db.sh "$f" 2> /tmp/err; then
+              echo "::error::restore-db.sh restored an invalid dump: $f"
+              exit 1
+            fi
+            cat /tmp/err
+            grep -q 'REFUSED' /tmp/err
+          done
+          tables=$(psql -d whity_restore_guard -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';")
+          [ "$tables" = "0" ] || { echo "::error::A refused restore still wrote ${tables} tables."; exit 1; }
+          echo "Both invalid dumps were refused before touching the database."
+
+      - name: With no file named, restore-db.sh skips them for the newest valid dump
+        env:
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          DB_NAME: whity_restore_guard
+          DB_USER: whity
+          DB_PASSWORD: whity_dev
+        run: |
+          bash scripts/restore-db.sh 2> /tmp/err
+          cat /tmp/err
+          grep -q 'skipping .*29990102T000000Z' /tmp/err
+          grep -q 'skipping .*29990101T000000Z' /tmp/err
+          tenants=$(psql -d whity_restore_guard -tAc 'SELECT count(*) FROM tenants;')
+          [ "$tenants" -ge 1 ] || { echo "::error::The no-file restore did not restore the real dump."; exit 1; }
+          echo "No-file restore skipped the invalid dumps and restored ${tenants} tenants."
+
+      - name: The freshness exporter reports the newest dump as invalid
+        run: |
+          TEXTFILE_DIR=/tmp/textfile bash ops/alerting/backup-freshness-textfile.sh
+          cat /tmp/textfile/whity_backup.prom
+          grep -qx 'whity_backup_latest_valid 0' /tmp/textfile/whity_backup.prom
+          grep -qx 'whity_backup_latest_verified 1' /tmp/textfile/whity_backup.prom
+          grep -q '^whity_backup_last_success_timestamp_seconds ' /tmp/textfile/whity_backup.prom
+          # Remove the planted dumps: the real one is newest again, and valid.
+          rm ./backups/whity_whity_core_2999*.sql.gz.enc
+          TEXTFILE_DIR=/tmp/textfile bash ops/alerting/backup-freshness-textfile.sh
+          grep -qx 'whity_backup_latest_valid 1' /tmp/textfile/whity_backup.prom
+          echo "Exporter: invalid newest dump = 0, real newest dump = 1."
+
+      - name: Check the alert rules
+        run: |
+          docker run --rm -v "$PWD/ops/alerting:/rules:ro" --entrypoint promtool             prom/prometheus:v2.53.0 check rules /rules/prometheus-rules.yml

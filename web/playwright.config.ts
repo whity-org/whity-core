@@ -90,7 +90,7 @@ export default defineConfig({
       // silently never executes. `document-library` (#1006) is here for exactly
       // that reason — it was written against an earlier version of this list and
       // would otherwise have been dropped by the rewrite that added the others.
-      testMatch: /(agents-pages|navigation|roles|users|ous-tenants|ous-hub|stats|settings-2fa|profile|website-settings|branding|global-settings|sso|email-settings|mcp-connect|document-create|document-record|document-library|form-document-fit|rtl-direction|user-groups)\.spec\.ts/,
+      testMatch: /(agents-pages|navigation|roles|users|ous-tenants|ous-hub|stats|settings-2fa|profile|website-settings|branding|global-settings|sso|email-settings|mcp-connect|document-create|document-record|document-library|form-document-fit|rtl-direction|user-groups|workspace-create-paid|workspace-create-pay-step|plugin-embed-isolation)\.spec\.ts/,
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], storageState: adminStatePath },
     },
@@ -111,6 +111,15 @@ export default defineConfig({
     {
       name: 'plugins-uikit',
       testMatch: /ui-kit-showcase\.spec\.ts/,
+      dependencies: ['setup'],
+      use: { ...devices['Desktop Chrome'], storageState: adminStatePath },
+    },
+    // WHIT-1202: a template's locked card starts its paid plugin's trial. It
+    // uploads two throwaway plugins as the operator (in the spec), then works
+    // in the admin's workspace.
+    {
+      name: 'templates-locked',
+      testMatch: /template-locked-card\.spec\.ts/,
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], storageState: adminStatePath },
     },

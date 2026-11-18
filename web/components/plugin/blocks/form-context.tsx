@@ -60,7 +60,7 @@ export type FieldArrayValue = Record<string, FieldArrayCell>[];
  * `{unit, scope, type}` rule — the picker always writes the WHOLE object, so a
  * value in this map can never be a rule missing its `scope`.
  */
-export type FormValue = string | boolean | LocalizedTextValue | FieldArrayValue | OuScopeValue;
+export type FormValue = string | boolean | LocalizedTextValue | FieldArrayValue | OuScopeValue | string[];
 
 /** The value shape exposed to all form descendants via context. */
 export interface FormBlockContextValue {
@@ -203,6 +203,9 @@ const FORM_INPUT_TYPES = [
   'referenceSelect',
   'richTextInput',
   'ouScopePicker',
+  'timeInput',
+  'weeklyHours',
+  'checkboxGroup',
 ] as const;
 
 /**
@@ -359,7 +362,37 @@ function collectDefaults(
       // required-min array starts populated; 0 min → an empty array.
       const min = typeof input.min === 'number' && input.min > 0 ? input.min : 0;
       const rowDefault = collectDefaults(input.children, resolveRef) as FieldArrayValue[number];
-      defaults[input.name] = Array.from({ length: min }, () => ({ ...rowDefault }));
+      // SDK 1.113: `default` rows are a ready list to tick and edit. Each is
+      // laid over the template's own defaults, a checkbox's 'true'/'false'
+      // read as the boolean it edits.
+      const given = Array.isArray(input.default) ? input.default : [];
+      if (given.length > 0) {
+        const checkboxes = new Set(
+          collectFormInputs(input.children)
+            .filter((c) => c.type === 'checkbox')
+            .map((c) => (c as { name: string }).name)
+        );
+        defaults[input.name] = given.map((row) => {
+          const seeded: FieldArrayValue[number] = { ...rowDefault };
+          for (const [key, cell] of Object.entries(row)) {
+            seeded[key] = checkboxes.has(key) ? cell === 'true' || cell === '1' : cell;
+          }
+          return seeded;
+        });
+      } else {
+        defaults[input.name] = Array.from({ length: min }, () => ({ ...rowDefault }));
+      }
+    } else if (input.type === 'weeklyHours') {
+      defaults[input.name] = Array.isArray(input.default) ? input.default.map((row) => ({ ...row })) : [];
+    } else if (input.type === 'checkboxGroup') {
+      defaults[input.name] = Array.isArray(input.default) ? [...input.default] : [];
+    } else if (input.type === 'referenceSelect' && input.multiple === true) {
+      // SDK 1.121 (#1437): several references are a list. A scalar seed (a
+      // context ref or the literal `default`) becomes a one-item list, so the
+      // value is always an array and the required check reads one shape.
+      const seeded = input.defaultFrom !== undefined ? resolveRef?.(input.defaultFrom) : undefined;
+      const first = seeded ?? input.default;
+      defaults[input.name] = typeof first === 'string' && first !== '' ? [first] : [];
     } else if (input.type === 'checkbox') {
       // WC-block-modal-drawer: `defaultFrom` (a master-detail context ref) wins
       // over the literal `default`. A row's boolean serialises as 'true'/'1'.
@@ -381,6 +414,7 @@ function collectDefaults(
       input.type === 'slider' ||
       input.type === 'dateInput' ||
       input.type === 'colorInput' ||
+      input.type === 'timeInput' ||
       input.type === 'referenceSelect' ||
       input.type === 'richTextInput'
     ) {
@@ -437,6 +471,27 @@ function unwrapEnvelope(body: unknown): Record<string, FormValue> | null {
     return null;
   }
   return data as Record<string, FormValue>;
+}
+
+/**
+ * A preloaded record as the inputs read it. A field's value in JSON may be a
+ * number (`chairs: 3`), but every text, number and select input holds a
+ * string and shows nothing for anything else, so a saved number appeared as an
+ * empty field and a person re-typed what was already stored (WHIT-1176).
+ * Numbers become their digits; lists, objects and booleans are left as they
+ * are, for the inputs that hold those (`weeklyHours`, `checkboxGroup`,
+ * `fieldArray`, `bilingualText`, `checkbox`).
+ */
+export function seedableRecord(record: Record<string, unknown>): Record<string, FormValue> {
+  const out: Record<string, FormValue> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (typeof value === 'number') {
+      if (Number.isFinite(value)) out[key] = String(value);
+    } else if (value !== null && value !== undefined) {
+      out[key] = value as FormValue;
+    }
+  }
+  return out;
 }
 
 export function FormProvider({
@@ -541,7 +596,7 @@ export function FormProvider({
         // while the other failed loudly.
         const record = unwrapEnvelope(body);
         if (record !== null) {
-          setValues((prev) => ({ ...prev, ...record }));
+          setValues((prev) => ({ ...prev, ...seedableRecord(record) }));
         }
         setIsLoading(false);
       })
@@ -593,7 +648,9 @@ export function FormProvider({
           child.type === 'select' ||
           child.type === 'dateInput' ||
           child.type === 'fileInput' ||
-          child.type === 'richTextInput') &&
+          child.type === 'timeInput' ||
+          child.type === 'richTextInput' ||
+          (child.type === 'referenceSelect' && child.multiple !== true)) &&
         child.required === true
       ) {
         const val = values[child.name];
@@ -604,6 +661,19 @@ export function FormProvider({
           newErrors[child.name] = t('form.error.required', '{label} is required', {
             label: child.label,
           });
+        }
+      } else if (
+        (child.type === 'weeklyHours' ||
+          child.type === 'checkboxGroup' ||
+          (child.type === 'referenceSelect' && child.multiple === true)) &&
+        child.required === true
+      ) {
+        // SDK 1.113: a required week needs at least one open day; a required
+        // group at least one choice. SDK 1.121: a required multiple reference
+        // select at least one row.
+        const val = values[child.name];
+        if (!Array.isArray(val) || val.length === 0) {
+          newErrors[child.name] = t('form.error.required', '{label} is required', { label: child.label });
         }
       } else if (child.type === 'bilingualText' && child.required === true) {
         // A required bilingual field is satisfied by at least one language

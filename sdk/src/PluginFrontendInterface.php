@@ -57,6 +57,13 @@ namespace Whity\Sdk;
  *     default `Content-Security-Policy`/`X-Frame-Options` — the host lets a
  *     handler-set CSP with a non-`'none'` `frame-ancestors` survive, and also
  *     drops the legacy `X-Frame-Options: DENY` in that case.
+ *     The page runs ISOLATED (WHIT-1217): the iframe is
+ *     `sandbox="allow-scripts allow-forms"` with no `allow-same-origin`, and
+ *     the host adds `sandbox allow-scripts allow-forms` to the page's CSP
+ *     (replacing any `sandbox` the handler wrote), so it has an opaque origin
+ *     even when opened in a tab. It cannot read the host page, cookies or
+ *     storage, and its own calls to the API carry no session. Render the data
+ *     into the HTML on the server, or use `'blocks'`.
  * - `requiredPermission` (string, REQUIRED — fail-closed, there are no
  *   permissionless screens): must match
  *   `/^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/` and be a permission this plugin

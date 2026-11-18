@@ -63,4 +63,5 @@ it('needs someone to hand over to', async () => {
   expect(handOver).toBeDisabled();
   expect(screen.getByRole('switch', { name: 'Approvals in flows' })).toBeChecked();
   expect(screen.getByRole('switch', { name: 'Documents to sign' })).not.toBeChecked();
+  expect(screen.getByRole('switch', { name: 'Approvals in plugins' })).not.toBeChecked();
 });

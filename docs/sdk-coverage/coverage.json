@@ -1,8 +1,8 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.110.0",
-    "core_version": "0.2.29",
-    "updated": "2026-11-16",
+    "sdk_version": "1.121.0",
+    "core_version": "0.2.30",
+    "updated": "2026-11-18",
     "ratings": {
         "full": "A plugin can read, change, react to and extend this area through a published SDK contract.",
         "partial": "Some of it is in the SDK; the rest is missing or reachable only through internal core classes.",
@@ -78,7 +78,34 @@
                 "A person picker block"
             ],
             "security": "People records are personal data. A reader must be pinned to the current workspace, checked against relations:read for the caller, and able to redact fields.",
-            "plan": "0.2.28"
+            "plan": "later"
+        },
+        {
+            "id": "contacts",
+            "group": "people",
+            "name": "Contacts (customers and suppliers)",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Setup\\WorkspaceSetup: list and add contacts through core routes, as the acting person (for packs)",
+                    "since": "1.110"
+                },
+                {
+                    "what": "Contacts\\Contacts host service: list, get, find by a custom field, create and update contacts without HTTP, writes acting as a person with contacts:write",
+                    "since": "1.119"
+                },
+                {
+                    "what": "PluginContactFieldsInterface: a plugin's own fields on contacts, named under the plugin, made where it is on and archived with values kept where it is off",
+                    "since": "1.119"
+                }
+            ],
+            "missing": [
+                "contact.created and contact.updated events",
+                "Archiving a contact from a plugin",
+                "A contact picker block"
+            ],
+            "security": "Contacts are personal data. Reads are trusted to the plugin; writes check the acting person's permissions like the routes do.",
+            "plan": "later"
         },
         {
             "id": "authentication",
@@ -121,6 +148,10 @@
                 {
                     "what": "Owned tables cascade on workspace deletion (PluginTablesInterface)",
                     "since": "1.20"
+                },
+                {
+                    "what": "workspace.owner_added, workspace.owner_removed and workspace.ownership_transferred when a workspace changes hands or gains or loses a co-owner",
+                    "since": "1.112"
                 }
             ],
             "missing": [
@@ -129,7 +160,7 @@
                 "A slot on workspace settings"
             ],
             "security": "Install-wide plugins see every workspace's events. Hook subscriptions scoped to a workspace need a design before more workspace data is exposed.",
-            "plan": "0.2.28"
+            "plan": "later"
         },
         {
             "id": "rbac",
@@ -186,10 +217,15 @@
             "id": "delegations",
             "group": "people",
             "name": "Delegations",
-            "rating": "none",
-            "has": [],
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Delegation\\Away::at(): whether a person is away at a moment (their \"I'm away\" period or time off) and who stands in for them, with what is handed over; the plugins cover lets a plugin's own approvals follow the stand-in",
+                    "since": "1.120"
+                }
+            ],
             "missing": [
-                "Reading active delegations and the acting-for context",
+                "The acting-for context of a request made by a stand-in",
                 "Delegation events",
                 "A veto on delegating a plugin-owned permission"
             ],
@@ -217,7 +253,7 @@
                 "A group picker block"
             ],
             "security": "A plugin rule resolver returns people for a workspace. The host must drop anyone who is not an active member of that workspace rather than trusting the resolver.",
-            "plan": "0.2.28"
+            "plan": "later"
         },
         {
             "id": "ous",
@@ -243,7 +279,7 @@
                 "OU custom fields"
             ],
             "security": null,
-            "plan": "0.2.28"
+            "plan": "later"
         },
         {
             "id": "invitations-registration",
@@ -420,6 +456,10 @@
                 {
                     "what": "Render and issue from queue jobs and CLI commands",
                     "since": "1.76"
+                },
+                {
+                    "what": "QR codes as SVG or a data URI for a printout, without a vendor package (Print\\QrCode)",
+                    "since": "1.111"
                 }
             ],
             "missing": [
@@ -857,17 +897,26 @@
             "id": "home",
             "group": "platform",
             "name": "Home page",
-            "rating": "partial",
+            "rating": "full",
             "has": [
                 {
                     "what": "One home card per plugin",
                     "since": "1.62"
+                },
+                {
+                    "what": "PluginDashboardInterface: setup points on Finish setting up, done by the plugin's own status route",
+                    "since": "1.115"
+                },
+                {
+                    "what": "Dashboard widgets (stat, list, chart, actions) built from blocks, several per plugin, with actions; people hide, move and resize them",
+                    "since": "1.115"
+                },
+                {
+                    "what": "Contributing to Waiting for you, through an inbox source (see Inbox and Waiting for you)",
+                    "since": "1.97"
                 }
             ],
-            "missing": [
-                "More than one card, and actions on cards",
-                "Contributing to Waiting for you"
-            ],
+            "missing": [],
             "security": null,
             "plan": "0.2.28"
         },
@@ -984,6 +1033,10 @@
                 {
                     "what": "Plugins sold per seat (getAccess seats) and QuantityCheckout for a checkout of several",
                     "since": "1.110"
+                },
+                {
+                    "what": "TrialCheckout: take a card now and charge when a workspace's free trial ends",
+                    "since": "1.118"
                 }
             ],
             "missing": [
@@ -1207,13 +1260,21 @@
                 {
                     "what": "PluginOnboardingInterface: a guided, step-by-step setup drawn by core as a stepper",
                     "since": "1.109"
+                },
+                {
+                    "what": "Setup inputs: time, weekly hours, checkbox group, colour swatches, prefilled repeating rows",
+                    "since": "1.113"
+                },
+                {
+                    "what": "referenceSelect multiple: several rows from an API-backed source, shown as chips",
+                    "since": "1.121"
                 }
             ],
             "missing": [
                 "Native screens for store plugins (custom screens need a change in this repository)",
                 "Blocks outside /admin/x pages"
             ],
-            "security": "Embedded screens are not isolated from the app. Third-party UI needs a separate origin, a message bridge and a scoped token first.",
+            "security": "Embedded screens run in a sandboxed frame with no origin of their own (0.2.30). A message bridge and a scoped token are still needed before an embedded screen can call the API.",
             "plan": "later"
         },
         {
@@ -1228,7 +1289,7 @@
                 "Top bar and user menu entries"
             ],
             "security": "A slot receives the record it sits on. It needs per-record permission checks and the same own-routes rule blocks have.",
-            "plan": "0.2.28"
+            "plan": "later"
         },
         {
             "id": "desktop",
@@ -1375,11 +1436,15 @@
             "id": "webhooks",
             "group": "agents",
             "name": "Outbound webhooks and connectors",
-            "rating": "none",
-            "has": [],
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "One outbound HTTP client for calling other servers: https only unless asked, verified TLS, no redirects, timeouts and a size cap, with recorded answers for tests (Http\\Outbound\\HttpClient, StreamHttpClient, Testing\\RecordedHttpClient)",
+                    "since": "1.114"
+                }
+            ],
             "missing": [
                 "Subscribing external URLs to events, with signing, retries and a delivery log",
-                "An outbound HTTP client",
                 "Admin-registered connectors"
             ],
             "security": "Outbound calls need a guard against private addresses, signing secrets kept in PluginSecrets, a workspace check per event and id-only payloads.",
@@ -1413,6 +1478,18 @@
                 {
                     "what": "Setup\\WorkspaceSetup: set up booking rules, services, staff and hours through core routes, as the acting person (for packs)",
                     "since": "1.108"
+                },
+                {
+                    "what": "PluginWorkspaceTemplatesInterface: ready starts for one kind of business, offered after a workspace is created and applied by core as the person choosing them",
+                    "since": "1.116"
+                },
+                {
+                    "what": "PluginDisplayNameInterface: the name people read for a plugin, in English and Arabic",
+                    "since": "1.117"
+                },
+                {
+                    "what": "Calendar\\TimeOff host service: create, cancel and list a person's time off as the acting person, idempotent by the plugin's own reference",
+                    "since": "1.120"
                 }
             ],
             "missing": [
@@ -1494,7 +1571,7 @@
                     },
                     {
                         "id": "notifier",
-                        "title": "Notifier: declared notification types, sent to a person, role or unit in the current workspace",
+                        "title": "Notifier: declared notification types, sent to a person, role or unit in the current workspace (shipped in SDK 1.90)",
                         "areas": [
                             "notifications"
                         ],
@@ -1548,23 +1625,6 @@
                 "theme": "Reading core data safely, and appearing inside core screens",
                 "items": [
                     {
-                        "id": "directory-reader",
-                        "title": "People, user, group and unit readers pinned to the workspace and checked per caller, with picker blocks",
-                        "areas": [
-                            "people-directory",
-                            "users",
-                            "groups-audiences",
-                            "ous",
-                            "tenants"
-                        ],
-                        "value": "high",
-                        "risk": "high",
-                        "design_first": true,
-                        "issues": [
-                            1680
-                        ]
-                    },
-                    {
                         "id": "inbox-sources",
                         "title": "Inbox source contract: plugin tasks in Waiting for you",
                         "areas": [
@@ -1576,19 +1636,6 @@
                         "design_first": true,
                         "issues": [
                             881
-                        ]
-                    },
-                    {
-                        "id": "record-page-slots",
-                        "title": "Tabs, sections and actions on core record pages, rendered with blocks",
-                        "areas": [
-                            "core-screen-slots"
-                        ],
-                        "value": "high",
-                        "risk": "high",
-                        "design_first": true,
-                        "issues": [
-                            1681
                         ]
                     },
                     {
@@ -1687,6 +1734,36 @@
                 "version": "later",
                 "theme": "High-risk surface, each behind its own design",
                 "items": [
+                    {
+                        "id": "directory-reader",
+                        "title": "People, user, group and unit readers pinned to the workspace and checked per caller, with picker blocks",
+                        "areas": [
+                            "people-directory",
+                            "users",
+                            "groups-audiences",
+                            "ous",
+                            "tenants"
+                        ],
+                        "value": "high",
+                        "risk": "high",
+                        "design_first": true,
+                        "issues": [
+                            1680
+                        ]
+                    },
+                    {
+                        "id": "record-page-slots",
+                        "title": "Tabs, sections and actions on core record pages, rendered with blocks",
+                        "areas": [
+                            "core-screen-slots"
+                        ],
+                        "value": "high",
+                        "risk": "high",
+                        "design_first": true,
+                        "issues": [
+                            1681
+                        ]
+                    },
                     {
                         "id": "outbound-webhooks",
                         "title": "Outbound webhooks and connectors, and the send_webhook automation step",

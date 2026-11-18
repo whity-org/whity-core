@@ -88,12 +88,13 @@ export function isPluginKey(key: string): boolean {
 export type SettingsMap = Record<string, string>;
 
 /** The General tab's tenant-overridable key set. */
-export type GeneralSettingKey = 'site_name' | 'timezone' | 'support_email';
+export type GeneralSettingKey = 'support_email' | 'timezone' | 'locale';
 
-// The General tab's tenant-overridable keys, kept in display order. `locale`
-// lives on the Branding tab instead (grouped with logos/colors as the
-// instance's "identity & language" surface) — see branding/page.tsx.
-export const GENERAL_SETTING_KEYS: readonly GeneralSettingKey[] = ['site_name', 'timezone', 'support_email'];
+// The General tab's tenant-overridable keys, in the order of its card
+// (TplSettingsGeneral, section 25: support email, time zone, language). The
+// product name (`site_name`) is on Branding with the logo and colour
+// (TplAdminBranding).
+export const GENERAL_SETTING_KEYS: readonly GeneralSettingKey[] = ['support_email', 'timezone', 'locale'];
 
 /**
  * Per-tenant DISPLAY preferences, rendered on the General tab beneath the four
@@ -153,7 +154,7 @@ export function generalFieldLabels(t: TranslateFn): Record<SettingKey, string> {
   return {
     site_name: t('settings.field.site_name', 'Site name'),
     timezone: t('settings.field.timezone', 'Timezone'),
-    locale: t('settings.field.locale', 'Locale'),
+    locale: t('settings.field.locale', 'Main language'),
     support_email: t('settings.field.support_email', 'Support email'),
   };
 }
@@ -322,6 +323,41 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
       help: t(
         'settings.meta.auth.sso_self_provision_workspace.help',
         'Give a person who signs in through an operator identity provider, and belongs to no workspace, a new workspace of their own.'
+      ),
+    },
+    'workspaces.self_create_enabled': {
+      label: t('settings.meta.workspaces.self_create_enabled.label', 'People create their own workspaces'),
+      help: t(
+        'settings.meta.workspaces.self_create_enabled.help',
+        'Let anyone signed in create another workspace from the workspace switcher and own it. It starts on the default plan, unless a plan for each further workspace is set below.'
+      ),
+    },
+    'workspaces.max_owned_per_person': {
+      label: t('settings.meta.workspaces.max_owned_per_person.label', 'Workspaces one person may own'),
+      help: t(
+        'settings.meta.workspaces.max_owned_per_person.help',
+        'The most workspaces one person may own, counting ones they co-own. 0 means no limit.'
+      ),
+    },
+    'workspaces.additional_plan': {
+      label: t('settings.meta.workspaces.additional_plan.label', 'Plan for each further workspace'),
+      help: t(
+        'settings.meta.workspaces.additional_plan.help',
+        'The plan key a person’s second and later owned workspaces start on, in a trial, so each extra workspace pays. Their first starts on the default plan, and being invited stays free. Empty means the default plan for every workspace.'
+      ),
+    },
+    'workspaces.additional_trial_days': {
+      label: t('settings.meta.workspaces.additional_trial_days.label', 'Trial for each further workspace (days)'),
+      help: t(
+        'settings.meta.workspaces.additional_trial_days.help',
+        'How long that plan is free. If it isn’t paid when the trial ends, the workspace becomes read-only until it is; nothing is deleted. 0 means it is read-only until it’s paid. Used only when the plan above is set.'
+      ),
+    },
+    'auth.password_sign_in': {
+      label: t('settings.meta.auth.password_sign_in.label', 'Password sign-in'),
+      help: t(
+        'settings.meta.auth.password_sign_in.help',
+        'Off: people sign in and sign up only with the identity provider. Password sign-in, reset and two-step set-up stop. The server can turn it back on with whity-cli auth password-sign-in on.'
       ),
     },
     'storage.driver': {
@@ -537,7 +573,16 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'settings.section.signup.description',
         'Control whether and how new people can create accounts on this instance.'
       ),
-      keys: ['auth.self_registration_enabled', 'auth.registration_approval_required'],
+      keys: [
+        'auth.self_registration_enabled',
+        'auth.registration_approval_required',
+        // Creating more workspaces while signed in (WHIT-1169).
+        'workspaces.self_create_enabled',
+        'workspaces.max_owned_per_person',
+        // Each further owned workspace pays (WHIT-1203).
+        'workspaces.additional_plan',
+        'workspaces.additional_trial_days',
+      ],
     },
     {
       id: 'i18n',
@@ -555,7 +600,7 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'settings.section.signin.description',
         'Federated sign-in across the whole instance.'
       ),
-      keys: ['auth.sso_enabled'],
+      keys: ['auth.sso_enabled', 'auth.password_sign_in'],
     },
     {
       id: 'integrations',

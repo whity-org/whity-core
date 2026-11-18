@@ -55,9 +55,12 @@ import {
 } from '@/lib/calendar/api';
 import { dateInZone, type CalendarDate } from '@/lib/calendar/layout';
 import { SlotPicker } from './slot-picker';
+import { ServiceList, isSeveral, useServicesName } from './booking-services';
 import { useCalendarWords } from './use-calendar-words';
 
 const ANYONE = 'anyone';
+/** Moving a booking of several services: each keeps its own person. */
+const KEEP = 'keep';
 
 /** Money in normal units with the currency's decimals: JOD 12.500. */
 export function bookingMoney(minor: number, currency: string): string {
@@ -137,6 +140,9 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
   const service = booking ? services.find((s) => s.id === booking.service_id) ?? null : null;
   const person = booking ? staff.find((s) => s.profile_id === booking.profile_id) ?? null : null;
   const open = booking !== null && booking.status !== 'cancelled' && booking.status !== 'expired';
+  // WHIT-1173: a booking of several services is named by all of them.
+  const servicesName = useServicesName();
+  const what = booking && isSeveral(booking) ? servicesName(booking.items ?? []) : words.serviceName(service);
 
   return (
     <Sheet open={booking !== null} onOpenChange={(next) => (next ? undefined : close())}>
@@ -146,7 +152,7 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
             <SheetHeader className="pe-10">
               <SheetTitle className="text-lg font-semibold">{booking.customer.name ?? t('booking.noName', 'No name given')}</SheetTitle>
               <SheetDescription className="text-sm">
-                {words.serviceName(service)}
+                {what}
                 {' · '}
                 {dates.dateTime(booking.starts_at) ?? '—'}
               </SheetDescription>
@@ -163,6 +169,7 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
               <MovePanel
                 booking={booking}
                 service={service}
+                services={services}
                 staff={staff}
                 timeZone={timeZone}
                 suggest={mode === 'suggest'}
@@ -218,7 +225,7 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
             <CancelDialog
               open={cancelling}
               booking={booking}
-              serviceName={words.serviceName(service)}
+              serviceName={what}
               when={dates.dateTime(booking.starts_at) ?? '—'}
               onOpenChange={setCancelling}
               onCancelled={(cancelled) => {
@@ -264,11 +271,20 @@ function BookingFacts({
       testId: 'booking-when',
     });
   }
-  rows.push({
-    label: t('booking.fact.with', 'With'),
-    value: person ? <ActorChip name={person.display_name} /> : t('booking.fact.removedPerson', 'Someone no longer on the calendar'),
-  });
-  rows.push({ label: t('booking.fact.service', 'Service'), value: words.serviceName(service) });
+  if (isSeveral(booking)) {
+    // WHIT-1173: each service with its time and who does it.
+    rows.push({
+      label: t('booking.fact.services', 'Services'),
+      value: <ServiceList items={booking.items ?? []} timeZone={timeZone} />,
+      testId: 'booking-services-fact',
+    });
+  } else {
+    rows.push({
+      label: t('booking.fact.with', 'With'),
+      value: person ? <ActorChip name={person.display_name} /> : t('booking.fact.removedPerson', 'Someone no longer on the calendar'),
+    });
+    rows.push({ label: t('booking.fact.service', 'Service'), value: words.serviceName(service) });
+  }
   if (booking.room_name) {
     rows.push({ label: t('booking.fact.room', 'Room'), value: words.label(booking.room_name), testId: 'booking-room' });
   }
@@ -321,6 +337,7 @@ function BookingFacts({
 function MovePanel({
   booking,
   service,
+  services,
   staff,
   timeZone,
   suggest,
@@ -329,6 +346,8 @@ function MovePanel({
 }: {
   booking: CalendarBooking;
   service: CalendarService | null;
+  /** Every service, to know who does all of a booking of several. */
+  services: CalendarService[];
   staff: CalendarStaff[];
   timeZone: string;
   /** Suggest the time to the customer instead of moving the booking. */
@@ -338,17 +357,28 @@ function MovePanel({
 }) {
   const t = useTranslation('calendar');
   const words = useCalendarWords();
-  const [person, setPerson] = useState<string>(String(booking.profile_id));
+  // WHIT-1173: a booking of several services moves as one; each keeps its
+  // person unless one person who does them all is chosen.
+  const items = isSeveral(booking) ? booking.items ?? [] : [];
+  const several = items.length > 1;
+  const [person, setPerson] = useState<string>(several ? KEEP : String(booking.profile_id));
   const [date, setDate] = useState<CalendarDate>(dateInZone(new Date(booking.starts_at), timeZone));
   const [slot, setSlot] = useState<CalendarSlot | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const providers = service && service.staff_profile_ids.length > 0
-    ? staff.filter((s) => service.staff_profile_ids.includes(s.profile_id))
-    : staff;
-  const profileId = person === ANYONE ? null : Number(person);
+  const offers = (s: CalendarService | null | undefined, profile: number) =>
+    s === null || s === undefined || s.staff_profile_ids.length === 0 || s.staff_profile_ids.includes(profile);
+  const providers = several
+    ? staff.filter((p) => items.every((item) => offers(services.find((s) => s.id === item.service_id), p.profile_id)))
+    : service && service.staff_profile_ids.length > 0
+      ? staff.filter((s) => service.staff_profile_ids.includes(s.profile_id))
+      : staff;
+  const profileId = person === ANYONE || person === KEEP ? null : Number(person);
+  const choices = several
+    ? items.map((item) => ({ service_id: item.service_id, profile_id: profileId ?? item.profile_id }))
+    : null;
   // The booking's own time is left out of the choices: it is not a move.
   const currentStart = booking.starts_at;
 
@@ -361,7 +391,8 @@ function MovePanel({
     setProblem(null);
     try {
       // With Anyone, take the first person free then; the server re-checks.
-      const target = profileId ?? slot.profile_ids[0];
+      // Several services keep their people unless one person was chosen.
+      const target = several ? profileId ?? undefined : profileId ?? slot.profile_ids[0];
       const body = {
         starts_at: toZonedIso(new Date(slot.starts_at), timeZone),
         ...(target !== undefined && target !== booking.profile_id ? { profile_id: target } : {}),
@@ -401,13 +432,17 @@ function MovePanel({
             setSlot(null);
           }}
           options={[
-            { value: ANYONE, label: t('booking.field.anyone', 'Anyone who is free') },
+            several
+              ? { value: KEEP, label: t('booking.field.keepPeople', 'Each with the same person') }
+              : { value: ANYONE, label: t('booking.field.anyone', 'Anyone who is free') },
             ...providers.map((s) => ({ value: String(s.profile_id), label: s.display_name })),
           ]}
         />
       </div>
       <SlotPicker
         id="move"
+        several={choices}
+        exceptBookingId={several ? booking.id : null}
         serviceId={booking.service_id}
         profileId={profileId}
         date={date}

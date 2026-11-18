@@ -10,6 +10,26 @@ reference plugins (`HelloWorld/`, `ExamplePlugin.php`) out of git, so an
 installed plugin never dirties the host checkout. Product plugins live in
 their own repositories.
 
+## What the release image ships
+
+The release image (`ghcr.io/whity-org/whity-core`) contains exactly two
+plugins in `/app/plugins`, the reference plugins `HelloWorld/` and
+`ExamplePlugin.php` (`.dockerignore` lets only these in). They are examples of
+the SDK and do **not run** there: the image sets
+`WHITY_REFERENCE_PLUGINS=off`, and plugin discovery then skips them, so they
+add no routes, permissions, roles, jobs or migrations and are not listed.
+
+| `WHITY_REFERENCE_PLUGINS` | Reference plugins | Where |
+|---|---|---|
+| unset or `on` | load and run like any plugin | development, CI, e2e (`docker-compose.yml` sets `on`; the e2e suite uses HelloWorld) |
+| `off` (also `0`, `false`, `no`) | skipped by discovery | the release image (Dockerfile `release` stage) |
+
+To run them on a deployment, set `WHITY_REFERENCE_PLUGINS=on` on the app
+container. Turning them off later does not remove what they wrote while they
+ran (their table, permissions, `hello_viewer` role, migration records); those
+rows stay, as with any plugin whose code is gone. Your own plugins are
+unaffected by the switch.
+
 ## Package anatomy
 
 A distributable plugin is one Composer package in its own repository, with the

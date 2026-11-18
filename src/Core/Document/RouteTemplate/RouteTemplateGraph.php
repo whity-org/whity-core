@@ -12,6 +12,7 @@ use Whity\Core\Document\Routing\RouteStepInputs;
 use Whity\Core\Document\Routing\RouteStepKind;
 use Whity\Core\Document\Routing\RouteVerdict;
 use Whity\Core\Document\Routing\RoutingRuleRegistry;
+use Whity\Core\Form\Print\ApprovalCertificate;
 
 /**
  * Validates a whole template graph before a single row is written (#1027).
@@ -404,6 +405,23 @@ final class RouteTemplateGraph
                 "Step {$position}: 'label' must be text of 160 characters or fewer."
             );
         }
+        // The approval certificate's options, the only thing a final document
+        // stage's rule_config may hold (ApprovalCertificate::config()).
+        $config = $step['rule_config'] ?? [];
+        if (!is_array($config) || ($config !== [] && array_is_list($config))) {
+            throw RouteTemplateRejectedException::because("Step {$position}: 'rule_config' must be an object.");
+        }
+        $unknown = array_diff(array_keys($config), ['certificate']);
+        if ($unknown !== []) {
+            throw RouteTemplateRejectedException::because(
+                "Step {$position} makes the final document. Its 'rule_config' may only hold 'certificate'."
+            );
+        }
+        try {
+            $certificate = ApprovalCertificate::config($config['certificate'] ?? null);
+        } catch (InvalidArgumentException $e) {
+            throw RouteTemplateRejectedException::because("Step {$position}: " . $e->getMessage());
+        }
         $templateId = $step['final_template_id'] ?? null;
         if ($templateId !== null && (!is_int($templateId) || $templateId < 1)) {
             throw RouteTemplateRejectedException::because(
@@ -415,7 +433,7 @@ final class RouteTemplateGraph
         return [
             'position' => $position,
             'rule_kind' => RouteStepKind::FINALISE_RULE,
-            'rule_config' => [],
+            'rule_config' => $certificate !== [] ? ['certificate' => $certificate] : [],
             'label' => is_string($label) && trim($label) !== '' ? $label : null,
             'decision' => false,
             'decision_quorum' => null,

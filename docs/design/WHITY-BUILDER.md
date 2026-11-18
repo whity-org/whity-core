@@ -1,6 +1,6 @@
 # Whity Builder: a paid, no-code plugin builder (vision and design)
 
-Status: **fully decided; the owner answered all 11 questions on 31 Oct 2026** (section 7). Nothing here is built, and no implementation starts until the owner says to build. Written 31 Oct 2026 against `origin/develop` at `0b3e2d4e`.
+Status: **fully decided; the owner answered all 11 questions on 31 Oct 2026** (section 7). The core runtime it needs shipped in v0.2.20 to v0.2.22: `plugin.json` manifests (SDK 1.47), workspace plugins published without a deploy, their records, rules, automations and tests (SDK 1.50 to 1.54), and the impact plan on an approval. The builder itself is the separate, paid `whity-org/whity-builder`. Written 31 Oct 2026 against `origin/develop` at `0b3e2d4e`.
 
 The owner's ask: "creating plugins and changing how whity works now is technical and hard... i want a future with a paid whity-builder a no-code plugin building tool with mcp to let users and theirs ai customize their company logic on the fly".
 

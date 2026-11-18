@@ -64,6 +64,11 @@ final class SettingsRegistryCorePinTest extends TestCase
             'auth.self_2fa_recovery_enabled',
             'auth.sso_enabled',
             'auth.sso_self_provision_workspace',
+            'workspaces.self_create_enabled',
+            'workspaces.max_owned_per_person',
+            'workspaces.additional_plan',
+            'workspaces.additional_trial_days',
+            'auth.password_sign_in',
             'auth.desktop_login_max_hours',
             'storage.driver',
             'storage.s3.endpoint',
@@ -194,6 +199,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.weekend_days',
             // Design 3.3: off makes booking-page bookings requests.
             'calendar.instant_booking',
+            // WHIT-1173: one booking, several services back to back.
+            'calendar.multi_service_booking',
             // #1733. Whether the web app can be installed (instance-wide).
             'app.installable',
             // WS.5, WS.19: the operator's website (global-only).
@@ -279,6 +286,11 @@ final class SettingsRegistryCorePinTest extends TestCase
             'auth.self_2fa_recovery_enabled' => 'true',
             'auth.sso_enabled' => 'true',
             'auth.sso_self_provision_workspace' => 'false',
+            'workspaces.self_create_enabled' => 'false',
+            'workspaces.max_owned_per_person' => '0',
+            'workspaces.additional_plan' => '',
+            'workspaces.additional_trial_days' => '30',
+            'auth.password_sign_in' => 'true',
             'auth.desktop_login_max_hours' => '72',
             'storage.driver' => 'local',
             'storage.s3.endpoint' => '',
@@ -429,6 +441,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.week_start' => 'saturday',
             'calendar.weekend_days' => 'friday,saturday',
             'calendar.instant_booking' => 'true',
+            'calendar.multi_service_booking' => 'false',
             // #1733: on, which is what app.whity.dev wants; an operator turns
             // it off here or with PWA_ENABLED.
             'app.installable' => 'true',

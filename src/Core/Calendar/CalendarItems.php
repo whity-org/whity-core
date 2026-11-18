@@ -77,7 +77,11 @@ final class CalendarItems
         if ($wants(self::KIND_BOOKING)) {
             $statuses = $withCancelled ? [...BookingRepository::LIVE, BookingRepository::STATUS_CANCELLED] : [];
             foreach ($this->bookings->list($tenantId, $profileIds, $from, $to, $statuses, $unitId) as $row) {
-                $items[] = $this->fromBooking(BookingRepository::toApi($row), $viewerId, $viewerManages);
+                foreach ($this->fromBookingRuns(BookingRepository::toApi($row), $viewerId, $viewerManages) as $item) {
+                    if ($profileIds === [] || in_array($item['organiser_id'], $profileIds, true)) {
+                        $items[] = $item;
+                    }
+                }
             }
         }
 
@@ -96,6 +100,58 @@ final class CalendarItems
         usort($items, static fn (array $a, array $b): int => [$a['starts_at'], $a['id']] <=> [$b['starts_at'], $b['id']]);
 
         return $items;
+    }
+
+    /**
+     * A booking as the grid draws it. A booking of several services
+     * (WHIT-1173) done by more than one person is drawn once per person, for
+     * the services they do back to back ("booking:7" for the first,
+     * "booking:7:2" for the one starting at the third service), so each
+     * person's column shows their own part. Its length is the services', so
+     * it is never resized, and a split one moves from its details (Move), not
+     * by dragging one part.
+     *
+     * @param array<string, mixed> $b a booking as {@see BookingRepository::toApi()} gives it
+     * @return list<array<string, mixed>>
+     */
+    private function fromBookingRuns(array $b, int $viewerId, bool $viewerManages): array
+    {
+        /** @var list<array<string, mixed>> $parts */
+        $parts = $b['items'] ?? [];
+        if (count($parts) < 2) {
+            return [$this->fromBooking($b, $viewerId, $viewerManages)];
+        }
+        $runs = [];
+        foreach ($parts as $part) {
+            $last = count($runs) - 1;
+            if ($last >= 0 && $runs[$last][0]['profile_id'] === $part['profile_id']) {
+                $runs[$last][] = $part;
+            } else {
+                $runs[] = [$part];
+            }
+        }
+        $out = [];
+        foreach ($runs as $n => $run) {
+            $first = $run[0];
+            $end = $run[count($run) - 1];
+            // "Mine" is whoever does this part; the booking itself is unchanged.
+            $item = $this->fromBooking(['profile_id' => $first['profile_id']] + $b, $viewerId, $viewerManages);
+            $item['booking'] = $b;
+            $names = BookingRepository::joinedNames($run);
+            $item['title'] = $names['en'] ?? (string) (reset($names) ?: $item['title']);
+            $item['starts_at'] = $first['starts_at'];
+            $item['ends_at'] = $end['ends_at'];
+            $item['organiser_id'] = (int) $first['profile_id'];
+            $item['room_id'] = $first['room_id'];
+            $item['can']['resize'] = false;
+            if (count($runs) > 1) {
+                $item['id'] = $n === 0 ? $item['id'] : self::KIND_BOOKING . ':' . $b['id'] . ':' . $first['position'];
+                $item['can']['move'] = false;
+            }
+            $out[] = $item;
+        }
+
+        return $out;
     }
 
     /**

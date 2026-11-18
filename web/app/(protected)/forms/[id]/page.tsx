@@ -33,6 +33,7 @@ import { FormHeader, type FormBannerValue } from '@whity/features/forms';
 import { Button } from '@whity/ui/button';
 import { useDirection } from '@/lib/direction-context';
 import { api } from '@/lib/api/client';
+import { fetchAllPagesTyped } from '@/lib/api/fetch-all-pages';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useTranslation } from '@whity/features/i18n';
 import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
@@ -174,6 +175,36 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
       cancelled = true;
     };
   }, [asksForUnit, mayListUnits]);
+
+  // The people for any person question or person column (WHIT-1162), for a reader
+  // who may list the workspace's people. Same reasoning as the units above.
+  const mayListPeople = hasPermission('users:read');
+  const asksForPerson =
+    rendered?.fields.some(
+      (field) => field.field_type === 'profile_ref' || (field.validation?.columns ?? []).some((column) => column.type === 'profile_ref')
+    ) ?? false;
+  const [people, setPeople] = useState<ReferenceOption[]>([]);
+  useEffect(() => {
+    if (!asksForPerson || !mayListPeople) return;
+    let cancelled = false;
+
+    fetchAllPagesTyped<{ id: number; name: string }>((query) => api.GET('/api/v1/users', { params: { query } }))
+      .then((result) => {
+        if (cancelled) return;
+        setPeople(
+          result.items
+            .filter((person) => typeof person.id === 'number' && typeof person.name === 'string' && person.name !== '')
+            .map((person) => ({ value: String(person.id), label: person.name }))
+        );
+      })
+      .catch(() => {
+        // As with units: an empty picker, and the server refuses what it must.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [asksForPerson, mayListPeople]);
 
   useEffect(() => {
     if (!capabilitiesKnown) return;
@@ -479,7 +510,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
                 answers={answers}
                 onAnswersChange={changeAnswers}
                 preferArabic={preferArabic}
-                references={{ ou_ref: units }}
+                references={{ ou_ref: units, profile_ref: people }}
                 upload={uploadAttachment}
                 submitLabel={submitLabel}
                 submit={submitAnswers}

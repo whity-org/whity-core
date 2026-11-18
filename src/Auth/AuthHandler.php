@@ -1190,7 +1190,26 @@ class AuthHandler
                     // Every role held here, the primary one first.
                     'roles'       => $role === '' ? [] : [$role],
                     'kind'        => $kind,
+                    'is_owner'    => false,
                 ];
+            }
+
+            // Which of these workspaces the person owns (WHIT-1169), so the app
+            // can show "Owner" and owner-only actions. Their OWN rows only; a
+            // failed read costs the badge, never the sign-in.
+            if ($out !== []) {
+                try {
+                    // @tenant-guard-ignore: the person's own ownership rows across their workspaces, as at sign-in (ADR 0005 §6)
+                    $owned = $this->db->prepare('SELECT tenant_id FROM workspace_owners WHERE profile_id = ?');
+                    $owned->execute([$profileId]);
+                    foreach ($owned->fetchAll(PDO::FETCH_COLUMN) as $ownedTenantId) {
+                        if (isset($out[(int) $ownedTenantId])) {
+                            $out[(int) $ownedTenantId]['is_owner'] = true;
+                        }
+                    }
+                } catch (\Exception) {
+                    // Before migration 300: nobody is recorded as an owner.
+                }
             }
             return array_values($out);
         } catch (\Exception) {
@@ -1295,6 +1314,8 @@ class AuthHandler
                 'email'     => $email,
                 // WHIT-872: the home greets a person by name.
                 'display_name' => $this->profileDisplayName($profileId),
+                // WHIT-1181: the person's own phone, E.164, or null.
+                'phone'     => (new \Whity\Core\Identity\PersonalPhone($this->db))->of($profileId),
                 'role'      => $role,
                 'tenant_id' => $activeTenantId,
             ],
@@ -1469,6 +1490,13 @@ class AuthHandler
 
         if (!$emailProvided && !$passwordProvided) {
             return Response::error('No changes provided', 400);
+        }
+
+        // WHIT-1168: both changes are proved with the current password, and with
+        // password sign-in off the address and the credential live with the
+        // identity provider, so neither changes here.
+        if (!\Whity\Core\Identity\PasswordSignIn::allowed($this->settingsService)) {
+            return \Whity\Core\Identity\PasswordSignIn::refusal();
         }
 
         // Load the profile row (global identity table).

@@ -730,6 +730,377 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         ];
     }
 
+    /**
+     * The names people see for the loaded plugins (SDK 1.117), by plugin
+     * name: `{en, ar}`, or the id in both when a plugin declares none or a
+     * bad one.
+     *
+     * @return array<string, array{en: string, ar: string}>
+     */
+    public function getDisplayNames(): array
+    {
+        $out = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $plugin = $info['plugin'];
+            $name = $plugin->getName();
+            $out[$name] = ['en' => $name, 'ar' => $name];
+            if (!$plugin instanceof \Whity\Sdk\PluginDisplayNameInterface) {
+                continue;
+            }
+            try {
+                // Read untyped: a plugin's array is runtime data whatever its
+                // declared shape, so both languages are checked below.
+                /** @var array<string, mixed> $declared */
+                $declared = $plugin->getDisplayName();
+            } catch (Throwable $e) {
+                $this->handlePluginThrowable($pluginKey, $e, 'getDisplayName', false);
+                continue;
+            }
+            $en = $declared['en'] ?? null;
+            $ar = $declared['ar'] ?? null;
+            if (!is_string($en) || trim($en) === '' || mb_strlen($en) > 60 || !is_string($ar) || trim($ar) === '' || mb_strlen($ar) > 60) {
+                $this->logWarning("[Plugin:{$pluginKey}] getDisplayName(): needs en and ar, each up to 60 characters; its id is shown.");
+                continue;
+            }
+            $out[$name] = ['en' => trim($en), 'ar' => trim($ar)];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Each plugin's validated workspace templates (SDK 1.116), by plugin key.
+     *
+     * @var array<string, list<array<string, mixed>>>
+     */
+    private array $workspaceTemplates = [];
+
+    /**
+     * The workspace templates of the plugins on in the current workspace
+     * (SDK 1.116, WHIT-1194), each with the plugin that contributed it. A key
+     * offered by two plugins is kept from the first loaded.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getWorkspaceTemplates(): array
+    {
+        $out = [];
+        $seen = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $templates = $this->workspaceTemplates[$pluginKey] ?? [];
+            if ($templates === [] || isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive() || $this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+            foreach ($templates as $template) {
+                $key = (string) $template['key'];
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $out[] = $template + ['plugin' => $info['plugin']->getName()];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Each plugin's checked contact fields (SDK 1.119), by plugin key.
+     *
+     * @var array<string, list<array{key: string, label: array{en: string, ar: string}, kind: string, options: list<string>, required: bool, in_list: bool, edit_permission: ?string}>>
+     */
+    private array $contactFields = [];
+
+    /**
+     * Told when a workspace turns a plugin on or off, before the plugin is
+     * (WHIT-1209): core keeps what belongs to the plugin in step with it.
+     *
+     * @var list<\Closure(string, int, bool): void>
+     */
+    private array $workspaceSwitchListeners = [];
+
+    /** @param \Closure(string, int, bool): void $listener plugin name, tenant id, on */
+    public function onWorkspaceSwitch(\Closure $listener): void
+    {
+        $this->workspaceSwitchListeners[] = $listener;
+    }
+
+    /**
+     * The contact fields of the plugins a workspace can see (on or read-only),
+     * by plugin name (SDK 1.119, WHIT-1209); null before the plugins are
+     * loaded, so a caller never mistakes "not known yet" for "none".
+     *
+     * @return array<string, list<array{key: string, label: array{en: string, ar: string}, kind: string, options: list<string>, required: bool, in_list: bool, edit_permission: ?string}>>|null
+     */
+    public function contactFieldsFor(int $tenantId): ?array
+    {
+        if (!$this->loaded) {
+            return null;
+        }
+        $out = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $fields = $this->contactFields[$pluginKey] ?? [];
+            if ($fields === [] || isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive() || $this->isOffForWorkspace($pluginKey, $tenantId)) {
+                continue;
+            }
+            $out[$info['plugin']->getName()] = $fields;
+        }
+
+        return $out;
+    }
+
+    /**
+     * A plugin's contact fields (SDK 1.119): each checked alone, so a bad one
+     * is dropped with its reasons and the rest are kept.
+     *
+     * @return list<array{key: string, label: array{en: string, ar: string}, kind: string, options: list<string>, required: bool, in_list: bool, edit_permission: ?string}>
+     */
+    private function collectContactFields(PluginInterface $plugin, string $pluginKey): array
+    {
+        if (!$plugin instanceof \Whity\Sdk\PluginContactFieldsInterface) {
+            return [];
+        }
+        try {
+            // A plugin's array is runtime data whatever its declared shape.
+            $declared = $plugin->getContactFields();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'getContactFields');
+
+            return [];
+        }
+
+        return \Whity\Core\Contacts\PluginContactFields::normalize(
+            $plugin->getName(),
+            $declared,
+            fn (string $why) => $this->logWarning("[Plugin:{$pluginKey}] getContactFields(): {$why}"),
+        );
+    }
+
+    /**
+     * Validate a plugin's workspace templates (SDK 1.116): each one alone, so a
+     * bad template is dropped with its reasons and the rest are kept.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function collectWorkspaceTemplates(PluginInterface $plugin, string $pluginKey): array
+    {
+        if (!$plugin instanceof \Whity\Sdk\PluginWorkspaceTemplatesInterface) {
+            return [];
+        }
+        try {
+            // A plugin's array is runtime data whatever its declared shape:
+            // each template is checked on its own below.
+            $declared = $plugin->getWorkspaceTemplates();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'getWorkspaceTemplates');
+
+            return [];
+        }
+        $out = [];
+        foreach ($declared as $i => $template) {
+            $errors = \Whity\Sdk\Manifest\WorkspaceTemplateValidator::errors($template);
+            if ($errors !== []) {
+                $this->logWarning("[Plugin:{$pluginKey}] getWorkspaceTemplates(): template {$i} dropped: " . implode('; ', array_slice($errors, 0, 5)));
+                continue;
+            }
+            $out[] = $template;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Each plugin's validated dashboard part (SDK 1.115), by plugin key.
+     *
+     * @var array<string, array{setup: array<string, mixed>|null, widgets: list<array<string, mixed>>}|null>
+     */
+    private array $dashboards = [];
+
+    /**
+     * Setup points and widgets of the plugins on in the current workspace
+     * (SDK 1.115), in load order. Who may see each is the caller's business:
+     * {@see \Whity\Api\DashboardApiHandler} checks the permissions.
+     *
+     * @return list<array{plugin: string, setup: array<string, mixed>|null, widgets: list<array<string, mixed>>}>
+     */
+    public function getDashboards(): array
+    {
+        $out = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $dashboard = $this->dashboards[$pluginKey] ?? null;
+            if ($dashboard === null || isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive() || $this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+            $out[] = ['plugin' => $info['plugin']->getName(), 'setup' => $dashboard['setup'], 'widgets' => $dashboard['widgets']];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Validate a plugin's dashboard part (SDK 1.115). The setup part needs one
+     * of the plugin's own permissions and a GET status route of its own under
+     * it; each point must open one of its guided-setup steps or screens. Each
+     * widget needs one of its own permissions, a source that is its own GET
+     * route under that permission, and blocks that pass as a blocks screen.
+     * A bad point or widget is dropped alone, with a logged reason.
+     *
+     * @param array<string, string|null> $registeredGetRoutes
+     * @param array<string, string|null> $registeredWriteRoutes
+     * @param list<string> $screenIds
+     * @return array{setup: array<string, mixed>|null, widgets: list<array<string, mixed>>}|null
+     */
+    private function collectDashboard(PluginInterface $plugin, string $pluginKey, array $registeredGetRoutes, array $registeredWriteRoutes, array $screenIds): ?array
+    {
+        if (!$plugin instanceof \Whity\Sdk\PluginDashboardInterface) {
+            return null;
+        }
+        try {
+            // Read untyped: a plugin's array is runtime data whatever its
+            // declared shape, so every field is checked here.
+            /** @var array<string, mixed> $declared */
+            $declared = $plugin->getDashboard();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'getDashboard');
+
+            return null;
+        }
+        $name = $plugin->getName();
+        $ownPermissions = $plugin->getPermissions();
+        $ownRoute = static fn (mixed $path, mixed $permission): bool => is_string($path)
+            && array_key_exists($path, $registeredGetRoutes)
+            && $registeredGetRoutes[$path] === $permission;
+
+        $setup = null;
+        $rawSetup = $declared['setup'] ?? null;
+        if (is_array($rawSetup)) {
+            $permission = $rawSetup['permission'] ?? null;
+            $status = $rawSetup['status'] ?? null;
+            if (!is_string($permission) || !in_array($permission, $ownPermissions, true) || !$ownRoute($status, $permission)) {
+                $this->logWarning("[Plugin:{$pluginKey}] getDashboard(): setup needs one of its own permissions and one of its own GET routes under it as status; no setup points added.");
+            } else {
+                $onboarding = $this->onboardings[$pluginKey] ?? null;
+                $steps = is_array($onboarding) ? array_column((array) $onboarding['steps'], 'id') : [];
+                $points = [];
+                $rawPoints = $rawSetup['points'] ?? [];
+                foreach (is_array($rawPoints) ? $rawPoints : [] as $i => $point) {
+                    $errors = \Whity\Sdk\Manifest\DashboardValidator::pointErrors($point, "setup.points[{$i}]");
+                    if ($errors === [] && is_array($point)) {
+                        if (isset($point['step']) && !in_array($point['step'], $steps, true)) {
+                            $errors[] = "setup.points[{$i}].step: not a step of this plugin's guided setup";
+                        }
+                        if (isset($point['screen']) && !in_array($point['screen'], $screenIds, true)) {
+                            $errors[] = "setup.points[{$i}].screen: not a screen of this plugin";
+                        }
+                        if (in_array($point['id'], array_column($points, 'id'), true)) {
+                            $errors[] = "setup.points[{$i}].id: used twice";
+                        }
+                        if (count($points) >= \Whity\Sdk\Manifest\DashboardValidator::MAX_POINTS) {
+                            $errors[] = "setup.points[{$i}]: at most " . \Whity\Sdk\Manifest\DashboardValidator::MAX_POINTS . ' points';
+                        }
+                    }
+                    if ($errors !== [] || !is_array($point)) {
+                        $this->logWarning("[Plugin:{$pluginKey}] getDashboard(): a setup point dropped: " . implode('; ', $errors));
+                        continue;
+                    }
+                    $points[] = [
+                        'id' => (string) $point['id'],
+                        'label' => $point['label'],
+                        'why' => $point['why'] ?? null,
+                        'action' => $point['action'] ?? null,
+                        'step' => $point['step'] ?? null,
+                        'screen' => $point['screen'] ?? null,
+                        'icon' => $point['icon'] ?? null,
+                    ];
+                }
+                if ($points !== []) {
+                    $setup = [
+                        'permission' => $permission,
+                        'status' => $this->router->versionedPath((string) $status),
+                        'points' => $points,
+                    ];
+                }
+            }
+        } elseif ($rawSetup !== null) {
+            $this->logWarning("[Plugin:{$pluginKey}] getDashboard(): setup must be an object; no setup points added.");
+        }
+
+        $slug = \Whity\Sdk\PluginNamespace::slug($name) ?? 'plugin';
+        $widgets = [];
+        $rawWidgets = $declared['widgets'] ?? [];
+        foreach (is_array($rawWidgets) ? $rawWidgets : [] as $i => $widget) {
+            $errors = \Whity\Sdk\Manifest\DashboardValidator::widgetErrors($widget, "widgets[{$i}]");
+            if ($errors === [] && is_array($widget)) {
+                $permission = $widget['permission'];
+                if (!in_array($permission, $ownPermissions, true)) {
+                    $errors[] = "widgets[{$i}].permission: not one of this plugin's permissions";
+                }
+                if (isset($widget['source']) && !$ownRoute($widget['source'], $permission)) {
+                    $errors[] = "widgets[{$i}].source: not a GET route of this plugin gated on the widget's permission";
+                }
+                if (isset($widget['screen']) && !in_array($widget['screen'], $screenIds, true)) {
+                    $errors[] = "widgets[{$i}].screen: not a screen of this plugin";
+                }
+                if (in_array($widget['id'], array_column($widgets, 'id'), true)) {
+                    $errors[] = "widgets[{$i}].id: used twice";
+                }
+                if (count($widgets) >= \Whity\Sdk\Manifest\DashboardValidator::MAX_WIDGETS) {
+                    $errors[] = "widgets[{$i}]: at most " . \Whity\Sdk\Manifest\DashboardValidator::MAX_WIDGETS . ' widgets';
+                }
+            }
+            if ($errors !== [] || !is_array($widget)) {
+                $this->logWarning("[Plugin:{$pluginKey}] getDashboard(): a widget dropped: " . implode('; ', $errors));
+                continue;
+            }
+            // The blocks pass exactly as a blocks screen's would: owned
+            // endpoints, versioned sources. Checked as a pseudo screen, never
+            // registered as one.
+            $dropped = [];
+            $normalized = $this->validateFrontendFeature(
+                ['id' => $slug . '-widget-' . $widget['id'], 'label' => $widget['title'], 'screen' => 'blocks', 'requiredPermission' => $widget['permission'], 'blocks' => $widget['blocks']],
+                $name,
+                $pluginKey,
+                $ownPermissions,
+                $registeredGetRoutes,
+                $registeredWriteRoutes,
+                $dropped,
+            );
+            if ($normalized === null) {
+                continue;
+            }
+            $widgets[] = [
+                'id' => (string) $widget['id'],
+                'kind' => $widget['kind'],
+                'title' => $widget['title'],
+                'description' => $widget['description'] ?? null,
+                'permission' => $widget['permission'],
+                'source' => isset($widget['source']) ? $this->router->versionedPath((string) $widget['source']) : null,
+                'sizes' => \Whity\Sdk\Manifest\DashboardValidator::sizesOf($widget),
+                'blocks' => $normalized['blocks'] ?? [],
+                'screen' => $widget['screen'] ?? null,
+                'icon' => $widget['icon'] ?? null,
+            ];
+        }
+
+        if ($setup === null && $widgets === []) {
+            return null;
+        }
+
+        return ['setup' => $setup, 'widgets' => $widgets];
+    }
+
     private string $paidAccessFingerprint = '';
 
     /**
@@ -854,6 +1225,13 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
      */
     public function notifyWorkspaceSwitch(string $pluginName, int $tenantId, bool $enabled): void
     {
+        foreach ($this->workspaceSwitchListeners as $listener) {
+            try {
+                $listener($pluginName, $tenantId, $enabled);
+            } catch (Throwable $e) {
+                $this->logWarning('[PluginLoader] workspace switch listener failed for ' . $pluginName . ': ' . $e->getMessage());
+            }
+        }
         foreach ($this->registeredPlugins as $pluginKey => $info) {
             $plugin = $info['plugin'];
             if ($plugin->getName() !== $pluginName || !$plugin instanceof \Whity\Sdk\PluginWorkspaceLifecycleInterface) {
@@ -1278,6 +1656,11 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             return [];
         }
 
+        // #1831: the reference-plugins switch decides what discovery finds, so
+        // it is part of the signature: flipping it invalidates the manifest
+        // cache and makes reload() converge, like a file change would.
+        $fingerprint['@' . \Whity\Core\Plugin\ReferencePlugins::ENV] = \Whity\Core\Plugin\ReferencePlugins::enabled() ? 'on' : 'off';
+
         ksort($fingerprint);
 
         return $fingerprint;
@@ -1449,6 +1832,12 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             // sentinel) — discovery never require_once's its top-level code
             // (WC-220 minor).
             if (str_starts_with($item, '.')) {
+                continue;
+            }
+
+            // #1831: HelloWorld and ExamplePlugin ship in the image as examples;
+            // with WHITY_REFERENCE_PLUGINS=off (the release image) they don't run.
+            if (\Whity\Core\Plugin\ReferencePlugins::skips($item)) {
                 continue;
             }
 
@@ -4492,6 +4881,25 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         //     checked exactly like a blocks screen, so its forms may only post
         //     to the plugin's own routes.
         $this->onboardings[$pluginKey] = $this->collectOnboarding($plugin, $pluginKey, $registeredGetRoutes, $registeredWriteRoutes);
+
+        // 4c. What the plugin adds to the dashboard (SDK 1.115, WHIT-1177):
+        //     setup points and widgets, checked against its own routes,
+        //     screens and guided-setup steps.
+        $screenIds = [];
+        foreach ($collected['features'] as $feature) {
+            if (is_string($feature['id'] ?? null)) {
+                $screenIds[] = $feature['id'];
+            }
+        }
+        $this->dashboards[$pluginKey] = $this->collectDashboard($plugin, $pluginKey, $registeredGetRoutes, $registeredWriteRoutes, $screenIds);
+
+        // 4d. Workspace templates (SDK 1.116, WHIT-1194): data only, each
+        //     checked alone.
+        $this->workspaceTemplates[$pluginKey] = $this->collectWorkspaceTemplates($plugin, $pluginKey);
+
+        // 4e. Fields on contacts (SDK 1.119, WHIT-1209): data only, each
+        //     checked alone and named under the plugin.
+        $this->contactFields[$pluginKey] = $this->collectContactFields($plugin, $pluginKey);
 
         // 5. Collect the plugin's optional theme-override route (WC-242),
         //    same error-boundary + ownership-verification philosophy as (4).

@@ -1628,7 +1628,11 @@ $settingsService = new \Whity\Core\Settings\SettingsService(
 );
 \Whity\register_service(\Whity\Core\Settings\SettingsService::class, $settingsService); // @phpstan-ignore-line
 $authHandler = new AuthHandler($db->getPdo(), $jwtParser, null, null, $totpService, $logger, $auditLogger, $loginThrottle, $twoFactorPolicyResolver, $settingsService);
-$router->register('POST', '/api/login', [$authHandler, 'handle'], null);
+// WHIT-1168: every way in that takes a password refuses while the operator
+// has turned password sign-in off (auth.password_sign_in; break-glass
+// WHITY_PASSWORD_SIGN_IN=force). Sessions and tokens that exist keep working.
+$passwordRoute = static fn (callable $handler): callable => \Whity\Core\Identity\PasswordSignIn::guard($handler, $settingsService);
+$router->register('POST', '/api/login', $passwordRoute([$authHandler, 'handle']), null);
 // WC-235: public self-service registration — provisions a new tenant + owner
 // (profile + primary email + active admin membership). Public + no required
 // permission; the global rate-limiter (non-exempt path) throttles abuse.
@@ -1800,7 +1804,7 @@ $accountSecurityMailer = new \Whity\Core\Mail\AccountSecurityMailer(
 $authHandler->setSecurityMailer($accountSecurityMailer);
 
 $registerHandler = new RegisterApiHandler($db->getPdo(), $settingsService, $emailVerificationProvider, $hookManager);
-$router->register('POST', '/api/register', [$registerHandler, 'register'], null);
+$router->register('POST', '/api/register', $passwordRoute([$registerHandler, 'register']), null);
 
 // WC-235: public email verification — (re)send a link + confirm a token. Both are
 // unauthenticated (a new owner has no session yet; a confirm link carries no JWT),
@@ -1889,8 +1893,8 @@ $twoFactorProofThrottle = new LoginThrottleService(
 );
 $twoFactorHandler = new TwoFactorHandler($db->getPdo(), $totpService, $backupCodesService, $tokenValidator, $auditLogger, $twoFactorProofThrottle);
 $twoFactorHandler->setSecurityMailer($accountSecurityMailer);
-$router->register('POST', '/api/auth/2fa/setup', [$twoFactorHandler, 'setup'], null);
-$router->register('POST', '/api/auth/2fa/confirm', [$twoFactorHandler, 'confirm'], null);
+$router->register('POST', '/api/auth/2fa/setup', $passwordRoute([$twoFactorHandler, 'setup']), null);
+$router->register('POST', '/api/auth/2fa/confirm', $passwordRoute([$twoFactorHandler, 'confirm']), null);
 $router->register('POST', '/api/auth/2fa/disable', [$twoFactorHandler, 'disable'], null);
 $router->register('POST', '/api/auth/2fa/regenerate-codes', [$twoFactorHandler, 'regenerateCodes'], null);
 $router->register('GET', '/api/auth/2fa/status', [$twoFactorHandler, 'status'], null);
@@ -1913,8 +1917,8 @@ $passwordResetHandler = new \Whity\Api\PasswordResetHandler(
     $auditLogger,
     $settingsService
 );
-$router->register('POST', '/api/auth/password/forgot', [$passwordResetHandler, 'forgot'], null);
-$router->register('POST', '/api/auth/password/reset', [$passwordResetHandler, 'reset'], null);
+$router->register('POST', '/api/auth/password/forgot', $passwordRoute([$passwordResetHandler, 'forgot']), null);
+$router->register('POST', '/api/auth/password/reset', $passwordRoute([$passwordResetHandler, 'reset']), null);
 
 // AG.1: every gated approval (a password reset, a two-step reset, a Needs
 // verifying agent proposal) confirms the approver is who they say, through one
@@ -1955,7 +1959,7 @@ $adminPasswordResetHandler = new \Whity\Api\AdminPasswordResetApiHandler(
     $settingsService,
     $roleChecker
 );
-$router->register('POST', '/api/users/{id:\d+}/password-reset',      [$adminPasswordResetHandler, 'sendResetLink'],     null, null, CorePermissions::USERS_WRITE);
+$router->register('POST', '/api/users/{id:\d+}/password-reset', $passwordRoute([$adminPasswordResetHandler, 'sendResetLink']),     null, null, CorePermissions::USERS_WRITE);
 $router->register('GET',  '/api/password-resets/approver-coverage',  [$adminPasswordResetHandler, 'approverCoverage'], null, null, CorePermissions::USERS_READ);
 
 $twoFactorRecoveryService = new \Whity\Core\Identity\TwoFactorRecoveryService(
@@ -1976,8 +1980,8 @@ $twoFactorRecoveryHandler = new \Whity\Api\TwoFactorRecoveryHandler(
     $auditLogger,
     $settingsService
 );
-$router->register('POST', '/api/auth/2fa-recovery/request', [$twoFactorRecoveryHandler, 'request'], null);
-$router->register('POST', '/api/auth/2fa-recovery/confirm', [$twoFactorRecoveryHandler, 'confirm'], null);
+$router->register('POST', '/api/auth/2fa-recovery/request', $passwordRoute([$twoFactorRecoveryHandler, 'request']), null);
+$router->register('POST', '/api/auth/2fa-recovery/confirm', $passwordRoute([$twoFactorRecoveryHandler, 'confirm']), null);
 
 $twoFactorRecoveryApprovalsHandler = new \Whity\Api\TwoFactorRecoveryApprovalsApiHandler(
     $twoFactorRecoveryService,
@@ -2026,7 +2030,8 @@ $invitationsHandler = new \Whity\Api\InvitationsApiHandler(
 $invitationAcceptHandler = new \Whity\Api\InvitationAcceptHandler(
     $invitationService,
     new DatabaseSharedStore($db->getPdo()),
-    $auditLogger
+    $auditLogger,
+    $settingsService,
 );
 // The public pair is registered FIRST so `/invitations/accept` can never be
 // shadowed by a future `/invitations/{something}` route.
@@ -2512,6 +2517,9 @@ $router->register('POST', '/api/plugins/reload', [$pluginsHandler, 'reload'], nu
 // S.7: kept for 30 days after uninstalling.
 $router->register('GET', '/api/plugins/removed', [$pluginsHandler, 'removed'], null, null, CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/plugins/{name}/reinstall', [$pluginsHandler, 'reinstall'], null, null, CorePermissions::PLUGINS_INSTALL);
+// #1907: approve an existing role for a plugin's own grants (migration 221).
+// It widens what the plugin can do, so it takes the install permission.
+$router->register('POST', '/api/plugins/{name}/roles/{role}/approve', [$pluginsHandler, 'approveRole'], null, null, CorePermissions::PLUGINS_INSTALL);
 // WC-install-from-store: fetch a package from a TRUSTED plugin store (host must
 // be on the operator `plugins.store_allowed_hosts` allowlist; empty ⇒ disabled)
 // and stage it through the SAME hardened installer as an upload (lands DISABLED).
@@ -2750,7 +2758,9 @@ $settingsHandler = new \Whity\Api\SettingsApiHandler(
     $settingsService,
     $roleChecker,
     // #1044: the settings tab names answer in the caller's language.
-    $serverLabels
+    $serverLabels,
+    // WHIT-1168: turning password sign-in off must leave a way in.
+    $db->getPdo(),
 );
 $router->register('GET',   '/api/settings',        [$settingsHandler, 'get'],         null, null, CorePermissions::SETTINGS_READ);
 $router->register('PATCH', '/api/settings',        [$settingsHandler, 'patch'],       null, null, CorePermissions::SETTINGS_WRITE);
@@ -2908,7 +2918,48 @@ $entitlementService->usePluginPacks(static fn (int $tenantId): array => $pluginL
 $invitationsHandler->useSeats(new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService));
 // WHIT-1129 (SDK 1.108): packs set a workspace up through core's own routes,
 // as the person acting there, limited to WorkspaceSetup::ROUTES.
-\Whity\register_service(\Whity\Sdk\Setup\WorkspaceSetup::class, new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker)); // @phpstan-ignore-line
+$hostWorkspaceSetup = new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker);
+\Whity\register_service(\Whity\Sdk\Setup\WorkspaceSetup::class, $hostWorkspaceSetup); // @phpstan-ignore-line
+// WHIT-1194 (SDK 1.116): workspace templates, applied as the person choosing
+// one, through the same gates plus the template-only routes (roles,
+// documents, removing examples).
+$templateRuns = new \Whity\Core\Workspace\Templates\TemplateRuns($db->getPdo());
+$workspaceTemplatesHandler = new \Whity\Api\WorkspaceTemplatesApiHandler(
+    new \Whity\Core\Workspace\Templates\TemplateCatalogue($pluginLoader),
+    $templateRuns,
+    static fn (): \Whity\Core\Workspace\Templates\TemplateApplier => new \Whity\Core\Workspace\Templates\TemplateApplier($hostWorkspaceSetup->forTemplates(), $templateRuns, static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId)),
+    $codePluginActivation,
+    $auditLogger,
+    static fn (): string => $serverLabels->languageCode(),
+    static fn (): \Whity\Core\Workspace\Templates\TemplateSetup => new \Whity\Core\Workspace\Templates\TemplateSetup(
+        $hostWorkspaceSetup,
+        // WHIT-1198: the business step opens with the workspace's own name.
+        static function () use ($db): ?string {
+            $tenantId = \Whity\Core\Tenant\TenantContext::getTenantId();
+            if ($tenantId === null || $tenantId === 0) {
+                return null;
+            }
+            $stmt = $db->getPdo()->prepare('SELECT name FROM tenants WHERE id = ?');
+            $stmt->execute([$tenantId]);
+            $name = $stmt->fetchColumn();
+
+            return is_string($name) ? $name : null;
+        },
+    ),
+);
+$workspaceCodePluginsHandler->useTemplateOnboardings(static fn (int $tenantId): array => $workspaceTemplatesHandler->onboardings($tenantId));
+$workspaceTemplatesHandler->useDisplayNames(static fn (): array => $pluginLoader->getDisplayNames());
+$workspaceTemplatesHandler->useTrialStarter(static fn (int $tenantId, ?int $profileId, string $plugin, ?int $days): \Whity\Core\Response => $workspaceCodePluginsHandler->startTrialFor($tenantId, $profileId, $plugin, $days));
+$router->register('GET', '/api/workspace/templates', [$workspaceTemplatesHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', [$workspaceTemplatesHandler, 'apply'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('DELETE', '/api/workspace/templates/examples', [$workspaceTemplatesHandler, 'removeExamples'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+// WHIT-1195: a chosen template's guided setup, as the caller.
+$router->register('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/status', [$workspaceTemplatesHandler, 'setupStatus'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/current/{kind:business|hours|booking}', [$workspaceTemplatesHandler, 'setupCurrent'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/services', [$workspaceTemplatesHandler, 'setupServices'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/offer/close', [$workspaceTemplatesHandler, 'closeOffer'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+$router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/offer/trial', [$workspaceTemplatesHandler, 'startOfferTrial'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE);
+$router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/{kind:business|hours|services|team|booking}', [$workspaceTemplatesHandler, 'setupSave'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 // EM.1: workspace emails carry the workspace's brand, and white-label by plan.
 $brandedEmailSender->useBranding(new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService));
 $tenantEntitlementsHandler = new \Whity\Api\TenantEntitlementsApiHandler(
@@ -3222,6 +3273,16 @@ $externalBillingHandler->usePluginSeats($pluginSeats);
 $cashPayments = new \Whity\Core\Billing\Cash\CashPayments($db->getPdo());
 $codePluginActivation->useCashCover(static fn (int $tenantId, string $product): ?array => $cashPayments->coverOf($tenantId, $product));
 $externalBillingHandler->useCashPayments($cashPayments);
+// WHIT-1207: a further workspace's trial, for the payment step after creating
+// it, the banner across the app and checkouts that keep the trial free.
+$externalBillingHandler->useWorkspaceTrial(new \Whity\Core\Billing\WorkspaceTrial(
+    $db->getPdo(),
+    new \Whity\Core\Subscription\SubscriptionService(
+        new \Whity\Core\Subscription\SubscriptionRepository($db->getPdo()),
+        $settingsService
+    ),
+    $settingsService,
+));
 $cashPaymentsHandler = new \Whity\Api\CashPaymentsApiHandler($cashPayments, $auditLogger);
 $router->register('GET', '/api/billing/cash-payments', [$cashPaymentsHandler, 'list'], null, null, CorePermissions::PLANS_MANAGE);
 $router->register('POST', '/api/billing/cash-payments', [$cashPaymentsHandler, 'record'], null, null, CorePermissions::PLANS_MANAGE);
@@ -3243,6 +3304,9 @@ $router->register('GET',  '/api/billing/plans',    [$externalBillingHandler, 'pl
 // the local run stands down so nobody is charged twice — so without this the
 // billing screen showed an empty table to somebody who had just paid.
 $router->register('GET',  '/api/billing/receipts', [$externalBillingHandler, 'receipts'], null, null, CorePermissions::BILLING_VIEW);
+// WHIT-1207: the plan's trial and how to pay, for every member (the banner tells
+// those who can't pay to ask an owner).
+$router->register('GET',  '/api/billing/trial',    [$externalBillingHandler, 'trial']);
 
 // WHIT-1040: the plan limits the business model sells, and where a workspace
 // stands against them. Every one of them warns and none refuses: customers are
@@ -5347,6 +5411,10 @@ $calendarBookingService->setReminders($eventReminders);
 // events, through these host services.
 \Whity\register_service(\Whity\Sdk\Calendar\Bookings::class, new \Whity\Core\Calendar\HostBookings($calendarBookingService));
 \Whity\register_service(\Whity\Sdk\Calendar\CalendarEvents::class, new \Whity\Core\Calendar\HostCalendarEvents($calendarBookingService, $calendarRepository));
+// SDK 1.120 (WHIT-1210): a leave plugin puts time off on core's calendar and
+// reads who is away and who stands in for them.
+\Whity\register_service(\Whity\Sdk\Calendar\TimeOff::class, new \Whity\Core\Calendar\HostTimeOff($calendarBookingService, $calendarRepository, $roleChecker));
+\Whity\register_service(\Whity\Sdk\Delegation\Away::class, new \Whity\Core\Delegation\HostAway(new \Whity\Core\Delegation\AwayService($db->getPdo()), $calendarRepository));
 $calendarFeed = new \Whity\Core\Calendar\CalendarFeed($db->getPdo(), $calendarRepository, $calendarBookingRepository);
 $calendarHandler = new \Whity\Api\CalendarApiHandler(
     $calendarRepository,
@@ -5432,6 +5500,24 @@ $contactImportService = new \Whity\Core\Contacts\Import\ContactImportService(
     new \Whity\Core\Contacts\Import\ContactImportRepository($db->getPdo()),
 );
 $contactImportService->addTargets(new \Whity\Core\CustomFields\CustomFieldImportTargets($customFieldService, $customFieldRepository, 'contact'));
+// SDK 1.119 (WHIT-1209, #2131): plugins' own fields on contacts, kept in step
+// with the plugins each workspace has on (made, or archived with their values
+// kept), and core's contacts as a plugin service.
+$pluginContactFields = new \Whity\Core\Contacts\PluginContactFields(
+    $customFieldService,
+    static fn (int $tenantId): ?array => $pluginLoader->contactFieldsFor($tenantId),
+);
+$customFieldService->useOwnedFieldSync($pluginContactFields->syncer());
+$pluginLoader->onWorkspaceSwitch(static function (string $plugin, int $tenantId) use ($pluginContactFields): void {
+    $pluginContactFields->reconcile($tenantId);
+});
+\Whity\register_service(\Whity\Sdk\Contacts\Contacts::class, new \Whity\Core\Contacts\HostContacts( // @phpstan-ignore-line
+    $contactService,
+    $contactRepository,
+    $contactTags,
+    $customFieldService,
+    static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+));
 $contactsHandler = new \Whity\Api\ContactsApiHandler($contactService, $contactTags, $contactImportService, $roleChecker, new \Whity\Core\Contacts\CustomerActivity($db->getPdo()));
 $customFieldsHandler = new \Whity\Api\CustomFieldsApiHandler($customFieldService, $roleChecker);
 // Listing a type's fields checks that type's read permission in the handler.
@@ -5589,6 +5675,12 @@ $displayPreferencesHandler = new \Whity\Api\DisplayPreferencesApiHandler($tokenV
 $router->register('GET', '/api/me/display-preferences', [$displayPreferencesHandler, 'get'], null);
 $router->register('PUT', '/api/me/display-preferences', [$displayPreferencesHandler, 'update'], null);
 
+// WHIT-1181: a person's own phone number, E.164 on their profile. Self-scoped,
+// session-gated, no RBAC permission, no current password.
+$myPhoneHandler = new \Whity\Api\MyPhoneApiHandler($tokenValidator, new \Whity\Core\Identity\PersonalPhone($db->getPdo()));
+$router->register('GET', '/api/me/phone', [$myPhoneHandler, 'get'], null);
+$router->register('PUT', '/api/me/phone', [$myPhoneHandler, 'update'], null);
+
 // Per-tenant notification SENDER configuration (WC-notifications, d70c6083). A
 // tenant admin manages their OWN tenant's per-channel sender (from/reply-to,
 // transport, encrypted creds). settings:manage gated; creds are write-only.
@@ -5701,9 +5793,16 @@ $publicBookingHandler = new \Whity\Api\PublicBookingApiHandler(
     $publicFormBotCheck,
     new DatabaseSharedStore($db->getPdo()),
     $brandingService,
+    // WHIT-1179: the signed-in visitor's own name and email, from their
+    // session cookie and profile only.
+    new \Whity\Core\Calendar\BookingVisitor(
+        static fn (): ?array => $tokenValidator->validateAccessToken(),
+        $db->getPdo(),
+    ),
 );
 $router->register('GET',  '/api/public/booking/{workspace}',                       [$publicBookingHandler, 'page'],        null);
 $router->register('GET',  '/api/public/booking/{workspace}/slots',                 [$publicBookingHandler, 'slots'],       null);
+$router->register('GET',  '/api/public/booking/{workspace}/me',                    [$publicBookingHandler, 'visitor'],     null);
 $router->register('POST', '/api/public/booking/{workspace}/bookings',              [$publicBookingHandler, 'book'],        null);
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}',             [$publicBookingHandler, 'showBooking'], null);
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/slots',       [$publicBookingHandler, 'manageSlots'], null);
@@ -5727,6 +5826,7 @@ $router->register('POST',   '/api/branding/assets/{key}',           [$brandingHa
 $router->register('DELETE', '/api/branding/assets/{key}',           [$brandingHandler, 'clearTenant'],   null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('POST',   '/api/branding/global/assets/{key}',    [$brandingHandler, 'uploadGlobal'],  null, null, CorePermissions::SETTINGS_MANAGE);
 $router->register('DELETE', '/api/branding/global/assets/{key}',    [$brandingHandler, 'clearGlobal'],   null, null, CorePermissions::SETTINGS_MANAGE);
+$router->register('GET',    '/api/branding/host',                   [$brandingHandler, 'getBrandingHost'], null, null, CorePermissions::SETTINGS_READ);
 $router->register('PUT',    '/api/tenants/{id}/branding-host',      [$brandingHandler, 'setBrandingHost'], null, null, CorePermissions::SETTINGS_MANAGE);
 
 // WHIT-915: workspace-controlled customer sign-up. Platform sign-up
@@ -5778,12 +5878,14 @@ $publicSignupHandler = new \Whity\Api\PublicSignupApiHandler(
     $joinProviders,
     // WHIT-1044: the workspace's logo and colour on the join pages.
     $brandingService,
+    // WHIT-1168: off, people join only through the identity provider.
+    $settingsService,
 );
 // The confirm pair first, so it can never be read as a workspace slug.
 $router->register('GET',  '/api/public/signup/confirm',               [$publicSignupHandler, 'preview'], null);
-$router->register('POST', '/api/public/signup/confirm',               [$publicSignupHandler, 'confirm'], null);
+$router->register('POST', '/api/public/signup/confirm',               $passwordRoute([$publicSignupHandler, 'confirm']), null);
 $router->register('GET',  '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'info'],    null);
-$router->register('POST', '/api/public/signup/workspaces/{workspace}', [$publicSignupHandler, 'request'], null);
+$router->register('POST', '/api/public/signup/workspaces/{workspace}', $passwordRoute([$publicSignupHandler, 'request']), null);
 
 // MESSAGES (ADR 0016, WHIT-938): conversations with customers by email and web
 // chat, one send API for every core module, channels a store plugin can add,
@@ -6113,6 +6215,10 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     $tokenValidator,
     $externalIdentityRepository,
     $signingChallengeRepository,
+    // WHIT-1168: accept an invitation by signing in with the identity provider.
+    $invitationService,
+    // WHIT-1181: a verified phone_number fills the person's own phone.
+    new \Whity\Core\Identity\PersonalPhone($db->getPdo()),
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).
@@ -6132,6 +6238,42 @@ $ssoWorkspaceSetupHandler = new \Whity\Api\SsoWorkspaceSetupHandler(
 );
 $router->register('GET', '/api/auth/sso/workspace', [$ssoWorkspaceSetupHandler, 'show'], null);
 $router->register('POST', '/api/auth/sso/workspace', [$ssoWorkspaceSetupHandler, 'create'], null);
+// WHIT-1169: a signed-in person creates another workspace and owns it.
+// Self-authenticating like /api/me/identities; gated in WorkspaceCreator by
+// workspaces.self_create_enabled and workspaces.max_owned_per_person.
+$workspacesHandler = new \Whity\Api\WorkspacesApiHandler(
+    $tokenValidator,
+    new \Whity\Core\Tenant\WorkspaceCreator($db->getPdo(), $settingsService, $hookManager),
+    $settingsService,
+);
+$router->register('GET', '/api/workspaces/new', [$workspacesHandler, 'state'], null);
+$router->register('POST', '/api/workspaces', [$workspacesHandler, 'create'], null);
+// WHIT-1170: owners, and offers to hand a workspace over or co-own it. The
+// workspace routes act in the caller's current workspace (owners act, staff
+// read); the /me routes are the person offered, from any workspace. Making and
+// accepting an offer go through "Confirm it's you" (GatedApproval).
+$workspaceOwnersHandler = new \Whity\Api\WorkspaceOwnersApiHandler(
+    new \Whity\Core\Tenant\WorkspaceOwnership(
+        $db->getPdo(),
+        $auditLogger,
+        $hookManager,
+        new \Whity\Core\Tenant\OwnershipNotifier($notificationDispatcher, $brandedEmailSender, $profileEmailRepository, $frontendUrls->base()),
+    ),
+    $tokenValidator,
+    $gatedApproval,
+);
+$router->register('GET',    '/api/workspace/owners',                         [$workspaceOwnersHandler, 'list'], null);
+$router->register('POST',   '/api/workspace/owners/offers/identity-check',   [$workspaceOwnersHandler, 'offerIdentityCheck'], null);
+$router->register('POST',   '/api/workspace/owners/offers',                  [$workspaceOwnersHandler, 'offer'], null);
+$router->register('DELETE', '/api/workspace/owners/offers/{id:\d+}',         [$workspaceOwnersHandler, 'cancel'], null);
+// WHIT-1171: remove an owner, or stop being one; never the last owner.
+$router->register('POST',   '/api/workspace/owners/{profileId:\d+}/identity-check', [$workspaceOwnersHandler, 'removeIdentityCheck'], null);
+$router->register('DELETE', '/api/workspace/owners/{profileId:\d+}',         [$workspaceOwnersHandler, 'removeOwner'], null);
+$router->register('GET',    '/api/me/ownership-offers',                      [$workspaceOwnersHandler, 'mine'], null);
+$router->register('GET',    '/api/me/ownership-offers/{id:\d+}',             [$workspaceOwnersHandler, 'showMine'], null);
+$router->register('POST',   '/api/me/ownership-offers/{id:\d+}/identity-check', [$workspaceOwnersHandler, 'acceptIdentityCheck'], null);
+$router->register('POST',   '/api/me/ownership-offers/{id:\d+}/accept',      [$workspaceOwnersHandler, 'accept'], null);
+$router->register('POST',   '/api/me/ownership-offers/{id:\d+}/decline',     [$workspaceOwnersHandler, 'decline'], null);
 
 // 13g. Authenticated "connected accounts" management (WC-f3b17bd2): the caller
 // lists / unlinks their own federated identities. Self-authenticating via the
@@ -6409,7 +6551,7 @@ $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnl
 ))->registerOn($proposalDiffs);
 // WHIT-812: what an agent did that its person can still undo.
 $agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters);
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters, callKeys: new \Whity\Mcp\Tools\McpCallKeys($db->getPdo()));
 $mcpToolsCallHandler->setWorkspaceGate($pluginLoader);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
@@ -6436,6 +6578,22 @@ $meHomeHandler = new \Whity\Api\MeHomeApiHandler($db->getPdo());
 $router->register('GET', '/api/me/recent-documents', [$meHomeHandler, 'recentDocuments'], null);
 $router->register('GET', '/api/me/setup-steps', [$meHomeHandler, 'setupSteps'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('PUT', '/api/me/home-cards/{key:[A-Za-z][A-Za-z0-9_]*}/hidden', [$homeCardsHandler, 'setHidden'], null);
+// WHIT-1177 (SDK 1.115, H.5): setup points and widgets the caller's apps add to
+// the dashboard, and the caller's own order, sizes and hidden items. Session-gated
+// and self-scoped; each point and widget is listed only under its own permission.
+$dashboardHandler = new \Whity\Api\DashboardApiHandler(
+    $roleChecker,
+    $pluginLoader,
+    new \Whity\Core\Dashboard\DashboardLayoutRepository($db->getPdo()),
+    $homeCardsHandler,
+    static fn (): string => $serverLabels->languageCode(),
+);
+// WHIT-1195: the template's steps join Finish setting up.
+// WHIT-1202: locked cards for the paid plugins a workspace's template offers.
+$dashboardHandler->useTemplateOffers(static fn (int $tenantId): array => $workspaceTemplatesHandler->lockedOffers($tenantId));
+$dashboardHandler->useTemplateSetup(static fn (int $tenantId): array => $workspaceTemplatesHandler->dashboardSetup($tenantId));
+$router->register('GET', '/api/me/dashboard', [$dashboardHandler, 'show'], null);
+$router->register('PUT', '/api/me/dashboard/layout', [$dashboardHandler, 'saveLayout'], null);
 // WHIT-815: workspace agents (persona, toolsets, starting grant) and the
 // presets they start from. Gated on agents:manage, which migration 180 grants
 // to every role holding mcp:tokens:manage. Writes are agentPolicy refuse.
