@@ -7,27 +7,31 @@ namespace Tests\Core\Plugin;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Which SDK services each entry point binds (WHIT-1243).
+ * Which SDK services each entry point binds (WHIT-1243, WHIT-1247).
  *
- * A plugin's route, command and job are the same code, so a service its route
- * reaches and its job doesn't fails in production only, at night, in the
- * worker. This reads each entry point's `register_service()` calls and pins:
+ * A plugin's route, command, job and async listener are the same code, so a
+ * service its route reaches and its job doesn't fails in production only, at
+ * night, in the worker.
  *
- *  - what every entry point must bind (the plugin's own stores and the services
- *    a job needs), and
- *  - what each one is KNOWN not to bind yet, so a new gap fails here and a
- *    closed gap is taken off the list.
+ * Since WHIT-1247 every entry point that runs plugin code boots the web
+ * kernel's own wiring first ({@see \Whity\Core\Kernel\HostKernel::boot()},
+ * which runs public/index.php up to request handling), then adds its own. So
+ * each one binds everything the web binds, by construction. This reads each
+ * entry point's `register_service()` calls, follows the kernel boot into
+ * public/index.php, and checks that:
  *
- * `events:relay` loads no plugins at all, so no plugin code runs there and a
- * plugin's `*.async` listener is never called: that is the relay's own gap,
- * pinned below until the relay loads plugins (WHIT-1243 follow-up).
+ *  - every entry point binds the plugin stores and what a job needs, and
+ *  - no entry point binds fewer SDK services than the web. There is no list of
+ *    allowed gaps.
  */
 final class PluginServiceBindingsTest extends TestCase
 {
+    /** Each entry point's own wiring; one that calls HostKernel::boot() also gets public/index.php's. */
     private const ENTRY_POINTS = [
         'web' => ['public/index.php', 'src/Core/Plugin/HostPluginServices.php'],
         'cli' => ['src/Cli/Commands/BaseCommand.php', 'src/Core/Plugin/HostPluginServices.php'],
         'worker' => ['src/Cli/Commands/QueueWorkCommand.php', 'src/Core/Plugin/HostPluginServices.php', 'src/Core/Document/Issuing/WorkerDocumentServices.php'],
+        'relay' => ['src/Cli/Commands/EventRelayCommand.php'],
     ];
 
     /** Every entry point where plugin code runs binds these. */
@@ -44,53 +48,29 @@ final class PluginServiceBindingsTest extends TestCase
         'Whity\Sdk\Documents\Templates',
         'Whity\Sdk\Render\DocumentRenderer',
         'Whity\Sdk\Billing\PlanCatalogue',
+        'Whity\Sdk\Contacts\Contacts',
+        'Whity\Sdk\Calendar\TimeOff',
+        'Whity\Sdk\Messaging\CustomerMessages',
     ];
 
-    /**
-     * SDK services the web binds and this entry point doesn't, today. Each needs
-     * the web kernel's collaborators (role checker, mailer, billing portal),
-     * so closing one means sharing that wiring, not copying a line. Take an
-     * entry off when it is bound; never add one to make a test pass.
-     */
-    private const KNOWN_GAPS = [
-        'cli' => [
-            'Whity\Sdk\Billing\AccessRefresh',
-            'Whity\Sdk\Billing\LicenceSales',
-            'Whity\Sdk\Billing\WorkspaceAddons',
-            'Whity\Sdk\Calendar\Bookings',
-            'Whity\Sdk\Calendar\CalendarEvents',
-            'Whity\Sdk\Calendar\TimeOff',
-            'Whity\Sdk\Contacts\Contacts',
-            'Whity\Sdk\Delegation\Away',
-            'Whity\Sdk\Identity\LinkedPeople',
-            'Whity\Sdk\Licensing\StoreLicence',
-            'Whity\Sdk\Mail\BillingEmails',
-            'Whity\Sdk\Mail\WorkspaceEmails',
-            'Whity\Sdk\Messaging\CustomerMessages',
-            'Whity\Sdk\Setup\WorkspaceSetup',
-        ],
-        'worker' => [
-            'Whity\Sdk\Agents\Agents',
-            'Whity\Sdk\Billing\AccessRefresh',
-            'Whity\Sdk\Billing\LicenceSales',
-            'Whity\Sdk\Billing\WorkspaceAddons',
-            'Whity\Sdk\Calendar\Bookings',
-            'Whity\Sdk\Calendar\CalendarEvents',
-            'Whity\Sdk\Calendar\TimeOff',
-            'Whity\Sdk\Contacts\Contacts',
-            'Whity\Sdk\DataType\DataTypeGuard',
-            'Whity\Sdk\DataType\DataTypeLifecycle',
-            'Whity\Sdk\Delegation\Away',
-            'Whity\Sdk\Identity\LinkedPeople',
-            'Whity\Sdk\Licensing\StoreLicence',
-            'Whity\Sdk\Mail\BillingEmails',
-            'Whity\Sdk\Mail\WorkspaceEmails',
-            'Whity\Sdk\Mcp\McpConnections',
-            'Whity\Sdk\Rbac\ResourceScope',
-            'Whity\Sdk\Setup\WorkspaceSetup',
-            'Whity\Sdk\Sql\SequenceAllocator',
-        ],
-    ];
+    public function testEveryEntryPointBootsTheWebKernel(): void
+    {
+        foreach (['cli', 'worker', 'relay'] as $entry) {
+            self::assertTrue(self::bootsTheKernel($entry), "{$entry} doesn't call HostKernel::boot(), so it misses the web kernel's services");
+        }
+    }
+
+    public function testTheKernelStopsBeforeServingAndReturnsItsObjects(): void
+    {
+        $index = (string) file_get_contents(self::root() . '/public/index.php');
+        $stop = strpos($index, "if (defined('WHITY_HOST_KERNEL_BOOT')) {");
+        $serve = strpos($index, '$isWorker = function_exists(\'frankenphp_handle_request\');');
+
+        self::assertNotFalse($stop, 'public/index.php no longer stops for HostKernel::boot()');
+        self::assertNotFalse($serve);
+        self::assertLessThan($serve, $stop, 'the boot-only return comes before request handling');
+        self::assertSame('WHITY_HOST_KERNEL_BOOT', \Whity\Core\Kernel\HostKernel::BOOT_FLAG);
+    }
 
     public function testEveryEntryPointBindsThePluginStoresAndWhatAJobNeeds(): void
     {
@@ -100,35 +80,40 @@ final class PluginServiceBindingsTest extends TestCase
         }
     }
 
-    public function testTheGapsBehindTheWebAreTheKnownOnes(): void
+    public function testNoEntryPointBindsFewerSdkServicesThanTheWeb(): void
     {
         $web = self::bound('web');
-        foreach (self::KNOWN_GAPS as $entry => $known) {
+        foreach (['cli', 'worker', 'relay'] as $entry) {
             $gaps = array_values(array_diff($web, self::bound($entry)));
-            sort($gaps);
-            // PermissionResolver is bound at every entry point through its own
-            // wiring helper rather than a literal register_service() call.
-            $gaps = array_values(array_diff($gaps, ['Whity\Sdk\Rbac\PermissionResolver']));
-            self::assertSame($known, $gaps, "The SDK services the web binds and {$entry} doesn't changed. Bind a new one there too, or take a closed gap off KNOWN_GAPS.");
+            self::assertSame([], $gaps, "The web binds these and {$entry} doesn't");
         }
     }
 
-    public function testTheEventRelayLoadsNoPluginsYet(): void
+    public function testTheRelayDeliversIntoTheKernelsHookManager(): void
     {
         $relay = (string) file_get_contents(self::root() . '/src/Cli/Commands/EventRelayCommand.php');
 
-        self::assertStringNotContainsString(
-            'PluginLoader',
-            $relay,
-            'The relay now loads plugins: good. Remove this pin and add "relay" to ENTRY_POINTS, so its bindings are checked like the others.',
-        );
+        self::assertStringContainsString("\$hooks = \$kernel['hookManager'];", $relay, 'the relay must dispatch where the plugins are loaded');
+        self::assertStringNotContainsString('new HookManager()', $relay, 'an empty HookManager reaches no plugin listener');
+    }
+
+    private static function bootsTheKernel(string $entry): bool
+    {
+        $source = (string) file_get_contents(self::root() . '/' . self::ENTRY_POINTS[$entry][0]);
+
+        return str_contains($source, '\Whity\Core\Kernel\HostKernel::boot()');
     }
 
     /** @return list<string> */
     private static function bound(string $entry): array
     {
+        $files = self::ENTRY_POINTS[$entry];
+        if ($entry !== 'web' && self::bootsTheKernel($entry)) {
+            $files = [...$files, ...self::ENTRY_POINTS['web']];
+        }
+
         $bound = [];
-        foreach (self::ENTRY_POINTS[$entry] as $file) {
+        foreach (array_unique($files) as $file) {
             $source = (string) file_get_contents(self::root() . '/' . $file);
             $uses = [];
             preg_match_all('/^use\s+(Whity\\\\[A-Za-z\\\\]+?)(?:\s+as\s+(\w+))?;/m', $source, $useMatches, PREG_SET_ORDER);

@@ -101,7 +101,11 @@ abstract class BaseCommand implements CliCommand, CommandHelp
      */
     protected function setupKernel(): void
     {
-        $db = Database::connect();
+        // WHIT-1247: the web kernel's wiring first, so a plugin reached through
+        // whity-cli resolves every host service its routes do; the CLI kernel
+        // built below adds its own router and replaces what it registers.
+        // One connection for both, as in a request.
+        $db = \Whity\Core\Kernel\HostKernel::boot()['db'];
         // Registered as a service exactly as public/index.php does. Without it,
         // the CLI kernel's simulated API could not serve a plugin route at all:
         // the documented plugin seam is `\Whity\app(Database::class)` (both

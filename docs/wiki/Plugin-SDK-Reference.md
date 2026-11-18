@@ -34,7 +34,7 @@ $ctx->workspaceId();                          // null outside a workspace
 
 - **The workspace comes from the context (D2).** Every store acts in the workspace the request or job runs in, and none takes a workspace, so none can name another.
 - **A missing service fails when you use it.** A service this host doesn't provide throws `Context\ServiceUnavailable` (an `SdkException`) when you ask for it, not when you load.
-- **The context is bound at every entry point** (web, CLI, `queue:work`). `tests/Core/Plugin/PluginServiceBindingsTest` checks this.
+- **The context is bound at every entry point** (web, CLI, `queue:work`, `events:relay`): since WHIT-1247 each one boots the web kernel's own wiring, so a job or an async listener reaches every service a route does. `tests/Core/Plugin/PluginServiceBindingsTest` checks this.
 
 ### Your plugin's own stores: `->for($this)` (deprecated 1.124)
 

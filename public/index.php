@@ -6997,6 +6997,14 @@ $pluginLoader->collectJobs($jobsRegistry);
 \Whity\Core\PluginNavigationBridge::subscribe($hookManager, $pluginLoader, static fn (): string => $languageRegistry->getCurrentLanguageCode());
 \Whity\Core\Plugin\Tenant\TenantPluginNavigation::subscribe($hookManager, $tenantManifestHost);
 
+// WHIT-1247: queue:work, events:relay and the whity-cli kernel boot this same
+// wiring through \Whity\Core\Kernel\HostKernel::boot(), so every service a
+// plugin's job, async listener or command resolves is the one its routes get.
+// They stop here: nothing below serves a request.
+if (defined('WHITY_HOST_KERNEL_BOOT')) {
+    return ['db' => $db, 'hookManager' => $hookManager, 'pluginLoader' => $pluginLoader];
+}
+
 // Handle requests (persistent worker mode or fallback single-request mode)
 $isWorker = function_exists('frankenphp_handle_request');
 
