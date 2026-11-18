@@ -328,7 +328,10 @@ fn safe_extract(bytes: &[u8], stage_root: &Path) -> Result<(), String> {
         let entry = archive
             .by_index(i)
             .map_err(|e| format!("a package entry could not be read: {e}"))?;
-        let name = entry.name().to_string();
+        let name = entry
+            .name()
+            .map_err(|e| format!("a package entry has an unreadable name: {e}"))?
+            .to_string();
         assert_safe_entry_name(&name)?;
 
         if name.ends_with('/') {
@@ -356,7 +359,10 @@ fn safe_extract(bytes: &[u8], stage_root: &Path) -> Result<(), String> {
         let mut entry = archive
             .by_index(i)
             .map_err(|e| format!("a package entry could not be read: {e}"))?;
-        let name = entry.name().to_string();
+        let name = entry
+            .name()
+            .map_err(|e| format!("a package entry has an unreadable name: {e}"))?
+            .to_string();
         let target = resolve_entry_target(&anchor, &name)?;
 
         if name.ends_with('/') {
