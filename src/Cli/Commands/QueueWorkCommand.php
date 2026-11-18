@@ -149,6 +149,19 @@ final class QueueWorkCommand implements CliCommand
                 new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
                 new \Whity\Core\Settings\TenantSettingsRepository($pdo)
             );
+            // WHIT-1243: a plugin's job reads its own secrets and settings here
+            // exactly as its routes do. The worker isn't a BaseCommand, so the
+            // CLI kernel's bindings never reached it, and a job that read a
+            // provider key (Whity Pay's daily renewals) found no store at all.
+            \Whity\register_service(\Whity\Sdk\Secrets\PluginSecrets::class, new \Whity\Core\Plugin\HostPluginSecrets(
+                $pdo,
+                static fn (): \Whity\Core\Security\EncryptedSecretStore => $workerSecrets,
+                $auditLogger,
+            ));
+            \Whity\register_service(\Whity\Sdk\Settings\PluginSettings::class, new \Whity\Core\Plugin\HostPluginSettings(
+                $workerSettings,
+                static fn (): array => $loaded->loader instanceof \Whity\Core\PluginLoader ? $loaded->loader->getPlugins() : [],
+            ));
             $workerLogger = $this->logger;
             $workerMailer = new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
                 $workerSettings,

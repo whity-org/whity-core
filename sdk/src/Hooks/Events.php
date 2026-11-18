@@ -329,7 +329,12 @@ final class Events
     public const FORM_SUBMITTED = 'form.submitted';
     public const FORM_SUBMITTED_ASYNC = 'form.submitted.async';
 
-    /** The office recorded its answers on a submission. Payload: `id`, `form_id`, `tenant_id`, `actor_profile_id`. */
+    /**
+     * The office recorded its answers on a submission, at a step of its route,
+     * after the act committed. Payload: `id`, `form_id`, `tenant_id`,
+     * `actor_profile_id`, and since 1.124 `route_id`, `step_id` and `decided`
+     * (the step's outcome, or null while it is still open). Never the answers.
+     */
     public const SUBMISSION_REVIEWED = 'submission.reviewed';
     public const SUBMISSION_REVIEWED_ASYNC = 'submission.reviewed.async';
 

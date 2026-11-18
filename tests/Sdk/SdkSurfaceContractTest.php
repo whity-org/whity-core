@@ -23,10 +23,8 @@ final class SdkSurfaceContractTest extends TestCase
      * reader knows whether to wait for it or not rely on it.
      */
     private const RESERVED_EVENTS = [
-        // Published in 1.89 for a review step on submissions; core reviews
-        // through document routes today. Fire or retire it (WHIT-1230 follow-up).
-        'SUBMISSION_REVIEWED' => 'not fired yet',
-        'SUBMISSION_REVIEWED_ASYNC' => 'not fired yet',
+        // None today. `submission.reviewed` was here until WHIT-1243 fired it
+        // again from the route step where the office records its answers.
     ];
 
     public function testEveryExceptionTheSdkDefinesIsAnSdkException(): void

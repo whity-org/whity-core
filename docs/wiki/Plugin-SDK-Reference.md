@@ -1,6 +1,6 @@
 # Plugin SDK reference: services, contribution points, errors
 
-One map of the `whity/plugin-sdk` surface (SDK 1.123). It covers what a plugin **calls** (host services), what it **declares** (contribution points), and what it **implements** for the host (providers). Each interface's docblock is the full contract. This page tells you which one to open.
+One map of the `whity/plugin-sdk` surface (SDK 1.124). It covers what a plugin **calls** (host services), what it **declares** (contribution points), and what it **implements** for the host (providers). Each interface's docblock is the full contract. This page tells you which one to open.
 
 `tests/Sdk/SdkSurfaceContractTest.php` fails when an SDK interface is named on no wiki page, so a new contract arrives with its line here or on its own page.
 
@@ -15,9 +15,30 @@ Resolve each one with `\Whity\app(X::class)` in a route handler, an MCP tool han
 - **argument**: the call takes `int $tenantId`. Pass the workspace the host authorized the call in (the request's, or `McpToolContext::$tenantId`), never one a caller supplied.
 - **deployment**: the call is not about one workspace.
 
-### Your plugin's own stores: `->for($this)`
+### Start here: `PluginContext` (1.124)
 
-Pass the plugin itself. An object the host didn't load is refused. Everything a store holds is kept apart per plugin and per workspace.
+One entry point for everything that acts as your plugin (decision D3):
+
+```php
+$ctx = \Whity\app(\Whity\Sdk\PluginContext::class)->for($this);   // a Context\PluginScope
+$ctx->settings()->get('sync_interval');
+$ctx->secrets()->set('api_key', $key);       // Secrets\WorkspaceSecrets: no workspace argument
+$ctx->files()->put('exports/march.csv', $csv, 'text/csv');
+$ctx->documents()->issue($request);
+$ctx->notify()->toRole('order.shipped', $roleId, $notice);
+$ctx->jobs()->enqueue('catalog.sync');
+$ctx->audit()->record('order.refunded', 'order', $orderId);
+$ctx->http(AddressPolicy::publicOnly())->send('GET', $urlSomeoneTyped, []);
+$ctx->workspaceId();                          // null outside a workspace
+```
+
+- **The workspace comes from the context (D2).** Every store acts in the workspace the request or job runs in, and none takes a workspace, so none can name another.
+- **A missing service fails when you use it.** A service this host doesn't provide throws `Context\ServiceUnavailable` (an `SdkException`) when you ask for it, not when you load.
+- **The context is bound at every entry point** (web, CLI, `queue:work`). `tests/Core/Plugin/PluginServiceBindingsTest` checks this.
+
+### Your plugin's own stores: `->for($this)` (deprecated 1.124)
+
+These are the factories `PluginContext` uses. They keep working through SDK 2.0.x and go in 2.1 ([plan](Plugin-SDK-2.0-Plan.md)). Pass the plugin itself; an object the host didn't load is refused. Everything a store holds is kept apart per plugin and per workspace.
 
 | Factory → store | What for | Workspace | Since |
 |---|---|---|---|
@@ -63,7 +84,7 @@ Implement the interface next to `PluginInterface`. Each one is optional, and the
 | `PluginAccessInterface`, `PluginEntitlementsInterface` | How the plugin is sold (free, paid, per seat) and the entitlements it checks | [Workspace-Plugins](Workspace-Plugins.md) |
 | `PluginRolesInterface`, `PluginCustomerPermissionsInterface` | Roles and their permissions; what customers may do | Plugin-Development |
 | `PluginFrontendInterface` | Screens: crud, action, blocks, embed | [Plugin-UI-Blocks](Plugin-UI-Blocks.md) |
-| `PluginDashboardInterface`, `PluginHomeCardInterface` | Dashboard setup points and widgets; the older single home card | [Plugin-Dashboard](Plugin-Dashboard.md) |
+| `PluginDashboardInterface`, `PluginHomeCardInterface` | Dashboard setup points and widgets; the older single home card (deprecated 1.124, D5: use a `stat` widget) | [Plugin-Dashboard](Plugin-Dashboard.md) |
 | `PluginOnboardingInterface` | A guided setup | sdk/README |
 | `PluginWorkspaceTemplatesInterface` | Workspace templates | [Plugin-Workspace-Templates](Plugin-Workspace-Templates.md) |
 | `PluginWorkspaceLifecycleInterface` | Called when the plugin is turned on or off in a workspace | Workspace-Plugins |

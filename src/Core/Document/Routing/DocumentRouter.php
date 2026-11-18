@@ -997,6 +997,13 @@ final class DocumentRouter
                 'step_id' => (int) $step['id'],
             ]);
         }
+        // WHIT-1243: since WHIT-1140 the office records its answers on a form
+        // submission at a route step, so this is where `submission.reviewed`
+        // (SDK 1.94) fires: after the act committed, and only when it entered
+        // values.
+        if ($entered !== [] && $subjectType === \Whity\Core\Form\FormSubmissionRouteSubject::TYPE) {
+            $this->announceSubmissionReviewed($tenantId, $subjectId, $actorId, $routeId, (int) $step['id'], $decided);
+        }
         $this->announceIfCompleted($tenantId, $documentId, $subjectType, $subjectId, $routeId, $actorId, $eventId);
 
         $this->finishFinalise($tenantId, $routeId, $ownTransaction);
@@ -3000,6 +3007,26 @@ final class DocumentRouter
             'actor_profile_id' => $actorId,
             'event_id' => $eventId,
         ] + $extra);
+    }
+
+    /** `submission.reviewed` and its `.async` twin, for answers the office entered at a step. */
+    private function announceSubmissionReviewed(int $tenantId, int $submissionId, ?int $actorId, int $routeId, int $stepId, ?string $decided): void
+    {
+        if ($this->hooks === null) {
+            return;
+        }
+        $stmt = $this->db->prepare('SELECT form_id FROM form_submissions WHERE tenant_id = :tenant_id AND id = :id');
+        $stmt->execute([':tenant_id' => $tenantId, ':id' => $submissionId]);
+        $formId = $stmt->fetchColumn();
+        if ($formId === false) {
+            return;
+        }
+
+        \Whity\Core\Form\SubmissionEvents::announce($this->hooks, Events::SUBMISSION_REVIEWED, $tenantId, $submissionId, (int) $formId, $actorId, [
+            'route_id' => $routeId,
+            'step_id' => $stepId,
+            'decided' => $decided,
+        ]);
     }
 
     /** `route.completed`, when the act just committed left nothing open on the route. */

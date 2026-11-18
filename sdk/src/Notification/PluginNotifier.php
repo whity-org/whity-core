@@ -12,6 +12,9 @@ use Whity\Sdk\PluginInterface;
  *     \Whity\app(PluginNotifier::class)->for($this)->toRole('order.shipped', $roleId, $notice);
  *
  * Pass the plugin itself. An object the host did not load is refused.
+ *
+ * @deprecated 1.124 Use `\Whity\app(\Whity\Sdk\PluginContext::class)->for($this)->notify()`
+ *             (decision D3). This factory keeps working through SDK 2.0.x and goes in 2.1.
  */
 interface PluginNotifier
 {

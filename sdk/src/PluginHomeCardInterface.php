@@ -16,6 +16,11 @@ namespace Whity\Sdk;
  * the person's scope, because the host shows what it returns. A card grants nothing
  * by itself: it appears only to people holding `permission`, and a bad one is
  * dropped with a logged reason while the plugin keeps loading.
+ *
+ * @deprecated 1.124 Declare a `stat` widget in {@see PluginDashboardInterface}
+ *             instead (decision D5, register H.4, owner 19 Nov 2026). An
+ *             existing card keeps showing with the widgets through SDK 2.0.x
+ *             and the interface goes in 2.1.
  */
 interface PluginHomeCardInterface
 {

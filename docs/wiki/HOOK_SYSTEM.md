@@ -131,8 +131,7 @@ Every event core publishes is a constant on [`Whity\Sdk\Hooks\Events`](../../sdk
 - **veto**: throw `HookVetoException` to refuse; the API answers 409 with your `reason()`.
 - **queued**: the `.async` twin, persisted to the event spine and delivered by the relay after commit.
 
-Payload notes come from the constant's own comment in `Events.php`; where a row has none, read the dispatching code before relying on a key. `*.updating` events are observe-only today, whatever older text says. `submission.reviewed` is published but not yet fired (WHIT-1230 follow-up).
-
+Payload notes come from the constant's own comment in `Events.php`; where a row has none, read the dispatching code before relying on a key. `*.updating` events are observe-only today, whatever older text says.
 ### Users
 
 | Event | Constant | Kind | Notes |
@@ -272,7 +271,7 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `document.finalised.async` | `DOCUMENT_FINALISED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
 | `form.submitted` | `FORM_SUBMITTED` | observe | Somebody sent a form. Payload: `id` (the submission), `form_id`, `tenant_id`, `actor_profile_id` (null when it was anonymous), `route_id` (null when it has none). |
 | `form.submitted.async` | `FORM_SUBMITTED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
-| `submission.reviewed` | `SUBMISSION_REVIEWED` | observe | The office recorded its answers on a submission. Payload: `id`, `form_id`, `tenant_id`, `actor_profile_id`. |
+| `submission.reviewed` | `SUBMISSION_REVIEWED` | observe | The office recorded its answers on a submission, at a step of its route, after the act committed. Payload: `id`, `form_id`, `tenant_id`, `actor_profile_id`, `route_id`, `step_id`, `decided` (the step's outcome, or null while it is still open). Never the answers. |
 | `submission.reviewed.async` | `SUBMISSION_REVIEWED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
 | `submission.withdrawn` | `SUBMISSION_WITHDRAWN` | observe | The person who sent a submission withdrew it. Payload: `id`, `form_id`, `tenant_id`, `actor_profile_id`. |
 | `submission.withdrawn.async` | `SUBMISSION_WITHDRAWN_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
