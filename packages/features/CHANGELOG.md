@@ -1,5 +1,13 @@
 # @whity/features
 
+## 0.4.1
+
+### Patch Changes
+
+- 07a1dea: `LanguageProvider` applies each translation bundle as it arrives (WHIT-1205).
+  A domain registered while bundles were loading used to drop the bundles already
+  fetched, so those screens stayed in the default language until a reload.
+
 ## 0.4.0
 
 ### Minor Changes
