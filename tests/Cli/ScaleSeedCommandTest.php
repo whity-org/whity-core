@@ -57,11 +57,6 @@ final class ScaleSeedCommandTest extends TestCase
         return $db;
     }
 
-    public function testCommandCanBeInstantiated(): void
-    {
-        self::assertInstanceOf(ScaleSeedCommand::class, new ScaleSeedCommand());
-    }
-
     public function testHelpFlagPrintsUsageAndReturnsZero(): void
     {
         $command = new ScaleSeedCommand();

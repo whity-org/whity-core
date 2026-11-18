@@ -38,12 +38,6 @@ final class RevokedTokensCleanupCommandTest extends TestCase
         $this->pdo = self::makeSqliteSchema();
     }
 
-    public function testCommandCanBeInstantiated(): void
-    {
-        $command = new RevokedTokensCleanupCommand($this->pdo);
-        $this->assertInstanceOf(RevokedTokensCleanupCommand::class, $command);
-    }
-
     /**
      * The core contract: expired rows are deleted, non-expired rows are
      * retained, and the deleted count is reported.

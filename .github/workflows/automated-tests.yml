@@ -956,6 +956,22 @@ jobs:
           INITIAL_SUPERUSER_PASSWORD=superuser123
           EOF
 
+      # The full forward / rollback-to-zero / forward cycle, foreign keys and
+      # cascades on the real engine (tests/Database/MigrationCycleTest.php).
+      # It needs pdo_pgsql and DB_* credentials, so in the SQLite shards it
+      # skips; until WHIT-1224 nothing ran it anywhere, and it is the only test
+      # of a rollback to zero. It drops everything before and after itself, so
+      # it goes first, on the still-empty database, and --fail-on-skipped stops
+      # it quietly skipping here as well.
+      - name: Migration cycle (forward, full rollback, forward) on real PostgreSQL
+        env:
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          DB_NAME: whity_core
+          DB_USER: whity
+          DB_PASSWORD: whity_dev
+        run: vendor/bin/phpunit --fail-on-skipped tests/Database/MigrationCycleTest.php
+
       - name: Run migrations on real PostgreSQL
         run: php public/index.php migrate run
 

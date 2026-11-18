@@ -121,15 +121,12 @@ final class BillingRunRealEngineTest extends TestCase
         self::assertSame([], $this->invoices->listForTenant(self::TENANT));
     }
 
-    /** And a tenant with no external subscription is still billed here as before. */
-    public function testATenantWithNoExternalSubscriptionIsStillBilledLocally(): void
-    {
-        $this->priceThePlan(5000, 'JOD', 'month');
-        $this->subscribe(self::TENANT, '2026-10-01 00:00:00');
-
-        self::assertSame(1, $this->billing->run($this->now)['invoiced']);
-    }
-
+    /**
+     * Also the guard that a tenant nobody else owns, with no external
+     * subscription, is still billed here: the exclusions below are a narrowing,
+     * not an off switch. Two tests with this exact body used to say so
+     * separately (removed as duplicates, WHIT-1224).
+     */
     public function testASubscriptionWhosePeriodEndedIsInvoiced(): void
     {
         $this->priceThePlan(5000, 'JOD', 'month');
@@ -326,22 +323,6 @@ final class BillingRunRealEngineTest extends TestCase
         // something deeper was catching it instead.
         self::assertSame(0, $result['skipped']);
         self::assertSame([], $this->invoices->listForTenant(self::TENANT));
-    }
-
-    /**
-     * AND THE SAME TENANT IS BILLED WHEN NOBODY ELSE OWNS THEM, so the exclusion above is a
-     * narrowing rather than an off switch.
-     *
-     * Without this, setting the column unconditionally — or defaulting it wrong in a migration
-     * — would stop a self-hosted deployment billing anybody, and every test above would still
-     * pass because none of them set it.
-     */
-    public function testATenantNobodyElseOwnsIsStillBilled(): void
-    {
-        $this->priceThePlan(5000, 'JOD', 'month');
-        $this->subscribe(self::TENANT, '2026-10-01 00:00:00');
-
-        self::assertSame(1, $this->billing->run($this->now)['invoiced']);
     }
 
     /**
