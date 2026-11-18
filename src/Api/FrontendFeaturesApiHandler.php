@@ -190,6 +190,12 @@ final class FrontendFeaturesApiHandler
      */
     private ServerLabels $labels;
 
+    /** Most block-tree verdicts one worker remembers before starting over. */
+    private const BLOCK_VERDICTS_MAX = 512;
+
+    /** @var array<string, array{ok: bool, errors: list<string>}> tree hash => verdict */
+    private array $blockVerdicts = [];
+
     /**
      * @param PluginLoader        $pluginLoader The live loader carrying the validated descriptors.
      * @param RoleChecker         $roleChecker  Authoritative RBAC resolver for per-caller filtering.
@@ -550,7 +556,7 @@ final class FrontendFeaturesApiHandler
             return null;
         }
 
-        $result = BlockValidator::validate($blocks);
+        $result = $this->blockVerdict($blocks);
         if ($result['ok'] !== true) {
             $this->logBlocksDropped($pluginName, $featureId, $result['errors'], $dropped);
 
@@ -559,6 +565,34 @@ final class FrontendFeaturesApiHandler
 
         /** @var list<mixed> $blocks */
         return $blocks;
+    }
+
+    /**
+     * {@see BlockValidator::validate()} with this worker's memory of earlier
+     * verdicts (WHIT-1229). Validation is a pure function of the tree, and the
+     * trees are the same declarations on every call — re-walking them was a
+     * quarter of this endpoint's CPU. Keyed by a hash of the whole tree, so an
+     * edited tenant manifest is a different key and is judged afresh; the
+     * verdict holds no request or tenant data. Bounded, and started over when full.
+     *
+     * @param array<mixed> $blocks
+     * @return array{ok: bool, errors: list<string>}
+     */
+    private function blockVerdict(array $blocks): array
+    {
+        try {
+            $key = hash('xxh128', serialize($blocks));
+        } catch (\Throwable) {
+            return BlockValidator::validate($blocks); // not serializable (a closure): judge it every time
+        }
+        if (isset($this->blockVerdicts[$key])) {
+            return $this->blockVerdicts[$key];
+        }
+        if (count($this->blockVerdicts) >= self::BLOCK_VERDICTS_MAX) {
+            $this->blockVerdicts = [];
+        }
+
+        return $this->blockVerdicts[$key] = BlockValidator::validate($blocks);
     }
 
     /**

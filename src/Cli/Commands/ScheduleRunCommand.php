@@ -184,6 +184,18 @@ final class ScheduleRunCommand implements CliCommand
         // Built-in retention GC for the durable queue's retained completed jobs.
         $pruned = $this->jobs->pruneCompleted($retentionSeconds);
 
+        // WHIT-1229 (WHIT-315): expired shared-store rows. prune() existed but
+        // nothing called it, and several counters are keyed by the minute, hour
+        // or day (push budgets, alert and summary e-mails), so every elapsed
+        // window stayed in the table for good. One indexed range delete per
+        // tick; a failure must not fail the tick.
+        $storeExpired = 0;
+        try {
+            $storeExpired = $this->store->prune();
+        } catch (\Throwable $e) {
+            $this->logger->error('[schedule:run] shared store prune failed', ['error' => $e->getMessage()]);
+        }
+
         // S.7: uninstalled plugins whose 30 days are over. Once an hour is plenty,
         // and the queue worker does it because that's where plugin code is loaded.
         if ($this->pluginRecords !== null && $this->pluginRecords->dueRemovals() !== []) {
@@ -239,6 +251,7 @@ final class ScheduleRunCommand implements CliCommand
             'bucket'     => $bucket,
             'dispatched' => $dispatched,
             'pruned'     => $pruned,
+            'store_expired' => $storeExpired,
         ]);
 
         return $dispatched;

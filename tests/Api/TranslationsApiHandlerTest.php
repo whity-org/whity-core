@@ -503,6 +503,42 @@ final class TranslationsApiHandlerTest extends TestCase
         return $row->id;
     }
 
+    public function testBundleIsRevalidatedByEtagAndChangesWithAnyEdit(): void
+    {
+        // (Response keeps header names lower-cased.)
+        // WHIT-1229: the bundle answers 304 to a matching If-None-Match, and an
+        // edit is a new tag, so a cached copy is never served stale.
+        TenantContext::reset();
+        $params = ['language_code' => 'en', 'domain' => 'common'];
+
+        $first = $this->handler->getTranslations(new Request('GET', '/api/translations/en/common'), $params);
+        $this->assertSame(200, $first->getStatusCode());
+        $etag = $first->getHeaders()['etag'] ?? null;
+        $this->assertIsString($etag);
+        $this->assertSame('private, no-cache', $first->getHeaders()['cache-control'] ?? null);
+
+        $again = $this->handler->getTranslations(
+            new Request('GET', '/api/translations/en/common', ['If-None-Match' => $etag]),
+            $params,
+        );
+        $this->assertSame(304, $again->getStatusCode());
+        $this->assertSame('', $again->getBody());
+
+        $compressed = $this->handler->getTranslations(
+            new Request('GET', '/api/translations/en/common', ['If-None-Match' => substr($etag, 0, -1) . '-br"']),
+            $params,
+        );
+        $this->assertSame(304, $compressed->getStatusCode(), "Caddy's encoded copy revalidates too");
+
+        $this->seedRow(null, 'etag.probe', 'Probe');
+        $edited = $this->handler->getTranslations(
+            new Request('GET', '/api/translations/en/common', ['If-None-Match' => $etag]),
+            $params,
+        );
+        $this->assertSame(200, $edited->getStatusCode());
+        $this->assertNotSame($etag, $edited->getHeaders()['etag'] ?? null);
+    }
+
     /** @param array<string, mixed>|null $body */
     private function req(int $tenantId, int $profileId, string $method, ?array $body, string $path = '/api/translations'): Request
     {
