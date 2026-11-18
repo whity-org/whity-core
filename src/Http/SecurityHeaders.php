@@ -57,6 +57,14 @@ final class SecurityHeaders
     private const CSP_HEADER_KEY = 'content-security-policy';
     private const FRAME_OPTIONS_HEADER_NAME = 'X-Frame-Options';
 
+    /**
+     * The sandbox every framable handler response runs in (WHIT-1217, finding 4
+     * of docs/design/VERIFIED-PLUGINS-SECURITY.md). Scripts and forms, and
+     * NOTHING that hands back an origin: no `allow-same-origin`, no
+     * `allow-top-navigation`, no `allow-popups`.
+     */
+    private const FRAMED_SANDBOX = 'sandbox allow-scripts allow-forms';
+
     private const NOSNIFF = 'nosniff';
     private const FRAME_OPTIONS = 'DENY';
     // JSON-only surface: lock everything down. frame-ancestors is the
@@ -128,6 +136,16 @@ final class SecurityHeaders
      * at all leaves X-Frame-Options as the only clickjacking defense in
      * force, and dropping it there would be a real regression, not a feature.
      *
+     * Sandbox (WHIT-1217): a response that opts into framing is a plugin's
+     * `screen: 'embed'` page, and it must never run as the app. The iframe
+     * already leaves out `allow-same-origin`, but the same URL can be opened
+     * on its own in a tab, where no iframe attribute applies. So the handler's
+     * CSP is sent with `sandbox allow-scripts allow-forms` added: the page gets
+     * an opaque origin wherever it is loaded, cannot read the app's cookies or
+     * storage, and its calls to the API arrive without the person's session.
+     * A `sandbox` directive the handler wrote itself is replaced, so a handler
+     * cannot ask for `allow-same-origin` back.
+     *
      * @param array<string, string> $securityHeaders The output of {@see self::headers()}.
      * @param array<string, string> $responseHeaders The response's CURRENT
      *        headers (already normalized to lowercase-hyphenated keys by
@@ -146,9 +164,33 @@ final class SecurityHeaders
 
         if (self::cspAllowsFraming($handlerCsp)) {
             unset($securityHeaders[self::FRAME_OPTIONS_HEADER_NAME]);
+            // Merged after the response's own headers, so this value is the one
+            // the browser receives.
+            $securityHeaders[self::CSP_HEADER_NAME] = self::sandboxed($handlerCsp);
         }
 
         return $securityHeaders;
+    }
+
+    /**
+     * A handler CSP with its own `sandbox` directive (if any) replaced by
+     * {@see self::FRAMED_SANDBOX}.
+     *
+     * @param string $csp A Content-Security-Policy header value.
+     */
+    public static function sandboxed(string $csp): string
+    {
+        $directives = [];
+        foreach (explode(';', $csp) as $directive) {
+            $directive = trim($directive);
+            if ($directive === '' || preg_match('/^sandbox(\s|$)/i', $directive) === 1) {
+                continue;
+            }
+            $directives[] = $directive;
+        }
+        $directives[] = self::FRAMED_SANDBOX;
+
+        return implode('; ', $directives);
     }
 
     /**

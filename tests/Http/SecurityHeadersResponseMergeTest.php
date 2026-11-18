@@ -149,4 +149,27 @@ class SecurityHeadersResponseMergeTest extends TestCase
         $this->assertSame('nosniff', $headers['x-content-type-options']);
         $this->assertSame('DENY', $headers['x-frame-options']);
     }
+    /**
+     * WHIT-1217: the full merge sends a framable plugin page with the sandbox
+     * directive, replacing the handler's own CSP header rather than adding a
+     * second one.
+     */
+    public function testAFramablePluginPageReachesTheClientSandboxed(): void
+    {
+        $securityHeaders = SecurityHeaders::headers('production');
+        $pluginResponse = new Response(200, '<html>...</html>', [
+            'Content-Type' => 'text/html',
+            'Content-Security-Policy' => "default-src 'self'; script-src 'unsafe-inline'; frame-ancestors 'self'",
+        ]);
+
+        $merged = $pluginResponse->withHeaders(
+            SecurityHeaders::respectingHandlerCsp($securityHeaders, $pluginResponse->getHeaders())
+        );
+
+        $this->assertSame(
+            "default-src 'self'; script-src 'unsafe-inline'; frame-ancestors 'self'; sandbox allow-scripts allow-forms",
+            $merged->getHeaders()['content-security-policy']
+        );
+        $this->assertArrayNotHasKey('x-frame-options', $merged->getHeaders());
+    }
 }

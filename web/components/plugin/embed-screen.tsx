@@ -22,10 +22,26 @@ import { useTranslation } from '@whity/features/i18n';
  * it, the legacy `X-Frame-Options`) survive instead of being silently
  * overwritten by the strict JSON-API default.
  *
- * Sandboxed as a same-origin, authenticated plugin route (not third-party
- * content): scripts/forms/same-origin storage are allowed, top-level
- * navigation is not (a plugin screen can't navigate the admin shell away).
+ * ISOLATED, NOT TRUSTED (WHIT-1217; finding 4 of
+ * docs/design/VERIFIED-PLUGINS-SECURITY.md). The frame allows scripts and
+ * forms and nothing that gives an origin back: no `allow-same-origin`. With
+ * it, `allow-scripts` on a same-origin page let the plugin's page remove its
+ * own sandbox, reach this page and call any API with the person's cookies, so
+ * the "sandbox" was not one. Without it the page has an opaque origin: it
+ * cannot read `parent.document`, the app's cookies or storage, and its own
+ * calls to the API arrive with no session. The backend adds the same sandbox
+ * to the page's CSP (`SecurityHeaders::respectingHandlerCsp()`), so opening
+ * the route on its own in a tab does not run it as the app either.
+ *
+ * The frame's FIRST load is still the person's own authenticated GET, so a
+ * plugin renders what it needs into the HTML on the server. A page that wants
+ * to call the API after loading needs the postMessage bridge (a later step),
+ * or should be a `screen: 'blocks'` screen. No first-party plugin declares an
+ * embed screen.
  */
+
+/** The only sandbox tokens an embedded plugin page gets. Exported for the test that pins it. */
+export const EMBED_SANDBOX = 'allow-scripts allow-forms';
 export function EmbedScreen({ feature }: { feature: PluginFeature }) {
   // Called before the early return: a hook must run on every render.
   const t = useTranslation('plugin');
@@ -46,7 +62,8 @@ export function EmbedScreen({ feature }: { feature: PluginFeature }) {
         src={feature.embed.path}
         title={feature.label}
         className="h-[70vh] w-full rounded-lg border border-border"
-        sandbox="allow-scripts allow-same-origin allow-forms"
+        sandbox={EMBED_SANDBOX}
+        referrerPolicy="no-referrer"
       />
     </div>
   );

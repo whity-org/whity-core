@@ -826,7 +826,7 @@ Planned: 0.2.28.
 - Native screens for store plugins (custom screens need a change in this repository)
 - Blocks outside /admin/x pages
 
-**Needs a design.** Embedded screens are not isolated from the app. Third-party UI needs a separate origin, a message bridge and a scoped token first.
+**Needs a design.** Embedded screens run in a sandboxed frame with no origin of their own (0.2.30). A message bridge and a scoped token are still needed before an embedded screen can call the API.
 
 Planned: later.
 
