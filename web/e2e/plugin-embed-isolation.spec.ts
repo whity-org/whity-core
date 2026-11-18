@@ -48,6 +48,11 @@ test.describe('Plugin embed screen isolation (WHIT-1217)', () => {
 
     await page.addInitScript(() => {
       window.addEventListener('message', (event) => {
+        // Only a message from an OPAQUE origin counts: a sandboxed frame without
+        // `allow-same-origin` posts with origin "null". A frame that still had
+        // the app's origin would post with it, and its report is ignored here,
+        // so this check is itself part of the assertion.
+        if (event.origin !== 'null') return;
         const data = event.data as { whityEmbedProbe?: Record<string, string> } | null;
         if (data !== null && typeof data === 'object' && data.whityEmbedProbe !== undefined) {
           (window as unknown as { __embedProbe: Record<string, string> }).__embedProbe = data.whityEmbedProbe;
