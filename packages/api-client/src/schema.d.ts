@@ -2889,7 +2889,7 @@ export interface paths {
         put?: never;
         /**
          * Archive a field
-         * @description It leaves records, lists and documents; its values are kept and come back if it is restored.
+         * @description It leaves records, lists and documents; its values are kept and come back if it is restored. A plugin's own field answers 409: it follows the plugin being on or off.
          */
         post: operations["post_api_v1_custom_fields_id_archive"];
         delete?: never;
@@ -2907,7 +2907,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Bring an archived field back */
+        /**
+         * Bring an archived field back
+         * @description A plugin's own field answers 409: it comes back when the plugin is turned on.
+         */
         post: operations["post_api_v1_custom_fields_id_restore"];
         delete?: never;
         options?: never;
@@ -13643,6 +13646,8 @@ export interface components {
             edit_permission: string | null;
             sort_order: number;
             created_by_profile_id?: number | null;
+            /** @description The plugin that added the field (SDK 1.119), or null for one the workspace added. A plugin's field is archived while the plugin is off and back when it is on; it can't be archived or restored by hand. */
+            owner_plugin?: string | null;
             archived: boolean;
             /** @description How a document template uses it, such as `{{contact.preferred_branch}}`. */
             merge_field: string;
@@ -36248,6 +36253,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description The field belongs to a plugin */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description Internal server error */
             500: {
                 headers: {
@@ -36310,6 +36324,15 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The field belongs to a plugin */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

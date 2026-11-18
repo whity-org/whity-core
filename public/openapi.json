@@ -19260,7 +19260,7 @@
                 "tags": [
                     "custom-fields"
                 ],
-                "description": "It leaves records, lists and documents; its values are kept and come back if it is restored.",
+                "description": "It leaves records, lists and documents; its values are kept and come back if it is restored. A plugin's own field answers 409: it follows the plugin being on or off.",
                 "parameters": [
                     {
                         "name": "id",
@@ -19322,6 +19322,16 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The field belongs to a plugin",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -19355,6 +19365,7 @@
                 "tags": [
                     "custom-fields"
                 ],
+                "description": "A plugin's own field answers 409: it comes back when the plugin is turned on.",
                 "parameters": [
                     {
                         "name": "id",
@@ -19416,6 +19427,16 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The field belongs to a plugin",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -85678,6 +85699,11 @@
                     "created_by_profile_id": {
                         "type": "integer",
                         "nullable": true
+                    },
+                    "owner_plugin": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The plugin that added the field (SDK 1.119), or null for one the workspace added. A plugin's field is archived while the plugin is off and back when it is on; it can't be archived or restored by hand."
                     },
                     "archived": {
                         "type": "boolean"

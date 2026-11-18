@@ -177,6 +177,11 @@ export default function FieldsSettingsPage() {
                     {fieldLabel(field, language)}
                     {field.required && <Badge variant="secondary" className="ms-2">{t('fields.required', 'Required')}</Badge>}
                     {field.archived && <Badge variant="outline" className="ms-2">{t('fields.archivedBadge', 'Archived')}</Badge>}
+                    {field.owner_plugin && (
+                      <Badge variant="outline" className="ms-2" data-testid="field-owner-plugin">
+                        {t('fields.fromPlugin', 'From {plugin}', { plugin: field.owner_plugin })}
+                      </Badge>
+                    )}
                     <code dir="ltr" className="ms-2 font-mono text-xs text-muted-foreground">
                       {field.merge_field}
                     </code>
@@ -199,9 +204,12 @@ export default function FieldsSettingsPage() {
                             {t('fields.change', 'Change')}
                           </Button>
                         )}
-                        <Button size="sm" variant="outline" onClick={() => void archive(field, !field.archived)}>
-                          {field.archived ? t('fields.restore', 'Restore') : t('fields.archive', 'Archive')}
-                        </Button>
+                        {/* A plugin's field follows the plugin being on or off (SDK 1.119). */}
+                        {!field.owner_plugin && (
+                          <Button size="sm" variant="outline" onClick={() => void archive(field, !field.archived)}>
+                            {field.archived ? t('fields.restore', 'Restore') : t('fields.archive', 'Archive')}
+                          </Button>
+                        )}
                       </div>
                     )}
                   </td>

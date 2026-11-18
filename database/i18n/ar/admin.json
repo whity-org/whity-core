@@ -1506,6 +1506,7 @@
         "fields.archivedBadge": "مؤرشف",
         "fields.area": "الحقول",
         "fields.builtIn": "أساسي",
+        "fields.fromPlugin": "من {plugin}",
         "fields.change": "تعديل",
         "fields.change.submit": "حفظ",
         "fields.change.title": "تعديل حقل",

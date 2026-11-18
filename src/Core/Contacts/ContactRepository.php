@@ -134,6 +134,23 @@ final class ContactRepository
     }
 
     /**
+     * The lowest id matching the filter, or null (WHIT-1209: a plugin finds
+     * "the contact for supplier code X").
+     *
+     * @param array{kind?: ?string, tag_id?: ?int, q?: ?string, archived?: bool, ids?: ?list<int>, extra?: list<array{0: string, 1: array<string, mixed>}>} $filter
+     */
+    public function firstId(int $tenantId, array $filter): ?int
+    {
+        [$where, $params] = $this->where($tenantId, $filter);
+        // @tenant-guard-ignore: where() always starts with c.tenant_id = :tenant_id
+        $stmt = $this->db->prepare('SELECT c.id FROM contacts c WHERE ' . $where . ' ORDER BY c.id LIMIT 1');
+        $stmt->execute($params);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int) $id;
+    }
+
+    /**
      * @param array{kind?: ?string, tag_id?: ?int, q?: ?string, archived?: bool, ids?: ?list<int>, extra?: list<array{0: string, 1: array<string, mixed>}>} $filter
      */
     public function count(int $tenantId, array $filter): int
