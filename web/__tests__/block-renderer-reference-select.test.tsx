@@ -130,3 +130,88 @@ describe('BlockRenderer — WC-532 A6 referenceSelect', () => {
     expect(mockApiClient).not.toHaveBeenCalled();
   });
 });
+
+describe('BlockRenderer — SDK 1.121 referenceSelect multiple (#1437)', () => {
+  const ROWS = { data: [{ id: 1, name: 'Ada' }, { id: 2, name: 'Linus' }, { id: 3, name: 'Grace' }] };
+
+  function routeApi(saveStatus = 200) {
+    mockApiClient.mockImplementation((url: string) =>
+      Promise.resolve(
+        String(url).includes('/x/save') ? stubResponse(saveStatus < 400, saveStatus, {}) : stubResponse(true, 200, ROWS)
+      )
+    );
+  }
+
+  function savedBody(): Record<string, unknown> {
+    const call = mockApiClient.mock.calls.find(([u]) => String(u).includes('/x/save')) as [string, { body: string }];
+    return JSON.parse(call[1].body) as Record<string, unknown>;
+  }
+
+  async function pick(name: string) {
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /owner/i })).not.toBeDisabled());
+    await userEvent.click(screen.getByRole('combobox', { name: /owner/i }));
+    await userEvent.click(await screen.findByRole('option', { name }));
+  }
+
+  it('adds several rows as chips and submits them as a list', async () => {
+    routeApi();
+    renderWrapped(<BlockRenderer blocks={[refFormWith({ multiple: true })]} />);
+
+    expect(screen.getByText('Nothing chosen yet.')).toBeInTheDocument();
+    await pick('Ada');
+    await pick('Grace');
+
+    expect(screen.getByRole('button', { name: 'Remove Ada' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Grace' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(mockApiClient.mock.calls.some(([u]) => String(u).includes('/x/save'))).toBe(true));
+    expect(savedBody()).toEqual({ ownerId: ['1', '3'] });
+  });
+
+  it('lists only rows not chosen yet, and a chip removes its row', async () => {
+    routeApi();
+    renderWrapped(<BlockRenderer blocks={[refFormWith({ multiple: true })]} />);
+
+    await pick('Ada');
+    await userEvent.click(screen.getByRole('combobox', { name: /owner/i }));
+    expect(await screen.findByRole('option', { name: 'Linus' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Ada' })).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Remove Ada' }));
+    expect(screen.queryByRole('button', { name: 'Remove Ada' })).not.toBeInTheDocument();
+    expect(screen.getByText('Nothing chosen yet.')).toBeInTheDocument();
+  });
+
+  it('a required multiple select with nothing chosen blocks the submit', async () => {
+    routeApi();
+    renderWrapped(<BlockRenderer blocks={[refFormWith({ multiple: true, required: true })]} />);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /owner/i })).not.toBeDisabled());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Owner is required')).toBeInTheDocument();
+    expect(mockApiClient.mock.calls.some(([u]) => String(u).includes('/x/save'))).toBe(false);
+
+    await pick('Linus');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(mockApiClient.mock.calls.some(([u]) => String(u).includes('/x/save'))).toBe(true));
+    expect(savedBody()).toEqual({ ownerId: ['2'] });
+  });
+
+  it('a scalar default seeds a one-item list', async () => {
+    routeApi();
+    renderWrapped(<BlockRenderer blocks={[refFormWith({ multiple: true, default: '2' })]} />);
+    expect(await screen.findByRole('button', { name: 'Remove Linus' })).toBeInTheDocument();
+  });
+
+  it('a required single reference select is checked too', async () => {
+    routeApi();
+    renderWrapped(<BlockRenderer blocks={[refFormWith({ required: true })]} />);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: /owner/i })).not.toBeDisabled());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Owner is required')).toBeInTheDocument();
+    expect(mockApiClient.mock.calls.some(([u]) => String(u).includes('/x/save'))).toBe(false);
+  });
+});

@@ -2762,6 +2762,40 @@ final class BlockValidatorTest extends TestCase
         $this->assertStringContainsString("missing required prop 'labelField'", $joined);
     }
 
+    // ==================== SDK 1.121 (#1437): referenceSelect multiple ====================
+
+    public function testReferenceSelectWithMultipleIsValid(): void
+    {
+        $tree = [[
+            'type'   => 'form',
+            'submit' => ['method' => 'POST', 'endpoint' => '/api/uikit/demo/echo'],
+            'children' => [
+                ['type' => 'referenceSelect', 'name' => 'tagIds', 'label' => 'Tags',
+                 'source' => '/api/uikit/tags', 'valueField' => 'id', 'labelField' => 'name',
+                 'multiple' => true, 'required' => true],
+                ['type' => 'submitButton', 'label' => 'Save'],
+            ],
+        ]];
+
+        $this->assertSame(['ok' => true, 'errors' => []], BlockValidator::validate($tree));
+    }
+
+    public function testReferenceSelectMultipleMustBeABool(): void
+    {
+        $result = BlockValidator::validate([[
+            'type'   => 'form',
+            'submit' => ['method' => 'POST', 'endpoint' => '/api/x/y'],
+            'children' => [
+                ['type' => 'referenceSelect', 'name' => 'x', 'label' => 'X', 'source' => '/api/x/rows',
+                 'valueField' => 'id', 'labelField' => 'name', 'multiple' => 'yes'],
+                ['type' => 'submitButton', 'label' => 'Go'],
+            ],
+        ]]);
+
+        $this->assertFalse($result['ok']);
+        $this->assertStringContainsString("'referenceSelect.multiple' must be a boolean", implode(' | ', $result['errors']));
+    }
+
     // ==================== WC-532 A1: dataTable rowActions ====================
 
     public function testDataTableWithHrefAndEndpointRowActionsIsValid(): void

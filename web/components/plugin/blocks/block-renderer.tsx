@@ -16,6 +16,7 @@ import {
   IconPointFilled,
   IconRefresh,
   IconSearch,
+  IconX,
 } from '@tabler/icons-react';
 import type {
   ActionButtonBlock,
@@ -3794,6 +3795,121 @@ function ReferenceSelectRenderer({ block }: { block: ReferenceSelectBlock }) {
 }
 
 function ReferenceSelectField({ block, ctx }: { block: ReferenceSelectBlock; ctx: FormBlockContextValue }) {
+  if (block.multiple === true) return <ReferenceMultiSelectField block={block} ctx={ctx} />;
+  return <ReferenceSingleSelectField block={block} ctx={ctx} />;
+}
+
+/** A source's rows as `{value, label}` options; a row without a value is skipped. */
+function referenceOptions(
+  block: ReferenceSelectBlock,
+  rows: Array<Record<string, unknown>>,
+): Array<{ value: string; label: string }> {
+  return rows.flatMap((row) => {
+    const rawValue = row[block.valueField];
+    const rawLabel = row[block.labelField];
+    if (rawValue === undefined || rawValue === null) return [];
+    return [{
+      value: String(rawValue),
+      label: rawLabel === undefined || rawLabel === null ? String(rawValue) : String(rawLabel),
+    }];
+  });
+}
+
+/**
+ * The value a multiple reference select holds, as strings. A preloaded record
+ * may carry numbers (`[3, 7]`) or a single scalar; both read as a list here so
+ * the chips show and a touched field submits strings like an untouched one.
+ */
+function referenceValues(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((v) => (typeof v === 'string' || typeof v === 'number' ? [String(v)] : []));
+  }
+  if (typeof value === 'string' && value !== '') return [value];
+  if (typeof value === 'number') return [String(value)];
+  return [];
+}
+
+// SDK 1.121 (#1437): several rows from the same `source`. The chosen ones are
+// chips, each with a labelled remove button; the dropdown below adds one more
+// and lists only the rows not chosen yet. The value is a list of `valueField`
+// strings, in the order they were chosen.
+function ReferenceMultiSelectField({ block, ctx }: { block: ReferenceSelectBlock; ctx: FormBlockContextValue }) {
+  const t = useTranslation('plugin');
+  const state = usePluginData<Array<Record<string, unknown>>>(
+    block.source,
+    (body) => (Array.isArray(body) ? (body as Array<Record<string, unknown>>) : null)
+  );
+  const inputId = `block-input-${block.name}`;
+  const chosen = referenceValues(ctx.values[block.name]);
+  const options = state.status === 'ready' ? referenceOptions(block, state.data) : [];
+  const labelOf = new Map(options.map((opt) => [opt.value, opt.label]));
+  const remaining = options.filter((opt) => !chosen.includes(opt.value));
+
+  const add = (v: string): void => {
+    if (v === '' || chosen.includes(v)) return;
+    ctx.setValue(block.name, [...chosen, v]);
+  };
+  const remove = (v: string): void => {
+    ctx.setValue(block.name, chosen.filter((existing) => existing !== v));
+  };
+
+  return (
+    <div className="space-y-1.5" data-slot="reference-multi-select">
+      <InputLabel inputId={inputId} label={block.label} required={block.required} error={ctx.errors[block.name]} />
+      <div className="flex flex-wrap gap-1.5" data-slot="reference-multi-select-chosen">
+        {chosen.length === 0 ? (
+          <span className="text-xs text-muted-foreground">{t('blocks.referenceSelect.noneChosen', 'Nothing chosen yet.')}</span>
+        ) : (
+          chosen.map((v) => {
+            // A chosen value the source no longer lists still shows, by its
+            // value, rather than vanishing from what will be saved.
+            const label = labelOf.get(v) ?? v;
+            return (
+              <Badge key={v} variant="secondary" className="gap-1 pe-1" data-slot="reference-multi-select-chip">
+                {label}
+                <button
+                  type="button"
+                  aria-label={t('blocks.referenceSelect.remove', 'Remove {label}', { label })}
+                  onClick={() => remove(v)}
+                  className="rounded-full p-0.5 outline-none hover:bg-muted-foreground/20 focus-visible:ring-2 focus-visible:ring-ring/30"
+                >
+                  <IconX className="size-3" aria-hidden />
+                </button>
+              </Badge>
+            );
+          })
+        )}
+      </div>
+      {state.status === 'error' ? (
+        <div className="flex items-center gap-3 rounded-lg border border-border bg-card p-2 text-xs text-muted-foreground" data-slot="reference-select-error">
+          <span>{t('blocks.options.loadError', 'Failed to load options.')}</span>
+          <Button type="button" variant="outline" size="sm" onClick={state.retry}>{t('blocks.retry', 'Retry')}</Button>
+        </div>
+      ) : (
+        // Keyed by the count so the trigger empties again after each pick: it
+        // is an "add one" control, not a holder of the value.
+        <Select key={chosen.length} value="" onValueChange={add} disabled={state.status === 'loading' || (state.status === 'ready' && remaining.length === 0)}>
+          <SelectTrigger id={inputId} aria-label={block.label} data-slot="reference-select-trigger">
+            <SelectValue
+              placeholder={
+                state.status === 'loading'
+                  ? t('blocks.loading', 'Loading…')
+                  : state.status === 'ready' && remaining.length === 0 && options.length > 0
+                    ? t('blocks.referenceSelect.allChosen', 'All chosen')
+                    : (block.placeholder ?? t('blocks.referenceSelect.add', 'Add {label}', { label: block.label }))
+              }
+            />
+          </SelectTrigger>
+          <SelectContent>
+            {remaining.map((opt) => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      )}
+    </div>
+  );
+}
+
+function ReferenceSingleSelectField({ block, ctx }: { block: ReferenceSelectBlock; ctx: FormBlockContextValue }) {
   const t = useTranslation('plugin');
   const state = usePluginData<Array<Record<string, unknown>>>(
     block.source,
@@ -3803,18 +3919,7 @@ function ReferenceSelectField({ block, ctx }: { block: ReferenceSelectBlock; ctx
   const value = ctx.values[block.name];
   const strValue = typeof value === 'string' ? value : (block.default ?? '');
 
-  const options =
-    state.status === 'ready'
-      ? state.data.flatMap((row) => {
-          const rawValue = row[block.valueField];
-          const rawLabel = row[block.labelField];
-          if (rawValue === undefined || rawValue === null) return [];
-          return [{
-            value: String(rawValue),
-            label: rawLabel === undefined || rawLabel === null ? String(rawValue) : String(rawLabel),
-          }];
-        })
-      : [];
+  const options = state.status === 'ready' ? referenceOptions(block, state.data) : [];
 
   return (
     <div className="space-y-1.5">
