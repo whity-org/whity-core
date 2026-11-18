@@ -12232,7 +12232,7 @@ export interface components {
             startsOn: string;
             /** Format: date */
             backOn: string;
-            covers: ("flows" | "proposals" | "documents")[];
+            covers: ("flows" | "proposals" | "documents" | "plugins")[];
             message: string | null;
             /** @enum {string} */
             status: "starting" | "in_force" | "ended";
@@ -12251,7 +12251,7 @@ export interface components {
              * @description The day you are back; it ends at the start of that day
              */
             backOn: string;
-            covers: ("flows" | "proposals" | "documents")[];
+            covers: ("flows" | "proposals" | "documents" | "plugins")[];
             message?: string | null;
         };
         AwayPeriodResponse: {

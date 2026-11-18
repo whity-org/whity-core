@@ -734,6 +734,8 @@
         "away.cover.documentsHint": "Purchase orders, letters",
         "away.cover.flows": "Approvals in flows",
         "away.cover.flowsHint": "Purchases, leave, expense claims",
+        "away.cover.plugins": "Approvals in plugins",
+        "away.cover.pluginsHint": "Requests your plugins ask you to approve, such as leave",
         "away.cover.proposals": "Your agents' proposals",
         "away.cover.proposalsHint": "What your agents ask you to approve",
         "away.current.when": "{from} until you’re back on {back}",

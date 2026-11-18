@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.119).
+ * SDK identity (v1.120).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1395,12 +1395,21 @@ namespace Whity\Sdk;
  * (WHIT-1209, #2131).
  *
  * Purely additive.)
+ *
+ * 1.120 (TIME OFF AND AWAY: {@see Calendar\TimeOff} is the host service that puts real time off on a
+ * person's calendar (create, cancel, forPerson, byExternalRef), as the acting person with the time-off
+ * route's checks, idempotent by the plugin's own reference; refusals throw {@see Calendar\TimeOffRejected}.
+ * {@see Delegation\Away::at()} reads whether a person is away at a moment (their "I'm away" period or
+ * time off) and who stands in for them; "I'm away" gains the `plugins` cover for a plugin's own
+ * approvals (WHIT-1210, issue #2132).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.119.0';
+    public const VERSION = '1.120.0';
 
     /**
      * Static identity only — never instantiated.

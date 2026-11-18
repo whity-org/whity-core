@@ -5408,6 +5408,10 @@ $calendarBookingService->setReminders($eventReminders);
 // events, through these host services.
 \Whity\register_service(\Whity\Sdk\Calendar\Bookings::class, new \Whity\Core\Calendar\HostBookings($calendarBookingService));
 \Whity\register_service(\Whity\Sdk\Calendar\CalendarEvents::class, new \Whity\Core\Calendar\HostCalendarEvents($calendarBookingService, $calendarRepository));
+// SDK 1.120 (WHIT-1210): a leave plugin puts time off on core's calendar and
+// reads who is away and who stands in for them.
+\Whity\register_service(\Whity\Sdk\Calendar\TimeOff::class, new \Whity\Core\Calendar\HostTimeOff($calendarBookingService, $calendarRepository, $roleChecker));
+\Whity\register_service(\Whity\Sdk\Delegation\Away::class, new \Whity\Core\Delegation\HostAway(new \Whity\Core\Delegation\AwayService($db->getPdo()), $calendarRepository));
 $calendarFeed = new \Whity\Core\Calendar\CalendarFeed($db->getPdo(), $calendarRepository, $calendarBookingRepository);
 $calendarHandler = new \Whity\Api\CalendarApiHandler(
     $calendarRepository,
