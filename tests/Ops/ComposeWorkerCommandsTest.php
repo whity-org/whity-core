@@ -64,6 +64,25 @@ final class ComposeWorkerCommandsTest extends TestCase
         }
     }
 
+    /**
+     * WHIT-1219: a route's final document is made in the queue worker, and the
+     * verification QR needs the public origin to make its link. Without APP_URL
+     * there the QR was left off without a word. Production passes its whole
+     * `.env` to every service, so only the files that list variables are checked.
+     */
+    public function testTheWorkerServicesKnowThePublicOrigin(): void
+    {
+        foreach (['docker-compose.yml', 'docker-compose.staging.yml'] as $file) {
+            $text = self::read($file);
+            foreach (['queue-worker', 'events-relay', 'scheduler'] as $service) {
+                preg_match('/^  ' . preg_quote($service, '/') . ':\R(.*?)(?=^  [a-z][a-z0-9-]*:\R|\z)/ms', $text, $block);
+                $body = $block[1] ?? '';
+                self::assertNotSame('', $body, "{$file} has no {$service} service");
+                self::assertMatchesRegularExpression('/^      APP_URL: /m', $body, "{$file}: {$service} needs APP_URL, or the documents it makes print no verification QR.");
+            }
+        }
+    }
+
     public function testEveryQueueWorkerRunsTheRelayToo(): void
     {
         foreach (self::COMPOSE_FILES as $file) {

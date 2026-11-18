@@ -197,6 +197,11 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-whity_dev}
       JWT_SECRET: ${JWT_SECRET:-dev_secret_key_change_in_production}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev_encryption_key_change_in_production}
+      # WHIT-1219: the public origin, for links this process makes. A route's
+      # final document is made here, and without it the verification QR is
+      # left off (DocumentQrService needs FRONTEND_URL or APP_URL).
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -231,6 +236,11 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-whity_dev}
       JWT_SECRET: ${JWT_SECRET:-dev_secret_key_change_in_production}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev_encryption_key_change_in_production}
+      # WHIT-1219: the public origin, for links this process makes. A route's
+      # final document is made here, and without it the verification QR is
+      # left off (DocumentQrService needs FRONTEND_URL or APP_URL).
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -268,6 +278,11 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-whity_dev}
       JWT_SECRET: ${JWT_SECRET:-dev_secret_key_change_in_production}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-dev_encryption_key_change_in_production}
+      # WHIT-1219: the public origin, for links this process makes. A route's
+      # final document is made here, and without it the verification QR is
+      # left off (DocumentQrService needs FRONTEND_URL or APP_URL).
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
