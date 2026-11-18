@@ -36,8 +36,10 @@ Timings, cold:
 ```bash
 BACKUP=/c/Projects/Whity/backups/whity_core_YYYYMMDD-HHMMSS.sql.gz
 
-# 1. Verify the archive BEFORE trusting it.
-gzip -t "$BACKUP" && echo "archive intact"
+# 1. Verify the archive BEFORE trusting it. --check refuses an empty, too
+#    small, damaged or cut-short dump and touches no database. gzip -t alone
+#    is not enough: a gzip of nothing (20 bytes) passes it.
+bash scripts/restore-db.sh --check "$BACKUP"
 
 # 2. A throwaway server. No published port and no named volume, so a mistake
 #    here cannot reach anything real.
@@ -61,6 +63,40 @@ docker exec whity_restore_drill psql -U whity -d whity_core -tAc "
 # 6. Clean up.
 docker rm -f -v whity_restore_drill
 ```
+
+## Which backup? The newest valid one, not the newest file
+
+After a reboot the backup container can start before PostgreSQL accepts
+connections (the restart policy brings containers back without honouring
+`depends_on`). A loop shaped `pg_dump … | gzip > file && touch marker` then
+writes a **20-byte archive**, a valid gzip of nothing, and marks it a success.
+From then on the newest file, by name and by time, is the worst one, and
+"restore the newest" restores an empty database (#1908).
+
+So never pick a dump by date alone:
+
+```bash
+# Name no file: restore-db.sh checks BACKUP_DIR newest first, says which newer
+# dumps it skipped and why, and uses the newest that passes.
+BACKUP_DIR=/var/backups/whity bash scripts/restore-db.sh --check
+```
+
+A dump passes when it is at least `BACKUP_MIN_BYTES` long (default 10240), it
+decrypts and passes `gzip -t`, it is a complete pg_dump (a plain SQL dump ends
+with the `dump complete` trailer; a custom or tar archive passes
+`pg_restore --list`), and it has at least `BACKUP_MIN_TABLE_DATA` table-data
+entries (default 5). Anything else is refused with the reason, before any
+database is touched. The freshness exporter runs the same check on the newest
+dump and `WhityBackupLatestInvalid` fires when it fails, so an empty backup is
+an alert, not a surprise during an incident.
+
+**If you write your own backup loop**, do what `scripts/backup-db.sh` does:
+
+1. wait until the database answers (`pg_isready`, better a real `SELECT 1`);
+2. dump to a temporary name with `set -o pipefail` (or dump to a plain file and
+   check `pg_dump`'s own exit status before compressing);
+3. require a size over a floor, compress, and test the archive;
+4. only then give it its real name and update the marker.
 
 ## Two traps this drill fell into, so you do not
 
