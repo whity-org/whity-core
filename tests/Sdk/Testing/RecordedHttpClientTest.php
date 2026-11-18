@@ -36,4 +36,14 @@ final class RecordedHttpClientTest extends TestCase
         $this->expectException(HttpFailure::class);
         $http->send('GET', 'https://api.example.com/v1/events', []);
     }
+
+    public function testScriptedHeadersComeBack(): void
+    {
+        $http = (new RecordedHttpClient())->on('GET', 'https://api.example.com/', ['error' => 'slow down'], 429, ['Retry-After' => '30']);
+
+        $answer = $http->send('GET', 'https://api.example.com/v1/parts', []);
+
+        self::assertSame('30', $answer->header('retry-after'));
+        self::assertSame(['retry-after' => '30'], $answer->headers);
+    }
 }
