@@ -43,7 +43,7 @@ use Whity\Http\JsonBody;
 final class MeEmailsApiHandler
 {
     /** Hard cap on addresses per profile — generous, but not unbounded. */
-    private const MAX_EMAILS_PER_PROFILE = 10;
+    public const MAX_EMAILS_PER_PROFILE = 10;
 
     private const MAX_EMAIL_LENGTH = 255;
 

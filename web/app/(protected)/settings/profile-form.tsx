@@ -159,24 +159,39 @@ export function ProfileForm() {
       // backend returns the updated user, so assert the email it reports back
       // matches what we asked for rather than trusting a bare 200.
       const result = ((updated ?? null) as unknown) as
-        | { user?: { email?: string } }
+        | { user?: { email?: string }; pending_email?: string | null }
         | null;
+      // A new address is not taken on trust (WHIT-1246): the backend adds it
+      // unconfirmed and sends it a link, and the main address stays until the
+      // person confirms the new one and makes it their main address.
+      const pendingEmail = result?.pending_email ?? null;
       const persistedEmail = result?.user?.email;
-      if (persistedEmail !== undefined && persistedEmail !== data.email) {
+      if (pendingEmail === null && persistedEmail !== undefined && persistedEmail !== data.email) {
         throw new Error(
           t('profile.error.notPersisted', 'Profile update did not persist the new email')
         );
       }
 
-      addToast(t('profile.updated', 'Profile updated successfully'), 'success');
+      if (pendingEmail !== null) {
+        addToast(
+          t(
+            'profile.email.confirmSent',
+            'We sent a link to {email}. Open it to confirm the address, then make it your main address under Email addresses.',
+            { email: pendingEmail }
+          ),
+          'success'
+        );
+      } else {
+        addToast(t('profile.updated', 'Profile updated successfully'), 'success');
+      }
 
-      // Refresh the auth context so the new email shows immediately; the backend
-      // re-issued the auth cookies, so /api/me reflects the change.
+      // Refresh the auth context; the backend re-issued the auth cookies.
       await refreshAuth();
 
-      // Clear the credential fields; keep the (possibly new) email populated.
+      // Clear the credential fields. The email field shows the main address,
+      // which only changes once a new one is confirmed and made main.
       form.reset({
-        email: data.email,
+        email: persistedEmail ?? data.email,
         currentPassword: '',
         newPassword: '',
         confirmPassword: '',
