@@ -853,6 +853,14 @@ final class DocumentIssuing
         if ($this->qr === null || !DocumentQrPolicy::enabledForTenant($effective)) {
             return null;
         }
+        if (!$this->qr->isConfigured()) {
+            // WHIT-1219: the workspace asked for QR codes but this process has
+            // no public origin (FRONTEND_URL or APP_URL) to link them to. Said
+            // out loud, so a document printed without one is not a mystery.
+            error_log('[DocumentIssuing] QR codes are on for workspace ' . $tenantId . ', but this process has no FRONTEND_URL or APP_URL, so document ' . $documentId . ' prints without its verification code.');
+
+            return null;
+        }
         try {
             $token = $this->qr->ensure($tenantId, $documentId, $callerId);
         } catch (\Throwable $e) {
