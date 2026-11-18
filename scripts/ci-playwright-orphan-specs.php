@@ -65,9 +65,6 @@ const TOLERATED = [
     // this list guessed that the two July files predated the identity cutover and
     // were probably stale — /register and /verify-email both still exist, so that
     // guess was wrong and is recorded here rather than left to mislead.
-    'register.spec.ts' => 'WHIT-638: unwired since 2026-07-06. Covers /register — client-side validation and workspace creation. The page exists.',
-    'verify-email.spec.ts' => 'WHIT-638: unwired since 2026-07-08. Covers /verify-email — invalid-token handling and an enumeration-safe resend. The page exists, and the enumeration property is security-relevant.',
-    'role-record-sections.spec.ts' => 'WHIT-638: unwired since 2026-08-23. Covers the tenant-owned vs global base role editability asymmetry the instruction set documents (WC-110/WC-222).',
 ];
 
 $root = dirname(__DIR__);
