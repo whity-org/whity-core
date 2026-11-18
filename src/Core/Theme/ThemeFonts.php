@@ -1,0 +1,52 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Whity\Core\Theme;
+
+/**
+ * The allowed font pairs (TH.6). Each is a Latin face and an Arabic face, with
+ * the 400, 500 and 600 weights (3.6: no 700), loaded by the web app through
+ * next/font (self-hosted at build time) and bundled in the phone app. A theme
+ * names an id, never a file or a URL. Since TH.6 a theme may set the pair for
+ * headings and body on product screens; print keeps E.46.
+ *
+ * Tajawal and Almarai, on the list the owner saw, are left out until there is
+ * a 600 weight for them: both jump from 500 to 700, so 600 would print at 700.
+ *
+ * `latin` and `arabic` are the CSS custom properties next/font sets in
+ * `web/app/layout.tsx`.
+ */
+final class ThemeFonts
+{
+    public const DEFAULT = 'noto';
+
+    /** @var array<string, array{name: string, latin: string, arabic: string}> */
+    private const PAIRS = [
+        'noto' => ['name' => 'Noto Sans', 'latin' => 'font-noto-sans', 'arabic' => 'font-noto-sans-arabic'],
+        'plex' => ['name' => 'IBM Plex Sans', 'latin' => 'font-ibm-plex-sans', 'arabic' => 'font-ibm-plex-sans-arabic'],
+        'readex' => ['name' => 'Readex Pro', 'latin' => 'font-readex-pro', 'arabic' => 'font-readex-pro'],
+        'cairo' => ['name' => 'Cairo', 'latin' => 'font-cairo', 'arabic' => 'font-cairo'],
+        'kufi' => ['name' => 'Noto Sans and Noto Kufi Arabic', 'latin' => 'font-noto-sans', 'arabic' => 'font-noto-kufi-arabic'],
+    ];
+
+    /** @return list<string> */
+    public static function ids(): array
+    {
+        return array_keys(self::PAIRS);
+    }
+
+    public static function name(string $id): string
+    {
+        return self::PAIRS[$id]['name'] ?? self::PAIRS[self::DEFAULT]['name'];
+    }
+
+    /** The font stack as CSS: Latin first, then Arabic, then the system faces. */
+    public static function stack(string $id): string
+    {
+        $pair = self::PAIRS[$id] ?? self::PAIRS[self::DEFAULT];
+        $vars = array_unique([$pair['latin'], $pair['arabic']]);
+
+        return implode(', ', array_map(static fn (string $v): string => "var(--{$v})", $vars)) . ', ui-sans-serif, system-ui, sans-serif';
+    }
+}

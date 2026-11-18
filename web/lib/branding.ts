@@ -75,5 +75,5 @@ export const getBranding = cache(async (): Promise<Branding> => {
 /** The main colour's CSS for this request's workspace (see brandThemeCss). */
 export const getBrandThemeCss = cache(async (): Promise<string> => {
   const d = await fetchBranding();
-  return d ? brandThemeCss(d.theme) : '';
+  return d ? brandThemeCss(d.theme, d.themeHigh) : '';
 });

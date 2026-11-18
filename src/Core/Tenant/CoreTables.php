@@ -230,6 +230,8 @@ final class CoreTables
         'workspace_ownership_offers' => '301_create_workspace_ownership_offers.php',
         'workspace_template_items' => '305_create_workspace_templates.php',
         'workspace_template_runs' => '305_create_workspace_templates.php',
+        // WHIT-1225: themes a workspace imported or installed from the store.
+        'themes' => '323_create_themes.php',
         // Votes in chat polls (UC.5).
         'chat_poll_votes' => '280_create_chat_poll_votes.php',
         // Bots and blocked senders (UC.4, UC.12).

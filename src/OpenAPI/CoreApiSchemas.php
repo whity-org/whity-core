@@ -4505,6 +4505,36 @@ final class CoreApiSchemas
                     ],
                 ],
             ],
+            // WHIT-1225 (TH.13, TH.14): the themes a workspace can choose. Choosing
+            // one is the branding_theme setting (PATCH /api/settings).
+            self::permissionRoute('GET', '/api/themes', 'settings:read', [
+                'summary' => 'List the themes this workspace can choose',
+                'description' => 'Whity\'s own themes and the ones this workspace imported, each with a preview in the workspace\'s main colour, its fonts, and what the guard rails changed. Applying any of them is free.',
+                'tags' => ['theme'],
+                'responses' => [200 => self::jsonResponse('The themes and which one is in use', 'ThemeListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes', 'settings:write', [
+                'summary' => 'Import a theme file into this workspace',
+                'description' => 'A theme file in the format of schemas/theme/v1.json: choices, never CSS. Importing the same id again replaces it. It is not applied until branding_theme is set to its id.',
+                'tags' => ['theme'],
+                'request' => 'ImportThemeRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The theme was imported', 'ImportThemeResponse'),
+                    413 => self::errorResponse('The file is larger than 32 KB'),
+                    422 => self::errorResponse('The file is not a valid theme, or uses a whity. id'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/themes/{themeId}', 'settings:write', [
+                'summary' => 'Remove a theme this workspace imported',
+                'description' => 'If the workspace was using it, it goes back to the installation\'s theme. Whity\'s own themes cannot be removed.',
+                'tags' => ['theme'],
+                'parameters' => [['name' => 'themeId', 'in' => 'path', 'required' => true, 'description' => 'The theme\'s id, like acme.harbour', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('Removed', 'DeleteThemeResponse'),
+                    404 => self::errorResponse('This workspace has no imported theme with that id'),
+                    422 => self::errorResponse('Not an imported theme'),
+                ] + self::authErrors(),
+            ]),
         ];
     }
 
@@ -11496,7 +11526,8 @@ final class CoreApiSchemas
                 'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
                 'showTechnicalDetails' => self::bool(),
                 'animations' => ['type' => 'string', 'enum' => ['full', 'calm', 'off']],
-            ], ['textSize', 'showTechnicalDetails', 'animations']),
+                'contrast' => ['type' => 'string', 'enum' => ['standard', 'high'], 'description' => 'Higher contrast (TH.12): text at 7:1 whatever the theme.'],
+            ], ['textSize', 'showTechnicalDetails', 'animations', 'contrast']),
             'DisplayPreferencesResponse' => self::object([
                 'data' => SchemaBuilder::ref('DisplayPreferences'),
             ], ['data']),
@@ -11504,6 +11535,7 @@ final class CoreApiSchemas
                 'textSize' => ['type' => 'string', 'enum' => ['standard', 'larger']],
                 'showTechnicalDetails' => self::bool(),
                 'animations' => ['type' => 'string', 'enum' => ['full', 'calm', 'off']],
+                'contrast' => ['type' => 'string', 'enum' => ['standard', 'high'], 'description' => 'Higher contrast (TH.12): text at 7:1 whatever the theme.'],
             ], []),
             'NotificationPreferencesUpdateRequest' => self::object([
                 'preferences' => ['type' => 'array', 'items' => SchemaBuilder::ref('NotificationPreferenceEntry'), 'description' => 'Entries of `{type, channel, enabled}` to set for the signed-in user. Transactional notification types cannot be turned off.'],
@@ -11984,12 +12016,25 @@ final class CoreApiSchemas
                 'theme' => [
                     'type' => 'object',
                     'nullable' => true,
-                    'description' => 'Token values derived from the main colour (decision 2.8), keyed by token name without the leading dashes; null when no main colour is set.',
+                    'description' => 'The workspace\'s resolved theme (WHIT-1225): the chosen theme with the main colour as its seed, compiled with the guard rails. Token values keyed by name without the leading dashes; only those that differ from Whity\'s. Null for Whity\'s own look.',
+                    'properties' => [
+                        'id' => ['type' => 'string', 'description' => 'The theme in use.'],
+                        'version' => ['type' => 'string'],
+                        'light' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                        'dark' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                        'vars' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Type, shape, density and motion values, the same in both modes.'],
+                        'fonts' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'The font pair ids for body and heading.'],
+                        'adjustments' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']], 'description' => 'What the guard rails changed.'],
+                    ],
+                    'required' => ['light', 'dark'],
+                ],
+                'themeHigh' => [
+                    'type' => 'object',
+                    'description' => 'The tokens a person\'s Higher contrast changes (TH.12), per mode.',
                     'properties' => [
                         'light' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
                         'dark' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
                     ],
-                    'required' => ['light', 'dark'],
                 ],
                 // #1733: the instance switch for installing the web app.
                 'installable' => ['type' => 'boolean', 'description' => 'Whether the web app offers a manifest and service worker so it can be installed as an app. An instance setting (app.installable, else the PWA_ENABLED environment variable, else on).'],
@@ -12020,6 +12065,48 @@ final class CoreApiSchemas
                 'type' => 'object',
                 'additionalProperties' => ['type' => 'string'],
             ]),
+            // WHIT-1225: the theme picker's list.
+            'ThemeListResponse' => self::dataEnvelope(self::object([
+                'current' => self::str() + ['description' => 'The id of the theme in use (whity.default when none was chosen).'],
+                'themes' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::str(),
+                    'version' => self::str(),
+                    'name' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'en, and ar when given.'],
+                    'description' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => ['type' => 'string']],
+                    'author' => self::str(true),
+                    'source' => self::str() + ['description' => 'whity, import or store.'],
+                    'signature_verified' => self::bool(),
+                    'current' => self::bool(),
+                    'main_color_replaces_seed' => self::bool() + ['description' => 'True when the workspace\'s main colour replaces the theme\'s own colour.'],
+                    'fonts' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                    'preview' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Colours for light and dark, and the corner radii.'],
+                    'adjustments' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']], 'description' => 'What the guard rails changed: mode, role and change.'],
+                ], ['id', 'version', 'name', 'source', 'current', 'preview'])],
+            ], ['current', 'themes'])),
+            'ImportThemeRequest' => [
+                'type' => 'object',
+                'description' => 'A theme file (schemas/theme/v1.json).',
+                'additionalProperties' => false,
+                'required' => ['schemaVersion', 'id', 'version', 'name'],
+                'properties' => [
+                    '$schema' => ['type' => 'string', 'description' => 'The schema address, https://whity.dev/schema/theme/v1.json.'],
+                    'schemaVersion' => ['type' => 'integer', 'description' => 'The format version, 1.'],
+                    'id' => ['type' => 'string', 'description' => 'vendor.name in lowercase, like acme.harbour; whity. is reserved.'],
+                    'version' => ['type' => 'string', 'description' => 'A version number like 1.0.0.'],
+                    'name' => ['type' => 'object', 'description' => 'The name in English (en) and Arabic (ar).'],
+                    'description' => ['type' => 'object', 'description' => 'A short description in English (en) and Arabic (ar).'],
+                    'author' => ['type' => 'object', 'description' => 'Who made it: name.'],
+                    'colour' => ['type' => 'object', 'description' => 'seeds (primary, secondary, tertiary as #rrggbb), scheme, neutral, contrast and overrides per mode.'],
+                    'type' => ['type' => 'object', 'description' => 'family and headingFamily from the allowed fonts, scale, titleWeight and emphasis.'],
+                    'shape' => ['type' => 'object', 'description' => 'preset (square, crisp, whity, soft, round) and morph.'],
+                    'density' => ['type' => 'string', 'description' => 'compact, standard or comfortable.'],
+                    'elevation' => ['type' => 'object', 'description' => 'style (plane, soft, flat) and float.'],
+                    'motion' => ['type' => 'object', 'description' => 'preset: calm, standard or expressive.'],
+                    'documents' => ['type' => 'object', 'description' => 'Defaults for the workspace\'s document theme: accentUse, titleFace, largePrint.'],
+                ],
+            ],
+            'ImportThemeResponse' => self::dataEnvelope(self::object(['id' => self::str(), 'version' => self::str()], ['id', 'version'])),
+            'DeleteThemeResponse' => self::dataEnvelope(self::object(['deleted' => self::bool()], ['deleted'])),
 
             // ── Forgotten-password + 2FA-recovery (WC-password-reset-2fa-recovery) ──
 

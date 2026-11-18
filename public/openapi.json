@@ -69820,6 +69820,304 @@
                 }
             }
         },
+        "/api/v1/themes": {
+            "get": {
+                "operationId": "get_api_v1_themes",
+                "summary": "List the themes this workspace can choose",
+                "tags": [
+                    "theme"
+                ],
+                "description": "Whity's own themes and the ones this workspace imported, each with a preview in the workspace's main colour, its fonts, and what the guard rails changed. Applying any of them is free.",
+                "responses": {
+                    "200": {
+                        "description": "The themes and which one is in use",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemeListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_themes",
+                "summary": "Import a theme file into this workspace",
+                "tags": [
+                    "theme"
+                ],
+                "description": "A theme file in the format of schemas/theme/v1.json: choices, never CSS. Importing the same id again replaces it. It is not applied until branding_theme is set to its id.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportThemeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The theme was imported",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportThemeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "The file is larger than 32 KB",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The file is not a valid theme, or uses a whity. id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/themes/{themeId}": {
+            "delete": {
+                "operationId": "delete_api_v1_themes_themeid",
+                "summary": "Remove a theme this workspace imported",
+                "tags": [
+                    "theme"
+                ],
+                "description": "If the workspace was using it, it goes back to the installation's theme. Whity's own themes cannot be removed.",
+                "parameters": [
+                    {
+                        "name": "themeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "themeId",
+                        "in": "path",
+                        "required": true,
+                        "description": "The theme's id, like acme.harbour",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Removed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeleteThemeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This workspace has no imported theme with that id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not an imported theme",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/time-window-types": {
             "get": {
                 "operationId": "get_api_v1_time_window_types",
@@ -81286,7 +81584,60 @@
                     "theme": {
                         "type": "object",
                         "nullable": true,
-                        "description": "Token values derived from the main colour (decision 2.8), keyed by token name without the leading dashes; null when no main colour is set.",
+                        "description": "The workspace's resolved theme (WHIT-1225): the chosen theme with the main colour as its seed, compiled with the guard rails. Token values keyed by name without the leading dashes; only those that differ from Whity's. Null for Whity's own look.",
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "description": "The theme in use."
+                            },
+                            "version": {
+                                "type": "string"
+                            },
+                            "light": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            },
+                            "dark": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            },
+                            "vars": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "description": "Type, shape, density and motion values, the same in both modes."
+                            },
+                            "fonts": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "description": "The font pair ids for body and heading."
+                            },
+                            "adjustments": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                },
+                                "description": "What the guard rails changed."
+                            }
+                        },
+                        "required": [
+                            "light",
+                            "dark"
+                        ]
+                    },
+                    "themeHigh": {
+                        "type": "object",
+                        "description": "The tokens a person's Higher contrast changes (TH.12), per mode.",
                         "properties": {
                             "light": {
                                 "type": "object",
@@ -81300,11 +81651,7 @@
                                     "type": "string"
                                 }
                             }
-                        },
-                        "required": [
-                            "light",
-                            "dark"
-                        ]
+                        }
                     },
                     "installable": {
                         "type": "boolean",
@@ -86979,6 +87326,25 @@
                     "pagination"
                 ]
             },
+            "DeleteThemeResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "deleted": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "deleted"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "DemoCatalogConflictResponse": {
                 "type": "object",
                 "required": [
@@ -87200,12 +87566,21 @@
                             "calm",
                             "off"
                         ]
+                    },
+                    "contrast": {
+                        "type": "string",
+                        "enum": [
+                            "standard",
+                            "high"
+                        ],
+                        "description": "Higher contrast (TH.12): text at 7:1 whatever the theme."
                     }
                 },
                 "required": [
                     "textSize",
                     "showTechnicalDetails",
-                    "animations"
+                    "animations",
+                    "contrast"
                 ]
             },
             "DisplayPreferencesResponse": {
@@ -87239,6 +87614,14 @@
                             "calm",
                             "off"
                         ]
+                    },
+                    "contrast": {
+                        "type": "string",
+                        "enum": [
+                            "standard",
+                            "high"
+                        ],
+                        "description": "Higher contrast (TH.12): text at 7:1 whatever the theme."
                     }
                 }
             },
@@ -95655,6 +96038,98 @@
                         "type": "boolean"
                     }
                 }
+            },
+            "ImportThemeRequest": {
+                "type": "object",
+                "description": "A theme file (schemas/theme/v1.json).",
+                "additionalProperties": false,
+                "required": [
+                    "schemaVersion",
+                    "id",
+                    "version",
+                    "name"
+                ],
+                "properties": {
+                    "$schema": {
+                        "type": "string",
+                        "description": "The schema address, https://whity.dev/schema/theme/v1.json."
+                    },
+                    "schemaVersion": {
+                        "type": "integer",
+                        "description": "The format version, 1."
+                    },
+                    "id": {
+                        "type": "string",
+                        "description": "vendor.name in lowercase, like acme.harbour; whity. is reserved."
+                    },
+                    "version": {
+                        "type": "string",
+                        "description": "A version number like 1.0.0."
+                    },
+                    "name": {
+                        "type": "object",
+                        "description": "The name in English (en) and Arabic (ar)."
+                    },
+                    "description": {
+                        "type": "object",
+                        "description": "A short description in English (en) and Arabic (ar)."
+                    },
+                    "author": {
+                        "type": "object",
+                        "description": "Who made it: name."
+                    },
+                    "colour": {
+                        "type": "object",
+                        "description": "seeds (primary, secondary, tertiary as #rrggbb), scheme, neutral, contrast and overrides per mode."
+                    },
+                    "type": {
+                        "type": "object",
+                        "description": "family and headingFamily from the allowed fonts, scale, titleWeight and emphasis."
+                    },
+                    "shape": {
+                        "type": "object",
+                        "description": "preset (square, crisp, whity, soft, round) and morph."
+                    },
+                    "density": {
+                        "type": "string",
+                        "description": "compact, standard or comfortable."
+                    },
+                    "elevation": {
+                        "type": "object",
+                        "description": "style (plane, soft, flat) and float."
+                    },
+                    "motion": {
+                        "type": "object",
+                        "description": "preset: calm, standard or expressive."
+                    },
+                    "documents": {
+                        "type": "object",
+                        "description": "Defaults for the workspace's document theme: accentUse, titleFace, largePrint."
+                    }
+                }
+            },
+            "ImportThemeResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "version": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "version"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
             },
             "InboundAcceptedResponse": {
                 "type": "object",
@@ -109700,6 +110175,102 @@
                         "description": "New URL-safe identifier (lower-case letters, digits, dashes); must be unique."
                     }
                 }
+            },
+            "ThemeListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "current": {
+                                "type": "string",
+                                "description": "The id of the theme in use (whity.default when none was chosen)."
+                            },
+                            "themes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "string"
+                                        },
+                                        "version": {
+                                            "type": "string"
+                                        },
+                                        "name": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            },
+                                            "description": "en, and ar when given."
+                                        },
+                                        "description": {
+                                            "type": "object",
+                                            "nullable": true,
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "author": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "source": {
+                                            "type": "string",
+                                            "description": "whity, import or store."
+                                        },
+                                        "signature_verified": {
+                                            "type": "boolean"
+                                        },
+                                        "current": {
+                                            "type": "boolean"
+                                        },
+                                        "main_color_replaces_seed": {
+                                            "type": "boolean",
+                                            "description": "True when the workspace's main colour replaces the theme's own colour."
+                                        },
+                                        "fonts": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "preview": {
+                                            "type": "object",
+                                            "additionalProperties": true,
+                                            "description": "Colours for light and dark, and the corner radii."
+                                        },
+                                        "adjustments": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "additionalProperties": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "description": "What the guard rails changed: mode, role and change."
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "version",
+                                        "name",
+                                        "source",
+                                        "current",
+                                        "preview"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "current",
+                            "themes"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
             },
             "ThemeOverridesResponse": {
                 "type": "object",
