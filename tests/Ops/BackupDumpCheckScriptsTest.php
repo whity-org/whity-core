@@ -403,8 +403,9 @@ final class BackupDumpCheckScriptsTest extends TestCase
         $base['PATH'] = $this->dir . '/bin:' . ($base['PATH'] ?? '/usr/bin:/bin');
 
         $process = proc_open(
-            array_merge(['bash', $root . '/' . $script], $args),
-            [1 => ['pipe', 'w'], 2 => ['redirect', 1]],
+            // stderr joins stdout inside bash, so the output keeps its order.
+            array_merge(['bash', '-c', 'exec bash "$0" "$@" 2>&1', $root . '/' . $script], $args),
+            [1 => ['pipe', 'w']],
             $pipes,
             $this->dir,
             $env + $base

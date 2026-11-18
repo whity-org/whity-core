@@ -73,8 +73,27 @@ jobs:
           extensions: mbstring, pdo, pdo_pgsql, pgsql
           coverage: none
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      # The client must match the server's major version (the pg15 service
+      # above). The runner's default postgresql-client is newer (18): its
+      # pg_dump writes `SET transaction_timeout`, which a 15 server rejects on
+      # restore. A real deployment dumps with its own server's client, so the
+      # drill does too. Keep this in step with the service image.
+      - name: Install PostgreSQL client (same major as the server)
+        env:
+          PG_MAJOR: '15'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y "postgresql-client-${PG_MAJOR}"
+          echo "/usr/lib/postgresql/${PG_MAJOR}/bin" >> "$GITHUB_PATH"
+
+      - name: Client and server major versions match
+        run: |
+          client="$(pg_dump --version | grep -oE '[0-9]+' | head -1)"
+          server="$(psql -d whity_core -tAc 'SHOW server_version_num' | cut -c1-2)"
+          echo "pg_dump ${client}, server ${server}"
+          [ "$client" = "$server" ] || { echo "::error::pg_dump ${client} does not match the server ${server}; the dump would not restore."; exit 1; }
 
       - name: Install dependencies
         run: composer install --prefer-dist --no-progress --no-interaction
