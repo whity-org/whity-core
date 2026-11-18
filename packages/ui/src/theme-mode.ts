@@ -38,6 +38,28 @@ export function resolveIsDark(preference: ThemeModePreference | null | undefined
   return preference === 'dark' || (preference !== 'light' && systemPrefersDark);
 }
 
+// U+2028 and U+2029 (line and paragraph separator) are built from their code
+// points rather than written as escapes: some transpilers emit an escape
+// inside a regex literal as the raw character, which then ends the line.
+const LINE_SEPARATOR = String.fromCharCode(0x2028);
+const PARAGRAPH_SEPARATOR = String.fromCharCode(0x2029);
+const SCRIPT_UNSAFE_PATTERN = new RegExp(`[<>/${LINE_SEPARATOR}${PARAGRAPH_SEPARATOR}]`, 'g');
+
+/**
+ * A JS string literal that is also safe inside an inline `<script>` element.
+ * JSON.stringify alone escapes quotes and backslashes but not `</script>` or
+ * the two line separators an older parser treats as newlines, so a value
+ * carrying either could close the element or break the statement. The key
+ * is a constant today; this keeps it safe if it ever is not (WHIT-1236,
+ * CodeQL js/bad-code-sanitization).
+ */
+export function scriptSafeStringLiteral(value: string): string {
+  return JSON.stringify(value).replace(
+    SCRIPT_UNSAFE_PATTERN,
+    (c) => `\\u${c.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')}`,
+  );
+}
+
 /**
  * Source for a blocking `<script>` that must run as early as possible in
  * `<head>` (before any stylesheet / styled content) so `.dark` lands on
@@ -47,6 +69,6 @@ export function resolveIsDark(preference: ThemeModePreference | null | undefined
  * the actual `<script>` element.
  */
 export function buildThemeInitScript(): string {
-  const key = JSON.stringify(THEME_STORAGE_KEY);
+  const key = scriptSafeStringLiteral(THEME_STORAGE_KEY);
   return `(function(){try{var k=${key};var s=localStorage.getItem(k);var d=s==='dark'||(s!=='light'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
 }
