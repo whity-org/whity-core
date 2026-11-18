@@ -129,6 +129,7 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
             Events::ROUTE_SENT_BACK,
             Events::ROUTE_RESUBMITTED,
             Events::ROUTE_COMPLETED,
+            Events::SUBMISSION_REVIEWED,
         );
 
         $this->router = new DocumentRouter(
@@ -520,6 +521,32 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
         self::assertCount(1, $this->firedOf(Events::ROUTE_RESUBMITTED));
     }
 
+    /**
+     * WHIT-1243: the office records its answers at a route step (WHIT-1140), and
+     * `submission.reviewed` says so: once per act that entered values, ids only.
+     */
+    public function testTheOfficesAnswersAtAStepAnnounceSubmissionReviewed(): void
+    {
+        $this->formId = $this->publishedForm($this->clerkAsksForAMeetingThenCommittee(), 'supplier_request_meeting');
+        $submission = $this->send(self::APPLICANT, ['supplier' => 'Example Mill', 'amount' => '100']);
+        $id = (int) $submission['id'];
+        $route = $this->routeOf($id);
+
+        $this->router->act(self::TENANT, self::CLERK, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED, null, false, ['meeting_no' => '14']);
+
+        $reviewed = $this->firedOf(Events::SUBMISSION_REVIEWED);
+        self::assertCount(1, $reviewed);
+        self::assertSame($id, $reviewed[0]['id']);
+        self::assertSame($this->formId, $reviewed[0]['form_id']);
+        self::assertSame(self::CLERK, $reviewed[0]['actor_profile_id']);
+        self::assertSame((int) $route['id'], $reviewed[0]['route_id']);
+        self::assertSame(RouteVerdict::APPROVED, $reviewed[0]['decided']);
+        self::assertStringNotContainsString('"14"', (string) json_encode($reviewed[0]), 'ids only, never the answers');
+
+        $this->router->act(self::TENANT, self::MEMBER_A, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertCount(1, $this->firedOf(Events::SUBMISSION_REVIEWED), 'an act that enters nothing records no answers');
+    }
+
     public function testARejectedSubmissionsRouteCompletesAsRejected(): void
     {
         $submission = $this->send(self::APPLICANT, ['supplier' => 'Example Mill', 'amount' => '100']);
@@ -680,9 +707,9 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
         return $this->recipients->findOpenForProfile(self::TENANT, (int) $route['id'], $profileId);
     }
 
-    private function publishedForm(int $routeTemplateId): int
+    private function publishedForm(int $routeTemplateId, string $key = 'supplier_request'): int
     {
-        $id = $this->forms->create(self::TENANT, 'supplier_request', ['en' => 'Supplier request'], null, $routeTemplateId, null);
+        $id = $this->forms->create(self::TENANT, $key, ['en' => 'Supplier request'], null, $routeTemplateId, null);
         $this->fields->create(self::TENANT, $id, 'supplier', 'text', ['en' => 'Supplier'], null, true, [], [], null, null, null);
         $this->fields->create(self::TENANT, $id, 'amount', 'text', ['en' => 'Amount'], null, false, [], [], null, null, null);
         $this->forms->transition(self::TENANT, $id, 'draft', 'published');
@@ -709,6 +736,40 @@ final class FormSubmissionRoutesRealEngineTest extends TestCase
         $templates->replaceGraph($id, self::TENANT, [
             $step(1, 'Clerk check', [self::CLERK], null),
             $step(2, 'Committee', [self::MEMBER_A, self::MEMBER_B], 'all'),
+        ], []);
+
+        return $id;
+    }
+
+    /** As {@see clerkThenCommittee()}, with the clerk asked for the meeting number. */
+    private function clerkAsksForAMeetingThenCommittee(): int
+    {
+        $templates = new RouteTemplateRepository($this->pdo);
+        $id = $templates->create(self::TENANT, 'Supplier approval with a meeting', null, null);
+        $templates->replaceGraph($id, self::TENANT, [
+            [
+                'position' => 1,
+                'rule_kind' => 'explicit',
+                'rule_config' => ['profile_ids' => [self::CLERK]],
+                'label' => 'Clerk check',
+                'decision' => true,
+                'decision_quorum' => null,
+                'satisfied_by' => 'act',
+                'inputs' => [['key' => 'meeting_no', 'label' => 'Meeting number', 'label_ar' => 'رقم الجلسة']],
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
+            [
+                'position' => 2,
+                'rule_kind' => 'explicit',
+                'rule_config' => ['profile_ids' => [self::MEMBER_A, self::MEMBER_B]],
+                'label' => 'Committee',
+                'decision' => true,
+                'decision_quorum' => 'all',
+                'satisfied_by' => 'act',
+                'canvas_x' => 0,
+                'canvas_y' => 0,
+            ],
         ], []);
 
         return $id;

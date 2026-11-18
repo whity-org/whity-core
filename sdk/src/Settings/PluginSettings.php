@@ -17,6 +17,9 @@ use Whity\Sdk\PluginInterface;
  * It only reaches the keys this plugin declared
  * ({@see PluginSettingsInterface}), never core's or another plugin's. The host
  * implements it; a plugin never does.
+ *
+ * @deprecated 1.124 Use `\Whity\app(\Whity\Sdk\PluginContext::class)->for($this)->settings()`
+ *             (decision D3). This factory keeps working through SDK 2.0.x and goes in 2.1.
  */
 interface PluginSettings
 {

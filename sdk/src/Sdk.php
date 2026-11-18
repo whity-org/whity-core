@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.122).
+ * SDK identity (v1.124).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1418,12 +1418,30 @@ namespace Whity\Sdk;
  * refused when any address is not public, and the connection goes to the checked address (#2151).
  *
  * Purely additive: the new constructor arguments are optional and nothing changes without a policy.)
+ *
+ * 1.123 (ONE ERROR TYPE: every exception the SDK defines implements {@see SdkException}, so a plugin
+ * can catch "the host refused this" in one place. Each still extends \RuntimeException as before.
+ * The hook catalogue in docs/wiki/HOOK_SYSTEM.md lists every published event with its kind, and
+ * the reference page docs/wiki/Plugin-SDK-Reference.md names every SDK interface (WHIT-1230).
+ *
+ * Purely additive: no class changes its parent and no signature changes.)
+ *
+ * 1.124 (RELEASE 0.2.31, THE FIRST ONE-MINOR-PER-RELEASE ENTRY (decision D7): {@see PluginContext} is
+ * the one entry point (D3): `\Whity\app(PluginContext::class)->for($this)` gives a
+ * {@see Context\PluginScope} with settings, secrets ({@see Secrets\WorkspaceSecrets}, the workspace from
+ * the context, D2), files, documents, notify, jobs, audit and http; a service the host lacks throws
+ * {@see Context\ServiceUnavailable}. The seven `->for($this)` factories and
+ * {@see PluginHomeCardInterface} (D5) are @deprecated, working through 2.0.x. `submission.reviewed`
+ * fires again, from the route step where the office records its answers, with `route_id`, `step_id`
+ * and `decided` added (WHIT-1243). Other lanes' SDK additions in 0.2.31 join this entry.
+ *
+ * Purely additive: deprecations only; every existing name keeps working.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.122.0';
+    public const VERSION = '1.124.0';
 
     /**
      * Static identity only — never instantiated.

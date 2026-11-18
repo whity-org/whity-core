@@ -24,6 +24,9 @@ use Whity\Sdk\PluginInterface;
  * A plugin can never reach another plugin's documents, nor a document it did
  * not issue, even one in the same workspace. The host implements this; a
  * plugin never does.
+ *
+ * @deprecated 1.124 Use `\Whity\app(\Whity\Sdk\PluginContext::class)->for($this)->documents()`
+ *             (decision D3). This factory keeps working through SDK 2.0.x and goes in 2.1.
  */
 interface PluginDocuments
 {

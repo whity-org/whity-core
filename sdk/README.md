@@ -6,7 +6,12 @@ requires only PHP, never `whity-core`. That is what makes a plugin
 distributable across Whity-based applications without dragging a host
 framework along.
 
-## Contract surface (v1.44.0)
+## Contract surface
+
+Every type, grouped by what a plugin does with it (calls, declares or
+implements), is on the wiki page `docs/wiki/Plugin-SDK-Reference.md`; every hook
+event is in `docs/wiki/HOOK_SYSTEM.md`. The table below is the feature history,
+one row per contract, newest last.
 
 | Type | Since | Purpose |
 | --- | --- | --- |
@@ -100,6 +105,8 @@ framework along.
 | `Whity\Sdk\Calendar\TimeOff`, `Calendar\TimeOffRejected`, `Delegation\Away` | 1.120 | Host services for a leave plugin. `\Whity\app(TimeOff::class)->create()` puts real time off on a person's calendar (away in bookings, team views and "who's in"), as the acting person: their own needs `calendar:write`, anybody else's `calendar:manage` too. Your `externalRef` (`keyhub.leave:123`) makes it idempotent; find it with `byExternalRef()`, list with `forPerson()`, remove with `cancel()`. Refusals throw `TimeOffRejected` with a stable `reason`. `\Whity\app(Away::class)->at()` answers whether a person is away at a moment (their "I'm away" period or time off) with `from`, `until`, `standInProfileId` and `covers`; route a plugin's approval to the stand-in only when `covers` holds `plugins`. Both are null on older hosts. |
 | Block input `referenceSelect` `multiple` | 1.121 | Several rows from an API-backed `source`: with `multiple: true` the value is a list of `valueField` strings (possibly empty), shown as chips with a remove button each; `required` means at least one. A scalar `default` or `defaultFrom` seeds a one-item list. Without `multiple` it submits one string, as before. |
 | `Whity\Sdk\Http\Outbound\HttpResponse::$headers`, `header()`, `AddressPolicy` | 1.122 | The answer's headers, lower-cased: `$answer->header('Retry-After')`, or `Location` on a 3xx the client never follows; `RecordedHttpClient::on()` takes them too. When a person supplies the URL (a datasheet link, a webhook address), pass `new StreamHttpClient(addressPolicy: AddressPolicy::publicOnly())`: the host is resolved once, refused when any address is loopback, private, link-local, reserved or multicast (IPv4 written inside IPv6 too), and the request goes to the address that was checked, so DNS can't be swapped under it. Odd numeric spellings and non-punycode hosts are refused. `->allowing('10.20.0.0/16')` lets a known internal range through. Fixed API hosts don't need a policy. |
+| `Whity\Sdk\SdkException` | 1.123 | Every exception the SDK defines implements it (`ContactRejected`, `TimeOffRejected`, `DocumentNotIssuedException`, `HttpFailure`, `HookVetoException` and the rest), so `catch (SdkException $e)` catches whatever the host refused. Each still extends `\RuntimeException`, so existing catches don't change. |
+| `Whity\Sdk\PluginContext`, `Context\PluginScope`, `Secrets\WorkspaceSecrets` | 1.124 | The one entry point (release 0.2.31): `$ctx = \Whity\app(PluginContext::class)->for($this)`, then `settings()`, `secrets()`, `files()`, `documents()`, `notify()`, `jobs()`, `audit()`, `http()` and `workspaceId()`, all in the workspace the call runs in; nothing takes a workspace. A service the host lacks throws `Context\ServiceUnavailable` when asked for. The seven `->for($this)` factories (`PluginSettings` … `PluginDocuments`) and `PluginHomeCardInterface` are deprecated and keep working through 2.0.x. `submission.reviewed` fires again, with `route_id`, `step_id` and `decided`. |
 
 ## Versioning policy
 

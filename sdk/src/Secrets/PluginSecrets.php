@@ -22,6 +22,9 @@ use Whity\Sdk\PluginInterface;
  * Each plugin's secrets are kept apart, under the plugin's name, and each
  * workspace's apart from every other's. The host implements it; a plugin never
  * does.
+ *
+ * @deprecated 1.124 Use `\Whity\app(\Whity\Sdk\PluginContext::class)->for($this)->secrets()`
+ *             (decision D3). This factory keeps working through SDK 2.0.x and goes in 2.1.
  */
 interface PluginSecrets
 {

@@ -32,6 +32,12 @@ final class HostPluginServices
 
     public static function register(PDO $pdo, AuditLoggerInterface $audit, ?LoggerInterface $logger = null): void
     {
+        // SDK 1.124 (D3): the one entry point; it reaches the factories below
+        // and the ones each entry point binds itself, at call time.
+        \Whity\register_service(\Whity\Sdk\PluginContext::class, new HostPluginContext());
+        // SDK 1.84: plans and prices need only the database, so every entry
+        // point has them (a billing plugin's renewal job runs in the worker).
+        \Whity\register_service(\Whity\Sdk\Billing\PlanCatalogue::class, new \Whity\Core\Plan\HostPlanCatalogue($pdo));
         \Whity\register_service(\Whity\Sdk\Audit\PluginAudit::class, new \Whity\Core\Audit\HostPluginAudit($pdo, $audit));
         \Whity\register_service(\Whity\Sdk\Jobs\PluginJobQueue::class, new \Whity\Core\Queue\HostPluginJobQueue(new \Whity\Core\Queue\JobRepository($pdo)));
         $activation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($pdo);

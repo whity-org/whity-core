@@ -14,7 +14,7 @@ use RuntimeException;
  * rules runtime, a preview) can say which without parsing the message, and the
  * TypeScript evaluator throws the same kinds for the same inputs.
  */
-final class ExpressionError extends RuntimeException
+final class ExpressionError extends RuntimeException implements \Whity\Sdk\SdkException
 {
     public const TYPE = 'type';
     public const BUDGET = 'budget';

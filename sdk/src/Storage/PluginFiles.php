@@ -20,6 +20,9 @@ use Whity\Sdk\PluginInterface;
  * files. It is scoped to the workspace the request or job is running in, so one
  * workspace never reaches another's. Neither is a value the caller supplies.
  * The host implements this; a plugin never does.
+ *
+ * @deprecated 1.124 Use `\Whity\app(\Whity\Sdk\PluginContext::class)->for($this)->files()`
+ *             (decision D3). This factory keeps working through SDK 2.0.x and goes in 2.1.
  */
 interface PluginFiles
 {

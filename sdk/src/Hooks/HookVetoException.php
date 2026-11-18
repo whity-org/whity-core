@@ -80,7 +80,7 @@ use RuntimeException;
  * }
  * ```
  */
-final class HookVetoException extends RuntimeException
+final class HookVetoException extends RuntimeException implements \Whity\Sdk\SdkException
 {
     /**
      * Maximum length of the client-visible {@see reason()} text. A listener that

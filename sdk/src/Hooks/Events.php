@@ -12,11 +12,18 @@ use Whity\Sdk\PluginNamespace;
  * Plugins subscribe to these via {@see \Whity\Sdk\PluginInterface::getHooks()}.
  * Two flavours exist:
  *
- * - Synchronous FILTER hooks (`*.creating` / `*.updating` / `*.deleting`):
- *   listeners receive the mutable payload plus a context array and MUST return
- *   the (possibly modified) payload.
+ * - Synchronous FILTER hooks: listeners receive the payload plus a context
+ *   array and return the (possibly modified) payload, which the host reads.
+ *   Only a few events are filters: `navigation.register`, `tenant.creating`,
+ *   `ou.creating`, `role.creating`, `document.issuing`,
+ *   `membership.customer_inviting`, `time_window.close_report` and
+ *   `rbac.resource_grant.verify_resource`. `*.updating` and `*.deleting` are
+ *   dispatched synchronously but their return value is not read (a
+ *   `*.deleting` listener can still veto, below).
  * - Notification hooks (`*.created` / `*.updated` / `*.deleted` and the
  *   `*.async` variants): listeners observe; async variants are queued.
+ *
+ * The full catalogue, with each event's kind, is in docs/wiki/HOOK_SYSTEM.md.
  *
  * Any listener can be OBSERVE-ONLY (SDK 1.89): subscribe with
  * `['callback' => $fn, 'observe' => true]`. The host ignores what it returns,
@@ -322,7 +329,12 @@ final class Events
     public const FORM_SUBMITTED = 'form.submitted';
     public const FORM_SUBMITTED_ASYNC = 'form.submitted.async';
 
-    /** The office recorded its answers on a submission. Payload: `id`, `form_id`, `tenant_id`, `actor_profile_id`. */
+    /**
+     * The office recorded its answers on a submission, at a step of its route,
+     * after the act committed. Payload: `id`, `form_id`, `tenant_id`,
+     * `actor_profile_id`, and since 1.124 `route_id`, `step_id` and `decided`
+     * (the step's outcome, or null while it is still open). Never the answers.
+     */
     public const SUBMISSION_REVIEWED = 'submission.reviewed';
     public const SUBMISSION_REVIEWED_ASYNC = 'submission.reviewed.async';
 
