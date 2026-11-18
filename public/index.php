@@ -2517,6 +2517,9 @@ $router->register('POST', '/api/plugins/reload', [$pluginsHandler, 'reload'], nu
 // S.7: kept for 30 days after uninstalling.
 $router->register('GET', '/api/plugins/removed', [$pluginsHandler, 'removed'], null, null, CorePermissions::PLUGINS_READ);
 $router->register('POST', '/api/plugins/{name}/reinstall', [$pluginsHandler, 'reinstall'], null, null, CorePermissions::PLUGINS_INSTALL);
+// #1907: approve an existing role for a plugin's own grants (migration 221).
+// It widens what the plugin can do, so it takes the install permission.
+$router->register('POST', '/api/plugins/{name}/roles/{role}/approve', [$pluginsHandler, 'approveRole'], null, null, CorePermissions::PLUGINS_INSTALL);
 // WC-install-from-store: fetch a package from a TRUSTED plugin store (host must
 // be on the operator `plugins.store_allowed_hosts` allowlist; empty ⇒ disabled)
 // and stage it through the SAME hardened installer as an upload (lands DISABLED).

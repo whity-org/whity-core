@@ -176,7 +176,61 @@ final class PluginRoleGrantsRealEngineTest extends TestCase
         self::assertSame([self::OWN], $this->grants($this->roleId('stock_keeper', null)));
     }
 
+    public function testARefusedRoleIsWarnedAboutOnceWithTheFix(): void
+    {
+        // A role from before 0.2.26: it exists, but carries no creator.
+        $this->pdo->exec("INSERT INTO roles (name, description, created_at) VALUES ('stock_keeper', '', CURRENT_TIMESTAMP)");
+        $plugin = $this->plugin('AcmeStock', [self::OWN], ['stock_keeper' => []], ['stock_keeper' => [self::OWN]]);
+
+        $logger = $this->logger();
+        $seeder = new PluginRoleSeeder($this->pdo, $logger);
+        $seeder->seed($plugin, PluginRoleSeeder::SYSTEM_TENANT_ID);
+        $seeder->seed($plugin, PluginRoleSeeder::SYSTEM_TENANT_ID);
+        (new PluginRoleSeeder($this->pdo, $logger))->seed($plugin, PluginRoleSeeder::SYSTEM_TENANT_ID);
+
+        $warnings = array_values(array_filter($logger->records, static fn (array $r): bool => $r[0] === 'warning'));
+        self::assertCount(1, $warnings, 'one warning per role, not one per boot');
+        self::assertStringContainsString('whity-cli plugin role-approve AcmeStock stock_keeper', $warnings[0][1]);
+        self::assertCount(2, array_filter($logger->records, static fn (array $r): bool => $r[0] === 'debug'));
+        self::assertSame([], $this->grants($this->roleId('stock_keeper', null)));
+    }
+
+    public function testApprovingTheRefusedRoleLetsThePluginGrantAndRearmsTheWarning(): void
+    {
+        $this->pdo->exec("INSERT INTO roles (name, description, created_at) VALUES ('stock_keeper', '', CURRENT_TIMESTAMP)");
+        $plugin = $this->plugin('AcmeStock', [self::OWN], ['stock_keeper' => []], ['stock_keeper' => [self::OWN]]);
+        $role = $this->roleId('stock_keeper', null);
+        $logger = $this->logger();
+        $seeder = new PluginRoleSeeder($this->pdo, $logger);
+        $seeder->seed($plugin, PluginRoleSeeder::SYSTEM_TENANT_ID);
+
+        self::assertTrue($seeder->approveRole('AcmeStock', $role, 7));
+        self::assertFalse($seeder->approveRole('AcmeStock', $role, 7), 'idempotent');
+        $seeder->seed($plugin, PluginRoleSeeder::SYSTEM_TENANT_ID);
+
+        self::assertSame([self::OWN], $this->grants($role));
+        $approvedBy = $this->pdo->query("SELECT approved_by FROM plugin_role_approvals WHERE plugin_key = 'AcmeStock'");
+        self::assertNotFalse($approvedBy);
+        self::assertSame(7, (int) $approvedBy->fetchColumn());
+        $marker = $this->pdo->query("SELECT COUNT(*) FROM app_settings WHERE setting_key LIKE 'plugins.role_refused.%'");
+        self::assertNotFalse($marker);
+        self::assertSame(0, (int) $marker->fetchColumn(), 'the once-only marker goes with the approval');
+    }
+
+    public function testTheWarningForAWorkspaceRoleNamesTheWorkspace(): void
+    {
+        self::assertStringContainsString(
+            'whity-cli plugin role-approve AcmeStock stock_keeper --tenant 1',
+            PluginRoleSeeder::refusalMessage('AcmeStock', 'stock_keeper', self::TENANT)
+        );
+    }
+
     // -------------------------------------------------------------------------
+
+    private function logger(): PluginRoleSeederRecordingLogger
+    {
+        return new PluginRoleSeederRecordingLogger();
+    }
 
     /**
      * @param list<string>                                         $permissions
@@ -292,5 +346,18 @@ final class PluginRoleGrantsRealEngineTest extends TestCase
         }
 
         return $out;
+    }
+}
+
+/** A logger that keeps what it was told. */
+final class PluginRoleSeederRecordingLogger extends \Psr\Log\AbstractLogger
+{
+    /** @var list<array{0: string, 1: string}> */
+    public array $records = [];
+
+    /** @param array<mixed> $context */
+    public function log($level, string|\Stringable $message, array $context = []): void
+    {
+        $this->records[] = [is_string($level) ? $level : '', (string) $message];
     }
 }

@@ -8,6 +8,7 @@ use PDO;
 use PDOException;
 use Psr\Log\LoggerInterface;
 use Whity\Core\RBAC\CorePermissions;
+use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Sdk\PluginInterface;
 use Whity\Sdk\PluginRolesInterface;
 
@@ -144,13 +145,11 @@ final class PluginRoleSeeder
             }
 
             if (!$this->mayGrantTo($roleId, $pluginName, $tenantId)) {
+                // #1907: once per role, not on every boot, and naming the fix.
+                // Later boots still say it, at debug level.
                 $this->log(
-                    'warning',
-                    sprintf(
-                        'PluginRoleSeeder: plugin "%s" did not create role "%s" and it is not approved for the plugin; not granting',
-                        $pluginName,
-                        $roleName
-                    ),
+                    $this->firstRefusal($pluginName, $roleId) ? 'warning' : 'debug',
+                    self::refusalMessage($pluginName, $roleName, $tenantId),
                     ['plugin' => $pluginName, 'role' => $roleName, 'tenant_id' => $tenantId]
                 );
                 continue;
@@ -188,9 +187,9 @@ final class PluginRoleSeeder
      * @param string   $pluginName The plugin's name, as {@see PluginInterface::getName()} returns it.
      * @param int      $roleId     The approved role.
      * @param int|null $approvedBy The operator's user id, when known.
-     * @return void
+     * @return bool Whether this call recorded it (false: it was already approved).
      */
-    public function approveRole(string $pluginName, int $roleId, ?int $approvedBy = null): void
+    public function approveRole(string $pluginName, int $roleId, ?int $approvedBy = null): bool
     {
         $stmt = $this->pdo->prepare(
             'INSERT INTO plugin_role_approvals (role_id, plugin_key, approved_by, created_at)
@@ -198,6 +197,67 @@ final class PluginRoleSeeder
              ON CONFLICT (role_id, plugin_key) DO NOTHING'
         );
         $stmt->execute([':role_id' => $roleId, ':plugin_key' => $pluginName, ':approved_by' => $approvedBy]);
+        $approved = $stmt->rowCount() === 1;
+
+        // The once-only warning marker goes with the refusal it was about.
+        try {
+            (new GlobalSettingsRepository($this->pdo))->delete(self::refusalKey($pluginName, $roleId));
+        } catch (PDOException) {
+            // A marker left behind only keeps a later warning quiet.
+        }
+
+        return $approved;
+    }
+
+    /**
+     * The id of a role in a tenant's scope (0 = the global roles), or null.
+     *
+     * @param string $roleName The role's name.
+     * @param int    $tenantId Tenant scope (0 = system tenant → NULL in DB).
+     * @return int|null
+     */
+    public function roleId(string $roleName, int $tenantId): ?int
+    {
+        return $this->findRoleId($roleName, $tenantId);
+    }
+
+    /**
+     * Whether the plugin may grant to this role: it created it, or the operator approved it.
+     *
+     * @param int    $roleId     The role, resolved in the tenant's scope.
+     * @param string $pluginName The plugin's name.
+     * @param int    $tenantId   Tenant scope (0 = system tenant → NULL in DB).
+     * @return bool
+     */
+    public function mayGrant(int $roleId, string $pluginName, int $tenantId): bool
+    {
+        return $this->mayGrantTo($roleId, $pluginName, $tenantId);
+    }
+
+    /**
+     * The refusal the seeder logs, with the command that fixes it.
+     *
+     * @param string $pluginName The plugin's name.
+     * @param string $roleName   The refused role.
+     * @param int    $tenantId   Tenant scope (0 = the global roles).
+     * @return string
+     */
+    public static function refusalMessage(string $pluginName, string $roleName, int $tenantId): string
+    {
+        $command = sprintf(
+            'whity-cli plugin role-approve %s %s%s',
+            $pluginName,
+            $roleName,
+            $tenantId === self::SYSTEM_TENANT_ID ? '' : ' --tenant ' . $tenantId
+        );
+
+        return sprintf(
+            'PluginRoleSeeder: plugin "%s" did not create role "%s" and it is not approved for the plugin; not granting. '
+                . 'If you trust this plugin with that role, approve it with: %s',
+            $pluginName,
+            $roleName,
+            $command
+        );
     }
 
     /**
@@ -454,6 +514,34 @@ final class PluginRoleSeeder
             );
             return false;
         }
+    }
+
+    /**
+     * Whether this is the first time the seeder refuses this role for this plugin.
+     *
+     * Remembered in `app_settings` so the warning is logged once per role, not
+     * on every boot (#1907). Approving the role clears it. When the marker
+     * cannot be read or written the answer is yes: a repeated warning is better
+     * than a lost one.
+     *
+     * @param string $pluginName The plugin's name.
+     * @param int    $roleId     The refused role.
+     * @return bool
+     */
+    private function firstRefusal(string $pluginName, int $roleId): bool
+    {
+        try {
+            return (new GlobalSettingsRepository($this->pdo))
+                ->setIfAbsent(self::refusalKey($pluginName, $roleId), (string) time());
+        } catch (PDOException) {
+            return true;
+        }
+    }
+
+    /** The `app_settings` key that remembers a refusal was logged (fits its 100 characters). */
+    private static function refusalKey(string $pluginName, int $roleId): string
+    {
+        return 'plugins.role_refused.' . sha1($pluginName . "|" . $roleId);
     }
 
     /**

@@ -51,6 +51,7 @@ class PluginsCommand extends BaseCommand implements CliCommand
             'reload' => $this->reload(),
             'uninstall' => $this->uninstall($argv),
             'agent-context' => $this->agentContext($argv),
+            'role-approve' => $this->roleApprove($argv),
             '--help', '-h', 'help' => $this->showHelp(),
             default => $this->unknownAction($action),
         };
@@ -293,6 +294,63 @@ class PluginsCommand extends BaseCommand implements CliCommand
     }
 
     /**
+     * Let a plugin grant its own permissions to an existing role it did not
+     * create (#1907). Roles a plugin made before 0.2.26 (migration 221) carry
+     * no creator, so the seeder refuses them until the operator approves each
+     * one. Goes through the app's API: operator only, audited.
+     *
+     * Usage: plugin role-approve <plugin> <role> [--tenant <workspace id>]
+     *
+     * @param array<mixed> $argv
+     */
+    private function roleApprove(array $argv): int
+    {
+        $positional = [];
+        $tenantId = null;
+        for ($i = 0; $i < count($argv); $i++) {
+            $arg = $argv[$i];
+            if (!is_string($arg)) {
+                continue;
+            }
+            if ($arg === '--tenant' || str_starts_with($arg, '--tenant=')) {
+                $value = $arg === '--tenant' ? ($argv[++$i] ?? '') : substr($arg, strlen('--tenant='));
+                if (!is_string($value) || !ctype_digit($value)) {
+                    echo "Error: --tenant needs a workspace id.\n";
+                    return 1;
+                }
+                $tenantId = (int) $value;
+                continue;
+            }
+            $positional[] = $arg;
+        }
+
+        if (count($positional) !== 2 || $positional[0] === '' || $positional[1] === '') {
+            echo "Usage: whity-cli plugin role-approve <plugin> <role> [--tenant <workspace id>]\n";
+            return 1;
+        }
+        [$plugin, $role] = $positional;
+
+        $response = $this->callApi(
+            'POST',
+            '/api/plugins/' . rawurlencode($plugin) . '/roles/' . rawurlencode($role) . '/approve',
+            $tenantId === null ? [] : ['tenant_id' => $tenantId]
+        );
+
+        if ($response->getStatusCode() !== 200) {
+            echo "Error: " . $response->getBody() . "\n";
+            return 1;
+        }
+
+        $payload = json_decode($response->getBody(), true);
+        $already = is_array($payload) && is_array($payload['data'] ?? null) && ($payload['data']['already_allowed'] ?? false) === true;
+        echo $already
+            ? "{$plugin} could already grant its permissions to role {$role}.\n"
+            : "Approved: {$plugin} can now grant its own permissions to role {$role}. They were granted.\n";
+
+        return 0;
+    }
+
+    /**
      * Show help for plugins command
      */
     private function showHelp(): int
@@ -307,6 +365,7 @@ class PluginsCommand extends BaseCommand implements CliCommand
         echo "  agent-context [list]                  Plugins whose MCP prompts and resources may reach AI agents\n";
         echo "  agent-context grant <name>            Let this Verified plugin's prompts and resources reach AI agents\n";
         echo "  agent-context revoke <name>           Stop them, at once\n";
+        echo "  role-approve <plugin> <role> [--tenant <id>]  Let a plugin grant its own permissions to an existing role\n";
         return 0;
     }
 
