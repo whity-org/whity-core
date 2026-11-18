@@ -1,0 +1,14 @@
+{
+  "$schema": "https://whity.dev/schema/theme/v1.json",
+  "schemaVersion": 1,
+  "id": "whity.harbour",
+  "version": "1.0.0",
+  "name": { "en": "Harbour", "ar": "الميناء" },
+  "description": { "en": "Deep teal on cool, lightly tinted greys, softer corners and IBM Plex.", "ar": "أزرق مخضر عميق على رماديات باردة، وزوايا أنعم، وخط IBM Plex." },
+  "author": { "name": "Whity" },
+  "colour": { "seeds": { "primary": "#0b6e74" }, "scheme": "tonal", "neutral": "cool" },
+  "type": { "family": "plex" },
+  "shape": { "preset": "soft" },
+  "elevation": { "style": "soft" },
+  "motion": { "preset": "standard" }
+}

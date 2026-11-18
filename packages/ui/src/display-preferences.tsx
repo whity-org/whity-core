@@ -16,11 +16,19 @@ export const TEXT_SIZE_STORAGE_KEY = "whity-text-size"
 /** The localStorage key for Animations, applied as `<html data-motion>` before React runs. */
 export const MOTION_STORAGE_KEY = "whity-motion"
 
+/** Higher contrast (TH.12): text at 7:1 whatever the workspace's theme, as `<html data-contrast="high">`. */
+export type Contrast = "standard" | "high"
+
+/** The localStorage key for Higher contrast, applied before React runs. */
+export const CONTRAST_STORAGE_KEY = "whity-contrast"
+
 export interface DisplayPreferences {
   textSize: TextSize
   showTechnicalDetails: boolean
   /** Full (default), Calm or Off (LT.4). The device's reduce motion means Off on top. */
   animations: MotionMode
+  /** Standard (default) or high (TH.12). */
+  contrast?: Contrast
 }
 
 export interface DisplayPreferencesValue extends DisplayPreferences {
@@ -31,6 +39,7 @@ const DisplayPreferencesContext = React.createContext<DisplayPreferencesValue>({
   textSize: "standard",
   showTechnicalDetails: false,
   animations: "full",
+  contrast: "standard",
   update: () => {},
 })
 

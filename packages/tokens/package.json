@@ -15,6 +15,7 @@
     "./fonts.css": "./generated/fonts.css",
     "./fonts/*": "./fonts/*",
     "./site.css": "./generated/site.css",
+    "./theme.schema.json": "./generated/theme.schema.json",
     "./logos/*": "./logos/*"
   },
   "files": [

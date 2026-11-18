@@ -1,0 +1,14 @@
+{
+  "$schema": "https://whity.dev/schema/theme/v1.json",
+  "schemaVersion": 1,
+  "id": "whity.bloom",
+  "version": "1.0.0",
+  "name": { "en": "Bloom", "ar": "تفتّح" },
+  "description": { "en": "Plum with a warm second colour, round shapes, Cairo and lively motion.", "ar": "برقوقي مع لون ثانٍ دافئ، وأشكال دائرية، وخط القاهرة، وحركة حيوية." },
+  "author": { "name": "Whity" },
+  "colour": { "seeds": { "primary": "#8a2a86" }, "scheme": "expressive" },
+  "type": { "family": "cairo" },
+  "shape": { "preset": "round" },
+  "density": "comfortable",
+  "motion": { "preset": "expressive" }
+}

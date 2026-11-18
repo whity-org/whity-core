@@ -1,0 +1,11 @@
+{
+  "$schema": "https://whity.dev/schema/theme/v1.json",
+  "schemaVersion": 1,
+  "id": "whity.desert",
+  "version": "1.0.0",
+  "name": { "en": "Desert", "ar": "صحراء" },
+  "description": { "en": "Burnt orange on warm greys, Kufi headings and roomier text.", "ar": "برتقالي محروق على رماديات دافئة، وعناوين بالخط الكوفي، ونص أكبر قليلاً." },
+  "author": { "name": "Whity" },
+  "colour": { "seeds": { "primary": "#b74c05" }, "neutral": "warm" },
+  "type": { "family": "noto", "headingFamily": "kufi", "scale": "roomy" }
+}

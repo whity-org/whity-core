@@ -54,7 +54,7 @@ export function parseBrandingResponse(body: unknown): { branding: Branding; them
       builtOnWhity: r.builtOnWhity !== false,
       currency: typeof r.currency === 'string' && /^[A-Z]{3}$/.test(r.currency) ? r.currency : undefined,
     },
-    themeCss: brandThemeCss(r.theme),
+    themeCss: brandThemeCss(r.theme, r.themeHigh),
   };
 }
 

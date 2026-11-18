@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import {
   DisplayPreferencesContextProvider,
   MOTION_STORAGE_KEY,
+  CONTRAST_STORAGE_KEY,
+  type Contrast,
   TEXT_SIZE_STORAGE_KEY,
   type DisplayPreferences,
   type TextSize,
@@ -49,11 +51,25 @@ function storeMotion(mode: MotionMode): void {
   }
 }
 
+/** Higher contrast (TH.12): the theme CSS writes its colours under `<html data-contrast="high">`. */
+function applyContrast(contrast: Contrast): void {
+  if (contrast === 'high') document.documentElement.dataset.contrast = 'high';
+  else delete document.documentElement.dataset.contrast;
+}
+
+function storeContrast(contrast: Contrast): void {
+  try {
+    localStorage.setItem(CONTRAST_STORAGE_KEY, contrast);
+  } catch {
+    // As for the text size.
+  }
+}
+
 function toMotion(value: unknown): MotionMode {
   return (MOTION_MODES as readonly unknown[]).includes(value) ? (value as MotionMode) : 'full';
 }
 
-const INIT_SCRIPT = `try{var d=document.documentElement;if(localStorage.getItem(${JSON.stringify(TEXT_SIZE_STORAGE_KEY)})==='larger')d.dataset.textSize='larger';var m=localStorage.getItem(${JSON.stringify(MOTION_STORAGE_KEY)});if(m==='calm'||m==='off')d.dataset.motion=m}catch(e){}`;
+const INIT_SCRIPT = `try{var d=document.documentElement;if(localStorage.getItem(${JSON.stringify(TEXT_SIZE_STORAGE_KEY)})==='larger')d.dataset.textSize='larger';var m=localStorage.getItem(${JSON.stringify(MOTION_STORAGE_KEY)});if(m==='calm'||m==='off')d.dataset.motion=m;if(localStorage.getItem(${JSON.stringify(CONTRAST_STORAGE_KEY)})==='high')d.dataset.contrast='high'}catch(e){}`;
 
 export function DisplayPreferencesInitScript() {
   return <script dangerouslySetInnerHTML={{ __html: INIT_SCRIPT }} />;
@@ -65,6 +81,7 @@ export function DisplayPreferencesProvider({ children }: { children: ReactNode }
     textSize: 'standard',
     showTechnicalDetails: false,
     animations: 'full',
+    contrast: 'standard',
   });
 
   const accept = useCallback((next: DisplayPreferences) => {
@@ -73,6 +90,8 @@ export function DisplayPreferencesProvider({ children }: { children: ReactNode }
     storeTextSize(next.textSize);
     applyMotion(next.animations);
     storeMotion(next.animations);
+    applyContrast(next.contrast ?? 'standard');
+    storeContrast(next.contrast ?? 'standard');
   }, []);
 
   const userId = user !== null ? user.id : null;
@@ -89,6 +108,7 @@ export function DisplayPreferencesProvider({ children }: { children: ReactNode }
           textSize: body.data.textSize === 'larger' ? 'larger' : 'standard',
           showTechnicalDetails: body.data.showTechnicalDetails === true,
           animations: toMotion(body.data.animations),
+          contrast: body.data.contrast === 'high' ? 'high' : 'standard',
         });
       } catch {
         // Offline or a failed request: keep what's showing.

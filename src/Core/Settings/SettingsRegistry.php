@@ -52,6 +52,15 @@ final class SettingsRegistry
     // (TenantTheme). Tenant-overridable: each workspace is its own brand.
     public const BRANDING_MAIN_COLOR = 'branding_main_color';
 
+    // WHIT-1225 (TH.1-TH.14): the workspace's chosen theme, by id ('' for the
+    // installation's, which is Whity's own unless the operator chose one), and
+    // the colour roles it set by hand on top, as JSON
+    // `{"light": {role: "#rrggbb"}, "dark": {...}}`. The main colour above is
+    // the theme's primary seed. Tenant-overridable; the global value is the
+    // installation theme (30-themes.md section 5).
+    public const BRANDING_THEME = 'branding_theme';
+    public const BRANDING_THEME_OVERRIDES = 'branding_theme_overrides';
+
     // MCP feature flag (WC-149b2fc9). Value is the literal string 'true' or
     // 'false'; an admin sets it per-tenant to enable the MCP endpoint.
     public const MCP_ENABLED = 'mcp.enabled';
@@ -1196,6 +1205,8 @@ final class SettingsRegistry
         self::BRANDING_LOGO_SQUARE => '',
         self::BRANDING_FAVICON => '',
         self::BRANDING_MAIN_COLOR => '',
+        self::BRANDING_THEME => '',
+        self::BRANDING_THEME_OVERRIDES => '',
         self::MCP_ENABLED => 'false',
         self::MCP_ALWAYS_ON_PLUGIN_TOOLS => '',
         // Secure-by-default: signup CLOSED, approval REQUIRED when opened.
@@ -1763,6 +1774,10 @@ final class SettingsRegistry
             self::LOCALE => self::validateLocale($value),
             self::SUPPORT_EMAIL => self::validateSupportEmail($value),
             self::BRANDING_MAIN_COLOR => $value === '' ? null : self::validateHexColor($value, self::BRANDING_MAIN_COLOR),
+            self::BRANDING_THEME => $value === '' || preg_match(\Whity\Core\Theme\ThemeValidator::ID_RE, $value) === 1
+                ? null
+                : 'branding_theme must be a theme id like vendor.name, or empty for the installation\'s theme.',
+            self::BRANDING_THEME_OVERRIDES => self::validateThemeOverrides($value),
             self::MCP_ENABLED => self::validateMcpEnabled($value),
             self::MCP_ALWAYS_ON_PLUGIN_TOOLS => self::validateToolNameList($value, self::MCP_ALWAYS_ON_PLUGIN_TOOLS),
             self::SELF_REGISTRATION_ENABLED => self::validateBoolean($value, self::SELF_REGISTRATION_ENABLED),
@@ -2332,6 +2347,25 @@ final class SettingsRegistry
             self::SITE_NAME => trim($value),
             default => $value,
         };
+    }
+
+    /** WHIT-1225: empty, or the JSON of a workspace's colour overrides (ThemeValidator). */
+    private static function validateThemeOverrides(string $value): ?string
+    {
+        if (trim($value) === '') {
+            return null;
+        }
+        if (strlen($value) > 8000) {
+            return 'branding_theme_overrides is too long.';
+        }
+        try {
+            $decoded = json_decode($value, true, 8, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return 'branding_theme_overrides must be JSON.';
+        }
+        $errors = \Whity\Core\Theme\ThemeValidator::validateOverrides($decoded);
+
+        return $errors === [] ? null : $errors[0];
     }
 
     private static function validateSiteName(string $value): ?string
