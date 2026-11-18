@@ -917,7 +917,7 @@ class RoleChecker
      */
     private function getParentRoleId(int $roleId): ?int
     {
-        // @tenant-guard-ignore: role-hierarchy traversal by globally-unique role id (SERIAL PK); the role hierarchy is tenant-independent
+        // @tenant-guard-ignore: walks parent links by role PK; parent_id is written only by migrations, seeders and PluginRoleSeeder, never by a request
         $statement = $this->db->query(
             'SELECT parent_id FROM roles WHERE id = :roleId',
             [':roleId' => $roleId]
