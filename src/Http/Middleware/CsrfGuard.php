@@ -120,7 +120,9 @@ final class CsrfGuard
             return $next($request);
         }
 
-        return Response::error('Cross-site request rejected', 403);
+        // Naming the header costs nothing (it is documented) and saves an API
+        // client a guess when its own request is refused (WHIT-703).
+        return Response::error('Cross-site request rejected: send the header X-Requested-With: XMLHttpRequest', 403);
     }
 
     /**
