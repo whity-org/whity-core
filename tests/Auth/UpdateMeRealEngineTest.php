@@ -52,8 +52,12 @@ final class UpdateMeRealEngineTest extends TestCase
 
     // ==================== self-update persists ====================
 
-    public function testSelfEmailUpdatePersistsScopedToProfile(): void
+    public function testNewEmailIsAddedUnconfirmedAndTheMainAddressStays(): void
     {
+        // WHIT-1246: the current password proves who is asking, not who owns
+        // the new mailbox. Before, the primary row was rewritten and stayed
+        // verified, so any account could claim someone else's address as a
+        // confirmed one.
         $profileId = $this->seedProfile('old@example.com', 'secret-123');
         $this->authenticateAs($profileId, self::TENANT, 'old@example.com');
 
@@ -61,17 +65,40 @@ final class UpdateMeRealEngineTest extends TestCase
             $this->jsonRequest(['email' => 'new@example.com', 'current_password' => 'secret-123'])
         );
 
-        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(200, $response->getStatusCode(), $response->getBody());
 
-        // The profile_emails row must carry the new address.
-        $email = $this->pdo->prepare('SELECT email FROM profile_emails WHERE profile_id = ? AND is_primary = true');
-        $email->execute([$profileId]);
-        $this->assertSame('new@example.com', $email->fetchColumn(), 'The new email must be persisted in profile_emails.');
+        $rows = $this->pdo->prepare('SELECT email, verified, is_primary FROM profile_emails WHERE profile_id = ? ORDER BY id');
+        $rows->execute([$profileId]);
+        $emails = $rows->fetchAll(PDO::FETCH_ASSOC);
+        $this->assertCount(2, $emails);
+        $this->assertSame('old@example.com', $emails[0]['email'], 'The confirmed main address must not change.');
+        $this->assertTrue((bool) $emails[0]['is_primary']);
+        $this->assertSame('new@example.com', $emails[1]['email']);
+        $this->assertFalse((bool) $emails[1]['verified'], 'The new address must wait for its confirmation link.');
+        $this->assertFalse((bool) $emails[1]['is_primary']);
 
-        $data = json_decode($response->getBody(), true)['user'];
-        $this->assertSame('new@example.com', $data['email']);
-        $this->assertSame($profileId, $data['id'], 'id in response must equal profileId (stable).');
-        $this->assertArrayNotHasKey('password', $data, 'The password hash must never leak.');
+        $body = json_decode($response->getBody(), true);
+        $this->assertSame('old@example.com', $body['user']['email']);
+        $this->assertSame('new@example.com', $body['pending_email']);
+        $this->assertSame($profileId, $body['user']['id'], 'id in response must equal profileId (stable).');
+        $this->assertArrayNotHasKey('password', $body['user'], 'The password hash must never leak.');
+    }
+
+    public function testAskingAgainForAnUnconfirmedAddressDoesNotDuplicateIt(): void
+    {
+        $profileId = $this->seedProfile('again@example.com', 'secret-123');
+        $this->authenticateAs($profileId, self::TENANT, 'again@example.com');
+
+        foreach ([1, 2] as $attempt) {
+            $response = $this->handler()->handleUpdateMe(
+                $this->jsonRequest(['email' => 'later@example.com', 'current_password' => 'secret-123'])
+            );
+            $this->assertSame(200, $response->getStatusCode(), "attempt {$attempt}: " . $response->getBody());
+        }
+
+        $count = $this->pdo->prepare('SELECT COUNT(*) FROM profile_emails WHERE profile_id = ?');
+        $count->execute([$profileId]);
+        $this->assertSame(2, (int) $count->fetchColumn());
     }
 
     public function testSelfPasswordUpdatePersistsVerifiableBcryptHash(): void
@@ -213,11 +240,12 @@ final class UpdateMeRealEngineTest extends TestCase
             'A self-service update must never edit another profile.'
         );
 
-        // The actor's email changed (hijacked@example.com).
-        $stmt->execute([$actorId]);
+        // The new address went to the actor, unconfirmed (WHIT-1246).
+        $owner = $this->pdo->prepare('SELECT profile_id FROM profile_emails WHERE email = ?');
+        $owner->execute(['hijacked@example.com']);
         $this->assertSame(
-            'hijacked@example.com',
-            $stmt->fetchColumn(),
+            $actorId,
+            (int) $owner->fetchColumn(),
             'Only the authenticated profile is updated.'
         );
     }

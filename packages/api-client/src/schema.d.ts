@@ -17023,6 +17023,8 @@ export interface components {
                 display_name?: string | null;
                 role: string;
             };
+            /** @description The new address waiting for its confirmation link, or null. */
+            pending_email?: string | null;
             access_token?: string;
             refresh_token?: string;
             token_type?: string;

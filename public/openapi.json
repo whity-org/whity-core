@@ -97023,6 +97023,11 @@
                             "role"
                         ]
                     },
+                    "pending_email": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The new address waiting for its confirmation link, or null."
+                    },
                     "access_token": {
                         "type": "string"
                     },

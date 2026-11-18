@@ -4,6 +4,7 @@ namespace Whity\Auth;
 
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Whity\Api\MeEmailsApiHandler;
 use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Identity\AuthMethod;
 use Whity\Core\PasswordPolicy;
@@ -169,6 +170,14 @@ class AuthHandler
     public function setSecurityMailer(\Whity\Core\Mail\AccountSecurityMailer $mailer): void
     {
         $this->securityMailer = $mailer;
+    }
+
+    /** Sends the confirmation link for a new address (WHIT-1246): set at boot once mail is wired. */
+    private ?\Whity\Core\Identity\EmailVerificationProvider $emailVerificationProvider = null;
+
+    public function setEmailVerificationProvider(\Whity\Core\Identity\EmailVerificationProvider $provider): void
+    {
+        $this->emailVerificationProvider = $provider;
     }
 
     /**
@@ -1548,6 +1557,7 @@ class AuthHandler
         }
 
         $newEmail          = (string) $profileEmail['email'];
+        $pendingEmail      = null;
         $passwordChanged   = false;
 
         if ($emailProvided) {
@@ -1567,12 +1577,50 @@ class AuthHandler
                     return Response::error('Email already exists', 409);
                 }
 
-                // Update the primary profile_email row.
+                // WHIT-1246: the new address is ADDED, unconfirmed, beside the
+                // current one, and a confirmation link goes to it. Rewriting the
+                // primary row in place kept it verified, so anyone could claim an
+                // address they do not own as a confirmed one, and a later sign-in
+                // through an identity provider that vouches for that address
+                // would be linked to their profile. The current password proves
+                // who is asking, not who owns the new mailbox. It becomes the
+                // sign-in address once confirmed and made primary under Email
+                // addresses (MeEmailsApiHandler), as any added address does.
                 // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
-                $this->db->prepare(
-                    'UPDATE profile_emails SET email = ? WHERE id = ?'
-                )->execute([$email, $profileEmail['id']]);
-                $newEmail = $email;
+                $ownStmt = $this->db->prepare(
+                    'SELECT verified FROM profile_emails WHERE profile_id = ? AND email = ? LIMIT 1'
+                );
+                $ownStmt->execute([$profileId, $email]);
+                $own = $ownStmt->fetch(PDO::FETCH_ASSOC);
+                if (is_array($own) && self::dbTruthy($own['verified'])) {
+                    return Response::error(
+                        'That address is already confirmed. Make it your main address under Email addresses.',
+                        409
+                    );
+                }
+                if ($own === false) {
+                    $countStmt = $this->db->prepare('SELECT COUNT(*) FROM profile_emails WHERE profile_id = ?');
+                    $countStmt->execute([$profileId]);
+                    if ((int) $countStmt->fetchColumn() >= MeEmailsApiHandler::MAX_EMAILS_PER_PROFILE) {
+                        return Response::error('You have reached the maximum number of email addresses', 422);
+                    }
+                    $this->db->prepare(
+                        'INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
+                         VALUES (?, ?, FALSE, FALSE, CURRENT_TIMESTAMP)'
+                    )->execute([$profileId, $email]);
+                }
+                // A new address, or one added earlier and not yet confirmed: the
+                // link goes (again) either way.
+                if ($this->emailVerificationProvider !== null) {
+                    try {
+                        $this->emailVerificationProvider->sendVerification($profileId, $email);
+                    } catch (\Throwable $e) {
+                        // The address is recorded; the link can be sent again from
+                        // Email addresses (resend-verification).
+                        error_log('[update-me] confirmation link not sent: ' . $e->getMessage());
+                    }
+                }
+                $pendingEmail = $email;
             }
         }
 
@@ -1647,6 +1695,7 @@ class AuthHandler
                     'email' => $newEmail,
                     'role'  => $role,
                 ],
+                'pending_email' => $pendingEmail,
                 'access_token'  => $accessToken,
                 'refresh_token' => $refreshToken,
                 'token_type'    => 'Bearer',
@@ -1662,7 +1711,7 @@ class AuthHandler
             'id'    => $profileId,
             'email' => $newEmail,
             'role'  => $role,
-        ]], 200);
+        ], 'pending_email' => $pendingEmail], 200);
     }
 
     /**

@@ -85,13 +85,14 @@ test.describe('Self-service profile management (WC-64)', () => {
     await expect(page.getByLabel('Email Address')).toBeVisible();
   });
 
-  test('changing the email persists and is reflected by GET /api/me', async ({
+  test('a new email waits for its confirmation link; the main address stays (WHIT-1246)', async ({
     browser,
     baseURL,
     adminApi,
   }) => {
     expect(baseURL).toBeTruthy();
     throwaway = await createThrowawayUser(adminApi);
+    const originalEmail = throwaway.email;
     const newEmail = `wc64-renamed-${uniqueSuffix()}@example.com`;
 
     const session = await loginAs(browser, baseURL as string, throwaway.email, throwaway.password);
@@ -110,18 +111,22 @@ test.describe('Self-service profile management (WC-64)', () => {
       await page.getByRole('button', { name: 'Save Changes' }).click();
       const patchRes = await patch;
       expect(patchRes.status(), 'PATCH /api/me should succeed').toBe(200);
+      expect(((await patchRes.json()) as { pending_email?: string }).pending_email).toBe(newEmail);
 
-      await expect(page.getByText('Profile updated successfully')).toBeVisible();
+      await expect(page.getByText(`We sent a link to ${newEmail}`)).toBeVisible();
 
-      // PERSISTENCE: re-fetch GET /api/me in the SAME authenticated session; the
-      // backend re-issued the auth cookies, so the new email is returned.
+      // The password proves who is asking, not who owns the new mailbox, so the
+      // main address does not change until the link is opened.
       const me = await page.request.get('/api/v1/me');
       expect(me.status()).toBe(200);
       const meBody = (await me.json()) as { user: { email: string } };
-      expect(meBody.user.email).toBe(newEmail);
+      expect(meBody.user.email).toBe(originalEmail);
 
-      // Keep cleanup correct: the user now has the new email (id is unchanged).
-      throwaway.email = newEmail;
+      // The new address is listed, unconfirmed, under Email addresses.
+      const emails = await page.request.get('/api/v1/me/emails');
+      expect(emails.status()).toBe(200);
+      const listed = ((await emails.json()) as { data: { email: string; verified: boolean; isPrimary: boolean }[] }).data;
+      expect(listed.find((e) => e.email === newEmail)).toMatchObject({ verified: false, isPrimary: false });
     } finally {
       await session.close();
     }

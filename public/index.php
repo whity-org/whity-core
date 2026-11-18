@@ -1775,6 +1775,8 @@ $emailVerificationProvider = new TokenEmailVerificationProvider(
     $brandedEmailSender,
     $verifyUrlBase,
 );
+// WHIT-1246: PATCH /api/me sends the confirmation link for a new address.
+$authHandler->setEmailVerificationProvider($emailVerificationProvider);
 // WC-email: customer lifecycle emails. The subscriber listens on lifecycle hooks
 // (welcome on registration today; approval/invitation to follow) and sends via
 // the branded EmailLayout, gated per-event on the mail.events.* toggles. Sends

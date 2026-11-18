@@ -5115,6 +5115,9 @@ final class CoreApiSchemas
             // tenant_id) — a genuinely different shape from GET /api/me above.
             'MeResponse' => self::object([
                 'user' => $selfUser,
+                // WHIT-1246: a new email is added unconfirmed and sent a link;
+                // user.email stays the main address until it is confirmed.
+                'pending_email' => self::str(true) + ['description' => 'The new address waiting for its confirmation link, or null.'],
             ] + $tokenPair, ['user']),
 
             // GET and PUT /api/me/phone (WHIT-1181)
