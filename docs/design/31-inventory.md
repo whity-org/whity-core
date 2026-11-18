@@ -1,6 +1,6 @@
 # 31 · Inventory in core
 
-**Status: PROPOSED, waiting for the owner (19 November 2026).** Nothing here is built. The register rows are IV.1–IV.24 (section "Inventory in core"). Ticket WHIT-1228.
+**Status: decided by the owner on 19 November 2026.** All recommendations in section 9 were accepted; D9 is "Free up to 100 items". Built phase by phase from 0.2.31. The register rows are IV.1–IV.24 (section "Inventory in core"). Ticket WHIT-1228.
 
 On 19 November 2026 the owner lifted the WHIT-667 freeze for inventory: "Core basics now, spec first." Core gets items, units, places, stock moves, levels and reorder points, and simple purchase and sales documents, all reachable through the plugin SDK from day one. Costing, accounting and production stay with plugins or come later.
 
@@ -349,12 +349,12 @@ Each phase is one pull request (or two where marked), merged on green, with its 
 | **P2 Counts, transfers, waste, reorder** | 0.2.33 | Operations table, counts (web and phone), transfers with transit, adjustment reasons, waste threshold and route subjects for adjustment and count, reorder rules, `ReorderWatcher`, below-reorder events, Stock assistant tools as proposals. SDK `Operations`. | 320 | `TplAdjustments`, counts, transfers, `TmInventoryMobile` stock and count |
 | **P3 Purchasing** | 0.2.34–0.2.35 (two PRs) | Orders and lines (purchase), supplier items, purchase route subject, receiving (partial, over-receipt tolerance), PO, goods received note and label documents, contact page tabs, import targets (items, opening stock, supplier prices). SDK `Orders` (purchase). | 321 | Purchase orders list, new PO, `TplReceiving` (order and receiving tabs), `TmOpsMobile` receiving, `TplDocPurchaseOrder` |
 | **P4 Lots and expiry** | 0.2.36 | Lots and serials, receipt capture, FEFO picking, expiring jobs and events, batch labels, GS1 parsing in the scan field. SDK `Lots`, `PluginBarcodeParserInterface`. | 322 | Batches tab, Expiring soon, phone batches |
-| **P5 Sales** | 0.2.37 | Sales orders, reservations, deliveries and returns, delivery note and pick list, sales route subject, Whity Pay "Ask for payment" and payment status. SDK `Orders` (sale), `reserve`/`release`, `PluginPriceListInterface`. | ask (1) | Sales orders list and record, delivery, phone sales |
-| **P6 Recipes and consumables** (if D3 is yes) | 0.2.38 | One-level recipes, make a batch (production operation), service consumables, `consumeRecipe`, Appointments wiring in the Appointments plugin. | ask (1) | `TplRecipe`, make a batch on web and phone |
-| **P7 Extension points and polish** | 0.2.38–0.2.39 | `PluginCostingMethodInterface` with core's simple method (D1), stock value tile, `PluginAccountingExportInterface`, `PluginStockOperationTypesInterface`, `PluginItemFieldsInterface`, `PluginReorderPolicyInterface`, month-end snapshots, period lock, webhook catalogue entries, reference plugin example (HelloWorld gains a tiny "stock move on an event"), docs and the plugin guide chapter. | ask (1) | Settings, stock value |
+| **P5 Sales** | 0.2.37 | Sales orders, reservations, deliveries and returns, delivery note and pick list, sales route subject, Whity Pay "Ask for payment" and payment status. SDK `Orders` (sale), `reserve`/`release`, `PluginPriceListInterface`. | 325 | Sales orders list and record, delivery, phone sales |
+| **P6 Recipes and consumables** (if D3 is yes) | 0.2.38 | One-level recipes, make a batch (production operation), service consumables, `consumeRecipe`, Appointments wiring in the Appointments plugin. | 326 | `TplRecipe`, make a batch on web and phone |
+| **P7 Extension points and polish** | 0.2.38–0.2.39 | `PluginCostingMethodInterface` with core's simple method (D1), stock value tile, `PluginAccountingExportInterface`, `PluginStockOperationTypesInterface`, `PluginItemFieldsInterface`, `PluginReorderPolicyInterface`, month-end snapshots, period lock, webhook catalogue entries, reference plugin example (HelloWorld gains a tiny "stock move on an event"), docs and the plugin guide chapter. | 327 | Settings, stock value |
 | Buffer | 0.2.39 | Arabic and phone pass on every inventory screen, the card comparisons, performance checks, fixes. | — | — |
 
-Reserved migrations 317–322 cover P1–P4. P5–P7 need three more, asked of the orchestrator when P4 opens. If the owner trims scope (D3 no), P6 drops out and the buffer grows.
+Reserved migrations: 317–322 for P1–P4 and 325–327 for P5–P7.
 
 ## 9. Decisions for the owner
 
@@ -368,10 +368,10 @@ Reserved migrations 317–322 cover P1–P4. P5–P7 need three more, asked of t
 | D6 | Can people be limited to their own branch's stock? | (a) yes, places scoped to units; (b) no, workspace-wide | **(a) yes**, through the place's organisational unit, as routing already does for branch managers. |
 | D7 | Lock a period (no moves dated before it)? | (a) yes, a setting for admins; (b) no | **(a) yes.** Counts and month-end figures stay true; it is a few lines in `stock.moving`. |
 | D8 | Plan ledger partitioning now? | (a) design for it, build only when needed; (b) build now | **(a)**: not needed below tens of millions of rows per table; the model leaves room. |
-| D9 | Is inventory free core on every plan, including Free (2 staff, 100 customers)? | (a) yes, all of it; (b) basics free, lots, recipes and sales on paid plans; (c) a limit on items for Free | **Owner's call.** The open core rule says core is free; a Free plan limit (c, e.g. 100 items) matches the existing customer limit without hiding features. |
+| D9 | Is inventory free core on every plan, including Free (2 staff, 100 customers)? | (a) yes, all of it; (b) basics free, lots, recipes and sales on paid plans; (c) a limit on items for Free | **Decided: (c).** Everything works on Free with up to 100 items, each variant counted separately; Team and above have no item limit. |
 | D10 | Sidebar | Operations: Contacts, Inventory, Purchases, Sales, Money and expenses, Subscriptions, Reports | **Inventory with Purchases and Sales as tabs inside it at first**, so the sidebar grows by one item; split out when Money arrives. |
 | D11 | The 39 frozen tasks | Leave them frozen (none are inventory); add a note to WHIT-667 | **Leave frozen, add the note.** |
 
 ## 10. Register rows proposed
 
-IV.1–IV.24 in the register, section "Inventory in core (PROPOSED, 19 November 2026)". They take effect when the owner approves them; D1–D11's answers replace the recommended values where they differ.
+IV.1–IV.24 in the register, section "Inventory in core (decided 19 November 2026)". The owner accepted D1–D8, D10 and D11 as recommended and chose "Free up to 100 items" for D9. Migrations: 317–322 for P1–P4, 325–327 for P5–P7.

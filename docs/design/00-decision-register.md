@@ -936,9 +936,9 @@ Owner's direction (19 Nov 2026): themes are tokens only, in the spirit of Materi
 | TH.13 | Plugins and the store | Plugins ship theme files through a new SDK interface (the route-based `PluginThemeInterface` is deprecated); store themes are signed packages; publishers may sell themes through Whity Pay; applying is free. **Owner:** yes, through Whity Pay, as recommended. |
 | TH.14 | Free and paid | Free in core: apply any installed theme, set the primary seed and overrides, import a theme file. Whity Studio (paid): live editor, seeds from the logo, presets, import from shadcn and Material Theme Builder, export, preview across key screens, documents and the phone, versions, publishing to the store. **Owner:** accepted as recommended. |
 
-## Inventory in core (PROPOSED, 19 November 2026)
+## Inventory in core (decided 19 November 2026)
 
-**Not yet decided.** Proposed in section 31 for the owner's approval (WHIT-1228). The owner lifted WHIT-667 for inventory on 19 November 2026 ("Core basics now, spec first"). Rows marked D1–D11 carry the recommended answer to that question in section 31; the owner's answer replaces it.
+Decided by the owner on 19 November 2026 (WHIT-1228, section 31): D1–D8, D10 and D11 as recommended; D9 as IV.24; build as planned, P1–P7 across 0.2.31–0.2.39 with 0.2.39 as the buffer. The owner lifted WHIT-667 for inventory ("Core basics now, spec first").
 
 | # | Decision | Choice |
 | --- | --- | --- |
@@ -965,7 +965,7 @@ Owner's direction (19 Nov 2026): themes are tokens only, in the spirit of Materi
 | IV.21 | Language | Names are bilingual through the one bilingual text; SKUs, barcodes, lot codes, quantities and amounts stay Western digits and left to right in Arabic; quantity before unit in both languages |
 | IV.22 | SDK | Services Items, Locations, Stock, Lots, Orders, Operations, Units; events from `stock.moving` (can veto) and `stock.moved` to `stock.level.below_reorder` and `inventory.order.*`; extension points for costing, accounting export, operation kinds, item fields, barcode parsing, price lists and reorder policy. Plugin moves are namespaced by the host |
 | IV.23 | Sidebar | Operations › Inventory, with Purchases and Sales as tabs inside it until Money arrives (D10) |
-| IV.24 | Plans | Open: whether every part is free on every plan, or Free gets an item limit (D9) |
+| IV.24 | Plans | Everything works on Free with up to 100 items, each variant counted separately; Team and above have no item limit (D9) |
 
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.
