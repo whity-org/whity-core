@@ -27,6 +27,11 @@ concurrency:
   group: e2e-${{ github.event_name == 'schedule' && 'nightly' || github.ref }}
   cancel-in-progress: true
 
+# Least privilege (WHIT-1223): every job here only reads the repository, so
+# the token gets nothing more, whatever the repository default becomes.
+permissions:
+  contents: read
+
 jobs:
   # Path filtering lives HERE rather than on the workflow triggers.
   #
@@ -195,20 +200,13 @@ jobs:
 
       # Setup Node, npm ci and the Playwright browser/deps steps sit between
       # the background start above and the join below.
-      - name: Setup Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '22'
-          cache: npm
-          # Single lockfile at the workspace root (npm workspaces).
-          cache-dependency-path: package-lock.json
-
-      # npm workspaces install from the root lockfile; the Playwright steps below
-      # still run with working-directory: web (bins resolve from the hoisted root
-      # node_modules and the config is loaded from web/).
-      - name: Install dependencies
-        working-directory: .
-        run: npm ci
+      # Node plus the npm workspace from the root lockfile, with node_modules
+      # restored from the cache when the lockfile is unchanged (CI-0231; npm ci
+      # took 55-67 s a shard). The Playwright steps below still run with
+      # working-directory: web (bins resolve from the hoisted root node_modules
+      # and the config is loaded from web/).
+      - name: Setup Node and install the workspace
+        uses: ./.github/actions/setup-node-deps
 
       # Playwright browser binaries are versioned by the @playwright/test
       # release and live in ~/.cache/ms-playwright. Cache them keyed on that

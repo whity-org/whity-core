@@ -49,6 +49,12 @@ concurrency:
   group: tests-${{ github.event_name == 'schedule' && 'nightly' || github.ref }}
   cancel-in-progress: true
 
+# Least privilege (WHIT-1223). Every job here only reads the repository (the
+# upgrade check pulls a public ghcr.io image and reads the latest release),
+# so the token gets nothing more, whatever the repository default becomes.
+permissions:
+  contents: read
+
 # ---------------------------------------------------------------------------
 # What runs where (WHIT-801)
 #
@@ -1869,8 +1875,26 @@ jobs:
         if: always()
         run: docker rm -f whity_render_ci || true
 
-  web:
-    name: Frontend types, tests & generated-artifact drift
+  # ---------------------------------------------------------------------------
+  # The frontend, as three parallel jobs (CI-0231).
+  #
+  # Until 0.2.31 this was ONE job, "Frontend types, tests & generated-artifact
+  # drift", and at ~6m20s it was the longest job in the workflow: 61 s of
+  # npm ci, then type checks, lint, the production build, Jest and Storybook
+  # one after another. None of those steps reads another's output (Jest does
+  # not need the build, the build does not need tsc), so they now run side by
+  # side, each on its own runner, and node_modules comes from the cache
+  # instead of a fresh npm ci (.github/actions/setup-node-deps).
+  #
+  #   web-checks  audit, generated-artifact drift, package tests, every tsc
+  #   web-tests   Jest
+  #   web-build   lint, production build, Storybook galleries
+  #
+  # Same steps, same commands, same trigger (`frontend`) as before; only the
+  # grouping changed. All three are in the CI gate's `needs`.
+  # ---------------------------------------------------------------------------
+  web-checks:
+    name: Frontend types & generated-artifact drift
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
@@ -1883,20 +1907,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Setup Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '22'
-          cache: npm
-          # Single lockfile at the workspace root (npm workspaces).
-          cache-dependency-path: package-lock.json
-
-      # npm workspaces install the whole repo from the root lockfile; the web
-      # scripts below still run with working-directory: web (bins resolve from
+      # Node plus the whole npm workspace from the root lockfile, with
+      # node_modules restored from the cache when the lockfile is unchanged.
+      # The scripts below run with working-directory: web (bins resolve from
       # the hoisted root node_modules).
-      - name: Install dependencies
-        working-directory: .
-        run: npm ci
+      - name: Setup Node and install the workspace
+        uses: ./.github/actions/setup-node-deps
 
       # Fail on a high or critical advisory in an installed npm dependency
       # (WC-232ec317). RESTORED to `high` on 2026-10-26 — where this gate
@@ -1955,8 +1971,20 @@ jobs:
       - name: Registry build smoke
         run: npm run registry:build
 
+      # Incremental: tsc keeps per-file hashes in the build-info file and
+      # re-checks only what changed and what depends on it, so restoring the
+      # last run's file is safe on any branch (a stale entry is just
+      # re-checked). The key is per-commit so every run saves its own.
+      - name: Restore the tsc build info
+        uses: actions/cache@v6
+        with:
+          path: web/ci.tsbuildinfo
+          key: tsc-web-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            tsc-web-${{ hashFiles('package-lock.json') }}-
+
       - name: Type check
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit --incremental --tsBuildInfoFile ci.tsbuildinfo
 
       # `packages/ui` ships RAW SOURCES (exports "." -> "./src/index.ts"), so
       # until now its only type checking was whatever each consumer's tsconfig
@@ -1992,6 +2020,62 @@ jobs:
         working-directory: templates/tauri-desktop
         run: npx vite build
 
+  web-tests:
+    name: Frontend unit tests (Jest)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # Node plus the whole npm workspace from the root lockfile, with
+      # node_modules restored from the cache when the lockfile is unchanged.
+      # The scripts below run with working-directory: web (bins resolve from
+      # the hoisted root node_modules).
+      - name: Setup Node and install the workspace
+        uses: ./.github/actions/setup-node-deps
+
+      # Jest's transform cache is keyed on file content and config, so a
+      # restored cache from another commit can only skip work, never change a
+      # result.
+      - name: Restore the Jest cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/jest-cache
+          key: jest-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            jest-${{ hashFiles('package-lock.json') }}-
+
+      - name: Run Jest
+        run: npx jest --cacheDirectory "$RUNNER_TEMP/jest-cache"
+
+  web-build:
+    name: Frontend lint, production build & Storybook
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # Node plus the whole npm workspace from the root lockfile, with
+      # node_modules restored from the cache when the lockfile is unchanged.
+      # The scripts below run with working-directory: web (bins resolve from
+      # the hoisted root node_modules).
+      - name: Setup Node and install the workspace
+        uses: ./.github/actions/setup-node-deps
+
       # ESLint gate (WC-122): zero errors required; warnings are tolerated.
       # Runs after the WC-195 debt clearance so the gate starts clean.
       - name: Lint
@@ -2018,9 +2102,6 @@ jobs:
 
       - name: Build (production)
         run: npm run build
-
-      - name: Run Jest
-        run: npx jest
 
       # Gate both component galleries so a broken story can't land silently
       # (WC-3f9b0364). Both workspaces define build-storybook; run from the repo
@@ -2065,7 +2146,9 @@ jobs:
       - postgres-timings
       - render-service
       - watchdog
-      - web
+      - web-checks
+      - web-tests
+      - web-build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
