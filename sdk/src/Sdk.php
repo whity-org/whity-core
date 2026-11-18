@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.126).
+ * SDK identity (v1.125).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1437,7 +1437,7 @@ namespace Whity\Sdk;
  *
  * Purely additive: deprecations only; every existing name keeps working.)
  *
- * 1.126 (THEMES: a plugin ships theme files with {@see Contribute\PluginThemesInterface}; the host checks
+ * 1.125 (THEMES: a plugin ships theme files with {@see Contribute\PluginThemesInterface}; the host checks
  * each against the theme format (`schemas/theme/v1.json`) and lists them in the workspace's theme
  * picker, where a person chooses one; a plugin never applies a theme. {@see Context\PluginScope::themes()}
  * gives {@see Theme\WorkspaceTheme}, the workspace's compiled theme and the themes it can choose,
@@ -1450,7 +1450,7 @@ namespace Whity\Sdk;
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.126.0';
+    public const VERSION = '1.125.0';
 
     /**
      * Static identity only — never instantiated.

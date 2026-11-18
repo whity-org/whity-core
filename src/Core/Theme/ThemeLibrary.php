@@ -6,7 +6,7 @@ namespace Whity\Core\Theme;
 
 /**
  * The themes a workspace can choose (TH.13, TH.14): Whity's own, shipped in
- * `themes/`, then the ones plugins on in the workspace ship (SDK 1.126,
+ * `themes/`, then the ones plugins on in the workspace ship (SDK 1.125,
  * PluginThemesInterface), then the ones it imported or installed from the
  * store. Applying any of them is free. An id already taken by an earlier
  * source is not offered again.

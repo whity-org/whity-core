@@ -209,7 +209,7 @@ final class ThemeEngineTest extends TestCase
         self::assertContains('theme-missing', array_column($missing['theme']['adjustments'], 'change'));
     }
 
-    /** SDK 1.126: plugin themes join the list after Whity's own, never replacing them. */
+    /** SDK 1.125: plugin themes join the list after Whity's own, never replacing them. */
     public function testPluginThemesAreListedAndResolvable(): void
     {
         $plugin = ['schemaVersion' => 1, 'id' => 'acme.sea', 'version' => '1.0.0', 'name' => ['en' => 'Sea'], 'colour' => ['seeds' => ['primary' => '#006d77']]];

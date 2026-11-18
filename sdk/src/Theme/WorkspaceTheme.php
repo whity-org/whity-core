@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Theme;
 
 /**
- * The workspace's theme, read-only (SDK 1.126, WHIT-1225). Reached through
+ * The workspace's theme, read-only (SDK 1.125, WHIT-1225). Reached through
  * the plugin's context, so the workspace is the one in use (decision D2):
  *
  * ```php

@@ -20562,7 +20562,7 @@ export interface components {
                     author?: string | null;
                     /** @description whity, plugin, import or store. */
                     source: string;
-                    /** @description The plugin that ships it, for a theme from a plugin (SDK 1.126). */
+                    /** @description The plugin that ships it, for a theme from a plugin (SDK 1.125). */
                     plugin?: string | null;
                     signature_verified?: boolean;
                     current: boolean;

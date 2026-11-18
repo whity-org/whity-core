@@ -31,7 +31,7 @@ export interface ThemeListItem {
   name: Record<string, string>;
   description?: Record<string, string> | null;
   source: string;
-  /** The plugin that ships it, for a plugin's theme (SDK 1.126). */
+  /** The plugin that ships it, for a plugin's theme (SDK 1.125). */
   plugin?: string | null;
   current: boolean;
   main_color_replaces_seed?: boolean;

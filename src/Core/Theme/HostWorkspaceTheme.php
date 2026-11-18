@@ -11,7 +11,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Theme\WorkspaceTheme;
 
 /**
- * The host side of {@see WorkspaceTheme} (SDK 1.126): the theme of the
+ * The host side of {@see WorkspaceTheme} (SDK 1.125): the theme of the
  * workspace in the request's context (D2), read-only. With no workspace it
  * answers for the installation.
  */

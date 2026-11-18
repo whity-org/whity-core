@@ -242,9 +242,9 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.126.0',
+            '1.125.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.126 ADDS Contribute\PluginThemesInterface and Theme\WorkspaceTheme (PluginScope::themes()): plugins ship theme files and read the workspace theme; deprecates PluginThemeInterface (WHIT-1225). '
+            'SDK 1.125 ADDS Contribute\PluginThemesInterface and Theme\WorkspaceTheme (PluginScope::themes()): plugins ship theme files and read the workspace theme; deprecates PluginThemeInterface (WHIT-1225). '
             . 'SDK 1.124 (release 0.2.31) ADDS PluginContext, Context\\PluginScope and Secrets\\WorkspaceSecrets, deprecates the seven ->for($this) factories and PluginHomeCardInterface, and fires submission.reviewed again (WHIT-1243). '
             . 'SDK 1.123 ADDS SdkException: one marker interface on every exception the SDK defines (WHIT-1230). '
             . 'SDK 1.122 ADDS HttpResponse headers and Http\\Outbound\\AddressPolicy: an opt-in public-address policy for URLs people supply (#2151). '

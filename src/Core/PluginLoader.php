@@ -809,14 +809,14 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     }
 
     /**
-     * Each plugin's checked themes (SDK 1.126, WHIT-1225), by plugin key.
+     * Each plugin's checked themes (SDK 1.125, WHIT-1225), by plugin key.
      *
      * @var array<string, list<array<string, mixed>>>
      */
     private array $themes = [];
 
     /**
-     * The themes of the plugins on in the current workspace (SDK 1.126,
+     * The themes of the plugins on in the current workspace (SDK 1.125,
      * TH.13), each with the plugin that shipped it. An id offered by two
      * plugins is kept from the first loaded.
      *
@@ -849,7 +849,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     }
 
     /**
-     * Check a plugin's themes (SDK 1.126) against the theme format, each on
+     * Check a plugin's themes (SDK 1.125) against the theme format, each on
      * its own, so a bad one is dropped with its reasons and the rest kept.
      *
      * @return list<array<string, mixed>>
@@ -4971,7 +4971,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         //     checked alone.
         $this->workspaceTemplates[$pluginKey] = $this->collectWorkspaceTemplates($plugin, $pluginKey);
 
-        // 4d'. Themes (SDK 1.126, WHIT-1225): data only, each checked alone.
+        // 4d'. Themes (SDK 1.125, WHIT-1225): data only, each checked alone.
         $this->themes[$pluginKey] = $this->collectThemes($plugin, $pluginKey);
 
         // 4e. Fields on contacts (SDK 1.119, WHIT-1209): data only, each

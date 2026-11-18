@@ -33,7 +33,7 @@ final class BrandingService
         private readonly ?EntitlementService $entitlements = null,
         // WHIT-1225: the themes a workspace imported. Null: Whity's own themes only.
         private readonly ?ThemeRepository $themes = null,
-        // SDK 1.126: the themes plugins ship (PluginLoader::getPluginThemes).
+        // SDK 1.125: the themes plugins ship (PluginLoader::getPluginThemes).
         private readonly ?\Closure $pluginThemes = null,
     ) {
     }

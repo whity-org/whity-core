@@ -12075,7 +12075,7 @@ final class CoreApiSchemas
                     'description' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => ['type' => 'string']],
                     'author' => self::str(true),
                     'source' => self::str() + ['description' => 'whity, plugin, import or store.'],
-                    'plugin' => self::str(true) + ['description' => 'The plugin that ships it, for a theme from a plugin (SDK 1.126).'],
+                    'plugin' => self::str(true) + ['description' => 'The plugin that ships it, for a theme from a plugin (SDK 1.125).'],
                     'signature_verified' => self::bool(),
                     'current' => self::bool(),
                     'main_color_replaces_seed' => self::bool() + ['description' => 'True when the workspace\'s main colour replaces the theme\'s own colour.'],

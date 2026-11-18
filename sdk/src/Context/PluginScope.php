@@ -65,7 +65,7 @@ interface PluginScope
     public function http(?AddressPolicy $policy = null): HttpClient;
 
     /**
-     * The workspace's theme, read-only (1.126): what it looks like now and
+     * The workspace's theme, read-only (1.125): what it looks like now and
      * which themes it can choose. A person chooses; a plugin only reads.
      */
     public function themes(): WorkspaceTheme;

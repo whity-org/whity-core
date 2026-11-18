@@ -4185,7 +4185,7 @@ $brandingService = new \Whity\Core\Branding\BrandingService(
     $entitlementService,
     // WHIT-1225: themes a workspace imported, beside Whity's own.
     new \Whity\Core\Theme\ThemeRepository($db->getPdo()),
-    // SDK 1.126: and the themes plugins ship.
+    // SDK 1.125: and the themes plugins ship.
     static fn (): array => $pluginLoader->getPluginThemes(),
 );
 $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(

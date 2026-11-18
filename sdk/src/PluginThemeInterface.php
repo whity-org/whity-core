@@ -36,7 +36,7 @@ namespace Whity\Sdk;
  * is silently dropped, never trusted blindly even though the route itself is
  * already permission-gated.
  *
- * @deprecated 1.126 Ship theme files with {@see \Whity\Sdk\Contribute\PluginThemesInterface}
+ * @deprecated 1.125 Ship theme files with {@see \Whity\Sdk\Contribute\PluginThemesInterface}
  *             instead: a workspace chooses among them, and they carry fonts,
  *             shape and motion too. This keeps working through 2.0.x.
  */

@@ -34,7 +34,7 @@ final class ThemesApiHandler
     public function __construct(
         private readonly ThemeRepository $repository,
         private readonly SettingsService $settings,
-        // SDK 1.126: the themes plugins ship (PluginLoader::getPluginThemes).
+        // SDK 1.125: the themes plugins ship (PluginLoader::getPluginThemes).
         private readonly ?\Closure $pluginThemes = null,
     ) {
     }

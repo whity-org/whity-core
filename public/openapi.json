@@ -110222,7 +110222,7 @@
                                         "plugin": {
                                             "type": "string",
                                             "nullable": true,
-                                            "description": "The plugin that ships it, for a theme from a plugin (SDK 1.126)."
+                                            "description": "The plugin that ships it, for a theme from a plugin (SDK 1.125)."
                                         },
                                         "signature_verified": {
                                             "type": "boolean"

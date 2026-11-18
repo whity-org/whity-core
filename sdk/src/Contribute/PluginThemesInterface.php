@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Contribute;
 
 /**
- * Ship themes with a plugin (SDK 1.126, WHIT-1225, decision TH.13).
+ * Ship themes with a plugin (SDK 1.125, WHIT-1225, decision TH.13).
  *
  * A theme is data, never CSS: each one is a theme file in the format of
  * `schemas/theme/v1.json` (also `@whity/tokens/theme.schema.json`), decoded

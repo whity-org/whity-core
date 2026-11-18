@@ -38,7 +38,7 @@ final class HostPluginServices
      */
     public static function register(PDO $pdo, AuditLoggerInterface $audit, ?LoggerInterface $logger = null, ?\Closure $pluginThemes = null): void
     {
-        // SDK 1.126 (WHIT-1225): the workspace's theme, read-only, for plugin
+        // SDK 1.125 (WHIT-1225): the workspace's theme, read-only, for plugin
         // code everywhere it runs. The workspace comes from the context (D2).
         $settings = new \Whity\Core\Settings\SettingsService(
             new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
