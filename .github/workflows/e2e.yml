@@ -168,6 +168,10 @@ jobs:
       - name: Start the backend stack (in the background)
         env:
           MCP_ENABLED: 'true'
+          # One browser is one client IP here, and against the production
+          # build the suite passes the default 2000 requests a minute
+          # (WHIT-1222). The limiter itself stays on.
+          RATE_LIMIT_IP_LIMIT: '20000'
         run: |
           nohup bash -c '
             for i in 1 2 3; do
