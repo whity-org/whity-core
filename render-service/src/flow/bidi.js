@@ -67,8 +67,12 @@ function rtlRun() {
 }
 
 /**
- * A run without what it swallowed at its end: whitespace, a comma, and a closing
- * bracket it never opened. Linear: each pass removes at least one character.
+ * A run without what it swallowed at its end: whitespace, a comma, a closing
+ * bracket it never opened, and an opening bracket it never closed (#1915).
+ * "10:05 (بتوقيت عمّان)" matches the Latin run "10:05 (": the bracket opens the
+ * Arabic note, so it belongs outside the isolate, with the space before it.
+ * Both patterns allow brackets, so this holds in either direction.
+ * Linear: each pass removes at least one character.
  */
 function withoutTrailingNeutrals(run) {
   let end = run.length;
@@ -83,6 +87,9 @@ function withoutTrailingNeutrals(run) {
       end -= 1;
     } else if (ch === ')' && open < 0) {
       open += 1;
+      end -= 1;
+    } else if (ch === '(' && open > 0) {
+      open -= 1;
       end -= 1;
     } else {
       break;
