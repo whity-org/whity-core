@@ -69,7 +69,7 @@ class CsrfGuardTest extends TestCase
         $this->assertFalse($reached, "Forged POST {$path} must not reach the handler");
         $this->assertSame(403, $response->getStatusCode());
         $data = json_decode($response->getBody(), true);
-        $this->assertSame('Cross-site request rejected', $data['error']);
+        $this->assertSame('Cross-site request rejected: send the header X-Requested-With: XMLHttpRequest', $data['error']);
     }
 
     /**
