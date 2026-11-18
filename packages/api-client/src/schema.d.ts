@@ -8455,6 +8455,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plugins/{name}/roles/{role}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Let a plugin grant its own permissions to an existing role it did not create (tenant_id picks a workspace role) */
+        post: operations["post_api_v1_plugins_name_roles_role_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/plugins/{name}/update": {
         parameters: {
             query?: never;
@@ -18193,6 +18210,15 @@ export interface components {
                 purge_after: string;
                 purge_failed: boolean;
             }[];
+        };
+        PluginRoleApprovalResponse: {
+            data: {
+                plugin: string;
+                role: string;
+                role_id: number;
+                tenant_id: number | null;
+                already_allowed: boolean;
+            };
         };
         PluginSecretFieldSaveRequest: {
             /** Format: password */
@@ -65681,6 +65707,92 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_plugins_name_roles_role_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                role: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Approved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginRoleApprovalResponse"];
+                };
+            };
+            /** @description Plugin, role or tenant_id missing or invalid */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the platform operator */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Plugin not loaded or role not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The plugin does not grant permissions to this role */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

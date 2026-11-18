@@ -9,6 +9,8 @@ use Whity\Core\Response;
 use Whity\Core\PluginLoader;
 use Whity\Core\PluginInstaller;
 use Whity\Core\PluginMigrationRunner;
+use Whity\Core\PluginRoleSeeder;
+use Whity\Core\Audit\AuditContext;
 use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Db\DbBool;
 use Whity\Core\Exception\PluginAlreadyInstalled;
@@ -23,6 +25,7 @@ use Whity\Core\Plugin\PluginOperatorGate;
 use Whity\Core\Plugin\PluginRecords;
 use Whity\Core\Plugin\StoreCatalogueEntry;
 use Whity\Core\Plugin\Store\StoreMarks;
+use Whity\Sdk\PluginRolesInterface;
 
 /**
  * Plugins API Handler
@@ -768,6 +771,105 @@ class PluginsApiHandler
         ], $this->records->removals());
 
         return Response::json(['data' => $rows], 200);
+    }
+
+    /**
+     * POST /api/plugins/{name}/roles/{role}/approve {tenant_id?} - Let a plugin
+     * grant its own permissions to an existing role it did not create (#1907).
+     *
+     * Since migration 221 (GHSA-r4hx-wj99-jw8m) a plugin grants only to roles it
+     * created or roles the operator approved for it. Roles a plugin made before
+     * 0.2.26 carry no creator, so they need this, one role at a time: there is
+     * deliberately no automatic backfill. Operators only, audited, idempotent.
+     *
+     * The plugin must be loaded and must name the role in its role grants, so an
+     * approval always answers a refusal the seeder can make. The plugin's grants
+     * are applied at once, still limited to the permissions it declares itself.
+     * `tenant_id` picks a workspace's role; without it the global role.
+     *
+     * @param Request $request The incoming request.
+     * @param array<string, string> $params Route parameters ('name', 'role').
+     * @return Response
+     */
+    public function approveRole(Request $request, array $params): Response
+    {
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
+
+        $identifier = $this->identifier($params);
+        $roleName = $params['role'] ?? '';
+        if ($identifier === null || $roleName === '') {
+            return Response::error('Plugin and role are required', 400);
+        }
+        if ($this->pdo === null || $this->pluginLoader === null) {
+            return Response::error('Plugins are not available here', 503);
+        }
+
+        $tenantId = PluginRoleSeeder::SYSTEM_TENANT_ID;
+        $rawBody = $request->getBody();
+        if ($rawBody !== '') {
+            $decoded = json_decode($rawBody, true);
+            if (is_array($decoded) && isset($decoded['tenant_id'])) {
+                if (!is_int($decoded['tenant_id']) || $decoded['tenant_id'] < 0) {
+                    return Response::error('tenant_id must be a workspace id', 400);
+                }
+                $tenantId = $decoded['tenant_id'];
+            }
+        }
+
+        $key = $this->resolvePluginKey($identifier);
+        $plugin = $key !== null ? $this->pluginLoader->getPluginInstance($key) : null;
+        if ($plugin === null) {
+            return Response::error("Plugin {$identifier} is not loaded", 404);
+        }
+        $pluginName = $plugin->getName();
+
+        $declared = [];
+        if ($plugin instanceof PluginRolesInterface) {
+            try {
+                $declared = array_merge(array_keys($plugin->getRoles()), array_keys($plugin->getRolePermissions()));
+            } catch (\Throwable) {
+                $declared = [];
+            }
+        }
+        if (!in_array($roleName, $declared, true)) {
+            return Response::error("Plugin {$pluginName} does not grant permissions to role {$roleName}", 422);
+        }
+
+        $seeder = new PluginRoleSeeder($this->pdo);
+        $roleId = $seeder->roleId($roleName, $tenantId);
+        if ($roleId === null) {
+            return Response::error("Role {$roleName} does not exist", 404);
+        }
+
+        $createdByPlugin = $seeder->mayGrant($roleId, $pluginName, $tenantId);
+        $recorded = $seeder->approveRole($pluginName, $roleId, AuditContext::getActorUserId());
+
+        $this->auditLogger?->record('plugin.role_approve', [
+            'target_type' => 'role',
+            'target_id' => $roleId,
+            'metadata' => [
+                'plugin' => $pluginName,
+                'role' => $roleName,
+                'role_tenant_id' => $tenantId === PluginRoleSeeder::SYSTEM_TENANT_ID ? null : $tenantId,
+                'result' => $recorded ? 'approved' : 'already_approved',
+            ],
+        ]);
+
+        // Apply the plugin's grants now rather than at the next boot.
+        $seeder->seed($plugin, $tenantId);
+
+        return Response::json([
+            'data' => [
+                'plugin' => $pluginName,
+                'role' => $roleName,
+                'role_id' => $roleId,
+                'tenant_id' => $tenantId === PluginRoleSeeder::SYSTEM_TENANT_ID ? null : $tenantId,
+                'already_allowed' => $createdByPlugin || !$recorded,
+            ],
+        ], 200);
     }
 
     /**

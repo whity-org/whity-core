@@ -3685,6 +3685,17 @@ final class CoreApiSchemas
                     404 => self::errorResponse('Not found'),
                 ],
             ]),
+            self::permissionRoute('POST', '/api/plugins/{name}/roles/{role}/approve', 'plugins:install', [
+                'summary' => 'Let a plugin grant its own permissions to an existing role it did not create (tenant_id picks a workspace role)',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Approved', 'PluginRoleApprovalResponse'),
+                    400 => self::errorResponse('Plugin, role or tenant_id missing or invalid'),
+                    403 => self::errorResponse('Not the platform operator'),
+                    404 => self::errorResponse('Plugin not loaded or role not found'),
+                    422 => self::errorResponse('The plugin does not grant permissions to this role'),
+                ],
+            ]),
             self::permissionRoute('GET', '/api/plugins/trust-status', 'plugins:read', [
                 'summary' => 'Whether Verified can work here, and how fresh the signed revocation list is',
                 'tags' => ['platform-ops'],
@@ -11745,6 +11756,15 @@ final class CoreApiSchemas
                     'message' => self::str(),
                     'state' => self::str(true),
                 ], ['message']),
+            ], ['data']),
+            'PluginRoleApprovalResponse' => self::object([
+                'data' => self::object([
+                    'plugin' => self::str(),
+                    'role' => self::str(),
+                    'role_id' => self::int(),
+                    'tenant_id' => self::int(true),
+                    'already_allowed' => self::bool(),
+                ], ['plugin', 'role', 'role_id', 'tenant_id', 'already_allowed']),
             ], ['data']),
             'PluginUpdatesResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => self::object([

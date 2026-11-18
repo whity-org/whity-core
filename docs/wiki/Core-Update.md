@@ -327,6 +327,42 @@ For a compose-based deployment (the per-product deployment anatomy in
    Its `core_version` must equal the other two. See
    [Document-Render-Service.md](./Document-Render-Service.md).
 
+## Notes for particular versions
+
+### Upgrading across 0.2.26: plugin roles made before it
+
+Since 0.2.26 (migration 221, GHSA-r4hx-wj99-jw8m) a plugin grants its own
+permissions only to roles it created, or to roles the operator approved for it.
+Roles a plugin created before 0.2.26 carry no record of that, so after the
+upgrade the plugin may not grant to them. Nothing breaks at upgrade time: the
+grants those roles already hold stay. It matters the first time a plugin
+release adds a permission for such a role, which then does not reach it.
+
+The log says so once per role (not on every boot), with the command to run:
+
+```
+PluginRoleSeeder: plugin "AcmeStock" did not create role "stock_keeper" and it is not approved for the plugin; not granting. If you trust this plugin with that role, approve it with: whity-cli plugin role-approve AcmeStock stock_keeper
+```
+
+If you trust the plugin with that role, approve it:
+
+```bash
+whity-cli plugin role-approve <plugin> <role>                 # a global role
+whity-cli plugin role-approve <plugin> <role> --tenant <id>   # a workspace's role
+```
+
+It calls `POST /api/plugins/{name}/roles/{role}/approve` (body
+`{"tenant_id": <id>}` for a workspace's role), which only the platform
+operator may call. The approval is recorded in `plugin_role_approvals` with
+who approved it, written to the audit log as `plugin.role_approve`, and the
+plugin's grants apply at once, still only the permissions the plugin declares
+itself (never core ones). The plugin must be loaded and must grant to that
+role.
+
+There is deliberately no automatic backfill: deciding which existing roles a
+plugin may grant to is the security decision migration 221 made, so each role
+is approved by a person.
+
 ## Rolling back
 
 Check out the previous tag and restart (steps 5–6). Migrations are

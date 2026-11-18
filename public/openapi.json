@@ -56538,6 +56538,120 @@
                 ]
             }
         },
+        "/api/v1/plugins/{name}/roles/{role}/approve": {
+            "post": {
+                "operationId": "post_api_v1_plugins_name_roles_role_approve",
+                "summary": "Let a plugin grant its own permissions to an existing role it did not create (tenant_id picks a workspace role)",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "role",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Approved",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginRoleApprovalResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Plugin, role or tenant_id missing or invalid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the platform operator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Plugin not loaded or role not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The plugin does not grant permissions to this role",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/plugins/{name}/update": {
             "post": {
                 "operationId": "post_api_v1_plugins_name_update",
@@ -101561,6 +101675,42 @@
                                 "purge_failed"
                             ]
                         }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "PluginRoleApprovalResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "plugin": {
+                                "type": "string"
+                            },
+                            "role": {
+                                "type": "string"
+                            },
+                            "role_id": {
+                                "type": "integer"
+                            },
+                            "tenant_id": {
+                                "type": "integer",
+                                "nullable": true
+                            },
+                            "already_allowed": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "plugin",
+                            "role",
+                            "role_id",
+                            "tenant_id",
+                            "already_allowed"
+                        ]
                     }
                 },
                 "required": [
