@@ -71,6 +71,21 @@ describe('isolateForeignRuns in an RTL document', () => {
     expect(isolateForeignRuns('الصنف Tray (large) هنا', 'rtl')).toContain('<bdi>Tray (large)</bdi>');
   });
 
+  // #1915: a Latin run followed by a bracketed Arabic note swallowed the
+  // opening bracket ("10:05 (") and printed it inside the isolate.
+  test('leaves an opening bracket it never closed outside the isolate', () => {
+    expect(isolateForeignRuns('الاجتماع 10:05 (بتوقيت عمّان)', 'rtl')).toBe(
+      'الاجتماع <bdi>10:05</bdi> (بتوقيت عمّان)'
+    );
+    expect(isolateForeignRuns('CS 101 (مختبر)', 'rtl')).toBe('<bdi>CS 101</bdi> (مختبر)');
+    expect(isolateForeignRuns('Ali (علي)', 'rtl')).toBe('<bdi>Ali</bdi> (علي)');
+  });
+
+  test('keeps a balanced bracket pair and drops a trailing comma (#1915)', () => {
+    expect(isolateForeignRuns('المعيار ISO 9001 (2015) هنا', 'rtl')).toBe('المعيار <bdi>ISO 9001 (2015)</bdi> هنا');
+    expect(isolateForeignRuns('العيّنات A-7, B-9, ثم', 'rtl')).toBe('العيّنات <bdi>A-7, B-9</bdi>, ثم');
+  });
+
   // An identifier is one run, punctuation included: isolating "A" and "7"
   // separately would let the hyphen between them reorder.
   test('keeps identifier punctuation inside the isolate', () => {
@@ -125,6 +140,23 @@ describe('isolateForeignRuns in an LTR document', () => {
 
   test('a page number in an LTR document needs no isolate', () => {
     expect(isolateForeignRuns('78', 'ltr')).toBe('78');
+  });
+
+  // #1915, the mirror image: the Arabic run pattern allows brackets too, so an
+  // Arabic run followed by a bracketed Latin note must give its "(" back.
+  test('leaves an opening bracket it never closed outside the isolate', () => {
+    expect(isolateForeignRuns('Meeting الاجتماع (10:05) today', 'ltr')).toBe(
+      'Meeting <bdi>الاجتماع</bdi> (10:05) today'
+    );
+    expect(isolateForeignRuns('Lab مختبر (CS 101)', 'ltr')).toBe('Lab <bdi>مختبر</bdi> (CS 101)');
+    expect(isolateForeignRuns('علي (Ali)', 'ltr')).toBe('<bdi>علي</bdi> (Ali)');
+  });
+
+  test('keeps a balanced bracket pair and drops a trailing comma (#1915)', () => {
+    expect(isolateForeignRuns('Standard المعيار (الإصدار) here', 'ltr')).toBe(
+      'Standard <bdi>المعيار (الإصدار)</bdi> here'
+    );
+    expect(isolateForeignRuns('Samples أ-٧, ب-٩, then', 'ltr')).toBe('Samples <bdi>أ-٧, ب-٩</bdi>, then');
   });
 });
 

@@ -948,7 +948,7 @@ The design says "TipTap inside `packages/ui`". In this repository the split is: 
 
 ## 3. Server proposal
 
-The design leaves all of this open. These are proposals for the owner to approve or change; nothing here is built. They follow the house rules: every table carries `tenant_id` and is registered in `src/Core/Tenant/CoreTables.php`, every query has a literal tenant predicate, every new table gets a case in `CrossTenantRejectionRealEngineTest`, and every new permission ships with its grant migration.
+The design leaves all of this open. These were proposals for the owner to approve or change; the editor shipped them from v0.2.19 (`document_sources` and its versions, migrations 160 onwards). They follow the house rules: every table carries `tenant_id` and is registered in `src/Core/Tenant/CoreTables.php`, every query has a literal tenant predicate, every new table gets a case in `CrossTenantRejectionRealEngineTest`, and every new permission ships with its grant migration.
 
 ### 3.1 Tables
 
