@@ -46,7 +46,7 @@ async function setUp(page: Page, baseURL: string) {
   const original = await readGlobals(system);
   const run = `${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`;
   const planKey = `e2e-team-pay-${run}`;
-  const person = { email: `e2e-pay-step-${run}@example.com`, password: `E2e-pay-${run}-Ws1!` };
+  const run = crypto.randomUUID().slice(0, 12);
 
   const plan = await system.post('/api/v1/plans', { data: { plan_key: planKey, name: 'Team', is_active: true } });
   expect(plan.status(), 'POST /api/v1/plans').toBe(201);
