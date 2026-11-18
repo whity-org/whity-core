@@ -675,6 +675,18 @@ jobs:
       - name: Database-boolean guard
         run: php scripts/ci-db-bool-guard.php
 
+      # Migration safety (WHIT-1240): a migration newer than the schema
+      # baseline must not lock or rewrite a big table (non-concurrent index,
+      # rewriting column add or type change, validated constraint, unbatched
+      # backfill) and must be safe to run twice. Then: the migrations the
+      # baseline stands for must not have changed since it was made, or fresh
+      # installs would get a different schema from upgraded ones. Rules and
+      # their safe forms: docs/ops/migrations.md.
+      - name: Migration safety lint and baseline check
+        run: |
+          php scripts/ci-migration-lint.php
+          php scripts/migration-baseline.php check
+
       # WHIT-616: the README advertises suite sizes, and that bullet has been
       # corrected by hand three times (#685, #690, and #1266 — the last found
       # it claiming 3695 PHPUnit tests against a real 7,875). A number
