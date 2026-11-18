@@ -6,6 +6,8 @@ namespace Whity\Tests\Unit\Core\Form\Print;
 
 use PHPUnit\Framework\TestCase;
 use Whity\Core\Document\Theme\FormPrintStyle;
+use Whity\Core\Form\Print\ApprovalCertificate;
+use Whity\Core\Form\Print\FormPrintLabels;
 use Whity\Core\Form\Print\FormPrintout;
 
 /**
@@ -45,11 +47,12 @@ final class FormPrintoutTest extends TestCase
      * @param array<string, mixed> $style
      * @param array<string, mixed> $answers
      * @param list<array<string, mixed>> $extraFields
+     * @param array<string, mixed> $extra top-level inputs to add or replace
      * @return array<string, mixed>
      */
-    private function build(array $style = [], array $answers = [], string $lang = 'en', bool $custom = true, array $extraFields = []): array
+    private function build(array $style = [], array $answers = [], string $lang = 'en', bool $custom = true, array $extraFields = [], array $extra = []): array
     {
-        return (new FormPrintout())->build([
+        return (new FormPrintout())->build($extra + [
             'lang' => $lang,
             'style' => FormPrintStyle::resolve($style, $custom),
             'theme' => ['accent' => '#7a1f3d'],
@@ -414,5 +417,186 @@ final class FormPrintoutTest extends TestCase
         self::assertSame('approved', \Whity\Core\Form\Print\FormPrintoutService::statusOf('noted', 'approved'));
         self::assertTrue(\Whity\Core\Form\Print\FormPrintoutService::isDecisionKey('irb_decision'));
         self::assertFalse(\Whity\Core\Form\Print\FormPrintoutService::isDecisionKey('decisions_count'));
+    }
+
+    /* ------------------------------------------------- approval certificate */
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return list<array<string, mixed>> the blocks before the cover's page break
+     */
+    private static function cover(array $payload): array
+    {
+        $out = [];
+        foreach ($payload['content'] as $block) {
+            if ($block['type'] === 'pageBreak') {
+                return $out;
+            }
+            $out[] = $block;
+        }
+        self::fail('the certificate ends in a page break');
+    }
+
+    public function testAnApprovedFinalDocumentOpensOnACertificatePage(): void
+    {
+        $plain = $this->build();
+        $payload = $this->build(extra: ['certificate' => []]);
+        $cover = self::cover($payload);
+
+        self::assertSame(1, $payload['coverPages'], 'one unnumbered page in front');
+        self::assertSame(['letterhead', 'heading', 'paragraph', 'heading', 'decisionBlock', 'approvals'], array_column($cover, 'type'));
+        self::assertSame('centred', $cover[0]['layout']);
+        self::assertSame('Example University', $cover[0]['start']['name']);
+        self::assertSame(['Amman · rec@example.edu'], $cover[0]['start']['lines']);
+        self::assertSame('Certificate of approval', $cover[1]['text']);
+        self::assertTrue($cover[1]['unnumbered'] && $cover[3]['unnumbered'], 'unnumbered headings');
+        self::assertSame(
+            'This is to certify that Example University has reviewed the application below and approved it. Scan the code to check that this certificate is genuine.',
+            $cover[2]['text'],
+        );
+        self::assertSame('Sleep and exams', $cover[3]['text'], 'the project title answer, not the form name');
+        self::assertSame(3, $cover[3]['level']);
+        self::assertSame(['approved', 'Approved'], [$cover[4]['status'], $cover[4]['word']]);
+        self::assertSame([
+            ['label' => 'Reference', 'value' => 'REC-EU 14/3/2026-27', 'mono' => true],
+            ['label' => 'Decided', 'value' => '12 Nov 2026'],
+            ['label' => 'Conditions', 'value' => 'None'],
+            ['label' => 'Submitted by', 'value' => 'Dr Ahmad Khalil'],
+        ], $cover[4]['rows'], 'without options, the person who submitted');
+        self::assertSame(['value' => 'https://app.whity.dev/verify/abc', 'caption' => 'Scan to verify', 'reference' => 'ABC-123'], $cover[4]['qr']);
+        self::assertSame('Approvals', $cover[5]['title']);
+        self::assertSame([['status' => 'approved', 'word' => 'Approved', 'name' => 'Prof. Amro Saleh', 'role' => 'Committee', 'at' => '12 Nov 2026, 10:14']], $cover[5]['rows']);
+
+        // The application printout follows, unchanged: same blocks, header and footer.
+        self::assertSame($plain['content'], array_slice($payload['content'], count($cover) + 1));
+        self::assertSame($plain['header'], $payload['header']);
+        self::assertSame($plain['footer'], $payload['footer']);
+    }
+
+    public function testTheCertificateFollowsTheRouteTemplatesOptions(): void
+    {
+        $f = static fn (string $key, string $type, array $extra = []): array => $extra + [
+            'field_key' => $key, 'field_type' => $type, 'label' => ['en' => $key], 'help_text' => null, 'is_required' => false,
+            'options' => [], 'validation' => [], 'section_key' => 'project', 'visible_when' => null,
+        ];
+        $payload = $this->build(
+            answers: [
+                'pi' => 'Dr Mohammad Ameen Al-Aghbar',
+                'start' => '2026-08-01', 'end' => '2027-08-01',
+                'students' => [
+                    ['name' => 'Rahaf Riad Ja’ran', 'degree' => 'Master’s', 'id' => '202327051'],
+                    ['name' => 'NA', 'degree' => 'NA', 'id' => 'NA'],
+                ],
+            ],
+            extraFields: [
+                $f('pi', 'text'), $f('start', 'date'), $f('end', 'date'), $f('empty', 'text'),
+                $f('students', 'repeating', ['validation' => ['columns' => [['key' => 'name', 'label' => 'Name'], ['key' => 'degree', 'label' => 'Degree'], ['key' => 'id', 'label' => 'ID']]]]),
+            ],
+            extra: [
+                'certificate' => ApprovalCertificate::config([
+                    'title' => ['en' => 'Certificate of Ethics Approval', 'ar' => 'شهادة الموافقة الأخلاقية'],
+                    'issuer' => 'the Institutional Review Board of Example University',
+                    'rows' => [
+                        ['label' => 'Applicant (principal investigator)', 'field' => 'pi'],
+                        ['label' => 'Student researcher', 'field' => 'students'],
+                        ['label' => 'Nothing answered', 'field' => 'empty'],
+                        ['label' => 'Project period', 'fields' => ['start', 'end']],
+                    ],
+                ]),
+                'decision' => [
+                    'status' => 'conditional', 'word' => 'Conditionally approved', 'decidedAt' => '2026-11-18 09:30:00',
+                    'conditions' => 'Report adverse events within 48 hours.',
+                    'approvals' => [
+                        ['name' => 'Amro Saleh', 'role' => 'Faculty Research Ethics Committee', 'at' => '2026-11-17 08:00:00', 'outcome' => 'Recommend approval'],
+                        ['name' => 'Awss Haddad', 'role' => 'IRB decision', 'at' => '2026-11-18 09:30:00', 'outcome' => 'Conditionally approved'],
+                    ],
+                ],
+            ],
+        );
+        $cover = self::cover($payload);
+
+        self::assertSame('Certificate of Ethics Approval', $cover[1]['text']);
+        self::assertStringStartsWith('This is to certify that the Institutional Review Board of Example University has reviewed the application below and approved it, subject to the conditions stated.', $cover[2]['text']);
+        self::assertSame(['conditional', 'Conditionally approved'], [$cover[4]['status'], $cover[4]['word']]);
+        self::assertSame([
+            ['label' => 'Reference', 'value' => 'REC-EU 14/3/2026-27', 'mono' => true],
+            ['label' => 'Decided', 'value' => '18 Nov 2026'],
+            ['label' => 'Conditions', 'value' => 'Report adverse events within 48 hours.'],
+            ['label' => 'Applicant (principal investigator)', 'value' => 'Dr Mohammad Ameen Al-Aghbar'],
+            ['label' => 'Student researcher', 'value' => 'Rahaf Riad Ja’ran, Master’s, 202327051'],
+            ['label' => 'Project period', 'value' => '1 Aug 2026 to 1 Aug 2027'],
+        ], $cover[4]['rows'], 'an unanswered row and an N/A table row are left out');
+        self::assertSame(['status' => 'approved', 'word' => 'Recommend approval', 'name' => 'Amro Saleh', 'role' => 'Faculty Research Ethics Committee', 'at' => '17 Nov 2026, 08:00'], $cover[5]['rows'][0]);
+    }
+
+    public function testTheCertificateInArabic(): void
+    {
+        $payload = $this->build(lang: 'ar', extra: ['certificate' => []]);
+        $cover = self::cover($payload);
+
+        self::assertSame('rtl', $payload['direction']);
+        self::assertSame('جامعة المثال', $cover[0]['start']['name'], 'the workspace’s Arabic name');
+        self::assertSame('شهادة موافقة', $cover[1]['text']);
+        self::assertStringStartsWith('تشهد جامعة المثال بأنها راجعت الطلب المبيّن أدناه ووافقت عليه.', $cover[2]['text']);
+        self::assertSame('تمت الموافقة', $cover[4]['word']);
+        self::assertSame('الموافقات', $cover[5]['title']);
+        self::assertSame('12 تشرين الثاني 2026، 10:14', $cover[5]['rows'][0]['at'], 'Western digits');
+    }
+
+    public function testNoCertificateWithoutTheOptionOrAnApproval(): void
+    {
+        $plain = $this->build();
+        self::assertArrayNotHasKey('coverPages', $plain);
+        self::assertSame('letterhead', $plain['content'][0]['type']);
+
+        foreach (['waiting', 'revisions', 'rejected'] as $status) {
+            $payload = $this->build(extra: ['certificate' => [], 'decision' => ['status' => $status, 'approvals' => []]]);
+            self::assertArrayNotHasKey('coverPages', $payload, $status);
+            self::assertNotContains('pageBreak', array_slice(array_column($payload['content'], 'type'), 0, 3), $status);
+        }
+    }
+
+    public function testWithoutQrCodesTheCertificatePrintsNone(): void
+    {
+        $cover = self::cover($this->build(extra: ['certificate' => [], 'verify' => null]));
+
+        self::assertArrayNotHasKey('qr', $cover[4]);
+        self::assertStringNotContainsString('Scan', $cover[2]['text']);
+    }
+
+    public function testTheCertificateFitsItsPageWhateverWasTyped(): void
+    {
+        $approvals = [];
+        for ($i = 1; $i <= 30; $i++) {
+            $approvals[] = ['name' => str_repeat('Name ', 40), 'role' => 'Stage ' . $i, 'at' => '2026-11-12 10:14:00'];
+        }
+        $cover = self::cover($this->build(answers: ['title' => str_repeat('A very long project title ', 100)], extra: [
+            'certificate' => [],
+            'decision' => ['status' => 'approved', 'decidedAt' => '2026-11-12 10:14:00', 'conditions' => str_repeat('Condition. ', 200), 'approvals' => $approvals],
+        ]));
+
+        self::assertLessThanOrEqual(ApprovalCertificate::SUBJECT_MAX, mb_strlen($cover[3]['text']));
+        self::assertStringEndsWith('… (In full in the decision on the last page.)', $cover[4]['rows'][2]['value'], 'long conditions point to the decision');
+        self::assertSame(ApprovalCertificate::CONDITIONS_MAX, mb_strlen(explode(' (In full', $cover[4]['rows'][2]['value'])[0]));
+        self::assertCount(ApprovalCertificate::APPROVALS_MAX, $cover[5]['rows']);
+        self::assertSame('Stage 30', $cover[5]['rows'][ApprovalCertificate::APPROVALS_MAX - 1]['role'], 'the latest approvals');
+        self::assertLessThanOrEqual(30, mb_strlen($cover[5]['rows'][0]['name']));
+    }
+
+    public function testMomentsPrintInTheWorkspacesTimeZone(): void
+    {
+        $payload = $this->build(extra: ['timezone' => 'Asia/Amman', 'certificate' => []]);
+
+        // Stored in UTC; Amman is three hours ahead.
+        self::assertSame('12 Nov 2026, 13:14', self::blocks($payload, 'approvals')[0]['rows'][0]['at']);
+        self::assertSame('12 Nov 2026, 13:14', self::cover($payload)[5]['rows'][0]['at']);
+
+        // A moment late in the UTC day is the next day in Amman.
+        $amman = new FormPrintLabels('en', 'Asia/Amman');
+        self::assertSame('13 Nov 2026', $amman->date('2026-11-12 22:30:00'));
+        self::assertSame('2 Nov 2026, 12:12', $amman->date('2026-11-02T09:12:00Z', true));
+        // A date question's answer is a day, not a moment: it never moves.
+        self::assertSame('1 Aug 2026', (new FormPrintLabels('en', 'America/New_York'))->date('2026-08-01'));
+        self::assertSame('12 Nov 2026, 10:14', (new FormPrintLabels('en', 'Not/AZone'))->date('2026-11-12 10:14:00', true), 'an unknown zone prints UTC');
     }
 }

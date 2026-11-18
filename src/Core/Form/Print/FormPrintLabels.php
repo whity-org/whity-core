@@ -64,6 +64,12 @@ final class FormPrintLabels
             'conditional' => 'Conditionally approved',
             'officeStrip' => 'For office use',
             'filesAttached' => '{n} file attached|{n} files attached',
+            'certificate' => 'Certificate of approval',
+            'certifyApproved' => 'This is to certify that {issuer} has reviewed the application below and approved it.',
+            'certifyConditional' => 'This is to certify that {issuer} has reviewed the application below and approved it, subject to the conditions stated.',
+            'certifyVerify' => 'Scan the code to check that this certificate is genuine.',
+            'conditionsInFull' => '(In full in the decision on the last page.)',
+            'to' => '{from} to {to}',
         ],
         'ar' => [
             'notAnswered' => 'لم تتم الإجابة',
@@ -85,7 +91,7 @@ final class FormPrintLabels
             'waiting' => 'بانتظار القرار',
             'reference' => 'المرجع',
             'received' => 'الاستلام',
-            'decided' => 'القرار',
+            'decided' => 'تاريخ القرار',
             'decision' => 'القرار',
             'project' => 'العنوان',
             'applicant' => 'مقدّم الطلب',
@@ -111,6 +117,12 @@ final class FormPrintLabels
             'conditional' => 'موافقة مشروطة',
             'officeStrip' => 'لاستخدام المكتب',
             'filesAttached' => 'مرفق {n} ملف|مرفقة {n} ملفات',
+            'certificate' => 'شهادة موافقة',
+            'certifyApproved' => 'تشهد {issuer} بأنها راجعت الطلب المبيّن أدناه ووافقت عليه.',
+            'certifyConditional' => 'تشهد {issuer} بأنها راجعت الطلب المبيّن أدناه ووافقت عليه وفق الشروط المذكورة.',
+            'certifyVerify' => 'امسح الرمز للتحقق من صحة هذه الشهادة.',
+            'conditionsInFull' => '(النص الكامل في القرار في الصفحة الأخيرة.)',
+            'to' => 'من {from} إلى {to}',
         ],
     ];
 
@@ -121,9 +133,21 @@ final class FormPrintLabels
 
     public readonly string $lang;
 
-    public function __construct(string $lang)
+    /** Where the workspace is: a moment prints in its time, not UTC. */
+    private readonly \DateTimeZone $zone;
+
+    /**
+     * @param ?string $timezone the workspace's IANA time zone (setting `timezone`);
+     *        stored moments are UTC
+     */
+    public function __construct(string $lang, ?string $timezone = null)
     {
         $this->lang = $lang === 'ar' ? 'ar' : 'en';
+        try {
+            $this->zone = new \DateTimeZone($timezone !== null && $timezone !== '' ? $timezone : 'UTC');
+        } catch (\Exception) {
+            $this->zone = new \DateTimeZone('UTC');
+        }
     }
 
     /** @param array<string, string|int> $with */
@@ -148,19 +172,30 @@ final class FormPrintLabels
     /**
      * A date as "12 Nov 2026", with Western digits in both languages (CLAUDE.md:
      * numbers stay Western), or with the time as "12 Nov 2026, 10:14".
+     *
+     * A stored moment ("2026-11-12 08:14:00", UTC) prints in the workspace's
+     * time zone, so an approval given at 10:14 in Amman reads 10:14. A bare
+     * date ("2026-08-01", a date question's answer) is a day, not a moment,
+     * and prints as written.
      */
     public function date(?string $iso, bool $withTime = false): string
     {
         if ($iso === null || $iso === '') {
             return '';
         }
-        $ts = strtotime($iso);
-        if ($ts === false) {
+        $iso = trim($iso);
+        $day = preg_match('/^\d{4}-\d{2}-\d{2}$/', $iso) === 1;
+        try {
+            $at = new \DateTimeImmutable($iso, new \DateTimeZone('UTC'));
+        } catch (\Exception) {
             return $iso;
         }
-        $text = gmdate('j', $ts) . ' ' . self::MONTHS[$this->lang][(int) gmdate('n', $ts) - 1] . ' ' . gmdate('Y', $ts);
+        if (!$day) {
+            $at = $at->setTimezone($this->zone);
+        }
+        $text = $at->format('j') . ' ' . self::MONTHS[$this->lang][(int) $at->format('n') - 1] . ' ' . $at->format('Y');
 
-        return $withTime ? $text . ($this->lang === 'ar' ? '، ' : ', ') . gmdate('H:i', $ts) : $text;
+        return $withTime && !$day ? $text . ($this->lang === 'ar' ? '، ' : ', ') . $at->format('H:i') : $text;
     }
 
     /** A localized {en, ar} label in this printout's language, falling back to the other. */

@@ -59,12 +59,16 @@ final class FormPrintout
      *   verify?: ?array{url: string, reference?: ?string},
      *   marks?: list<array{src: string, alt?: string}>,
      *   names?: callable(string, int): ?string,
-     * } $in
+     *   timezone?: ?string,
+     *   certificate?: ?array<string, mixed>,
+     * } $in `certificate`: the route's certificate options; when given and the
+     *        response is approved, a certificate page prints in front
+     *        ({@see ApprovalCertificate})
      * @return array<string, mixed>
      */
     public function build(array $in): array
     {
-        $this->t = new FormPrintLabels($in['lang']);
+        $this->t = new FormPrintLabels($in['lang'], $in['timezone'] ?? null);
         $this->attachments = 0;
         $this->style = $in['style'];
         $this->names = $in['names'] ?? static fn (string $type, int $id): ?string => null;
@@ -125,7 +129,61 @@ final class FormPrintout
             $content[] = $this->approvals($decision);
         }
 
-        return $this->page($content, $title, $reference, $workspace, $in['theme'] ?? [], $in['marks'] ?? [], $verify);
+        $cover = [];
+        if (is_array($in['certificate'] ?? null) && $decision !== null) {
+            $cover = (new ApprovalCertificate())->build([
+                'config' => $in['certificate'],
+                'workspace' => $workspace,
+                'formTitle' => $title,
+                'fields' => $fields,
+                'answers' => $in['answers'],
+                'reference' => $reference,
+                'submittedBy' => $in['submission']['submittedBy'] ?? null,
+                'decision' => $decision,
+                'verify' => $verify,
+            ], $t, fn (array $field, mixed $answer): string => $this->line($field, $answer));
+        }
+        if ($cover !== []) {
+            // The certificate is a cover: unnumbered, and the printout after it
+            // numbers and heads its pages exactly as it would on its own.
+            $content = [...$cover, ['type' => 'pageBreak'], ...$content];
+        }
+
+        $payload = $this->page($content, $title, $reference, $workspace, $in['theme'] ?? [], $in['marks'] ?? [], $verify);
+        if ($cover !== []) {
+            $payload['coverPages'] = 1;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * An answer as one line, for the certificate: the words the printout
+     * would print for it, a table's rows joined, N/A rows left out.
+     *
+     * @param array<string, mixed> $field
+     */
+    private function line(array $field, mixed $answer): string
+    {
+        if ($this->isBlank($answer)) {
+            return '';
+        }
+        $block = [];
+        $out = $this->answer($field, $answer, $block);
+        if (($out['kind'] ?? '') === 'empty' || ($out['paragraphs'] ?? null) === [$this->t->get('notAnswered')]) {
+            return '';
+        }
+
+        return match ($out['kind'] ?? '') {
+            'text' => implode(' ', array_map('strval', $out['paragraphs'] ?? [])),
+            'yesNo' => (string) ($out['word'] ?? ''),
+            'choices' => implode(', ', array_map(static fn (array $o): string => (string) $o['text'], array_filter($out['options'] ?? [], static fn (array $o): bool => $o['chosen'] === true))),
+            'table' => implode('; ', array_filter(array_map(
+                fn (array $row): string => implode(', ', array_filter(array_map('strval', $row), fn (string $c): bool => trim($c) !== '' && !in_array(mb_strtolower(trim($c)), self::NA_WORDS, true))),
+                $out['rows'] ?? [],
+            ), static fn (string $r): bool => $r !== '')),
+            default => '',
+        };
     }
 
     /* --------------------------------------------------------------- page */

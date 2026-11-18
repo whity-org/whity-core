@@ -251,3 +251,44 @@ describe('the footer (FP.10)', () => {
     expect(validateFlowPayload(doc([{ type: 'paragraph', text: 'x' }], { footer: { end: { marks: [{ image: { src: 'https://example.com/iso.png' } }] } } }))).toMatch(/image/);
   });
 });
+
+describe('a cover in front (coverPages): the approval certificate', () => {
+  const cover = [{ type: 'heading', level: 1, unnumbered: true, text: 'Certificate of approval' }, { type: 'pageBreak' }, { type: 'paragraph', text: 'Printout' }];
+
+  test('is accepted with a page break after it, and reaches the paginator', () => {
+    const payload = doc(cover, { coverPages: 1, footer: { start: 'Page {{page}} of {{pages}}' } });
+    expect(validateFlowPayload(payload)).toBeNull();
+    expect(normaliseFlowDocument(payload).coverPages).toBe(1);
+    expect(boot(payload).coverPages).toBe(1);
+  });
+
+  test('a document without one prints as before', () => {
+    expect(normaliseFlowDocument(doc(cover)).coverPages).toBe(0);
+    expect(boot(doc(cover)).coverPages).toBe(0);
+  });
+
+  test('refuses a cover with no page break, more than two pages, or beside generated front matter', () => {
+    expect(validateFlowPayload(doc([cover[0], cover[2]], { coverPages: 1 }))).toMatch(/pageBreak after the cover/);
+    expect(validateFlowPayload(doc(cover, { coverPages: 3 }))).toMatch(/coverPages/);
+    expect(validateFlowPayload(doc(cover, { coverPages: 1.5 }))).toMatch(/coverPages/);
+    expect(validateFlowPayload(doc(cover, { coverPages: 1, frontMatter: [{ kind: 'contents' }] }))).toMatch(/cannot be used together/);
+    expect(validateFlowPayload(doc(cover, { coverPages: 0, frontMatter: [{ kind: 'contents' }] }))).toBeNull();
+  });
+
+  test('the paginator leaves the cover without bands, numbers from the page after it, and refuses a cover that runs over', () => {
+    const { readFileSync } = require('node:fs');
+    const script = readFileSync(require.resolve('../src/flow/assets/paginate.js'), 'utf8');
+    expect(script).toContain('var cover = Math.min(doc.coverPages || 0, pages.length);');
+    expect(script).toContain('var pageNumber = i + 1 - cover;');
+    expect(script).toMatch(/the cover runs over/);
+  });
+
+  test('the largest certificate core sends validates in both directions', () => {
+    const { build } = require('../scripts/generate-flow-cover-fixture');
+    for (const direction of ['ltr', 'rtl']) {
+      const payload = build({ direction, variant: 'fit' });
+      expect(validateFlowPayload(payload)).toBeNull();
+      expect(payload.coverPages).toBe(1);
+    }
+  });
+});

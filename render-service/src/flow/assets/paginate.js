@@ -65,6 +65,8 @@
     contentHeightPx: 0,
     anchorPage: Object.create(null),
     problems: [],
+    /** Body pages before the first pageBreak (`coverPages`). */
+    coverEnd: null,
     frontMatterPasses: 0,
   };
 
@@ -167,6 +169,10 @@
 
       if (node.getAttribute && node.getAttribute('data-flow-unit') === 'pageBreak') {
         index += 1;
+        // Where the cover ends: the pages filled before the first break.
+        if (host.id === 'flow-body-pages' && state.coverEnd === null) {
+          state.coverEnd = current.content.firstChild ? pages.length : pages.length - 1;
+        }
         if (current.content.firstChild) {
           openPage();
         }
@@ -756,10 +762,13 @@
   }
 
   function applyRunningFurniture(pages, sectionMarks) {
-    var total = pages.length;
-    for (var i = 0; i < total; i += 1) {
-      var pageNumber = i + 1;
-      var section = sectionForPage(pageNumber, sectionMarks, null);
+    // A cover carries no bands and is not counted: the pages after it number
+    // from 1, and fromPage counts from there too.
+    var cover = Math.min(doc.coverPages || 0, pages.length);
+    var total = pages.length - cover;
+    for (var i = cover; i < pages.length; i += 1) {
+      var pageNumber = i + 1 - cover;
+      var section = sectionForPage(i + 1, sectionMarks, null);
       var values = {
         page: pageNumber,
         pages: total,
@@ -882,6 +891,13 @@
     pagesRoot.appendChild(bodyHost);
     var bodyPages = paginate(bodyUnits, bodyHost);
     recordAnchors(bodyPages, 0);
+    if (doc.coverPages > 0 && state.coverEnd !== null && state.coverEnd > doc.coverPages) {
+      state.problems.push({
+        page: doc.coverPages + 1,
+        reason: 'the cover runs over ' + doc.coverPages + (doc.coverPages === 1 ? ' page' : ' pages'),
+        kind: 'content',
+      });
+    }
     source.className = 'flow-consumed';
 
     // Pass 2..n: the front matter, whose LENGTH changes the page numbers it
@@ -954,6 +970,7 @@
       frontMatterEntriesChecked: entriesChecked,
       pageCount: allPages.length,
       frontMatterPages: frontPages.length,
+      coverPages: Math.min(doc.coverPages || 0, state.coverEnd === null ? 0 : state.coverEnd),
       bodyPages: bodyPages.length,
       frontMatterPasses: state.frontMatterPasses,
       anchors: state.anchorPage,

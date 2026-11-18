@@ -2914,9 +2914,18 @@ final class DocumentRouter
             );
         }
 
+        // The approval certificate's options, carried from the route template
+        // and checked again (ApprovalCertificate::config()).
+        $config = is_array($step['rule_config'] ?? null) ? $step['rule_config'] : [];
+        try {
+            $certificate = \Whity\Core\Form\Print\ApprovalCertificate::config($config['certificate'] ?? null);
+        } catch (\InvalidArgumentException $e) {
+            throw RoutingRejectedException::because("Step {$position}: " . $e->getMessage());
+        }
+
         return [
             'rule_kind' => RouteStepKind::FINALISE_RULE,
-            'rule_config' => [],
+            'rule_config' => $certificate !== [] ? ['certificate' => $certificate] : [],
             'label' => is_string($label) && trim($label) !== '' ? trim($label) : null,
             'decision' => false,
             'decision_quorum' => null,

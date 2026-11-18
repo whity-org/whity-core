@@ -91,6 +91,9 @@ const BLOCK_TYPES = new Set([
 ]);
 
 /** E.40: the symbologies the editor offers, as bwip-js names them. */
+/** How many pages a cover may take (`coverPages`). */
+const MAX_COVER_PAGES = 2;
+
 const BARCODE_SYMBOLOGIES = { code128: 'code128', ean13: 'ean13', code39: 'code39' };
 const MAX_BARCODE_VALUE_LENGTH = 80;
 const MAX_MATH_LENGTH = 2000;
@@ -792,6 +795,24 @@ function validateFlowPayload(payload) {
     return blocksError;
   }
 
+  // A cover (an approval certificate in front of a form printout): the first
+  // pages, up to the first pageBreak, carry no running header or footer and
+  // are not counted by {{page}} / {{pages}}, so what follows numbers as if it
+  // started the document. The cover must fit in that many pages, or the
+  // render fails rather than print a cover that runs on.
+  if (payload.coverPages !== undefined) {
+    const n = payload.coverPages;
+    if (!Number.isInteger(n) || n < 0 || n > MAX_COVER_PAGES) {
+      return `"coverPages" must be a whole number from 0 to ${MAX_COVER_PAGES}`;
+    }
+    if (n > 0 && Array.isArray(payload.frontMatter) && payload.frontMatter.length > 0) {
+      return '"coverPages" and "frontMatter" cannot be used together';
+    }
+    if (n > 0 && !content.some((b) => isPlainObject(b) && b.type === 'pageBreak')) {
+      return '"coverPages" needs a pageBreak after the cover';
+    }
+  }
+
   if (payload.frontMatter !== undefined) {
     if (!Array.isArray(payload.frontMatter)) {
       return '"frontMatter" must be an array';
@@ -959,6 +980,7 @@ function normaliseFlowDocument(payload) {
     theme: isPlainObject(payload.theme) ? normaliseTheme(payload.theme) : null,
     title: typeof payload.title === 'string' ? payload.title : '',
     frontMatter,
+    coverPages: Number.isInteger(payload.coverPages) ? Math.min(MAX_COVER_PAGES, Math.max(0, payload.coverPages)) : 0,
     content,
     index: { headings, tables, figures },
   };
@@ -1045,6 +1067,7 @@ module.exports = {
   DEFAULT_LABELS,
   DEFAULT_MARGIN_MM,
   MAX_BLOCKS,
+  MAX_COVER_PAGES,
   MAX_TABLE_ROWS,
   MAX_PAYLOAD_BYTES,
   MAX_QR_VALUE_LENGTH,
