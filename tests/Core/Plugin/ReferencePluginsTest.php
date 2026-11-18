@@ -41,7 +41,7 @@ final class ReferencePluginsTest extends TestCase
             'empty'   => ['', true],
             'off'     => ['off', false],
             'OFF'     => [' OFF ', false],
-            '0'       => ['0', false],
+            'zero'    => ['0', false],
             'false'   => ['false', false],
             'no'      => ['no', false],
         ];
@@ -97,7 +97,7 @@ final class ReferencePluginsTest extends TestCase
     {
         $dockerfile = (string) file_get_contents(__DIR__ . '/../../../Dockerfile');
         $release = substr($dockerfile, (int) strpos($dockerfile, 'AS release'));
-        self::assertMatchesRegularExpression('/^ENV WHITY_REFERENCE_PLUGINS=off$/m', $release);
+        self::assertMatchesRegularExpression('/^ENV WHITY_REFERENCE_PLUGINS=off\r?$/m', $release);
         self::assertStringNotContainsString(
             'WHITY_REFERENCE_PLUGINS',
             substr($dockerfile, 0, (int) strpos($dockerfile, 'AS release')),
