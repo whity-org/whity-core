@@ -10,14 +10,13 @@
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useNavigation } from '@/lib/navigation-context';
-import { ICONS } from '@whity/ui/icon-map';
+import { namedIcon } from '@/lib/named-icon';
 import type { AppSidebarNavGroup } from '@whity/ui/app-sidebar';
 import { navGroupsFromServerItems } from '@whity/features/nav';
 import { useTranslation } from '@whity/features/i18n';
-import * as TablerIcons from '@tabler/icons-react';
 import { IconDashboard, IconSettings } from '@tabler/icons-react';
 import type { Icon } from '@tabler/icons-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { useNavItemLabels } from '@/lib/nav-item-labels';
 import { WAITING_CHANGED_EVENT } from '@/lib/waiting-changed';
@@ -35,38 +34,17 @@ import { SETTINGS_HOME_HREF } from '@/lib/settings/my-settings';
  *
  * Core nav items emit kebab-case names (e.g. `"building-community"`), but
  * plugins may supply any Tabler icon by its kebab/snake name or its full
- * PascalCase component name (e.g. `"IconUsers"`). We normalize the name to the
- * `Icon<PascalCase>` export and look it up dynamically against the full
- * `@tabler/icons-react` set, falling back to a safe default for unknown names
- * so a plugin can never render a missing-icon hole.
+ * PascalCase component name (e.g. `"IconUsers"`). {@link namedIcon} resolves
+ * the curated set at once and loads any other Tabler icon on demand, falling
+ * back to a safe default for unknown names so a plugin can never render a
+ * missing-icon hole.
  */
-const tablerIcons = TablerIcons as unknown as Record<string, Icon | undefined>;
-
 export function resolveIcon(name: string | undefined): Icon {
-  if (!name) {
-    return IconDashboard;
-  }
-
   // Whity's own names first (decision 5.1, `handoff/icons/icons.json`): core
   // registers `comment`, `customer`, `list-todo` and `dashboard`, which are
-  // curated names, not Tabler's. Read as Tabler names they were missing (Chat,
-  // Contacts and Tasks fell back to the dashboard gauge) or the wrong glyph.
-  const curated = (ICONS as Record<string, { icon: Icon } | undefined>)[name.trim()];
-  if (curated) {
-    return curated.icon;
-  }
-
-  // Split on hyphen/underscore/whitespace, capitalize each segment, join.
-  const pascal = name
-    .trim()
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join('');
-
-  const componentName = pascal.startsWith('Icon') ? pascal : `Icon${pascal}`;
-
-  return tablerIcons[componentName] ?? IconDashboard;
+  // curated names, not Tabler's. Any other Tabler name loads on demand
+  // (WHIT-1245) instead of shipping the whole icon set to every page.
+  return namedIcon(name, IconDashboard);
 }
 
 /**
@@ -127,6 +105,50 @@ function prettifyGroupId(groupId: string): string {
 
 
 /**
+ * The three reads behind the waiting counts, shared by every mounted shell
+ * (WHIT-1245). The sidebar and the phone tab bar are both mounted, one hidden
+ * by CSS, and each used to make its own three reads on every page change. A
+ * read for the same page and the same nudge within a moment is answered from
+ * the one already made. A nudge or a new page is a new key, so counts still
+ * follow every change.
+ */
+let lastWaitingRead: { key: string; at: number; counts: Promise<Record<string, number>> } | null = null;
+const WAITING_READ_SHARE_MS = 2000;
+
+function sharedWaitingCounts(key: string): Promise<Record<string, number>> {
+  const now = Date.now();
+  if (lastWaitingRead !== null && lastWaitingRead.key === key && now - lastWaitingRead.at < WAITING_READ_SHARE_MS) {
+    return lastWaitingRead.counts;
+  }
+  const counts = readWaitingCounts();
+  lastWaitingRead = { key, at: now, counts };
+  return counts;
+}
+
+async function readWaitingCounts(): Promise<Record<string, number>> {
+  // Three reads at once; a failed one shows no count rather than a wrong one.
+  const [sources, proposals, chats] = await Promise.all([
+    api.GET('/api/v1/me/inbox/sources').catch(() => null),
+    api.GET('/api/v1/me/agent-proposals', { params: { query: { status: 'waiting' } } }).catch(() => null),
+    api.GET('/api/v1/chat/inbox').catch(() => null),
+  ]);
+  const list = (result: { data?: unknown } | null): Record<string, unknown>[] => {
+    const body = result?.data as { data?: unknown } | undefined;
+    return Array.isArray(body?.data) ? (body.data as Record<string, unknown>[]) : [];
+  };
+  const sum = (rows: Record<string, unknown>[], key: string) =>
+    rows.reduce((total, row) => total + (typeof row[key] === 'number' ? (row[key] as number) : 0), 0);
+  const approvals = list(proposals).length;
+  // The Inbox's Waiting for me holds agents' proposals too (owner, 16 Nov
+  // 2026), so its count does; Approvals keeps its own count of them.
+  const inbox = sum(list(sources), 'open_count') + approvals;
+  // Chat (CH.3, UC.1): unread messages over every chat the person is in,
+  // customer conversations included for people who may read them.
+  const chat = sum(list(chats), 'unread');
+  return { inbox, approvals, chat };
+}
+
+/**
  * How many things wait for the person, by nav item id: the Inbox's open items,
  * summed over its sources (`GET /api/me/inbox/sources` carries each source's
  * open count for exactly this badge), the agent proposals waiting for
@@ -136,6 +158,14 @@ function prettifyGroupId(groupId: string): string {
  * rather than a wrong one.
  */
 export function useWaitingCounts(pathname: string | null): Record<string, number> {
+  const { user } = useAuth();
+  // Read at fetch time, not a dependency: auth resolving is not a page change
+  // and must not cost three more reads.
+  const reader = useRef('');
+  const readerKey = `${user?.id ?? ''}@${user?.tenant_id ?? ''}`;
+  useEffect(() => {
+    reader.current = readerKey; // runs before the read below in the same commit
+  }, [readerKey]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   // A page that just changed what waits (Approvals after a decision) says so
   // with WAITING_CHANGED_EVENT, so the count follows without a navigation.
@@ -148,28 +178,11 @@ export function useWaitingCounts(pathname: string | null): Record<string, number
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
-      // Three reads at once; a failed one shows no count rather than a wrong one.
-      const [sources, proposals, chats] = await Promise.all([
-        api.GET('/api/v1/me/inbox/sources').catch(() => null),
-        api.GET('/api/v1/me/agent-proposals', { params: { query: { status: 'waiting' } } }).catch(() => null),
-        api.GET('/api/v1/chat/inbox').catch(() => null),
-      ]);
-      const list = (result: { data?: unknown } | null): Record<string, unknown>[] => {
-        const body = result?.data as { data?: unknown } | undefined;
-        return Array.isArray(body?.data) ? (body.data as Record<string, unknown>[]) : [];
-      };
-      const sum = (rows: Record<string, unknown>[], key: string) =>
-        rows.reduce((total, row) => total + (typeof row[key] === 'number' ? (row[key] as number) : 0), 0);
-      const approvals = list(proposals).length;
-      // The Inbox's Waiting for me holds agents' proposals too (owner, 16 Nov
-      // 2026), so its count does; Approvals keeps its own count of them.
-      const inbox = sum(list(sources), 'open_count') + approvals;
-      // Chat (CH.3, UC.1): unread messages over every chat the person is in,
-      // customer conversations included for people who may read them.
-      const chat = sum(list(chats), 'unread');
-      if (!cancelled) setCounts((prev) => ({ ...prev, inbox, approvals, chat }));
-    })();
+    // Keyed by who is reading too, so a sign-out and back in as someone else
+    // within the sharing window never shows the previous person's counts.
+    void sharedWaitingCounts(`${reader.current}${pathname ?? ''}#${nudge}`).then((next) => {
+      if (!cancelled) setCounts((prev) => ({ ...prev, ...next }));
+    });
     return () => {
       cancelled = true;
     };

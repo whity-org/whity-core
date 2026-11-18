@@ -7,7 +7,7 @@
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { renderMarkdown } from '@/lib/safe-markdown';
 
 // TextEncoder/TextDecoder (needed by KaTeX) are polyfilled globally in jest.setup.js.
@@ -55,10 +55,10 @@ describe('renderMarkdown — formatting', () => {
     expect(pre?.textContent).toBe('const x = 1 < 2;');
   });
 
-  it('renders inline $…$ math via KaTeX', () => {
+  it('renders inline $…$ math via KaTeX', async () => {
     const { container } = render(<div>{renderMarkdown('Euler: $e^{i\\pi}+1=0$ done')}</div>);
-    // KaTeX emits a .katex container.
-    expect(container.querySelector('.katex')).not.toBeNull();
+    // KaTeX emits a .katex container; it is its own chunk (WHIT-1245), so a tick later.
+    await waitFor(() => expect(container.querySelector('.katex')).not.toBeNull());
     expect(container.textContent).toContain('Euler:');
   });
 });
