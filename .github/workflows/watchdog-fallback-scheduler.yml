@@ -69,7 +69,30 @@ jobs:
           # A watchdog that cannot be reached is itself an outage worth failing
           # over. This job going red is the last line of defence — the one
           # signal that survives when the thing meant to alert you is down.
-          if [ "$code" != "200" ]; then
-            echo "::error::The watchdog did not accept a forced run (HTTP $code). Nothing is watching the deployment."
-            exit 1
-          fi
+          #
+          # A 401 or 403 is a different failure, and the one this job has hit
+          # on every run since 2026-11: the Worker is up and answering, it
+          # just refuses the bearer token. That is a credential mismatch, not
+          # an outage, and no change to this file fixes it. Say so plainly,
+          # so the red run points at the right fix.
+          case "$code" in
+            200) ;;
+            401|403)
+              {
+                echo "::error title=Watchdog secret mismatch::The watchdog Worker is reachable but rejected the token (HTTP $code)."
+                echo "::error::The WATCHDOG_SECRET repository secret does not match the Worker's HEARTBEAT_SECRET (POST /run checks it, ops/watchdog/src/index.js)."
+                echo "::error::Fix: an owner copies the HEARTBEAT_SECRET value already in use into Settings > Secrets and variables > Actions > WATCHDOG_SECRET."
+                echo "::error::Do not rotate HEARTBEAT_SECRET in Cloudflare alone: the backup heartbeat and /alert senders use the same value and would start failing."
+                echo "::error::Until then the Worker's own Cloudflare cron is the only thing driving the watchdog."
+              }
+              {
+                echo "### Watchdog fallback: secret mismatch (HTTP $code)"
+                echo
+                echo "The Worker answered, so the deployment is not down. The \`WATCHDOG_SECRET\` repository secret does not match the Worker's \`HEARTBEAT_SECRET\`."
+                echo "An owner must copy the Worker's current value into this repository's \`WATCHDOG_SECRET\` Actions secret. Nothing in this workflow can fix it."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1 ;;
+            *)
+              echo "::error::The watchdog did not accept a forced run (HTTP $code). Nothing is watching the deployment."
+              exit 1 ;;
+          esac

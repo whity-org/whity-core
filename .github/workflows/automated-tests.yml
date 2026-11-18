@@ -149,7 +149,7 @@ jobs:
 
       - name: Filter changed paths
         if: steps.mode.outputs.all != 'true'
-        uses: dorny/paths-filter@v4
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: filter
         with:
           filters: |
@@ -332,7 +332,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_sqlite
@@ -431,7 +431,7 @@ jobs:
       # instance; installing the extension costs seconds and removes any
       # question of unserialising into an environment the object came from.
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_sqlite
@@ -512,7 +512,7 @@ jobs:
       # Same extension set as the test shards: the OpenAPI generator and the
       # plugin/guard scripts boot the app's CLI, which expects a PDO driver.
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_sqlite
@@ -748,7 +748,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring
@@ -806,7 +806,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           coverage: none
@@ -825,7 +825,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring
@@ -869,7 +869,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring
@@ -920,7 +920,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_pgsql, pgsql
@@ -1058,7 +1058,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_pgsql, pgsql
@@ -1248,7 +1248,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_pgsql, pgsql
@@ -1363,7 +1363,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           coverage: none
