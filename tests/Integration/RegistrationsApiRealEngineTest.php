@@ -201,7 +201,76 @@ final class RegistrationsApiRealEngineTest extends TestCase
         self::assertSame('invited', $this->statusOf(self::MEM_PENDING_B));
     }
 
+    // ==================== re-approving a rejected registration (#408) ====================
+
+    public function testRejectedRegistrationIsListedAndCanBeApprovedAfterAll(): void
+    {
+        TenantContext::setTenantId(self::SYSTEM_TENANT);
+        $this->handler->reject(
+            $this->req('POST', '/api/registrations/x/reject', null, self::SYS_ADMIN, self::SYSTEM_TENANT),
+            ['id' => (string) self::MEM_PENDING_B]
+        );
+        self::assertNotNull($this->rejectedAtOf(self::MEM_PENDING_B));
+
+        // Gone from the pending list, present in the rejected one.
+        $pending = $this->decode($this->handler->listPending(
+            $this->req('GET', '/api/registrations/pending', null, self::SYS_ADMIN, self::SYSTEM_TENANT)
+        ))['data'];
+        self::assertSame([], $pending);
+        $rejected = $this->decode($this->handler->listPending(
+            $this->req('GET', '/api/registrations/pending?status=rejected', null, self::SYS_ADMIN, self::SYSTEM_TENANT)
+        ))['data'];
+        self::assertCount(1, $rejected);
+        self::assertSame(self::MEM_PENDING_B, $rejected[0]['membership_id']);
+        self::assertNotNull($rejected[0]['rejected_at']);
+
+        $response = $this->handler->approve(
+            $this->req('POST', '/api/registrations/x/approve', null, self::SYS_ADMIN, self::SYSTEM_TENANT),
+            ['id' => (string) self::MEM_PENDING_B]
+        );
+        self::assertSame(200, $response->getStatusCode(), $response->getBody());
+        self::assertSame('active', $this->statusOf(self::MEM_PENDING_B));
+        self::assertNull($this->rejectedAtOf(self::MEM_PENDING_B));
+    }
+
+    public function testApproveNeverReactivatesAMemberSuspendedForCause(): void
+    {
+        // Same status a rejection leaves, but no rejected_at: an operator
+        // suspended this owner, and only they can lift it.
+        $this->pdo->exec("UPDATE memberships SET status = 'suspended' WHERE id = " . self::MEM_PENDING_B);
+
+        TenantContext::setTenantId(self::SYSTEM_TENANT);
+        $rejected = $this->decode($this->handler->listPending(
+            $this->req('GET', '/api/registrations/pending?status=rejected', null, self::SYS_ADMIN, self::SYSTEM_TENANT)
+        ))['data'];
+        self::assertSame([], $rejected);
+
+        $response = $this->handler->approve(
+            $this->req('POST', '/api/registrations/x/approve', null, self::SYS_ADMIN, self::SYSTEM_TENANT),
+            ['id' => (string) self::MEM_PENDING_B]
+        );
+        self::assertSame(404, $response->getStatusCode());
+        self::assertSame('suspended', $this->statusOf(self::MEM_PENDING_B));
+    }
+
+    public function testRejectingTwiceFindsNothingTheSecondTime(): void
+    {
+        TenantContext::setTenantId(self::SYSTEM_TENANT);
+        $req = fn () => $this->req('POST', '/api/registrations/x/reject', null, self::SYS_ADMIN, self::SYSTEM_TENANT);
+        self::assertSame(200, $this->handler->reject($req(), ['id' => (string) self::MEM_PENDING_B])->getStatusCode());
+        self::assertSame(404, $this->handler->reject($req(), ['id' => (string) self::MEM_PENDING_B])->getStatusCode());
+    }
+
     // ==================== helpers ====================
+
+    private function rejectedAtOf(int $membershipId): ?string
+    {
+        $stmt = $this->pdo->prepare('SELECT rejected_at FROM memberships WHERE id = :id');
+        $stmt->execute([':id' => $membershipId]);
+        $value = $stmt->fetchColumn();
+
+        return $value === false || $value === null ? null : (string) $value;
+    }
 
     private function statusOf(int $membershipId): string
     {

@@ -62,19 +62,29 @@ function grant(...perms: string[]) {
   hasPermission.mockImplementation((slug: string) => perms.includes(slug));
 }
 
+type FakeResponse = { ok: boolean; status: number; json: () => Promise<unknown> };
+
+// Responses for the page's own calls, in order. The rejected-sign-ups list
+// (?status=rejected) is answered separately, so it never takes a queued one.
+let queued: FakeResponse[] = [];
+let rejectedList: unknown[] = [];
+
 function mockFetchOnceJson(data: unknown, ok = true, status = 200) {
-  (global.fetch as jest.Mock).mockResolvedValueOnce({
-    ok,
-    status,
-    json: async () => data,
-  });
+  queued.push({ ok, status, json: async () => data });
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockTenantId = 0;
   grant('registrations:approve');
-  global.fetch = jest.fn();
+  queued = [];
+  rejectedList = [];
+  global.fetch = jest.fn(async (url: string) => {
+    if (url.includes('status=rejected')) {
+      return { ok: true, status: 200, json: async () => ({ data: rejectedList }) };
+    }
+    return queued.shift();
+  }) as unknown as typeof fetch;
 });
 
 // ---------------------------------------------------------------------------
@@ -171,6 +181,25 @@ describe('PendingRegistrationsPage — list and actions', () => {
         expect.objectContaining({ method: 'POST' })
       )
     );
+  });
+
+  it('lists rejected sign-ups and approves one after all (#408)', async () => {
+    mockFetchOnceJson({ data: [] }); // nothing pending
+    rejectedList = [{ ...PENDING[0], rejected_at: '2026-07-02T00:00:00Z' }];
+    mockFetchOnceJson({ data: { membership_id: 1002, status: 'active' } }); // approve
+    render(<PendingRegistrationsPage />);
+
+    const approve = await screen.findByTestId('registration-reapprove-1002');
+    expect(screen.getByTestId('registrations-rejected')).toBeInTheDocument();
+    fireEvent.click(approve);
+
+    await waitFor(() =>
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/v1/registrations/1002/approve',
+        expect.objectContaining({ method: 'POST' })
+      )
+    );
+    await waitFor(() => expect(screen.queryByTestId('registrations-rejected')).not.toBeInTheDocument());
   });
 
   it('surfaces a load error with a retry affordance', async () => {
