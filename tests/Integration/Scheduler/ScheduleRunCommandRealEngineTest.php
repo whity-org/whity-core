@@ -112,6 +112,18 @@ final class ScheduleRunCommandRealEngineTest extends TestCase
         self::assertSame(0, $this->countJobs(), 'no job enqueued when the tick is not owned');
     }
 
+    public function testTickPrunesExpiredSharedStoreRows(): void
+    {
+        // WHIT-1229: elapsed windows used to stay in shared_store forever.
+        $this->store->increment('push:minute:elapsed', -1);
+        $this->store->increment('push:minute:live', 600);
+
+        $this->command->tick(300, 86400);
+
+        self::assertSame(0, $this->store->prune(), 'the tick already removed the elapsed row');
+        self::assertSame(1, $this->store->count('push:minute:live'), 'a live window is kept');
+    }
+
     public function testTickPrunesOldCompletedJobs(): void
     {
         // A retained, completed job whose completion is older than the window.
