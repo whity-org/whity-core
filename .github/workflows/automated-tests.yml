@@ -970,7 +970,10 @@ jobs:
           DB_NAME: whity_core
           DB_USER: whity
           DB_PASSWORD: whity_dev
-        run: vendor/bin/phpunit --fail-on-skipped tests/Database/MigrationCycleTest.php
+        # Database::connect() reads $_ENV only, and the runner's CLI PHP leaves
+        # $_ENV empty (variables_order=GPCS), so without EGPCS the connection
+        # fails and the test skips itself as "not reachable".
+        run: php -d variables_order=EGPCS vendor/bin/phpunit --fail-on-skipped --display-skipped tests/Database/MigrationCycleTest.php
 
       - name: Run migrations on real PostgreSQL
         run: php public/index.php migrate run

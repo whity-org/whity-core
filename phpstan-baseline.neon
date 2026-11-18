@@ -535,15 +535,9 @@ parameters:
 			path: tests/Auth/RoleCheckerRealEngineTest.php
 
 		-
-			message: '#^Parameter \#1 \$string of function strtolower expects string, string\|false given\.$#'
-			identifier: argument.type
-			count: 1
-			path: tests/Cli/MigrationsCommandTest.php
-
-		-
 			message: '#^Parameter \#2 \$haystack of method PHPUnit\\Framework\\Assert\:\:assertStringContainsString\(\) expects string, string\|false given\.$#'
 			identifier: argument.type
-			count: 2
+			count: 1
 			path: tests/Cli/MigrationsCommandTest.php
 
 		-
@@ -578,12 +572,6 @@ parameters:
 
 		-
 			message: '#^Parameter \#1 \$string of function strtolower expects string, string\|false given\.$#'
-			identifier: argument.type
-			count: 2
-			path: tests/Cli/SeedCommandTest.php
-
-		-
-			message: '#^Parameter \#2 \$haystack of method PHPUnit\\Framework\\Assert\:\:assertStringContainsString\(\) expects string, string\|false given\.$#'
 			identifier: argument.type
 			count: 1
 			path: tests/Cli/SeedCommandTest.php
