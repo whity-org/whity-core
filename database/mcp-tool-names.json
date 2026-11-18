@@ -1703,6 +1703,10 @@
     "en": "Switch on a plugin and apply its pending updates",
     "ar": "تفعيل إضافة"
   },
+  "post_api_plugins_name_roles_role_approve": {
+    "en": "Let a plugin give its own permissions to an existing role",
+    "ar": "اعتماد دور موجود لإضافة"
+  },
   "post_api_plugins_reload": {
     "en": "Reload the list of plugins",
     "ar": "إعادة تحميل الإضافات"
