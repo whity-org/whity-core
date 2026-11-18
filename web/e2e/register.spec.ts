@@ -53,9 +53,13 @@ test.describe('Self-service registration (WC-235)', () => {
     await page.getByRole('button', { name: 'Create workspace' }).click();
 
     // Success provisions the workspace, chains login, and redirects in. Landing
-    // on /dashboard (rather than being bounced back to /login) proves the owner
-    // was signed in.
-    await page.waitForURL('**/dashboard');
-    await expect(page).toHaveURL(/\/dashboard$/);
+    // inside the app (rather than being bounced back to /login) proves the owner
+    // was signed in. Since workspace templates (November 2026) a new owner may
+    // be sent to the template picker first (TEMPLATE_PICKER_PATH in
+    // web/lib/workspace-template.ts) instead of /dashboard.
+    const signedIn = (url: URL) =>
+      url.pathname === '/dashboard' || url.pathname === '/setup/template';
+    await page.waitForURL(signedIn);
+    expect(signedIn(new URL(page.url()))).toBe(true);
   });
 });
