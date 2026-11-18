@@ -1058,12 +1058,20 @@ final class BlockContract
             // Each row's `valueField` becomes the submitted value; `labelField`
             // is the display text. Also the reusable primitive behind the
             // Part-B tag-picker.
+            //
+            // SDK 1.121 (#1437): `multiple: true` picks SEVERAL rows. The value
+            // is then a list of `valueField` strings (possibly empty), shown as
+            // chips; `required` means at least one; a scalar `default` (or a
+            // `defaultFrom` that resolves to one) seeds a one-item list, and a
+            // preloaded list seeds as it is. Without `multiple` nothing changes:
+            // one string, exactly as before.
             'referenceSelect' => ['container' => false, 'props' => [
                 'name'        => ['type' => 'inputName', 'required' => true],
                 'label'       => ['type' => 'string',    'required' => true],
                 'source'      => ['type' => 'apiPath',    'required' => true],
                 'valueField'  => ['type' => 'string',     'required' => true],
                 'labelField'  => ['type' => 'string',     'required' => true],
+                'multiple'    => ['type' => 'bool',       'required' => false],
                 'required'    => ['type' => 'bool',       'required' => false],
                 'placeholder' => ['type' => 'string',     'required' => false],
                 'default'     => ['type' => 'string',     'required' => false],

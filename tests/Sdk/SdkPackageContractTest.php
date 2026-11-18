@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.120.0',
+            '1.121.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.120 ADDS Calendar\\TimeOff and Delegation\\Away: a plugin puts time off on core\'s calendar and reads who is away and who stands in (WHIT-1210). '
+            'SDK 1.121 ADDS referenceSelect `multiple`: several rows from an API-backed source, as chips (#1437). '
+            . 'SDK 1.120 ADDS Calendar\\TimeOff and Delegation\\Away: a plugin puts time off on core\'s calendar and reads who is away and who stands in (WHIT-1210). '
             . 'SDK 1.119 ADDS Contacts\\Contacts and PluginContactFieldsInterface: core contacts and a plugin\'s own contact fields (WHIT-1209). '
             . 'SDK 1.118 ADDS Billing\\TrialCheckout: the card now, the first charge when a workspace\'s trial ends (WHIT-1207). '
             . 'SDK 1.117 ADDS PluginDisplayNameInterface: the name people read for a plugin (WHIT-1198). '

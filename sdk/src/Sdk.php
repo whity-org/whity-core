@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.120).
+ * SDK identity (v1.121).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1404,12 +1404,18 @@ namespace Whity\Sdk;
  * approvals (WHIT-1210, issue #2132).
  *
  * Purely additive.)
+ *
+ * 1.121 (SEVERAL REFERENCES: a `referenceSelect` block takes `multiple: true` to pick several rows
+ * from its `source`. Its value is then a list of `valueField` strings shown as chips, and
+ * `required` means at least one (#1437).
+ *
+ * Purely additive: without `multiple` a reference select submits one string, as before.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.120.0';
+    public const VERSION = '1.121.0';
 
     /**
      * Static identity only — never instantiated.

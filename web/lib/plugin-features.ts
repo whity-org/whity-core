@@ -708,6 +708,11 @@ export interface ReferenceSelectBlock {
   source: string;
   valueField: string;
   labelField: string;
+  /**
+   * SDK 1.121 (#1437): pick several rows. The value is then a list of
+   * `valueField` strings, shown as chips; `required` means at least one.
+   */
+  multiple?: boolean;
   required?: boolean;
   placeholder?: string;
   default?: string;

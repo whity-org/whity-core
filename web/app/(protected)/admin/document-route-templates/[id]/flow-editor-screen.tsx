@@ -90,6 +90,7 @@ import { RouteReadOnly } from './route-read-only';
 import { routeSentence } from '@/lib/documents/route-sentence';
 import type { RoutingRule } from '@/components/documents/routing-wire';
 import { AudienceGroupPicker, type AudienceGroupPreview } from '@whity/ui/audience-group-picker';
+import { ExplicitPeopleInspector, PluginRuleSummary } from './stage-rule-inspectors';
 import {
   audiencePreviewRequest,
   toAudienceGroupPreview,
@@ -121,6 +122,8 @@ const FORM_DEFAULT = 'form';
 /** The two core kinds whose config is `{ role_id }`. */
 const ROLE_KINDS = new Set(['role', 'role_below_actor']);
 const GROUP_KIND = 'group';
+/** The kind that names people one by one: `{ profile_ids: [...] }` (#999, #1034). */
+const EXPLICIT_KIND = 'explicit';
 
 /**
  * What a NEW stage names, in order of preference.
@@ -1187,6 +1190,8 @@ function StageInspector({
 }) {
   const isRoleKind = ROLE_KINDS.has(step.ruleKind);
   const isGroupKind = step.ruleKind === GROUP_KIND;
+  const isExplicitKind = step.ruleKind === EXPLICIT_KIND;
+  const rule = rules.find((r) => r.kind === step.ruleKind);
 
   // THE MERGE, SAID IN FULL — the half of #1058 the card cannot hold.
   //
@@ -1355,15 +1360,24 @@ function StageInspector({
         </div>
       )}
 
-      {!isRoleKind && !isGroupKind && (
-        <Alert>
-          <AlertDescription className="text-xs">
-            {t(
-              'routeTemplates.inspector.unsupportedKind',
-              'This rule kind has no editor here yet. Its configuration is kept exactly as it was saved.'
-            )}
-          </AlertDescription>
-        </Alert>
+      {/* #1034: the hand-picked kind, with #1015's people picker. */}
+      {isExplicitKind && (
+        <ExplicitPeopleInspector
+          ruleConfig={step.ruleConfig}
+          readOnly={readOnly}
+          onChange={(ruleConfig) => onChange({ ruleConfig })}
+        />
+      )}
+
+      {/* #1034: a plugin's kind (or one no longer registered). Its config is the
+          plugin's vocabulary and rule contributions declare no schema yet, so
+          the host shows it read only rather than guessing at a form. */}
+      {!isRoleKind && !isGroupKind && !isExplicitKind && (
+        <PluginRuleSummary
+          known={rule !== undefined}
+          source={rule === undefined || rule.source === 'core' ? null : rule.source}
+          ruleConfig={step.ruleConfig}
+        />
       )}
 
       {/* THE COUNT, BESIDE THE QUORUM. This pairing is the point: an author

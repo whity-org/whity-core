@@ -386,6 +386,13 @@ function collectDefaults(
       defaults[input.name] = Array.isArray(input.default) ? input.default.map((row) => ({ ...row })) : [];
     } else if (input.type === 'checkboxGroup') {
       defaults[input.name] = Array.isArray(input.default) ? [...input.default] : [];
+    } else if (input.type === 'referenceSelect' && input.multiple === true) {
+      // SDK 1.121 (#1437): several references are a list. A scalar seed (a
+      // context ref or the literal `default`) becomes a one-item list, so the
+      // value is always an array and the required check reads one shape.
+      const seeded = input.defaultFrom !== undefined ? resolveRef?.(input.defaultFrom) : undefined;
+      const first = seeded ?? input.default;
+      defaults[input.name] = typeof first === 'string' && first !== '' ? [first] : [];
     } else if (input.type === 'checkbox') {
       // WC-block-modal-drawer: `defaultFrom` (a master-detail context ref) wins
       // over the literal `default`. A row's boolean serialises as 'true'/'1'.
@@ -642,7 +649,8 @@ export function FormProvider({
           child.type === 'dateInput' ||
           child.type === 'fileInput' ||
           child.type === 'timeInput' ||
-          child.type === 'richTextInput') &&
+          child.type === 'richTextInput' ||
+          (child.type === 'referenceSelect' && child.multiple !== true)) &&
         child.required === true
       ) {
         const val = values[child.name];
@@ -654,9 +662,15 @@ export function FormProvider({
             label: child.label,
           });
         }
-      } else if ((child.type === 'weeklyHours' || child.type === 'checkboxGroup') && child.required === true) {
+      } else if (
+        (child.type === 'weeklyHours' ||
+          child.type === 'checkboxGroup' ||
+          (child.type === 'referenceSelect' && child.multiple === true)) &&
+        child.required === true
+      ) {
         // SDK 1.113: a required week needs at least one open day; a required
-        // group at least one choice.
+        // group at least one choice. SDK 1.121: a required multiple reference
+        // select at least one row.
         const val = values[child.name];
         if (!Array.isArray(val) || val.length === 0) {
           newErrors[child.name] = t('form.error.required', '{label} is required', { label: child.label });
