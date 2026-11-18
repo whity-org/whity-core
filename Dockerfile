@@ -15,13 +15,16 @@
 # So the version is written out here where a bump is a diff somebody reviews.
 # A stale exact pin is visible; a stale floating tag is not.
 #
-# Two stages (WC-172):
-#   * base    — runtime only. Dev and staging composes build THIS stage and
-#               bind-mount the checkout over /app, so it ships no code.
-#   * release — the publishable image: base + the application tree + a
-#               production (no-dev) composer install. The release workflow
-#               builds this stage and pushes it to GHCR; container-based
-#               deployments run it as-is (see docs/wiki/Core-Update.md).
+# Three stages (WC-172, WHIT-1221):
+#   * base          — runtime only. Dev and staging composes build THIS stage
+#                     and bind-mount the checkout over /app, so it ships no code.
+#   * release-build — base + git/unzip/composer: installs vendor/ (no-dev) and
+#                     bakes the build identity. Never published.
+#   * release       — the publishable image: base without the compiler and
+#                     headers, plus the finished /app from release-build. The
+#                     release workflow builds this stage and pushes it to GHCR;
+#                     container-based deployments run it as-is (see
+#                     docs/wiki/Core-Update.md).
 FROM dunglas/frankenphp:1-php8.4.27 AS base
 
 # Install required packages for the PostgreSQL and zip extensions. libzip-dev
@@ -93,7 +96,11 @@ ENV FRANKENPHP_WORKERS=8
 ENV FRANKENPHP_TIMEOUT=60s
 ENV MAX_REQUESTS=500
 
-FROM base AS release
+FROM base AS release-build
+
+# Everything that only BUILDS the release lives in this stage: git, unzip and
+# composer to install vendor/, and the build-identity step. The release stage
+# below copies the finished /app out of it and ships none of these tools.
 
 # Composer needs git + unzip to install dist packages (the frankenphp base
 # image ships neither).
@@ -111,12 +118,6 @@ WORKDIR /app
 # ship). composer.json resolves whity/plugin-sdk from the in-repo sdk/ path
 # repository, which this COPY brings along.
 COPY . /app
-
-# The reference plugins (HelloWorld, ExamplePlugin) ship in the image as
-# examples but do not run in it (#1831): no routes, roles, jobs or migrations
-# from them on a real deployment. Set WHITY_REFERENCE_PLUGINS=on to run them.
-# Development, CI and e2e build the `base` stage, where it is unset (= on).
-ENV WHITY_REFERENCE_PLUGINS=off
 
 RUN composer install --no-dev --prefer-dist --no-progress --no-interaction \
     && composer clear-cache
@@ -150,3 +151,35 @@ RUN composer install --no-dev --prefer-dist --no-progress --no-interaction \
 # afterwards can move it.
 ARG WHITY_BUILD_COMMIT=""
 RUN php scripts/write-build-identity.php
+
+FROM base AS release
+
+# The runtime ships no compiler and no headers (WHIT-1221).
+#
+# The PHP base image keeps its PHPIZE_DEPS (gcc, g++, make, autoconf, libc6-dev)
+# installed so docker-php-ext-install works, and the base stage above adds the
+# libpq/libzip headers to build pgsql and zip. A running Whity needs none of it:
+# the extensions are already compiled. Left in, they were most of the image's
+# Trivy findings: libc6-dev pulls linux-libc-dev, the kernel headers, and every
+# kernel CVE is reported against that package whether or not a header is ever
+# read. The shared libraries the two extensions link (libpq5, libzip5) are
+# marked manual first so the purge keeps them. libc6-dev is named on its own
+# because the base image marks it manual, so auto-remove would leave it. The
+# base stage is untouched: dev and staging composes build it and may still
+# install extensions there.
+RUN apt-mark manual libpq5 libzip5 \
+    && apt-get purge -y --auto-remove $PHPIZE_DEPS libc6-dev libpq-dev libzip-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && php -m | grep -qx pgsql \
+    && php -m | grep -qx pdo_pgsql \
+    && php -m | grep -qx zip
+
+COPY --from=release-build /app /app
+
+WORKDIR /app
+
+# The reference plugins (HelloWorld, ExamplePlugin) ship in the image as
+# examples but do not run in it (#1831): no routes, roles, jobs or migrations
+# from them on a real deployment. Set WHITY_REFERENCE_PLUGINS=on to run them.
+# Development, CI and e2e build the `base` stage, where it is unset (= on).
+ENV WHITY_REFERENCE_PLUGINS=off

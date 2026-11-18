@@ -17,6 +17,11 @@ docs
 wiki
 web
 
+# The desktop app scaffold (Tauri/Rust + Vite) is built on a developer's machine,
+# never by the backend; shipping it put its Cargo.lock and node_modules in the
+# image's vulnerability scan (WHIT-1221).
+templates
+
 # CI runs the test suites from the git checkout, never from the image.
 tests
 
