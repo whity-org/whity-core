@@ -302,6 +302,37 @@ final class MessagingRealEngineTest extends TestCase
         self::assertStringNotContainsString('owner@example.com', (string) json_encode($info));
     }
 
+    public function testWebChatWithoutAProviderButAllowedWithoutABotCheckLetsVisitorsSend(): void
+    {
+        // WHIT-1220: "allow without a bot check" and no provider made the chat ask for a
+        // check that could never pass, so Send stayed off and every first message got 422.
+        $global = new GlobalSettingsRepository($this->pdo);
+        $global->set(BotCheck::SETTING_ALLOW_NONE, '1');
+        $chat = new PublicChatApiHandler(
+            $this->pdo,
+            $this->messaging,
+            $this->settings,
+            new TenantHostRepository($this->pdo),
+            new HostResolver(new TenantHostRepository($this->pdo), 'whity.test'),
+            new BotCheck($global, new EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'), new HttpFetcher()),
+            new DatabaseSharedStore($this->pdo),
+            'pepper',
+        );
+        $this->settings->save(self::A, true, null, null);
+        $req = fn (string $method, array $body = []): Request => new Request(
+            $method,
+            '/api/public/chat/bakery/conversations',
+            ['Host' => 'app.whity.test', ClientIp::HEADER => '203.0.113.20'],
+            json_encode($body) ?: ''
+        );
+        $params = ['workspace' => 'bakery'];
+
+        self::assertNull(json_decode($chat->info($req('GET'), $params)->getBody(), true)['data']['bot_check'], 'no provider, no check to show');
+        $started = $chat->start($req('POST', ['message' => 'Are you open today?']), $params);
+        self::assertSame(201, $started->getStatusCode(), (string) $started->getBody());
+        self::assertSame(1, $this->rows('messages'));
+    }
+
     public function testWebChatForVisitorsHidesNotesAndChecksTheToken(): void
     {
         $chat = new PublicChatApiHandler(
