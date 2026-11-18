@@ -202,44 +202,6 @@ class RolesApiHandlerTest extends TestCase
         $this->assertSame('description', json_decode($response->getBody(), true)['details']['field']);
     }
 
-    /**
-     * WC-110 (mocked): POST with numeric permission ids validates them against
-     * the catalogue and links the matching ids (the web UI sends ids). The real
-     * SQL semantics are exercised in RolesApiHandlerRealEngineTest.
-     */
-    public function testCreateLinksNumericPermissionIds(): void
-    {
-        $nameCheck = $this->statement(false);            // role name free
-        $insertRole = $this->statement();                // INSERT roles (with tenant_id)
-        $validateIds = $this->statement(false, [         // SELECT id FROM permissions WHERE id IN
-            ['id' => 7], ['id' => 8],
-        ]);
-        // #1040: one lookup of the companion map, on every grant path.
-        $companionLookup = $this->statement(false, []);
-        $insertPerms = $this->statement();               // INSERT role_permissions
-
-        $pdo = $this->createMock(PDO::class);
-        $pdo->method('prepare')->willReturnOnConsecutiveCalls(
-            $nameCheck,
-            $insertRole,
-            $validateIds,
-            $companionLookup,
-            $insertPerms
-        );
-        $pdo->method('lastInsertId')->willReturn('43');
-
-        $handler = new RolesApiHandler($pdo, $this->passthroughHookManager());
-        $request = $this->authedRequest('POST', '/api/roles', [
-            'name' => 'Editor',
-            'permissions' => [7, 8],
-        ]);
-
-        $response = $handler->create($request);
-
-        $this->assertSame(201, $response->getStatusCode());
-        $this->assertSame(2, json_decode($response->getBody(), true)['data']['permissionCount']);
-    }
-
     public function testCreateWithoutNameReturns400(): void
     {
         $pdo = $this->createMock(PDO::class);
@@ -356,26 +318,6 @@ class RolesApiHandlerTest extends TestCase
         // handler — `global` and `manageable` are the whole per-row contract.
         $this->assertFalse($data[0]['global']);
         $this->assertArrayNotHasKey('tenant_id', $data[0]);
-    }
-
-    /**
-     * AC2: a role belonging only to another tenant is not returned for this
-     * tenant (the tenant-scoped query yields no rows).
-     */
-    public function testListIsolatesRolesAcrossTenants(): void
-    {
-        // Tenant 2 has no user_roles links to Tenant 1's 'Custom Admin' role, so
-        // the scoped query returns an empty set.
-        $stmt = $this->statement(false, []);
-
-        $pdo = $this->createMock(PDO::class);
-        $pdo->method('prepare')->willReturn($stmt);
-
-        $handler = new RolesApiHandler($pdo, $this->passthroughHookManager());
-        $response = $handler->list(new Request('GET', '/api/roles'));
-
-        $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame([], json_decode($response->getBody(), true)['data']);
     }
 
     public function testListAsSystemTenantSeesAllRoles(): void

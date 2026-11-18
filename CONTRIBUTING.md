@@ -532,6 +532,28 @@ docker run --rm -v "$PWD":/app -w /app php:8.4-cli vendor/bin/phpunit
 
 (`composer install` must have been run first so `vendor/` exists.)
 
+### Skipped and flaky tests
+
+There is no quarantine group. A test that cannot run, or that fails only
+sometimes, is dealt with in the pull request that finds it:
+
+- **A skip names a condition some CI job meets.** `PHPUNIT_PG_DSN` unset, a
+  missing extension, no configured database: fine, as long as a job runs the
+  test with that condition true (the PostgreSQL jobs set `PHPUNIT_PG_DSN`;
+  `postgres-migrations` runs `tests/Database/MigrationCycleTest.php` with
+  `--fail-on-skipped`). A test that every job skips is dead: wire it into a job
+  or delete it. WHIT-1224 removed several that had been skipped on every run
+  for months.
+- **Playwright retries once** (`retries: 1`) and reports a pass-on-retry as
+  flaky. Fix the cause (usually an ambiguous locator or a missing wait) or open a
+  WHIT ticket naming the spec; do not add retries or `test.fixme`.
+- **Every Playwright spec belongs to a project.** `scripts/ci-playwright-orphan-specs.php`
+  fails CI when a spec matches no project's `testMatch`.
+
+A new worktree has no `vendor/`: run `composer install` in it (or in the
+container). Copying another checkout's `vendor/` can bring an older PHPUnit
+than the lockfile pins.
+
 ### Running frontend tests
 
 ```bash

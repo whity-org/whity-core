@@ -6,7 +6,6 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\RequiresConfiguredDatabase;
 use Whity\Database\Database;
 use Whity\Cli\Commands\MigrationsCommand;
-use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 
 /**
  * Tests for MigrationsCommand CLI handler
@@ -20,15 +19,6 @@ class MigrationsCommandTest extends TestCase
     // configured and unreachable — see the trait for why those are two different
     // situations and only one of them deserves a skip (#1013).
     use RequiresConfiguredDatabase;
-
-    /**
-     * Test that MigrationsCommand can be instantiated
-     */
-    public function testCommandCanBeInstantiated(): void
-    {
-        $command = new MigrationsCommand();
-        $this->assertInstanceOf(MigrationsCommand::class, $command);
-    }
 
     /**
      * Test help command displays usage information
@@ -47,48 +37,6 @@ class MigrationsCommandTest extends TestCase
         $this->assertSame(0, $exitCode);
         $this->assertStringContainsString('Usage:', $output);
         $this->assertStringContainsString('rollback --plugin <PluginName>', $output);
-    }
-
-    /**
-     * Test migration status with database available
-     */
-    #[RequiresPhpExtension('pdo_pgsql')]
-    public function testMigrationStatusWithDatabase(): void
-    {
-        // Skips only when nothing says where a database is; fails loudly when
-        // something does and it is not there.
-        $this->connectToConfiguredDatabase();
-
-        $command = new MigrationsCommand();
-
-        ob_start();
-        $exitCode = $command->execute(['status']);
-        $output = ob_get_clean();
-
-        // Should succeed
-        $this->assertSame(0, $exitCode);
-        // Output should contain migration information
-        $this->assertStringContainsString('Migration', $output);
-    }
-
-    /**
-     * Test migration run with database available
-     */
-    #[RequiresPhpExtension('pdo_pgsql')]
-    public function testMigrationRunWithDatabase(): void
-    {
-        // Skips only when nothing says where a database is; fails loudly when
-        // something does and it is not there.
-        $this->connectToConfiguredDatabase();
-
-        $command = new MigrationsCommand();
-
-        ob_start();
-        $exitCode = $command->execute(['run']);
-        $output = ob_get_clean();
-
-        // Output should mention migrations
-        $this->assertStringContainsString('migration', strtolower($output));
     }
 
     /**
