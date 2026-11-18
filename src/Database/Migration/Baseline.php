@@ -6,6 +6,7 @@ namespace Whity\Database\Migration;
 
 use PDO;
 use RuntimeException;
+use Whity\Core\Identity\AuthMethod;
 use Whity\Database\BootstrapIdentity;
 use Whity\Database\Database;
 use Whity\Database\InitialPassword;
@@ -306,12 +307,24 @@ final class Baseline
         $email = BootstrapIdentity::DEFAULT_EMAIL;
         $hash = InitialPassword::hashFor('INITIAL_SYSTEM_ADMIN_PASSWORD', $email);
 
+        // Written here, not through AuthMethod::setPasswordHash(), because that
+        // also moves token_epoch on, and a fresh install must hold exactly what
+        // migration 036 leaves. The same refusal is in the WHERE clause: only
+        // the bootstrap administrator's placeholder, never an identity-provider
+        // or service account (ProfileCredentialWriteSitesTest).
         // Unscoped by design (migration): profiles and profile_emails are sanctioned GLOBAL tables (ADR 0005)
         $db->query(
             'UPDATE profiles SET password_hash = :hash
              WHERE password_hash = :placeholder
+               AND auth_method NOT IN (:idp, :service)
                AND id IN (SELECT profile_id FROM profile_emails WHERE email = :email)',
-            [':hash' => $hash, ':placeholder' => self::PASSWORD_PLACEHOLDER, ':email' => $email]
+            [
+                ':hash' => $hash,
+                ':placeholder' => self::PASSWORD_PLACEHOLDER,
+                ':idp' => AuthMethod::IDP,
+                ':service' => AuthMethod::SERVICE,
+                ':email' => $email,
+            ]
         );
 
         BootstrapIdentity::applyConfiguredEmail($db);

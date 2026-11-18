@@ -62,7 +62,7 @@ PHP);
         };
 
         $migration('001_bl_create_profiles', 'BlCreateProfiles',
-            "\$db->exec('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, password_hash TEXT NOT NULL)');
+            "\$db->exec('CREATE TABLE IF NOT EXISTS profiles (id INTEGER PRIMARY KEY, password_hash TEXT NOT NULL, auth_method TEXT NOT NULL DEFAULT \'local\')');
         \$db->exec('CREATE TABLE IF NOT EXISTS profile_emails (profile_id INTEGER NOT NULL, email TEXT NOT NULL UNIQUE)');");
         $migration('002_bl_create_widgets', 'BlCreateWidgets',
             "\$db->exec('CREATE TABLE IF NOT EXISTS widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL, created_at TEXT)');");
@@ -72,7 +72,7 @@ PHP);
         file_put_contents(self::$root . '/baseline/baseline.sqlite.sql', implode("\n", [
             '-- fixture baseline',
             'CREATE TABLE core_schema_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, migration_name VARCHAR(255) NOT NULL UNIQUE, executed_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, execution_time_ms INTEGER);',
-            'CREATE TABLE profiles (id INTEGER PRIMARY KEY, password_hash TEXT NOT NULL);',
+            "CREATE TABLE profiles (id INTEGER PRIMARY KEY, password_hash TEXT NOT NULL, auth_method TEXT NOT NULL DEFAULT 'local');",
             'CREATE TABLE profile_emails (profile_id INTEGER NOT NULL, email TEXT NOT NULL UNIQUE);',
             'CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL, created_at TEXT);',
             "INSERT INTO profiles (id, password_hash) VALUES (1, '" . Baseline::PASSWORD_PLACEHOLDER . "');",
