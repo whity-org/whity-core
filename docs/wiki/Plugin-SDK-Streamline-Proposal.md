@@ -1,6 +1,6 @@
 # Plugin SDK: streamline proposal (v0.2.31 → public beta v0.2.40)
 
-Status: **proposal, waiting for the owner** (WHIT-1227). Written 2026-11-19 against `develop` at SDK 1.121 (1.122 is open as #2161).
+Status: **decided by the owner on 19 Nov 2026** (WHIT-1227, WHIT-1242). Every recommendation was accepted. D10 and D11 were replaced by the owner's theme and inventory decisions of the same day (§5, §7). Written 2026-11-19 against `develop` at SDK 1.121. The plan to build it is [Plugin-SDK-2.0-Plan](Plugin-SDK-2.0-Plan.md).
 The owner asked to "streamline the SDK, remove redundancies, make a better SDK that covers more and more customization" before the public beta. This document audits what the SDK is today, says what to fold together, what to fix, and what is missing, and ends with the decisions only the owner can take.
 
 Nothing here changes `docs/design/00-decision-register.md`. The SDK lane is shipping only the non-breaking items in §6 while this waits.
@@ -238,83 +238,62 @@ There is no package a plugin's frontend can depend on. The proposal is `@whity/p
 
 ---
 
-## 5. Extension points for themes and an inventory/ERP domain (sketch only)
+## 5. Themes and inventory (decided elsewhere)
 
-### 5.1 Themes
+This section first sketched both. The owner decided both on 19 Nov 2026 in their own specs, so the sketches are replaced by pointers. The SDK follows those specs and does not define a second schema or a second service set.
 
-Three surfaces already exist and none is a full theme system:
-- **App theme.** `PluginThemeInterface` (1.12): one plugin's GET route answers token overrides (`#rrggbb`), validated against `tokens.json`. theme-creator uses it.
-- **Document themes.** `docs/design/DOCUMENT-THEMES.md`: `document_themes`, token layers, freezing.
-- **Websites** (section 29).
+### 5.1 Themes: TH.1–TH.14, `docs/design/30-themes.md` (#2158)
 
-Sketch: a declarative `themes` key (manifest-first, D4) with one schema across the three scopes:
+- A theme is data: one JSON file with the schema `schemas/theme/v1.json`, tokens only. It is one declarative format, and the SDK copies it rather than defining its own.
+- Plugins ship theme files through a new SDK interface, `PluginThemesInterface::themes(): list<string>` (paths inside the plugin). Core validates each file on install.
+- `PluginThemeInterface` (1.12, a route that returns colour overrides) is **deprecated**. While it lives, the host reads its overrides as a theme that has only `colour.overrides`. It goes in 2.0.
+- Under D4 (manifest-first), `plugin.json` gets a `themes` key that lists the same files.
+- The SDK minor comes from this lane under D7. The theme lane (theme-0231) builds the interface and validator, and the version bump goes through the SDK lane.
 
-```json
-"themes": [{
-  "key": "sand", "name": {"en": "Sand", "ar": "رملي"},
-  "scope": ["app", "document", "website"],
-  "tokens": {"primary": "#8a6d3b", "surface": "#fbf8f2"},
-  "fonts": {"document_title": "readex-pro"},
-  "assets": {"letterhead": "files:letterhead.svg"}
-}]
-```
+### 5.2 Inventory: IV.1–IV.24, `docs/design/31-inventory.md` (#2162)
 
-- **The host owns rendering.** Tokens are validated against `tokens.json` per scope, fonts come from the register's list (no weight 700, Readex only where §03 allows), and assets go through `PluginFiles`.
-- **Dynamic themes** (theme-creator) keep the route as a `source`, like a block's.
-- **Freezing** follows DOCUMENT-THEMES §4.3. An issued document keeps the theme version it was made with.
-- **What the register must decide:** which tokens a plugin may set per scope. Brand and accessibility tokens are probably locked.
-- **Related issues:** #1689 (editor blocks and document themes).
+Inventory is **in core**, not a plugin family. The SDK gets the services `Whity\Sdk\Inventory\{Items, Locations, Stock, Lots, Orders, Operations, Units}`, value objects (`Quantity`, `Item`, `Variant`, `Move`, …), the `stock.*` and `inventory.*` events, and extension points:
+- `PluginCostingMethodInterface`
+- `PluginAccountingExportInterface`
+- `PluginStockOperationTypesInterface`
+- `PluginItemFieldsInterface`
+- `PluginBarcodeParserInterface`
+- `PluginPriceListInterface`
+- `PluginReorderPolicyInterface`
 
-### 5.2 Inventory / ERP
+ERP plugins (costing, accounting, POS) build on those.
 
-Core stays out of the domain. ERP is a **plugin family** (inventory, purchasing, accounting) that interoperates through small shared contracts. Every extension point below exists today or is on the ranked list:
-
-| Need | Extension point | Exists? |
-|---|---|---|
-| Items, locations, stock moves as records with trash/retire and delete guards | `PluginDataTypesInterface` + `RecordTypeValidator`, `blocks_delete` | yes |
-| Document numbers (GRN-2026-0001), invoices, delivery notes | `Documents\DocumentNumberingRule`, `Sql\SequenceAllocator`, template slots, `PluginDocumentStore` | yes |
-| Stock on a contact or booking page, an "Adjust stock" action | record-page tabs and actions | **#1681** |
-| Closed accounting periods | closed-period guard | **#1692** |
-| Approval of a purchase order | route subjects + `Routes` | **#1728** |
-| Reports (stock value, movements) | report sources | **#1682** |
-| Salons/Front Office decrement stock on a sale | plugin-to-plugin services | **new** (§3.2) |
-| Shared value objects so plugins agree | `Whity\Sdk\Commerce\{Money, Quantity, Unit, ItemRef, LocationRef}` (Money follows CU.1–CU.4: currency and its own decimals) | **new**, small |
-| Meters (SKUs, locations per plan) | entitlements and meters | **#1683** |
-| Offline counts on a phone | `Sync\SyncableResource`, `SyncController` | yes |
-| Agents proposing reorders | MCP tools + proposals (agents propose, people approve) | yes |
-| Events other plugins react to (`inventory:stock.moved`) | `Events::forPlugin()`, plugin events in the catalogue | yes (needs the catalogue's discoverability) |
-
-The two new pieces (plugin-to-plugin services and `Commerce` value objects) are small and also serve Whity Pay, Front Office and Salons today. They are worth designing before the beta even if ERP waits.
+Two things from the original sketch still apply, through the inventory spec:
+- **Plugin-to-plugin services (§3.2).** Appointments reserving consumables or a POS basket now goes through core's `Stock` service instead. The general mechanism is still useful for plugin families, so it stays in the 2.0 plan as a design item.
+- **Workspace pinning (D2).** The inventory spec's §6.1 signatures take `tenantId` the way `Contacts` does. Under D2, plugins reach them through `PluginContext` (`$ctx->inventory()->stock()->available($variantId, $locationId)`) and the workspace comes from the context. The explicit-`tenantId` form is the host-side one, and it moves to `Whity\Sdk\Host\` in 2.0. The inventory lane is told this so phase 1 can ship the context form directly.
 
 ---
 
-## 6. What the SDK lane ships now (non-breaking, while this waits)
+## 6. What the SDK lane ships
 
 | Item | SDK | Status |
 |---|---|---|
-| #2151: response headers, `AddressPolicy` | 1.122 | PR #2161, auto-merge armed |
-| `SdkException` marker on every SDK exception | 1.123 | next |
-| Contract tests: every `Events` constant is dispatched or listed as reserved; every public SDK type is named in the docs or coverage; every plugin-callable service is bound at every entry point (web, CLI, `queue:work`, `events:relay`) | test only | next |
-| Docs: `HOOK_SYSTEM.md` event table from `Events` (and the `_context` contradiction fixed); a "Host services" wiki page covering the 12 undocumented types (`JobQueue`, `PluginFileStore`, `PluginSettingsStore`, `PluginDocuments`, `PluginAgentsInterface`, `PluginOuTypesInterface`, `PluginRoutingRulesInterface`, `PluginWindowTypesInterface`, `PluginThemeInterface`, `AudienceRuleResolverInterface`, `HostedCheckoutPage`, `SyncableResource`); README heading and `^1.x` examples; the home card docblock's "can't rearrange" | docs | next |
-| `PluginContext` (additive, the factories stay) | 1.124 | **only after D3** |
-| `Contribute\` aliases | — | **only after D6** |
+| #2151: response headers, `AddressPolicy` | 1.122 | #2161 |
+| `SdkException` marker, full hook catalogue, the `Plugin-SDK-Reference` page, `SdkSurfaceContractTest` | 1.123 | #2165 |
+| `PluginContext` (D3), the binding test for each entry point, `submission.reviewed` | 1.124 (0.2.31's minor under D7) | next |
+| The 2.0 plan with the D9 issues | docs | [Plugin-SDK-2.0-Plan](Plugin-SDK-2.0-Plan.md) |
 
 Not touched by this lane: performance, security and CI files (the other v0.2.31 lanes). Security reports go through SECURITY.md, never here; where a design choice here (D2, #1693, #1688) also hardens the SDK, the security lane is told separately.
 
 ---
 
-## 7. Decisions for the owner
+## 7. Decisions (owner, 19 Nov 2026)
 
-| # | Decision | Recommendation |
+| # | Decision | Owner's answer |
 |---|---|---|
-| **D1** | Ship **SDK 2.0** as the public beta's SDK (v0.2.40), with the 1.x shims kept through 2.x's first release? Or stay on 1.x and break later? | **2.0 at the beta.** Every plugin today is ours and there are no customers; after the beta a break costs third parties. Fold the open `seats.enforcement` question into it. |
-| **D2** | Workspace pinning: implicit (the workspace the call runs in) for everything a plugin calls; explicit `$tenantId` only in a host-only namespace plugins can't resolve | **Yes.** It also removes a whole class of wrong-workspace mistakes. |
-| **D3** | One entry point, `PluginContext::for($this)`, and the seven factories deprecated | **Yes**, additive in 1.124. |
-| **D4** | Manifest-first: every declarative contribution point gets a `plugin.json` key and a published JSON Schema; PHP for code only | **Yes.** It is what Whity Builder and the store need. |
-| **D5** | Home card folded into dashboard widgets (deprecate `PluginHomeCardInterface`). This changes register H.4. | **Yes**, the host renders old cards as widgets. |
-| **D6** | Contribution interfaces move to `Whity\Sdk\Contribute\` (aliases in 1.x) and "workspace" replaces "tenant" in SDK names | **Yes.** |
-| **D7** | SDK versioning: one minor per core release instead of one per feature; `sdk/CHANGELOG.md` replaces the `Sdk.php` ledger; npm plugin package in lockstep | **Yes.** Fewer collisions between parallel lanes too. |
-| **D8** | Publish `@whity/plugin-sdk` (npm) for plugin frontends; make the unused `@whity/ui` and `@whity/features` subpaths private | **Yes.** |
-| **D9** | Beta scope for the open issues: #2151 (done), #1681, #1914→#1680, #1683, #1728, #1686, #1910, #2137 built; #1688 and #1693 designed | **Yes**, the rest after the beta. |
-| **D10** | Themes: one declarative theme schema across app, documents and websites; the register lists which tokens a plugin may set | Design in 0.2.3x; build with #1689. |
-| **D11** | ERP: a plugin family on shared contracts. Design plugin-to-plugin services and `Commerce` value objects before the beta | **Design yes, build after the beta.** |
+| **D1** | SDK 2.0 as the public beta's SDK | **"2.0 at the beta (Recommended)".** 2.0 ships at v0.2.40, and the 1.x shims are kept through 2.x's first release. `seats.enforcement` folds into it. |
+| **D2** | Implicit workspace pinning for everything a plugin calls; explicit `$tenantId` only host-side | **Accepted** ("Accept all (Recommended)", D2, D3, D4, D6, D8) |
+| **D3** | One entry point, `PluginContext::for($this)`; the seven factories deprecated | **Accepted** |
+| **D4** | Manifest-first `plugin.json` with a published JSON Schema | **Accepted** |
+| **D5** | Home card folded into dashboard widgets | **"Fold into widgets (Recommended)"**, register H.4 updated |
+| **D6** | `Whity\Sdk\Contribute\` namespace; "workspace" replaces "tenant" in SDK names | **Accepted** |
+| **D7** | One SDK minor per core release; `sdk/CHANGELOG.md`; npm package in lockstep | **Accepted** ("Accept both (Recommended)", D7 and D9). The SDK lane owns the number; other lanes add to the current release's minor through it. 0.2.31 is **1.124** (1.122 and 1.123 were already used). |
+| **D8** | `@whity/plugin-sdk` npm package; unused ui/features subpaths private | **Accepted** |
+| **D9** | Beta scope: #2151 (done), #1681, #1914→#1680, #1683, #1728, #1686, #1910, #2137 built; #1688 and #1693 designed | **Accepted** |
+| **D10** | Themes | **Superseded** by TH.1–TH.14 (§5.1): one schema `schemas/theme/v1.json`, tokens only; `PluginThemesInterface`; `PluginThemeInterface` deprecated |
+| **D11** | Inventory / ERP | **Superseded** by IV.1–IV.24 (§5.2): inventory in core with SDK services and extension points; ERP plugins (costing, accounting, POS) build on them |
