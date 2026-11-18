@@ -43,9 +43,25 @@ final class VapidKeys
     ) {
     }
 
-    /** The public key, base64url without padding: what a browser subscribes with. */
+    /**
+     * The public key, base64url without padding: what a browser subscribes with.
+     *
+     * Read straight from the stored pair, without decrypting the private half
+     * (WHIT-1229). Decrypting runs the key ring's password derivation — about
+     * 40 ms of CPU — and this is asked on every dashboard load (the device
+     * list), where the private key is never needed. Only a missing pair falls
+     * through to {@see pair()}, which makes one.
+     */
     public function publicKey(): string
     {
+        $raw = $this->globals->get(self::SETTING_KEY);
+        if ($raw !== null && $raw !== '') {
+            $data = json_decode($raw, true);
+            if (is_array($data) && is_string($data['public'] ?? null) && $data['public'] !== '') {
+                return $data['public'];
+            }
+        }
+
         return $this->pair()['public'];
     }
 
