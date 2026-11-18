@@ -61,15 +61,24 @@ final class AgentProposalRepository
         ?int $undoWindowSeconds = null,
         // WHIT-833: what the call would change, from the tool's preview.
         ?array $diff = null,
+        // WHIT-931: the call's arguments hash ({@see \Whity\Mcp\Tools\McpCallKeys::hashArguments()}).
+        // With one, an identical proposal already waiting wins: nothing is
+        // stored and 0 is returned, so the caller answers with that one.
+        ?string $argumentsHash = null,
     ): int {
         $stmt = $this->db->prepare(
             'INSERT INTO agent_proposals
                  (tenant_id, agent_principal_id, on_behalf_of_profile_id, tool, arguments, diff, scope, permissions,
-                  summary, undo_window_seconds, status, expires_at, created_at)
+                  summary, undo_window_seconds, status, expires_at, created_at, arguments_hash)
              VALUES (:tenant_id, :agent, :profile, :tool, :arguments, :diff, :scope, :permissions,
-                  :summary, :undo, :status, :expires_at, NOW())'
+                  :summary, :undo, :status, :expires_at, NOW(), :arguments_hash)'
+            . ($argumentsHash !== null
+                ? " ON CONFLICT (tenant_id, agent_principal_id, on_behalf_of_profile_id, tool, arguments_hash)
+                    WHERE status = 'waiting' AND arguments_hash IS NOT NULL DO NOTHING"
+                : '')
         );
         $stmt->execute([
+            ':arguments_hash' => $argumentsHash,
             ':tenant_id'   => $tenantId,
             ':agent'       => $agentPrincipalId,
             ':profile'     => $onBehalfOfProfileId,
@@ -84,10 +93,43 @@ final class AgentProposalRepository
             ':expires_at'  => gmdate('Y-m-d H:i:s', time() + self::LIFETIME_SECONDS),
         ]);
 
+        if ($argumentsHash !== null && $stmt->rowCount() === 0) {
+            return 0;
+        }
+
         $id = (int) $this->db->lastInsertId();
         $this->events?->created($tenantId, $id, $agentPrincipalId, $onBehalfOfProfileId, $tool);
 
         return $id;
+    }
+
+    /**
+     * The proposal still waiting for the same call (WHIT-931): this agent, for
+     * this person, this tool, these arguments. Expired ones are marked first,
+     * so one past its 7 days is never handed back.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findWaitingCall(int $tenantId, string $agentPrincipalId, int $onBehalfOfProfileId, string $tool, string $argumentsHash): ?array
+    {
+        $this->expireDue($tenantId);
+        $stmt = $this->db->prepare(
+            'SELECT ' . self::COLUMNS . ' FROM agent_proposals
+              WHERE tenant_id = :tenant_id AND agent_principal_id = :agent AND on_behalf_of_profile_id = :profile
+                AND tool = :tool AND arguments_hash = :hash AND status = :waiting
+              ORDER BY id LIMIT 1'
+        );
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':agent'     => $agentPrincipalId,
+            ':profile'   => $onBehalfOfProfileId,
+            ':tool'      => $tool,
+            ':hash'      => $argumentsHash,
+            ':waiting'   => self::WAITING,
+        ]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? self::normalize($row) : null;
     }
 
     /** @return array<string, mixed>|null */

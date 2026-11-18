@@ -77,6 +77,9 @@ final class ToolsCallHandler implements MethodHandler
         // WHIT-932: counts agent work against `agents.runs.per_month`. Never
         // refuses; null counts nothing.
         private readonly ?MeterService $agentWork = null,
+        // WHIT-931: idempotency keys, so a retried call runs once. Null: keys
+        // are ignored and every call runs, as before.
+        private readonly ?McpCallKeys $callKeys = null,
     ) {}
 
     /**
@@ -93,6 +96,15 @@ final class ToolsCallHandler implements MethodHandler
 
     /** WHIT-812: on an agent's result, the action to undo and until when. */
     public const META_UNDO = 'dev.whity/undo';
+
+    /**
+     * WHIT-931: where a client puts its idempotency key, in the request's
+     * `params._meta`. A plain `idempotencyKey` there is accepted too.
+     */
+    public const META_IDEMPOTENCY_KEY = 'dev.whity/idempotencyKey';
+
+    /** WHIT-931: on a result handed back for a retry instead of running again. */
+    public const META_REPLAYED = 'dev.whity/replayed';
 
     /**
      * Run a call a person approved (WHIT-784). Every check runs again for the
@@ -361,9 +373,103 @@ final class ToolsCallHandler implements MethodHandler
             }
         }
 
-        $this->countAgentWork($principal);
+        $key = self::idempotencyKeyOf($params);
+        if ($key === null || $this->callKeys === null) {
+            $this->countAgentWork($principal);
+            return $this->run($principal, $toolName, $arguments, false, $surface->split);
+        }
 
-        return $this->run($principal, $toolName, $arguments, false, $surface->split);
+        return $this->runOnce($this->callKeys, $principal, $toolName, $arguments, $key, $surface->split);
+    }
+
+    /**
+     * The client's idempotency key, or null when it sent none (WHIT-931).
+     *
+     * @param array<string, mixed>|null $params
+     * @throws McpException when the key is there but not a usable string
+     */
+    private static function idempotencyKeyOf(?array $params): ?string
+    {
+        $meta = is_array($params['_meta'] ?? null) ? $params['_meta'] : [];
+        $key  = $meta[self::META_IDEMPOTENCY_KEY] ?? $meta['idempotencyKey'] ?? null;
+        if ($key === null) {
+            return null;
+        }
+        if (!is_string($key) || trim($key) === '' || strlen($key) > McpCallKeys::MAX_KEY_LENGTH) {
+            throw new McpException(ErrorCode::INVALID_PARAMS, 'The idempotency key must be a non-empty string of at most ' . McpCallKeys::MAX_KEY_LENGTH . ' characters.');
+        }
+        return $key;
+    }
+
+    /**
+     * Run a call that came with an idempotency key at most once (WHIT-931).
+     *
+     * The key is claimed before anything runs. A retry while the first call
+     * is still running is refused with CALL_IN_PROGRESS; once it is done the
+     * retry gets the stored result, marked `dev.whity/replayed`, and counts
+     * no agent work. The same key with other arguments is INVALID_PARAMS. A
+     * call that fails releases its key, so the same key can try again.
+     *
+     * @param array<string, mixed> $arguments
+     * @throws McpException
+     */
+    private function runOnce(McpCallKeys $keys, McpPrincipal $principal, string $toolName, array $arguments, string $key, ?string $split): mixed
+    {
+        $claim = $keys->claim($principal->tenantId, self::keyOwner($principal), $toolName, $key, McpCallKeys::hashArguments($arguments));
+
+        if ($claim['state'] === 'mismatch') {
+            throw new McpException(ErrorCode::INVALID_PARAMS, 'This idempotency key was already used for this tool with other arguments. Use a new key for a new call.');
+        }
+        if ($claim['state'] === 'running') {
+            throw new McpException(ErrorCode::CALL_IN_PROGRESS, 'A call with this idempotency key is still running. Try again shortly with the same key to get its result.');
+        }
+        if ($claim['state'] === 'done') {
+            $result = $claim['result'];
+            if (is_array($result)) {
+                $result['_meta'] = (is_array($result['_meta'] ?? null) ? $result['_meta'] : []) + [self::META_REPLAYED => true];
+            }
+            return $result;
+        }
+
+        $id = $claim['id'];
+        try {
+            $this->countAgentWork($principal);
+            $result = $this->run($principal, $toolName, $arguments, false, $split);
+        } catch (Throwable $e) {
+            $this->releaseKey($keys, $id, $principal->tenantId);
+            throw $e;
+        }
+
+        if (is_array($result) && ($result['isError'] ?? false) === true) {
+            $this->releaseKey($keys, $id, $principal->tenantId);
+            return $result;
+        }
+        try {
+            $keys->finish($id, $principal->tenantId, $result);
+        } catch (Throwable $e) {
+            $this->warn("[mcp] storing the result of {$toolName} for its idempotency key failed (tenant {$principal->tenantId}): " . $e->getMessage());
+        }
+        return $result;
+    }
+
+    private function releaseKey(McpCallKeys $keys, int $id, int $tenantId): void
+    {
+        try {
+            $keys->release($id, $tenantId);
+        } catch (Throwable $e) {
+            $this->warn("[mcp] releasing an idempotency key failed (tenant {$tenantId}): " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Whose keys these are: an agent for its person, or the person. Two agents
+     * of one person, or one agent for two people, never share a key.
+     */
+    private static function keyOwner(McpPrincipal $principal): string
+    {
+        return $principal->isAgent()
+            ? 'agent:' . $principal->agentPrincipalId() . '@' . $principal->userId
+            : 'profile:' . $principal->userId;
     }
 
     /**
@@ -719,6 +825,15 @@ final class ToolsCallHandler implements MethodHandler
 
         $permission = is_string($access['requiredPermission'] ?? null) ? $access['requiredPermission'] : null;
         $summary    = is_string($tool['description'] ?? null) && $tool['description'] !== '' ? $tool['description'] : $toolName;
+
+        // WHIT-931: the same call asked again (a retry with no key) while the
+        // first is still waiting is that proposal, not a second card.
+        $hash    = McpCallKeys::hashArguments($arguments);
+        $waiting = $this->proposals->findWaitingCall($principal->tenantId, $principal->agentPrincipalId(), $principal->userId, $toolName, $hash);
+        if ($waiting !== null) {
+            return self::proposalResult($waiting['id'], $waiting['summary'], $waiting['permissions'], true);
+        }
+
         $id = $this->proposals->create(
             $principal->tenantId,
             $principal->agentPrincipalId(),
@@ -731,20 +846,48 @@ final class ToolsCallHandler implements MethodHandler
             diff: $this->proposalDiffs?->diffFor($toolName, $arguments, $principal->tenantId, self::contextFor($principal, $principal->tenantId)),
             // WHIT-812: the card says how long it can be undone once it runs.
             undoWindowSeconds: is_int($tool['_meta'][ToolSurface::META_UNDO_WINDOW] ?? null) ? $tool['_meta'][ToolSurface::META_UNDO_WINDOW] : null,
+            argumentsHash: $hash,
         );
+        if ($id === 0) {
+            // An identical call stored its proposal between the lookup and now.
+            $waiting = $this->proposals->findWaitingCall($principal->tenantId, $principal->agentPrincipalId(), $principal->userId, $toolName, $hash);
+            if ($waiting === null) {
+                throw new McpException(ErrorCode::INTERNAL_ERROR, 'The proposal could not be stored.');
+            }
+            return self::proposalResult($waiting['id'], $waiting['summary'], $waiting['permissions'], true);
+        }
+
+        return self::proposalResult($id, $summary, $permission !== null ? [$permission] : [], false);
+    }
+
+    /**
+     * What an agent is told about its Ask-first call: the proposal waiting for
+     * its person, marked `alreadyWaiting` when it had asked the same before.
+     *
+     * @param list<string> $permissions
+     * @return array<string, mixed>
+     */
+    private static function proposalResult(int $id, string $summary, array $permissions, bool $alreadyWaiting): array
+    {
+        $proposal = [
+            'id'            => $id,
+            'status'        => AgentProposalRepository::WAITING,
+            'summary'       => $summary,
+            'permissions'   => $permissions,
+            'expiresInDays' => intdiv(AgentProposalRepository::LIFETIME_SECONDS, 86400),
+        ];
+        if ($alreadyWaiting) {
+            $proposal['alreadyWaiting'] = true;
+        }
 
         return [
             'content' => [[
                 'type' => 'text',
                 'text' => (string) json_encode([
-                    'proposal' => [
-                        'id'          => $id,
-                        'status'      => AgentProposalRepository::WAITING,
-                        'summary'     => $summary,
-                        'permissions' => $permission !== null ? [$permission] : [],
-                        'expiresInDays' => intdiv(AgentProposalRepository::LIFETIME_SECONDS, 86400),
-                    ],
-                    'message' => 'Not done yet: this needs the person you act for to approve it. They will see it in their approvals.',
+                    'proposal' => $proposal,
+                    'message'  => $alreadyWaiting
+                        ? 'Not done yet: you asked for this already and it is still waiting for the person you act for to approve it. Nothing new was added to their approvals.'
+                        : 'Not done yet: this needs the person you act for to approve it. They will see it in their approvals.',
                 ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
             ]],
         ];
