@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.121.0",
+    "sdk_version": "1.122.0",
     "core_version": "0.2.30",
     "updated": "2026-11-18",
     "ratings": {
@@ -1441,13 +1441,17 @@
                 {
                     "what": "One outbound HTTP client for calling other servers: https only unless asked, verified TLS, no redirects, timeouts and a size cap, with recorded answers for tests (Http\\Outbound\\HttpClient, StreamHttpClient, Testing\\RecordedHttpClient)",
                     "since": "1.114"
+                },
+                {
+                    "what": "Response headers, and an opt-in policy that keeps a person-supplied URL off the server's own network: resolved once, every address public, connected to the checked address (HttpResponse::$headers, Http\\Outbound\\AddressPolicy)",
+                    "since": "1.122"
                 }
             ],
             "missing": [
                 "Subscribing external URLs to events, with signing, retries and a delivery log",
                 "Admin-registered connectors"
             ],
-            "security": "Outbound calls need a guard against private addresses, signing secrets kept in PluginSecrets, a workspace check per event and id-only payloads.",
+            "security": "Outbound calls to person-supplied URLs use AddressPolicy (1.122); webhooks still need signing secrets kept in PluginSecrets, a workspace check per event and id-only payloads.",
             "issues": [
                 342
             ],

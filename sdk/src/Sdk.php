@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.121).
+ * SDK identity (v1.122).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1410,12 +1410,20 @@ namespace Whity\Sdk;
  * `required` means at least one (#1437).
  *
  * Purely additive: without `multiple` a reference select submits one string, as before.)
+ *
+ * 1.122 (OUTBOUND HEADERS AND ADDRESSES: {@see Http\Outbound\HttpResponse::$headers} and `header()`
+ * carry the answer's headers (`Retry-After`, `Location`), and {@see Testing\RecordedHttpClient::on()}
+ * scripts them. {@see Http\Outbound\AddressPolicy::publicOnly()} is an opt-in for
+ * {@see Http\Outbound\StreamHttpClient} when a person supplies the URL: the host is resolved once,
+ * refused when any address is not public, and the connection goes to the checked address (#2151).
+ *
+ * Purely additive: the new constructor arguments are optional and nothing changes without a policy.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.121.0';
+    public const VERSION = '1.122.0';
 
     /**
      * Static identity only — never instantiated.

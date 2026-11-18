@@ -27,6 +27,20 @@ if ($path === '/echo') {
     return;
 }
 
+if ($path === '/headers') {
+    http_response_code(429);
+    header('Retry-After: 30');
+    header('X-Twice: one', false);
+    header('X-Twice: two', false);
+    echo '{"error":"slow down"}';
+    return;
+}
+
+if ($path === '/host') {
+    echo (string) ($_SERVER['HTTP_HOST'] ?? '');
+    return;
+}
+
 if ($path === '/redirect') {
     header('Location: /echo', true, 302);
     return;
