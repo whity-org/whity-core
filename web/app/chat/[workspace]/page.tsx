@@ -139,7 +139,8 @@ export default function PublicChatPage({ params }: { params: Promise<{ workspace
   );
 
   const firstMessage = token === null;
-  const needsBotCheck = firstMessage && info?.bot_check != null;
+  // WHIT-1220: a check without a site key can never render, so it never blocks Send.
+  const needsBotCheck = firstMessage && !!info?.bot_check?.site_key;
   const brand = info?.brand ?? null;
   const shownName = brand?.name || info?.workspace_name || '';
 

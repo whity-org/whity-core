@@ -64,6 +64,12 @@ final class PublicChatApiHandler
     ) {
     }
 
+    /** A visitor must pass a bot check: a provider is chosen and fully set up. */
+    private function needsBotCheck(): bool
+    {
+        return $this->bot->isRequired() && $this->bot->isReady();
+    }
+
     /** @param array<string, string> $params */
     public function info(Request $request, array $params = []): Response
     {
@@ -76,7 +82,9 @@ final class PublicChatApiHandler
             'workspace_name' => $workspace['name'],
             'greeting' => $workspace['greeting'],
             'max_length' => WebChatChannel::MAX_BODY,
-            'bot_check' => $this->bot->isReady()
+            // WHIT-1220: only when a provider is chosen. "Allow without a bot check"
+            // also makes isReady() true, and a check with no provider could never pass.
+            'bot_check' => $this->needsBotCheck()
                 ? ['provider' => $this->bot->provider(), 'site_key' => $this->bot->siteKey()]
                 : null,
             'brand' => $this->brandFor($workspace['id'], $workspace['name']),
@@ -124,7 +132,7 @@ final class PublicChatApiHandler
             return Response::json(['data' => ['token' => PublicToken::make(32), 'messages' => []]], 201);
         }
 
-        if ($this->bot->isReady()) {
+        if ($this->needsBotCheck()) {
             $verdict = $this->bot->verify((string) ($body['bot_token'] ?? ''), $ip);
             if ($verdict === BotCheck::UNREACHABLE) {
                 return Response::error('The bot check could not be reached. Please try again.', 503);
