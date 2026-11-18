@@ -112,6 +112,12 @@ WORKDIR /app
 # repository, which this COPY brings along.
 COPY . /app
 
+# The reference plugins (HelloWorld, ExamplePlugin) ship in the image as
+# examples but do not run in it (#1831): no routes, roles, jobs or migrations
+# from them on a real deployment. Set WHITY_REFERENCE_PLUGINS=on to run them.
+# Development, CI and e2e build the `base` stage, where it is unset (= on).
+ENV WHITY_REFERENCE_PLUGINS=off
+
 RUN composer install --no-dev --prefer-dist --no-progress --no-interaction \
     && composer clear-cache
 

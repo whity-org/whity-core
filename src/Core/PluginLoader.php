@@ -1656,6 +1656,11 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             return [];
         }
 
+        // #1831: the reference-plugins switch decides what discovery finds, so
+        // it is part of the signature: flipping it invalidates the manifest
+        // cache and makes reload() converge, like a file change would.
+        $fingerprint['@' . \Whity\Core\Plugin\ReferencePlugins::ENV] = \Whity\Core\Plugin\ReferencePlugins::enabled() ? 'on' : 'off';
+
         ksort($fingerprint);
 
         return $fingerprint;
@@ -1827,6 +1832,12 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             // sentinel) — discovery never require_once's its top-level code
             // (WC-220 minor).
             if (str_starts_with($item, '.')) {
+                continue;
+            }
+
+            // #1831: HelloWorld and ExamplePlugin ship in the image as examples;
+            // with WHITY_REFERENCE_PLUGINS=off (the release image) they don't run.
+            if (\Whity\Core\Plugin\ReferencePlugins::skips($item)) {
                 continue;
             }
 
