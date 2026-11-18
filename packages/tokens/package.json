@@ -1,6 +1,6 @@
 {
   "name": "@whity/tokens",
-  "version": "1.2.0",
+  "version": "1.1.0",
   "description": "Design tokens (colors, typography, spacing, radius), fonts and logos for Whity products — generated from src/design/tokens/base.json and the brand handoff. No React/Next dependency: a plain JSON bundle, standalone importable Tailwind v4 theme CSS, a shadcn/Tailwind base-reset layer, self-hosted @font-face CSS, the websites' plain token CSS and the logo set.",
   "license": "MIT",
   "repository": {
