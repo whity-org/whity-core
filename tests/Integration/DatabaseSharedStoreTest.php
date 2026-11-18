@@ -62,10 +62,22 @@ final class DatabaseSharedStoreTest extends TestCase
         self::assertSame(1, $relaxed->increment('expired', 60), 'an elapsed window restarts at one');
 
         if ($this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
-            $setting = $this->pdo->query('SHOW synchronous_commit');
-            self::assertNotFalse($setting);
-            self::assertSame('on', $setting->fetchColumn(), 'the relaxed commit is statement-local, never the session');
+            // Compared with the session's own value, not 'on': a test server
+            // may run with it off already.
+            $before = $this->synchronousCommit();
+            $this->pdo->exec("SET synchronous_commit = 'on'");
+            $relaxed->increment('r', 60);
+            self::assertSame('on', $this->synchronousCommit(), 'the relaxed commit is statement-local, never the session');
+            $this->pdo->exec("SET synchronous_commit = '" . $before . "'");
         }
+    }
+
+    private function synchronousCommit(): string
+    {
+        $setting = $this->pdo->query('SHOW synchronous_commit');
+        self::assertNotFalse($setting);
+
+        return (string) $setting->fetchColumn();
     }
 
     public function testRelaxedIncrementInsideACallersTransactionStillCounts(): void
