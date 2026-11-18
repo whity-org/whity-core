@@ -277,21 +277,21 @@ Everything core does with stock, a plugin can do through the SDK, from the first
 
 **The workspace comes from the call, never from an argument** (owner decisions D2 and D3 for the SDK, 19 November 2026). A plugin method runs in the workspace of the route, MCP tool or job that called it; with no workspace (or the system workspace) it refuses with reason `no_workspace`. No plugin-facing method takes a workspace id, so a plugin cannot reach another workspace's stock even by mistake. Core's own code calls the services in `Whity\Core\Inventory` with an explicit workspace; those forms stay host-side and move to `Whity\Sdk\Host\` in SDK 2.0.
 
-The services are host services, resolved from the container (`\Whity\app(Items::class)`, null on an older host). Once `PluginContext` lands they are also on the context: `$ctx->inventory()->items()`, `->locations()`, `->stock()`, `->units()`. Reads are not permission-checked (the plugin is trusted with its workspace's data). Writes act as a person (`$actingProfileId`) and go through the same validation and permissions as the API. Refusals throw `InventoryRejected`, which extends `\RuntimeException`, will implement `Whity\Sdk\SdkException` once that lands, and carries a stable `reason` (`no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `item_limit`, `vetoed`), an HTTP-like `status` and the `field` at fault.
+The services are host services, resolved from the container (`\Whity\app(Items::class)`, null on an older host). They are also on the plugin context: `$ctx->inventory()->items()`, `->locations()`, `->stock()`, `->units()`. Writing stock goes only through the context: its `stock()` is bound to the loaded plugin, so a move's source type comes from the plugin the loader loaded, never from an argument. The container's `Stock` reads, and refuses a write with reason `use_plugin_context`. Reads are not permission-checked (the plugin is trusted with its workspace's data). Writes act as a person (`$actingProfileId`) and go through the same validation and permissions as the API. Refusals throw `InventoryRejected`, which extends `\RuntimeException`, implements `Whity\Sdk\SdkException`, and carries a stable `reason` (`no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `item_limit`, `vetoed`), an HTTP-like `status` and the `field` at fault.
 
 ### 6.1 Services (`Whity\Sdk\Inventory\...`)
 
-| Service | Methods (P1 shipped in SDK 1.125; the rest arrive with their phase) |
+| Service | Methods (P1 shipped in SDK 1.126; the rest arrive with their phase) |
 | --- | --- |
 | `Items` | `list(filter, limit, offset)`, `get(itemId)`, `findBySku(sku)`, `findByBarcode(code)` (the item, the variant and the unit the barcode means), `create(data, actingProfileId)`, `update(itemId, changes, actingProfileId)`, `archive(itemId, actingProfileId)` |
 | `Locations` | `list(includeVirtual)`, `get(locationId)`, `virtual(role)`, `create(data, actingProfileId)` |
-| `Stock` | `levels(filter)` (variant, place, lot, on hand, reserved, available), `available(variantId, locationId)`, `history(filter, limit)` (keyset by `before_id`), `move(plugin, MoveRequest)` (one or many lines, one transaction, idempotency key, source type and id), `reverse(plugin, batchKey, actingProfileId, note)`; P5 adds `reserve(plugin, ReservationRequest)` and `release(plugin, reservationId)`; P6 adds `consumeRecipe(...)` |
+| `Stock` | `levels(filter)` (variant, place, lot, on hand, reserved, available), `available(variantId, locationId)`, `history(filter, limit)` (keyset by `before_id`), `move(MoveRequest)` (one or many lines, one transaction, idempotency key, source type and id), `reverse(batchKey, actingProfileId, note)`; P5 adds `reserve(ReservationRequest)` and `release(reservationId)`; P6 adds `consumeRecipe(...)` |
 | `Units` | `list()`, `convert(quantity, fromUnit, toUnit, itemId)` |
 | `Lots` (P4) | `get(lotId)`, `findByCode(variantId, code)`, `expiring(days)` |
 | `Orders` (P3, P5) | `list`, `get`, `createPurchase`, `createSale`, `addLines`, `submit` (sends to its route or confirms), `cancel` |
 | `Operations` (P2) | `create(kind, ...)`, `addLines`, `post` (to done), `get`, `list` |
 
-Value objects: `Quantity` (whole steps and decimals, `parse()`, `toDecimal()`, `convert()`), `Item`, `Variant`, `Unit`, `Location`, `StockLevel`, `Move`, `MoveRequest`, `MoveLine`, `InventoryRejected`; later `Reservation`, `Order`, `OrderLine`, `Operation`, `Lot`. Writes that move stock take the plugin object (`$this`): the host prefixes the request's source type with the name the loader bound to that object (`pos.sale`, `appointments.booking`), never with anything the plugin says, the same namespace rule as routing kinds, and namespaces its idempotency keys the same way.
+Value objects: `Quantity` (whole steps and decimals, `parse()`, `toDecimal()`, `convert()`), `Item`, `Variant`, `Unit`, `Location`, `StockLevel`, `Move`, `MoveRequest`, `MoveLine`, `InventoryRejected`; later `Reservation`, `Order`, `OrderLine`, `Operation`, `Lot`. Stock reached through the context is bound to the plugin the loader loaded: the host prefixes the request's source type with that plugin's name (`pos.sale`, `appointments.booking`), never with anything the plugin says, the same namespace rule as routing kinds, and namespaces its idempotency keys the same way.
 
 ### 6.2 Events (`Whity\Sdk\Hooks\Events`)
 
@@ -331,7 +331,7 @@ POS and barcode scanners are not their own interfaces: a POS plugin uses `Stock`
 
 ### 6.4 SDK numbers and names
 
-P1 shipped as SDK 1.125 (one minor per pull request while 0.2.31 lasts; from 0.2.32 one minor per core release, owner decision D7). Each later phase asks lane sdk-0231 for its number before it opens its pull request. Contributions a plugin makes (the interfaces in 6.3) live under `Whity\Sdk\Contribute\` with "workspace" in their names and parameters, never "tenant" (owner decision D6); their exact names are settled with sdk-0231 when each phase opens. `docs/sdk-coverage/coverage.json` lists every service, event and interface with the version it arrived in.
+P1 shipped as SDK 1.126 (one minor per pull request while 0.2.31 lasts; from 0.2.32 one minor per core release, owner decision D7). Each later phase asks lane sdk-0231 for its number before it opens its pull request. Contributions a plugin makes (the interfaces in 6.3) live under `Whity\Sdk\Contribute\` with "workspace" in their names and parameters, never "tenant" (owner decision D6); their exact names are settled with sdk-0231 when each phase opens. `docs/sdk-coverage/coverage.json` lists every service, event and interface with the version it arrived in.
 
 ## 7. What it takes from Taskaat's "Frozen by WHIT-667"
 
