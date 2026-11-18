@@ -6075,13 +6075,41 @@ final class CoreApiSchemas
             'CheckoutStartRequest' => self::object([
                 'plan_key' => self::str(),
                 'billing_period' => ['type' => 'string', 'enum' => ['month', 'half_year', 'year', 'once']],
+                // WHIT-1207: the payment step after creating a workspace comes back to /setup/pay/done.
+                'after' => ['type' => 'string', 'enum' => ['setup'], 'description' => 'Where the payer comes back to: `setup` for the payment step after creating a workspace (WHIT-1207); Billing otherwise'],
             ], ['plan_key']),
             // Only a destination. The session reference is a capability token
             // and is deliberately not returned — the browser needs somewhere to
             // go, and nothing else here has to reach it.
             'CheckoutStartResponse' => self::dataEnvelope(self::object([
                 'url' => self::str(),
+                'trial_days' => self::int() + ['description' => 'Set when the card is taken now and first charged when the trial of the workspace ends, this many days from now (WHIT-1207)'],
             ], ['url'])),
+            // WHIT-1207: where a workspace stands with its plan's trial and payment.
+            'WorkspaceTrialState' => self::object([
+                'plan_key' => self::str(),
+                'plan_name' => self::str(),
+                'status' => self::str(),
+                'trial_ends_at' => self::str(true) + ['format' => 'date-time'],
+                'days_left' => self::int(true) + ['description' => 'Whole days left in the trial, rounded up; null when not in a trial'],
+                'read_only' => self::bool() + ['description' => 'The trial ended unpaid: changes are refused until it is paid'],
+                'card_added' => self::bool() + ['description' => 'A subscription with the payment provider exists'],
+                'price' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'unit_amount' => self::int(),
+                        'currency' => self::str(),
+                        'billing_period' => self::str(),
+                    ],
+                    'required' => ['unit_amount', 'currency', 'billing_period'],
+                ],
+                'pay_online' => self::bool() + ['description' => 'This deployment takes payments online'],
+                'card_step' => self::bool() + ['description' => 'A card can be added now and first charged when the trial ends'],
+            ], ['plan_key', 'plan_name', 'status', 'trial_ends_at', 'days_left', 'read_only', 'card_added', 'price', 'pay_online', 'card_step']),
+            'WorkspaceTrialResponse' => self::object([
+                'data' => ['allOf' => [['$ref' => '#/components/schemas/WorkspaceTrialState']], 'nullable' => true],
+            ], ['data']),
             // WHAT A TENANT MAY BUY. Separate from the operator's plan catalogue,
             // which is gated on plans:manage — a permission a paying customer
             // never holds. Amounts are MINOR UNITS with a currency code; the
@@ -14943,6 +14971,19 @@ final class CoreApiSchemas
                     422 => self::errorResponse('That plan cannot be bought on these terms'),
                     502 => self::errorResponse('The billing service refused the request'),
                     503 => self::errorResponse('The billing service is temporarily unreachable'),
+                ] + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/billing/trial', [
+                'summary' => 'Where this workspace stands with the trial and payment of its plan',
+                'description' =>
+                    'For every member (WHIT-1207): the plan, when its free trial ends, whether the '
+                    . 'workspace is read-only because the trial ended unpaid, whether a card is on '
+                    . 'file, the monthly price, and whether a card can be added now and charged when '
+                    . 'the trial ends (`card_step`). `data` is null for a workspace with no billed '
+                    . 'plan. Not behind the payment wall, so a read-only workspace can find out how to pay.',
+                'tags' => ['billing'],
+                'responses' => [
+                    200 => self::jsonResponse('The trial of this workspace','WorkspaceTrialResponse'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/billing/limits', 'billing:view', [

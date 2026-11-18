@@ -73,6 +73,8 @@ final class ExternalBillingApiHandler
     ) {
     }
 
+    private ?\Whity\Core\Billing\WorkspaceTrial $workspaceTrial = null;
+
     // ── the tenant-facing surface ───────────────────────────────────────────
 
     /**
@@ -166,6 +168,40 @@ final class ExternalBillingApiHandler
             return Response::error('That plan cannot be bought on these terms.', 422);
         }
 
+        // WHIT-1207: the payment step after creating a workspace comes back to
+        // the setup flow, not to Billing. Only this one fixed word is taken,
+        // never an address from the caller.
+        $fromSetup = ($body['after'] ?? null) === 'setup';
+        $returnUrl = $this->appUrl . ($fromSetup ? '/setup/pay/done' : '/billing/return');
+        // `/billing`, not `/billing/plans`: the latter does not exist and 404'd
+        // every payer who abandoned the hosted page.
+        $cancelUrl = $this->appUrl . ($fromSetup ? '/setup/pay' : '/billing');
+
+        // WHIT-1207 (owner 2026-11-18): a workspace still in the free trial of
+        // its own plan adds a card WITHOUT losing the rest of the trial: the
+        // first charge is when the trial ends. The days come from our own
+        // record of the trial, never from the request. A portal that cannot
+        // start a trial falls through to an ordinary checkout, which is what
+        // Billing's Pay always did; the setup step is not offered there.
+        $trialDays = !$isAddon ? $this->workspaceTrial?->trialDaysForCheckout($tenantId, trim($planKey)) : null;
+        $trialBridge = $trialDays !== null ? $this->pluginBridge() : null;
+        if ($trialDays !== null && $trialBridge !== null && $trialBridge->takesTrials()) {
+            try {
+                $handoff = $trialBridge->startCheckoutWithTrial(
+                    $this->actorFor($request),
+                    BillingSubject::forTenant($tenantId),
+                    $priceRef,
+                    $trialDays,
+                    $returnUrl,
+                    $cancelUrl,
+                );
+            } catch (BillingPortalException $e) {
+                return $this->portalFailure($e, 'start a checkout', ['tenant_id' => $tenantId]);
+            }
+
+            return Response::json(['data' => ['url' => $handoff->url, 'trial_days' => $trialDays]]);
+        }
+
         // SDK 1.110: a plugin sold per seat (Whity for Salons per chair) is
         // bought for the count the workspace set, never a number the caller
         // sends.
@@ -181,8 +217,8 @@ final class ExternalBillingApiHandler
                     BillingSubject::forTenant($tenantId),
                     $priceRef,
                     $quantity,
-                    $this->appUrl . '/billing/return',
-                    $this->appUrl . '/billing',
+                    $returnUrl,
+                    $cancelUrl,
                 );
             } catch (BillingPortalException $e) {
                 return $this->portalFailure($e, 'start a checkout', ['tenant_id' => $tenantId]);
@@ -196,11 +232,8 @@ final class ExternalBillingApiHandler
                 $this->actorFor($request),
                 BillingSubject::forTenant($tenantId),
                 $priceRef,
-                $this->appUrl . '/billing/return',
-                // `/billing`, not `/billing/plans`: the latter does not exist
-                // and 404'd every payer who abandoned the hosted page — the same
-                // dead end the return URL had, found the same way.
-                $this->appUrl . '/billing',
+                $returnUrl,
+                $cancelUrl,
             );
         } catch (BillingPortalException $e) {
             return $this->portalFailure($e, 'start a checkout', ['tenant_id' => $tenantId]);
@@ -809,6 +842,49 @@ final class ExternalBillingApiHandler
     public function usePluginSeats(\Whity\Core\Plugin\Workspace\PluginSeats $seats): void
     {
         $this->pluginSeats = $seats;
+    }
+
+    /** WHIT-1207: the workspace's trial, for the payment step, the banner and trial checkouts. */
+    public function useWorkspaceTrial(\Whity\Core\Billing\WorkspaceTrial $trial): void
+    {
+        $this->workspaceTrial = $trial;
+    }
+
+    /**
+     * GET /api/v1/billing/trial — where this workspace stands with its plan's
+     * trial and payment (WHIT-1207).
+     *
+     * For EVERY member, not only payers: everyone sees the read-only banner,
+     * and those who can't pay are told to ask an owner. It says nothing a
+     * member can't already see (the plan's name and price, and whether the
+     * workspace is read-only). `data` is null for a workspace with no billed
+     * plan. Exempt from the payment wall with the rest of /billing, so a
+     * read-only workspace can still find out how to pay.
+     *
+     * `card_step` says whether "add a card now, charged when the trial ends"
+     * can be offered: a portal is configured, it can start a trial, and the
+     * trial is still running with no card on file.
+     */
+    public function trial(Request $request): Response
+    {
+        $tenantId = TenantContext::getTenantId();
+        if ($tenantId === null) {
+            return Response::error('Tenant context is required', 403);
+        }
+        $trial = $this->workspaceTrial;
+        $state = $trial?->stateFor($tenantId);
+        if ($trial === null || $state === null) {
+            return Response::json(['data' => null]);
+        }
+
+        $payOnline = $this->portal->isConfigured();
+        $bridge = $payOnline ? $this->pluginBridge() : null;
+        $state['pay_online'] = $payOnline;
+        $state['card_step'] = $bridge !== null
+            && $bridge->takesTrials()
+            && $trial->trialDaysForCheckout($tenantId, $state['plan_key']) !== null;
+
+        return Response::json(['data' => $state]);
     }
 
     private function pluginBridge(): ?SdkBillingPortalBridge

@@ -93,6 +93,53 @@ final class SdkBillingPortalBridge implements BillingPortal
         return new CheckoutHandoff($handoff->url, $handoff->reference);
     }
 
+    /** Whether this plugin can take a card now and charge when a trial ends (SDK 1.118, WHIT-1207). */
+    public function takesTrials(): bool
+    {
+        $portal = $this->portal;
+        if (!$portal instanceof \Whity\Sdk\Billing\TrialCheckout) {
+            return false;
+        }
+        try {
+            return $portal->takesTrials();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * A checkout whose first charge is $trialDays from now (SDK 1.118,
+     * WHIT-1207): a workspace already in a trial adds its card without the
+     * trial being cut short.
+     *
+     * @param array<string, string> $payer
+     */
+    public function startCheckoutWithTrial(
+        BillingActor $actor,
+        string $subjectRef,
+        string $priceRef,
+        int $trialDays,
+        string $returnUrl,
+        ?string $cancelUrl = null,
+        array $payer = [],
+    ): CheckoutHandoff {
+        $portal = $this->portal;
+        if (!$portal instanceof \Whity\Sdk\Billing\TrialCheckout) {
+            throw BillingPortalException::unsupported('this billing plugin cannot start a trial');
+        }
+        $handoff = $this->call(fn () => $portal->startCheckoutWithTrial(
+            $actor->value,
+            $subjectRef,
+            $priceRef,
+            max(1, $trialDays),
+            $returnUrl,
+            $cancelUrl,
+            $payer,
+        ));
+
+        return new CheckoutHandoff($handoff->url, $handoff->reference);
+    }
+
     public function accessFor(string $subjectRef): AccessSnapshot
     {
         $snapshot = $this->call(fn () => $this->portal->accessFor($subjectRef));

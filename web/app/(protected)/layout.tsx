@@ -6,6 +6,7 @@ import { TopBar } from '@/components/shell/top-bar';
 import { AppCommandPalette } from '@/components/shell/app-command-palette';
 import { MaintenanceNotice } from '@/components/shell/maintenance-notice';
 import { PlanLimitBanner } from '@/components/billing/plan-limit-banner';
+import { WorkspaceTrialBanner } from '@/components/billing/workspace-trial-banner';
 import { PhoneNav } from '@/components/shell/phone-nav';
 import { DataTableLabels } from '@/components/shell/data-table-labels';
 import { PushOffer } from '@/components/pwa/push-offer';
@@ -52,6 +53,8 @@ export default function ProtectedLayout({
           <MaintenanceNotice />
           {/* TplPlanLimit (BM.11): past a plan limit, for people who can change the plan. */}
           <PlanLimitBanner />
+          {/* WHIT-1207: a further workspace's trial ending, or read-only after it, with Pay. */}
+          <WorkspaceTrialBanner />
           {/* Gutters 16px on phones, 24 from 640, 32 from 768 (register 4.5).
               A page marked data-full-width (the calendar, CV.1) takes the whole width. */}
           <div className="p-4 sm:p-6 md:p-8 max-w-7xl has-[[data-full-width]]:max-w-none">

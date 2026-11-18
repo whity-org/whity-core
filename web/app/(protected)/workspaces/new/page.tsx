@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useNavigation } from '@/lib/navigation-context';
 import { invalidateWorkspaceCreateState, useWorkspaceCreateState } from '@/lib/use-workspace-create';
 import { templatePickerPath } from '@/lib/workspace-template';
+import { PAYMENT_STEP_PATH } from '@/lib/billing/workspace-trial';
 import { Button } from '@whity/ui/button';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Card, CardContent } from '@whity/ui/card';
@@ -33,6 +34,9 @@ import type { components } from '@whity/api-client';
  * operator has set `workspaces.additional_plan`, every further one starts a
  * trial of that plan. `next_plan` says so before they create it, with the
  * plan's monthly price (CU.1-4).
+ *
+ * WHIT-1207: creating such a workspace goes on to the payment step
+ * (/setup/pay), which asks for a card and keeps the trial free.
  */
 
 type FieldError = 'name_required' | 'name_too_long' | null;
@@ -148,10 +152,14 @@ export default function NewWorkspacePage() {
         // Into the new workspace, as its owner; the switch re-reads /me.
         await switchTenant(body.data.tenant_id);
         await refreshNav();
+        // Read before the cache is dropped: whether this one starts a paid trial.
+        const paid = (state?.next_plan ?? null) !== null;
         // After the switch, so the fresh answer is read with the new session.
         invalidateWorkspaceCreateState();
-        // WHIT-1195: a new workspace starts from a template.
-        router.push((await templatePickerPath()) ?? '/dashboard');
+        // WHIT-1207: a further workspace asks for a card first (charged when the
+        // trial ends; Not now keeps the trial). The step goes straight on when
+        // no card can be taken. WHIT-1195: then a new workspace starts from a template.
+        router.push(paid ? PAYMENT_STEP_PATH : ((await templatePickerPath()) ?? '/dashboard'));
         return;
       }
       if (response.status === 422) {

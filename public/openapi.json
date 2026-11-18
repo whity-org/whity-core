@@ -7094,6 +7094,78 @@
                 ]
             }
         },
+        "/api/v1/billing/trial": {
+            "get": {
+                "operationId": "get_api_v1_billing_trial",
+                "summary": "Where this workspace stands with the trial and payment of its plan",
+                "tags": [
+                    "billing"
+                ],
+                "description": "For every member (WHIT-1207): the plan, when its free trial ends, whether the workspace is read-only because the trial ended unpaid, whether a card is on file, the monthly price, and whether a card can be added now and charged when the trial ends (`card_step`). `data` is null for a workspace with no billed plan. Not behind the payment wall, so a read-only workspace can find out how to pay.",
+                "responses": {
+                    "200": {
+                        "description": "The trial of this workspace",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspaceTrialResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/billing/webhook": {
             "post": {
                 "operationId": "post_api_v1_billing_webhook",
@@ -84661,6 +84733,13 @@
                             "year",
                             "once"
                         ]
+                    },
+                    "after": {
+                        "type": "string",
+                        "enum": [
+                            "setup"
+                        ],
+                        "description": "Where the payer comes back to: `setup` for the payment step after creating a workspace (WHIT-1207); Billing otherwise"
                     }
                 },
                 "required": [
@@ -84675,6 +84754,10 @@
                         "properties": {
                             "url": {
                                 "type": "string"
+                            },
+                            "trial_days": {
+                                "type": "integer",
+                                "description": "Set when the card is taken now and first charged when the trial of the workspace ends, this many days from now (WHIT-1207)"
                             }
                         },
                         "required": [
@@ -112767,6 +112850,94 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "WorkspaceTrialResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/WorkspaceTrialState"
+                            }
+                        ],
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "WorkspaceTrialState": {
+                "type": "object",
+                "properties": {
+                    "plan_key": {
+                        "type": "string"
+                    },
+                    "plan_name": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "trial_ends_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "date-time"
+                    },
+                    "days_left": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Whole days left in the trial, rounded up; null when not in a trial"
+                    },
+                    "read_only": {
+                        "type": "boolean",
+                        "description": "The trial ended unpaid: changes are refused until it is paid"
+                    },
+                    "card_added": {
+                        "type": "boolean",
+                        "description": "A subscription with the payment provider exists"
+                    },
+                    "price": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "unit_amount": {
+                                "type": "integer"
+                            },
+                            "currency": {
+                                "type": "string"
+                            },
+                            "billing_period": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "unit_amount",
+                            "currency",
+                            "billing_period"
+                        ]
+                    },
+                    "pay_online": {
+                        "type": "boolean",
+                        "description": "This deployment takes payments online"
+                    },
+                    "card_step": {
+                        "type": "boolean",
+                        "description": "A card can be added now and first charged when the trial ends"
+                    }
+                },
+                "required": [
+                    "plan_key",
+                    "plan_name",
+                    "status",
+                    "trial_ends_at",
+                    "days_left",
+                    "read_only",
+                    "card_added",
+                    "price",
+                    "pay_online",
+                    "card_step"
                 ]
             }
         },
