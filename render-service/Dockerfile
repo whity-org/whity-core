@@ -114,6 +114,14 @@ COPY --from=build /workspace/render-service/dist ./dist
 COPY render-service/scripts/write-browser-info.js ./scripts/write-browser-info.js
 RUN npm run build:browser-info
 
+# npm was needed only for the two steps above. The service runs `node` alone,
+# and the npm, npx and corepack the node image bundles carried their own
+# dependency tree into the vulnerability scan (brace-expansion, pacote,
+# sigstore, picomatch, ip-address...; WHIT-1221), so they leave the image here.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+    /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
+
 EXPOSE 8130
 
 CMD ["node", "src/server.js"]
