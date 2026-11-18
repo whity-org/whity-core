@@ -47,6 +47,14 @@ on:
     tags:
       - 'v*'
 
+# Serialised, never cancelled (WHIT-277): a half-finished run of this
+# workflow leaves the release in a state someone has to repair by hand.
+# A main push and a quick follow-up must not race on tagging, images and
+# the GitHub Release for the same ref.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   resolve:
     name: Resolve the release

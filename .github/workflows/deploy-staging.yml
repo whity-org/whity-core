@@ -51,6 +51,13 @@ on:
 permissions:
   contents: read
 
+# Serialised, never cancelled (WHIT-277): a half-finished run of this
+# workflow leaves the release in a state someone has to repair by hand.
+# Two deploys over SSH at once would interleave on the same host.
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
 jobs:
   # Gate: only proceed when a staging host is actually configured. secrets can't
   # be used in a job-level `if:`, so we surface "is it configured?" as an output.
