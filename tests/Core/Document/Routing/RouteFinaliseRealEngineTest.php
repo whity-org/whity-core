@@ -639,6 +639,59 @@ final class RouteFinaliseRealEngineTest extends TestCase
         self::assertSame('Page {{page}} of {{pages}}', $payload['footer']['start'] === 'Page {{page}} of {{pages}}' ? $payload['footer']['start'] : substr($payload['footer']['start'], -strlen('Page {{page}} of {{pages}}')));
     }
 
+    /**
+     * The approval certificate: an approved response's final document opens on
+     * a one-page certificate, set on the route template's final document
+     * stage, and the printout follows with its own page numbers. Approval
+     * times print in the workspace's time zone, not UTC.
+     */
+    public function testAnApprovedResponsePrintsACertificatePageInFrontOfThePrintout(): void
+    {
+        $this->settings->setTenant(self::TENANT, SettingsRegistry::TIMEZONE, 'Asia/Amman');
+        $graph = new RouteTemplateGraph($this->rules, fn (int $tenantId): bool => $this->finaliser->isAvailable($tenantId));
+        $this->assertDesignRefused('no option', fn () => $graph->validate([
+            ['position' => 1, 'rule_kind' => 'explicit', 'rule_config' => ['profile_ids' => [self::CLERK]], 'canvas_x' => 0, 'canvas_y' => 0],
+            ['position' => 2, 'kind' => 'finalise', 'rule_config' => ['certificate' => ['colour' => 'gold']], 'canvas_x' => 0, 'canvas_y' => 0],
+        ], [], 10, self::TENANT));
+        $valid = $graph->validate([
+            ['position' => 1, 'rule_kind' => 'explicit', 'rule_config' => ['profile_ids' => [self::CLERK]], 'canvas_x' => 0, 'canvas_y' => 0],
+            ['position' => 2, 'kind' => 'finalise', 'rule_config' => ['certificate' => [
+                'title' => ['en' => 'Certificate of supplier approval'],
+                'subject' => 'supplier',
+            ]], 'canvas_x' => 0, 'canvas_y' => 0],
+        ], [], 10, self::TENANT);
+        self::assertSame(['certificate' => ['title' => ['en' => 'Certificate of supplier approval'], 'subject' => 'supplier']], $valid['steps'][1]['rule_config']);
+
+        $formId = $this->form($this->clerkThenFinalise(null, [], $valid['steps'][1]['rule_config']), null);
+        $this->approve($formId, ['supplier' => 'Example Mill']);
+
+        $payload = $this->render->flowCalls[0];
+        self::assertSame(1, $payload['coverPages']);
+        $cover = [];
+        foreach ($payload['content'] as $block) {
+            if ($block['type'] === 'pageBreak') {
+                break;
+            }
+            $cover[$block['type']][] = $block;
+        }
+        self::assertSame('Certificate of supplier approval', $cover['heading'][0]['text']);
+        self::assertSame('Example Mill', $cover['heading'][1]['text'], 'the subject is the answer the stage names');
+        self::assertArrayHasKey('qr', $cover['decisionBlock'][0], 'the workspace prints QR codes');
+        $approval = $cover['approvals'][0]['rows'][0];
+        self::assertSame(['Clerk check', 'Clerk Rana', 'Approved'], [$approval['role'], $approval['name'], $approval['word']]);
+        $events = $this->pdo->query("SELECT occurred_at FROM document_route_events WHERE verdict = 'approved' ORDER BY id DESC LIMIT 1");
+        self::assertNotFalse($events);
+        $at = (string) $events->fetchColumn();
+        $amman = (new \DateTimeImmutable($at, new \DateTimeZone('UTC')))->setTimezone(new \DateTimeZone('Asia/Amman'));
+        self::assertSame($amman->format('j M Y, H:i'), $approval['at'], 'in the workspace’s time');
+        foreach (array_slice($payload['content'], (int) array_search('pageBreak', array_column($payload['content'], 'type'), true) + 1) as $block) {
+            if ($block['type'] === 'approvals') {
+                self::assertSame($amman->format('j M Y, H:i'), $block['rows'][0]['at'], 'the printout’s approvals too');
+            }
+        }
+        self::assertSame(2, $payload['header']['fromPage'], 'the printout heads its pages as before');
+    }
+
     public function testASupervisorTheOfficeNamesAtPreCheckIsLeftOutOfTheCommittee(): void
     {
         // WHIT-1028: a public form cannot ask the applicant to pick people, so
@@ -1334,9 +1387,13 @@ final class RouteFinaliseRealEngineTest extends TestCase
         }
     }
 
-    /** Stage 1: the clerk decides. Stage 2: the final document, with this template or none. */
-    /** @param list<array<string, mixed>> $clerkInputs */
-    private function clerkThenFinalise(?int $templateId, array $clerkInputs = []): int
+    /**
+     * Stage 1: the clerk decides. Stage 2: the final document, with this template or none.
+     *
+     * @param list<array<string, mixed>> $clerkInputs
+     * @param array<string, mixed> $finaliseConfig the final document stage's rule_config
+     */
+    private function clerkThenFinalise(?int $templateId, array $clerkInputs = [], array $finaliseConfig = []): int
     {
         $id = $this->routeTemplates->create(self::TENANT, 'Supplier approval ' . bin2hex(random_bytes(3)), null, null);
         $this->routeTemplates->replaceGraph($id, self::TENANT, [
@@ -1355,7 +1412,7 @@ final class RouteFinaliseRealEngineTest extends TestCase
             [
                 'position' => 2,
                 'rule_kind' => RouteStepKind::FINALISE_RULE,
-                'rule_config' => [],
+                'rule_config' => $finaliseConfig,
                 'label' => 'Approval letter',
                 'decision' => false,
                 'decision_quorum' => null,

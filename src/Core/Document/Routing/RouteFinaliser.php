@@ -356,7 +356,8 @@ final class RouteFinaliser implements RouteFinaliseService
      * The automatic printout of a form response (design 3.4, P1): a document
      * with no template, its PDF laid out from the form's sections and questions
      * with the approved answers, the decision, the approvals and the
-     * verification code.
+     * verification code, behind a one-page approval certificate
+     * ({@see \Whity\Core\Form\Print\ApprovalCertificate}).
      *
      * @param array<string, mixed> $row
      * @return array{0: string, 1: string, 2: ?int, 3: ?int}
@@ -391,6 +392,9 @@ final class RouteFinaliser implements RouteFinaliseService
                 'answers' => $answers,
                 'routeId' => $routeId,
                 'approved' => true,
+                // The approval certificate prints in front (its page is a cover:
+                // the printout after it keeps its own page numbers).
+                'certificate' => true,
                 'verify' => $stamp !== null ? ['url' => $stamp->url, 'reference' => $stamp->reference] : null,
             ]);
             if ($payload !== null && $footnote !== '') {
