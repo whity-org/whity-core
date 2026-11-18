@@ -32,7 +32,7 @@ test.describe('Self-service registration (WC-235)', () => {
     await page.goto('/register');
     await page.getByLabel('Workspace name').fill('Shorty WS');
     await page.getByLabel('Email').fill('shorty@e2e.test');
-    await page.getByLabel('Password').fill('short');
+    await page.getByLabel('Password', { exact: true }).fill('short');
     await page.getByRole('button', { name: 'Create workspace' }).click();
 
     await expect(page.getByText('Password must be at least 8 characters')).toBeVisible();
@@ -49,7 +49,7 @@ test.describe('Self-service registration (WC-235)', () => {
     await page.goto('/register');
     await page.getByLabel('Workspace name').fill(workspace);
     await page.getByLabel('Email').fill(email);
-    await page.getByLabel('Password').fill('a-strong-e2e-password');
+    await page.getByLabel('Password', { exact: true }).fill('a-strong-e2e-password');
     await page.getByRole('button', { name: 'Create workspace' }).click();
 
     // Success provisions the workspace, chains login, and redirects in. Landing
