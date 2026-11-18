@@ -537,7 +537,7 @@ final class FormPrintoutTest extends TestCase
         self::assertSame('rtl', $payload['direction']);
         self::assertSame('جامعة المثال', $cover[0]['start']['name'], 'the workspace’s Arabic name');
         self::assertSame('شهادة موافقة', $cover[1]['text']);
-        self::assertStringStartsWith('تشهد جامعة المثال بأنها راجعت الطلب المبيّن أدناه ووافقت عليه.', $cover[2]['text']);
+        self::assertStringStartsWith('تشهد هذه الوثيقة بأنّ الطلب المبيّن أدناه قد رُوجع من قِبَل جامعة المثال وتمّت الموافقة عليه.', $cover[2]['text'], 'the same words for a university or a board');
         self::assertSame('تمت الموافقة', $cover[4]['word']);
         self::assertSame('الموافقات', $cover[5]['title']);
         self::assertSame('12 تشرين الثاني 2026، 10:14', $cover[5]['rows'][0]['at'], 'Western digits');
