@@ -75,18 +75,15 @@ final class EventRelayCommand implements CliCommand, CommandHelp
             return $this->relay;
         }
 
-        $database = Database::connect();
-
-        // Registered for the reason queue:work registers its own: a listener
-        // resolving a service from a bare CLI process would otherwise get an
-        // improvised one — a dispatch that succeeds, reaches nobody, and reports
-        // nothing. That is the HTTP/CLI divergence this codebase has paid for
-        // repeatedly (#717, #724, #727), and it would be especially cruel here,
-        // in the command whose whole purpose is to stop events silently going
-        // nowhere.
+        // WHIT-1247: the relay delivers into the web kernel's own hook manager,
+        // with every plugin loaded and every host service bound, exactly as a
+        // request would have them. It used to build an empty HookManager and
+        // load no plugins, so no plugin `*.async` listener ever ran: each
+        // event was relayed, marked delivered, and reached nobody.
+        $kernel = \Whity\Core\Kernel\HostKernel::boot();
+        $database = $kernel['db'];
+        $hooks = $kernel['hookManager'];
         \Whity\register_service(Database::class, $database);
-
-        $hooks = new HookManager();
         \Whity\register_service(HookManager::class, $hooks);
 
         return $this->relay = new EventRelay(new DomainEventStore($database->getPdo()), $hooks, $this->logger);

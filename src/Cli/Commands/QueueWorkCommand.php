@@ -69,7 +69,13 @@ final class QueueWorkCommand implements CliCommand
     ) {
         $this->logger = $logger ?? new NullLogger();
         if ($repo === null || $runner === null) {
-            $database = Database::connect();
+            // WHIT-1247: every host service a request has, a plugin's job has
+            // too: the web kernel's wiring runs first, and what the worker
+            // builds below is added on top (its own loader, job registry,
+            // hook manager and document services replace the kernel's where
+            // it registers them).
+            // One connection for both, as in a request.
+            $database = \Whity\Core\Kernel\HostKernel::boot()['db'];
             $pdo = $database->getPdo();
             // A plugin builds its own job handlers and resolves what they need
             // from the host service container — the documented data-access seam.
