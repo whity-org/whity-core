@@ -809,6 +809,82 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     }
 
     /**
+     * Each plugin's checked contact fields (SDK 1.119), by plugin key.
+     *
+     * @var array<string, list<array{key: string, label: array{en: string, ar: string}, kind: string, options: list<string>, required: bool, in_list: bool, edit_permission: ?string}>>
+     */
+    private array $contactFields = [];
+
+    /**
+     * Told when a workspace turns a plugin on or off, before the plugin is
+     * (WHIT-1209): core keeps what belongs to the plugin in step with it.
+     *
+     * @var list<\Closure(string, int, bool): void>
+     */
+    private array $workspaceSwitchListeners = [];
+
+    /** @param \Closure(string, int, bool): void $listener plugin name, tenant id, on */
+    public function onWorkspaceSwitch(\Closure $listener): void
+    {
+        $this->workspaceSwitchListeners[] = $listener;
+    }
+
+    /**
+     * The contact fields of the plugins a workspace can see (on or read-only),
+     * by plugin name (SDK 1.119, WHIT-1209); null before the plugins are
+     * loaded, so a caller never mistakes "not known yet" for "none".
+     *
+     * @return array<string, list<array{key: string, label: array{en: string, ar: string}, kind: string, options: list<string>, required: bool, in_list: bool, edit_permission: ?string}>>|null
+     */
+    public function contactFieldsFor(int $tenantId): ?array
+    {
+        if (!$this->loaded) {
+            return null;
+        }
+        $out = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $fields = $this->contactFields[$pluginKey] ?? [];
+            if ($fields === [] || isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive() || $this->isOffForWorkspace($pluginKey, $tenantId)) {
+                continue;
+            }
+            $out[$info['plugin']->getName()] = $fields;
+        }
+
+        return $out;
+    }
+
+    /**
+     * A plugin's contact fields (SDK 1.119): each checked alone, so a bad one
+     * is dropped with its reasons and the rest are kept.
+     *
+     * @return list<array{key: string, label: array{en: string, ar: string}, kind: string, options: list<string>, required: bool, in_list: bool, edit_permission: ?string}>
+     */
+    private function collectContactFields(PluginInterface $plugin, string $pluginKey): array
+    {
+        if (!$plugin instanceof \Whity\Sdk\PluginContactFieldsInterface) {
+            return [];
+        }
+        try {
+            // A plugin's array is runtime data whatever its declared shape.
+            $declared = $plugin->getContactFields();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'getContactFields');
+
+            return [];
+        }
+
+        return \Whity\Core\Contacts\PluginContactFields::normalize(
+            $plugin->getName(),
+            $declared,
+            fn (string $why) => $this->logWarning("[Plugin:{$pluginKey}] getContactFields(): {$why}"),
+        );
+    }
+
+    /**
      * Validate a plugin's workspace templates (SDK 1.116): each one alone, so a
      * bad template is dropped with its reasons and the rest are kept.
      *
@@ -1149,6 +1225,13 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
      */
     public function notifyWorkspaceSwitch(string $pluginName, int $tenantId, bool $enabled): void
     {
+        foreach ($this->workspaceSwitchListeners as $listener) {
+            try {
+                $listener($pluginName, $tenantId, $enabled);
+            } catch (Throwable $e) {
+                $this->logWarning('[PluginLoader] workspace switch listener failed for ' . $pluginName . ': ' . $e->getMessage());
+            }
+        }
         foreach ($this->registeredPlugins as $pluginKey => $info) {
             $plugin = $info['plugin'];
             if ($plugin->getName() !== $pluginName || !$plugin instanceof \Whity\Sdk\PluginWorkspaceLifecycleInterface) {
@@ -4802,6 +4885,10 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // 4d. Workspace templates (SDK 1.116, WHIT-1194): data only, each
         //     checked alone.
         $this->workspaceTemplates[$pluginKey] = $this->collectWorkspaceTemplates($plugin, $pluginKey);
+
+        // 4e. Fields on contacts (SDK 1.119, WHIT-1209): data only, each
+        //     checked alone and named under the plugin.
+        $this->contactFields[$pluginKey] = $this->collectContactFields($plugin, $pluginKey);
 
         // 5. Collect the plugin's optional theme-override route (WC-242),
         //    same error-boundary + ownership-verification philosophy as (4).

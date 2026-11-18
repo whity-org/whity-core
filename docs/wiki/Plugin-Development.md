@@ -1877,6 +1877,79 @@ logged. Keep outside events on a person's calendar with
 keyed by your own reference, and write outwards from `Events::BOOKING_*` and
 `Events::CALENDAR_EVENT_*` (ids only).
 
+## Step 12h — Keep your customers or suppliers as core contacts (SDK 1.119)
+
+Core's Contacts already holds customers and suppliers (`is_customer`,
+`is_supplier`) with tags and the workspace's own fields. Keep your records
+linked to a contact instead of keeping a second address book.
+
+**Declare your own fields.** Implement `PluginContactFieldsInterface`:
+
+```php
+public function getContactFields(): array
+{
+    return [
+        ['key' => 'supplier_code', 'label' => ['en' => 'Supplier code', 'ar' => 'رمز المورّد'], 'type' => 'text', 'inList' => true],
+        ['key' => 'distributor_account', 'label' => ['en' => 'Distributor account', 'ar' => 'حساب الموزّع'], 'type' => 'text'],
+        ['key' => 'supplier_kind', 'label' => ['en' => 'Supplier kind', 'ar' => 'نوع المورّد'], 'type' => 'select',
+            'options' => ['Distributor', 'PCB house', 'Manufacturer']],
+    ];
+}
+```
+
+Each key is named under your plugin: `supplier_code` from `KeyHub` becomes
+`keyhub.supplier_code`. Use that full key everywhere. `type` is one of the
+custom field kinds (`text`, `textarea`, `number`, `date`, `select`,
+`multiselect`, `checkbox`, `profile_ref`); both labels are required.
+`Manifest\ContactFieldValidator::errors()` runs the host's checks in your own
+tests.
+
+Custom fields belong to a workspace. Your fields are made in a workspace when
+it turns your plugin on (before your `onWorkspaceEnabled()` runs, so it can
+fill them) and, where you were already on, the first time its contact fields
+are used. When the workspace turns you off, or you are removed, they are
+archived and every value is kept; turning you on brings them back. Core never
+overwrites what the workspace changed on them (the label, list column or
+order), and they don't count toward its 50 fields. People see them on the
+contact screens, marked "From KeyHub", and can match a spreadsheet column to
+them in an import. They can't archive them. Be careful with `required`: a
+required field is required on every contact the workspace adds, customers
+too.
+
+**Read and write contacts** through the host service, with no HTTP call and no
+session:
+
+```php
+use Whity\Sdk\Contacts\ContactRejected;
+use Whity\Sdk\Contacts\Contacts;
+
+$contacts = \Whity\app(Contacts::class); // null before SDK 1.119
+
+$supplier = $contacts?->findByField($tenantId, 'keyhub.supplier_code', 'DK-0042')
+    ?? $contacts?->create($tenantId, [
+        'name' => 'Example Components',
+        'is_customer' => false,
+        'is_supplier' => true,
+        'fields' => ['keyhub.supplier_code' => 'DK-0042', 'keyhub.supplier_kind' => 'Distributor'],
+    ], $actingProfileId);
+
+try {
+    $contacts?->update($tenantId, $supplier->id, ['fields' => ['keyhub.distributor_account' => 'ACC-991']], $actingProfileId);
+} catch (ContactRejected $e) {
+    // $e->status (403, 404, 422) and $e->field ('fields.keyhub.distributor_account')
+}
+
+$suppliers = $contacts?->list($tenantId, ['is_supplier' => true, 'field' => ['keyhub.supplier_kind' => 'Distributor']]);
+```
+
+Writes take the same body as `POST /api/contacts` and are checked the same
+way: `$actingProfileId` must be in the workspace and hold `contacts:write`
+(and a field's own edit permission, when it has one), and the contact records
+who added it. In a job, act as the person who set the job up. Reads are not
+permission-checked: show a person only what their own `contacts:read` allows.
+`findByField()` matches the whole value, ignoring case, and returns the live
+contact with the lowest id.
+
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 
 Everything a plugin only *declares* can live in a JSON file instead of PHP methods: its identity and requirements, permissions, roles, `blocks` screens, owned tables, data types and limits. Put `plugin.json` next to an empty class:

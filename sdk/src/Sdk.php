@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.118).
+ * SDK identity (v1.119).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1386,12 +1386,21 @@ namespace Whity\Sdk;
  * workspace already in a trial of a plan adds a card, so the trial is never cut short (WHIT-1207).
  *
  * Purely additive.)
+ *
+ * 1.119 (CONTACTS: the host service {@see Contacts\Contacts} lists, reads, finds by a custom
+ * field, creates and updates core's customers and suppliers without HTTP, writes acting as a
+ * person who holds `contacts:write`, and {@see PluginContactFieldsInterface} declares a plugin's
+ * own fields on contacts (`keyhub.supplier_code`), checked by {@see Manifest\ContactFieldValidator},
+ * made in each workspace where the plugin is on and archived with their values kept where it is off
+ * (WHIT-1209, #2131).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.118.0';
+    public const VERSION = '1.119.0';
 
     /**
      * Static identity only — never instantiated.

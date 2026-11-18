@@ -1518,6 +1518,7 @@
         "fields.error.choices": "أضف خيارًا واحدًا على الأقل، واحدًا في كل سطر.",
         "fields.error.load": "تعذر تحميل الحقول.",
         "fields.error.name": "أعطِ الحقل اسمًا.",
+        "fields.fromPlugin": "من {plugin}",
         "fields.kind": "النوع",
         "fields.kind.checkbox": "نعم أو لا",
         "fields.kind.date": "تاريخ",

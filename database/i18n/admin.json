@@ -1517,6 +1517,7 @@
         "fields.error.choices": "Add at least one choice, one per line.",
         "fields.error.load": "The fields could not be loaded.",
         "fields.error.name": "Give the field a name.",
+        "fields.fromPlugin": "From {plugin}",
         "fields.kind": "Kind",
         "fields.kind.checkbox": "Yes or no",
         "fields.kind.date": "Date",

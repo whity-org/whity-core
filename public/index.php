@@ -5493,6 +5493,24 @@ $contactImportService = new \Whity\Core\Contacts\Import\ContactImportService(
     new \Whity\Core\Contacts\Import\ContactImportRepository($db->getPdo()),
 );
 $contactImportService->addTargets(new \Whity\Core\CustomFields\CustomFieldImportTargets($customFieldService, $customFieldRepository, 'contact'));
+// SDK 1.119 (WHIT-1209, #2131): plugins' own fields on contacts, kept in step
+// with the plugins each workspace has on (made, or archived with their values
+// kept), and core's contacts as a plugin service.
+$pluginContactFields = new \Whity\Core\Contacts\PluginContactFields(
+    $customFieldService,
+    static fn (int $tenantId): ?array => $pluginLoader->contactFieldsFor($tenantId),
+);
+$customFieldService->useOwnedFieldSync($pluginContactFields->syncer());
+$pluginLoader->onWorkspaceSwitch(static function (string $plugin, int $tenantId) use ($pluginContactFields): void {
+    $pluginContactFields->reconcile($tenantId);
+});
+\Whity\register_service(\Whity\Sdk\Contacts\Contacts::class, new \Whity\Core\Contacts\HostContacts( // @phpstan-ignore-line
+    $contactService,
+    $contactRepository,
+    $contactTags,
+    $customFieldService,
+    static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+));
 $contactsHandler = new \Whity\Api\ContactsApiHandler($contactService, $contactTags, $contactImportService, $roleChecker, new \Whity\Core\Contacts\CustomerActivity($db->getPdo()));
 $customFieldsHandler = new \Whity\Api\CustomFieldsApiHandler($customFieldService, $roleChecker);
 // Listing a type's fields checks that type's read permission in the handler.

@@ -13,7 +13,7 @@ use PDO;
 final class CustomFieldRepository
 {
     private const COLUMNS = 'id, tenant_id, record_type, field_key, label, kind, options_json, show_in_list, is_required, edit_permission,
-        sort_order, created_by_profile_id, archived_at, created_at, updated_at';
+        sort_order, created_by_profile_id, owner_plugin, archived_at, created_at, updated_at';
 
     public function __construct(private readonly PDO $db)
     {
@@ -59,6 +59,36 @@ final class CustomFieldRepository
         return is_array($row) ? $row : null;
     }
 
+    /**
+     * The plugins' own fields on a record type, archived or not (WHIT-1209).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function ownedDefinitions(int $tenantId, string $recordType): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT ' . self::COLUMNS . ' FROM custom_field_definitions
+              WHERE tenant_id = :tenant_id AND record_type = :record_type AND owner_plugin IS NOT NULL
+              ORDER BY id'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':record_type' => $recordType]);
+
+        /** @var list<array<string, mixed>> */
+        return array_values($stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    /** How many fields the workspace made itself on a record type, archived or not. */
+    public function workspaceFieldCount(int $tenantId, string $recordType): int
+    {
+        $stmt = $this->db->prepare(
+            'SELECT COUNT(*) FROM custom_field_definitions
+              WHERE tenant_id = :tenant_id AND record_type = :record_type AND owner_plugin IS NULL'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':record_type' => $recordType]);
+
+        return (int) $stmt->fetchColumn();
+    }
+
     public function keyTaken(int $tenantId, string $recordType, string $key): bool
     {
         $stmt = $this->db->prepare(
@@ -70,16 +100,18 @@ final class CustomFieldRepository
     }
 
     /**
-     * @param array{record_type: string, field_key: string, label: string, kind: string, options_json: string, show_in_list: bool, is_required: bool, edit_permission: ?string} $row
+     * `owner_plugin` is the plugin that declared the field (WHIT-1209), absent for the workspace's own.
+     *
+     * @param array{record_type: string, field_key: string, label: string, kind: string, options_json: string, show_in_list: bool, is_required: bool, edit_permission: ?string, owner_plugin?: ?string} $row
      */
     public function insert(int $tenantId, array $row, ?int $actor): int
     {
         $stmt = $this->db->prepare(
             'INSERT INTO custom_field_definitions
-                (tenant_id, record_type, field_key, label, kind, options_json, show_in_list, is_required, edit_permission, sort_order, created_by_profile_id, created_at, updated_at)
+                (tenant_id, record_type, field_key, label, kind, options_json, show_in_list, is_required, edit_permission, sort_order, created_by_profile_id, owner_plugin, created_at, updated_at)
              VALUES (:tenant_id, :record_type, :field_key, :label, :kind, :options_json, :show_in_list, :is_required, :edit_permission,
                 (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM custom_field_definitions WHERE tenant_id = :tenant_id2 AND record_type = :record_type2),
-                :actor, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                :actor, :owner_plugin, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
              RETURNING id'
         );
         $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
@@ -94,6 +126,8 @@ final class CustomFieldRepository
         $stmt->bindValue(':is_required', $row['is_required'], PDO::PARAM_BOOL);
         $stmt->bindValue(':edit_permission', $row['edit_permission'], $row['edit_permission'] === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
         $stmt->bindValue(':actor', $actor, $actor === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $owner = $row['owner_plugin'] ?? null;
+        $stmt->bindValue(':owner_plugin', $owner, $owner === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
         $stmt->execute();
 
         return (int) $stmt->fetchColumn();
