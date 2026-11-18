@@ -3270,6 +3270,16 @@ $externalBillingHandler->usePluginSeats($pluginSeats);
 $cashPayments = new \Whity\Core\Billing\Cash\CashPayments($db->getPdo());
 $codePluginActivation->useCashCover(static fn (int $tenantId, string $product): ?array => $cashPayments->coverOf($tenantId, $product));
 $externalBillingHandler->useCashPayments($cashPayments);
+// WHIT-1207: a further workspace's trial, for the payment step after creating
+// it, the banner across the app and checkouts that keep the trial free.
+$externalBillingHandler->useWorkspaceTrial(new \Whity\Core\Billing\WorkspaceTrial(
+    $db->getPdo(),
+    new \Whity\Core\Subscription\SubscriptionService(
+        new \Whity\Core\Subscription\SubscriptionRepository($db->getPdo()),
+        $settingsService
+    ),
+    $settingsService,
+));
 $cashPaymentsHandler = new \Whity\Api\CashPaymentsApiHandler($cashPayments, $auditLogger);
 $router->register('GET', '/api/billing/cash-payments', [$cashPaymentsHandler, 'list'], null, null, CorePermissions::PLANS_MANAGE);
 $router->register('POST', '/api/billing/cash-payments', [$cashPaymentsHandler, 'record'], null, null, CorePermissions::PLANS_MANAGE);
@@ -3291,6 +3301,9 @@ $router->register('GET',  '/api/billing/plans',    [$externalBillingHandler, 'pl
 // the local run stands down so nobody is charged twice — so without this the
 // billing screen showed an empty table to somebody who had just paid.
 $router->register('GET',  '/api/billing/receipts', [$externalBillingHandler, 'receipts'], null, null, CorePermissions::BILLING_VIEW);
+// WHIT-1207: the plan's trial and how to pay, for every member (the banner tells
+// those who can't pay to ask an owner).
+$router->register('GET',  '/api/billing/trial',    [$externalBillingHandler, 'trial']);
 
 // WHIT-1040: the plan limits the business model sells, and where a workspace
 // stands against them. Every one of them warns and none refuses: customers are

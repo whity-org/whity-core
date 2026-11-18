@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.117).
+ * SDK identity (v1.118).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1380,12 +1380,18 @@ namespace Whity\Sdk;
  * id (WHIT-1198).
  *
  * Purely additive.)
+ *
+ * 1.118 (TRIAL CHECKOUT: {@see Billing\TrialCheckout} is the optional portal interface for a
+ * checkout that takes the card now and charges when a free trial ends. The host uses it when a
+ * workspace already in a trial of a plan adds a card, so the trial is never cut short (WHIT-1207).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.117.0';
+    public const VERSION = '1.118.0';
 
     /**
      * Static identity only — never instantiated.

@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.117.0',
+            '1.118.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.117 ADDS PluginDisplayNameInterface: the name people read for a plugin (WHIT-1198). '
+            'SDK 1.118 ADDS Billing\\TrialCheckout: the card now, the first charge when a workspace\'s trial ends (WHIT-1207). '
+            . 'SDK 1.117 ADDS PluginDisplayNameInterface: the name people read for a plugin (WHIT-1198). '
             . 'SDK 1.116 ADDS PluginWorkspaceTemplatesInterface and Manifest\\WorkspaceTemplateValidator: workspace templates (WHIT-1194). '
             . 'SDK 1.115 ADDS PluginDashboardInterface and Manifest\\DashboardValidator: setup points and dashboard widgets (WHIT-1177). '
             . 'SDK 1.114 ADDS Http\\Outbound\\HttpClient, StreamHttpClient and Testing\\RecordedHttpClient: one outbound HTTP client (WHIT-1058). '

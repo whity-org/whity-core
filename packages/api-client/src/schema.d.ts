@@ -1201,6 +1201,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing/trial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where this workspace stands with the trial and payment of its plan
+         * @description For every member (WHIT-1207): the plan, when its free trial ends, whether the workspace is read-only because the trial ended unpaid, whether a card is on file, the monthly price, and whether a card can be added now and charged when the trial ends (`card_step`). `data` is null for a workspace with no billed plan. Not behind the payment wall, so a read-only workspace can find out how to pay.
+         */
+        get: operations["get_api_v1_billing_trial"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/webhook": {
         parameters: {
             query?: never;
@@ -13347,10 +13367,17 @@ export interface components {
             plan_key: string;
             /** @enum {string} */
             billing_period?: "month" | "half_year" | "year" | "once";
+            /**
+             * @description Where the payer comes back to: `setup` for the payment step after creating a workspace (WHIT-1207); Billing otherwise
+             * @enum {string}
+             */
+            after?: "setup";
         };
         CheckoutStartResponse: {
             data: {
                 url: string;
+                /** @description Set when the card is taken now and first charged when the trial of the workspace ends, this many days from now (WHIT-1207) */
+                trial_days?: number;
             };
         };
         CodePluginAccess: {
@@ -21278,6 +21305,31 @@ export interface components {
                 [key: string]: unknown;
             };
         };
+        WorkspaceTrialResponse: {
+            data: components["schemas"]["WorkspaceTrialState"] | null;
+        };
+        WorkspaceTrialState: {
+            plan_key: string;
+            plan_name: string;
+            status: string;
+            /** Format: date-time */
+            trial_ends_at: string | null;
+            /** @description Whole days left in the trial, rounded up; null when not in a trial */
+            days_left: number | null;
+            /** @description The trial ended unpaid: changes are refused until it is paid */
+            read_only: boolean;
+            /** @description A subscription with the payment provider exists */
+            card_added: boolean;
+            price: {
+                unit_amount: number;
+                currency: string;
+                billing_period: string;
+            } | null;
+            /** @description This deployment takes payments online */
+            pay_online: boolean;
+            /** @description A card can be added now and first charged when the trial ends */
+            card_step: boolean;
+        };
     };
     responses: never;
     parameters: never;
@@ -26963,6 +27015,71 @@ export interface operations {
             };
             /** @description The billing service is temporarily unreachable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_billing_trial: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The trial of this workspace */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceTrialResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };
