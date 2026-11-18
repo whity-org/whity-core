@@ -10,7 +10,7 @@ namespace Whity\Sdk\Contacts;
  * valid) and, when one field is at fault, its name (`email`,
  * `fields.keyhub.supplier_code`).
  */
-final class ContactRejected extends \RuntimeException
+final class ContactRejected extends \RuntimeException implements \Whity\Sdk\SdkException
 {
     public function __construct(
         string $message,

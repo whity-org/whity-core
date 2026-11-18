@@ -68,7 +68,7 @@ $context = [
 ];
 ```
 
-For sync hooks the context is the **second argument** to each listener; for async hooks it is merged into the payload under the `_context` key. Use `$context['tenant_id']` whenever a listener queries the database so its work stays within the current tenant (see [TENANT_ISOLATION](TENANT_ISOLATION.md)).
+For sync hooks the context is the **second argument** to each listener. Async hooks carry no `_context` key: the relay reads the tenant and actor from the `domain_events` columns above. Use `$context['tenant_id']` whenever a listener queries the database so its work stays within the current tenant (see [TENANT_ISOLATION](TENANT_ISOLATION.md)).
 
 ```php
 $hookManager->listen('user.creating', function (array $data, array $context): array {
@@ -122,24 +122,227 @@ A plugin subscribes with `['callback' => $fn, 'observe' => true]` when it only n
 
 ## Events fired by the core
 
-These events are dispatched by the current core code (verify in source before relying on payload shapes):
+Every event core publishes is a constant on [`Whity\Sdk\Hooks\Events`](../../sdk/src/Hooks/Events.php). The string is the wire contract; the constant gives a plugin completion and typo safety. The full catalogue is below, grouped as in `Events.php`, and `tests/Sdk/SdkSurfaceContractTest.php` fails when an event is added there without a row here.
 
-| Event | Where | Notes |
-| --- | --- | --- |
-| `worker.boot` | `public/index.php` | Once per worker, at boot (worker mode). |
-| `worker.request.start` | `public/index.php` | At the start of each request. |
-| `worker.request.end` | `public/index.php` | In the request `finally` block. |
-| `navigation.register` | `public/index.php` (core listener) + `NavigationApiHandler` | Filter chain that assembles navigation items; core registers Dashboard/Users/Roles/OUs/Tenants/Settings. |
-| `permission.registered` | `PermissionRegistry::storeAndDispatch()` | Fires on registration with `plugin_id`, `source`, `permissions`. |
-| `role.creating` / `role.created` | `RolesApiHandler::create()` | Filter before insert; sync notify after. |
-| `role.created.async` | `RolesApiHandler::create()` | Queued async after create. |
-| `role.updating` / `role.updated` | `RolesApiHandler::update()` | Filter before / notify after update. |
-| `role.deleting` / `role.deleted` | `RolesApiHandler::delete()` | Filter before / notify after delete. |
-| `role.deleted.async` | `RolesApiHandler::delete()` | Queued async after delete. |
-| `datatype.lifecycle.changing` | `DataTypeLifecycleService` | **Vetoable.** Fires before the write for `trash`/`restore`/`retire`/`delete` on a plugin-declared data type. See [Plugin-Data-Types](Plugin-Data-Types.md#refusing-a-transition-datatypelifecyclechanging). |
-| `datatype.lifecycle.changed` | `DataTypeLifecycleService` | Observation only, after a transition that actually committed. Same payload. |
+**Kind** says what a listener can do:
 
-`UsersApiHandler`, `TenantsApiHandler`, and `OusApiHandler` are also constructed with the `HookManager`, so check those handlers for the exact `user.*` / `tenant.*` / `ou.*` events they emit; treat any event not in the table above as something to confirm in source rather than assume.
+- **observe**: the host ignores what the listener returns. Subscribe with `'observe' => true` (SDK 1.89).
+- **filter**: the host reads the returned payload; return it, changed or not. [Plugin-Development](Plugin-Development.md#what-a-listener-may-change) lists these and `HookEventCatalogueTest` pins the list.
+- **veto**: throw `HookVetoException` to refuse; the API answers 409 with your `reason()`.
+- **queued**: the `.async` twin, persisted to the event spine and delivered by the relay after commit.
+
+Payload notes come from the constant's own comment in `Events.php`; where a row has none, read the dispatching code before relying on a key. `*.updating` events are observe-only today, whatever older text says. `submission.reviewed` is published but not yet fired (WHIT-1230 follow-up).
+
+### Users
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `user.creating` | `USER_CREATING` | veto |  |
+| `user.created` | `USER_CREATED` | observe |  |
+| `user.created.async` | `USER_CREATED_ASYNC` | queued |  |
+| `user.updated` | `USER_UPDATED` | observe |  |
+| `user.deleted` | `USER_DELETED` | observe |  |
+| `user.membership.added` | `USER_MEMBERSHIP_ADDED` | observe | Fired after the change, the return value ignored (SDK 1.89). Payload: `profile_id`, `tenant_id`, `membership_id`, `role_id`, `role_name`, `ou_id`. `added` may also carry `status`, `kind`, `via` or `is_primary`; `removed` also carries `status` and `granted_at`. |
+| `user.membership.removed` | `USER_MEMBERSHIP_REMOVED` | observe |  |
+
+### Registration
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `registration.completed` | `REGISTRATION_COMPLETED` | observe | Fired after the change, the return value ignored. These carry the person's address, so treat the payload as personal data. Payload: `email`, `name`, `tenant_name`, `approval_required`, `verification_required`. |
+| `registration.approved` | `REGISTRATION_APPROVED` | observe | Payload: `email`, `name`. |
+| `registration.rejected` | `REGISTRATION_REJECTED` | observe | Payload: `email`, `name`. |
+
+### Federated sign-in
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `auth.federated.signed_in` | `AUTH_FEDERATED_SIGNED_IN` | observe | Somebody signed in through a federated provider. Fired after the sign-in, the return value ignored. Payload: `profile_id`, `email`, `provider_key`, `issuer`, `subject`, `global_trust`, `provider_tenant_id`, `provisioned_tenant_id`. Never a token. |
+
+### Resource grants
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `rbac.resource_grant.created` | `RBAC_RESOURCE_GRANT_CREATED` | observe | After the grant. Payload: `id`, `tenant_id`, `resource_type`, `resource_id`, `role_id`, `profile_id`. |
+| `rbac.resource_grant.revoked` | `RBAC_RESOURCE_GRANT_REVOKED` | observe | After the revoke. Payload: `id`, `tenant_id`. |
+| `rbac.resource_grant.revoked_all` | `RBAC_RESOURCE_GRANT_REVOKED_ALL` | observe | After every grant at one resource is revoked. Payload: `tenant_id`, `resource_type`, `resource_id`, `revoked`. |
+| `rbac.resource_grant.verify_resource` | `RBAC_RESOURCE_GRANT_VERIFY_RESOURCE` | filter | A FILTER: the host asks whether a plugin-owned resource exists before granting on it. Payload: `tenant_id`, `resource_type`, `resource_id`, `exists`. Return it with `exists` true for a resource you own. An observe-only listener cannot answer. |
+
+### Time windows
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `time_window.close_report` | `TIME_WINDOW_CLOSE_REPORT` | filter | A FILTER: the host collects what is unfinished before a period closes. Payload: `tenant_id`, `window_id`, `window_type_id`, `starts_on`, `ends_on`, `unfinished`. Append `['label' => string, 'count' => int, 'source' => string]` to `unfinished`. An observe-only … |
+
+### Data type lifecycle
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `datatype.lifecycle.changing` | `DATATYPE_LIFECYCLE_CHANGING` | veto | Before a declared data type's record changes state. A listener may veto. |
+| `datatype.lifecycle.changed` | `DATATYPE_LIFECYCLE_CHANGED` | observe | After the change, the return value ignored. |
+
+### Tenants
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `tenant.creating` | `TENANT_CREATING` | filter |  |
+| `tenant.created` | `TENANT_CREATED` | observe |  |
+| `tenant.created.async` | `TENANT_CREATED_ASYNC` | queued |  |
+| `tenant.updating` | `TENANT_UPDATING` | observe |  |
+| `tenant.updated` | `TENANT_UPDATED` | observe |  |
+| `tenant.deleting` | `TENANT_DELETING` | veto |  |
+| `tenant.deleted` | `TENANT_DELETED` | veto |  |
+| `tenant.deleted.async` | `TENANT_DELETED_ASYNC` | queued |  |
+
+### Roles
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `role.creating` | `ROLE_CREATING` | filter |  |
+| `role.created` | `ROLE_CREATED` | observe |  |
+| `role.created.async` | `ROLE_CREATED_ASYNC` | queued |  |
+| `role.updating` | `ROLE_UPDATING` | observe |  |
+| `role.updated` | `ROLE_UPDATED` | observe |  |
+| `role.deleting` | `ROLE_DELETING` | veto |  |
+| `role.deleted` | `ROLE_DELETED` | veto |  |
+| `role.deleted.async` | `ROLE_DELETED_ASYNC` | queued |  |
+
+### Organizational units
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `ou.creating` | `OU_CREATING` | filter |  |
+| `ou.created` | `OU_CREATED` | observe |  |
+| `ou.created.async` | `OU_CREATED_ASYNC` | queued |  |
+| `ou.updating` | `OU_UPDATING` | observe |  |
+| `ou.updated` | `OU_UPDATED` | observe |  |
+| `ou.updated.async` | `OU_UPDATED_ASYNC` | queued |  |
+| `ou.deleting` | `OU_DELETING` | veto |  |
+| `ou.deleted` | `OU_DELETED` | veto |  |
+| `ou.deleted.async` | `OU_DELETED_ASYNC` | queued |  |
+| `ou.role_assigned` | `OU_ROLE_ASSIGNED` | observe |  |
+| `ou.role_removed` | `OU_ROLE_REMOVED` | observe |  |
+
+### Memberships
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `membership.customer_joined` | `MEMBERSHIP_CUSTOMER_JOINED` | observe | Somebody joined a workspace as a CUSTOMER through the workspace's own sign-up: at once when sign-up is Open, or when an admin approves them when it is Approval required. Fired after the membership is committed, and the return value is ignored, so a listener … |
+| `membership.customer_inviting` | `MEMBERSHIP_CUSTOMER_INVITING` | filter, veto | A customer is about to invite a colleague into the workspace (SDK 1.105, #1872). Customers may invite only when an admin turned it on in Settings > Sign-up, only into their own role, and only as customers. Runs before anything is written. Payload: … |
+
+### Workspace owners
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `workspace.owner_added` | `WORKSPACE_OWNER_ADDED` | observe | Someone became an owner of a workspace: they accepted an offer to take it over or to co-own it. Payload: `tenant_id`, `profile_id`, `added_by` (the owner who offered), `offer_id`. |
+| `workspace.owner_removed` | `WORKSPACE_OWNER_REMOVED` | observe | Someone stopped being an owner of a workspace. Payload: `tenant_id`, `profile_id`, `removed_by` (who caused it: the new owner on a hand-over, another owner, or themselves), `via` (`transfer`, `removed` or `left`). |
+| `workspace.ownership_transferred` | `WORKSPACE_OWNERSHIP_TRANSFERRED` | observe | A workspace was handed over: fired after {@see self::WORKSPACE_OWNER_ADDED} and {@see self::WORKSPACE_OWNER_REMOVED} for the same change. Payload: `tenant_id`, `from_profile_id`, `to_profile_id`, `offer_id`, `from_left` (true when the old owner chose to leave … |
+
+### Documents
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `document.issuing` | `DOCUMENT_ISSUING` | filter, veto | Before a document is issued: a listener may veto with HookVetoException, and nothing is written. Payload: tenant_id, source_id, version, record, origin_key, actor — ids only, never field values. SDK 1.66: it also fires for a preflight, with `check_only: … |
+| `document.issued` | `DOCUMENT_ISSUED` | observe | A document was issued (its record exists, with its QR code when the tenant has them on). Payload as above, plus id. |
+| `document.issued.async` | `DOCUMENT_ISSUED_ASYNC` | queued |  |
+| `document.rendered` | `DOCUMENT_RENDERED` | observe | A PDF was stored for a document, on issue or on a correction. Payload: id, tenant_id, artifact_id, source_id, version. |
+| `document.rendered.async` | `DOCUMENT_RENDERED_ASYNC` | queued |  |
+| `document.numbered` | `DOCUMENT_NUMBERED` | observe | SDK 1.65: a number handed out at final approval, once per document. A document numbered at issue carries its number on `document.issued` instead. Payload: `id`, `number`, `route_id`, `actor_profile_id`. |
+| `document.numbered.async` | `DOCUMENT_NUMBERED_ASYNC` | queued |  |
+| `document.revised` | `DOCUMENT_REVISED` | observe | SDK 1.68: a revision replaced a document. Payload: `id`, `supersedes_id`, `reason`, `actor`, `number`, `revision`. It also fires `document.issued` for the new document. |
+| `document.revised.async` | `DOCUMENT_REVISED_ASYNC` | queued |  |
+
+### Routes and forms
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `document.routed` | `DOCUMENT_ROUTED` | observe | A route was started on a document or a form submission. Payload also has `action`, `recipients`. |
+| `document.routed.async` | `DOCUMENT_ROUTED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
+| `document.route_acted` | `DOCUMENT_ROUTE_ACTED` | observe | Somebody acted on a route. Payload also has `action`, `verdict`, `decided`, `step_id`, `recipients`. |
+| `document.route_acted.async` | `DOCUMENT_ROUTE_ACTED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
+| `route.sent_back` | `ROUTE_SENT_BACK` | observe | A route was sent back to its author for changes. Payload also has `step_id`, `resume_from`. |
+| `route.sent_back.async` | `ROUTE_SENT_BACK_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
+| `route.resubmitted` | `ROUTE_RESUBMITTED` | observe | The author sent the changes back in, and the route went on. Payload also has `step_id`. |
+| `route.resubmitted.async` | `ROUTE_RESUBMITTED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
+| `route.completed` | `ROUTE_COMPLETED` | observe | Nothing is left open on a route. Payload also has `outcome`: `approved`, `rejected` or null. |
+| `route.completed.async` | `ROUTE_COMPLETED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
+| `route.signed` | `ROUTE_SIGNED` | observe | Somebody signed on a signing step. Payload also has `step_id`. |
+| `route.signed.async` | `ROUTE_SIGNED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
+| `document.finalised` | `DOCUMENT_FINALISED` | observe | A route's finalise step made its final document. Payload: `id` (the document), `document_id`, `route_id`, `subject_type`, `subject_id`, `artifact_id`, `tenant_id`. |
+| `document.finalised.async` | `DOCUMENT_FINALISED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
+| `form.submitted` | `FORM_SUBMITTED` | observe | Somebody sent a form. Payload: `id` (the submission), `form_id`, `tenant_id`, `actor_profile_id` (null when it was anonymous), `route_id` (null when it has none). |
+| `form.submitted.async` | `FORM_SUBMITTED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
+| `submission.reviewed` | `SUBMISSION_REVIEWED` | observe | The office recorded its answers on a submission. Payload: `id`, `form_id`, `tenant_id`, `actor_profile_id`. |
+| `submission.reviewed.async` | `SUBMISSION_REVIEWED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
+| `submission.withdrawn` | `SUBMISSION_WITHDRAWN` | observe | The person who sent a submission withdrew it. Payload: `id`, `form_id`, `tenant_id`, `actor_profile_id`. |
+| `submission.withdrawn.async` | `SUBMISSION_WITHDRAWN_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
+
+### Calendar and bookings
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `calendar.event.created` | `CALENDAR_EVENT_CREATED` | observe | Fired after the write commits; the return value is ignored, so a listener cannot refuse or change anything. Each has an `.async` twin on the event spine. Ids only: `id`, `tenant_id`, `profile_id` (the member of staff whose calendar it is), and for bookings … |
+| `calendar.event.created.async` | `CALENDAR_EVENT_CREATED_ASYNC` | queued |  |
+| `calendar.event.updated` | `CALENDAR_EVENT_UPDATED` | observe |  |
+| `calendar.event.updated.async` | `CALENDAR_EVENT_UPDATED_ASYNC` | queued |  |
+| `calendar.event.deleted` | `CALENDAR_EVENT_DELETED` | observe |  |
+| `calendar.event.deleted.async` | `CALENDAR_EVENT_DELETED_ASYNC` | queued |  |
+| `booking.created` | `BOOKING_CREATED` | observe | A booking was made: `status` is `confirmed`, or `pending_payment` while a payment step runs. |
+| `booking.created.async` | `BOOKING_CREATED_ASYNC` | queued |  |
+| `booking.confirmed` | `BOOKING_CONFIRMED` | observe | A booking became confirmed: at once, or when its payment came in. |
+| `booking.confirmed.async` | `BOOKING_CONFIRMED_ASYNC` | queued |  |
+| `booking.rescheduled` | `BOOKING_RESCHEDULED` | observe |  |
+| `booking.rescheduled.async` | `BOOKING_RESCHEDULED_ASYNC` | queued |  |
+| `booking.cancelled` | `BOOKING_CANCELLED` | observe |  |
+| `booking.cancelled.async` | `BOOKING_CANCELLED_ASYNC` | queued |  |
+| `booking.expired` | `BOOKING_EXPIRED` | observe | A payment hold lapsed and the time is free again. |
+| `booking.expired.async` | `BOOKING_EXPIRED_ASYNC` | queued |  |
+
+### Agents
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `agent.created` | `AGENT_CREATED` | observe | A workspace's agent changed. Fired after the change is saved, and the return value is ignored: a listener can't refuse or undo it. Payload: `tenant_id`, `agent_id`, `actor_profile_id` (the person who made the change). Ids only: read the agent with {@see … |
+| `agent.updated` | `AGENT_UPDATED` | observe |  |
+| `agent.archived` | `AGENT_ARCHIVED` | observe |  |
+| `agent.restored` | `AGENT_RESTORED` | observe |  |
+| `agent.paused` | `AGENT_PAUSED` | observe | Paused: refused on every call, and its waiting proposals can't run, until resumed. |
+| `agent.resumed` | `AGENT_RESUMED` | observe |  |
+
+### Agent proposals
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `agent.proposal.created` | `AGENT_PROPOSAL_CREATED` | observe | Notifications only: each fires after the change is saved, the return value is ignored, and a listener can't refuse or change anything. Only the person who granted the agent decides a proposal, never a plugin. Ids and the tool's name only, never the call's … |
+| `agent.proposal.decided` | `AGENT_PROPOSAL_DECIDED` | observe | A proposal stopped waiting. Payload: `tenant_id`, `proposal_id`, `decision` (`approved`, `declined` or `expired`), `decided_by_profile_id` (null when it expired), `on_behalf_of_profile_id`, `tool`, `failed` (it was approved and a check refused it when it ran, … |
+| `agent.action.undone` | `AGENT_ACTION_UNDONE` | observe | A person undid what an agent did for them. Payload: `tenant_id`, `action_id`, `proposal_id` (null when it ran without asking), `on_behalf_of_profile_id`, `tool`. |
+
+### AI connections
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `mcp.connection.created` | `MCP_CONNECTION_CREATED` | observe | An app or agent connected over MCP. Fired after the change, the return value ignored. Payload: `tenant_id`, `connection_id` (as {@see \Whity\Sdk\Mcp\McpConnections} lists it), `profile_id` (whose connection), `kind` (`user` or `ai-agent`), … |
+| `mcp.connection.grant_changed` | `MCP_CONNECTION_GRANT_CHANGED` | observe |  |
+| `mcp.connection.revoked` | `MCP_CONNECTION_REVOKED` | observe | Also `by`: `owner`, `admin`, or `agent_removed` (the person stopped using the agent). |
+| `plugin.settings.changed` | `PLUGIN_SETTINGS_CHANGED` | observe | A plugin setting changed (SDK 1.88). Fired after the change, the return value ignored. Payload: `tenant_id` (null when the deployment's own value changed, which every workspace without its own follows), `plugin` (slug), `key` (bare), `actor_profile_id` (null … |
+
+### Platform
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `navigation.register` | `NAVIGATION_REGISTER` | filter |  |
+| `permission.registered` | `PERMISSION_REGISTERED` | observe |  |
+| `datatype.registered` | `DATATYPE_REGISTERED` | observe | Boot-time announcements (SDK 1.89). Each names the `source` that registered and what it registered; the return value is ignored. |
+| `ou_type.registered` | `OU_TYPE_REGISTERED` | observe |  |
+| `routing_rule.registered` | `ROUTING_RULE_REGISTERED` | observe |  |
+| `window_type.registered` | `WINDOW_TYPE_REGISTERED` | observe |  |
+| `rbac.resource_types.registered` | `RBAC_RESOURCE_TYPES_REGISTERED` | observe |  |
+| `health.probes.registered` | `HEALTH_PROBES_REGISTERED` | observe |  |
+| `settings.declared` | `SETTINGS_DECLARED` | observe |  |
+| `tenant.tables.registered` | `TENANT_TABLES_REGISTERED` | observe |  |
+| `worker.boot` | `WORKER_BOOT` | observe |  |
+| `worker.request.start` | `WORKER_REQUEST_START` | observe |  |
+| `worker.request.end` | `WORKER_REQUEST_END` | observe |  |
 
 ### Deletion is transactional (WC-713)
 

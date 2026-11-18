@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.122.0',
+            '1.123.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.122 ADDS HttpResponse headers and Http\Outbound\AddressPolicy: an opt-in public-address policy for URLs people supply (#2151). '
+            'SDK 1.123 ADDS SdkException: one marker interface on every exception the SDK defines (WHIT-1230). '
+            . 'SDK 1.122 ADDS HttpResponse headers and Http\\Outbound\\AddressPolicy: an opt-in public-address policy for URLs people supply (#2151). '
             . 'SDK 1.121 ADDS referenceSelect `multiple`: several rows from an API-backed source, as chips (#1437). '
             . 'SDK 1.120 ADDS Calendar\\TimeOff and Delegation\\Away: a plugin puts time off on core\'s calendar and reads who is away and who stands in (WHIT-1210). '
             . 'SDK 1.119 ADDS Contacts\\Contacts and PluginContactFieldsInterface: core contacts and a plugin\'s own contact fields (WHIT-1209). '

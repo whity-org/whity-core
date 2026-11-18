@@ -12,11 +12,18 @@ use Whity\Sdk\PluginNamespace;
  * Plugins subscribe to these via {@see \Whity\Sdk\PluginInterface::getHooks()}.
  * Two flavours exist:
  *
- * - Synchronous FILTER hooks (`*.creating` / `*.updating` / `*.deleting`):
- *   listeners receive the mutable payload plus a context array and MUST return
- *   the (possibly modified) payload.
+ * - Synchronous FILTER hooks: listeners receive the payload plus a context
+ *   array and return the (possibly modified) payload, which the host reads.
+ *   Only a few events are filters: `navigation.register`, `tenant.creating`,
+ *   `ou.creating`, `role.creating`, `document.issuing`,
+ *   `membership.customer_inviting`, `time_window.close_report` and
+ *   `rbac.resource_grant.verify_resource`. `*.updating` and `*.deleting` are
+ *   dispatched synchronously but their return value is not read (a
+ *   `*.deleting` listener can still veto, below).
  * - Notification hooks (`*.created` / `*.updated` / `*.deleted` and the
  *   `*.async` variants): listeners observe; async variants are queued.
+ *
+ * The full catalogue, with each event's kind, is in docs/wiki/HOOK_SYSTEM.md.
  *
  * Any listener can be OBSERVE-ONLY (SDK 1.89): subscribe with
  * `['callback' => $fn, 'observe' => true]`. The host ignores what it returns,

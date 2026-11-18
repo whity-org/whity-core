@@ -23,6 +23,6 @@ namespace Whity\Sdk\Render;
  * distinction {@see RenderRejectedException} draws with its `clientMessage`
  * exists precisely because this type has no equivalent.
  */
-final class RenderUnavailableException extends \RuntimeException
+final class RenderUnavailableException extends \RuntimeException implements \Whity\Sdk\SdkException
 {
 }

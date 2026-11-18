@@ -9,7 +9,7 @@ namespace Whity\Sdk\Documents;
  * `reason` is stable, one of the constants below; `details` adds what the
  * reason needs, such as the missing fields. Nothing was written.
  */
-final class DocumentNotIssuedException extends \RuntimeException
+final class DocumentNotIssuedException extends \RuntimeException implements \Whity\Sdk\SdkException
 {
     /**
      * No person to act for and no allowed background plugin: outside a

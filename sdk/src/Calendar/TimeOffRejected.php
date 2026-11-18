@@ -8,7 +8,7 @@ namespace Whity\Sdk\Calendar;
  * Why {@see TimeOff} wrote nothing (SDK 1.120). `reason` is one of the
  * constants below and stable; the message is for logs.
  */
-final class TimeOffRejected extends \RuntimeException
+final class TimeOffRejected extends \RuntimeException implements \Whity\Sdk\SdkException
 {
     /** The acting person may not change this person's calendar (`calendar:manage`). */
     public const FORBIDDEN = 'forbidden';

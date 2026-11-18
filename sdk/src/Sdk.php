@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.122).
+ * SDK identity (v1.123).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1418,12 +1418,19 @@ namespace Whity\Sdk;
  * refused when any address is not public, and the connection goes to the checked address (#2151).
  *
  * Purely additive: the new constructor arguments are optional and nothing changes without a policy.)
+ *
+ * 1.123 (ONE ERROR TYPE: every exception the SDK defines implements {@see SdkException}, so a plugin
+ * can catch "the host refused this" in one place. Each still extends \RuntimeException as before.
+ * The hook catalogue in docs/wiki/HOOK_SYSTEM.md lists every published event with its kind, and
+ * the reference page docs/wiki/Plugin-SDK-Reference.md names every SDK interface (WHIT-1230).
+ *
+ * Purely additive: no class changes its parent and no signature changes.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.122.0';
+    public const VERSION = '1.123.0';
 
     /**
      * Static identity only — never instantiated.

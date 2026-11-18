@@ -11,6 +11,6 @@ namespace Whity\Sdk\Http\Outbound;
  * Its message names the host at most. It never carries the URL's path or
  * query, a header, credentials or a body, so it is safe to log.
  */
-final class HttpFailure extends \RuntimeException
+final class HttpFailure extends \RuntimeException implements \Whity\Sdk\SdkException
 {
 }
