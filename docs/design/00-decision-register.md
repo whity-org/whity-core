@@ -915,5 +915,26 @@ Owner's answer: use US dollars everywhere. Every card, sample, document, email, 
 | CU.4 | Components | `Money`, `MoneyInput`, `Doc`, `DocAmount` and the document tables read the workspace's currency (default USD) for the symbol, decimals and words; `Whity.currencies`, `Whity.moneyText` and `Whity.amountInWords(amount, lang, currency)` are exported. MoneyInput's decimals error names the currency's own count |
 | CU.5 | What changed | 130 cards, 20 component notes, the generators, `bundle.js` and `bundle.css`, and docs 04, 07, 12, 13, 16, 17, 23, 25 and 29. Three-decimal sample amounts were rounded to cents, so receipts and invoices still add up |
 
+## Themes (PROPOSED, 19 November 2026, not yet decided)
+
+**PROPOSED: none of these rows is decided.** Owner's direction (19 Nov 2026): themes are tokens only, in the spirit of Material 3 Expressive and the shadcn/ui customizer; applying a theme is free, the visual editor is paid and part of Whity Studio. The spec is `30-themes.md` (WHIT-1225). Each row gives the recommendation; the owner's answer replaces it, and the rows that change earlier decisions (2.3, 3.1, 4.3, 06-motion, 09 "What stays") are updated with it.
+
+| # | Decision | Proposed |
+| --- | --- | --- |
+| TH.1 | What a theme is | PROPOSED. A versioned JSON file with a schema in the repo, never CSS: choices for colour, type, shape, density, elevation and motion, compiled by core into the existing CSS variables. No logo, name, URLs or images (30 §4) |
+| TH.2 | Reach | PROPOSED. Widens 09 "What stays" from one colour to these six token groups. Status colours, layout, components, icons and the rules that protect people stay (30 §6.4, §7) |
+| TH.3 | Seeds | PROPOSED. One to three seed colours (primary, secondary, tertiary) and a neutral setting (pure, warm, cool, tinted) give every colour role in light and dark, in OKLCH; any role can be overridden per mode. The main colour (2.8) is the primary seed |
+| TH.4 | Schemes | PROPOSED. Calm (default, today's look and exactly `TenantTheme`'s output), Tonal, Vibrant, Expressive, Monochrome; contrast Standard or High |
+| TH.5 | New colour roles | PROPOSED. Add `surface-1`…`surface-5`, primary and secondary containers, and tertiary with its container, to `base.json` |
+| TH.6 | Fonts | PROPOSED. An allowed list of Latin and Arabic pairs, self-hosted and bundled in the phone app: Noto (default), IBM Plex, Cairo, Tajawal, Almarai, Noto Kufi for headings, Readex Pro for headings only (relaxes 3.1 for themes that choose it). Body 15, 16 or 17px; title weight 500 or 600; no 700; Arabic at 100% |
+| TH.7 | Status colours | PROPOSED. Fixed in every theme (2.5) |
+| TH.8 | Shape and density | PROPOSED. Shape presets Square, Crisp, Whity (¼ rule, default), Soft, Round, with optional press morphing; density Compact (36px controls), Standard, Comfortable, never below A.1 |
+| TH.9 | Elevation | PROPOSED. Plane (default), Soft shadow or Flat border in the places 4.3 names; a waiting proposal always looks different from approved work |
+| TH.10 | Motion | PROPOSED. Calm (default, 06-motion), Standard springs, Expressive springs with a small overshoot (relaxes "without bounce" for themes that choose it). The person's Animations setting and reduce motion always win |
+| TH.11 | Documents | PROPOSED. Print stays under E.44–E.47; a theme sets only the document theme's defaults and the accent comes from its primary; theme fonts don't reach print |
+| TH.12 | Inheritance and the person | PROPOSED. Whity default, installation theme, chosen theme, workspace adjustments (primary seed and overrides), then the person: light or dark, text size, animations, and a new Higher contrast (7:1). Guard rails last: 4.5:1 text and 3:1 non-text with automatic fallback, A.1 and M.5 minimums, Arabic and RTL |
+| TH.13 | Plugins and the store | PROPOSED. Plugins ship theme files through a new SDK interface (the route-based `PluginThemeInterface` is deprecated); store themes are signed packages; publishers may sell themes through Whity Pay; applying is free |
+| TH.14 | Free and paid | PROPOSED. Free in core: apply any installed theme, set the primary seed and overrides, import a theme file. Whity Studio (paid): live editor, seeds from the logo, presets, import from shadcn and Material Theme Builder, export, preview across key screens, documents and the phone, versions, publishing to the store |
+
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.
