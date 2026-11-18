@@ -56,6 +56,10 @@ services:
       # service worker, offline page. Empty leaves it on. The app.installable
       # system setting, once an operator saves it, wins over this.
       PWA_ENABLED: ${PWA_ENABLED:-}
+      # The reference plugins (HelloWorld, ExamplePlugin) run in development,
+      # CI and e2e, which use HelloWorld; the release image turns them off
+      # (#1831, docs/wiki/Plugin-Distribution.md).
+      WHITY_REFERENCE_PLUGINS: ${WHITY_REFERENCE_PLUGINS:-on}
       DB_USER: ${DB_USER:-whity}
       DB_PASSWORD: ${DB_PASSWORD:-whity_dev}
       DB_NAME: ${DB_NAME:-whity_core}
