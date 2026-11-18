@@ -1,0 +1,54 @@
+name: Set up Node and the npm workspace
+description: >
+  Sets up Node and installs the npm workspace (web/, packages/*, templates/*)
+  from the root lockfile, restoring node_modules from the cache when the
+  lockfile has not changed.
+
+  Every frontend job and every E2E shard used to spend 55-67 s in `npm ci`,
+  even though setup-node's `cache: npm` already restored ~/.npm: with a warm
+  download cache, npm ci's time goes into unpacking and linking, not fetching.
+  Restoring the finished node_modules trees skips both.
+
+  The key is the lockfile plus the Node version and the OS, and there are no
+  restore-keys: a node_modules built from another lockfile is never reused,
+  so a cache hit is exactly what `npm ci` would have produced. On a miss this
+  runs `npm ci` as before and saves the result for the next job.
+
+inputs:
+  node-version:
+    description: Node.js version.
+    default: "22"
+
+outputs:
+  cache-hit:
+    description: '"true" when node_modules came from the cache and npm ci was skipped.'
+    value: ${{ steps.modules.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      uses: actions/setup-node@v7
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    # npm workspaces put most packages in the root node_modules and only
+    # version-conflicting ones in each workspace's own; all of them must
+    # travel together, or the restored tree is not the one the lockfile
+    # describes. Workspace links (node_modules/@whity/ui -> packages/ui) are
+    # relative symlinks, which the cache's tar keeps as links.
+    - name: Restore node_modules
+      id: modules
+      uses: actions/cache@v6
+      with:
+        path: |
+          node_modules
+          web/node_modules
+          packages/*/node_modules
+          templates/*/node_modules
+        key: node-modules-${{ runner.os }}-node${{ inputs.node-version }}-${{ hashFiles('package-lock.json') }}
+
+    - name: Install dependencies
+      if: steps.modules.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci --no-audit --no-fund
