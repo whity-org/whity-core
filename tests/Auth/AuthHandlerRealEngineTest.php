@@ -275,6 +275,25 @@ final class AuthHandlerRealEngineTest extends TestCase
         $this->assertArrayHasKey('error', json_decode($response->getBody(), true));
     }
 
+    public function testHandle2faRefusesATokenMintedForAnotherJob(): void
+    {
+        // WHIT-1248: every token type shares the signing key, so the step must
+        // check the type, not only the signature and profile_id.
+        $profileId = $this->seedProfile('wrongtype2fa@whity.local', 1, 2);
+        $_COOKIE['temp_auth_token'] = $this->jwtParser->create([
+            'profile_id'       => $profileId,
+            'active_tenant_id' => 1,
+            'email'            => 'wrongtype2fa@whity.local',
+        ], 900, 'access');
+
+        $response = $this->authHandler->handle2fa(
+            new Request('POST', '/api/login/2fa', [], (string) json_encode(['code' => '123456']))
+        );
+
+        $this->assertSame(401, $response->getStatusCode());
+        $this->assertSame('Invalid or expired temporary token', json_decode($response->getBody(), true)['error']);
+    }
+
     // ==================== helpers ====================
 
     private function login(string $email): \Whity\Core\Response
