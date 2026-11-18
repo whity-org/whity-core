@@ -12,6 +12,8 @@ use Whity\Core\Licensing\ActivationService;
 use Whity\Core\Licensing\DeviceAllowance;
 use Whity\Core\Licensing\LicensingException;
 use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimits;
+use Whity\Core\Store\SharedStoreInterface;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -86,6 +88,8 @@ final class LicensingApiHandler
         private readonly ?\Closure $clock = null,
         /** The tier's device cap, or null on a deployment that caps nobody. */
         private readonly ?DeviceAllowance $allowance = null,
+        /** Counts redeem attempts per address; null only in tests that do not exercise it. */
+        private readonly ?SharedStoreInterface $store = null,
     ) {
     }
 
@@ -345,6 +349,18 @@ final class LicensingApiHandler
      */
     public function redeem(Request $request): Response
     {
+        // A caller with no session, checking a secret: limited per address before
+        // anything is looked up (WHIT-1248). ActivationCode's 50 bits were sized
+        // on the assumption that this endpoint is rate-limited, and each attempt
+        // is a database round trip.
+        $ip = ClientIp::fromRequest($request);
+        if ($this->store !== null && $ip !== null && $ip !== '') {
+            $limited = RateLimits::licensingRedeemPerAddress()->take($this->store, 'licensing:redeem:ip:' . $ip);
+            if ($limited !== null) {
+                return $limited;
+            }
+        }
+
         $body = JsonBody::parsed($request);
 
         $code = $body['code'] ?? null;

@@ -33,6 +33,12 @@ final class RateLimits
         return RateLimitRule::keyed('document_verification.address', 60, self::HOUR);
     }
 
+    /** Redeeming a device activation code, per client address (WHIT-1248). */
+    public static function licensingRedeemPerAddress(): RateLimitRule
+    {
+        return RateLimitRule::keyed('licensing_redeem.address', 30, self::HOUR);
+    }
+
     /** Asking for a verification email, per address asked about. */
     public static function emailVerificationPerEmail(): RateLimitRule
     {
