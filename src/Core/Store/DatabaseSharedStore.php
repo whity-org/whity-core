@@ -20,8 +20,23 @@ use PDO;
  */
 final class DatabaseSharedStore implements SharedStoreInterface
 {
-    public function __construct(private readonly PDO $pdo)
-    {
+    /**
+     * @param bool $relaxedCounterCommits Commit {@see increment()} without waiting
+     *        for the WAL flush (PostgreSQL `synchronous_commit = off`, scoped to
+     *        that one statement). For counters whose loss on a database crash is
+     *        harmless — the request rate limiter, which writes on EVERY request —
+     *        and never for counters used as a once-only lock (the billing event
+     *        ledger, the scheduler tick): those keep the default. On a server
+     *        crash the last few hundred milliseconds of relaxed increments may be
+     *        lost, which for a rate limiter means a window counts a little low.
+     *        Measured on the perf stack (WHIT-1229): an upsert went from 2-4 ms
+     *        to ~0.4 ms, and the platform-wide counter row is locked for that
+     *        much less time by every request in the deployment.
+     */
+    public function __construct(
+        private readonly PDO $pdo,
+        private readonly bool $relaxedCounterCommits = false,
+    ) {
     }
 
     public function increment(string $key, int $ttlSeconds): int
@@ -32,9 +47,22 @@ final class DatabaseSharedStore implements SharedStoreInterface
         //   • New key → insert with counter = 1 and the supplied TTL.
         //   • Existing key, not expired → increment counter, keep original expiry.
         //   • Existing key, expired → reset counter to 1, apply fresh TTL.
-        $stmt = $this->pdo->prepare("
+        // Relaxed: the same upsert, fed from a CTE that turns off the WAL-flush
+        // wait for THIS statement's implicit transaction only (set_config(...,
+        // true) is transaction-local, so nothing leaks into the session). Only
+        // outside an explicit transaction — inside one it would relax the
+        // caller's whole commit, which is not this store's call to make.
+        $relaxed = $this->relaxedCounterCommits
+            && !$this->pdo->inTransaction()
+            && $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql';
+        $values = $relaxed
+            ? "WITH relax AS (SELECT set_config('synchronous_commit', 'off', true))
             INSERT INTO shared_store (store_key, counter, expires_at, updated_at)
-            VALUES (:key, 1, :expires_at, CURRENT_TIMESTAMP)
+            SELECT :key, 1, CAST(:expires_at AS TIMESTAMP), CURRENT_TIMESTAMP FROM relax"
+            : "INSERT INTO shared_store (store_key, counter, expires_at, updated_at)
+            VALUES (:key, 1, :expires_at, CURRENT_TIMESTAMP)";
+
+        $stmt = $this->pdo->prepare($values . "
             ON CONFLICT (store_key) DO UPDATE SET
                 counter    = CASE
                                  WHEN shared_store.expires_at IS NOT NULL

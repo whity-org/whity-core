@@ -32,7 +32,7 @@ class HttpKernel
     private array $middleware = [];
     /** @var array<array{callback:callable,args:array<mixed>}> */
     private static array $shutdownFunctions = [];
-    /** @var array<string> */
+    /** @var array<array-key, true> Names of the globals the boot script left, as a set. */
     private array $initialGlobals = [];
     private bool $memoryLimitExceeded = false;
 
@@ -139,7 +139,7 @@ class HttpKernel
 
         // 4. Reset custom globals
         foreach (array_keys($GLOBALS) as $key) {
-            if ($key !== 'GLOBALS' && !in_array($key, $this->initialGlobals, true)) {
+            if ($key !== 'GLOBALS' && !isset($this->initialGlobals[$key])) {
                 unset($GLOBALS[$key]);
             }
         }
@@ -195,7 +195,10 @@ class HttpKernel
     {
         // Initialize state isolation tracking on the first request
         if (empty($this->initialGlobals)) {
-            $this->initialGlobals = array_keys($GLOBALS);
+            // A set, not a list (WHIT-1229): the boot script leaves ~1000 globals
+            // behind, and an in_array over them for every one of them was a
+            // million string compares at the end of every request.
+            $this->initialGlobals = array_fill_keys(array_keys($GLOBALS), true);
         }
 
         try {

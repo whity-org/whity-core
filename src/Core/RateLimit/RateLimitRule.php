@@ -78,6 +78,12 @@ final class RateLimitRule
      */
     public const IP_UNKNOWN = 'unknown';
 
+    /** How long a worker trusts a tenant's plan rate budget before reading it again. */
+    public const BUDGET_TTL_SECONDS = 30;
+
+    /** Most tenant budgets one worker remembers before starting over. */
+    private const BUDGET_CACHE_MAX = 2048;
+
     /**
      * Per-IP rule — keyed on the forwarding-header client IP. Suitable for the
      * pre-auth pipeline position, where no principal/tenant is known yet.
@@ -144,16 +150,33 @@ final class RateLimitRule
             $tenantId = TenantContext::getTenantId();
             return ($tenantId === null || $tenantId === 0) ? null : (string) $tenantId;
         };
-        $limitResolver = static function (Request $r) use ($entitlements, $fallbackLimit): ?int {
+        // The budget per tenant, remembered for BUDGET_TTL_SECONDS in this worker
+        // (WHIT-1229). Reading it is three entitlement queries, and it was read on
+        // every authenticated request. It is keyed by tenant and holds one int,
+        // so nothing crosses tenants; a plan change reaches the limiter within
+        // the TTL, which for a per-minute budget is the same window anyway.
+        /** @var array<int, array{0: int, 1: int}> $budgets tenant id => [limit, expires at] */
+        $budgets = [];
+        $limitResolver = static function (Request $r) use ($entitlements, $fallbackLimit, &$budgets): ?int {
             $tenantId = TenantContext::getTenantId();
             if ($tenantId === null || $tenantId === 0) {
                 return null; // dimension skipped anyway; use fallback defensively
+            }
+            $now = time();
+            if (isset($budgets[$tenantId]) && $budgets[$tenantId][1] > $now) {
+                return $budgets[$tenantId][0];
             }
             $rpm = $entitlements->limit($tenantId, EntitlementRegistry::RATELIMIT_RPM);
 
             // A positive rpm is the plan's explicit budget; -1 (default/unlimited)
             // or any non-positive value means "no plan cap" → the platform baseline.
-            return $rpm > 0 ? $rpm : $fallbackLimit;
+            $limit = $rpm > 0 ? $rpm : $fallbackLimit;
+            if (count($budgets) >= self::BUDGET_CACHE_MAX) {
+                $budgets = []; // bounded: a worker never holds more than this many
+            }
+            $budgets[$tenantId] = [$limit, $now + self::BUDGET_TTL_SECONDS];
+
+            return $limit;
         };
 
         return new self('tenant', $resolve, $fallbackLimit, $window, $limitResolver);

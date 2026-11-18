@@ -89,6 +89,31 @@ final class RateLimitRuleEntitlementRealEngineTest extends TestCase
         self::assertSame(250000, $this->rule()->limitFor($this->req()));
     }
 
+    public function testTheBudgetIsRememberedPerTenantForAShortWhile(): void
+    {
+        // WHIT-1229: the budget was three entitlement queries on every request.
+        // One rule (one worker) now remembers it per tenant for BUDGET_TTL_SECONDS.
+        $this->pdo->exec("INSERT INTO tenants (id, name, slug) VALUES (2, 'b', 'b')");
+        $this->entitlements->set(self::TENANT, EntitlementRegistry::RATELIMIT_RPM, '500', null);
+        $this->entitlements->set(2, EntitlementRegistry::RATELIMIT_RPM, '700', null);
+        $rule = $this->rule();
+
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT);
+        self::assertSame(500, $rule->limitFor($this->req()));
+
+        $this->entitlements->set(self::TENANT, EntitlementRegistry::RATELIMIT_RPM, '900', null);
+        self::assertSame(500, $rule->limitFor($this->req()), 'within the TTL the remembered budget is used');
+
+        TenantContext::reset();
+        TenantContext::setTenantId(2);
+        self::assertSame(700, $rule->limitFor($this->req()), 'remembered per tenant, never shared');
+
+        TenantContext::reset();
+        TenantContext::setTenantId(self::TENANT);
+        self::assertSame(900, $this->rule()->limitFor($this->req()), 'a fresh rule reads the new plan');
+    }
+
     public function testPlatformRuleUsesOneSharedCounterAndFixedLimit(): void
     {
         $rule = RateLimitRule::platform(100000, 60);

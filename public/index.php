@@ -1472,7 +1472,9 @@ $kernel = new HttpKernel($router, $rbacMiddleware);
 // disables the whole layer. Defaults are generous so normal usage (and the e2e
 // suite) is never throttled — operators tighten them per deployment.
 $rateLimitEnabled    = (($_ENV['RATE_LIMIT_ENABLED'] ?? '1') !== '0');
-$rateLimitStore      = new SharedStoreRateLimitStore(new DatabaseSharedStore($db->getPdo()));
+// WHIT-1229: relaxed commits — four counter upserts run on EVERY request, and
+// waiting for each one's WAL flush was the largest single cost of a page load.
+$rateLimitStore      = new SharedStoreRateLimitStore(new DatabaseSharedStore($db->getPdo(), relaxedCounterCommits: true));
 // #1049: /api/build joins the infrastructure probes. A monitor that compares it
 // against /web-build on an interval is the intended consumer, and a throttled
 // 429 there is indistinguishable from the drift it is watching for.
