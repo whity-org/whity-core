@@ -3163,7 +3163,8 @@ $licensingHandler = new \Whity\Api\LicensingApiHandler(
     new \Whity\Core\Licensing\ActivationService($db->getPdo(), null, $deviceAllowance),
     $roleChecker,
     null,
-    $deviceAllowance
+    $deviceAllowance,
+    new DatabaseSharedStore($db->getPdo())
 );
 $router->register('GET',  '/api/licensing/devices',                 [$licensingHandler, 'devices'],    null, null, CorePermissions::LICENSING_VIEW);
 $router->register('POST', '/api/licensing/devices',                 [$licensingHandler, 'provision'],  null, null, CorePermissions::LICENSING_MANAGE);
