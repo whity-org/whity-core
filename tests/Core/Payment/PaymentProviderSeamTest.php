@@ -282,6 +282,17 @@ final class PaymentProviderSeamTest extends TestCase
         (new MockPaymentProvider('the-real-secret'))->translateWebhook($signed['body'], $signed['headers']);
     }
 
+    public function testAWebhookIsRefusedWhenNoSecretIsStored(): void
+    {
+        // WHIT-1248: with no secret, anybody can compute the HMAC under the
+        // empty key, so a correctly "signed" callback proves nothing.
+        $unconfigured = new MockPaymentProvider('');
+        $forged = $unconfigured->signedWebhook(PaymentEventType::Succeeded, 'mock-1', $this->jod(5000));
+
+        $this->expectException(WebhookVerificationException::class);
+        $unconfigured->translateWebhook($forged['body'], $forged['headers']);
+    }
+
     public function testAnUnsignedWebhookIsRefused(): void
     {
         $mock = new MockPaymentProvider('shhh');

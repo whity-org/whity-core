@@ -214,6 +214,14 @@ final class MockPaymentProvider implements PaymentProviderAdapter
             }
         }
 
+        // No secret stored (or one that could not be decrypted) reaches here as
+        // ''. An HMAC under an empty key is one anybody can compute, so it
+        // proves nothing: refuse every callback rather than accept forged
+        // "paid" events (WHIT-1248).
+        if ($this->webhookSecret === '') {
+            throw new WebhookVerificationException('Mock webhook secret is not configured.');
+        }
+
         if ($provided === null) {
             throw new WebhookVerificationException('Mock webhook carried no signature.');
         }
