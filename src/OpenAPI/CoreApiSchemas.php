@@ -12320,7 +12320,7 @@ final class CoreApiSchemas
                 'delegate' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']),
                 'startsOn' => ['type' => 'string', 'format' => 'date'],
                 'backOn' => ['type' => 'string', 'format' => 'date'],
-                'covers' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['flows', 'proposals', 'documents']]],
+                'covers' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['flows', 'proposals', 'documents', 'plugins']]],
                 'message' => self::str(true),
                 'status' => ['type' => 'string', 'enum' => ['starting', 'in_force', 'ended']],
                 'endedAt' => self::str(true),
@@ -12332,7 +12332,7 @@ final class CoreApiSchemas
                 'delegateProfileId' => self::int(),
                 'startsOn' => ['type' => 'string', 'format' => 'date'],
                 'backOn' => ['type' => 'string', 'format' => 'date', 'description' => 'The day you are back; it ends at the start of that day'],
-                'covers' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['flows', 'proposals', 'documents']], 'minItems' => 1],
+                'covers' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['flows', 'proposals', 'documents', 'plugins']], 'minItems' => 1],
                 'message' => self::str(true),
             ], ['delegateProfileId', 'startsOn', 'backOn', 'covers']),
 

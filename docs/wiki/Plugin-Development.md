@@ -1863,7 +1863,7 @@ asks for payment, core saves the booking as `pending_payment`, holds the slot
 for the workspace's `calendar.payment_hold_minutes`, and calls
 `start(PendingBooking, $returnUrl)` for the URL to send the customer to. When
 your provider says the money arrived, call
-`\Whitypp(\Whity\Sdk\Calendar\Bookings::class)->confirmPaid($tenantId, $bookingId, $ref)`.
+`\Whity\app(\Whity\Sdk\Calendar\Bookings::class)->confirmPaid($tenantId, $bookingId, $ref)`.
 It returns false if the hold lapsed and the time was taken since: refund then.
 Call `release()` when the payment will not happen. One deployment has one
 payment step.
@@ -1873,7 +1873,7 @@ and return `BusyInterval`s in UTC. Core asks when it lists free times and again
 inside the person's lock before saving a booking, so answer from a cache. A
 throw is read as "not busy" and logged; an answer slower than 1.5 seconds is
 logged. Keep outside events on a person's calendar with
-`\Whitypp(\Whity\Sdk\Calendar\CalendarEvents::class)->upsertExternal(...)`
+`\Whity\app(\Whity\Sdk\Calendar\CalendarEvents::class)->upsertExternal(...)`
 keyed by your own reference, and write outwards from `Events::BOOKING_*` and
 `Events::CALENDAR_EVENT_*` (ids only).
 
@@ -1949,6 +1949,67 @@ who added it. In a job, act as the person who set the job up. Reads are not
 permission-checked: show a person only what their own `contacts:read` allows.
 `findByField()` matches the whole value, ignoring case, and returns the live
 contact with the lowest id.
+
+## Step 12i — Put leave on the calendar, and ask who is away (SDK 1.120)
+
+A plugin that runs its own leave requests (a manager decides, then HR) can
+land approved leave on core's calendar as real time off, and drop its own
+record of who is away. Time off from here is the same as Calendar › Time off:
+the person has no free times in bookings, and team views and "who's in" show
+them as away. A busy event from `CalendarEvents::upsertExternal()` is not
+time off.
+
+```php
+use Whity\Sdk\Calendar\TimeOff;
+use Whity\Sdk\Calendar\TimeOffRejected;
+use Whity\Sdk\Delegation\Away;
+
+$timeOff = \Whity\app(TimeOff::class);   // null on a host older than 1.120
+
+// HR approved leave request 123: 22 to 24 November, whole days in Amman.
+try {
+    $id = $timeOff?->create(
+        $tenantId,
+        $personId,
+        '2026-11-22T00:00:00+03:00',
+        '2026-11-25T00:00:00+03:00',     // the end is exclusive
+        'Annual leave',
+        $hrProfileId,                    // acting person: the final approver
+        'keyhub.leave:123',              // your reference
+    );
+} catch (TimeOffRejected $e) {
+    // $e->reason: forbidden, not_staff, invalid_times, invalid_ref, ref_conflict
+}
+
+// The request was withdrawn.
+$row = $timeOff?->byExternalRef($tenantId, 'keyhub.leave:123');
+if ($row !== null) {
+    $timeOff->cancel($tenantId, $row['id'], $actingProfileId);
+}
+```
+
+- **Who may.** Each write runs as `$actingProfileId` with the time-off
+  route's checks: `calendar:write` for one's own time off, and
+  `calendar:manage` too for anybody else's. The person must be staff of the
+  workspace.
+- **Times.** Instants with an offset or `Z`; the end is exclusive; at most a
+  year. For whole days, pass the person's local midnights.
+- **Your reference makes it safe to retry.** While time off with your
+  `externalRef` exists in the workspace, `create()` returns its id (moving it
+  to the new times and reason if they changed) and never adds a second, even
+  when two retries race. A reference that names someone else's time off is
+  refused with `ref_conflict`. Cancelling frees the reference.
+- `forPerson($tenantId, $profileId, $fromUtc, $toUtc)` lists a person's time
+  off in a range, times in UTC.
+
+**Who decides while someone is away.** `\Whity\app(Away::class)->at($tenantId,
+$profileId, $atUtc)` returns null when the person is in, or `from`, `until`,
+`standInProfileId`, `covers`, `source` (`away` or `time_off`) and `timeOffId`.
+Their "I'm away" period (Settings › Delegations) names the stand-in; time off
+alone has none. Send one of your approvals to the stand-in only when `covers`
+holds `Away::COVER_PLUGINS` (the person chose "Approvals in plugins"), and
+still check the stand-in's own permissions: anything above what they may
+approve waits for the person. A plugin can read this, never set it.
 
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 

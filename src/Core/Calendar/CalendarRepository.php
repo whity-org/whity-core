@@ -261,6 +261,47 @@ final class CalendarRepository
         return is_array($row) ? ['id' => (int) $row['id'], 'profile_id' => (int) $row['profile_id']] : null;
     }
 
+    /**
+     * Confirmed time off (kind `time_off` only) for the SDK's
+     * {@see \Whity\Sdk\Calendar\TimeOff}: by id, by a plugin's reference, or
+     * for one person touching `[from, to)`. The reason is the note.
+     *
+     * @return list<array{id: int, profile_id: int, interval: Interval, note: string, external_ref: ?string}>
+     */
+    public function timeOff(int $tenantId, ?int $profileId = null, ?DateTimeImmutable $from = null, ?DateTimeImmutable $to = null, ?int $id = null, ?string $externalRef = null): array
+    {
+        $sql = "SELECT id, profile_id, starts_at, ends_at, notes, external_ref FROM calendar_events
+                 WHERE tenant_id = :tenant_id AND status = 'confirmed' AND kind = 'time_off'";
+        $params = [':tenant_id' => $tenantId];
+        if ($profileId !== null) {
+            $sql .= ' AND profile_id = :profile_id';
+            $params[':profile_id'] = $profileId;
+        }
+        if ($from !== null && $to !== null) {
+            $sql .= ' AND starts_at < :to AND ends_at > :from';
+            $params[':from'] = Interval::toDb($from);
+            $params[':to'] = Interval::toDb($to);
+        }
+        if ($id !== null) {
+            $sql .= ' AND id = :id';
+            $params[':id'] = $id;
+        }
+        if ($externalRef !== null) {
+            $sql .= ' AND external_ref = :ref';
+            $params[':ref'] = $externalRef;
+        }
+        $stmt = $this->db->prepare($sql . ' ORDER BY starts_at, id');
+        $stmt->execute($params);
+
+        return array_values(array_map(static fn (array $r): array => [
+            'id' => (int) $r['id'],
+            'profile_id' => (int) $r['profile_id'],
+            'interval' => new Interval(Interval::fromDb((string) $r['starts_at']), Interval::fromDb((string) $r['ends_at'])),
+            'note' => (string) $r['notes'],
+            'external_ref' => $r['external_ref'] !== null ? (string) $r['external_ref'] : null,
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC)));
+    }
+
     public function deleteException(int $tenantId, int $id): void
     {
         $this->cancelEvent($tenantId, $id);

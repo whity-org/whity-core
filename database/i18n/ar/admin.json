@@ -735,6 +735,8 @@
         "away.cover.documentsHint": "أوامر الشراء والخطابات",
         "away.cover.flows": "الموافقات في المسارات",
         "away.cover.flowsHint": "المشتريات والإجازات ومطالبات النفقات",
+        "away.cover.plugins": "الموافقات في الإضافات",
+        "away.cover.pluginsHint": "طلبات تطلب منك إضافاتك الموافقة عليها، مثل الإجازات",
         "away.cover.proposals": "اقتراحات مساعديك",
         "away.cover.proposalsHint": "ما يطلب منك مساعدوك الموافقة عليه",
         "away.current.when": "من {from} حتى عودتك في {back}",

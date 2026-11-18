@@ -80858,7 +80858,8 @@
                             "enum": [
                                 "flows",
                                 "proposals",
-                                "documents"
+                                "documents",
+                                "plugins"
                             ]
                         }
                     },
@@ -80931,7 +80932,8 @@
                             "enum": [
                                 "flows",
                                 "proposals",
-                                "documents"
+                                "documents",
+                                "plugins"
                             ]
                         },
                         "minItems": 1

@@ -164,7 +164,9 @@ export default function DelegationsPage() {
                   ? t('away.cover.flows', 'Approvals in flows')
                   : cover === 'proposals'
                     ? t('away.cover.proposals', "Your agents' proposals")
-                    : t('away.cover.documents', 'Documents to sign'),
+                    : cover === 'plugins'
+                      ? t('away.cover.plugins', 'Approvals in plugins')
+                      : t('away.cover.documents', 'Documents to sign'),
               )
               .join(', '),
             grantor: a.profile.name ?? t('delegations.grantee.user', 'A person'),
