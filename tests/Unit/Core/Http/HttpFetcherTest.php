@@ -29,6 +29,16 @@ final class HttpFetcherTest extends TestCase
             ['https://169.254.169.254/latest/meta-data'], // cloud-metadata link-local
             ['https://0.0.0.0/x'],                         // reserved
             ['https://[::1]/x'],                           // IPv6 loopback
+            // WHIT-1248: ranges the old NO_PRIV|NO_RES pair let through.
+            ['https://100.100.100.200/x'],                 // carrier-grade NAT (a cloud metadata address)
+            ['https://100.64.0.1/x'],                      // carrier-grade NAT
+            ['https://198.18.0.1/x'],                      // benchmarking
+            ['https://192.0.0.8/x'],                       // IETF protocol assignments
+            ['https://[::ffff:127.0.0.1]/x'],              // IPv4-mapped loopback
+            ['https://[::ffff:169.254.169.254]/x'],        // IPv4-mapped metadata
+            ['https://[64:ff9b::a9fe:a9fe]/x'],            // NAT64 of 169.254.169.254
+            ['https://[fe80::1]/x'],                       // IPv6 link-local
+            ['https://[fc00::1]/x'],                       // IPv6 unique local
             ['https://localhost/x'],                       // resolves to loopback
             ['https:///no-host'],                          // no host
             ['not-a-url'],                                 // unparseable
