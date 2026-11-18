@@ -161,7 +161,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npm run dev -- -p ${PORT}`,
+    // CI builds the app first and sets E2E_NEXT_START, so the suite runs
+    // against `next start` — the production server, as deployed — instead of
+    // `next dev`, which compiles every route on its first visit and spent a
+    // good part of each shard doing so (WHIT-1222). Locally it stays `next dev`.
+    command: process.env.E2E_NEXT_START
+      ? `npm run start -- -p ${PORT}`
+      : `npm run dev -- -p ${PORT}`,
     url: `${BASE_URL}/login`,
     reuseExistingServer: true,
     timeout: 120_000,
