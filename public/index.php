@@ -789,6 +789,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CONTACTS_READ,
     ];
     $items[] = [
+        'id' => 'inventory',
+        'label' => 'Inventory',
+        'href' => '/inventory',
+        'icon' => 'package',
+        // Items, places and stock (WHIT-1232, design section 31, IV.23): after
+        // Contacts in Work, as Operations still holds nothing else.
+        'group' => 'work',
+        'order' => 5,
+        // Mirrors GET /api/inventory/items.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::INVENTORY_READ,
+    ];
+    $items[] = [
         'id' => 'users',
         'label' => 'Users',
         'href' => '/admin/users',
