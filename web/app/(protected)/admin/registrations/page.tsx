@@ -49,6 +49,7 @@ interface PendingRegistration {
   display_name: string;
   owner_email: string;
   created_at: string;
+  rejected_at?: string | null;
 }
 
 export default function PendingRegistrationsPage() {
@@ -78,6 +79,10 @@ export default function PendingRegistrationsPage() {
   const [busyId, setBusyId] = useState<number | null>(null);
   // Rejecting suspends the account, so it asks first and names that (tier 2).
   const [rejecting, setRejecting] = useState<PendingRegistration | null>(null);
+  // Sign-ups rejected earlier, so one turned down by mistake can still be
+  // approved (#408). Only rejections are listed here, never members
+  // suspended for another reason.
+  const [rejected, setRejected] = useState<PendingRegistration[]>([]);
   const dates = useDateDisplay();
 
   const load = useCallback(async () => {
@@ -105,6 +110,20 @@ export default function PendingRegistrationsPage() {
     }
   }, [page]);
 
+  const loadRejected = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/api/v1/registrations/pending?status=rejected&per_page=${PER_PAGE}`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'include',
+      });
+      if (!res.ok) return;
+      const body = await res.json().catch(() => ({}));
+      setRejected(Array.isArray(body?.data) ? (body.data as PendingRegistration[]) : []);
+    } catch {
+      // The rejected list is secondary; the pending list reports its own errors.
+    }
+  }, []);
+
   useEffect(() => {
     // Only fetch once the caller is confirmed eligible — otherwise the API
     // returns 403 and we render the access-denied state instead. Deferred off
@@ -112,8 +131,9 @@ export default function PendingRegistrationsPage() {
     // does not run synchronously within the effect body.
     if (!isCapabilitiesLoading && isSystemTenant && canApprove) {
       void Promise.resolve().then(load);
+      void Promise.resolve().then(loadRejected);
     }
-  }, [isCapabilitiesLoading, isSystemTenant, canApprove, load]);
+  }, [isCapabilitiesLoading, isSystemTenant, canApprove, load, loadRejected]);
 
   const act = async (item: PendingRegistration, action: 'approve' | 'reject') => {
     setBusyId(item.membership_id);
@@ -150,6 +170,8 @@ export default function PendingRegistrationsPage() {
       );
       // Drop the handled row locally (avoids a full refetch flicker).
       setItems((prev) => prev.filter((i) => i.membership_id !== item.membership_id));
+      setRejected((prev) => prev.filter((i) => i.membership_id !== item.membership_id));
+      if (action === 'reject') void loadRejected();
     } catch {
       addToast(
         action === 'approve'
@@ -315,6 +337,61 @@ export default function PendingRegistrationsPage() {
           )}
         </CardContent>
       </Card>
+
+      {rejected.length > 0 && (
+        <Card className="border border-border bg-card shadow-sm" data-testid="registrations-rejected">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold font-heading">
+              <h2>{t('registrations.rejected.title', 'Rejected sign-ups')}</h2>
+            </CardTitle>
+            <CardDescription className="text-sm">
+              {t(
+                'registrations.rejected.description',
+                'Sign-ups you rejected. Approve one if you change your mind, and its owner can sign in.'
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-border">
+              {rejected.map((item) => (
+                <li
+                  key={item.membership_id}
+                  className="flex flex-col gap-3 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between"
+                  data-testid={`registration-rejected-row-${item.membership_id}`}
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-foreground truncate">{item.tenant_name}</p>
+                    <p className="text-sm text-muted-foreground truncate">
+                      {[
+                        item.owner_email || item.display_name,
+                        item.rejected_at && dates.date(item.rejected_at) !== null
+                          ? t('registrations.rejected.on', 'Rejected on {date}', {
+                              date: dates.date(item.rejected_at) ?? '',
+                            })
+                          : null,
+                      ]
+                        .filter((part) => part)
+                        .join(' · ')}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={busyId === item.membership_id}
+                    onClick={() => void act(item, 'approve')}
+                    className="gap-1 shrink-0"
+                    data-testid={`registration-reapprove-${item.membership_id}`}
+                  >
+                    <IconCheck className="w-4 h-4" />
+                    {t('registrations.action.approve', 'Approve')}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
       <ConfirmAction
         open={rejecting !== null}
         onOpenChange={(open) => {
