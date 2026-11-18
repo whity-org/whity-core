@@ -27,6 +27,11 @@ concurrency:
   group: e2e-${{ github.event_name == 'schedule' && 'nightly' || github.ref }}
   cancel-in-progress: true
 
+# Least privilege (WHIT-1223): every job here only reads the repository, so
+# the token gets nothing more, whatever the repository default becomes.
+permissions:
+  contents: read
+
 jobs:
   # Path filtering lives HERE rather than on the workflow triggers.
   #

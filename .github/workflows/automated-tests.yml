@@ -49,6 +49,12 @@ concurrency:
   group: tests-${{ github.event_name == 'schedule' && 'nightly' || github.ref }}
   cancel-in-progress: true
 
+# Least privilege (WHIT-1223). Every job here only reads the repository (the
+# upgrade check pulls a public ghcr.io image and reads the latest release),
+# so the token gets nothing more, whatever the repository default becomes.
+permissions:
+  contents: read
+
 # ---------------------------------------------------------------------------
 # What runs where (WHIT-801)
 #
