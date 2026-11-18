@@ -936,5 +936,36 @@ Owner's direction (19 Nov 2026): themes are tokens only, in the spirit of Materi
 | TH.13 | Plugins and the store | Plugins ship theme files through a new SDK interface (the route-based `PluginThemeInterface` is deprecated); store themes are signed packages; publishers may sell themes through Whity Pay; applying is free. **Owner:** yes, through Whity Pay, as recommended. |
 | TH.14 | Free and paid | Free in core: apply any installed theme, set the primary seed and overrides, import a theme file. Whity Studio (paid): live editor, seeds from the logo, presets, import from shadcn and Material Theme Builder, export, preview across key screens, documents and the phone, versions, publishing to the store. **Owner:** accepted as recommended. |
 
+## Inventory in core (PROPOSED, 19 November 2026)
+
+**Not yet decided.** Proposed in section 31 for the owner's approval (WHIT-1228). The owner lifted WHIT-667 for inventory on 19 November 2026 ("Core basics now, spec first"). Rows marked D1–D11 carry the recommended answer to that question in section 31; the owner's answer replaces it.
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| IV.1 | Scope | Core keeps items, units, places, an append-only ledger of stock moves, levels, reservations, reorder levels, lots, serials and expiry, adjustments, counts, transfers, and simple purchase and sales orders, all in the plugin SDK from the first phase. Costing beyond one simple cost, accounting, multi-level production, point of sale and supplier bills are plugins or later |
+| IV.2 | The ledger | Every change in stock is a move from one place to another, using virtual places (supplier, customer, loss, found, production, consumed, opening, transit). Moves are never edited or deleted; corrections are reversing moves. Levels are a projection that can be rebuilt from the ledger |
+| IV.3 | Quantities | Whole numbers in the base unit's smallest step, like money's minor units; unit conversions are whole-number fractions. No floats anywhere in stock |
+| IV.4 | Items and variants | An item has one or more variants; the variant is what has a SKU, barcodes, stock and lines. Items with one variant don't show it. Up to 3 option axes and 100 variants per item (D5) |
+| IV.5 | Units | Each item has a base unit and may be bought or sold in others (25 kg bag, box of 12); a barcode can mean a unit, so scanning a box adds 12 |
+| IV.6 | Kinds of item | Stocked, consumable, service (no stock, may use consumables), made (has a recipe) |
+| IV.7 | Places | Warehouses, shops and branches, with areas inside; a place may belong to an organisational unit, which scopes who sees it and who approves for it (D6) |
+| IV.8 | Negative stock | A workspace setting; by default stock may go below zero, shown red, and is fixed by the next count. Serial items never go below zero (D2) |
+| IV.9 | Reservations | Confirmed sales orders and plugins reserve stock; available = on hand minus reserved |
+| IV.10 | Lots and expiry | Off by default, turned on per item; receipts ask for lot and expiry; first expiring, first out, with the suggestion changeable; warning 7 days before (IN.1) |
+| IV.11 | Reorder | A reorder level and order-up-to per variant and place; going below fires one event until it recovers; the Stock assistant proposes purchase orders grouped by supplier, a person approves |
+| IV.12 | Purchasing | Purchase order → approval by route if set → print and send → receive in parts, with lots and a delivery note photo → done. Receiving over the order asks (tolerance 0% by default). The bill and three-way match wait for Money |
+| IV.13 | Sales | Sales order → confirm (reserves) → deliver in parts → done; returns linked to the delivery. Payment through Whity Pay's payment link when installed, else marked by hand (D4) |
+| IV.14 | Adjustments and waste | Reasons from a short list; approval above $25 a line by the branch manager, through routing (N5) |
+| IV.15 | Counts | Expected is taken when each line is counted; blind counts are a choice; differences above a value route for approval before posting |
+| IV.16 | Transfers | Send and receive in two steps through "on the way", or one step when the setting says so |
+| IV.17 | Recipes | One level in core: make a batch, and the consumables a service uses (salons, clinics). Multi-level production is a plugin (D3) |
+| IV.18 | Cost | Core keeps a moving average cost per item for stock value; other methods come from costing plugins (D1) |
+| IV.19 | Approvals | Orders, adjustments and counts are route subjects; the workspace picks a route per kind in Flows; approving is never a permission, it comes from routing rules. Agents propose; their purchase orders and adjustments are Check first (tier 2) |
+| IV.20 | Printing | Purchase order, goods received note, sales order, delivery note, pick list, transfer note, count sheet and labels are documents issued through the document themes, with English and Arabic starters, numbered by document numbering |
+| IV.21 | Language | Names are bilingual through the one bilingual text; SKUs, barcodes, lot codes, quantities and amounts stay Western digits and left to right in Arabic; quantity before unit in both languages |
+| IV.22 | SDK | Services Items, Locations, Stock, Lots, Orders, Operations, Units; events from `stock.moving` (can veto) and `stock.moved` to `stock.level.below_reorder` and `inventory.order.*`; extension points for costing, accounting export, operation kinds, item fields, barcode parsing, price lists and reorder policy. Plugin moves are namespaced by the host |
+| IV.23 | Sidebar | Operations › Inventory, with Purchases and Sales as tabs inside it until Money arrives (D10) |
+| IV.24 | Plans | Open: whether every part is free on every plan, or Free gets an item limit (D9) |
+
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.
