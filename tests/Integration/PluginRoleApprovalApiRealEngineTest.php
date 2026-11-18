@@ -207,7 +207,7 @@ PHP);
         );
         $stmt->execute([':r' => $roleId]);
 
-        return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        return array_values(array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN)));
     }
 
     private function scalar(string $sql): int
