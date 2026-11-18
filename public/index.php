@@ -4185,6 +4185,8 @@ $brandingService = new \Whity\Core\Branding\BrandingService(
     $entitlementService,
     // WHIT-1225: themes a workspace imported, beside Whity's own.
     new \Whity\Core\Theme\ThemeRepository($db->getPdo()),
+    // SDK 1.126: and the themes plugins ship.
+    static fn (): array => $pluginLoader->getPluginThemes(),
 );
 $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     $documentQrService,
@@ -5168,7 +5170,7 @@ $notificationDispatcher = new \Whity\Core\Notification\NotificationDispatcher(
     $brandedEmailSender->gate()
 );
 $notificationDispatcher->subscribe($hookManager);
-\Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger, $logger);
+\Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger, $logger, static fn (): array => $pluginLoader->getPluginThemes());
 
 // Comments and suggestions on editor documents (editor M5; E.4, E.6, E.10,
 // E.29, E.37). Registered here, after the notification dispatcher, because a
@@ -6138,6 +6140,7 @@ $router->register('GET', '/api/theme', [$themeHandler, 'get'], null, null, null)
 $themesHandler = new \Whity\Api\ThemesApiHandler(
     new \Whity\Core\Theme\ThemeRepository($db->getPdo()),
     $settingsService,
+    static fn (): array => $pluginLoader->getPluginThemes(),
 );
 $router->register('GET',    '/api/themes',            [$themesHandler, 'list'],   null, null, CorePermissions::SETTINGS_READ);
 $router->register('POST',   '/api/themes',            [$themesHandler, 'import'], null, null, CorePermissions::SETTINGS_WRITE);

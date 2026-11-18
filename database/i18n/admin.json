@@ -3847,6 +3847,7 @@
         "theme.description.platform": "The look every workspace starts with: colours, fonts, corners and motion. Free to change.",
         "theme.fonts.one": "Text in {body}",
         "theme.fonts.two": "Text in {body}, headings in {heading}",
+        "theme.fromPlugin": "From {plugin}",
         "theme.import": "Add a theme file",
         "theme.import.done": "Theme added. Choose it below to use it.",
         "theme.import.failed": "This theme file can’t be used.",

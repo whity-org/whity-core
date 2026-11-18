@@ -809,6 +809,80 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     }
 
     /**
+     * Each plugin's checked themes (SDK 1.126, WHIT-1225), by plugin key.
+     *
+     * @var array<string, list<array<string, mixed>>>
+     */
+    private array $themes = [];
+
+    /**
+     * The themes of the plugins on in the current workspace (SDK 1.126,
+     * TH.13), each with the plugin that shipped it. An id offered by two
+     * plugins is kept from the first loaded.
+     *
+     * @return list<array{plugin: string, theme: array<string, mixed>}>
+     */
+    public function getPluginThemes(): array
+    {
+        $out = [];
+        $seen = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $themes = $this->themes[$pluginKey] ?? [];
+            if ($themes === [] || isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive() || $this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+            foreach ($themes as $theme) {
+                $id = (string) $theme['id'];
+                if (isset($seen[$id])) {
+                    continue;
+                }
+                $seen[$id] = true;
+                $out[] = ['plugin' => $info['plugin']->getName(), 'theme' => $theme];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Check a plugin's themes (SDK 1.126) against the theme format, each on
+     * its own, so a bad one is dropped with its reasons and the rest kept.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function collectThemes(PluginInterface $plugin, string $pluginKey): array
+    {
+        if (!$plugin instanceof \Whity\Sdk\Contribute\PluginThemesInterface) {
+            return [];
+        }
+        try {
+            $declared = $plugin->getThemes();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'getThemes');
+
+            return [];
+        }
+        $out = [];
+        foreach ($declared as $i => $theme) {
+            $errors = \Whity\Core\Theme\ThemeValidator::validate($theme);
+            if ($errors === [] && str_starts_with((string) $theme['id'], 'whity.')) {
+                $errors[] = 'ids starting with "whity." are Whity\'s own';
+            }
+            if ($errors !== []) {
+                $this->logWarning("[Plugin:{$pluginKey}] getThemes(): theme {$i} dropped: " . implode('; ', array_slice($errors, 0, 5)));
+                continue;
+            }
+            $out[] = $theme;
+        }
+
+        return $out;
+    }
+
+    /**
      * Each plugin's checked contact fields (SDK 1.119), by plugin key.
      *
      * @var array<string, list<array{key: string, label: array{en: string, ar: string}, kind: string, options: list<string>, required: bool, in_list: bool, edit_permission: ?string}>>
@@ -4896,6 +4970,9 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // 4d. Workspace templates (SDK 1.116, WHIT-1194): data only, each
         //     checked alone.
         $this->workspaceTemplates[$pluginKey] = $this->collectWorkspaceTemplates($plugin, $pluginKey);
+
+        // 4d'. Themes (SDK 1.126, WHIT-1225): data only, each checked alone.
+        $this->themes[$pluginKey] = $this->collectThemes($plugin, $pluginKey);
 
         // 4e. Fields on contacts (SDK 1.119, WHIT-1209): data only, each
         //     checked alone and named under the plugin.

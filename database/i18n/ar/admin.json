@@ -3848,6 +3848,7 @@
         "theme.description.platform": "المظهر الذي تبدأ به كل مساحة عمل: الألوان والخطوط والزوايا والحركة. تغييره مجاني.",
         "theme.fonts.one": "النص بخط {body}",
         "theme.fonts.two": "النص بخط {body}، والعناوين بخط {heading}",
+        "theme.fromPlugin": "من {plugin}",
         "theme.import": "إضافة ملف مظهر",
         "theme.import.done": "أُضيف المظهر. اختره أدناه لاستخدامه.",
         "theme.import.failed": "لا يمكن استخدام ملف المظهر هذا.",

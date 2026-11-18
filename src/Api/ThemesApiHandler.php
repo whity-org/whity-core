@@ -34,6 +34,8 @@ final class ThemesApiHandler
     public function __construct(
         private readonly ThemeRepository $repository,
         private readonly SettingsService $settings,
+        // SDK 1.126: the themes plugins ship (PluginLoader::getPluginThemes).
+        private readonly ?\Closure $pluginThemes = null,
     ) {
     }
 
@@ -49,7 +51,7 @@ final class ThemesApiHandler
             $overrides = json_decode((string) ($values[SettingsRegistry::BRANDING_THEME_OVERRIDES] ?? ''), true);
             $overrides = is_array($overrides) && ThemeValidator::validateOverrides($overrides) === [] ? $overrides : [];
 
-            $library = new ThemeLibrary($this->repository);
+            $library = new ThemeLibrary($this->repository, $this->pluginThemes);
             $current = $chosen !== '' && $library->find($tenantId, $chosen) !== null ? $chosen : ThemeLibrary::DEFAULT_ID;
             $items = [];
             foreach ($library->available($tenantId) as $entry) {
@@ -62,6 +64,7 @@ final class ThemesApiHandler
                     'description' => $theme['description'] ?? null,
                     'author' => $theme['author']['name'] ?? null,
                     'source' => $entry['source'],
+                    'plugin' => $entry['plugin'],
                     'signature_verified' => $entry['signature_verified'],
                     'current' => $theme['id'] === $current,
                     // The main colour replaces this theme's own colour (layer 4).

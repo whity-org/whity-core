@@ -13,6 +13,7 @@ use Whity\Sdk\Notification\Notifier;
 use Whity\Sdk\Secrets\WorkspaceSecrets;
 use Whity\Sdk\Settings\PluginSettingsStore;
 use Whity\Sdk\Storage\PluginFileStore;
+use Whity\Sdk\Theme\WorkspaceTheme;
 
 /**
  * One plugin's view of the host, from {@see \Whity\Sdk\PluginContext::for()}
@@ -62,4 +63,10 @@ interface PluginScope
      * supplied the URL.
      */
     public function http(?AddressPolicy $policy = null): HttpClient;
+
+    /**
+     * The workspace's theme, read-only (1.126): what it looks like now and
+     * which themes it can choose. A person chooses; a plugin only reads.
+     */
+    public function themes(): WorkspaceTheme;
 }

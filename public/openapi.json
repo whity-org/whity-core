@@ -110217,7 +110217,12 @@
                                         },
                                         "source": {
                                             "type": "string",
-                                            "description": "whity, import or store."
+                                            "description": "whity, plugin, import or store."
+                                        },
+                                        "plugin": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "The plugin that ships it, for a theme from a plugin (SDK 1.126)."
                                         },
                                         "signature_verified": {
                                             "type": "boolean"

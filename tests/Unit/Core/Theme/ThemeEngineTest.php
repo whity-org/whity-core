@@ -208,4 +208,29 @@ final class ThemeEngineTest extends TestCase
         self::assertSame(ThemeLibrary::DEFAULT_ID, $missing['theme']['id']);
         self::assertContains('theme-missing', array_column($missing['theme']['adjustments'], 'change'));
     }
+
+    /** SDK 1.126: plugin themes join the list after Whity's own, never replacing them. */
+    public function testPluginThemesAreListedAndResolvable(): void
+    {
+        $plugin = ['schemaVersion' => 1, 'id' => 'acme.sea', 'version' => '1.0.0', 'name' => ['en' => 'Sea'], 'colour' => ['seeds' => ['primary' => '#006d77']]];
+        $clash = ['schemaVersion' => 1, 'id' => 'whity.harbour', 'version' => '9.0.0', 'name' => ['en' => 'Fake']];
+        $library = new ThemeLibrary(null, static fn (): array => [
+            ['plugin' => 'acme', 'theme' => $plugin],
+            ['plugin' => 'evil', 'theme' => $clash],
+        ]);
+
+        $available = $library->available(1);
+        $sea = array_values(array_filter($available, static fn (array $e): bool => $e['theme']['id'] === 'acme.sea'));
+        self::assertCount(1, $sea);
+        self::assertSame('plugin', $sea[0]['source']);
+        self::assertSame('acme', $sea[0]['plugin']);
+        self::assertSame('1.0.0', $library->find(1, 'whity.harbour')['version']);
+        self::assertCount(1, array_filter($available, static fn (array $e): bool => $e['theme']['id'] === 'whity.harbour'));
+
+        $resolved = ThemeResolver::resolve([SettingsRegistry::BRANDING_THEME => 'acme.sea'], $library, 1);
+        self::assertSame('#006d77', $resolved['theme']['light']['primary']);
+
+        $broken = new ThemeLibrary(null, static fn (): array => throw new \RuntimeException('loader down'));
+        self::assertSame(ThemeLibrary::DEFAULT_ID, $broken->available(1)[0]['theme']['id']);
+    }
 }

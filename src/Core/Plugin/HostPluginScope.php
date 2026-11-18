@@ -25,6 +25,7 @@ use Whity\Sdk\Settings\PluginSettings;
 use Whity\Sdk\Settings\PluginSettingsStore;
 use Whity\Sdk\Storage\PluginFiles;
 use Whity\Sdk\Storage\PluginFileStore;
+use Whity\Sdk\Theme\WorkspaceTheme;
 
 /** One plugin's view of the host ({@see HostPluginContext}, SDK 1.124). */
 final class HostPluginScope implements PluginScope
@@ -93,6 +94,20 @@ final class HostPluginScope implements PluginScope
     public function http(?AddressPolicy $policy = null): HttpClient
     {
         return new StreamHttpClient(addressPolicy: $policy);
+    }
+
+    public function themes(): WorkspaceTheme
+    {
+        // The service reads the workspace from the request's context (D2).
+        if (!isset($this->stores[WorkspaceTheme::class])) {
+            $this->stores[WorkspaceTheme::class] = $this->factory(WorkspaceTheme::class);
+        }
+        $service = $this->stores[WorkspaceTheme::class];
+        if (!$service instanceof WorkspaceTheme) {
+            throw ServiceUnavailable::named(WorkspaceTheme::class);
+        }
+
+        return $service;
     }
 
     /**

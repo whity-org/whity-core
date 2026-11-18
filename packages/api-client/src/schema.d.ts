@@ -20560,8 +20560,10 @@ export interface components {
                         [key: string]: string;
                     } | null;
                     author?: string | null;
-                    /** @description whity, import or store. */
+                    /** @description whity, plugin, import or store. */
                     source: string;
+                    /** @description The plugin that ships it, for a theme from a plugin (SDK 1.126). */
+                    plugin?: string | null;
                     signature_verified?: boolean;
                     current: boolean;
                     /** @description True when the workspace's main colour replaces the theme's own colour. */

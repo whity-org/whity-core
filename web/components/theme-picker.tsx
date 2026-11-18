@@ -31,6 +31,8 @@ export interface ThemeListItem {
   name: Record<string, string>;
   description?: Record<string, string> | null;
   source: string;
+  /** The plugin that ships it, for a plugin's theme (SDK 1.126). */
+  plugin?: string | null;
   current: boolean;
   main_color_replaces_seed?: boolean;
   fonts?: Record<string, string>;
@@ -267,6 +269,9 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
                     <p className="text-xs text-muted-foreground">
                       {t('theme.mainColourReplaces', 'Shown in your main colour, which replaces the theme’s own.')}
                     </p>
+                  )}
+                  {item.source === 'plugin' && item.plugin && (
+                    <p className="text-xs text-muted-foreground">{t('theme.fromPlugin', 'From {plugin}', { plugin: item.plugin })}</p>
                   )}
                   {item.source === 'import' && (
                     <p className="text-xs text-muted-foreground">{t('theme.imported', 'Added by this workspace')}</p>

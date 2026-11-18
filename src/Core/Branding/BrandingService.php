@@ -33,6 +33,8 @@ final class BrandingService
         private readonly ?EntitlementService $entitlements = null,
         // WHIT-1225: the themes a workspace imported. Null: Whity's own themes only.
         private readonly ?ThemeRepository $themes = null,
+        // SDK 1.126: the themes plugins ship (PluginLoader::getPluginThemes).
+        private readonly ?\Closure $pluginThemes = null,
     ) {
     }
 
@@ -71,7 +73,7 @@ final class BrandingService
 
         // WHIT-1225: the chosen theme, the main colour as its primary seed and
         // the overrides, compiled with the guard rails (ThemeResolver).
-        $resolved = ThemeResolver::resolve($values, new ThemeLibrary($this->themes), $tenantId);
+        $resolved = ThemeResolver::resolve($values, new ThemeLibrary($this->themes, $this->pluginThemes), $tenantId);
         $mainColor = $resolved['mainColor'];
         $theme = $resolved['theme'];
 
