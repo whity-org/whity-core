@@ -85,7 +85,7 @@ test.describe('User groups (admin)', () => {
     await expect(page.getByText(/a named RULE/i)).toBeVisible();
 
     await page.getByRole('button', { name: /define a group/i }).click();
-    await page.getByLabel('Name').fill(name);
+    await page.getByLabel('Name', { exact: true }).fill(name);
     await page
       .getByLabel('Description (optional)')
       .fill('Defined by the #1015 end-to-end spec.');
