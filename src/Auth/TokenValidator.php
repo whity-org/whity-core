@@ -234,9 +234,14 @@ class TokenValidator
      * Validate an MCP bearer token passed from the Authorization header.
      *
      * Checks: signature + expiry (via JwtParser), type='mcp', aud='mcp',
-     * jti not in revoked_tokens, jti exists in mcp_tokens.
-     * Epoch checking is intentionally skipped for MCP tokens; revocation is
-     * explicit via DELETE /api/mcp/tokens/{jti}.
+     * jti not in revoked_tokens, jti exists in mcp_tokens, epoch current.
+     *
+     * EPOCH-CHECKED (#2262), like device credentials. Issuing one is
+     * self-service off any live session, so without the check a stolen
+     * 15-minute access token could be swapped for 90 days of access that
+     * survived a password change, a password reset and "Sign out other
+     * sessions". A token minted before the claim existed counts as epoch 0.
+     * A single token is still revoked explicitly via DELETE /api/mcp/tokens/{jti}.
      *
      * WC-idcut-E: profile_id/active_tenant_id only.
      *
@@ -269,6 +274,10 @@ class TokenValidator
 
         $registered = $this->registeredMcpScope($jti);
         if ($registered === null) {
+            return null;
+        }
+
+        if (!$this->isTokenEpochCurrent($claims)) {
             return null;
         }
 
