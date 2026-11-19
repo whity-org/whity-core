@@ -888,7 +888,8 @@ class AuthHandler
         bool $recordNewSession = false,
         ?string $rotateSessionFromJti = null,
         array $extraTokenBody = [],
-        ?int $confinedTenantId = null
+        ?int $confinedTenantId = null,
+        bool $withRefreshToken = true
     ): Response
     {
         // A deactivated profile gets no session, whichever path got here (#2227).
@@ -964,6 +965,28 @@ class AuthHandler
         }
 
         $accessTokenStr  = $this->jwtParser->create($claims, 900, 'access');
+
+        // The device-credential exchange gets an access token only (#2265). The
+        // device credential IS that client's refresh credential: a 7-day refresh
+        // token beside it rotated forever through /auth/refresh, out of reach of
+        // device revocation and of auth.desktop_login_max_hours, and listed
+        // nowhere. Token mode only; it never sets cookies.
+        if (!$withRefreshToken) {
+            $this->audit($auditAction, $request, $activeTenantId, $profileId, $auditMetadata);
+
+            return Response::json([
+                'access_token' => $accessTokenStr,
+                'token_type'   => 'Bearer',
+                'expires_in'   => 900,
+                'user'         => [
+                    'id'        => $profileId,
+                    'email'     => $email,
+                    'role'      => $roleName,
+                    'tenant_id' => $activeTenantId,
+                ],
+            ] + $extraTokenBody, 200);
+        }
+
         $refreshTokenStr = $this->jwtParser->create($claims, 604800, 'refresh');
 
         // Session registry (WC-f): record a new interactive session on login /
@@ -1942,6 +1965,21 @@ class AuthHandler
         }
     }
 
+    /**
+     * Whether a refresh jti is the current one of a live session row. Fails
+     * closed: an unreadable sessions table refuses the refresh (#2265).
+     */
+    private function refreshHasLiveSession(string $refreshJti): bool
+    {
+        try {
+            return $this->sessions()->isLiveRefresh($refreshJti);
+        } catch (\Throwable $e) {
+            error_log('[sessions] live-session check failed: ' . $e->getMessage());
+
+            return false;
+        }
+    }
+
     /** The session registry service (constructed per call; no ctor change). */
     private function sessions(): SessionService
     {
@@ -2271,6 +2309,20 @@ class AuthHandler
             return Response::error('Unauthorized', 401);
         }
 
+        // A refresh token rotates only inside a live session row (#2265). Every
+        // interactive sign-in records one; the device-credential exchange used
+        // to mint refresh tokens with none, which then rotated forever, past
+        // device revocation and desktop_login_max_hours, listed nowhere. A
+        // revoked or missing row ends the chain here.
+        $presentedJti = isset($claims['jti']) && is_string($claims['jti']) ? $claims['jti'] : '';
+        if ($presentedJti === '' || !$this->refreshHasLiveSession($presentedJti)) {
+            $this->audit('auth.refresh.failure', $request, $activeTenantId, $profileId, [
+                'reason' => 'no_live_session',
+            ]);
+
+            return Response::error('Unauthorized', 401);
+        }
+
         // WC-525: a refresh is how a session PERSISTS across the deadline of an
         // admin-enforced 2FA policy that took effect (or whose grace period
         // elapsed) after this session was minted — without this check here,
@@ -2300,15 +2352,13 @@ class AuthHandler
 
         // Rotate the interactive session row in place, matched by the OLD refresh
         // jti this call presented, so the family stays one row across rotations.
-        $oldRefreshJti = isset($claims['jti']) && is_string($claims['jti']) ? $claims['jti'] : null;
-        if ($oldRefreshJti !== null) {
-            $this->recordSession($accessToken, $newRefreshToken, $profileId, $activeTenantId, $request, false, $oldRefreshJti);
+        // The live-session check above proved the presented jti non-empty.
+        $this->recordSession($accessToken, $newRefreshToken, $profileId, $activeTenantId, $request, false, $presentedJti);
 
-            // WC-refresh-reuse: revoke the old refresh token to prevent reuse.
-            // On next use of this token, it will be detected as revoked and logged
-            // as a security incident (auth.refresh_token_reuse_detected).
-            $this->revokeRefreshToken($oldRefreshJti);
-        }
+        // WC-refresh-reuse: revoke the old refresh token to prevent reuse.
+        // On next use of this token, it will be detected as revoked and logged
+        // as a security incident (auth.refresh_token_reuse_detected).
+        $this->revokeRefreshToken($presentedJti);
 
         // WC-525: same grace-period nag as issueSessionForProfile() — the
         // refusal check above already means we only reach here when not
@@ -2345,8 +2395,9 @@ class AuthHandler
      *
      * The native client presents its long-lived device credential (type='device',
      * issued at enrollment) as `Authorization: Bearer` or in the body field
-     * `credential`, and receives a fresh access+refresh session (token-body mode —
-     * device clients never use cookies). This is the "per-device refresh
+     * `credential`, and receives a fresh 15-minute access token (token-body mode —
+     * device clients never use cookies). No refresh token (#2265): the client
+     * exchanges the credential again when the access token expires. This is the "per-device refresh
      * credential" step: the durable, individually-revocable enrollment mints
      * ephemeral sessions on demand.
      *
@@ -2449,7 +2500,8 @@ class AuthHandler
             [
                 'desktop_login_max_seconds' => $maxSeconds,
                 'desktop_login_expires_at'  => date('c', $issuedAt + $maxSeconds),
-            ]
+            ],
+            withRefreshToken: false
         );
     }
 

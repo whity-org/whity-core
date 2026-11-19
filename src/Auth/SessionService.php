@@ -133,6 +133,24 @@ final class SessionService
     }
 
     /**
+     * Whether $refreshJti is the CURRENT refresh jti of a session that is not
+     * revoked and not expired. handleRefresh() requires it (#2265), so a
+     * refresh token rotates only inside a recorded, revocable session.
+     */
+    public function isLiveRefresh(string $refreshJti): bool
+    {
+        // @tenant-guard-ignore: refresh_jti is a 128-bit random handle unique platform-wide, carried by the caller's own validated refresh token.
+        $stmt = $this->db->prepare(
+            'SELECT 1 FROM sessions
+              WHERE refresh_jti = ? AND revoked_at IS NULL AND expires_at > NOW()
+              LIMIT 1'
+        );
+        $stmt->execute([$refreshJti]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
      * List a profile+tenant's active (non-revoked, non-expired) sessions, newest
      * first, flagging the caller's own current session (matched by access jti).
      *

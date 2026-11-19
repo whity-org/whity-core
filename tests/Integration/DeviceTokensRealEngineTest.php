@@ -137,6 +137,58 @@ final class DeviceTokensRealEngineTest extends TestCase
         self::assertNotNull($seen);
     }
 
+    /**
+     * #2265: the exchange hands out an access token only. A refresh token beside
+     * it rotated forever through /auth/refresh, past device revocation and the
+     * desktop sign-in limit, and appeared in no session list.
+     */
+    public function testExchangeReturnsNoRefreshToken(): void
+    {
+        $profileId = $this->seedProfile('norefresh@example.com');
+        $credential = $this->enroll($profileId);
+
+        $res = $this->authHandler()->handleDeviceTokenExchange(
+            new Request('POST', '/api/devices/token', ['Authorization' => 'Bearer ' . $credential])
+        );
+
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        $data = json_decode($res->getBody(), true);
+        self::assertIsArray($data);
+        self::assertArrayHasKey('access_token', $data);
+        self::assertArrayNotHasKey('refresh_token', $data);
+        self::assertSame(900, $data['expires_in']);
+        self::assertArrayHasKey('desktop_login_max_seconds', $data);
+    }
+
+    /**
+     * #2265: a refresh token minted outside a recorded session (what the
+     * exchange used to return) no longer rotates. Only a refresh token that is
+     * the current one of a live, unrevoked session row does.
+     */
+    public function testARefreshTokenWithoutALiveSessionDoesNotRotate(): void
+    {
+        $profileId = $this->seedProfile('orphan-refresh@example.com');
+        $claims = [
+            'profile_id' => $profileId, 'active_tenant_id' => 1,
+            'email' => 'orphan-refresh@example.com', 'role' => 'user', 'token_epoch' => 0,
+        ];
+        $orphan = $this->jwtParser->create($claims, 604800, 'refresh');
+        $refresh = fn (string $token) => $this->authHandler()->handleRefresh(
+            new Request('POST', '/api/auth/refresh', ['X-Auth-Mode' => 'token'], (string) json_encode(['refresh_token' => $token]))
+        );
+
+        self::assertSame(401, $refresh($orphan)->getStatusCode());
+
+        // The same token inside a live session rotates; once that session is
+        // revoked it does not.
+        $live = \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $this->jwtParser->create($claims, 604800, 'refresh'));
+        $rotated = json_decode($refresh($live)->getBody(), true);
+        self::assertIsArray($rotated);
+        self::assertIsString($rotated['refresh_token'] ?? null);
+        $this->pdo->exec('UPDATE sessions SET revoked_at = NOW()');
+        self::assertSame(401, $refresh($rotated['refresh_token'])->getStatusCode());
+    }
+
     public function testExchangeRejectsASessionAccessToken(): void
     {
         // A normal access token (type='access') must NOT be exchangeable — only

@@ -1034,13 +1034,13 @@ class BodyTokenModeTest extends TestCase
      */
     private function mintRefresh(int $epoch): string
     {
-        return $this->jwtParser->create([
+        return \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $this->jwtParser->create([
             'profile_id'      => self::USER_ID,
             'active_tenant_id' => self::TENANT_ID,
             'email'           => self::EMAIL,
             'role'            => self::ROLE_NAME,
             'token_epoch'     => $epoch,
-        ], 604800, 'refresh');
+        ], 604800, 'refresh'));
     }
 
     /**

@@ -201,13 +201,13 @@ final class DualClaimAuthFlowTest extends TestCase
      */
     public function testRefreshRemintsNewClaimsOnly(): void
     {
-        $_COOKIE['refresh_token'] = $this->jwtParser->create([
+        $_COOKIE['refresh_token'] = \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $this->jwtParser->create([
             'profile_id'       => $this->migratedProfileId,
             'active_tenant_id' => self::TENANT_ID,
             'email'            => self::MIGRATED_EMAIL,
             'role'             => 'admin',
             'token_epoch'      => 0,
-        ], 604800, 'refresh');
+        ], 604800, 'refresh'));
 
         $response = $this->handler->handleRefresh(new Request('POST', '/api/auth/refresh', []));
         self::assertSame(200, $response->getStatusCode());
@@ -225,13 +225,13 @@ final class DualClaimAuthFlowTest extends TestCase
      */
     public function testRefreshRejectsAfterMembershipSuspension(): void
     {
-        $_COOKIE['refresh_token'] = $this->jwtParser->create([
+        $_COOKIE['refresh_token'] = \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $this->jwtParser->create([
             'profile_id'       => $this->migratedProfileId,
             'active_tenant_id' => self::TENANT_ID,
             'email'            => self::MIGRATED_EMAIL,
             'role'             => 'admin',
             'token_epoch'      => 0,
-        ], 604800, 'refresh');
+        ], 604800, 'refresh'));
 
         $membership = $this->memberships->findByProfile($this->migratedProfileId, self::TENANT_ID);
         self::assertIsArray($membership);
