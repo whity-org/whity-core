@@ -20025,6 +20025,8 @@ export interface components {
                 provider?: string;
                 site_key?: string;
             } | null;
+            /** @description False when booking is refused until the bot check is set up (WHIT-1298). */
+            bot_check_ready?: boolean;
             /** @description The brand of the workspace, for the page (WHIT-1014). */
             brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
         };
@@ -20072,6 +20074,8 @@ export interface components {
                     provider?: string;
                     site_key?: string;
                 } | null;
+                /** @description False when no new chat can start until the bot check is set up (WHIT-1298). */
+                bot_check_ready?: boolean;
                 /** @description The brand of the workspace, for the chat box (WHIT-1014). */
                 brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
             };

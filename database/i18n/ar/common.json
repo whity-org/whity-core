@@ -25,6 +25,8 @@
         "chat.mine.description": "راسل {name}. تظهر الردود هنا.",
         "chat.mine.title": "الرسائل",
         "chat.name": "اسمك (اختياري)",
+        "chat.notReady": "{name} لا يستقبل الدردشات هنا بعد",
+        "chat.notReadyNext": "ما زالوا يجهّزون هذه الصفحة. عد لاحقاً، أو تواصل معهم بطريقة أخرى.",
         "chat.placeholder": "اكتب رسالة…",
         "chat.retry": "إعادة المحاولة",
         "chat.send": "إرسال",

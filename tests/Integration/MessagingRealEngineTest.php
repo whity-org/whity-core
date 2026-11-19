@@ -371,7 +371,11 @@ final class MessagingRealEngineTest extends TestCase
         self::assertSame(0, $this->rows('messages'));
     }
 
-    public function testWebChatForVisitorsHidesNotesAndChecksTheToken(): void
+    /**
+     * WHIT-1298 (#2203, owner 2026-11-19): no provider and "allow without a
+     * bot check" off: the box says chat isn't ready and no chat starts.
+     */
+    public function testWebChatWithNoBotCheckAndNotAllowedWithoutOneStartsNoChat(): void
     {
         $chat = new PublicChatApiHandler(
             $this->pdo,
@@ -380,6 +384,38 @@ final class MessagingRealEngineTest extends TestCase
             new TenantHostRepository($this->pdo),
             new HostResolver(new TenantHostRepository($this->pdo), 'whity.test'),
             new BotCheck(new GlobalSettingsRepository($this->pdo), new EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'), new HttpFetcher()),
+            new DatabaseSharedStore($this->pdo),
+            'pepper',
+        );
+        $this->settings->save(self::A, true, null, null);
+        $req = fn (string $method, array $body = []): Request => new Request(
+            $method,
+            '/api/public/chat/bakery/conversations',
+            ['Host' => 'app.whity.test', ClientIp::HEADER => '203.0.113.22'],
+            json_encode($body) ?: ''
+        );
+        $params = ['workspace' => 'bakery'];
+
+        $info = json_decode($chat->info($req('GET'), $params)->getBody(), true)['data'];
+        self::assertFalse($info['bot_check_ready']);
+        self::assertNull($info['bot_check']);
+        $started = $chat->start($req('POST', ['message' => 'Are you open today?']), $params);
+        self::assertSame(503, $started->getStatusCode(), (string) $started->getBody());
+        self::assertSame(0, $this->rows('messages'));
+    }
+
+    public function testWebChatForVisitorsHidesNotesAndChecksTheToken(): void
+    {
+        $global = new GlobalSettingsRepository($this->pdo);
+        // No provider here, so chat needs "allow without a bot check" (WHIT-1298).
+        $global->set(BotCheck::SETTING_ALLOW_NONE, '1');
+        $chat = new PublicChatApiHandler(
+            $this->pdo,
+            $this->messaging,
+            $this->settings,
+            new TenantHostRepository($this->pdo),
+            new HostResolver(new TenantHostRepository($this->pdo), 'whity.test'),
+            new BotCheck($global, new EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'), new HttpFetcher()),
             new DatabaseSharedStore($this->pdo),
             'pepper',
         );

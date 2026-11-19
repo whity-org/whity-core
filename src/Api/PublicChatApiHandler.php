@@ -71,13 +71,14 @@ final class PublicChatApiHandler
     }
 
     /**
-     * A provider is chosen but its secret or site key is missing (WHIT-1286,
-     * #2203): nobody can pass the check, and skipping it would leave the
-     * chat open to bots, so no chat starts until it is set up.
+     * The bot check isn't set up, so no new chat starts (#2203). Either a
+     * provider is chosen with its secret or site key missing (WHIT-1286), or
+     * none is chosen and "allow without a bot check" is off (WHIT-1298, owner
+     * 2026-11-19: refuse). Chats already open carry on.
      */
-    private function botCheckHalfSetUp(): bool
+    private function botCheckNotSetUp(): bool
     {
-        return $this->bot->isRequired() && !$this->bot->isReady();
+        return !$this->bot->isReady();
     }
 
     /** @param array<string, string> $params */
@@ -97,6 +98,9 @@ final class PublicChatApiHandler
             'bot_check' => $this->needsBotCheck()
                 ? ['provider' => $this->bot->provider(), 'site_key' => $this->bot->siteKey()]
                 : null,
+            // WHIT-1298 (#2203): false when no new chat can start until an admin
+            // sets up the bot check, so the page says so before anyone types.
+            'bot_check_ready' => $this->bot->isReady(),
             'brand' => $this->brandFor($workspace['id'], $workspace['name']),
         ]]);
     }
@@ -142,7 +146,7 @@ final class PublicChatApiHandler
             return Response::json(['data' => ['token' => PublicToken::make(32), 'messages' => []]], 201);
         }
 
-        if ($this->botCheckHalfSetUp()) {
+        if ($this->botCheckNotSetUp()) {
             return Response::error('Chat is not available right now. Please try again later.', 503);
         }
         if ($this->needsBotCheck()) {

@@ -58,6 +58,29 @@ test('chat off answers in plain words', async () => {
   expect(await screen.findByText('Chat is closed right now')).toBeInTheDocument();
 });
 
+// WHIT-1298 (#2203): no new chat starts until the bot check is set up.
+test('a bot check not set up says the workspace is still setting up, before anyone types', async () => {
+  fetchMock.mockImplementation(() =>
+    json(200, { data: { workspace_name: 'Example Bakery', greeting: 'Hi there', max_length: 4000, bot_check: null, bot_check_ready: false } })
+  );
+  await renderPage();
+
+  expect(await screen.findByText('Example Bakery isn’t taking chats here yet')).toBeInTheDocument();
+  expect(screen.queryByRole('textbox', { name: 'Your message' })).not.toBeInTheDocument();
+});
+
+test('a chat this browser already has carries on while the bot check is not set up', async () => {
+  window.localStorage.setItem('whity.chat.bakery', 'tok-1');
+  fetchMock.mockImplementation((url: string) =>
+    url === '/api/v1/public/chat/bakery'
+      ? json(200, { data: { workspace_name: 'Example Bakery', greeting: 'Hi there', max_length: 4000, bot_check: null, bot_check_ready: false } })
+      : json(200, { data: [] })
+  );
+  await renderPage();
+
+  expect(await screen.findByRole('textbox', { name: 'Your message' })).toBeInTheDocument();
+});
+
 test('the first message starts a chat, keeps the token, and later reads send it', async () => {
   fetchMock.mockImplementation((url: string, init?: RequestInit) => {
     if (url === '/api/v1/public/chat/bakery') {
