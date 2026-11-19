@@ -1946,6 +1946,8 @@ $gatedApproval = new \Whity\Core\Security\GatedApproval(
         new \Whity\Core\Document\Signing\SigningChallengeRepository($db->getPdo()),
         $totpService,
         new \Whity\Core\Security\IdentityCheckMailer($brandedEmailSender),
+        // #2223: the signing limiter, so both "confirm it's you" checks share one budget.
+        new \Whity\Core\Document\Signing\SigningAttemptLimiter(new DatabaseSharedStore($db->getPdo())),
     )
 );
 
