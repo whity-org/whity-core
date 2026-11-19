@@ -125,6 +125,14 @@ class RoleChecker
      */
     private static array $effectiveUserPermissionCache = [];
 
+    /**
+     * #2224: profile+tenant => {@see self::getPermissionScopesForProfile()}.
+     * Same lifetime as the caches above.
+     *
+     * @var array<string, array<string, list<int|null>>>
+     */
+    private static array $permissionScopeCache = [];
+
     private Database $db;
     private PermissionRegistry $registry;
     private ?LoggerInterface $logger;
@@ -490,6 +498,89 @@ class RoleChecker
     }
 
     /**
+     * WHERE a profile holds each of its permissions in a tenant (#2224).
+     *
+     * `null` means tenant-wide: the permission comes from a membership's own
+     * role. An OU id means the permission comes from a role assigned to that OU
+     * (which its members, and the members of every OU below it, inherit), so it
+     * is held for that OU's subtree only.
+     *
+     * Only permissions in the profile's effective set appear, so everything
+     * that set drops (no active membership, customer-only, owner-only) is
+     * dropped here too. Resource grants and delegations are never a scope: a
+     * delegation is not something its holder may pass on, and a resource grant
+     * is held at one record, not over people.
+     *
+     * @return array<string, list<int|null>> permission => the scopes it is held at
+     */
+    public function getPermissionScopesForProfile(int $profileId, int $tenantId): array
+    {
+        $cacheKey = $profileId . ':' . $tenantId . ':' . ($this->delegationResolver !== null ? '1' : '0');
+        if (isset(self::$permissionScopeCache[$cacheKey])) {
+            return self::$permissionScopeCache[$cacheKey];
+        }
+
+        $effective = array_fill_keys($this->getEffectivePermissionsForProfile($profileId, $tenantId), true);
+        if ($effective === []) {
+            return self::$permissionScopeCache[$cacheKey] = [];
+        }
+
+        /** @var array<string, array<string, int|null>> $scopes */
+        $scopes = [];
+        $add = function (int $roleId, ?int $ouId) use (&$scopes, $effective, $tenantId): void {
+            foreach ($this->getEffectivePermissionsForRole($roleId, $tenantId) as $permission) {
+                if (isset($effective[$permission])) {
+                    $scopes[$permission][$ouId === null ? '-' : (string) $ouId] = $ouId;
+                }
+            }
+        };
+
+        foreach ($this->getActiveMembershipRows($profileId, $tenantId) as $membership) {
+            if ($membership['role_id'] !== null) {
+                $add($membership['role_id'], null);
+            }
+            if ($membership['ou_id'] !== null) {
+                foreach ($this->buildOuChainIds($membership['ou_id'], $tenantId) as $ouId) {
+                    foreach ($this->getRoleIdsAssignedToOu($ouId, $tenantId) as $roleId) {
+                        $add($roleId, $ouId);
+                    }
+                }
+            }
+        }
+
+        return self::$permissionScopeCache[$cacheKey] = array_map(static fn (array $s): array => array_values($s), $scopes);
+    }
+
+    /**
+     * An OU and every OU above it, tenant scoped: the OUs whose subtree
+     * contains `$ouId` (#2224).
+     *
+     * @return list<int>
+     */
+    public function getOuAndAncestorIds(int $ouId, int $tenantId): array
+    {
+        return array_values($this->buildOuChainIds($ouId, $tenantId));
+    }
+
+    /**
+     * Whether a profile holds `$permission` at a scope that covers `$ouId`
+     * (null: the whole tenant) (#2224). Tenant-wide covers everything; an OU
+     * covers itself and every OU below it.
+     */
+    public function holdsPermissionOver(int $profileId, int $tenantId, string $permission, ?int $ouId): bool
+    {
+        $scopes = $this->getPermissionScopesForProfile($profileId, $tenantId)[$permission] ?? [];
+        if (in_array(null, $scopes, true)) {
+            return true;
+        }
+        if ($ouId === null || $scopes === []) {
+            return false;
+        }
+
+        return array_intersect($scopes, $this->getOuAndAncestorIds($ouId, $tenantId)) !== [];
+    }
+
+    /**
      * Invalidate the worker-level effective-permission caches.
      *
      * Must be called whenever any input to authorization changes — role/permission
@@ -513,6 +604,7 @@ class RoleChecker
     {
         self::$effectivePermissionCache = [];
         self::$effectiveUserPermissionCache = [];
+        self::$permissionScopeCache = [];
     }
 
     // =========================================================================

@@ -55,6 +55,75 @@ final class DelegationServiceRealEngineTest extends TestCase
         RoleChecker::clearCache();
     }
 
+    // ==================== #2224: only as widely as the grantor holds it ====================
+
+    /**
+     * A grantor who holds a permission only because of a role on Branch A can
+     * delegate it inside Branch A, and not tenant-wide or into Branch B.
+     */
+    public function testAnOuScopedPermissionCanBeDelegatedOnlyInsideThatOu(): void
+    {
+        $this->grant('user', 'users:write');
+        $this->seedOu(500, 1, null, 'branch-a');
+        $this->seedOu(501, 1, 500, 'branch-a-desk');
+        $this->seedOu(600, 1, null, 'branch-b');
+        $this->pdo->exec("INSERT INTO ou_role_assignments (tenant_id, ou_id, role_id, created_at)
+            VALUES (1, 500, (SELECT id FROM roles WHERE name = 'user'), NOW())");
+        // The grantor's own role grants nothing; users:write reaches them only
+        // through Branch A's role.
+        $this->pdo->exec("INSERT INTO roles (name, description, tenant_id, created_at) VALUES ('plain', '', 1, NOW())");
+        $grantorId = $this->seedUser('manager@example.com', 'plain', 1, 501);
+        $grantee = $this->seedUser('helper@example.com', 'admin', 1, 600);
+        RoleChecker::clearCache();
+
+        foreach ([null, 600] as $scope) {
+            try {
+                $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $grantee, ['users:write'], $scope);
+                $this->fail('users:write must not be delegated at scope ' . var_export($scope, true));
+            } catch (PermissionNotDelegableException) {
+            }
+        }
+        $count = $this->pdo->prepare('SELECT COUNT(*) FROM permission_delegations WHERE grantor_profile_id = ?');
+        $count->execute([$grantorId]);
+        $this->assertSame(0, (int) $count->fetchColumn());
+
+        // Inside Branch A (the OU itself or one below it) it is the grantor's to give.
+        $this->assertCount(1, $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $grantee, ['users:write'], 500));
+        $this->assertCount(1, $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $grantee, ['users:write'], 501));
+    }
+
+    /** A permission from the grantor's own membership role is theirs tenant-wide. */
+    public function testATenantWidePermissionCanBeDelegatedAnywhere(): void
+    {
+        $this->grant('admin', 'users:read');
+        $this->seedOu(700, 1, null, 'anywhere');
+        $grantorId = $this->seedUser('admin@example.com', 'admin', 1);
+        $grantee = $this->seedUser('any@example.com', 'user', 1, 700);
+
+        $this->assertCount(1, $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $grantee, ['users:read'], null));
+        $this->assertCount(1, $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $grantee, ['users:read'], 700));
+    }
+
+    /**
+     * And at use time: an old tenant-wide grant of a permission the grantor
+     * holds only through an OU role does not count.
+     */
+    public function testAGrantWiderThanTheGrantorsScopeDoesNotCountWhenUsed(): void
+    {
+        $this->grant('user', 'users:write');
+        $this->seedOu(800, 1, null, 'branch-c');
+        $this->pdo->exec("INSERT INTO ou_role_assignments (tenant_id, ou_id, role_id, created_at)
+            VALUES (1, 800, (SELECT id FROM roles WHERE name = 'user'), NOW())");
+        $this->pdo->exec("INSERT INTO roles (name, description, tenant_id, created_at) VALUES ('plain', '', 1, NOW())");
+        $grantorId = $this->seedUser('manager@example.com', 'plain', 1, 800);
+        $grantee = $this->seedUser('helper@example.com', 'plain', 1);
+        // Written straight to the table, as a row made before this rule existed.
+        (new DelegationRepository($this->pdo))->insert(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $grantee, 'users:write', null, null);
+        RoleChecker::clearCache();
+
+        $this->assertFalse($this->delegationAwareChecker()->hasPermissionForProfile($grantee, 'users:write', 1));
+    }
+
     // ==================== Subset invariant ====================
 
     public function testGrantorCannotDelegatePermissionTheyDoNotHold(): void
