@@ -1725,6 +1725,7 @@
         "inventory.status.draft": "Draft",
         "inventory.status.onTheWay": "On the way",
         "inventory.status.waiting": "Waiting for approval",
+        "inventory.status.waitingShort": "Waiting",
         "inventory.tab.counts": "Counts",
         "inventory.tab.items": "Items",
         "inventory.tab.places": "Places",

@@ -110,7 +110,8 @@ function routeGet(path: string) {
     case '/api/v1/inventory/reasons':
       return ok({ data: reasons });
     case '/api/v1/inventory/reorder-rules':
-      return ok({ data: [rule] });
+      // Two places with a level, one under it: "Low at Sweifieh".
+      return ok({ data: [rule, { ...rule, id: 10, location_id: 1, is_below: false, available: '450.000', suggested_quantity: null }] });
     case '/api/v1/inventory/settings':
       return ok({ data: { approve_adjustments_above: '25', approve_counts_above: '25', adjustment_route_template_id: null, count_route_template_id: null, transfers_one_step: false } });
     case '/api/v1/inventory/operations/{id}':

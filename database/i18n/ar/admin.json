@@ -1726,6 +1726,7 @@
         "inventory.status.draft": "مسودة",
         "inventory.status.onTheWay": "في الطريق",
         "inventory.status.waiting": "بانتظار الموافقة",
+        "inventory.status.waitingShort": "بانتظار",
         "inventory.tab.counts": "الجرد",
         "inventory.tab.items": "الأصناف",
         "inventory.tab.places": "المواقع",

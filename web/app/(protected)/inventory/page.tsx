@@ -209,7 +209,10 @@ export default function InventoryPage() {
       id: 'reorder',
       header: t('inventory.column.reorderAt', 'Reorder at'),
       cell: (row) => {
-        const levels = [...new Set(itemRules(row).map((r) => quantityText(r.min_quantity)))];
+        // The low place's level when one place is low (as on the card), else each level once.
+        const ruled = itemRules(row);
+        const low = ruled.filter((r) => r.is_below);
+        const levels = [...new Set((low.length === 1 ? low : ruled).map((r) => quantityText(r.min_quantity)))];
         if (levels.length === 0) return <span className="text-muted-foreground">–</span>;
         return (
           <bdi dir="ltr" className="font-mono tabular-nums">
@@ -227,7 +230,7 @@ export default function InventoryPage() {
         if (low.length === 0) return null;
         return (
           <Badge variant="destructive">
-            {low.length === 1 && places.length > 1
+            {low.length === 1 && ruled.length > 1
               ? t('inventory.badge.lowAt', 'Low at {place}', { place: placeName(low[0].location_id) })
               : t('inventory.badge.belowReorder', 'Below reorder')}
           </Badge>
@@ -374,6 +377,7 @@ export default function InventoryPage() {
 
       {meta.data && tab === 'stock' && (
         <KpiStrip
+          className="pb-4"
           items={[
             { label: t('inventory.kpi.items', 'Items'), value: String(meta.data.itemTotal) },
             {
@@ -383,8 +387,8 @@ export default function InventoryPage() {
                 belowItems.length > 0
                   ? belowItems
                       .slice(0, 3)
-                      .map((r) => r.item_name)
-                      .join(', ') + (belowItems.length > 3 ? '…' : '')
+                      .map((r) => nameIn(r.item_names, r.item_name ?? '', language))
+                      .join(language === 'ar' ? '، ' : ', ') + (belowItems.length > 3 ? '…' : '')
                   : meta.data.rules.length === 0
                     ? t('inventory.kpi.noReorder', 'Set reorder levels on an item’s page')
                     : t('inventory.kpi.allAbove', 'Everything is above its level'),

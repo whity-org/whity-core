@@ -18,8 +18,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Button } from '@whity/ui/button';
-import { useTranslation } from '@whity/features/i18n';
-import { inventoryApi, inventoryErrorText, quantityText, type InventoryOperation } from '@/lib/inventory/api';
+import { useLanguageCode, useTranslation } from '@whity/features/i18n';
+import { inventoryApi, inventoryErrorText, nameIn, quantityText, type InventoryOperation } from '@/lib/inventory/api';
 
 export function ReceiveTransferDialog({
   transfer,
@@ -34,6 +34,7 @@ export function ReceiveTransferDialog({
   onDone: (transfer: InventoryOperation) => void;
 }) {
   const t = useTranslation('admin');
+  const language = useLanguageCode();
   const lines = transfer.lines ?? [];
   const [received, setReceived] = useState<Record<number, string>>(
     Object.fromEntries(lines.map((l) => [l.id, quantityText(l.quantity ?? '0')]))
@@ -77,7 +78,7 @@ export function ReceiveTransferDialog({
           {lines.map((line) => (
             <li key={line.id} className="flex items-center gap-3 px-3 py-2">
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{line.item_name}</div>
+                <div className="truncate text-sm font-medium">{nameIn(line.item_names, line.item_name, language)}</div>
                 <div className="text-xs text-muted-foreground">
                   {t('inventory.receive.sent', 'Sent')}{' '}
                   <bdi dir="ltr" className="font-mono">

@@ -105,8 +105,9 @@ export default function WasteAndAdjustmentsPage() {
     const wasteMinor = wasted.reduce((sum, r) => sum + (r.line.value_minor ?? 0), 0);
     const byItem = new Map<string, { minor: number; place: number | null }>();
     for (const r of wasted) {
-      const current = byItem.get(r.line.item_name) ?? { minor: 0, place: r.operation.location_id ?? null };
-      byItem.set(r.line.item_name, { minor: current.minor + (r.line.value_minor ?? 0), place: current.place });
+      const label = nameIn(r.line.item_names, r.line.item_name, language);
+      const current = byItem.get(label) ?? { minor: 0, place: r.operation.location_id ?? null };
+      byItem.set(label, { minor: current.minor + (r.line.value_minor ?? 0), place: current.place });
     }
     const most = [...byItem.entries()].sort((a, b) => b[1].minor - a[1].minor)[0] ?? null;
     const byReason = new Map<string, number>();
@@ -117,7 +118,7 @@ export default function WasteAndAdjustmentsPage() {
       .flatMap((c) => c.lines ?? [])
       .reduce((sum, l) => sum + (Number(l.difference ?? 0) > 0 ? (l.value_minor ?? 0) : 0), 0);
     return { currency, wasteMinor, most, byReason, waiting, found };
-  }, [rows, waste, data]);
+  }, [rows, waste, data, language]);
 
   if (!accessLoading && !has(INVENTORY_READ)) {
     return <NoAccess area={t('inventory.area', 'inventory')} permission={INVENTORY_READ} />;
@@ -129,6 +130,9 @@ export default function WasteAndAdjustmentsPage() {
   };
   const money = (minor: number) => (numbers.currency ? moneyText(minor, numbers.currency) : '–');
   const firstWaiting = numbers.waiting[0];
+  // "19 Nov 21:05": short enough for the column, as on the card.
+  const when = (value: string | null | undefined) =>
+    [dates.calendarLabel(value, 'dayMonth'), dates.time(value)].filter((part) => part).join(' ');
 
   return (
     <div className="space-y-6">
@@ -160,7 +164,9 @@ export default function WasteAndAdjustmentsPage() {
       ) : (
         <>
           {data && (
-            <KpiStrip
+            // Wrapped: the strip's own m-0 would cancel the page's spacing below it.
+            <div>
+              <KpiStrip
               items={[
                 { label: t('inventory.waste.kpiWeek', 'This week, at cost'), value: money(numbers.wasteMinor) },
                 {
@@ -168,7 +174,7 @@ export default function WasteAndAdjustmentsPage() {
                   value: String(numbers.waiting.length),
                   note:
                     firstWaiting !== undefined
-                      ? [firstWaiting.lines?.[0]?.item_name, firstWaiting.value_minor != null && firstWaiting.currency ? moneyText(firstWaiting.value_minor, firstWaiting.currency) : null]
+                      ? [firstWaiting.lines?.[0] ? nameIn(firstWaiting.lines[0].item_names, firstWaiting.lines[0].item_name, language) : null, firstWaiting.value_minor != null && firstWaiting.currency ? moneyText(firstWaiting.value_minor, firstWaiting.currency) : null]
                           .filter((part) => part)
                           .join(', ')
                       : undefined,
@@ -183,7 +189,8 @@ export default function WasteAndAdjustmentsPage() {
                   value: numbers.found > 0 ? `+${money(numbers.found)}` : money(0),
                 },
               ]}
-            />
+              />
+            </div>
           )}
 
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
@@ -204,10 +211,10 @@ export default function WasteAndAdjustmentsPage() {
                 <tbody className="divide-y divide-border">
                   {rows.map(({ key, operation, line, reason }) => (
                     <tr key={key} className="h-12 align-top">
-                      <td className="px-4 py-3">{dates.dateTime(operation.done_at ?? operation.created_at) ?? ''}</td>
+                      <td className="whitespace-nowrap px-4 py-3">{when(operation.done_at ?? operation.created_at)}</td>
                       <td className="px-4 py-3">{placeName(operation.location_id)}</td>
-                      <td className="px-4 py-3 font-medium">{line.item_name}</td>
-                      <td className="px-4 py-3 text-end">
+                      <td className="px-4 py-3 font-medium">{nameIn(line.item_names, line.item_name, language)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-end">
                         <bdi dir="ltr" className={`font-mono tabular-nums ${Number(line.change ?? 0) < 0 ? 'text-destructive' : ''}`}>
                           {Number(line.change ?? 0) > 0 ? '+' : ''}
                           {quantityText(line.change ?? '0')} <span className="text-xs text-muted-foreground">{line.unit}</span>
@@ -221,8 +228,8 @@ export default function WasteAndAdjustmentsPage() {
                         {line.value_minor != null && line.currency ? <Money minor={line.value_minor} currency={line.currency} /> : <span className="text-muted-foreground">–</span>}
                       </td>
                       <td className="px-4 py-3">{operation.created_by_name ?? '–'}</td>
-                      <td className="px-4 py-3">
-                        <OperationStatus operation={operation} />
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <OperationStatus operation={operation} short />
                       </td>
                     </tr>
                   ))}

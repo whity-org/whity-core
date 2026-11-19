@@ -67,7 +67,7 @@ export function CountsTab({ counts, places }: { counts: Loaded; places: Inventor
       header: t('inventory.column.started', 'Started'),
       cell: (row) => dates.dateTime(row.created_at) ?? '',
     },
-    { id: 'state', header: '', cell: (row) => <OperationStatus operation={row} /> },
+    { id: 'state', header: '', cell: (row) => <OperationStatus operation={row} short /> },
   ];
 
   if (counts.error) {
@@ -134,7 +134,7 @@ export function TransfersTab({
       header: t('inventory.column.sent', 'Sent'),
       cell: (row) => (row.sent_at ? (dates.dateTime(row.sent_at) ?? '') : '–'),
     },
-    { id: 'state', header: '', cell: (row) => <OperationStatus operation={row} /> },
+    { id: 'state', header: '', cell: (row) => <OperationStatus operation={row} short /> },
   ];
 
   if (transfers.error) {

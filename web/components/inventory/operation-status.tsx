@@ -9,13 +9,24 @@ import { Badge } from '@whity/ui/badge';
 import { useTranslation } from '@whity/features/i18n';
 import type { InventoryOperation } from '@/lib/inventory/api';
 
-export function OperationStatus({ operation }: { operation: Pick<InventoryOperation, 'kind' | 'status'> }) {
+/** `short` for a table column: "Waiting" instead of "Waiting for approval". */
+export function OperationStatus({
+  operation,
+  short = false,
+}: {
+  operation: Pick<InventoryOperation, 'kind' | 'status'>;
+  short?: boolean;
+}) {
   const t = useTranslation('admin');
   switch (operation.status) {
     case 'done':
       return <Badge variant="success">{t('inventory.status.done', 'Done')}</Badge>;
     case 'waiting_approval':
-      return <Badge variant="warning">{t('inventory.status.waiting', 'Waiting for approval')}</Badge>;
+      return (
+        <Badge variant="warning">
+          {short ? t('inventory.status.waitingShort', 'Waiting') : t('inventory.status.waiting', 'Waiting for approval')}
+        </Badge>
+      );
     case 'in_transit':
       return <Badge variant="info">{t('inventory.status.onTheWay', 'On the way')}</Badge>;
     case 'cancelled':

@@ -17742,6 +17742,10 @@ export interface components {
             variant_id: number;
             item_id: number;
             item_name: string;
+            /** @description The name in each language, such as `{"en": "Flour", "ar": "طحين"}`. */
+            item_names?: {
+                [key: string]: string;
+            };
             sku: string;
             unit: string;
             decimals: number;
@@ -17825,6 +17829,10 @@ export interface components {
             id: number;
             item_id: number;
             item_name?: string;
+            /** @description The name in each language, such as `{"en": "Flour", "ar": "طحين"}`. */
+            item_names?: {
+                [key: string]: string;
+            };
             variant_id: number;
             sku?: string;
             location_id: number;

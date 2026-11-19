@@ -86,7 +86,7 @@ export default function InventoryCountPage({ params }: { params: Promise<{ id: s
     for (const line of pending) {
       const value = (typed[line.id] ?? '').trim();
       if (!/^\d+(\.\d+)?$/.test(value)) {
-        setProblem(t('inventory.count.badAmount', '{item}: count 0 or more, in {unit}.', { item: line.item_name, unit: line.unit }));
+        setProblem(t('inventory.count.badAmount', '{item}: count 0 or more, in {unit}.', { item: nameIn(line.item_names, line.item_name, language), unit: line.unit }));
         return false;
       }
     }
@@ -218,7 +218,7 @@ export default function InventoryCountPage({ params }: { params: Promise<{ id: s
             {lines.map((line: InventoryOperationLine) => (
               <tr key={line.id} className="h-12">
                 <td className="px-4 py-2">
-                  <div className="font-medium">{line.item_name}</div>
+                  <div className="font-medium">{nameIn(line.item_names, line.item_name, language)}</div>
                   <bdi dir="ltr" className="font-mono text-xs text-muted-foreground">
                     {line.sku}
                   </bdi>
@@ -232,7 +232,7 @@ export default function InventoryCountPage({ params }: { params: Promise<{ id: s
                         dir="ltr"
                         inputMode="decimal"
                         className="text-end font-mono"
-                        aria-label={t('inventory.count.countedOf', 'Counted, {item}, in {unit}', { item: line.item_name, unit: line.unit })}
+                        aria-label={t('inventory.count.countedOf', 'Counted, {item}, in {unit}', { item: nameIn(line.item_names, line.item_name, language), unit: line.unit })}
                         placeholder={line.counted != null ? quantityText(line.counted) : line.unit}
                         value={typed[line.id] ?? ''}
                         onChange={(e) => setTyped({ ...typed, [line.id]: e.target.value })}

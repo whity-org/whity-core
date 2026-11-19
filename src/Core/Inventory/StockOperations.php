@@ -673,7 +673,7 @@ final class StockOperations
         $op['lines'] = array_map(function (array $l) use ($op, $hideExpected): array {
             $q = static fn (?int $steps): ?string => $steps === null ? null : (new Quantity($steps, $l['decimals']))->toDecimal();
             $line = [
-                'id' => $l['id'], 'variant_id' => $l['variant_id'], 'item_id' => $l['item_id'], 'item_name' => $l['item_name'],
+                'id' => $l['id'], 'variant_id' => $l['variant_id'], 'item_id' => $l['item_id'], 'item_name' => $l['item_name'], 'item_names' => $l['item_names'],
                 'sku' => $l['sku'], 'unit' => $l['unit'], 'decimals' => $l['decimals'],
                 'entered_unit' => $l['entered_unit'],
                 'entered_quantity' => $l['entered_quantity'] !== null && $l['entered_unit'] !== null
@@ -961,7 +961,7 @@ final class StockOperations
         $rows = $this->db->all(
             'SELECT l.id, l.variant_id, l.quantity, l.entered_unit_id, l.entered_quantity, l.expected_quantity, l.counted_at,
                     l.counted_by_profile_id, l.received_quantity, l.reason_code, l.note, l.value_minor,
-                    v.item_id, v.sku, v.purchase_price_minor AS variant_price, i.name AS item_name, i.purchase_price_minor AS item_price,
+                    v.item_id, v.sku, v.purchase_price_minor AS variant_price, i.name AS item_name, i.names AS item_names, i.purchase_price_minor AS item_price,
                     i.currency, u.code AS unit, u.decimals, eu.code AS entered_unit, eu.decimals AS entered_decimals
                FROM inv_operation_lines l
                JOIN inv_variants v ON v.tenant_id = l.tenant_id AND v.id = l.variant_id
@@ -975,7 +975,8 @@ final class StockOperations
 
         return array_map(static fn (array $r): array => [
             'id' => (int) $r['id'], 'variant_id' => (int) $r['variant_id'], 'item_id' => (int) $r['item_id'],
-            'item_name' => (string) $r['item_name'], 'sku' => (string) $r['sku'],
+            'item_name' => (string) $r['item_name'], 'item_names' => InventoryNames::decode($r['item_names'], (string) $r['item_name']),
+            'sku' => (string) $r['sku'],
             'quantity' => InventoryDb::int($r['quantity']), 'expected' => InventoryDb::int($r['expected_quantity']),
             'received' => InventoryDb::int($r['received_quantity']),
             'entered_unit_id' => InventoryDb::int($r['entered_unit_id']), 'entered_quantity' => InventoryDb::int($r['entered_quantity']),

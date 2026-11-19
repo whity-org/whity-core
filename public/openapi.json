@@ -102161,6 +102161,13 @@
                     "item_name": {
                         "type": "string"
                     },
+                    "item_names": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "The name in each language, such as `{\"en\": \"Flour\", \"ar\": \"\u0637\u062d\u064a\u0646\"}`."
+                    },
                     "sku": {
                         "type": "string"
                     },
@@ -102421,6 +102428,13 @@
                     },
                     "item_name": {
                         "type": "string"
+                    },
+                    "item_names": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "The name in each language, such as `{\"en\": \"Flour\", \"ar\": \"\u0637\u062d\u064a\u0646\"}`."
                     },
                     "variant_id": {
                         "type": "integer"

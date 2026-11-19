@@ -34,7 +34,9 @@ final class LocationService
             'SELECT ' . self::COLUMNS . ' FROM inv_locations WHERE tenant_id = :tenant_id'
                 . ($includeVirtual ? '' : " AND kind <> 'virtual'")
                 . ($includeInactive ? '' : ' AND is_active = TRUE')
-                . " ORDER BY CASE WHEN kind = 'virtual' THEN 1 ELSE 0 END, sort_order, name, id",
+                // In the order they were added, as TplInventory's columns are
+                // (the central kitchen first, then the shops it feeds).
+                . " ORDER BY CASE WHEN kind = 'virtual' THEN 1 ELSE 0 END, sort_order, id",
             [':tenant_id' => $tenantId]
         );
 
