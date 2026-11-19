@@ -108,7 +108,7 @@ final class ChatDiscussRealEngineTest extends TestCase
         $this->notFound(fn () => $this->chat->discuss(self::A, ChatViewer::person(self::AWSS), ['type' => 'record', 'id' => 'booking:7 OR 1', 'label' => 'x']));
         $this->notFound(fn () => $this->chat->discuss(self::A, ChatViewer::person(self::AWSS), ['type' => 'meeting', 'id' => '43', 'label' => 'x']));
 
-        self::assertSame([self::AMRO], $this->people($this->linked('record', 'booking:7')));
+        self::assertSame([self::AMRO], $this->people((int) $this->linked('record', 'booking:7')));
     }
 
     public function testADocumentFollowsItsVisibilityAndASubmissionItsReaders(): void
@@ -200,7 +200,7 @@ final class ChatDiscussRealEngineTest extends TestCase
     /** @return list<string> */
     private function lines(int $chatId): array
     {
-        return array_map(static fn (array $m): string => (string) ($m['body'] ?? ''), $this->chat->show(self::A, ChatViewer::person(self::AMRO), $chatId)['messages']);
+        return array_values(array_map(static fn (array $m): string => (string) ($m['body'] ?? ''), $this->chat->show(self::A, ChatViewer::person(self::AMRO), $chatId)['messages']));
     }
 
     private function memberId(int $chatId, int $profileId): int
