@@ -680,7 +680,15 @@ class UsersApiHandler
 
             try {
                 // Find-or-create the global profile for this (globally-unique) email.
-                $profileId = $this->findOrCreateProfile($email, $passwordHash);
+                try {
+                    $profileId = $this->findOrCreateProfile($email, $passwordHash);
+                } catch (\Whity\Core\Identity\UnconfirmedEmailClaimException) {
+                    // #2245: another account's unconfirmed sign-in address.
+                    if ($ownTx && $this->db->inTransaction()) {
+                        $this->db->rollBack();
+                    }
+                    return Response::error('This email address is waiting to be confirmed on another account', 409, ['code' => 'email_unconfirmed_elsewhere']);
+                }
 
                 // Reject when an ACTIVE membership already exists for this profile
                 // in the tenant (a profile may be re-added after being removed, but

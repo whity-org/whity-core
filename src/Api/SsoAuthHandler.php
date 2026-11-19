@@ -630,8 +630,13 @@ final class SsoAuthHandler
             if ($preview === null) {
                 return null;
             }
+            // #2245: only a CONFIRMED address is theirs. An unconfirmed row is a
+            // claim anyone signed in can make on any address.
             $owner = $this->emails->findByEmail(strtolower(trim($preview['email'])));
-            if ($owner === null || (int) ($owner['profile_id'] ?? 0) !== $profileId) {
+            if ($owner === null
+                || ($owner['verified'] ?? false) !== true
+                || (int) ($owner['profile_id'] ?? 0) !== $profileId
+            ) {
                 return -1;
             }
 
