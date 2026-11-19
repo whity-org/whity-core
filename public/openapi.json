@@ -121103,6 +121103,7 @@
                             "lapsed",
                             "installation_unlicensed",
                             "installation_grace",
+                            "withdrawn",
                             null
                         ]
                     },
