@@ -263,10 +263,9 @@ final class ConveningBodyRepository
     /**
      * The body's CURRENT seats, chair first.
      *
-     * Ordered by seat precedence and then by id, which is the order
-     * {@see DecisionRouteBridge} wants and the order a reader expects — a
-     * membership list that puts the chair somewhere in the middle alphabetically
-     * reads as unordered.
+     * Ordered by seat precedence and then by id, which is the order a
+     * reader expects — a membership list that puts the chair somewhere in
+     * the middle alphabetically reads as unordered.
      *
      * @return list<array<string, mixed>>
      */

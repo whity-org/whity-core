@@ -5399,8 +5399,7 @@ $decisionRecorder = new \Whity\Core\Convening\DecisionRecorder(
         $documentRouter,
         $routeRepository,
         $routeStepRepository,
-        $routeRecipientRepository,
-        $conveningBodyRepository
+        $routeRecipientRepository
     )
 );
 
