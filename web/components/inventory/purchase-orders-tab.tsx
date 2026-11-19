@@ -10,6 +10,7 @@
 import { useRouter } from 'next/navigation';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { LoadProblem } from '@/components/load-problem';
+import { UserText } from '@/components/ui/user-text';
 import { Badge } from '@whity/ui/badge';
 import { Money } from '@whity/ui/money/money';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -62,7 +63,7 @@ export function PurchaseOrdersTab({ orders, places }: { orders: Loaded; places: 
         </bdi>
       ),
     },
-    { id: 'supplier', header: t('inventory.po.supplier', 'Supplier'), cell: (row) => row.contact_name ?? '' },
+    { id: 'supplier', header: t('inventory.po.supplier', 'Supplier'), cell: (row) => <UserText>{row.contact_name ?? ''}</UserText> },
     { id: 'place', header: t('inventory.po.receiveInto', 'Received into'), cell: (row) => placeName(row.location_id) },
     {
       id: 'expected',

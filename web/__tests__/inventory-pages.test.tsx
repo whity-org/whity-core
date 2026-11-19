@@ -286,6 +286,35 @@ describe('purchases (WHIT-1234)', () => {
   });
 });
 
+describe('a purchase order page', () => {
+  it('reads Purchases › PO-0001, keeps a typed note in its own direction, and tells its history', async () => {
+    permissions = ['purchases:read'];
+    GET.mockImplementation(async (path: string) =>
+      path === '/api/v1/inventory/purchase-orders/{id}'
+        ? ok({ data: purchaseOrder({ notes: 'Deliver to the back door before 9.', submitted_at: '2026-11-19 08:05:00', approved_at: '2026-11-19 08:10:00' }) })
+        : routeGet(path)
+    );
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <PurchaseOrderPage params={Promise.resolve({ id: '60' })} />
+        </Suspense>
+      );
+    });
+    const crumbs = await screen.findByRole('navigation', { name: 'Breadcrumb' });
+    expect(crumbs).toHaveTextContent('Purchases');
+    expect(crumbs).toHaveTextContent('PO-0001');
+    expect(screen.getByText('Deliver to the back door before 9.').tagName).toBe('BDI');
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'History' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'History' }));
+    const history = await screen.findByTestId('po-history');
+    expect(history).toHaveTextContent('Drafted by Amro Saleh');
+    expect(history).toHaveTextContent('Sent for approval');
+    expect(history).toHaveTextContent('Approved by Emad Nasser');
+  });
+});
+
 describe('/inventory/adjustments', () => {
   it('lists waste with its reason, value and state, and the approval rule', async () => {
     GET.mockImplementation(async (path: string, opts?: { params?: { query?: { kind?: string } } }) => {

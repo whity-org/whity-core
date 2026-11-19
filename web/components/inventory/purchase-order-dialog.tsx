@@ -179,7 +179,7 @@ export function PurchaseOrderDialog({
             />
           </div>
           <StockLinesEditor lines={lines} onChange={setLines} idPrefix="po" priceCurrency={currency} />
-          <Input id="po-notes" label={t('inventory.po.notes', 'Notes for the supplier')} value={notes} onChange={(e) => setNotes(e.target.value)} />
+          <Input dir="auto" id="po-notes" label={t('inventory.po.notes', 'Notes for the supplier')} value={notes} onChange={(e) => setNotes(e.target.value)} />
           {problem && (
             <Alert variant="destructive">
               <AlertDescription>{problem}</AlertDescription>

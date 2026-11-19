@@ -10,6 +10,7 @@
 import { useState } from 'react';
 import { useFetch } from '@/hooks/useFetch';
 import { contactsApi } from '@/lib/contacts/api';
+import { UserText } from '@/components/ui/user-text';
 import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { Icon } from '@whity/ui/icon';
@@ -89,7 +90,7 @@ export function SupplierPrices({ item, currency, canEdit }: { item: InventoryIte
           {rows.map((row) => (
             <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
               <span className="flex items-center gap-2">
-                {row.contact_name}
+                <UserText>{row.contact_name}</UserText>
                 {row.is_preferred && <Badge variant="success">{t('inventory.prices.preferred', 'Preferred')}</Badge>}
                 {row.supplier_sku !== '' && (
                   <bdi dir="ltr" className="font-mono text-xs text-muted-foreground">

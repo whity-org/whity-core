@@ -10,6 +10,7 @@
 import { useRouter } from 'next/navigation';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { LoadProblem } from '@/components/load-problem';
+import { UserText } from '@/components/ui/user-text';
 import { OperationStatus } from '@/components/inventory/operation-status';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
@@ -60,7 +61,7 @@ export function CountsTab({ counts, places }: { counts: Loaded; places: Inventor
     {
       id: 'by',
       header: t('inventory.column.by', 'By'),
-      cell: (row) => row.created_by_name ?? '–',
+      cell: (row) => <UserText>{row.created_by_name ?? '–'}</UserText>,
     },
     {
       id: 'when',
@@ -128,7 +129,7 @@ export function TransfersTab({
       header: t('inventory.column.items', 'Items'),
       cell: (row) => <span className="font-mono tabular-nums">{row.line_count ?? 0}</span>,
     },
-    { id: 'by', header: t('inventory.column.by', 'By'), cell: (row) => row.created_by_name ?? '–' },
+    { id: 'by', header: t('inventory.column.by', 'By'), cell: (row) => <UserText>{row.created_by_name ?? '–'}</UserText> },
     {
       id: 'when',
       header: t('inventory.column.sent', 'Sent'),

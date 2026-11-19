@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { UserText } from '@/components/ui/user-text';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Button } from '@whity/ui/button';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
@@ -87,7 +88,7 @@ export function ReceiveOrderDialog({
         <DialogHeader>
           <DialogTitle>{t('inventory.po.receiveTitle', 'Receive {number}', { number: order.number })}</DialogTitle>
           <DialogDescription>
-            {order.contact_name}.{' '}
+            <UserText>{order.contact_name}</UserText>.{' '}
             {t('inventory.po.receiveHint', 'Each line starts at what is still to come. Change it to what arrived, or clear it if nothing did.')}
           </DialogDescription>
         </DialogHeader>
@@ -122,6 +123,7 @@ export function ReceiveOrderDialog({
           ))}
         </ul>
         <Input
+          dir="auto"
           id="po-receive-note"
           label={t('inventory.po.deliveryNote', 'Delivery note number or a note')}
           value={note}

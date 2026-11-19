@@ -8,6 +8,8 @@
  *   bought in; a line still short says how many have not arrived, in red. The
  *   totals are in the order's own currency (CU.1-CU.4).
  * - Receiving: each receipt (GRN-0001) with when, who, and what came.
+ * - History: who drafted, sent, approved and received it, and when, oldest
+ *   first.
  *
  * The one main button follows the state: Send while a draft, Receive once
  * approved. A short line that won't come is closed from its row. The Bill tab
@@ -19,6 +21,8 @@ import Link from 'next/link';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
+import { UserText } from '@/components/ui/user-text';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { PurchaseOrderStatus } from '@/components/inventory/purchase-orders-tab';
 import { ReceiveOrderDialog } from '@/components/inventory/receive-order-dialog';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -42,7 +46,13 @@ import {
   type InventoryPurchaseOrderLine,
 } from '@/lib/inventory/api';
 
-type Tab = 'order' | 'receiving';
+type Tab = 'order' | 'receiving' | 'history';
+
+interface HistoryEntry {
+  at: string;
+  text: string;
+  icon: 'edit' | 'send' | 'check' | 'check-in' | 'close';
+}
 
 /** Ordered minus received, in the line's unit; 0 when it all came. */
 function shortBy(line: InventoryPurchaseOrderLine): number {
@@ -109,6 +119,40 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
     }
   };
 
+  // What happened to the order, from its own times and its receipts.
+  const history: HistoryEntry[] = [
+    {
+      at: order.created_at,
+      text: order.created_by_name
+        ? t('inventory.po.history.created', 'Drafted by {name}', { name: order.created_by_name })
+        : t('inventory.po.history.createdNoName', 'Drafted'),
+      icon: 'edit' as const,
+    },
+    ...(order.submitted_at ? [{ at: order.submitted_at, text: t('inventory.po.history.sent', 'Sent for approval'), icon: 'send' as const }] : []),
+    ...(order.approved_at
+      ? [
+          {
+            at: order.approved_at,
+            text: order.approved_by_name
+              ? t('inventory.po.history.approved', 'Approved by {name}', { name: order.approved_by_name })
+              : t('inventory.po.history.approvedNoName', 'Approved'),
+            icon: 'check' as const,
+          },
+        ]
+      : []),
+    ...receipts.map((r) => ({
+      at: r.done_at ?? r.created_at,
+      text: r.created_by_name
+        ? t('inventory.po.history.received', '{number} received by {name}', { number: r.number, name: r.created_by_name })
+        : t('inventory.po.history.receivedNoName', '{number} received', { number: r.number }),
+      icon: 'check-in' as const,
+    })),
+    ...(order.status === 'done' && order.done_at
+      ? [{ at: order.done_at, text: t('inventory.po.history.done', 'Everything received or closed'), icon: 'check' as const }]
+      : []),
+    ...(order.cancelled_at ? [{ at: order.cancelled_at, text: t('inventory.po.history.cancelled', 'Cancelled'), icon: 'close' as const }] : []),
+  ].sort((a, b) => a.at.localeCompare(b.at));
+
   const subtitle = [
     t('inventory.po.heading', 'Purchase order {number}', { number: order.number }),
     order.approved_by_name ? t('inventory.po.approvedBy', 'approved by {name}', { name: order.approved_by_name }) : null,
@@ -155,9 +199,10 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
     <div className="space-y-6">
       <AdminHeader
         breadcrumb={
-          <Link href="/inventory?tab=purchases" className="hover:underline">
-            {t('inventory.tab.purchases', 'Purchases')}
-          </Link>
+          <Breadcrumb
+            linkComponent={Link}
+            items={[{ label: t('inventory.tab.purchases', 'Purchases'), href: '/inventory?tab=purchases' }, { label: order.number }]}
+          />
         }
         title={order.contact_name ?? order.number}
         description={subtitle}
@@ -182,6 +227,7 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
             {t('inventory.po.tab.receiving', 'Receiving')}
             {receipts.length > 0 && <span className="ms-2 font-mono text-xs">{receipts.length}</span>}
           </TabsTrigger>
+          <TabsTrigger value="history">{t('inventory.po.tab.history', 'History')}</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -189,7 +235,7 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
         <section className="overflow-x-auto rounded-lg border border-border" data-testid="po-lines">
           <div className="px-4 pb-2 pt-4">
             <h2 className="font-semibold">
-              <bdi dir="ltr">{order.number}</bdi> · {order.contact_name}
+              <bdi dir="ltr">{order.number}</bdi> · <UserText>{order.contact_name}</UserText>
             </h2>
             <p className="text-sm text-muted-foreground">{t('inventory.po.linesHint', 'Ordered and received, line by line')}</p>
           </div>
@@ -210,7 +256,7 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
                 return (
                   <tr key={line.id} className="h-12">
                     <td className="px-4 py-2">
-                      <div>{nameIn(line.item_names, line.item_name, language)}</div>
+                      <UserText className="block">{nameIn(line.item_names, line.item_name, language)}</UserText>
                       <bdi dir="ltr" className="font-mono text-xs text-muted-foreground">
                         {line.sku}
                       </bdi>
@@ -301,8 +347,24 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
               </tr>
             </tfoot>
           </table>
-          {order.notes !== '' && <p className="border-t border-border px-4 py-3 text-sm">{order.notes}</p>}
+          {order.notes !== '' && (
+            <p className="border-t border-border px-4 py-3 text-sm">
+              <UserText>{order.notes}</UserText>
+            </p>
+          )}
         </section>
+      ) : tab === 'history' ? (
+        <ol className="divide-y divide-border rounded-lg border border-border" data-testid="po-history">
+          {history.map((entry, i) => (
+            <li key={`${entry.at}-${i}`} className="flex items-center gap-3 px-4 py-3 text-sm">
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Icon name={entry.icon} size={16} />
+              </span>
+              <span className="min-w-0 flex-1">{entry.text}</span>
+              <span className="text-xs text-muted-foreground">{dates.dateTime(entry.at) ?? ''}</span>
+            </li>
+          ))}
+        </ol>
       ) : (
         <div className="space-y-4" data-testid="po-receipts">
           {receipts.length === 0 ? (
@@ -322,8 +384,13 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
                   <bdi dir="ltr" className="font-mono">
                     {receipt.number}
                   </bdi>
-                  {receipt.created_by_name ? ` · ${t('inventory.po.by', 'by {name}', { name: receipt.created_by_name })}` : ''}
-                  {receipt.note ? ` · ${receipt.note}` : ''}
+                  {receipt.created_by_name ? <> · {t('inventory.po.by', 'by {name}', { name: receipt.created_by_name })}</> : null}
+                  {receipt.note ? (
+                    <>
+                      {' · '}
+                      <UserText>{receipt.note}</UserText>
+                    </>
+                  ) : null}
                 </p>
                 <dl className="mt-3 divide-y divide-border text-sm">
                   {(receipt.lines ?? []).map((l) => (

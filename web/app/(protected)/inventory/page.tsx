@@ -29,6 +29,7 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
+import { UserText } from '@/components/ui/user-text';
 import { ItemFormDialog, kindLabel } from '@/components/inventory/item-form-dialog';
 import { PlaceFormDialog } from '@/components/inventory/place-form-dialog';
 import { CountStartDialog } from '@/components/inventory/count-start-dialog';
@@ -183,7 +184,7 @@ export default function InventoryPage() {
         <Icon name="package" size={16} />
       </span>
       <div className="min-w-0">
-        <div className="truncate font-medium">{itemName(row)}</div>
+        <UserText className="block truncate font-medium">{itemName(row)}</UserText>
         <div className="text-xs text-muted-foreground">
           <bdi dir="ltr" className="font-mono">
             {skuText(row)}
@@ -288,8 +289,12 @@ export default function InventoryPage() {
             <Icon name="store" size={16} />
           </span>
           <div className="min-w-0">
-            <div className="truncate font-medium">{nameIn(row.names, row.name, language)}</div>
-            {row.address !== '' && <div className="truncate text-xs text-muted-foreground">{row.address}</div>}
+            <UserText className="block truncate font-medium">{nameIn(row.names, row.name, language)}</UserText>
+            {row.address !== '' && (
+              <div className="truncate text-xs text-muted-foreground">
+                <UserText>{row.address}</UserText>
+              </div>
+            )}
           </div>
         </div>
       ),

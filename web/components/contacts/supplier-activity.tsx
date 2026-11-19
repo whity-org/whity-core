@@ -11,6 +11,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { UserText } from '@/components/ui/user-text';
 import { useFetch } from '@/hooks/useFetch';
 import { useWorkspaceCurrency } from '@/lib/branding-context';
 import { PurchaseOrderDialog } from '@/components/inventory/purchase-order-dialog';
@@ -60,7 +61,7 @@ export function SupplierActivity({ contactId }: { contactId: number }) {
             {data.supplies.map((s) => (
               <li key={s.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
                 <Link href={`/inventory/items/${s.item_id}`} className="hover:underline">
-                  {nameIn(s.item_names, s.item_name, language)}
+                  <UserText>{nameIn(s.item_names, s.item_name, language)}</UserText>
                 </Link>
                 <span>
                   <Money minor={s.price_minor} currency={s.currency} />{' '}
