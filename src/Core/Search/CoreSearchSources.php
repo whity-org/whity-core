@@ -27,6 +27,7 @@ final class CoreSearchSources
             new FormsSearchSource($db),
             new PeopleSearchSource($db),
             new OusSearchSource($db),
+            new ItemsSearchSource($db),
         ];
     }
 

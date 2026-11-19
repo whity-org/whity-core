@@ -122,6 +122,16 @@ final class CoreTables
         'agent_proposals' => '176_create_agent_proposals.php',
         // MCP idempotency keys (WHIT-931).
         'mcp_call_keys' => '308_create_mcp_call_keys.php',
+        // Inventory (WHIT-1232, design section 31).
+        'inv_barcodes' => '317_create_inventory_items.php',
+        'inv_categories' => '317_create_inventory_items.php',
+        'inv_item_units' => '317_create_inventory_items.php',
+        'inv_items' => '317_create_inventory_items.php',
+        'inv_levels' => '318_create_inventory_stock_ledger.php',
+        'inv_locations' => '318_create_inventory_stock_ledger.php',
+        'inv_moves' => '318_create_inventory_stock_ledger.php',
+        'inv_units' => '317_create_inventory_items.php',
+        'inv_variants' => '317_create_inventory_items.php',
         'plugin_secrets' => '187_create_plugin_secrets.php',
         'public_form_keys' => '217_create_public_form_keys.php',
         'workspace_signup_settings' => '222_create_workspace_signup.php',

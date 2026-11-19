@@ -69,4 +69,10 @@ interface PluginScope
      * which themes it can choose. A person chooses; a plugin only reads.
      */
     public function themes(): WorkspaceTheme;
+
+    /**
+     * Core's items, places, stock and units in this workspace (SDK 1.127, WHIT-1232).
+     * Its `stock()` is bound to this plugin, the only way a plugin writes stock.
+     */
+    public function inventory(): InventoryScope;
 }

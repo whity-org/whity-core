@@ -442,6 +442,35 @@ final class Events
     public const WORKER_REQUEST_START = 'worker.request.start';
     public const WORKER_REQUEST_END = 'worker.request.end';
 
+    // ---- inventory (SDK 1.127, WHIT-1232, design section 31) ----
+    /**
+     * FILTER hook, before stock moves post, inside their transaction. Payload:
+     * `tenant_id`, `batch_key`, `source_type`, `source_id`, `reason_code`,
+     * `acting_profile_id`, `occurred_at`, and `lines` (each `variant_id`,
+     * `from_location_id`, `to_location_id`, `quantity` as base-unit steps).
+     * Return the payload unchanged; refuse the whole post with
+     * {@see HookVetoException} (the caller gets 409 and your reason). Used for
+     * a workspace's rules (stock below zero, a locked period) and a plugin's own.
+     */
+    public const STOCK_MOVING = 'stock.moving';
+    /**
+     * Stock moves posted. Payload: `tenant_id`, `batch_key`, `source_type`,
+     * `source_id`, `acting_profile_id`, `move_ids`, and `moves` (each `id`,
+     * `variant_id`, `from_location_id`, `to_location_id`, `quantity` as a base-unit
+     * decimal). One event per post, listing all its moves.
+     */
+    public const STOCK_MOVED = 'stock.moved';
+    public const STOCK_MOVED_ASYNC = 'stock.moved.async';
+    /** An item was added. Payload: `tenant_id`, `item_id`, `variant_ids`, `acting_profile_id`. */
+    public const INVENTORY_ITEM_CREATED = 'inventory.item.created';
+    public const INVENTORY_ITEM_CREATED_ASYNC = 'inventory.item.created.async';
+    /** An item changed. Payload: `tenant_id`, `item_id`, `changed` (field names), `acting_profile_id`. */
+    public const INVENTORY_ITEM_UPDATED = 'inventory.item.updated';
+    public const INVENTORY_ITEM_UPDATED_ASYNC = 'inventory.item.updated.async';
+    /** An item was archived. Payload: `tenant_id`, `item_id`, `acting_profile_id`. */
+    public const INVENTORY_ITEM_ARCHIVED = 'inventory.item.archived';
+    public const INVENTORY_ITEM_ARCHIVED_ASYNC = 'inventory.item.archived.async';
+
     /**
      * The event name to dispatch for one of THIS plugin's own events (SDK 1.29).
      *

@@ -99,6 +99,11 @@ final class CoreToolsets
             'titleAr'     => 'العملاء والموردون',
             'description' => 'Contacts (customers and suppliers), their tags, and importing them from a spreadsheet.',
         ],
+        'core.inventory' => [
+            'title'       => 'Inventory',
+            'titleAr'     => 'المخزون',
+            'description' => 'Items, units, places and stock: levels, history, opening stock and adjustments.',
+        ],
         'core.convening' => [
             'title'       => 'Meetings',
             'titleAr'     => 'الاجتماعات',
@@ -171,6 +176,7 @@ final class CoreToolsets
         'calendar'                 => 'core.calendar',
         'contacts'                 => 'core.contacts',
         'custom-fields'            => 'core.contacts',
+        'inventory'                => 'core.inventory',
         'chat'                     => 'core.chat',
         'taxonomy'                 => 'core.taxonomy',
         'data-types'               => 'core.taxonomy',

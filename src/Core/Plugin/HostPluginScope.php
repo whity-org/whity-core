@@ -7,6 +7,8 @@ namespace Whity\Core\Plugin;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Audit\AuditTrail;
 use Whity\Sdk\Audit\PluginAudit;
+use Whity\Core\Inventory\Host\HostInventoryScope;
+use Whity\Sdk\Context\InventoryScope;
 use Whity\Sdk\Context\PluginScope;
 use Whity\Sdk\Context\ServiceUnavailable;
 use Whity\Sdk\Documents\PluginDocuments;
@@ -108,6 +110,18 @@ final class HostPluginScope implements PluginScope
         }
 
         return $service;
+    }
+
+    /** Core's inventory for this plugin; its stock is bound to this plugin (SDK 1.127, WHIT-1232). */
+    public function inventory(): InventoryScope
+    {
+        if (!isset($this->stores[InventoryScope::class])) {
+            $this->stores[InventoryScope::class] = new HostInventoryScope($this->plugin);
+        }
+        $scope = $this->stores[InventoryScope::class];
+        assert($scope instanceof InventoryScope);
+
+        return $scope;
     }
 
     /**

@@ -19,7 +19,9 @@ use Whity\Core\Seat\SeatService;
  *
  * One row per limit that has a number or a feature in use:
  *
- *  - `kind` `count`: staff, customers this month, agent work, documents.
+ *  - `kind` `count`: staff, customers this month, agent work, documents,
+ *    items in inventory (each variant counted; only when the plan sets a
+ *    number).
  *    `limit` null means unlimited; `over` is true once `used` passes it.
  *  - `kind` `feature`: a brand feature the workspace is using without its plan
  *    including it (today: its own web address). Shown only when that is so.
@@ -67,6 +69,11 @@ final class PlanLimitsReport
             $this->customers->resetsAt($tenantId),
         );
 
+        $itemLimit = $this->entitlements->limit($tenantId, EntitlementRegistry::INVENTORY_ITEMS_MAX);
+        if ($itemLimit !== EntitlementRegistry::UNLIMITED) {
+            $rows[] = self::count(EntitlementRegistry::INVENTORY_ITEMS_MAX, $this->liveItems($tenantId), $itemLimit, null);
+        }
+
         foreach ($this->meters->peek($tenantId, self::METERED) as $key => $meter) {
             // An unlimited meter is not counted at all, so it has no number to
             // show; leaving it out beats showing "0 used" that is not true.
@@ -106,6 +113,19 @@ final class PlanLimitsReport
             'over'      => !$unlimited && $used > $limit,
             'resets_at' => $resetsAt,
         ];
+    }
+
+    /** Live variants of live items: what `inventory.items.max` counts (IV.24). */
+    private function liveItems(int $tenantId): int
+    {
+        $stmt = $this->db->prepare(
+            'SELECT COUNT(*) FROM inv_variants v
+               JOIN inv_items i ON i.tenant_id = v.tenant_id AND i.id = v.item_id
+              WHERE v.tenant_id = :tenant_id AND v.archived_at IS NULL AND i.archived_at IS NULL'
+        );
+        $stmt->execute([':tenant_id' => $tenantId]);
+
+        return (int) $stmt->fetchColumn();
     }
 
     private function usesOwnWebAddress(int $tenantId): bool

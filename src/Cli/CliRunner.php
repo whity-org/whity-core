@@ -22,6 +22,8 @@ class CliRunner
         'plugin'     => 'Whity\Cli\Commands\PluginsCommand',
         'tenant'     => 'Whity\Cli\Commands\TenantsCommand',
         'totp'       => 'Whity\Cli\Commands\TotpCommand',
+        // WHIT-1232: stock levels recomputed from the append-only ledger.
+        'inventory:rebuild-levels' => 'Whity\Cli\Commands\InventoryCommand',
         // WHIT-1168: the break-glass for a server that signs in only with its identity provider.
         'auth'       => 'Whity\Cli\Commands\AuthCommand',
         // WHIT-1047: every stored secret onto the current key after a rotation.

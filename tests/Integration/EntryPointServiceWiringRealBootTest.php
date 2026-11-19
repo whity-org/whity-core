@@ -746,6 +746,11 @@ final class EntryPointServiceWiringRealBootTest extends TestCase
             \Whity\Sdk\Identity\LinkedPeople::class,
             \Whity\Sdk\Sql\SequenceAllocator::class,
             \Whity\Sdk\Messaging\CustomerMessages::class,
+            // Inventory (SDK 1.127, WHIT-1232): a job that moves stock reaches the same services.
+            \Whity\Sdk\Inventory\Items::class,
+            \Whity\Sdk\Inventory\Locations::class,
+            \Whity\Sdk\Inventory\Stock::class,
+            \Whity\Sdk\Inventory\Units::class,
         ];
         $list = var_export($services, true);
 

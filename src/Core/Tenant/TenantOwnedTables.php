@@ -643,6 +643,17 @@ final class TenantOwnedTables
         // MCP idempotency keys (WHIT-931). Its one cross-tenant statement is
         // the retention prune, marked for the guard.
         'mcp_call_keys' => '308_create_mcp_call_keys.php',
+        // Inventory (WHIT-1232, design section 31). Every query binds tenant_id;
+        // inv_moves is append-only (a trigger refuses UPDATE and DELETE).
+        'inv_units' => '317_create_inventory_items.php',
+        'inv_categories' => '317_create_inventory_items.php',
+        'inv_items' => '317_create_inventory_items.php',
+        'inv_variants' => '317_create_inventory_items.php',
+        'inv_item_units' => '317_create_inventory_items.php',
+        'inv_barcodes' => '317_create_inventory_items.php',
+        'inv_locations' => '318_create_inventory_stock_ledger.php',
+        'inv_moves' => '318_create_inventory_stock_ledger.php',
+        'inv_levels' => '318_create_inventory_stock_ledger.php',
     ];
 
     /**

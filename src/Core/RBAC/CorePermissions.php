@@ -494,6 +494,14 @@ final class CorePermissions
     public const CONTACTS_READ = 'contacts:read';
     public const CONTACTS_WRITE = 'contacts:write';
     public const CONTACTS_IMPORT = 'contacts:import';
+    // INVENTORY (migrations 317-319, WHIT-1232, design section 31). Read goes to
+    // every staff role (anchor documents:read); write, stock:adjust and the
+    // settings to the roles that run the workspace. Approving is never a
+    // permission: it comes from routing rules (IV.19).
+    public const INVENTORY_READ = 'inventory:read';
+    public const INVENTORY_WRITE = 'inventory:write';
+    public const STOCK_ADJUST = 'stock:adjust';
+    public const INVENTORY_SETTINGS = 'inventory:settings';
     // TASKS on Taskaat (A10, T.3). Tasks and boards live in the workspace's
     // Taskaat; these gate Whity's way into them. Read and write go to every
     // staff role (anchor documents:read); manage (connecting the workspace to
@@ -613,6 +621,10 @@ final class CorePermissions
             self::CONTACTS_READ,
             self::CONTACTS_WRITE,
             self::CONTACTS_IMPORT,
+            self::INVENTORY_READ,
+            self::INVENTORY_WRITE,
+            self::STOCK_ADJUST,
+            self::INVENTORY_SETTINGS,
             self::FIELDS_MANAGE,
             self::TASKS_READ,
             self::TASKS_WRITE,
