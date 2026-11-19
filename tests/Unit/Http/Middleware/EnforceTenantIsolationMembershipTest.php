@@ -130,9 +130,22 @@ final class EnforceTenantIsolationMembershipTest extends TestCase
         self::assertSame(403, $response->getStatusCode());
     }
 
-    public function testSystemTenantZeroIsUnscoped(): void
+    public function testSystemTenantZeroWithoutAMembershipIsRefused(): void
     {
-        // No membership rows: active_tenant_id 0 carries system authority.
+        // #2229: active_tenant_id 0 carries system authority, so it needs a live
+        // tenant-0 membership like any other tenant.
+        $response = $this->dispatch([
+            'profile_id' => $this->profileId,
+            'active_tenant_id' => 0,
+        ]);
+
+        self::assertSame(403, $response->getStatusCode());
+    }
+
+    public function testSystemTenantZeroWithAMembershipIsUnscoped(): void
+    {
+        $this->memberships->insert($this->profileId, 0, 1);
+
         $response = $this->dispatch([
             'profile_id' => $this->profileId,
             'active_tenant_id' => 0,

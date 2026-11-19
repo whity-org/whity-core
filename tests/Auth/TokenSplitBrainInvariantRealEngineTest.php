@@ -173,18 +173,19 @@ final class TokenSplitBrainInvariantRealEngineTest extends TestCase
      * the invariant that no split-brain is possible still holds because
      * there is only ONE tenant claim (active_tenant_id).
      */
-    public function testSystemTenantTokenIsAcceptedWithoutMembership(): void
+    public function testSystemTenantTokenNeedsATenantZeroMembership(): void
     {
+        // #2229: the system tenant is no longer exempt from the membership check.
         $_COOKIE['access_token'] = $this->mint([
             'profile_id'       => $this->profileId,
-            'active_tenant_id' => 0, // system tenant — no membership required
+            'active_tenant_id' => 0,
             'token_epoch'      => 0,
         ]);
 
-        self::assertIsArray(
-            $this->validator->validateAccessToken(),
-            'System tenant (active_tenant_id = 0) must be accepted without a membership row.'
-        );
+        self::assertNull($this->validator->validateAccessToken(), 'refused without a tenant-0 membership');
+
+        $this->memberships->insert($this->profileId, 0, 1);
+        self::assertIsArray($this->validator->validateAccessToken(), 'accepted with one');
     }
 
     // ── helper ────────────────────────────────────────────────────────────────────
