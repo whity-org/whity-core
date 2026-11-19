@@ -332,6 +332,52 @@ final class WhityStoreConnectorRealEngineTest extends TestCase
         }
     }
 
+    /**
+     * WHIT-1275 (#2242): the connection is the operator's own Whity ID account.
+     * A workspace with plugins:read learns whether the installation is
+     * connected and to which store, never the account; and an installation's
+     * licences are the operator's to read.
+     */
+    public function testAWorkspaceSeesThatTheStoreIsConnectedButNotTheOperatorsAccount(): void
+    {
+        $connector = $this->connect();
+        $pdo = SchemaFromMigrations::make(true);
+        $settings = new \Whity\Core\Settings\SettingsService(
+            new GlobalSettingsRepository($pdo),
+            new \Whity\Core\Settings\TenantSettingsRepository($pdo),
+        );
+        $settings->setGlobal(\Whity\Core\Settings\SettingsRegistry::PLUGINS_STORE_ALLOWED_HOSTS, 'store.whity.test');
+        $handler = new \Whity\Api\InstallFromStoreApiHandler(
+            sys_get_temp_dir() . '/whity_store_connect_' . uniqid(),
+            $settings,
+            null, null, null, null, null, null, null, null,
+            $connector,
+        );
+        $get = static fn (\Whity\Core\Response $r): array => json_decode($r->getBody(), true);
+
+        \Whity\Core\Tenant\TenantContext::reset();
+        try {
+            \Whity\Core\Tenant\TenantContext::setTenantId(7);
+            $connection = $get($handler->connection(new \Whity\Core\Request('GET', '/x', [], '')))['data'];
+            $allowed = $get($handler->allowedStores(new \Whity\Core\Request('GET', '/x', [], '')))['data']['connection'];
+            self::assertSame(['connected' => true, 'store_host' => 'store.whity.test', 'needs_reconnect' => false], $connection);
+            self::assertSame($connection, $allowed);
+            foreach ([$connection, $allowed] as $seen) {
+                self::assertStringNotContainsString('rania', (string) json_encode($seen));
+                self::assertStringNotContainsString(self::ISSUER, (string) json_encode($seen));
+            }
+            self::assertSame(403, $handler->licenceStatus(new \Whity\Core\Request('GET', '/x', [], ''), ['slug' => 'demo'])->getStatusCode());
+
+            \Whity\Core\Tenant\TenantContext::reset();
+            \Whity\Core\Tenant\TenantContext::setTenantId(0);
+            $operator = $get($handler->connection(new \Whity\Core\Request('GET', '/x', [], '')))['data'];
+            self::assertSame('rania@example-bakery.test', $operator['account']['email'], 'the operator sees which account');
+            self::assertSame(200, $handler->licenceStatus(new \Whity\Core\Request('GET', '/x', [], ''), ['slug' => 'demo'])->getStatusCode());
+        } finally {
+            \Whity\Core\Tenant\TenantContext::reset();
+        }
+    }
+
     public function testDisconnectRevokesAndForgets(): void
     {
         $connector = $this->connect();

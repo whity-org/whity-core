@@ -258,10 +258,36 @@ final class ChatRepository
         return (int) $stmt->fetchColumn();
     }
 
-    public function removeMember(int $tenantId, int $memberId): void
+    /** `$removedBy`: who took them out, their own id when they left (WHIT-1266). */
+    public function removeMember(int $tenantId, int $memberId, ?int $removedBy = null): void
     {
-        $this->db->prepare('UPDATE chat_members SET removed_at = NOW() WHERE tenant_id = :tid AND id = :id AND removed_at IS NULL')
-            ->execute([':tid' => $tenantId, ':id' => $memberId]);
+        $stmt = $this->db->prepare('UPDATE chat_members SET removed_at = NOW(), removed_by_profile_id = :by
+             WHERE tenant_id = :tid AND id = :id AND removed_at IS NULL');
+        $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':id', $memberId, PDO::PARAM_INT);
+        $stmt->bindValue(':by', $removedBy, $removedBy === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmt->execute();
+    }
+
+    /**
+     * Whether someone else took this person out of the chat the last time they
+     * were in it (WHIT-1266): they may be added back by a member, but not walk
+     * back in through "Discuss in chat". Leaving yourself does not count.
+     */
+    public function wasRemovedByOther(int $tenantId, int $chatId, int $profileId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT removed_at, removed_by_profile_id FROM chat_members
+              WHERE tenant_id = :tid AND conversation_id = :cid AND profile_id = :pid
+              ORDER BY id DESC LIMIT 1'
+        );
+        $stmt->execute([':tid' => $tenantId, ':cid' => $chatId, ':pid' => $profileId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row === false || $row['removed_at'] === null || $row['removed_by_profile_id'] === null) {
+            return false;
+        }
+
+        return (int) $row['removed_by_profile_id'] !== $profileId;
     }
 
     /** Moves the member's read mark forward, never back. */
