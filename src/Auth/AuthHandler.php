@@ -2201,6 +2201,15 @@ class AuthHandler
                         if ($this->isJtiRevoked($jti)) {
                             // This token has been reused → log security event
                             $this->audit('auth.refresh_token_reuse_detected', $request, $activeTenantId, $profileId);
+                        } elseif (($parsedToken['type'] ?? null) === 'refresh'
+                            && $this->sessionRefusalReason($profileId) === 'profile_inactive'
+                        ) {
+                            // The membership guard now refuses a deactivated
+                            // profile before we get here (#2227); keep the
+                            // record that a deactivated person tried to stay in.
+                            $this->audit('auth.refresh.failure', $request, $activeTenantId, $profileId, [
+                                'reason' => 'profile_inactive',
+                            ]);
                         }
                     }
                 }
