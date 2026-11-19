@@ -104,6 +104,17 @@ describe('PlanLimits', () => {
     expect(screen.queryByTestId('plan-limit-customers.per_month')).not.toBeInTheDocument();
   });
 
+  it('meters items in inventory past the plan, each variant counted (IV.24)', async () => {
+    limits([{ key: 'inventory.items.max', kind: 'count', used: 104, limit: 100, over: true, resets_at: null }]);
+
+    render(<PlanLimits />);
+
+    expect(await screen.findByTestId('plan-limits-passed')).toHaveTextContent('nothing is removed');
+    expect(screen.getByTestId('plan-limit-inventory.items.max')).toHaveTextContent('104 of 100');
+    expect(screen.getByTestId('plan-limit-inventory.items.max')).toHaveTextContent('Each size or colour counts.');
+    expect(screen.getByRole('meter', { name: 'Items in inventory' })).toHaveAttribute('aria-valuenow', '104');
+  });
+
   it('names a brand feature in use that the plan does not include', async () => {
     limits([{ key: 'brand.custom_domain', kind: 'feature', used: null, limit: null, over: true, resets_at: null }]);
 

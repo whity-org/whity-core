@@ -5540,6 +5540,260 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inventory/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List item categories, with how many items each has */
+        get: operations["get_api_v1_inventory_categories"];
+        put?: never;
+        /** Add an item category */
+        post: operations["post_api_v1_inventory_categories"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List items
+         * @description Sorted by name. Search matches names in every language, SKUs, and barcodes exactly.
+         */
+        get: operations["get_api_v1_inventory_items"];
+        put?: never;
+        /**
+         * Add an item
+         * @description Needs a name. Counted in `unit` (pc when left out). For sizes or colours send `variants`; otherwise one variant is made, with `sku` and `barcodes` if given. Each variant counts toward the plan's item limit, which only warns: the item is always added.
+         */
+        post: operations["post_api_v1_inventory_items"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/items/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Find the item a scanned barcode or SKU belongs to
+         * @description Answers the item, the variant, and the unit the barcode stands for (a box barcode means a box).
+         */
+        get: operations["get_api_v1_inventory_items_lookup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one item, its variants, units and stock */
+        get: operations["get_api_v1_inventory_items_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change an item; fields left out keep their value
+         * @description `variants`, when sent, is the whole list: entries with an `id` change that variant, entries without one are added, and variants left out are archived. The unit can't change once the item has stock history.
+         */
+        patch: operations["patch_api_v1_inventory_items_id"];
+        trace?: never;
+    };
+    "/api/v1/inventory/items/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive an item
+         * @description Archived items leave the lists and can't be moved; their history stays and they can be restored.
+         */
+        post: operations["post_api_v1_inventory_items_id_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/items/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring an archived item back */
+        post: operations["post_api_v1_inventory_items_id_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List places stock is kept */
+        get: operations["get_api_v1_inventory_locations"];
+        put?: never;
+        /** Add a place (a warehouse, shop or van, or an area inside one) */
+        post: operations["post_api_v1_inventory_locations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/locations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one place */
+        get: operations["get_api_v1_inventory_locations_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a place; `is_active: false` stops using it */
+        patch: operations["patch_api_v1_inventory_locations_id"];
+        trace?: never;
+    };
+    "/api/v1/inventory/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stock now, per variant and place, in each item's base unit */
+        get: operations["get_api_v1_inventory_stock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/stock/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set opening stock, or adjust stock with a reason
+         * @description `kind: opening` adds stock to a place. `kind: adjustment` changes it by a signed amount with a `reason_code`: going out expired, damaged, spoiled, used_in_house, sample, theft, count_correction or other; coming in found, count_correction, returned or other. With an `idempotency_key`, sending the same key again changes nothing and answers the first result (200).
+         */
+        post: operations["post_api_v1_inventory_stock_adjustments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/stock/batches/{key}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo a stock change
+         * @description Posts the same moves the other way, linked to the originals. A change can be undone once.
+         */
+        post: operations["post_api_v1_inventory_stock_batches_key_undo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/stock/moves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stock history: every move, newest first
+         * @description Moves are never changed; an undo is another move the other way, with `reverses_move_id`. Page back with `before_id`.
+         */
+        get: operations["get_api_v1_inventory_stock_moves"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/units": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List units of measure
+         * @description Every workspace starts with piece (pc), kg, g, l, ml, m, box, pack and bag. Quantities are decimals with the unit's own decimals.
+         */
+        get: operations["get_api_v1_inventory_units"];
+        put?: never;
+        /** Add a unit of measure */
+        post: operations["post_api_v1_inventory_units"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/invitations": {
         parameters: {
             query?: never;
@@ -16813,6 +17067,300 @@ export interface components {
         InstanceStatusResponse: {
             configured: boolean;
             version: string;
+        };
+        InventoryAdjustmentRequest: {
+            /**
+             * @description `opening` to set starting stock; `adjustment` (the default) to change stock with a reason.
+             * @enum {string}
+             */
+            kind?: "opening" | "adjustment";
+            /** @description One line per item and place: `{variant_id, location_id, change, unit}`. */
+            lines: {
+                variant_id: number;
+                location_id: number;
+                /** @description Opening: a positive amount. Adjustment: signed, -2 takes two out. */
+                change: string;
+                /** @description A unit code; the item's base unit when left out. */
+                unit?: string;
+                note?: string;
+            }[];
+            /** @description Why stock changed. Out: expired, damaged, spoiled, used_in_house, sample, theft, count_correction, other. In: found, count_correction, returned, other. */
+            reason_code?: string;
+            /** @description A note kept with the change. */
+            note?: string;
+            /** @description When it happened, if earlier than now (ISO 8601). */
+            occurred_at?: string;
+            /** @description Any unique text; sending the same key again changes nothing and answers the first result. */
+            idempotency_key?: string;
+        };
+        InventoryBatch: {
+            batch_key: string;
+            moves: components["schemas"]["InventoryMove"][];
+            repeated: boolean;
+        };
+        InventoryCategory: {
+            id: number;
+            parent_id: number | null;
+            name: string;
+            /** @description The name in each language, such as `{"en": "Flour", "ar": "طحين"}`. */
+            names: {
+                [key: string]: string;
+            };
+            item_count: number;
+        };
+        InventoryCategoryRequest: {
+            /** @description Text, or `{en, ar}`. */
+            name: string | {
+                en?: string;
+                ar?: string;
+            };
+            /** @description The category it sits under, or null for a top-level one. */
+            parent_id?: number | null;
+        };
+        InventoryItem: {
+            id: number;
+            /** @description As first written; `names` has every language. */
+            name: string;
+            /** @description The name in each language, such as `{"en": "Flour", "ar": "طحين"}`. */
+            names: {
+                [key: string]: string;
+            };
+            description: string;
+            /** @enum {string} */
+            kind: "stocked" | "consumable" | "service" | "made";
+            category_id: number | null;
+            base_unit: components["schemas"]["InventoryUnit"];
+            /** @enum {string} */
+            tracking: "none" | "lot" | "serial";
+            expires: boolean;
+            shelf_life_days?: number | null;
+            /** @description In the currency's minor units. */
+            sale_price_minor?: number | null;
+            purchase_price_minor?: number | null;
+            currency?: string | null;
+            tax_category?: string;
+            owner_plugin?: string | null;
+            variants: components["schemas"]["InventoryVariant"][];
+            units: {
+                unit: string;
+                /** @description How many of the base unit one of it is, such as "25". */
+                per: string;
+                /** @enum {string} */
+                purpose: "purchase" | "sale" | "both";
+                is_default: boolean;
+            }[];
+            /** @description Stock of every live variant at every real place, in the base unit. */
+            on_hand: string;
+            /** @description The workspace's own fields, by key. */
+            fields?: {
+                [key: string]: unknown;
+            };
+            archived: boolean;
+            created_at: string;
+            updated_at: string;
+        };
+        InventoryItemRequest: {
+            /** @description Text, or `{en, ar}`. */
+            name?: string | {
+                en?: string;
+                ar?: string;
+            };
+            /**
+             * @description `stocked` (kept and sold, the default), `consumable` (used up, such as cleaning supplies), `service` (no stock) or `made` (made from other items).
+             * @enum {string}
+             */
+            kind?: "stocked" | "consumable" | "service" | "made";
+            /** @description The unit code stock is counted in, such as `kg`. Only when adding, or before any stock moved. */
+            unit?: string;
+            /** @description For an item without variants. Made up when left out. */
+            sku?: string;
+            /** @description For an item without variants: barcodes, each a code or `{code, unit}` when it stands for a box or pack. */
+            barcodes?: (string | {
+                code: string;
+                unit?: string;
+            })[];
+            /** @description Sizes or colours, each `{options, sku, barcodes, sale_price_minor}`; each one counts as an item. On a change, the whole list: with `id` changes that variant, without adds one, left out archives it. */
+            variants?: {
+                id?: number;
+                sku?: string;
+                options?: {
+                    [key: string]: string;
+                };
+                barcodes?: (string | {
+                    code: string;
+                    unit?: string;
+                })[];
+                sale_price_minor?: number | null;
+                purchase_price_minor?: number | null;
+            }[];
+            /** @description Other units it is bought or sold in, each `{unit, per, purpose}`, such as a 25 kg bag: `{"unit": "bag", "per": "25"}`. */
+            units?: {
+                unit: string;
+                /** @description How many of the base unit one is. */
+                per: string;
+                /** @enum {string} */
+                purpose?: "purchase" | "sale" | "both";
+                is_default?: boolean;
+            }[];
+            /** @description A longer note about the item. */
+            description?: string;
+            /** @description The category it belongs to, or null for none. */
+            category_id?: number | null;
+            /** @description True when the item goes off and its stock has expiry dates. */
+            expires?: boolean;
+            /** @description Days it keeps once made or received, for working out expiry dates. */
+            shelf_life_days?: number | null;
+            /** @description Selling price in the currency's minor units (cents, or fils with three decimals). */
+            sale_price_minor?: number | null;
+            /** @description Usual buying price in the currency's minor units. */
+            purchase_price_minor?: number | null;
+            /** @description The workspace's currency when left out and a price is set. */
+            currency?: string | null;
+            /** @description The tax category it is sold under, as the workspace names it; empty for none. */
+            tax_category?: string;
+            /** @description The workspace's own fields for items, by key. */
+            fields?: {
+                [key: string]: unknown;
+            };
+        };
+        InventoryLevel: {
+            item_id: number;
+            variant_id: number;
+            sku: string;
+            location_id: number;
+            lot_id: number | null;
+            /** @description Below zero where the workspace allows it. */
+            on_hand: string;
+            /** @description Promised to orders. */
+            reserved: string;
+            /** @description On hand minus reserved. */
+            available: string;
+            unit: string;
+            decimals: number;
+            updated_at: string;
+        };
+        InventoryLocation: {
+            id: number;
+            parent_id: number | null;
+            /** @enum {string} */
+            kind: "warehouse" | "area" | "virtual";
+            virtual_role: string | null;
+            name: string;
+            /** @description The name in each language, such as `{"en": "Flour", "ar": "طحين"}`. */
+            names: {
+                [key: string]: string;
+            };
+            code: string;
+            /** @description The organisational unit (branch) it belongs to. */
+            ou_id: number | null;
+            address: string;
+            is_active: boolean;
+            created_at: string;
+            updated_at: string;
+        };
+        InventoryLocationRequest: {
+            /** @description Text, or `{en, ar}`. */
+            name?: string | {
+                en?: string;
+                ar?: string;
+            };
+            /**
+             * @description `warehouse` for a building, shop or van; `area` for a shelf or room inside one.
+             * @enum {string}
+             */
+            kind?: "warehouse" | "area";
+            /** @description For an area, the place it is inside. */
+            parent_id?: number | null;
+            /** @description A short code for the place, such as `WH1`. */
+            code?: string;
+            /** @description The organisational unit (branch) it belongs to, which limits who sees its stock. */
+            ou_id?: number | null;
+            /** @description Where it is. */
+            address?: string;
+            /** @description False to stop using the place; its history stays. */
+            is_active?: boolean;
+        };
+        InventoryMove: {
+            id: number;
+            item_id: number;
+            variant_id: number;
+            sku: string;
+            lot_id?: number | null;
+            from_location_id: number;
+            to_location_id: number;
+            /** @description In the item's base unit, always positive. */
+            quantity: string;
+            unit: string;
+            decimals?: number;
+            entered_quantity?: string | null;
+            entered_unit?: string | null;
+            unit_cost_minor?: number | null;
+            currency?: string | null;
+            source_type: string;
+            source_id?: number | null;
+            reason_code?: string;
+            note?: string;
+            batch_key: string;
+            reverses_move_id?: number | null;
+            posted_by_profile_id?: number | null;
+            posted_by_name?: string | null;
+            agent_id?: number | null;
+            on_behalf_of_profile_id?: number | null;
+            occurred_at: string;
+            posted_at: string;
+        };
+        InventoryUnit: {
+            id: number;
+            code: string;
+            name: string;
+            /** @description The name in each language, such as `{"en": "Flour", "ar": "طحين"}`. */
+            names: {
+                [key: string]: string;
+            };
+            /** @enum {string} */
+            dimension: "count" | "mass" | "volume" | "length" | "area" | "time" | "package";
+            decimals: number;
+            to_base_num: number;
+            to_base_den: number;
+            seeded: boolean;
+            archived: boolean;
+        };
+        InventoryUnitRequest: {
+            /** @description A short lower-case code for the unit, such as `tray` or `sack`; unique in the workspace. */
+            code: string;
+            /** @description Text, or `{en, ar}`. */
+            name?: string | {
+                en?: string;
+                ar?: string;
+            };
+            /**
+             * @description What it measures: `count` for pieces, `mass`, `volume`, `length`, `area`, `time`, or `package` for a box or pack.
+             * @enum {string}
+             */
+            dimension?: "count" | "mass" | "volume" | "length" | "area" | "time" | "package";
+            /** @description Decimal places a quantity in it may have: 0 for pieces, 3 for kg. */
+            decimals?: number;
+            /** @description How many of the dimension's base unit (kg, l, m) one of it is, such as "0.001" for g. */
+            to_base?: string;
+        };
+        InventoryVariant: {
+            id: number;
+            item_id: number;
+            sku: string;
+            /** @description Such as `{"size": "M", "colour": "red"}`; empty for an item without variants. */
+            options: {
+                [key: string]: string;
+            };
+            barcodes: {
+                code: string;
+                unit: string | null;
+                symbology: string;
+            }[];
+            sale_price_minor: number | null;
+            purchase_price_minor: number | null;
+            /** @description Stock at every real place, in the item's base unit. */
+            on_hand: string;
+            archived: boolean;
         };
         InvitationAcceptRequest: {
             token: string;
@@ -50680,6 +51228,1599 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_categories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Categories */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryCategory"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_categories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryCategoryRequest"];
+            };
+        };
+        responses: {
+            /** @description The category */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryCategory"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate SKU or barcode, or a rule */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_items: {
+        parameters: {
+            query?: {
+                /** @description Search text, a SKU or a barcode. */
+                q?: string;
+                /** @description `stocked`, `consumable`, `service` or `made`. */
+                kind?: string;
+                /** @description Only items in this category. */
+                category_id?: number;
+                /** @description `true` for archived items instead. */
+                archived?: string;
+                /** @description Page, from 1. */
+                page?: number;
+                /** @description Rows per page, at most 200. Default 50. */
+                per_page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Items */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryItem"][];
+                        pagination: components["schemas"]["Pagination"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_items: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryItemRequest"];
+            };
+        };
+        responses: {
+            /** @description The item */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryItem"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate SKU or barcode, or a rule */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_items_lookup: {
+        parameters: {
+            query?: {
+                /** @description The barcode or SKU. Spaces are ignored and Arabic-Indic digits read as Western ones. */
+                code?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The match */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            item: components["schemas"]["InventoryItem"];
+                            variant_id: number;
+                            unit: string;
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_items_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The item */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryItem"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_inventory_items_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryItemRequest"];
+            };
+        };
+        responses: {
+            /** @description The item */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryItem"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate SKU or barcode, or a rule */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_items_id_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The item */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryItem"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_items_id_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The item */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryItem"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate SKU or barcode, or a rule */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_locations: {
+        parameters: {
+            query?: {
+                /** @description `true` to include virtual places (supplier, customer, loss, found, production, consumed, opening, transit). */
+                virtual?: string;
+                /** @description `true` to include places no longer in use. */
+                inactive?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Places */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryLocation"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_locations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description The place */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryLocation"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate SKU or barcode, or a rule */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_locations_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The place */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryLocation"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_inventory_locations_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryLocationRequest"];
+            };
+        };
+        responses: {
+            /** @description The place */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryLocation"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate SKU or barcode, or a rule */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_stock: {
+        parameters: {
+            query?: {
+                /** @description Only this item. */
+                item_id?: number;
+                /** @description Only this variant. */
+                variant_id?: number;
+                /** @description Only this place. */
+                location_id?: number;
+                /** @description `true` to leave out levels at zero. */
+                nonzero?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Levels */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryLevel"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_stock_adjustments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryAdjustmentRequest"];
+            };
+        };
+        responses: {
+            /** @description The same key was sent before; nothing changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryBatch"];
+                    };
+                };
+            };
+            /** @description The stock change */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryBatch"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate SKU or barcode, or a rule */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_stock_batches_key_undo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The undo */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryBatch"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already undone */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_stock_moves: {
+        parameters: {
+            query?: {
+                /** @description Only this item. */
+                item_id?: number;
+                /** @description Only this variant. */
+                variant_id?: number;
+                /** @description Moves into or out of this place. */
+                location_id?: number;
+                /** @description Only moves from this source, such as `adjustment` or a plugin's `pos.sale`. */
+                source_type?: string;
+                /** @description Only the moves posted together under this key. */
+                batch_key?: string;
+                /** @description Moves older than this one. */
+                before_id?: number;
+                /** @description At most 200. Default 50. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Moves */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryMove"][];
+                        next_before_id?: number | null;
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_units: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Units */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryUnit"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_units: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryUnitRequest"];
+            };
+        };
+        responses: {
+            /** @description The unit */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryUnit"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate SKU or barcode, or a rule */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

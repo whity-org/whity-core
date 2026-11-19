@@ -37703,6 +37703,2229 @@
                 }
             }
         },
+        "/api/v1/inventory/categories": {
+            "get": {
+                "operationId": "get_api_v1_inventory_categories",
+                "summary": "List item categories, with how many items each has",
+                "tags": [
+                    "inventory"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Categories",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventoryCategory"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_inventory_categories",
+                "summary": "Add an item category",
+                "tags": [
+                    "inventory"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryCategoryRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The category",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryCategory"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate SKU or barcode, or a rule",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/items": {
+            "get": {
+                "operationId": "get_api_v1_inventory_items",
+                "summary": "List items",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Sorted by name. Search matches names in every language, SKUs, and barcodes exactly.",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": false,
+                        "description": "Search text, a SKU or a barcode.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "kind",
+                        "in": "query",
+                        "required": false,
+                        "description": "`stocked`, `consumable`, `service` or `made`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "category_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only items in this category.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "archived",
+                        "in": "query",
+                        "required": false,
+                        "description": "`true` for archived items instead.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "description": "Page, from 1.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "required": false,
+                        "description": "Rows per page, at most 200. Default 50.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Items",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventoryItem"
+                                            }
+                                        },
+                                        "pagination": {
+                                            "$ref": "#/components/schemas/Pagination"
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "pagination"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_inventory_items",
+                "summary": "Add an item",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Needs a name. Counted in `unit` (pc when left out). For sizes or colours send `variants`; otherwise one variant is made, with `sku` and `barcodes` if given. Each variant counts toward the plan's item limit, which only warns: the item is always added.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryItemRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The item",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryItem"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate SKU or barcode, or a rule",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/items/lookup": {
+            "get": {
+                "operationId": "get_api_v1_inventory_items_lookup",
+                "summary": "Find the item a scanned barcode or SKU belongs to",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Answers the item, the variant, and the unit the barcode stands for (a box barcode means a box).",
+                "parameters": [
+                    {
+                        "name": "code",
+                        "in": "query",
+                        "required": false,
+                        "description": "The barcode or SKU. Spaces are ignored and Arabic-Indic digits read as Western ones.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The match",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "item": {
+                                                    "$ref": "#/components/schemas/InventoryItem"
+                                                },
+                                                "variant_id": {
+                                                    "type": "integer"
+                                                },
+                                                "unit": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "item",
+                                                "variant_id",
+                                                "unit"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/items/{id}": {
+            "get": {
+                "operationId": "get_api_v1_inventory_items_id",
+                "summary": "Get one item, its variants, units and stock",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The item",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryItem"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "patch_api_v1_inventory_items_id",
+                "summary": "Change an item; fields left out keep their value",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "`variants`, when sent, is the whole list: entries with an `id` change that variant, entries without one are added, and variants left out are archived. The unit can't change once the item has stock history.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryItemRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The item",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryItem"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate SKU or barcode, or a rule",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/items/{id}/archive": {
+            "post": {
+                "operationId": "post_api_v1_inventory_items_id_archive",
+                "summary": "Archive an item",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Archived items leave the lists and can't be moved; their history stays and they can be restored.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The item",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryItem"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/items/{id}/restore": {
+            "post": {
+                "operationId": "post_api_v1_inventory_items_id_restore",
+                "summary": "Bring an archived item back",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The item",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryItem"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate SKU or barcode, or a rule",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/locations": {
+            "get": {
+                "operationId": "get_api_v1_inventory_locations",
+                "summary": "List places stock is kept",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "virtual",
+                        "in": "query",
+                        "required": false,
+                        "description": "`true` to include virtual places (supplier, customer, loss, found, production, consumed, opening, transit).",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "inactive",
+                        "in": "query",
+                        "required": false,
+                        "description": "`true` to include places no longer in use.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Places",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventoryLocation"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_inventory_locations",
+                "summary": "Add a place (a warehouse, shop or van, or an area inside one)",
+                "tags": [
+                    "inventory"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryLocationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The place",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryLocation"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate SKU or barcode, or a rule",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/locations/{id}": {
+            "get": {
+                "operationId": "get_api_v1_inventory_locations_id",
+                "summary": "Get one place",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The place",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryLocation"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "patch_api_v1_inventory_locations_id",
+                "summary": "Change a place; `is_active: false` stops using it",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryLocationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The place",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryLocation"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate SKU or barcode, or a rule",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/stock": {
+            "get": {
+                "operationId": "get_api_v1_inventory_stock",
+                "summary": "Stock now, per variant and place, in each item's base unit",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "item_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this item.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "variant_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this variant.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "location_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this place.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "nonzero",
+                        "in": "query",
+                        "required": false,
+                        "description": "`true` to leave out levels at zero.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Levels",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventoryLevel"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/stock/adjustments": {
+            "post": {
+                "operationId": "post_api_v1_inventory_stock_adjustments",
+                "summary": "Set opening stock, or adjust stock with a reason",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "`kind: opening` adds stock to a place. `kind: adjustment` changes it by a signed amount with a `reason_code`: going out expired, damaged, spoiled, used_in_house, sample, theft, count_correction or other; coming in found, count_correction, returned or other. With an `idempotency_key`, sending the same key again changes nothing and answers the first result (200).",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryAdjustmentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The same key was sent before; nothing changed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryBatch"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "The stock change",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryBatch"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate SKU or barcode, or a rule",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/stock/batches/{key}/undo": {
+            "post": {
+                "operationId": "post_api_v1_inventory_stock_batches_key_undo",
+                "summary": "Undo a stock change",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Posts the same moves the other way, linked to the originals. A change can be undone once.",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "The undo",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryBatch"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Already undone",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/stock/moves": {
+            "get": {
+                "operationId": "get_api_v1_inventory_stock_moves",
+                "summary": "Stock history: every move, newest first",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Moves are never changed; an undo is another move the other way, with `reverses_move_id`. Page back with `before_id`.",
+                "parameters": [
+                    {
+                        "name": "item_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this item.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "variant_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this variant.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "location_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Moves into or out of this place.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "source_type",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only moves from this source, such as `adjustment` or a plugin's `pos.sale`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "batch_key",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only the moves posted together under this key.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "before_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Moves older than this one.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "At most 200. Default 50.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Moves",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventoryMove"
+                                            }
+                                        },
+                                        "next_before_id": {
+                                            "type": "integer",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/units": {
+            "get": {
+                "operationId": "get_api_v1_inventory_units",
+                "summary": "List units of measure",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Every workspace starts with piece (pc), kg, g, l, ml, m, box, pack and bag. Quantities are decimals with the unit's own decimals.",
+                "responses": {
+                    "200": {
+                        "description": "Units",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventoryUnit"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_inventory_units",
+                "summary": "Add a unit of measure",
+                "tags": [
+                    "inventory"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryUnitRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The unit",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryUnit"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate SKU or barcode, or a rule",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/invitations": {
             "get": {
                 "operationId": "get_api_v1_invitations",
@@ -96332,6 +98555,979 @@
                 "required": [
                     "configured",
                     "version"
+                ]
+            },
+            "InventoryAdjustmentRequest": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "opening",
+                            "adjustment"
+                        ],
+                        "description": "`opening` to set starting stock; `adjustment` (the default) to change stock with a reason."
+                    },
+                    "lines": {
+                        "description": "One line per item and place: `{variant_id, location_id, change, unit}`.",
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 500,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "variant_id": {
+                                    "type": "integer"
+                                },
+                                "location_id": {
+                                    "type": "integer"
+                                },
+                                "change": {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+(\\.\\d+)?$",
+                                    "description": "Opening: a positive amount. Adjustment: signed, -2 takes two out."
+                                },
+                                "unit": {
+                                    "type": "string",
+                                    "description": "A unit code; the item's base unit when left out."
+                                },
+                                "note": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "variant_id",
+                                "location_id",
+                                "change"
+                            ]
+                        }
+                    },
+                    "reason_code": {
+                        "type": "string",
+                        "description": "Why stock changed. Out: expired, damaged, spoiled, used_in_house, sample, theft, count_correction, other. In: found, count_correction, returned, other."
+                    },
+                    "note": {
+                        "type": "string",
+                        "description": "A note kept with the change."
+                    },
+                    "occurred_at": {
+                        "type": "string",
+                        "description": "When it happened, if earlier than now (ISO 8601)."
+                    },
+                    "idempotency_key": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "description": "Any unique text; sending the same key again changes nothing and answers the first result."
+                    }
+                },
+                "required": [
+                    "lines"
+                ]
+            },
+            "InventoryBatch": {
+                "type": "object",
+                "properties": {
+                    "batch_key": {
+                        "type": "string"
+                    },
+                    "moves": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/InventoryMove"
+                        }
+                    },
+                    "repeated": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "batch_key",
+                    "moves",
+                    "repeated"
+                ]
+            },
+            "InventoryCategory": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "parent_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "names": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "The name in each language, such as `{\"en\": \"Flour\", \"ar\": \"\u0637\u062d\u064a\u0646\"}`."
+                    },
+                    "item_count": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "id",
+                    "parent_id",
+                    "name",
+                    "names",
+                    "item_count"
+                ]
+            },
+            "InventoryCategoryRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "en": {
+                                        "type": "string"
+                                    },
+                                    "ar": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        ],
+                        "description": "Text, or `{en, ar}`."
+                    },
+                    "parent_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The category it sits under, or null for a top-level one."
+                    }
+                },
+                "required": [
+                    "name"
+                ]
+            },
+            "InventoryItem": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "As first written; `names` has every language."
+                    },
+                    "names": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "The name in each language, such as `{\"en\": \"Flour\", \"ar\": \"\u0637\u062d\u064a\u0646\"}`."
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "stocked",
+                            "consumable",
+                            "service",
+                            "made"
+                        ]
+                    },
+                    "category_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "base_unit": {
+                        "$ref": "#/components/schemas/InventoryUnit"
+                    },
+                    "tracking": {
+                        "type": "string",
+                        "enum": [
+                            "none",
+                            "lot",
+                            "serial"
+                        ]
+                    },
+                    "expires": {
+                        "type": "boolean"
+                    },
+                    "shelf_life_days": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "sale_price_minor": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "In the currency's minor units."
+                    },
+                    "purchase_price_minor": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "currency": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "tax_category": {
+                        "type": "string"
+                    },
+                    "owner_plugin": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "variants": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/InventoryVariant"
+                        }
+                    },
+                    "units": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "unit": {
+                                    "type": "string"
+                                },
+                                "per": {
+                                    "type": "string",
+                                    "description": "How many of the base unit one of it is, such as \"25\"."
+                                },
+                                "purpose": {
+                                    "type": "string",
+                                    "enum": [
+                                        "purchase",
+                                        "sale",
+                                        "both"
+                                    ]
+                                },
+                                "is_default": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "unit",
+                                "per",
+                                "purpose",
+                                "is_default"
+                            ]
+                        }
+                    },
+                    "on_hand": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "description": "Stock of every live variant at every real place, in the base unit."
+                    },
+                    "fields": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The workspace's own fields, by key."
+                    },
+                    "archived": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "names",
+                    "description",
+                    "kind",
+                    "category_id",
+                    "base_unit",
+                    "tracking",
+                    "expires",
+                    "variants",
+                    "units",
+                    "on_hand",
+                    "archived",
+                    "created_at",
+                    "updated_at"
+                ]
+            },
+            "InventoryItemRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "en": {
+                                        "type": "string"
+                                    },
+                                    "ar": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        ],
+                        "description": "Text, or `{en, ar}`."
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "stocked",
+                            "consumable",
+                            "service",
+                            "made"
+                        ],
+                        "description": "`stocked` (kept and sold, the default), `consumable` (used up, such as cleaning supplies), `service` (no stock) or `made` (made from other items)."
+                    },
+                    "unit": {
+                        "type": "string",
+                        "description": "The unit code stock is counted in, such as `kg`. Only when adding, or before any stock moved."
+                    },
+                    "sku": {
+                        "type": "string",
+                        "description": "For an item without variants. Made up when left out."
+                    },
+                    "barcodes": {
+                        "type": "array",
+                        "items": {
+                            "oneOf": [
+                                {
+                                    "type": "string"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "code": {
+                                            "type": "string"
+                                        },
+                                        "unit": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "code"
+                                    ]
+                                }
+                            ]
+                        },
+                        "description": "For an item without variants: barcodes, each a code or `{code, unit}` when it stands for a box or pack."
+                    },
+                    "variants": {
+                        "type": "array",
+                        "maxItems": 100,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "sku": {
+                                    "type": "string"
+                                },
+                                "options": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                },
+                                "barcodes": {
+                                    "type": "array",
+                                    "items": {
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "code": {
+                                                        "type": "string"
+                                                    },
+                                                    "unit": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "code"
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                },
+                                "sale_price_minor": {
+                                    "type": "integer",
+                                    "nullable": true
+                                },
+                                "purchase_price_minor": {
+                                    "type": "integer",
+                                    "nullable": true
+                                }
+                            }
+                        },
+                        "description": "Sizes or colours, each `{options, sku, barcodes, sale_price_minor}`; each one counts as an item. On a change, the whole list: with `id` changes that variant, without adds one, left out archives it."
+                    },
+                    "units": {
+                        "type": "array",
+                        "maxItems": 10,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "unit": {
+                                    "type": "string"
+                                },
+                                "per": {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+(\\.\\d+)?$",
+                                    "description": "How many of the base unit one is."
+                                },
+                                "purpose": {
+                                    "type": "string",
+                                    "enum": [
+                                        "purchase",
+                                        "sale",
+                                        "both"
+                                    ]
+                                },
+                                "is_default": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "required": [
+                                "unit",
+                                "per"
+                            ]
+                        },
+                        "description": "Other units it is bought or sold in, each `{unit, per, purpose}`, such as a 25 kg bag: `{\"unit\": \"bag\", \"per\": \"25\"}`."
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "A longer note about the item."
+                    },
+                    "category_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The category it belongs to, or null for none."
+                    },
+                    "expires": {
+                        "type": "boolean",
+                        "description": "True when the item goes off and its stock has expiry dates."
+                    },
+                    "shelf_life_days": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Days it keeps once made or received, for working out expiry dates."
+                    },
+                    "sale_price_minor": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Selling price in the currency's minor units (cents, or fils with three decimals)."
+                    },
+                    "purchase_price_minor": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Usual buying price in the currency's minor units."
+                    },
+                    "currency": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The workspace's currency when left out and a price is set."
+                    },
+                    "tax_category": {
+                        "type": "string",
+                        "description": "The tax category it is sold under, as the workspace names it; empty for none."
+                    },
+                    "fields": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The workspace's own fields for items, by key."
+                    }
+                }
+            },
+            "InventoryLevel": {
+                "type": "object",
+                "properties": {
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "variant_id": {
+                        "type": "integer"
+                    },
+                    "sku": {
+                        "type": "string"
+                    },
+                    "location_id": {
+                        "type": "integer"
+                    },
+                    "lot_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "on_hand": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "description": "Below zero where the workspace allows it."
+                    },
+                    "reserved": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "description": "Promised to orders."
+                    },
+                    "available": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "description": "On hand minus reserved."
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "decimals": {
+                        "type": "integer"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "item_id",
+                    "variant_id",
+                    "sku",
+                    "location_id",
+                    "lot_id",
+                    "on_hand",
+                    "reserved",
+                    "available",
+                    "unit",
+                    "decimals",
+                    "updated_at"
+                ]
+            },
+            "InventoryLocation": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "parent_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "warehouse",
+                            "area",
+                            "virtual"
+                        ]
+                    },
+                    "virtual_role": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "names": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "The name in each language, such as `{\"en\": \"Flour\", \"ar\": \"\u0637\u062d\u064a\u0646\"}`."
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "ou_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The organisational unit (branch) it belongs to."
+                    },
+                    "address": {
+                        "type": "string"
+                    },
+                    "is_active": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "parent_id",
+                    "kind",
+                    "virtual_role",
+                    "name",
+                    "names",
+                    "code",
+                    "ou_id",
+                    "address",
+                    "is_active",
+                    "created_at",
+                    "updated_at"
+                ]
+            },
+            "InventoryLocationRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "en": {
+                                        "type": "string"
+                                    },
+                                    "ar": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        ],
+                        "description": "Text, or `{en, ar}`."
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "warehouse",
+                            "area"
+                        ],
+                        "description": "`warehouse` for a building, shop or van; `area` for a shelf or room inside one."
+                    },
+                    "parent_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "For an area, the place it is inside."
+                    },
+                    "code": {
+                        "type": "string",
+                        "description": "A short code for the place, such as `WH1`."
+                    },
+                    "ou_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The organisational unit (branch) it belongs to, which limits who sees its stock."
+                    },
+                    "address": {
+                        "type": "string",
+                        "description": "Where it is."
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "description": "False to stop using the place; its history stays."
+                    }
+                }
+            },
+            "InventoryMove": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "variant_id": {
+                        "type": "integer"
+                    },
+                    "sku": {
+                        "type": "string"
+                    },
+                    "lot_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "from_location_id": {
+                        "type": "integer"
+                    },
+                    "to_location_id": {
+                        "type": "integer"
+                    },
+                    "quantity": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "description": "In the item's base unit, always positive."
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "decimals": {
+                        "type": "integer"
+                    },
+                    "entered_quantity": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "entered_unit": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "unit_cost_minor": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "currency": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "source_type": {
+                        "type": "string"
+                    },
+                    "source_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "reason_code": {
+                        "type": "string"
+                    },
+                    "note": {
+                        "type": "string"
+                    },
+                    "batch_key": {
+                        "type": "string"
+                    },
+                    "reverses_move_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "posted_by_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "posted_by_name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "agent_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "on_behalf_of_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "occurred_at": {
+                        "type": "string"
+                    },
+                    "posted_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "item_id",
+                    "variant_id",
+                    "sku",
+                    "from_location_id",
+                    "to_location_id",
+                    "quantity",
+                    "unit",
+                    "source_type",
+                    "batch_key",
+                    "occurred_at",
+                    "posted_at"
+                ]
+            },
+            "InventoryUnit": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "names": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "The name in each language, such as `{\"en\": \"Flour\", \"ar\": \"\u0637\u062d\u064a\u0646\"}`."
+                    },
+                    "dimension": {
+                        "type": "string",
+                        "enum": [
+                            "count",
+                            "mass",
+                            "volume",
+                            "length",
+                            "area",
+                            "time",
+                            "package"
+                        ]
+                    },
+                    "decimals": {
+                        "type": "integer"
+                    },
+                    "to_base_num": {
+                        "type": "integer"
+                    },
+                    "to_base_den": {
+                        "type": "integer"
+                    },
+                    "seeded": {
+                        "type": "boolean"
+                    },
+                    "archived": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "id",
+                    "code",
+                    "name",
+                    "names",
+                    "dimension",
+                    "decimals",
+                    "to_base_num",
+                    "to_base_den",
+                    "seeded",
+                    "archived"
+                ]
+            },
+            "InventoryUnitRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]{0,19}$",
+                        "description": "A short lower-case code for the unit, such as `tray` or `sack`; unique in the workspace."
+                    },
+                    "name": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "en": {
+                                        "type": "string"
+                                    },
+                                    "ar": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        ],
+                        "description": "Text, or `{en, ar}`."
+                    },
+                    "dimension": {
+                        "type": "string",
+                        "enum": [
+                            "count",
+                            "mass",
+                            "volume",
+                            "length",
+                            "area",
+                            "time",
+                            "package"
+                        ],
+                        "description": "What it measures: `count` for pieces, `mass`, `volume`, `length`, `area`, `time`, or `package` for a box or pack."
+                    },
+                    "decimals": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 6,
+                        "description": "Decimal places a quantity in it may have: 0 for pieces, 3 for kg."
+                    },
+                    "to_base": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "description": "How many of the dimension's base unit (kg, l, m) one of it is, such as \"0.001\" for g."
+                    }
+                },
+                "required": [
+                    "code"
+                ]
+            },
+            "InventoryVariant": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "sku": {
+                        "type": "string"
+                    },
+                    "options": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Such as `{\"size\": \"M\", \"colour\": \"red\"}`; empty for an item without variants."
+                    },
+                    "barcodes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "code": {
+                                    "type": "string"
+                                },
+                                "unit": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "symbology": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "code",
+                                "unit",
+                                "symbology"
+                            ]
+                        }
+                    },
+                    "sale_price_minor": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "purchase_price_minor": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "on_hand": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "description": "Stock at every real place, in the item's base unit."
+                    },
+                    "archived": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "id",
+                    "item_id",
+                    "sku",
+                    "options",
+                    "barcodes",
+                    "sale_price_minor",
+                    "purchase_price_minor",
+                    "on_hand",
+                    "archived"
                 ]
             },
             "InvitationAcceptRequest": {

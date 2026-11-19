@@ -648,6 +648,42 @@
     "en": "List the sign-in providers of your workspace",
     "ar": "عرض مزودي تسجيل الدخول"
   },
+  "get_api_inventory_categories": {
+    "en": "List item categories",
+    "ar": "عرض فئات الأصناف"
+  },
+  "get_api_inventory_items": {
+    "en": "List items",
+    "ar": "عرض الأصناف"
+  },
+  "get_api_inventory_items_id": {
+    "en": "Get an item",
+    "ar": "عرض صنف"
+  },
+  "get_api_inventory_items_lookup": {
+    "en": "Find an item by barcode or SKU",
+    "ar": "البحث عن صنف بالباركود أو الرمز"
+  },
+  "get_api_inventory_locations": {
+    "en": "List places stock is kept",
+    "ar": "عرض مواقع المخزون"
+  },
+  "get_api_inventory_locations_id": {
+    "en": "Get a place",
+    "ar": "عرض موقع"
+  },
+  "get_api_inventory_stock": {
+    "en": "See stock in each place",
+    "ar": "عرض المخزون في كل موقع"
+  },
+  "get_api_inventory_stock_moves": {
+    "en": "See stock history",
+    "ar": "عرض حركات المخزون"
+  },
+  "get_api_inventory_units": {
+    "en": "List units of measure",
+    "ar": "عرض وحدات القياس"
+  },
   "get_api_invitations": {
     "en": "List your workspace's invitations",
     "ar": "عرض الدعوات"
@@ -1132,6 +1168,14 @@
     "en": "Change a sign-in provider",
     "ar": "تعديل مزود تسجيل دخول"
   },
+  "patch_api_inventory_items_id": {
+    "en": "Change an item",
+    "ar": "تعديل صنف"
+  },
+  "patch_api_inventory_locations_id": {
+    "en": "Change a place",
+    "ar": "تعديل موقع"
+  },
   "patch_api_languages_id": {
     "en": "Change a language's name or switch it on or off",
     "ar": "تعديل اسم لغة أو تشغيلها وإيقافها"
@@ -1581,6 +1625,38 @@
   "post_api_instance_complete_setup": {
     "en": "Finish the first-time setup",
     "ar": "إنهاء الإعداد الأولي"
+  },
+  "post_api_inventory_categories": {
+    "en": "Add an item category",
+    "ar": "إضافة فئة أصناف"
+  },
+  "post_api_inventory_items": {
+    "en": "Add an item",
+    "ar": "إضافة صنف"
+  },
+  "post_api_inventory_items_id_archive": {
+    "en": "Archive an item",
+    "ar": "أرشفة صنف"
+  },
+  "post_api_inventory_items_id_restore": {
+    "en": "Restore an archived item",
+    "ar": "استعادة صنف مؤرشف"
+  },
+  "post_api_inventory_locations": {
+    "en": "Add a place",
+    "ar": "إضافة موقع"
+  },
+  "post_api_inventory_stock_adjustments": {
+    "en": "Set opening stock or adjust stock",
+    "ar": "إدخال رصيد افتتاحي أو تسوية المخزون"
+  },
+  "post_api_inventory_stock_batches_key_undo": {
+    "en": "Undo a stock change",
+    "ar": "التراجع عن تغيير في المخزون"
+  },
+  "post_api_inventory_units": {
+    "en": "Add a unit of measure",
+    "ar": "إضافة وحدة قياس"
   },
   "post_api_invitations": {
     "en": "Invite someone to your workspace by email",

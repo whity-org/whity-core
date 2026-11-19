@@ -81,6 +81,8 @@ export function PlanLimitBanner() {
       case 'documents.render.per_day':
       case 'documents.render.per_month':
         return t('billing.banner.documents', 'documents');
+      case 'inventory.items.max':
+        return t('billing.banner.items', 'items');
       default:
         return t('billing.banner.ownWebAddress', 'own web address');
     }

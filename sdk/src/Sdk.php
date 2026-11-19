@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.125).
+ * SDK identity (v1.126).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1445,12 +1445,23 @@ namespace Whity\Sdk;
  * working through 2.0.x (WHIT-1225, decisions TH.1-TH.14).
  *
  * Purely additive: one new method on PluginScope, which only the host implements.)
+ *
+ * 1.126 (INVENTORY: host services {@see Inventory\Items}, {@see Inventory\Locations},
+ * {@see Inventory\Stock} and {@see Inventory\Units} read and change core's items, places and stock
+ * without HTTP, and {@see Context\InventoryScope} puts them on the plugin context as `$ctx->inventory()`.
+ * Stock is an append-only ledger of moves from one place to another; a plugin writes it only through
+ * the context, whose `stock()` is bound to the loaded plugin, so its moves are stored under its own name, act as a person holding `stock:adjust`, can be made idempotent, and
+ * are undone by reversing moves. {@see Inventory\Quantity} keeps quantities exact (whole steps of a
+ * unit, never floats). New events `stock.moving` (a filter that can veto), `stock.moved` and
+ * `inventory.item.created|updated|archived` (WHIT-1232, design section 31).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.125.0';
+    public const VERSION = '1.126.0';
 
     /**
      * Static identity only — never instantiated.

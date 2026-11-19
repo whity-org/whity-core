@@ -143,6 +143,16 @@ final class EntitlementRegistry
      */
     public const MESSAGES_OUTBOUND_PER_MONTH = 'messages.outbound.per_month';
 
+    // -- Inventory (WHIT-1232, register IV.24) -------------------------------
+    /**
+     * Items a workspace may keep in inventory, each variant counted on its
+     * own; archived ones don't count. Free keeps 100 ("Free up to 100 items",
+     * 19 November 2026). Only warns, by the owner's decision of the same day
+     * ("Warn, never block"): items are always added, and Billing and the plan
+     * banner show the count past the limit (SC.14).
+     */
+    public const INVENTORY_ITEMS_MAX = 'inventory.items.max';
+
     /**
      * Limits that only ever warn: passing one is recorded and shown, never
      * refused, whatever an enforcement setting says. The business model's
@@ -158,6 +168,7 @@ final class EntitlementRegistry
         self::BRAND_OWN_APP,
         self::AGENTS_RUNS_PER_MONTH,
         self::MESSAGES_OUTBOUND_PER_MONTH,
+        self::INVENTORY_ITEMS_MAX,
     ];
 
     /**
@@ -213,6 +224,7 @@ final class EntitlementRegistry
         self::BRAND_OWN_APP          => 'true',
         self::AGENTS_RUNS_PER_MONTH  => '-1',
         self::MESSAGES_OUTBOUND_PER_MONTH => '-1',
+        self::INVENTORY_ITEMS_MAX    => '-1',
     ];
 
     /**
@@ -239,6 +251,7 @@ final class EntitlementRegistry
         self::BRAND_OWN_APP          => 'bool',
         self::AGENTS_RUNS_PER_MONTH  => 'int',
         self::MESSAGES_OUTBOUND_PER_MONTH => 'int',
+        self::INVENTORY_ITEMS_MAX    => 'int',
     ];
 
     /**
@@ -264,6 +277,7 @@ final class EntitlementRegistry
         self::BRAND_OWN_APP          => 'Allow this workspace to publish its own app in the app stores.',
         self::AGENTS_RUNS_PER_MONTH  => 'Agent tool calls included each calendar month. Work past it is counted as usage and goes ahead (-1 for unlimited).',
         self::MESSAGES_OUTBOUND_PER_MONTH => 'Messages this workspace sends to customers each calendar month, on every channel. Sending past it is counted as usage and goes ahead (-1 for unlimited).',
+        self::INVENTORY_ITEMS_MAX    => 'Items this workspace may keep in inventory, each variant counted on its own (-1 for unlimited). Passing it warns and never refuses an item.',
     ];
 
     /**

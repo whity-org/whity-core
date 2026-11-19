@@ -57,6 +57,8 @@ export function PlanLimits() {
         return t('billing.limits.documentsToday', 'Documents made today');
       case 'documents.render.per_month':
         return t('billing.limits.documentsMonth', 'Documents made this month');
+      case 'inventory.items.max':
+        return t('billing.limits.items', 'Items in inventory');
       default:
         return t('billing.limits.ownWebAddress', 'Your own web address');
     }
@@ -68,6 +70,9 @@ export function PlanLimits() {
     }
     if (row.key === 'members.max') {
       return t('billing.limits.staffHelp', 'People who work in the workspace. Agents don’t count.');
+    }
+    if (row.key === 'inventory.items.max') {
+      return t('billing.limits.itemsHelp', 'Each size or colour counts. Archived items don’t.');
     }
     if (row.key === 'documents.render.per_day') {
       return t('billing.limits.resetsTomorrow', 'Starts again tomorrow');

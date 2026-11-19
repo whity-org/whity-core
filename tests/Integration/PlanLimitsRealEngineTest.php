@@ -13,6 +13,10 @@ use Whity\Core\Entitlement\EntitlementRegistry;
 use Whity\Core\Entitlement\EntitlementService;
 use Whity\Core\Entitlement\MeterService;
 use Whity\Core\Entitlement\TenantEntitlementRepository;
+use Whity\Core\Inventory\InventoryDb;
+use Whity\Core\Inventory\InventoryWorkspace;
+use Whity\Core\Inventory\ItemService;
+use Whity\Core\Inventory\UnitCatalog;
 use Whity\Core\Plan\PlanRepository;
 use Whity\Core\Plan\PlanService;
 use Whity\Core\Plan\PlanValidationException;
@@ -299,6 +303,27 @@ final class PlanLimitsRealEngineTest extends TestCase
 
         $row = $this->mustRow(EntitlementRegistry::MEMBERS_MAX);
         self::assertSame(['used' => 2, 'limit' => 1, 'over' => true], ['used' => $row['used'], 'limit' => $row['limit'], 'over' => $row['over']]);
+    }
+
+    public function testItemsPastTheLimitAreAddedAndShowAsAWarning(): void
+    {
+        $inventory = new InventoryDb($this->pdo);
+        $workspace = new InventoryWorkspace($inventory);
+        $items = new ItemService($inventory, $workspace, new UnitCatalog($inventory, $workspace), static fn (int $t): string => 'USD');
+
+        self::assertNull($this->row(EntitlementRegistry::INVENTORY_ITEMS_MAX), 'unlimited by default, so not shown');
+
+        $tier = $this->tier('free', [EntitlementRegistry::INVENTORY_ITEMS_MAX => '2']);
+        $this->plans->applyToTenant($tier, self::TENANT);
+        $items->create(self::TENANT, ['name' => 'T-shirt', 'variants' => [['options' => ['size' => 'S']], ['options' => ['size' => 'M']]]], null);
+        $row = $this->mustRow(EntitlementRegistry::INVENTORY_ITEMS_MAX);
+        self::assertSame(['used' => 2, 'limit' => 2, 'over' => false], ['used' => $row['used'], 'limit' => $row['limit'], 'over' => $row['over']]);
+
+        $cap = $items->create(self::TENANT, ['name' => 'Cap'], null);
+        self::assertSame('Cap', $cap['name']);
+        $row = $this->mustRow(EntitlementRegistry::INVENTORY_ITEMS_MAX);
+        self::assertSame(['used' => 3, 'limit' => 2, 'over' => true], ['used' => $row['used'], 'limit' => $row['limit'], 'over' => $row['over']]);
+        self::assertContains(EntitlementRegistry::INVENTORY_ITEMS_MAX, EntitlementRegistry::WARN_ONLY);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

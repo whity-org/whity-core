@@ -73,6 +73,31 @@ These are the factories `PluginContext` uses. They keep working through SDK 2.0.
 | `Billing\PlanCatalogue`, `Billing\WorkspaceAddons`, `Billing\AccessRefresh`, `Licensing\StoreLicence` | Plans and prices, add-on grants, refresh a subject's access, a store licence's state. | deployment / argument | 1.84–1.107 |
 | `Http\Outbound\HttpClient` | Call another server. Pass `StreamHttpClient` (with `AddressPolicy::publicOnly()` for URLs people type) and `Testing\RecordedHttpClient` in tests. | — | 1.114, 1.122 |
 
+### Inventory (1.126)
+
+Core's items, places and stock (WHIT-1232, design section 31). Through the context, in the workspace the call runs in:
+
+```php
+$inventory = $ctx->inventory();                                  // Context\InventoryScope
+$match = $inventory->items()->findByBarcode($scanned);           // item, variant_id, unit
+$customer = $inventory->locations()->virtual('customer');
+$inventory->stock()->move(new MoveRequest(
+    actingProfileId: $cashierId,                                 // must hold stock:adjust
+    lines: [new MoveLine($match['variant_id'], '2', $shopId, $customer->id, unit: $match['unit'])],
+    sourceType: 'sale',                                          // stored as "<your plugin>.sale"
+    idempotencyKey: 'receipt-' . $receiptId,
+));
+```
+
+| Service | What for | Workspace | Since |
+|---|---|---|---|
+| `Inventory\Items` | List, get, find by SKU or barcode, create, update and archive items with variants, units and barcodes, as the acting person (`inventory:write`, the plan's item limit). | current | 1.126 |
+| `Inventory\Locations` | Real places and the virtual ones (supplier, customer, loss, found, production, consumed, opening, transit); create a place. | current | 1.126 |
+| `Inventory\Stock` | Levels, available and the append-only ledger. `move()` and `reverse()` post as your plugin, idempotent by key, only through `$ctx->inventory()->stock()`; the container copy reads and refuses writes (`use_plugin_context`). | current | 1.126 |
+| `Inventory\Units` | The workspace's units and exact conversions (`Inventory\Quantity`, never floats). | current | 1.126 |
+
+`Context\InventoryScope` (`$ctx->inventory()`) holds the four. Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
+
 ## Contribution points: what a plugin declares
 
 Implement the interface next to `PluginInterface`. Each one is optional, and the host skips plugins that don't implement it. A declaration the host refuses is dropped with a logged reason, and the plugin keeps loading unless the page says otherwise. `Manifest\ManifestPlugin` answers some of them from `plugin.json`.
@@ -129,6 +154,6 @@ A plugin hands the host an object that does the work. The host decides when to c
 
 Every exception the SDK defines implements `Whity\Sdk\SdkException` (1.123), so `catch (SdkException $e)` catches "the host or the SDK refused this":
 
-`ContactRejected`, `TimeOffRejected`, `DocumentNotIssuedException`, `RenderRejectedException`, `RenderUnavailableException`, `BillingPortalException`, `HookVetoException`, `MultipartException`, `InvalidManifestException`, `ExpressionError`, `HttpFailure`.
+`ContactRejected`, `TimeOffRejected`, `InventoryRejected`, `DocumentNotIssuedException`, `RenderRejectedException`, `RenderUnavailableException`, `BillingPortalException`, `HookVetoException`, `MultipartException`, `InvalidManifestException`, `ExpressionError`, `HttpFailure`.
 
 Each still extends `\RuntimeException`, so existing catches don't change. The SDK also throws plain SPL exceptions that don't implement it: `\InvalidArgumentException` for a bad key or value, and `\RuntimeException` or `\LogicException` when there is no workspace in scope. The [streamline proposal](Plugin-SDK-Streamline-Proposal.md) suggests making these consistent in 2.0.

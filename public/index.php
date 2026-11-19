@@ -5552,6 +5552,65 @@ $router->register('POST',   '/api/contacts/imports/{id:\d+}/run',          [$con
 $router->register('POST',   '/api/contacts/imports/{id:\d+}/undo',         [$contactsHandler, 'undoImport'],  null, null, CorePermissions::CONTACTS_IMPORT);
 $router->register('GET',    '/api/contacts/imports/{id:\d+}/skipped.csv',  [$contactsHandler, 'skippedCsv'],  null, null, CorePermissions::CONTACTS_IMPORT);
 
+// Inventory in core (WHIT-1232, design section 31, register IV.1-IV.24): items,
+// units, places and the append-only stock ledger, with the same services for
+// plugins (SDK 1.126). Items carry the workspace's own fields (record type
+// `inventory.item`); the plan's `inventory.items.max` counts live variants and
+// only warns, on Billing and the plan banner (IV.24).
+$inventoryDb = new \Whity\Core\Inventory\InventoryDb($db->getPdo());
+$inventoryWorkspace = new \Whity\Core\Inventory\InventoryWorkspace($inventoryDb);
+$inventoryUnits = new \Whity\Core\Inventory\UnitCatalog($inventoryDb, $inventoryWorkspace);
+$inventoryItems = new \Whity\Core\Inventory\ItemService(
+    $inventoryDb,
+    $inventoryWorkspace,
+    $inventoryUnits,
+    static function (int $tenantId) use ($settingsService): string {
+        $currency = $settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? null;
+        return is_string($currency) && preg_match('/^[A-Z]{3}$/', $currency) === 1 ? $currency : 'USD';
+    },
+    $customFieldService,
+    $hookManager,
+);
+$customFieldRecordTypes->register(new \Whity\Core\CustomFields\CustomFieldRecordType(
+    \Whity\Core\Inventory\ItemService::RECORD_TYPE,
+    'Items',
+    'الأصناف',
+    CorePermissions::INVENTORY_READ,
+    CorePermissions::INVENTORY_WRITE,
+    static fn (int $tenantId, int $id): bool => $inventoryItems->row($tenantId, $id) !== null,
+    \Whity\Core\Inventory\ItemService::RESERVED_KEYS,
+));
+$inventoryLocations = new \Whity\Core\Inventory\LocationService($inventoryDb, $inventoryWorkspace);
+$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager);
+$inventoryGuard = new \Whity\Core\Inventory\Host\HostInventoryGuard(
+    $inventoryDb,
+    static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+);
+\Whity\register_service(\Whity\Sdk\Inventory\Items::class, new \Whity\Core\Inventory\Host\HostItems($inventoryItems, $inventoryGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Inventory\Locations::class, new \Whity\Core\Inventory\Host\HostLocations($inventoryLocations, $inventoryGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Inventory\Stock::class, new \Whity\Core\Inventory\Host\HostStock($inventoryLedger, $inventoryGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Inventory\Units::class, new \Whity\Core\Inventory\Host\HostUnits($inventoryUnits, $inventoryItems, $inventoryGuard)); // @phpstan-ignore-line
+$inventoryHandler = new \Whity\Api\InventoryApiHandler($inventoryUnits, $inventoryItems, $inventoryLocations, $inventoryLedger, $roleChecker);
+$router->register('GET',    '/api/inventory/units',                              [$inventoryHandler, 'listUnits'],      null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/units',                              [$inventoryHandler, 'createUnit'],     null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/categories',                         [$inventoryHandler, 'listCategories'], null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/categories',                         [$inventoryHandler, 'createCategory'], null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/items',                              [$inventoryHandler, 'listItems'],      null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/items',                              [$inventoryHandler, 'createItem'],     null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/items/lookup',                       [$inventoryHandler, 'lookupItem'],     null, null, CorePermissions::INVENTORY_READ);
+$router->register('GET',    '/api/inventory/items/{id:\d+}',                     [$inventoryHandler, 'showItem'],       null, null, CorePermissions::INVENTORY_READ);
+$router->register('PATCH',  '/api/inventory/items/{id:\d+}',                     [$inventoryHandler, 'updateItem'],     null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/items/{id:\d+}/archive',             [$inventoryHandler, 'archiveItem'],    null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/items/{id:\d+}/restore',             [$inventoryHandler, 'restoreItem'],    null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/locations',                          [$inventoryHandler, 'listLocations'],  null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/locations',                          [$inventoryHandler, 'createLocation'], null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/locations/{id:\d+}',                 [$inventoryHandler, 'showLocation'],   null, null, CorePermissions::INVENTORY_READ);
+$router->register('PATCH',  '/api/inventory/locations/{id:\d+}',                 [$inventoryHandler, 'updateLocation'], null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/stock',                              [$inventoryHandler, 'levels'],         null, null, CorePermissions::INVENTORY_READ);
+$router->register('GET',    '/api/inventory/stock/moves',                        [$inventoryHandler, 'moves'],          null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/stock/adjustments',                  [$inventoryHandler, 'adjust'],         null, null, CorePermissions::STOCK_ADJUST);
+$router->register('POST',   '/api/inventory/stock/batches/{key:[a-f0-9]+}/undo', [$inventoryHandler, 'undo'],         null, null, CorePermissions::STOCK_ADJUST);
+
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,
     $meetingRepository,

@@ -2011,6 +2011,39 @@ holds `Away::COVER_PLUGINS` (the person chose "Approvals in plugins"), and
 still check the stand-in's own permissions: anything above what they may
 approve waits for the person. A plugin can read this, never set it.
 
+## Step 12j — Use core's items and stock (SDK 1.126)
+
+Inventory is core (WHIT-1232, design section 31). A till, an online shop, a salon or a clinic plugin uses core's items, places and stock instead of keeping its own, through `$ctx->inventory()` (SDK 1.126). On an older host it throws `Context\ServiceUnavailable`.
+
+```php
+use Whity\Sdk\Inventory\{MoveLine, MoveRequest};
+
+// The workspace is the one this call runs in (a route, an MCP tool, a job):
+// no method takes a workspace id, so a plugin never reaches another one.
+$ctx = \Whity\app(\Whity\Sdk\PluginContext::class)->for($this);
+$inventory = $ctx->inventory();
+
+$match = $inventory->items()->findByBarcode($scanned);         // item, variant_id, unit
+$customer = $inventory->locations()->virtual('customer');      // the other end of a sale
+
+$moves = $inventory->stock()->move(new MoveRequest(
+    actingProfileId: $cashierProfileId,                         // must hold stock:adjust
+    lines: [new MoveLine($match['variant_id'], '2', $shopId, $customer->id, unit: $match['unit'])],
+    sourceType: 'sale',                                          // stored as "<your plugin>.sale"
+    sourceId: $receiptId,
+    idempotencyKey: 'receipt-' . $receiptId,                     // a retry posts nothing twice
+));
+```
+
+What to know:
+
+- **Stock is a ledger.** Every change is a move from one place to another, and moves are never changed. A sale goes to the virtual `customer` place, waste to `loss`, a delivery comes from `supplier`. To undo, call `$inventory->stock()->reverse($moves[0]->batchKey, $profileId)`, which posts the same moves the other way.
+- **Your moves carry your name.** The context's `stock()` is bound to the plugin the loader loaded, and the host prefixes `sourceType` with its name. History filters by `source_type` (`pos.sale`). `\Whity\app(Stock::class)` only reads: writing through it is refused with reason `use_plugin_context`.
+- **Quantities are exact.** Send decimals as text (`'2.5'`) in a unit code (`kg`, `bag`) or the item's base unit; the host converts with whole-number fractions. `Quantity` gives you steps and decimals back, never floats.
+- **Writes act as a person.** `Items::create()` and `update()` need `inventory:write`; `Stock::move()` and `reverse()` need `stock:adjust`. The plan's item limit (`inventory.items.max`, each variant counted) counts your items too; it only warns, so a create is never refused for it.
+- **Refusals** throw `InventoryRejected` with a stable `reason` (`no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`); branch on it, not on the message.
+- **Listen or refuse.** `stock.moved` (and `stock.moved.async` after commit) tells you what posted. `stock.moving` runs before, inside the transaction; throw `HookVetoException` to refuse the whole post (the caller gets 409 with your reason). `inventory.item.created`, `updated` and `archived` follow the items.
+
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 
 Everything a plugin only *declares* can live in a JSON file instead of PHP methods: its identity and requirements, permissions, roles, `blocks` screens, owned tables, data types and limits. Put `plugin.json` next to an empty class:

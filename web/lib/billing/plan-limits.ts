@@ -25,6 +25,7 @@ export const KNOWN_LIMITS = [
   'messages.outbound.per_month',
   'documents.render.per_day',
   'documents.render.per_month',
+  'inventory.items.max',
   'brand.custom_domain',
 ] as const;
 

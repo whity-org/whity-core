@@ -343,6 +343,20 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `worker.request.start` | `WORKER_REQUEST_START` | observe |  |
 | `worker.request.end` | `WORKER_REQUEST_END` | observe |  |
 
+### Inventory
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `stock.moving` | `STOCK_MOVING` | veto | Before stock moves post, inside their transaction (SDK 1.126). Payload: `tenant_id`, `batch_key`, `source_type`, `source_id`, `reason_code`, `acting_profile_id`, `occurred_at`, `lines` (`variant_id`, `from_location_id`, `to_location_id`, `quantity` in base-unit steps). Throw `HookVetoException` to refuse the whole post. |
+| `stock.moved` | `STOCK_MOVED` | observe | Inside the transaction, after the moves and levels are written. Payload: `tenant_id`, `batch_key`, `source_type`, `source_id`, `acting_profile_id`, `move_ids`, `moves`. One event per post. |
+| `stock.moved.async` | `STOCK_MOVED_ASYNC` | queued |  |
+| `inventory.item.created` | `INVENTORY_ITEM_CREATED` | observe | Payload: `tenant_id`, `item_id`, `variant_ids`, `acting_profile_id`. |
+| `inventory.item.created.async` | `INVENTORY_ITEM_CREATED_ASYNC` | queued |  |
+| `inventory.item.updated` | `INVENTORY_ITEM_UPDATED` | observe | Payload: `tenant_id`, `item_id`, `changed` (field names), `acting_profile_id`. |
+| `inventory.item.updated.async` | `INVENTORY_ITEM_UPDATED_ASYNC` | queued |  |
+| `inventory.item.archived` | `INVENTORY_ITEM_ARCHIVED` | observe | Payload: `tenant_id`, `item_id`, `acting_profile_id`. |
+| `inventory.item.archived.async` | `INVENTORY_ITEM_ARCHIVED_ASYNC` | queued |  |
+
 ### Deletion is transactional (WC-713)
 
 For `tenant.*`, `ou.*` and `role.*`, `TenantsApiHandler::delete()`, `OusApiHandler::delete()` and `RolesApiHandler::delete()` run
