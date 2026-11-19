@@ -987,6 +987,13 @@ class AuthHandler
             ] + $extraTokenBody, 200);
         }
 
+        // The refresh token names its session family (#2264): a new family on a
+        // new sign-in, the caller's own on a re-mint.
+        if ($recordNewSession) {
+            $claims['fam'] = $this->sessionFamilyFor(null);
+        } elseif ($rotateSessionFromJti !== null) {
+            $claims['fam'] = $this->sessionFamilyFor($rotateSessionFromJti);
+        }
         $refreshTokenStr = $this->jwtParser->create($claims, 604800, 'refresh');
 
         // Session registry (WC-f): record a new interactive session on login /
@@ -1771,13 +1778,17 @@ class AuthHandler
             'token_epoch'      => $currentEpoch,
         ];
 
+        $currentJti = isset($claims['jti']) && is_string($claims['jti']) ? $claims['jti'] : null;
         $accessToken  = $this->jwtParser->create($newClaims, 900, 'access');
-        $refreshToken = $this->jwtParser->create($newClaims, 604800, 'refresh');
+        $refreshToken = $this->jwtParser->create(
+            $newClaims + ['fam' => $this->sessionFamilyFor($currentJti)],
+            604800,
+            'refresh'
+        );
 
         // Rotate the caller's session row to the re-minted jtis (matched by the
         // access jti this request carried) so it stays live/listable after an
         // email or password change. Best-effort.
-        $currentJti = isset($claims['jti']) && is_string($claims['jti']) ? $claims['jti'] : null;
         if ($currentJti !== null) {
             $this->recordSession($accessToken, $refreshToken, $profileId, $activeTenantId, $request, false, $currentJti);
         }
@@ -1922,15 +1933,16 @@ class AuthHandler
         Request $request,
         bool $recordNew,
         ?string $rotateFromJti
-    ): void {
+    ): bool {
         try {
             $ac = $this->jwtParser->parse($accessToken);
             $rf = $this->jwtParser->parse($refreshToken);
             $accessJti  = is_array($ac) && isset($ac['jti']) ? (string) $ac['jti'] : '';
             $refreshJti = is_array($rf) && isset($rf['jti']) ? (string) $rf['jti'] : '';
             if ($accessJti === '' || $refreshJti === '') {
-                return;
+                return false;
             }
+            $family = isset($rf['fam']) && is_string($rf['fam']) ? $rf['fam'] : null;
             $expiresAt = isset($rf['exp'])
                 ? date('Y-m-d H:i:s', (int) $rf['exp'])
                 : date('Y-m-d H:i:s', time() + 604800);
@@ -1944,7 +1956,8 @@ class AuthHandler
                     $refreshJti,
                     $expiresAt,
                     $request->getHeader('User-Agent'),
-                    $this->clientIp($request)
+                    $this->clientIp($request),
+                    $family
                 );
                 // A browser this account hasn't used before gets the new
                 // sign-in email. Never lets a mail problem touch the sign-in.
@@ -1957,12 +1970,39 @@ class AuthHandler
                     );
                 } catch (\Throwable) {
                 }
-            } elseif ($rotateFromJti !== null) {
-                $sessions->rotate($rotateFromJti, $accessJti, $refreshJti, $expiresAt, $activeTenantId);
+
+                return true;
             }
+            if ($rotateFromJti !== null) {
+                return $sessions->rotate($rotateFromJti, $accessJti, $refreshJti, $expiresAt, $activeTenantId, $family);
+            }
+
+            return false;
         } catch (\Throwable $e) {
             error_log('[sessions] record/rotate failed: ' . $e->getMessage());
+
+            return false;
         }
+    }
+
+    /**
+     * The session family a refresh token names (#2264): the live session's own
+     * when $currentJti matches one that has a family, otherwise a new one.
+     */
+    private function sessionFamilyFor(?string $currentJti): string
+    {
+        if ($currentJti !== null && $currentJti !== '') {
+            try {
+                $family = $this->sessions()->familyOf($currentJti);
+                if ($family !== null) {
+                    return $family;
+                }
+            } catch (\Throwable $e) {
+                error_log('[sessions] family lookup failed: ' . $e->getMessage());
+            }
+        }
+
+        return bin2hex(random_bytes(16));
     }
 
     /**
@@ -2237,8 +2277,22 @@ class AuthHandler
                     $activeTenantId = $parsedToken['active_tenant_id'];
                     if (is_string($jti) && is_int($profileId) && is_int($activeTenantId)) {
                         if ($this->isJtiRevoked($jti)) {
-                            // This token has been reused → log security event
-                            $this->audit('auth.refresh_token_reuse_detected', $request, $activeTenantId, $profileId);
+                            // A refresh token that was already used came back
+                            // (#2264). Within 30 s of its rotation it is two tabs
+                            // racing; any other reuse ends the whole session, the
+                            // thief's copy and the person's alike.
+                            $family = isset($parsedToken['fam']) && is_string($parsedToken['fam']) ? $parsedToken['fam'] : null;
+                            try {
+                                $outcome = ($parsedToken['type'] ?? null) === 'refresh'
+                                    ? $this->sessions()->onRefreshReuse($jti, $family)
+                                    : 'unknown';
+                            } catch (\Throwable $e) {
+                                error_log('[sessions] reuse handling failed: ' . $e->getMessage());
+                                $outcome = 'unknown';
+                            }
+                            $this->audit('auth.refresh_token_reuse_detected', $request, $activeTenantId, $profileId, [
+                                'outcome' => $outcome,
+                            ]);
                         } elseif (($parsedToken['type'] ?? null) === 'refresh'
                             && $this->sessionRefusalReason($profileId) === 'profile_inactive'
                         ) {
@@ -2346,14 +2400,26 @@ class AuthHandler
         if ($confinedTenantId !== null) {
             $newClaims[TenantConfinement::CLAIM] = $confinedTenantId;
         }
+        $family = isset($claims['fam']) && is_string($claims['fam']) && $claims['fam'] !== ''
+            ? $claims['fam']
+            : $this->sessionFamilyFor($presentedJti);
 
         $accessToken     = $this->jwtParser->create($newClaims, 900, 'access');
-        $newRefreshToken = $this->jwtParser->create($newClaims, 604800, 'refresh');
+        $newRefreshToken = $this->jwtParser->create($newClaims + ['fam' => $family], 604800, 'refresh');
 
         // Rotate the interactive session row in place, matched by the OLD refresh
         // jti this call presented, so the family stays one row across rotations.
         // The live-session check above proved the presented jti non-empty.
-        $this->recordSession($accessToken, $newRefreshToken, $profileId, $activeTenantId, $request, false, $presentedJti);
+        // The rotation is the claim (#2264): of two requests racing on one
+        // refresh token only the first rotates; the other gets a plain 401 and
+        // the session carries on with the first one's tokens.
+        if (!$this->recordSession($accessToken, $newRefreshToken, $profileId, $activeTenantId, $request, false, $presentedJti)) {
+            $this->audit('auth.refresh.failure', $request, $activeTenantId, $profileId, [
+                'reason' => 'refresh_raced',
+            ]);
+
+            return Response::error('Unauthorized', 401);
+        }
 
         // WC-refresh-reuse: revoke the old refresh token to prevent reuse.
         // On next use of this token, it will be detected as revoked and logged
