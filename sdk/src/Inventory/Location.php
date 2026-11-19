@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Inventory;
 
 /**
- * A place stock is kept (SDK 1.126, WHIT-1232, register IV.7): a warehouse,
+ * A place stock is kept (SDK 1.127, WHIT-1232, register IV.7): a warehouse,
  * shop or van (`kind` `warehouse`), a shelf or area inside one (`area`), or a
  * virtual place at the other end of stock coming in or going out (`virtual`,
  * with `virtualRole` one of {@see self::VIRTUAL_ROLES}). Virtual places never

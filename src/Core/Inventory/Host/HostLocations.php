@@ -10,7 +10,7 @@ use Whity\Core\RBAC\CorePermissions;
 use Whity\Sdk\Inventory\Location;
 use Whity\Sdk\Inventory\Locations;
 
-/** Core's places for plugins (SDK 1.126, WHIT-1232), in the workspace the call runs in. */
+/** Core's places for plugins (SDK 1.127, WHIT-1232), in the workspace the call runs in. */
 final class HostLocations implements Locations
 {
     public function __construct(

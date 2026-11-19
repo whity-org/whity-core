@@ -7,7 +7,7 @@ namespace Whity\Sdk\Inventory;
 use Whity\Sdk\SdkException;
 
 /**
- * Something a caller of an inventory host service can fix (SDK 1.126,
+ * Something a caller of an inventory host service can fix (SDK 1.127,
  * WHIT-1232): a missing name, an unknown place, a quantity that isn't one, a
  * person without the permission, a call made outside any workspace.
  *

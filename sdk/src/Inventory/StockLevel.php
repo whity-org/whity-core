@@ -6,7 +6,7 @@ namespace Whity\Sdk\Inventory;
 
 /**
  * Stock now for one variant in one place (and lot), in the item's base unit
- * (SDK 1.126, WHIT-1232). Available is on hand minus reserved. On hand can be
+ * (SDK 1.127, WHIT-1232). Available is on hand minus reserved. On hand can be
  * below zero where the workspace allows it (register IV.8).
  */
 final class StockLevel

@@ -73,7 +73,7 @@ These are the factories `PluginContext` uses. They keep working through SDK 2.0.
 | `Billing\PlanCatalogue`, `Billing\WorkspaceAddons`, `Billing\AccessRefresh`, `Licensing\StoreLicence` | Plans and prices, add-on grants, refresh a subject's access, a store licence's state. | deployment / argument | 1.84–1.107 |
 | `Http\Outbound\HttpClient` | Call another server. Pass `StreamHttpClient` (with `AddressPolicy::publicOnly()` for URLs people type) and `Testing\RecordedHttpClient` in tests. | — | 1.114, 1.122 |
 
-### Inventory (1.126)
+### Inventory (1.127)
 
 Core's items, places and stock (WHIT-1232, design section 31). Through the context, in the workspace the call runs in:
 
@@ -91,10 +91,10 @@ $inventory->stock()->move(new MoveRequest(
 
 | Service | What for | Workspace | Since |
 |---|---|---|---|
-| `Inventory\Items` | List, get, find by SKU or barcode, create, update and archive items with variants, units and barcodes, as the acting person (`inventory:write`, the plan's item limit). | current | 1.126 |
-| `Inventory\Locations` | Real places and the virtual ones (supplier, customer, loss, found, production, consumed, opening, transit); create a place. | current | 1.126 |
-| `Inventory\Stock` | Levels, available and the append-only ledger. `move()` and `reverse()` post as your plugin, idempotent by key, only through `$ctx->inventory()->stock()`; the container copy reads and refuses writes (`use_plugin_context`). | current | 1.126 |
-| `Inventory\Units` | The workspace's units and exact conversions (`Inventory\Quantity`, never floats). | current | 1.126 |
+| `Inventory\Items` | List, get, find by SKU or barcode, create, update and archive items with variants, units and barcodes, as the acting person (`inventory:write`, the plan's item limit). | current | 1.127 |
+| `Inventory\Locations` | Real places and the virtual ones (supplier, customer, loss, found, production, consumed, opening, transit); create a place. | current | 1.127 |
+| `Inventory\Stock` | Levels, available and the append-only ledger. `move()` and `reverse()` post as your plugin, idempotent by key, only through `$ctx->inventory()->stock()`; the container copy reads and refuses writes (`use_plugin_context`). | current | 1.127 |
+| `Inventory\Units` | The workspace's units and exact conversions (`Inventory\Quantity`, never floats). | current | 1.127 |
 
 `Context\InventoryScope` (`$ctx->inventory()`) holds the four. Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
 

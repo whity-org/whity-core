@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Inventory;
 
 /**
- * One line of a {@see MoveRequest} (SDK 1.126, WHIT-1232): this much of a
+ * One line of a {@see MoveRequest} (SDK 1.127, WHIT-1232): this much of a
  * variant, from one place to another. `quantity` is a positive decimal in
  * `unit` (a unit code such as `kg` or `box`, or null for the item's base
  * unit); the host converts it exactly to the base unit.

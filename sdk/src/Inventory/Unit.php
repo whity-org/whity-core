@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Inventory;
 
 /**
- * A unit of measure in a workspace (SDK 1.126, WHIT-1232): piece, kg, box.
+ * A unit of measure in a workspace (SDK 1.127, WHIT-1232): piece, kg, box.
  * `toBaseNum / toBaseDen` is how many of its dimension's base unit one of it
  * is (g: 1 / 1000 of a kg).
  */

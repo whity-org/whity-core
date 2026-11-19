@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.126).
+ * SDK identity (v1.127).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1446,7 +1446,7 @@ namespace Whity\Sdk;
  *
  * Purely additive: one new method on PluginScope, which only the host implements.)
  *
- * 1.126 (INVENTORY: host services {@see Inventory\Items}, {@see Inventory\Locations},
+ * 1.127 (INVENTORY: host services {@see Inventory\Items}, {@see Inventory\Locations},
  * {@see Inventory\Stock} and {@see Inventory\Units} read and change core's items, places and stock
  * without HTTP, and {@see Context\InventoryScope} puts them on the plugin context as `$ctx->inventory()`.
  * Stock is an append-only ledger of moves from one place to another; a plugin writes it only through
@@ -1461,7 +1461,7 @@ namespace Whity\Sdk;
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.126.0';
+    public const VERSION = '1.127.0';
 
     /**
      * Static identity only — never instantiated.

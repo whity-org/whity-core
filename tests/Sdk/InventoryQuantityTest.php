@@ -9,7 +9,7 @@ use Whity\Core\Inventory\UnitCatalog;
 use Whity\Sdk\Inventory\Quantity;
 
 /**
- * Exact quantities (SDK 1.126, WHIT-1232, register IV.3): whole steps of a
+ * Exact quantities (SDK 1.127, WHIT-1232, register IV.3): whole steps of a
  * unit, conversions as whole-number fractions, rounding once, half away from
  * zero. No float ever touches a quantity.
  */

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Inventory;
 
 /**
- * Something a workspace buys, sells, makes or uses (SDK 1.126, WHIT-1232,
+ * Something a workspace buys, sells, makes or uses (SDK 1.127, WHIT-1232,
  * register IV.4–IV.6).
  *
  * `name` is the text as it was first written; `names` has it in every

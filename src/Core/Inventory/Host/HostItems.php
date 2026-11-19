@@ -11,7 +11,7 @@ use Whity\Sdk\Inventory\Item;
 use Whity\Sdk\Inventory\Items;
 
 /**
- * Core's items for plugins (SDK 1.126, WHIT-1232), in the workspace the call
+ * Core's items for plugins (SDK 1.127, WHIT-1232), in the workspace the call
  * runs in. Reads are trusted; writes act as a person holding
  * `inventory:write` and go through exactly what the routes do, the item limit
  * included. Core's own code calls {@see ItemService} with an explicit

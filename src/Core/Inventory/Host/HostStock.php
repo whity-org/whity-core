@@ -17,7 +17,7 @@ use Whity\Sdk\Inventory\StockLevel;
 use Whity\Sdk\PluginInterface;
 
 /**
- * Core's stock for plugins (SDK 1.126, WHIT-1232), in the workspace the call
+ * Core's stock for plugins (SDK 1.127, WHIT-1232), in the workspace the call
  * runs in.
  *
  * WHO POSTS. The instance in the container is unbound: it reads, and refuses

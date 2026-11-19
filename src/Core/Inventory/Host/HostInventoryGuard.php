@@ -11,7 +11,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Inventory\InventoryRejected;
 
 /**
- * What the inventory host services share (SDK 1.126, WHIT-1232):
+ * What the inventory host services share (SDK 1.127, WHIT-1232):
  *
  * - THE WORKSPACE is the one the call runs in ({@see TenantContext}), read on
  *   every call and never kept (owner decision D2: plugin-facing methods take

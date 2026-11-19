@@ -2011,9 +2011,9 @@ holds `Away::COVER_PLUGINS` (the person chose "Approvals in plugins"), and
 still check the stand-in's own permissions: anything above what they may
 approve waits for the person. A plugin can read this, never set it.
 
-## Step 12j — Use core's items and stock (SDK 1.126)
+## Step 12j — Use core's items and stock (SDK 1.127)
 
-Inventory is core (WHIT-1232, design section 31). A till, an online shop, a salon or a clinic plugin uses core's items, places and stock instead of keeping its own, through `$ctx->inventory()` (SDK 1.126). On an older host it throws `Context\ServiceUnavailable`.
+Inventory is core (WHIT-1232, design section 31). A till, an online shop, a salon or a clinic plugin uses core's items, places and stock instead of keeping its own, through `$ctx->inventory()` (SDK 1.127). On an older host it throws `Context\ServiceUnavailable`.
 
 ```php
 use Whity\Sdk\Inventory\{MoveLine, MoveRequest};

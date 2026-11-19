@@ -442,7 +442,7 @@ final class Events
     public const WORKER_REQUEST_START = 'worker.request.start';
     public const WORKER_REQUEST_END = 'worker.request.end';
 
-    // ---- inventory (SDK 1.126, WHIT-1232, design section 31) ----
+    // ---- inventory (SDK 1.127, WHIT-1232, design section 31) ----
     /**
      * FILTER hook, before stock moves post, inside their transaction. Payload:
      * `tenant_id`, `batch_key`, `source_type`, `source_id`, `reason_code`,

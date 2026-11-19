@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Inventory;
 
 /**
- * Core's stock, for a plugin (SDK 1.126, WHIT-1232, register IV.2).
+ * Core's stock, for a plugin (SDK 1.127, WHIT-1232, register IV.2).
  *
  * Reach it through the plugin context: `$ctx->inventory()->stock()`. That
  * one is bound to your plugin, so the moves it posts are stored under your

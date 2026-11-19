@@ -11,7 +11,7 @@ use Whity\Sdk\Inventory\Units;
 
 /**
  * Core's inventory for one plugin, in the workspace the call runs in (SDK
- * 1.126, WHIT-1232): `$ctx->inventory()`.
+ * 1.127, WHIT-1232): `$ctx->inventory()`.
  *
  * `stock()` is bound to the plugin the loader loaded: the moves it posts are
  * stored under that plugin's name (`pos.sale`), never under a name the plugin

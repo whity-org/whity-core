@@ -11,7 +11,7 @@ use Whity\Sdk\Inventory\Quantity;
 use Whity\Sdk\Inventory\Unit;
 use Whity\Sdk\Inventory\Units;
 
-/** The workspace's units and exact conversions, for plugins (SDK 1.126, WHIT-1232). */
+/** The workspace's units and exact conversions, for plugins (SDK 1.127, WHIT-1232). */
 final class HostUnits implements Units
 {
     public function __construct(

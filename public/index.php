@@ -5554,7 +5554,7 @@ $router->register('GET',    '/api/contacts/imports/{id:\d+}/skipped.csv',  [$con
 
 // Inventory in core (WHIT-1232, design section 31, register IV.1-IV.24): items,
 // units, places and the append-only stock ledger, with the same services for
-// plugins (SDK 1.126). Items carry the workspace's own fields (record type
+// plugins (SDK 1.127). Items carry the workspace's own fields (record type
 // `inventory.item`); the plan's `inventory.items.max` counts live variants and
 // only warns, on Billing and the plan banner (IV.24).
 $inventoryDb = new \Whity\Core\Inventory\InventoryDb($db->getPdo());

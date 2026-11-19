@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Inventory;
 
 /**
- * One row of the stock ledger (SDK 1.126, WHIT-1232, register IV.2): a
+ * One row of the stock ledger (SDK 1.127, WHIT-1232, register IV.2): a
  * quantity of a variant going from one place to another. Never changed and
  * never deleted; a correction is another move the other way, with
  * `reversesMoveId` set. `quantity` is in the item's base unit and always

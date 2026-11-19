@@ -6,10 +6,10 @@ namespace Whity\Sdk\Inventory;
 
 /**
  * The workspace's units of measure, and exact conversions between them (SDK
- * 1.126, WHIT-1232, register IV.3, IV.5).
+ * 1.127, WHIT-1232, register IV.3, IV.5).
  *
  * A host service: `\Whity\app(\Whity\Sdk\Inventory\Units::class)`, null on a
- * host older than 1.126. It works in the workspace the call runs in, like
+ * host older than 1.127. It works in the workspace the call runs in, like
  * {@see Items}. Every workspace starts with piece (pc), kg, g, l, ml, m, box,
  * pack and bag.
  */

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Inventory;
 
 /**
- * An exact quantity of stock (SDK 1.126, WHIT-1232, register IV.3).
+ * An exact quantity of stock (SDK 1.127, WHIT-1232, register IV.3).
  *
  * Inventory never uses floats. A quantity is a whole number of a unit's
  * smallest STEP: a unit with 3 decimals (kg) counts in thousandths (grams), a

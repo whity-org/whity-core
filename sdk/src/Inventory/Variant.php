@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Inventory;
 
 /**
- * One stock-keeping unit of an item (SDK 1.126, WHIT-1232, register IV.4).
+ * One stock-keeping unit of an item (SDK 1.127, WHIT-1232, register IV.4).
  * Stock, moves and order lines point at the variant. An item without sizes or
  * colours has exactly one, with empty `options`.
  */

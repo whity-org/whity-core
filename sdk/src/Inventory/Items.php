@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Inventory;
 
 /**
- * Core's items, for a plugin (SDK 1.126, WHIT-1232, design section 31).
+ * Core's items, for a plugin (SDK 1.127, WHIT-1232, design section 31).
  *
  * A host service, resolved from the container:
  *
@@ -34,7 +34,7 @@ namespace Whity\Sdk\Inventory;
  * `{sku, options, barcodes, sale_price_minor}`) for an item with sizes or
  * colours.
  *
- * Absent (null from the container) on a host older than 1.126; check before use.
+ * Absent (null from the container) on a host older than 1.127; check before use.
  */
 interface Items
 {

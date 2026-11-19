@@ -27,7 +27,7 @@ use Whity\Sdk\Inventory\MoveRequest;
 use Whity\Sdk\PluginInterface;
 
 /**
- * A plugin sells from the till through the SDK (1.126, WHIT-1232): it finds
+ * A plugin sells from the till through the SDK (1.127, WHIT-1232): it finds
  * the item by barcode, posts the sale as a move to the virtual customer place
  * under its OWN name, retries safely with an idempotency key, undoes it, and
  * is refused for a person without the permission or a plugin object the

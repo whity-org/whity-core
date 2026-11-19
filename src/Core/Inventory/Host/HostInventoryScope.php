@@ -13,7 +13,7 @@ use Whity\Sdk\Inventory\Units;
 use Whity\Sdk\PluginInterface;
 
 /**
- * `$ctx->inventory()` for one plugin (SDK 1.126, WHIT-1232). Items, places
+ * `$ctx->inventory()` for one plugin (SDK 1.127, WHIT-1232). Items, places
  * and units are the container's host services; `stock()` is the container's
  * {@see HostStock} bound to this plugin, so its moves carry this plugin's
  * name. Nothing here is kept per request: the services read the workspace

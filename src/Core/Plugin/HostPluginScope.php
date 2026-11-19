@@ -112,7 +112,7 @@ final class HostPluginScope implements PluginScope
         return $service;
     }
 
-    /** Core's inventory for this plugin; its stock is bound to this plugin (SDK 1.126, WHIT-1232). */
+    /** Core's inventory for this plugin; its stock is bound to this plugin (SDK 1.127, WHIT-1232). */
     public function inventory(): InventoryScope
     {
         if (!isset($this->stores[InventoryScope::class])) {

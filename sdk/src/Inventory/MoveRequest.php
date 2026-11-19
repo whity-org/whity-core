@@ -6,7 +6,7 @@ namespace Whity\Sdk\Inventory;
 
 /**
  * Stock moves to post together, in one transaction, in the workspace the call
- * runs in (SDK 1.126, WHIT-1232).
+ * runs in (SDK 1.127, WHIT-1232).
  *
  * `sourceType` says what caused them, in the plugin's own words: the host
  * prefixes it with the plugin's name (`sale` from the `pos` plugin is stored

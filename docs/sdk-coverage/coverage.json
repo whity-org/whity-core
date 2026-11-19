@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.126.0",
+    "sdk_version": "1.127.0",
     "core_version": "0.2.30",
     "updated": "2026-11-19",
     "ratings": {
@@ -115,27 +115,27 @@
             "has": [
                 {
                     "what": "Inventory\\Items host service: list, get, find by SKU or barcode, create, update and archive items with variants, units and barcodes, writes acting as a person with inventory:write and counted toward inventory.items.max, which only warns",
-                    "since": "1.126"
+                    "since": "1.127"
                 },
                 {
                     "what": "Inventory\\Locations host service: real places and the virtual ones (supplier, customer, loss, found, production, consumed, opening, transit)",
-                    "since": "1.126"
+                    "since": "1.127"
                 },
                 {
                     "what": "Inventory\\Stock: levels, available and the append-only ledger; plugins post and undo moves through $ctx->inventory()->stock(), bound to the loaded plugin (idempotent by key); the container copy only reads",
-                    "since": "1.126"
+                    "since": "1.127"
                 },
                 {
                     "what": "Inventory\\Units and Inventory\\Quantity: exact unit conversions and quantities as whole steps, never floats",
-                    "since": "1.126"
+                    "since": "1.127"
                 },
                 {
                     "what": "Events stock.moving (filter, can veto), stock.moved, inventory.item.created, updated and archived",
-                    "since": "1.126"
+                    "since": "1.127"
                 },
                 {
                     "what": "PluginContext: $ctx->inventory() (Context\\InventoryScope) with items(), locations(), stock() and units()",
-                    "since": "1.126"
+                    "since": "1.127"
                 }
             ],
             "missing": [
