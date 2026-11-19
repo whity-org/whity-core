@@ -126,6 +126,13 @@ const MAX_IMAGE_BYTES = Number.isFinite(Number(process.env.RENDER_FLOW_MAX_IMAGE
   && Number(process.env.RENDER_FLOW_MAX_IMAGE_BYTES) > 0
   ? Number(process.env.RENDER_FLOW_MAX_IMAGE_BYTES)
   : 512 * 1024;
+/* A figure in the body (WHIT-1289): the slot types plus GIF, which the
+ * document editor accepts, and room for a photo. Same NaN guard as above. */
+const FIGURE_DATA_URI = /^data:image\/(?:png|jpeg|gif|webp|svg\+xml)[;,]/;
+const MAX_FIGURE_BYTES = Number.isFinite(Number(process.env.RENDER_FLOW_MAX_FIGURE_BYTES))
+  && Number(process.env.RENDER_FLOW_MAX_FIGURE_BYTES) > 0
+  ? Number(process.env.RENDER_FLOW_MAX_FIGURE_BYTES)
+  : 8 * 1024 * 1024;
 /* A running-head image lives in the page margin; past this it is not a logo,
  * it is a second page header that the margin cannot hold. The real limit is
  * the page's own margin (see validateRunningFit); this is the ceiling. */
@@ -705,6 +712,14 @@ function validateBlocks(content, at) {
         // render tier, which is both an SSRF surface and a source of
         // non-deterministic output. Callers embed their images.
         return `"${at}[${i}].src" must be a data: URI (remote images are not fetched)`;
+      }
+      // WHIT-1289 (#2201): an image, and a bounded one, like a slot's image.
+      // A figure is a picture in the body, so it may be a GIF and larger.
+      if (!FIGURE_DATA_URI.test(block.src)) {
+        return `"${at}[${i}].src" must be a data:image/png, jpeg, gif, webp or svg+xml URI`;
+      }
+      if (block.src.length > MAX_FIGURE_BYTES) {
+        return `"${at}[${i}].src" exceeds ${MAX_FIGURE_BYTES} bytes`;
       }
     }
   }
