@@ -891,6 +891,20 @@ class AuthHandler
         ?int $confinedTenantId = null
     ): Response
     {
+        // A deactivated profile gets no session, whichever path got here (#2227).
+        // Login, refresh and tenant selection checked this themselves; the
+        // device-credential exchange and the 2FA step did not, so a desktop app
+        // holding a device credential kept minting sessions after "Deactivate".
+        // Generic wording: a deactivation-specific error is an enumeration oracle.
+        $refusalReason = $this->sessionRefusalReason($profileId);
+        if ($refusalReason !== null) {
+            $this->audit('auth.login.failure', $request, $activeTenantId, $profileId, [
+                'reason' => $refusalReason,
+            ]);
+
+            return Response::error('Invalid credentials', 401);
+        }
+
         // #2249: a session confined to one workspace is only ever minted INTO
         // that workspace. Every caller already passes the confined tenant as the
         // active one; this is the chokepoint that keeps it so.
