@@ -63,10 +63,14 @@ database that migrations 001 to N leave behind, and `migrate run` on an
 **empty** database loads it in one transaction, records 001 to N as applied,
 and then runs the migrations after N as usual.
 
-| Fresh install (Postgres 15, local Docker) | Time |
-| --- | --- |
-| Replaying migrations 001 to 308, then plugins and translations | 2 min 13 s |
-| Loading the baseline (5.0 s), then plugins and translations | 13.7 s |
+| Fresh install, `migrate run` (Postgres 15, local Docker) | Replay | Baseline |
+| --- | --- | --- |
+| App and database on one Docker network (as in CI and production) | 23 s | 18 s |
+| Database reached through the Windows host (`host.docker.internal`) | 2 min 13 s | 55 s |
+
+Most of what is left is loading about 17,700 labels one statement at a time
+(migrations 121 and 124, run again on load; see below). Without them the
+baseline itself loads in about 5 s.
 
 An existing install never takes the baseline: it has tables, so it keeps
 running the numbered migrations exactly as before.
@@ -77,7 +81,8 @@ Files:
   of their source.
 - `baseline.pgsql.sql`: the PostgreSQL schema and seed rows.
 - `baseline.sqlite.sql`: the same for the SQLite test engine. The test suite
-  loads it too, which saves about 9 s per test process.
+  loads it too; since labels are loaded on top, that takes about as long as a
+  replay (8 to 9 s per test process).
 
 Rows that differ per install aren't stored as they were: timestamps written
 during the replay are a placeholder set to the install's own time on load, and
@@ -85,12 +90,27 @@ the bootstrap administrator gets its password from
 `INITIAL_SYSTEM_ADMIN_PASSWORD` (or a printed random one) and its email from
 `INITIAL_SYSTEM_ADMIN_EMAIL`, as migrations 036 and 095 do.
 
+Rows that migrations read from files or code as they are today aren't stored at
+all, because a saved copy would go stale as soon as someone adds a label or a
+permission:
+
+- `translations` is saved empty. On load, migrations 091, 121 and 124 run
+  again and fill it from `database/i18n/` in this release, exactly as a replay
+  does.
+- Every permission in `CorePermissions` that the baseline lacks is added (as
+  migration 013 does), and migration 135 runs again, so descriptions come from
+  `CorePermissionDescriptions`.
+
+The list is `Baseline::RESEED_TABLES` and `Baseline::RESEED_MIGRATIONS`. A
+new migration that seeds rows from a file or a PHP list, rather than from
+values written in the migration itself, belongs on it.
+
 ### How we know it is the same database
 
 `tests/Database/MigrationBaselineEquivalenceTest.php` builds the database both
 ways, by replaying every migration and from the baseline, and compares tables,
 columns in order, defaults, constraints, indexes, triggers, functions, views,
-sequences, extensions and every seeded row. It runs on SQLite everywhere and on
+sequences, extensions and every seeded row (permissions by name, not id). It runs on SQLite everywhere and on
 PostgreSQL in the dialect shards.
 
 ### When a baseline migration changes

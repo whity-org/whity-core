@@ -53,14 +53,6 @@
             [
                 "tenants",
                 "created_at"
-            ],
-            [
-                "translations",
-                "created_at"
-            ],
-            [
-                "translations",
-                "updated_at"
             ]
         ],
         "sqlite": [
@@ -107,17 +99,15 @@
             [
                 "tenants",
                 "created_at"
-            ],
-            [
-                "translations",
-                "created_at"
-            ],
-            [
-                "translations",
-                "updated_at"
             ]
         ]
     },
+    "reseed": [
+        "091_seed_auth_translations",
+        "121_seed_translation_catalogues",
+        "124_add_translation_source_provenance",
+        "135_sync_permission_descriptions"
+    ],
     "migrations": [
         "001_create_users_roles",
         "002_create_permissions",

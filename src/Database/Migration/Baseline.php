@@ -332,12 +332,18 @@ final class Baseline
         if (in_array('permissions', self::userTables($db->getPdo()), true)) {
             foreach (CorePermissions::all() as $permission) {
                 // Migration 013's catalogue catch-up; migration 135 below writes
-                // the real description over the placeholder.
+                // the real description over the placeholder. NOT EXISTS rather
+                // than ON CONFLICT: PostgreSQL spends a sequence value on every
+                // conflict, and the permission ids must follow a replay's.
                 $db->query(
                     'INSERT INTO permissions (name, description, created_at)
-                     VALUES (:name, :description, NOW())
-                     ON CONFLICT (name) DO NOTHING',
-                    [':name' => $permission, ':description' => 'Core permission (' . $permission . ')']
+                     SELECT :name, :description, NOW()
+                     WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE name = :name_again)',
+                    [
+                        ':name' => $permission,
+                        ':description' => 'Core permission (' . $permission . ')',
+                        ':name_again' => $permission,
+                    ]
                 );
             }
         }

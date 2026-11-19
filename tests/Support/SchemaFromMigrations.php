@@ -1405,9 +1405,9 @@ final class SchemaFromMigrations
         // PHPUnit treats any test-time stdout output as a failure, so silence it.
         ob_start();
         try {
-            // The schema baseline stands for every migration up to its number:
-            // loading it is about 9 s quicker per process than replaying them,
-            // and MigrationBaselineEquivalenceTest proves the two agree. Its
+            // The schema baseline stands for every migration up to its number,
+            // and MigrationBaselineEquivalenceTest proves the two agree, so the
+            // suite runs on the database a fresh install really gets. Its
             // migrations are NOT recorded as applied, as the replay records none.
             $after = 0;
             $baseline = $useBaseline && $through === null ? self::usableSqliteBaseline($pdo) : null;
