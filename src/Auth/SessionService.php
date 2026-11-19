@@ -45,11 +45,12 @@ final class SessionService
         string $expiresAt,
         ?string $userAgent,
         ?string $ip,
+        ?string $family = null,
     ): void {
         $stmt = $this->db->prepare(
             'INSERT INTO sessions
-                 (profile_id, tenant_id, refresh_jti, access_jti, user_agent, ip_address, expires_at)
-             VALUES (:profile_id, :tenant_id, :refresh_jti, :access_jti, :user_agent, :ip, :expires_at)'
+                 (profile_id, tenant_id, refresh_jti, access_jti, user_agent, ip_address, expires_at, family)
+             VALUES (:profile_id, :tenant_id, :refresh_jti, :access_jti, :user_agent, :ip, :expires_at, :family)'
         );
         $stmt->execute([
             ':profile_id'  => $profileId,
@@ -59,7 +60,87 @@ final class SessionService
             ':user_agent'  => $userAgent !== null ? substr($userAgent, 0, 512) : null,
             ':ip'          => $ip !== null ? substr($ip, 0, 45) : null,
             ':expires_at'  => $expiresAt,
+            ':family'      => $family,
         ]);
+    }
+
+    /** How long a just-replaced refresh token may race its successor (#2264). */
+    public const REUSE_GRACE_SECONDS = 30;
+
+    /**
+     * The family id of the live session whose current access or refresh jti is
+     * $jti, or null when there is none (or it predates families).
+     */
+    public function familyOf(string $jti): ?string
+    {
+        // @tenant-guard-ignore: matched by the caller's own current jti (access OR refresh), unique platform-wide.
+        $stmt = $this->db->prepare(
+            'SELECT family FROM sessions
+              WHERE (refresh_jti = :jti OR access_jti = :jti) AND revoked_at IS NULL
+              LIMIT 1'
+        );
+        $stmt->execute([':jti' => $jti]);
+        $family = $stmt->fetchColumn();
+
+        return is_string($family) && $family !== '' ? $family : null;
+    }
+
+    /**
+     * A refresh token that was already rotated away came back (#2264, #2191).
+     *
+     * Its session is found by the token's `fam` claim, or, for a token minted
+     * before families, by being the session's previous refresh jti. If it is the
+     * token the last rotation replaced and that rotation was under
+     * REUSE_GRACE_SECONDS ago, it is two tabs racing: 'grace', nothing changes.
+     * Any other reuse means two holders of one family, so the whole session is
+     * revoked (both current jtis blacklisted, the row stamped): 'revoked'.
+     * 'already_revoked' and 'unknown' change nothing.
+     *
+     * @return 'grace'|'revoked'|'already_revoked'|'unknown'
+     */
+    public function onRefreshReuse(string $jti, ?string $family, ?int $now = null): string
+    {
+        $now ??= time();
+
+        if ($family !== null && $family !== '') {
+            // @tenant-guard-ignore: family is a 128-bit random id carried by the caller's own signed refresh token, unique platform-wide.
+            $stmt = $this->db->prepare(
+                'SELECT id, access_jti, refresh_jti, expires_at, previous_refresh_jti, rotated_at, revoked_at
+                   FROM sessions WHERE family = ? ORDER BY id DESC LIMIT 1'
+            );
+            $stmt->execute([$family]);
+        } else {
+            // @tenant-guard-ignore: matched by a refresh jti from the caller's own signed token; jtis are unique platform-wide.
+            $stmt = $this->db->prepare(
+                'SELECT id, access_jti, refresh_jti, expires_at, previous_refresh_jti, rotated_at, revoked_at
+                   FROM sessions WHERE previous_refresh_jti = ? ORDER BY id DESC LIMIT 1'
+            );
+            $stmt->execute([$jti]);
+        }
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return 'unknown';
+        }
+        if ($row['revoked_at'] !== null) {
+            return 'already_revoked';
+        }
+
+        $rotatedAt = is_string($row['rotated_at']) ? strtotime($row['rotated_at']) : false;
+        if ($row['previous_refresh_jti'] === $jti
+            && $rotatedAt !== false
+            && $now - $rotatedAt <= self::REUSE_GRACE_SECONDS
+        ) {
+            return 'grace';
+        }
+
+        $this->blacklistAndStamp(
+            (int) $row['id'],
+            $row['access_jti'] !== null ? (string) $row['access_jti'] : null,
+            (string) $row['refresh_jti'],
+            (string) $row['expires_at']
+        );
+
+        return 'revoked';
     }
 
     /**
@@ -93,29 +174,43 @@ final class SessionService
         string $newRefreshJti,
         string $expiresAt,
         ?int $tenantId = null,
+        ?string $family = null,
     ): bool {
         // @tenant-guard-ignore: matched by the caller's own current jti (access OR refresh), unique platform-wide.
         $previous = $this->db->prepare(
-            'SELECT access_jti FROM sessions
+            'SELECT access_jti, refresh_jti FROM sessions
               WHERE (refresh_jti = :match OR access_jti = :match) AND revoked_at IS NULL'
         );
         $previous->execute([':match' => $matchJti]);
-        $replacedAccessJti = $previous->fetchColumn();
+        $previousRow = $previous->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($previousRow)) {
+            return false;
+        }
+        $replacedAccessJti = $previousRow['access_jti'];
+        $replacedRefreshJti = (string) $previousRow['refresh_jti'];
 
         // Matched by the caller's own current jti (access OR refresh) — each is a platform-wide UNIQUE handle, so it cannot touch another tenant's session row.
         $stmt = $this->db->prepare(
             'UPDATE sessions
                 SET refresh_jti = :new_refresh, access_jti = :new_access,
-                    last_seen_at = NOW(), expires_at = :expires_at'
-                . ($tenantId !== null ? ', tenant_id = :tenant_id' : '') . '
-              WHERE (refresh_jti = :match OR access_jti = :match) AND revoked_at IS NULL'
+                    last_seen_at = NOW(), expires_at = :expires_at,
+                    previous_refresh_jti = :replaced_refresh, rotated_at = :rotated_at'
+                . ($tenantId !== null ? ', tenant_id = :tenant_id' : '')
+                . ($family !== null ? ', family = :family' : '') . '
+              WHERE refresh_jti = :replaced_refresh AND revoked_at IS NULL'
         );
+        // Matched on the refresh jti just read, so of two requests racing on one
+        // token only the first rotates; the other gets false (#2264).
         $params = [
-            ':new_refresh' => $newRefreshJti,
-            ':new_access'  => $newAccessJti,
-            ':expires_at'  => $expiresAt,
-            ':match'       => $matchJti,
+            ':new_refresh'      => $newRefreshJti,
+            ':new_access'       => $newAccessJti,
+            ':expires_at'       => $expiresAt,
+            ':replaced_refresh' => $replacedRefreshJti,
+            ':rotated_at'       => date('Y-m-d H:i:s'),
         ];
+        if ($family !== null) {
+            $params[':family'] = $family;
+        }
         if ($tenantId !== null) {
             $params[':tenant_id'] = $tenantId;
         }
