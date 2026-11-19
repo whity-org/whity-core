@@ -1979,7 +1979,7 @@ class RolesApiHandler
 
         $placeholders = implode(', ', array_fill(0, count($ids), '?'));
         $stmt = $this->db->prepare('SELECT name FROM permissions WHERE id IN (' . $placeholders . ')');
-        $stmt->execute(array_values($ids));
+        $stmt->execute($ids);
         $names = array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 
         $missing = $this->grantGuard->notHeld($actor, $tenantId, $names);

@@ -50,7 +50,7 @@ final class RoleGrantGuard
      * The permissions in `$permissions` the caller does not hold. Empty means
      * the grant is allowed.
      *
-     * @param list<string> $permissions `resource:action` slugs to grant.
+     * @param array<array-key, string> $permissions `resource:action` slugs to grant.
      * @return list<string> The ones the caller lacks, sorted.
      */
     public function notHeld(

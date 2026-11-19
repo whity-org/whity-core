@@ -334,7 +334,7 @@ final class RoleGrantGuardRealEngineTest extends TestCase
               WHERE rp.role_id = ' . $roleId . ' ORDER BY p.name'
         );
 
-        return array_map('strval', $stmt !== false ? $stmt->fetchAll(PDO::FETCH_COLUMN) : []);
+        return array_values(array_map('strval', $stmt !== false ? $stmt->fetchAll(PDO::FETCH_COLUMN) : []));
     }
 
     private function scalar(string $sql): int
