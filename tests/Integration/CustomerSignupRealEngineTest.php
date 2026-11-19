@@ -725,6 +725,27 @@ final class CustomerSignupRealEngineTest extends TestCase
         );
     }
 
+    /**
+     * #2174: the join page chooses its words from the FIRST key of `details`,
+     * so that key is still `email` or `display_name`; the per-field problems
+     * come after it.
+     */
+    public function testFieldProblemsKeepTheKeyTheJoinPageReadsFirst(): void
+    {
+        $this->saveSettings(self::TENANT_A, self::ADMIN_A, ['mode' => 'open', 'role_id' => $this->customerRole, 'allowed_domains' => ['uni.example']]);
+
+        $bad = json_decode((string) $this->request('tenant-a', 'not-an-email', '')->getBody(), true);
+        self::assertSame('Enter a valid email address', $bad['error']);
+        self::assertSame('email', array_key_first($bad['details']));
+        self::assertSame(['email' => 'invalid_email', 'display_name' => 'required'], $bad['details']['field_codes']);
+
+        $domain = json_decode((string) $this->request('tenant-a', 'outsider@gmail.example', 'Outsider')->getBody(), true);
+        self::assertSame('domain', $domain['details']['email']);
+        self::assertSame('email', array_key_first($domain['details']));
+        self::assertSame(['email' => 'not_allowed'], $domain['details']['field_codes']);
+        self::assertNotSame('', $domain['details']['fields_ar']['email']);
+    }
+
     private function request(string $slug, string $email, string $name = 'Someone', string $host = 'app.test'): Response
     {
         TenantContext::reset();

@@ -299,6 +299,30 @@ final class RegisterApiHandlerRealEngineTest extends TestCase
         self::assertSame(422, $res->getStatusCode());
     }
 
+    /**
+     * #2174: the shared field validator. The sentence the register page shows
+     * is unchanged, and every field's problem now comes with it in English and
+     * Arabic, with a code.
+     */
+    public function testEveryFieldProblemIsListedAndTheSentenceIsUnchanged(): void
+    {
+        $res = $this->register(['email' => 'not-an-email', 'password' => 'short', 'tenant_name' => '']);
+
+        self::assertSame(422, $res->getStatusCode());
+        $body = json_decode((string) $res->getBody(), true);
+        self::assertSame('A valid email address is required', $body['error']);
+        self::assertSame(
+            ['email' => 'invalid_email', 'tenant_name' => 'required', 'password' => 'too_short'],
+            $body['details']['field_codes']
+        );
+        self::assertSame(array_keys($body['details']['fields']), array_keys($body['details']['fields_ar']));
+
+        $res = $this->register(['email' => 'e@acme.test', 'password' => 'a-strong-password', 'tenant_name' => '!!!']);
+        $body = json_decode((string) $res->getBody(), true);
+        self::assertSame('Workspace name must contain letters or numbers', $body['error']);
+        self::assertSame(['tenant_name' => 'invalid'], $body['details']['field_codes']);
+    }
+
     public function testMissingWorkspaceNameIsRejected(): void
     {
         $res = $this->register([

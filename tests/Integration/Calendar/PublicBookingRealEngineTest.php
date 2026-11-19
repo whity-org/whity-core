@@ -265,6 +265,26 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertSame(0, (int) $this->scalar('SELECT COUNT(*) FROM calendar_bookings'));
     }
 
+    /**
+     * #2174: the booking page marks the field from `details.field`, which stays;
+     * every field's problem follows it, and nothing is booked.
+     */
+    public function testFieldProblemsKeepTheFieldTheBookingPageReads(): void
+    {
+        $response = $this->handler->book(
+            self::request('POST', '/x', $this->bookingBody(['email' => 'not-an-email', 'phone' => 'call me'])),
+            ['workspace' => 'example-bakery']
+        );
+
+        self::assertSame(422, $response->getStatusCode());
+        $body = json_decode((string) $response->getBody(), true);
+        self::assertSame('Your email address does not look right', $body['error']);
+        self::assertSame('email', $body['details']['field']);
+        self::assertSame('field', array_key_first($body['details']));
+        self::assertSame(['email' => 'invalid_email', 'phone' => 'invalid_phone'], $body['details']['field_codes']);
+        self::assertSame(0, (int) $this->scalar('SELECT COUNT(*) FROM calendar_bookings'));
+    }
+
     public function testOneAddressHoldsAtMostThreeOpenBookingsAndOneIpTenAttempts(): void
     {
         foreach (['10:00', '11:00', '12:00'] as $time) {

@@ -436,6 +436,15 @@ final class MessagingRealEngineTest extends TestCase
         self::assertSame(201, $bot->getStatusCode());
         self::assertSame(0, $this->rows('messages'), 'the honeypot writes nothing');
 
+        // #2174: a bad email address is refused through the shared field validator,
+        // with the sentence the chat page shows and the field's problem in both languages.
+        $badEmail = $chat->start($req('POST', ['message' => 'Hi', 'email' => 'not-an-email']), $params);
+        self::assertSame(422, $badEmail->getStatusCode());
+        $refused = json_decode($badEmail->getBody(), true);
+        self::assertSame('The email address is not valid.', $refused['error']);
+        self::assertSame(['email' => 'invalid_email'], $refused['details']['field_codes']);
+        self::assertNotSame('', $refused['details']['fields_ar']['email']);
+
         $started = $chat->start($req('POST', ['message' => 'Do you deliver?', 'name' => 'Visitor']), $params);
         self::assertSame(201, $started->getStatusCode());
         $token = json_decode($started->getBody(), true)['data']['token'];
