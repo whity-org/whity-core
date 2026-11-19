@@ -1,4 +1,4 @@
-import { CLIENT_IP_HEADER, stripClientIpHeaders, trustedClientIp, trustedForwardedHost, trustedProxyHops } from '@/lib/trusted-client-ip';
+import { CLIENT_IP_HEADER, stripClientIpHeaders, trustedClientIp, trustedForwardedHost, trustedForwardedHostFrom, trustedProxyHops } from '@/lib/trusted-client-ip';
 
 /**
  * Minimal Headers-like backing the stripClientIpHeaders tests, so they do not
@@ -191,5 +191,12 @@ describe('trustedForwardedHost', () => {
     stripClientIpHeaders(headers as unknown as Headers);
     expect(headers.has('x-forwarded-host')).toBe(false);
     expect(headers.has('accept')).toBe(true);
+  });
+  // WHIT-1295: server components pass next/headers' header set, not a Request.
+  it('reads a bare header set the same way', () => {
+    const h = new FakeHeaders({ host: 'bakery.example.com', 'x-forwarded-host': 'other.example.com' });
+    expect(trustedForwardedHostFrom(h, 0)).toBe('bakery.example.com');
+    expect(trustedForwardedHostFrom(h, 1)).toBe('other.example.com');
+    expect(trustedForwardedHostFrom(new FakeHeaders({}), 0)).toBeNull();
   });
 });
