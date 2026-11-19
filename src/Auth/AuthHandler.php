@@ -1921,7 +1921,7 @@ class AuthHandler
                 } catch (\Throwable) {
                 }
             } elseif ($rotateFromJti !== null) {
-                $sessions->rotate($rotateFromJti, $accessJti, $refreshJti, $expiresAt);
+                $sessions->rotate($rotateFromJti, $accessJti, $refreshJti, $expiresAt, $activeTenantId);
             }
         } catch (\Throwable $e) {
             error_log('[sessions] record/rotate failed: ' . $e->getMessage());
