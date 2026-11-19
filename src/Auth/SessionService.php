@@ -273,6 +273,37 @@ final class SessionService
     }
 
     /**
+     * Revoke the session whose CURRENT access or refresh jti is $jti: both of
+     * its jtis are listed in revoked_tokens and the row is stamped. Used on
+     * sign-out (#2264), so signing out with only the access token also ends the
+     * paired 7-day refresh token, and the session leaves the list. Returns false
+     * when no live row matched.
+     */
+    public function revokeByJti(string $jti): bool
+    {
+        // @tenant-guard-ignore: matched by a jti the caller presented on sign-out; jtis are 128-bit random handles unique platform-wide.
+        $stmt = $this->db->prepare(
+            'SELECT id, access_jti, refresh_jti, expires_at FROM sessions
+              WHERE (access_jti = :jti OR refresh_jti = :jti) AND revoked_at IS NULL
+              LIMIT 1'
+        );
+        $stmt->execute([':jti' => $jti]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return false;
+        }
+
+        $this->blacklistAndStamp(
+            (int) $row['id'],
+            $row['access_jti'] !== null ? (string) $row['access_jti'] : null,
+            (string) $row['refresh_jti'],
+            (string) $row['expires_at']
+        );
+
+        return true;
+    }
+
+    /**
      * Blacklist a session's current jti(s) into the shared revoked_tokens table
      * (so validateAccessToken rejects them immediately) and stamp revoked_at.
      */
