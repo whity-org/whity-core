@@ -79,6 +79,11 @@ final class SessionService
      * working until it expired, so signing out, which revokes only the tokens it
      * is handed, left an older access token alive for up to 15 minutes.
      *
+     * The row moves to the workspace the new tokens act in (#2218): after a
+     * switch-tenant it kept the sign-in workspace, so the person's own session
+     * vanished from GET /api/v1/me/sessions in the new one and could not be
+     * revoked there. Null keeps the row's workspace.
+     *
      * @param string $matchJti  The caller's CURRENT access or refresh jti.
      * @param string $expiresAt 'Y-m-d H:i:s' of the new refresh token's expiry.
      */
@@ -87,6 +92,7 @@ final class SessionService
         string $newAccessJti,
         string $newRefreshJti,
         string $expiresAt,
+        ?int $tenantId = null,
     ): bool {
         // @tenant-guard-ignore: matched by the caller's own current jti (access OR refresh), unique platform-wide.
         $previous = $this->db->prepare(
@@ -96,19 +102,24 @@ final class SessionService
         $previous->execute([':match' => $matchJti]);
         $replacedAccessJti = $previous->fetchColumn();
 
-        // @tenant-guard-ignore: matched by the caller's own current jti (access OR refresh) — each is a platform-wide UNIQUE handle, so it cannot touch another tenant's session row.
+        // Matched by the caller's own current jti (access OR refresh) — each is a platform-wide UNIQUE handle, so it cannot touch another tenant's session row.
         $stmt = $this->db->prepare(
             'UPDATE sessions
                 SET refresh_jti = :new_refresh, access_jti = :new_access,
-                    last_seen_at = NOW(), expires_at = :expires_at
+                    last_seen_at = NOW(), expires_at = :expires_at'
+                . ($tenantId !== null ? ', tenant_id = :tenant_id' : '') . '
               WHERE (refresh_jti = :match OR access_jti = :match) AND revoked_at IS NULL'
         );
-        $stmt->execute([
+        $params = [
             ':new_refresh' => $newRefreshJti,
             ':new_access'  => $newAccessJti,
             ':expires_at'  => $expiresAt,
             ':match'       => $matchJti,
-        ]);
+        ];
+        if ($tenantId !== null) {
+            $params[':tenant_id'] = $tenantId;
+        }
+        $stmt->execute($params);
         $rotated = $stmt->rowCount() > 0;
 
         if ($rotated && is_string($replacedAccessJti) && $replacedAccessJti !== '' && $replacedAccessJti !== $newAccessJti) {
