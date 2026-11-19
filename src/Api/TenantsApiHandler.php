@@ -904,10 +904,15 @@ class TenantsApiHandler
             return Response::error(sprintf('Role "%s" not found', $admin['role']), 404);
         }
 
-        $profileId = (new ProfileProvisioner($this->db))->findOrCreate(
-            $admin['email'],
-            password_hash($admin['password'], PASSWORD_BCRYPT)
-        );
+        try {
+            $profileId = (new ProfileProvisioner($this->db))->findOrCreate(
+                $admin['email'],
+                password_hash($admin['password'], PASSWORD_BCRYPT)
+            );
+        } catch (\Whity\Core\Identity\UnconfirmedEmailClaimException) {
+            // #2245: another account's unconfirmed sign-in address.
+            return Response::error('This email address is waiting to be confirmed on another account', 409, ['code' => 'email_unconfirmed_elsewhere']);
+        }
 
         // is_primary: this is the tenant's first membership for this profile and
         // the row that answers "what is this person here?" (migration 094).
