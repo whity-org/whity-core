@@ -14,6 +14,8 @@
  * - Places: warehouses, shops and vans.
  * - Counts and Transfers (P2): newest first; a count opens its page, a
  *   transfer on the way opens to be received.
+ * - Purchases (P3, D10: a tab here until Money arrives): purchase orders;
+ *   New purchase order is the main button on it.
  *
  * Count stock and Transfer are outline buttons beside the one main button,
  * New item (New place on the Places tab). Waste and adjustments has its own
@@ -27,12 +29,16 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
+import { UserText } from '@/components/ui/user-text';
 import { ItemFormDialog, kindLabel } from '@/components/inventory/item-form-dialog';
 import { PlaceFormDialog } from '@/components/inventory/place-form-dialog';
 import { CountStartDialog } from '@/components/inventory/count-start-dialog';
 import { CountsTab, TransfersTab } from '@/components/inventory/operations-tabs';
 import { ReceiveTransferDialog } from '@/components/inventory/receive-transfer-dialog';
 import { TransferDialog } from '@/components/inventory/transfer-dialog';
+import { PurchaseOrderDialog } from '@/components/inventory/purchase-order-dialog';
+import { PurchaseOrdersTab } from '@/components/inventory/purchase-orders-tab';
+import { useWorkspaceCurrency } from '@/lib/branding-context';
 import { useToast } from '@/lib/toast-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
@@ -50,6 +56,8 @@ import {
   INVENTORY_READ,
   INVENTORY_WRITE,
   ITEM_KINDS,
+  PURCHASES_READ,
+  PURCHASES_WRITE,
   STOCK_COUNT,
   STOCK_TRANSFER,
   inventoryApi,
@@ -63,8 +71,8 @@ import {
   type ItemKind,
 } from '@/lib/inventory/api';
 
-type Tab = 'stock' | 'items' | 'places' | 'counts' | 'transfers';
-const TABS: Tab[] = ['stock', 'items', 'places', 'counts', 'transfers'];
+type Tab = 'stock' | 'items' | 'places' | 'counts' | 'transfers' | 'purchases';
+const TABS: Tab[] = ['stock', 'items', 'places', 'counts', 'transfers', 'purchases'];
 const PER_PAGE = 50;
 
 export default function InventoryPage() {
@@ -76,6 +84,9 @@ export default function InventoryPage() {
   const canWrite = has(INVENTORY_WRITE);
   const canCount = has(STOCK_COUNT);
   const canTransfer = has(STOCK_TRANSFER);
+  const canSeePurchases = has(PURCHASES_READ);
+  const canPurchase = has(PURCHASES_WRITE);
+  const currency = useWorkspaceCurrency();
   const toast = useToast();
 
   // A tab can be linked to (?tab=counts), as the count page's way back does.
@@ -84,6 +95,7 @@ export default function InventoryPage() {
   const [counting, setCounting] = useState(false);
   const [transferring, setTransferring] = useState(false);
   const [receiving, setReceiving] = useState<InventoryOperation | null>(null);
+  const [ordering, setOrdering] = useState(false);
 
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
@@ -125,6 +137,10 @@ export default function InventoryPage() {
   const transfers = useFetch(
     () => (tab === 'transfers' ? inventoryApi.operations({ kind: 'transfer' }) : Promise.resolve(null)),
     [tab]
+  );
+  const purchases = useFetch(
+    () => (tab === 'purchases' && canSeePurchases ? inventoryApi.purchaseOrders() : Promise.resolve(null)),
+    [tab, canSeePurchases]
   );
 
   const list = useFetch(
@@ -168,7 +184,7 @@ export default function InventoryPage() {
         <Icon name="package" size={16} />
       </span>
       <div className="min-w-0">
-        <div className="truncate font-medium">{itemName(row)}</div>
+        <UserText className="block truncate font-medium">{itemName(row)}</UserText>
         <div className="text-xs text-muted-foreground">
           <bdi dir="ltr" className="font-mono">
             {skuText(row)}
@@ -273,8 +289,12 @@ export default function InventoryPage() {
             <Icon name="store" size={16} />
           </span>
           <div className="min-w-0">
-            <div className="truncate font-medium">{nameIn(row.names, row.name, language)}</div>
-            {row.address !== '' && <div className="truncate text-xs text-muted-foreground">{row.address}</div>}
+            <UserText className="block truncate font-medium">{nameIn(row.names, row.name, language)}</UserText>
+            {row.address !== '' && (
+              <div className="truncate text-xs text-muted-foreground">
+                <UserText>{row.address}</UserText>
+              </div>
+            )}
           </div>
         </div>
       ),
@@ -303,7 +323,14 @@ export default function InventoryPage() {
   const filtered = query !== '' || kind !== null;
 
   const mainAction =
-    tab === 'places'
+    tab === 'purchases'
+      ? canPurchase && (
+          <Button onClick={() => setOrdering(true)} data-testid="inventory-new-po">
+            <Icon name="plus" />
+            {t('inventory.po.new', 'New purchase order')}
+          </Button>
+        )
+      : tab === 'places'
       ? canWrite && (
           <Button onClick={() => setEditingPlace('new')} data-testid="inventory-new-place">
             <Icon name="plus" />
@@ -368,6 +395,7 @@ export default function InventoryPage() {
             </TabsTrigger>
             <TabsTrigger value="counts">{t('inventory.tab.counts', 'Counts')}</TabsTrigger>
             <TabsTrigger value="transfers">{t('inventory.tab.transfers', 'Transfers')}</TabsTrigger>
+            {canSeePurchases && <TabsTrigger value="purchases">{t('inventory.tab.purchases', 'Purchases')}</TabsTrigger>}
           </TabsList>
         </Tabs>
         <Link href="/inventory/adjustments" className="text-sm font-medium text-primary hover:underline" data-testid="inventory-waste-link">
@@ -502,6 +530,8 @@ export default function InventoryPage() {
         <CountsTab counts={counts} places={places} />
       ) : tab === 'transfers' ? (
         <TransfersTab transfers={transfers} places={places} onOpen={(row) => void openTransfer(row)} />
+      ) : tab === 'purchases' ? (
+        <PurchaseOrdersTab orders={purchases} places={places} />
       ) : (
         <DataTable
           columns={placeColumns}
@@ -524,6 +554,15 @@ export default function InventoryPage() {
           units={meta.data.units}
           places={places}
           onSaved={(item) => router.push(`/inventory/items/${item.id}`)}
+        />
+      )}
+      {ordering && meta.data && (
+        <PurchaseOrderDialog
+          open={ordering}
+          onOpenChange={setOrdering}
+          places={places}
+          currency={currency}
+          onSaved={(order) => router.push(`/inventory/purchase-orders/${order.id}`)}
         />
       )}
       {counting && meta.data && (

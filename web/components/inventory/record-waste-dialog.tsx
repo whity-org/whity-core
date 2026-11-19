@@ -132,7 +132,7 @@ export function RecordWasteDialog({
             </div>
           </div>
           <StockLinesEditor lines={lines} onChange={setLines} idPrefix="waste" />
-          <Input id="waste-note" label={t('inventory.field.note', 'Note')} value={note} onChange={(e) => setNote(e.target.value)} />
+          <Input dir="auto" id="waste-note" label={t('inventory.field.note', 'Note')} value={note} onChange={(e) => setNote(e.target.value)} />
           {problem && (
             <Alert variant="destructive">
               <AlertDescription>{problem}</AlertDescription>

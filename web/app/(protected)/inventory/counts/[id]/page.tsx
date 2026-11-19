@@ -17,6 +17,8 @@ import Link from 'next/link';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
+import { UserText } from '@/components/ui/user-text';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { Input } from '@/components/ui/input';
 import { OperationStatus } from '@/components/inventory/operation-status';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -157,9 +159,14 @@ export default function InventoryCountPage({ params }: { params: Promise<{ id: s
     <div className="space-y-6">
       <AdminHeader
         breadcrumb={
-          <Link href="/inventory?tab=counts" className="hover:underline">
-            {t('inventory.title', 'Inventory')}
-          </Link>
+          <Breadcrumb
+            linkComponent={Link}
+            items={[
+              { label: t('inventory.title', 'Inventory'), href: '/inventory' },
+              { label: t('inventory.tab.counts', 'Counts'), href: '/inventory?tab=counts' },
+              { label: count.number },
+            ]}
+          />
         }
         title={t('inventory.count.heading', 'Count {number}', { number: count.number })}
         description={[
@@ -218,7 +225,9 @@ export default function InventoryCountPage({ params }: { params: Promise<{ id: s
             {lines.map((line: InventoryOperationLine) => (
               <tr key={line.id} className="h-12">
                 <td className="px-4 py-2">
-                  <div className="font-medium">{nameIn(line.item_names, line.item_name, language)}</div>
+                  <div className="font-medium">
+                    <UserText>{nameIn(line.item_names, line.item_name, language)}</UserText>
+                  </div>
                   <bdi dir="ltr" className="font-mono text-xs text-muted-foreground">
                     {line.sku}
                   </bdi>

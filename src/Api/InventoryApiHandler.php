@@ -296,6 +296,7 @@ final class InventoryApiHandler
                 'kind' => $q['kind'] ?? null,
                 'status' => $q['status'] ?? null,
                 'location_id' => isset($q['location_id']) ? (int) $q['location_id'] : null,
+                'order_id' => isset($q['order_id']) ? (int) $q['order_id'] : null,
             ], $limit, max(0, (int) ($q['offset'] ?? 0)), ($q['lines'] ?? '') === 'true')]);
         });
     }

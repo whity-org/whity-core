@@ -17932,19 +17932,19 @@ export interface components {
         };
         InventoryPurchaseOrder: {
             id: number;
-            kind?: string;
+            kind: string;
             number: string;
             /** @enum {string} */
             status: "draft" | "waiting_approval" | "approved" | "partly_done" | "done" | "cancelled";
             contact_id: number;
-            contact_name?: string;
+            contact_name: string;
             location_id: number;
             expected_on?: string | null;
             currency: string;
-            subtotal_minor?: number;
-            tax_minor?: number;
+            subtotal_minor: number;
+            tax_minor: number;
             total_minor: number;
-            notes?: string;
+            notes: string;
             external_ref?: string;
             route_id?: number | null;
             document_id?: number | null;
@@ -17960,7 +17960,7 @@ export interface components {
             done_at?: string | null;
             cancelled_at?: string | null;
             created_at: string;
-            updated_at?: string;
+            updated_at: string;
             line_count?: number;
             received_percent?: number;
             lines?: components["schemas"]["InventoryPurchaseOrderLine"][];
@@ -18209,22 +18209,22 @@ export interface components {
             id: number;
             variant_id: number;
             item_id: number;
-            item_name?: string;
+            item_name: string;
             /** @description The name in each language, such as `{"en": "Flour", "ar": "طحين"}`. */
-            item_names?: {
+            item_names: {
                 [key: string]: string;
             };
-            sku?: string;
+            sku: string;
             contact_id: number;
-            contact_name?: string;
-            supplier_sku?: string;
+            contact_name: string;
+            supplier_sku: string;
             unit: string;
             price_minor: number;
             currency: string;
             min_quantity?: string | null;
             lead_days?: number | null;
             is_preferred: boolean;
-            updated_at?: string;
+            updated_at: string;
         };
         InventorySupplierItemRequest: {
             /** @description The item variant. */
@@ -53948,6 +53948,8 @@ export interface operations {
                 offset?: number;
                 /** @description `true` to include each one's lines. */
                 lines?: string;
+                /** @description Only the receipts of this purchase order. */
+                order_id?: number;
             };
             header?: never;
             path?: never;

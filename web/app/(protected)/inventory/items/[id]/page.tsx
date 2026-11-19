@@ -17,9 +17,13 @@ import Link from 'next/link';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
+import { UserText } from '@/components/ui/user-text';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { AdjustStockDialog } from '@/components/inventory/adjust-stock-dialog';
 import { useReasons } from '@/lib/inventory/use-reasons';
 import { ReorderLevels } from '@/components/inventory/reorder-levels';
+import { SupplierPrices } from '@/components/inventory/supplier-prices';
+import { useWorkspaceCurrency } from '@/lib/branding-context';
 import { ItemFormDialog, kindLabel } from '@/components/inventory/item-form-dialog';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -34,6 +38,7 @@ import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import {
   INVENTORY_READ,
   INVENTORY_WRITE,
+  PURCHASES_READ,
   STOCK_ADJUST,
   inventoryApi,
   inventoryErrorText,
@@ -50,6 +55,7 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
   const language = useLanguageCode();
   const toast = useToast();
   const { reasonName } = useReasons();
+  const currency = useWorkspaceCurrency();
   const { has, loading: accessLoading } = useCapabilities();
   const canWrite = has(INVENTORY_WRITE);
   const canAdjust = has(STOCK_ADJUST);
@@ -146,9 +152,10 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
     <div className="space-y-6">
       <AdminHeader
         breadcrumb={
-          <Link href="/inventory" className="hover:underline">
-            {t('inventory.title', 'Inventory')}
-          </Link>
+          <Breadcrumb
+            linkComponent={Link}
+            items={[{ label: t('inventory.title', 'Inventory'), href: '/inventory' }, { label: nameIn(item.names, item.name, language) }]}
+          />
         }
         title={nameIn(item.names, item.name, language)}
         description={`${kindLabel(t, item.kind)} · ${t('inventory.countedIn', 'counted in {unit}', { unit })}`}
@@ -284,6 +291,8 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
         <ReorderLevels item={item} places={places} rules={rules} canEdit={canWrite} onSaved={refetch} />
       )}
 
+      {item.kind !== 'service' && has(PURCHASES_READ) && <SupplierPrices item={item} currency={currency} canEdit={canWrite && !item.archived} />}
+
       {item.kind !== 'service' && (
         <section className="space-y-3 rounded-lg border border-border p-5" data-testid="item-history">
           <h2 className="text-sm font-semibold text-muted-foreground">{t('inventory.history', 'History')}</h2>
@@ -311,7 +320,14 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {/* Parts that are there, joined: a workspace that hides dates leaves no leading dot. */}
-                        {[dates.dateTime(move.occurred_at), move.posted_by_name, move.note].filter((part) => part).join(' · ')}
+                        {[dates.dateTime(move.occurred_at), move.posted_by_name, move.note]
+                          .filter((part): part is string => typeof part === 'string' && part !== '')
+                          .map((part, i) => (
+                            <span key={i}>
+                              {i > 0 && ' · '}
+                              <UserText>{part}</UserText>
+                            </span>
+                          ))}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">

@@ -203,6 +203,7 @@ export function AdjustStockDialog({
           </div>
           <Input
             id="adjust-note"
+            dir="auto"
             label={t('inventory.field.note', 'Note')}
             value={note}
             onChange={(e) => setNote(e.target.value)}

@@ -22,6 +22,8 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { Chart } from '@/components/lazy-heavy';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
+import { UserText } from '@/components/ui/user-text';
+import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { OperationStatus } from '@/components/inventory/operation-status';
 import { RecordWasteDialog } from '@/components/inventory/record-waste-dialog';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -152,9 +154,10 @@ export default function WasteAndAdjustmentsPage() {
     <div className="space-y-6">
       <AdminHeader
         breadcrumb={
-          <Link href="/inventory" className="hover:underline">
-            {t('inventory.title', 'Inventory')}
-          </Link>
+          <Breadcrumb
+            linkComponent={Link}
+            items={[{ label: t('inventory.title', 'Inventory'), href: '/inventory' }, { label: t('inventory.waste.page', 'Waste and adjustments') }]}
+          />
         }
         title={t('inventory.waste.page', 'Waste and adjustments')}
         description={t('inventory.waste.pageHint', 'Every change to stock that isn’t a sale, a delivery or a transfer')}
@@ -227,7 +230,9 @@ export default function WasteAndAdjustmentsPage() {
                     <tr key={key} className="h-12 align-top">
                       <td className="whitespace-nowrap px-4 py-3">{when(operation.done_at ?? operation.created_at)}</td>
                       <td className="px-4 py-3">{placeName(operation.location_id)}</td>
-                      <td className="px-4 py-3 font-medium">{nameIn(line.item_names, line.item_name, language)}</td>
+                      <td className="px-4 py-3 font-medium">
+                        <UserText>{nameIn(line.item_names, line.item_name, language)}</UserText>
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-end">
                         <bdi dir="ltr" className={`font-mono tabular-nums ${Number(line.change ?? 0) < 0 ? 'text-destructive' : ''}`}>
                           {Number(line.change ?? 0) > 0 ? '+' : ''}
@@ -236,12 +241,18 @@ export default function WasteAndAdjustmentsPage() {
                       </td>
                       <td className="px-4 py-3">
                         {reasonName(reason)}
-                        {(line.note || operation.note) && <div className="text-xs text-muted-foreground">{line.note || operation.note}</div>}
+                        {(line.note || operation.note) && (
+                          <div className="text-xs text-muted-foreground">
+                            <UserText>{line.note || operation.note}</UserText>
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-end">
                         {line.value_minor != null && line.currency ? <Money minor={line.value_minor} currency={line.currency} /> : <span className="text-muted-foreground">–</span>}
                       </td>
-                      <td className="px-4 py-3">{operation.created_by_name ?? '–'}</td>
+                      <td className="px-4 py-3">
+                        <UserText>{operation.created_by_name ?? '–'}</UserText>
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <OperationStatus operation={operation} short />
                       </td>

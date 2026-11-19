@@ -37,6 +37,7 @@ import InventoryPage from '@/app/(protected)/inventory/page';
 import InventoryItemPage from '@/app/(protected)/inventory/items/[id]/page';
 import InventoryCountPage from '@/app/(protected)/inventory/counts/[id]/page';
 import WasteAndAdjustmentsPage from '@/app/(protected)/inventory/adjustments/page';
+import PurchaseOrderPage from '@/app/(protected)/inventory/purchase-orders/[id]/page';
 import { nameIn, quantityText } from '@/lib/inventory/api';
 
 const ok = (data: unknown) => ({ data, error: undefined, response: new Response(null, { status: 200 }) });
@@ -93,6 +94,19 @@ const operation = (over: Record<string, unknown>) => ({
   ...over,
 });
 
+const purchaseOrder = (over: Record<string, unknown>) => ({
+  id: 60, kind: 'purchase', number: 'PO-0001', status: 'approved', contact_id: 31, contact_name: 'Jordan Flour Mills', location_id: 1,
+  expected_on: '2026-11-26', currency: 'USD', subtotal_minor: 38400, tax_minor: 0, total_minor: 38400, notes: '', external_ref: '',
+  route_id: null, document_id: null, source_plugin: null, created_by_profile_id: 11, created_by_name: 'Amro Saleh', agent_id: null,
+  on_behalf_of_profile_id: null, approved_by_profile_id: 23, approved_by_name: 'Emad Nasser', submitted_at: null, approved_at: null,
+  done_at: null, cancelled_at: null, created_at: '2026-11-19 08:00:00', updated_at: '2026-11-19 08:00:00', line_count: 1, received_percent: 0,
+  lines: [{ id: 600, variant_id: 70, item_id: 7, item_name: 'Flour', item_names: { en: 'Flour', ar: 'طحين' }, sku: 'FLR-25', unit: 'bag',
+    quantity: '24', received: '0', base_unit: 'kg', base_quantity: '600.000', price_minor: 1600, discount_bp: 0, tax_bp: 0,
+    line_total_minor: 38400, is_closed: false, is_over: false, note: '' }],
+  receipts: [],
+  ...over,
+});
+
 function routeGet(path: string) {
   switch (path) {
     case '/api/v1/inventory/units':
@@ -116,6 +130,10 @@ function routeGet(path: string) {
       return ok({ data: { approve_adjustments_above: '25', approve_counts_above: '25', adjustment_route_template_id: null, count_route_template_id: null, transfers_one_step: false } });
     case '/api/v1/inventory/operations/{id}':
       return ok({ data: operation({}) });
+    case '/api/v1/inventory/purchase-orders':
+      return ok({ data: [purchaseOrder({ lines: undefined, received_percent: 25, status: 'partly_done' })] });
+    case '/api/v1/inventory/purchase-orders/{id}':
+      return ok({ data: purchaseOrder({}) });
     default:
       return ok({ data: [] });
   }
@@ -214,6 +232,86 @@ describe('/inventory/counts/[id]', () => {
       expect(PUT).toHaveBeenCalledWith('/api/v1/inventory/counts/{id}/lines', expect.objectContaining({ body: { lines: [{ variant_id: 70, counted: '440' }] } }))
     );
     await waitFor(() => expect(POST).toHaveBeenCalledWith('/api/v1/inventory/counts/{id}/finish', expect.anything()));
+  });
+});
+
+describe('purchases (WHIT-1234)', () => {
+  it('lists purchase orders on the Purchases tab with New purchase order as the main button', async () => {
+    permissions = ['inventory:read', 'inventory:write', 'purchases:read', 'purchases:write'];
+    render(<InventoryPage />);
+    fireEvent.mouseDown(await screen.findByRole('tab', { name: 'Purchases' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Purchases' }));
+    expect(await screen.findByText('PO-0001')).toBeInTheDocument();
+    expect(screen.getByText('Jordan Flour Mills')).toBeInTheDocument();
+    expect(screen.getByText('Partly received')).toBeInTheDocument();
+    expect(screen.getByTestId('inventory-new-po')).toHaveTextContent('New purchase order');
+  });
+
+  it('hides the Purchases tab from people who don\'t see purchases', async () => {
+    permissions = ['inventory:read'];
+    render(<InventoryPage />);
+    expect(await screen.findByRole('tab', { name: 'Stock' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Purchases' })).toBeNull();
+  });
+
+  it('receives against an approved order and asks before taking more than ordered', async () => {
+    permissions = ['purchases:read', 'purchases:write'];
+    POST.mockResolvedValueOnce({
+      data: undefined,
+      error: { error: 'lines[0]: that is more Flour than ordered.', details: { code: 'over_receipt' } },
+      response: new Response(null, { status: 409 }),
+    });
+    POST.mockResolvedValueOnce(ok({ data: purchaseOrder({ status: 'done' }) }));
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <PurchaseOrderPage params={Promise.resolve({ id: '60' })} />
+        </Suspense>
+      );
+    });
+    expect(await screen.findByTestId('po-lines')).toHaveTextContent('24');
+    fireEvent.click(screen.getByTestId('po-receive'));
+    const amount = await screen.findByLabelText('Arrived, in bag');
+    expect(amount).toHaveValue('24');
+    fireEvent.change(amount, { target: { value: '25' } });
+    fireEvent.click(screen.getByTestId('po-receive-save'));
+    expect(await screen.findByText('More arrived than was ordered. Receive it anyway?')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('po-receive-save'));
+    await waitFor(() =>
+      expect(POST).toHaveBeenLastCalledWith(
+        '/api/v1/inventory/purchase-orders/{id}/receive',
+        expect.objectContaining({ body: expect.objectContaining({ allow_over: true, lines: [{ line_id: 600, quantity: '25' }] }) })
+      )
+    );
+  });
+});
+
+describe('a purchase order page', () => {
+  it('reads Purchases › PO-0001, keeps a typed note in its own direction, and tells its history', async () => {
+    permissions = ['purchases:read'];
+    GET.mockImplementation(async (path: string) =>
+      path === '/api/v1/inventory/purchase-orders/{id}'
+        ? ok({ data: purchaseOrder({ notes: 'Deliver to the back door before 9.', submitted_at: '2026-11-19 08:05:00', approved_at: '2026-11-19 08:10:00' }) })
+        : routeGet(path)
+    );
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <PurchaseOrderPage params={Promise.resolve({ id: '60' })} />
+        </Suspense>
+      );
+    });
+    const crumbs = await screen.findByRole('navigation', { name: 'Breadcrumb' });
+    expect(crumbs).toHaveTextContent('Purchases');
+    expect(crumbs).toHaveTextContent('PO-0001');
+    expect(screen.getByText('Deliver to the back door before 9.').tagName).toBe('BDI');
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'History' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'History' }));
+    const history = await screen.findByTestId('po-history');
+    expect(history).toHaveTextContent('Drafted by Amro Saleh');
+    expect(history).toHaveTextContent('Sent for approval');
+    expect(history).toHaveTextContent('Approved by Emad Nasser');
   });
 });
 

@@ -193,6 +193,7 @@ final class InventoryApiSchemas
                     self::param('limit', 'integer', 'At most 200. Default 50.'),
                     self::param('offset', 'integer', 'How many to skip.'),
                     self::param('lines', 'string', '`true` to include each one\'s lines.'),
+                    self::param('order_id', 'integer', 'Only the receipts of this purchase order.'),
                 ],
                 'responses' => [200 => self::json('Operations, with their lines when asked', self::list('InventoryOperation'))] + self::auth(),
             ]),
@@ -830,7 +831,7 @@ final class InventoryApiSchemas
                     'id' => self::int(), 'number' => self::str(), 'status' => self::str(), 'batch_key' => self::str(true),
                     'done_at' => self::str(true), 'created_by_name' => self::str(true), 'line_count' => self::int(),
                 ], ['id', 'number'])],
-            ], ['id', 'number', 'status', 'contact_id', 'location_id', 'currency', 'total_minor', 'created_at']),
+            ], ['id', 'kind', 'number', 'status', 'contact_id', 'contact_name', 'location_id', 'currency', 'subtotal_minor', 'tax_minor', 'total_minor', 'notes', 'created_at', 'updated_at']),
             'InventoryPurchaseOrderRequest' => self::object([
                 'contact_id' => self::int() + ['description' => 'The supplier: a contact marked as a supplier.'],
                 'location_id' => self::int() + ['description' => 'The place it is received into.'],
@@ -895,7 +896,7 @@ final class InventoryApiSchemas
                 'lead_days' => self::int(true),
                 'is_preferred' => self::bool(),
                 'updated_at' => self::str(),
-            ], ['id', 'variant_id', 'item_id', 'contact_id', 'unit', 'price_minor', 'currency', 'is_preferred']),
+            ], ['id', 'variant_id', 'item_id', 'item_name', 'item_names', 'sku', 'contact_id', 'contact_name', 'supplier_sku', 'unit', 'price_minor', 'currency', 'is_preferred', 'updated_at']),
             'InventorySupplierItemRequest' => self::object([
                 'variant_id' => self::int() + ['description' => 'The item variant.'],
                 'contact_id' => self::int() + ['description' => 'The supplier: a contact marked as a supplier.'],
