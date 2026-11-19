@@ -128,9 +128,23 @@ export function trustedClientIp(request: Request, hops: number = trustedProxyHop
  * an optional port gives null, and no `X-Forwarded-Host` is sent.
  */
 export function trustedForwardedHost(request: Request, hops: number = trustedProxyHops()): string | null {
-  let host = request.headers.get('host');
+  return trustedForwardedHostFrom(request.headers, hops);
+}
+
+/**
+ * {@link trustedForwardedHost} for a header set alone, such as the one
+ * `headers()` from `next/headers` gives a server component. The server-side
+ * fetches for branding, theme, UI preferences and share cards use it, so a
+ * browser can't pick another workspace's answer for the page it is shown by
+ * sending its own `X-Forwarded-Host` (WHIT-1295, #2195).
+ */
+export function trustedForwardedHostFrom(
+  headers: { get(name: string): string | null },
+  hops: number = trustedProxyHops(),
+): string | null {
+  let host = headers.get('host');
   if (hops > 0) {
-    const forwarded = (request.headers.get('x-forwarded-host') ?? '')
+    const forwarded = (headers.get('x-forwarded-host') ?? '')
       .split(',')
       .map(part => part.trim())
       .filter(part => part.length > 0);
