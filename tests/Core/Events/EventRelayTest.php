@@ -6,6 +6,8 @@ namespace Tests\Core\Events;
 
 use PDO;
 use PHPUnit\Framework\TestCase;
+use Whity\Auth\RoleChecker;
+use Whity\Core\Audit\AuditContext;
 use Whity\Core\Events\DomainEventStore;
 use Whity\Core\Events\EventRelay;
 use Whity\Core\Hooks\HookManager;
@@ -50,6 +52,8 @@ final class EventRelayTest extends TestCase
     protected function tearDown(): void
     {
         TenantContext::reset();
+        AuditContext::reset();
+        RoleChecker::clearCache();
     }
 
     private function createSchema(): void
@@ -238,6 +242,59 @@ final class EventRelayTest extends TestCase
         $this->relay->relayNext();
 
         self::assertNull(TenantContext::getTenantId());
+    }
+
+    // ── #2205: no permissions or actor carried from one event to the next ────
+
+    public function testAListenerNeverSeesPermissionsResolvedBeforeItsEvent(): void
+    {
+        // A permission set resolved earlier in this long-running process, then
+        // revoked: the relay must not hand it to the next listener.
+        self::seedPermissionCache(['p:7:11:0:-' => ['documents:approve']]);
+        AuditContext::set(7, '203.0.113.9');
+
+        $seen = null;
+        $actor = 'unset';
+        $this->hooks->listen('thing.happened.async', static function () use (&$seen, &$actor): void {
+            $seen = self::permissionCache();
+            $actor = AuditContext::getActorUserId();
+        });
+        $this->appendEvent(11, 'thing.happened.async');
+
+        $this->relay->relayNext();
+
+        self::assertSame([], $seen, 'a listener must resolve permissions afresh, not from before its event');
+        self::assertNull($actor, 'and must not inherit an audit actor from before its event');
+    }
+
+    public function testWhatAListenerResolvedDoesNotOutliveItsEvent(): void
+    {
+        $this->hooks->listen('thing.happened.async', static function (): void {
+            self::seedPermissionCache(['p:7:11:0:-' => ['documents:approve']]);
+            AuditContext::set(7, null);
+        });
+        $this->appendEvent(11, 'thing.happened.async');
+
+        $this->relay->relayNext();
+
+        self::assertSame([], self::permissionCache());
+        self::assertNull(AuditContext::getActorUserId());
+    }
+
+    /** @param array<string, list<string>> $entries */
+    private static function seedPermissionCache(array $entries): void
+    {
+        $property = new \ReflectionProperty(RoleChecker::class, 'effectiveUserPermissionCache');
+        $property->setValue(null, $entries);
+    }
+
+    /** @return array<string, mixed> */
+    private static function permissionCache(): array
+    {
+        $property = new \ReflectionProperty(RoleChecker::class, 'effectiveUserPermissionCache');
+        $value = $property->getValue();
+
+        return is_array($value) ? $value : [];
     }
 
     // ── failure: retried, then dead-lettered, never silently dropped ─────────
