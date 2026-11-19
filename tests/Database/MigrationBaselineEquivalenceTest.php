@@ -295,7 +295,9 @@ final class MigrationBaselineEquivalenceTest extends TestCase
                 if (self::isPerInstall($table, (string) $col['column_name'], (string) $col['data_type'])) {
                     continue;
                 }
-                $kept[] = Baseline::quoteIdent((string) $col['column_name']);
+                $kept[] = $table === 'role_permissions' && $col['column_name'] === 'permission_id'
+                    ? '(SELECT p.name FROM permissions p WHERE p.id = role_permissions.permission_id) AS permission_name'
+                    : Baseline::quoteIdent((string) $col['column_name']);
             }
             $list = $kept === [] ? '1' : implode(', ', $kept);
             $t = Baseline::quoteIdent($table);
@@ -323,7 +325,13 @@ final class MigrationBaselineEquivalenceTest extends TestCase
             $name = (string) $table['name'];
             $columns = self::queryVerbatim($pdo, 'PRAGMA table_info(' . Baseline::quoteIdent($name) . ')');
             $lines = [];
+            $permissionNames = $name === 'role_permissions'
+                ? array_column(self::queryVerbatim($pdo, 'SELECT id, name FROM permissions'), 'name', 'id')
+                : [];
             foreach (self::queryVerbatim($pdo, 'SELECT * FROM ' . Baseline::quoteIdent($name)) as $row) {
+                if ($permissionNames !== []) {
+                    $row['permission_id'] = $permissionNames[$row['permission_id']] ?? $row['permission_id'];
+                }
                 $cells = [];
                 foreach ($columns as $col) {
                     $column = (string) $col['name'];
@@ -375,6 +383,13 @@ final class MigrationBaselineEquivalenceTest extends TestCase
     private static function isPerInstall(string $table, string $column, string $type): bool
     {
         if ($table === 'profiles' && $column === 'password_hash') {
+            return true;
+        }
+        // A permission added to CorePermissions after the baseline gets its
+        // row from migration 013 in a replay and on load from the baseline, so
+        // its id differs. Permissions are compared by name instead (and
+        // role_permissions by the permission's name, see permissionName()).
+        if ($table === 'permissions' && $column === 'id') {
             return true;
         }
 

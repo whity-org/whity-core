@@ -125,6 +125,7 @@ try {
     replay($db, $migrationDir, $names);
     $say(sprintf('  replayed in %.1f s', microtime(true) - $started));
 
+    emptyReseededTables($pdo, 'pgsql');
     $pgNowColumns = placeholdersPostgres($pdo, $start);
     unset($db, $pdo);
 
@@ -143,6 +144,7 @@ $sqliteStart = min(gmdate('Y-m-d H:i:s', time() - 5), date('Y-m-d H:i:s', time()
 $started = microtime(true);
 $sqlite = SchemaFromMigrations::replaySqlite($through);
 $say(sprintf('  replayed in %.1f s', microtime(true) - $started));
+emptyReseededTables($sqlite, 'sqlite');
 $sqliteNowColumns = placeholdersSqlite($sqlite, $sqliteStart);
 $sqliteSql = dumpSqlite($sqlite);
 
@@ -160,6 +162,7 @@ file_put_contents($baselineDir . '/' . Baseline::MANIFEST, json_encode([
     'postgres_version' => $pgVersion,
     'sqlite_version' => (string) $sqlite->query('SELECT sqlite_version()')->fetchColumn(),
     'now_columns' => ['pgsql' => $pgNowColumns, 'sqlite' => $sqliteNowColumns],
+    'reseed' => array_values(array_intersect(Baseline::RESEED_MIGRATIONS, $names)),
     'migrations' => $names,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
 
@@ -195,6 +198,29 @@ function replay(Database $db, string $migrationDir, array $names): void
         }
     } finally {
         ob_end_clean();
+    }
+}
+
+/**
+ * Empty the tables a replay fills from today's catalogue (Baseline::RESEED_TABLES),
+ * with their id counters back at the start. A load re-runs the migrations that
+ * fill them, so new labels never make the baseline stale.
+ */
+function emptyReseededTables(PDO $pdo, string $driver): void
+{
+    $exec = static fn(string $sql) => (new ReflectionMethod(PDO::class, 'exec'))->invoke($pdo, $sql);
+    foreach (Baseline::RESEED_TABLES as $table) {
+        $t = Baseline::quoteIdent($table);
+        if ($driver === 'pgsql') {
+            $exec("TRUNCATE {$t} RESTART IDENTITY");
+        } else {
+            $exec("DELETE FROM {$t}");
+            $hasSequence = (new ReflectionMethod(PDO::class, 'query'))
+                ->invoke($pdo, "SELECT 1 FROM sqlite_master WHERE name = 'sqlite_sequence'")->fetchColumn();
+            if ($hasSequence !== false) {
+                $exec('DELETE FROM sqlite_sequence WHERE name = ' . $pdo->quote($table));
+            }
+        }
     }
 }
 

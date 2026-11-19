@@ -7,6 +7,7 @@ namespace Whity\Database\Migration;
 use PDO;
 use RuntimeException;
 use Whity\Core\Identity\AuthMethod;
+use Whity\Core\RBAC\CorePermissions;
 use Whity\Database\BootstrapIdentity;
 use Whity\Database\Database;
 use Whity\Database\InitialPassword;
@@ -39,9 +40,33 @@ use Whity\Database\InitialPassword;
  *   - the bootstrap administrator's password comes from
  *     INITIAL_SYSTEM_ADMIN_PASSWORD (or a printed random one), and its email
  *     from INITIAL_SYSTEM_ADMIN_EMAIL, exactly as migrations 036 and 095 do.
+ *
+ * Rows that migrations read from files or code AS THEY ARE TODAY are not in
+ * the files either, because a saved copy goes stale the moment someone adds a
+ * label or a permission:
+ *   - `translations` is saved empty, and on load migrations 091, 121 and 124
+ *     run again, so the labels come from the catalogue in this release, as a
+ *     replay would load them (RESEED_TABLES, RESEED_MIGRATIONS);
+ *   - every permission in CorePermissions that the baseline lacks is added, as
+ *     migration 013 does, and migration 135 runs again so descriptions come
+ *     from CorePermissionDescriptions.
  */
 final class Baseline
 {
+    /** Tables saved without their rows: a replay fills them from today's files. */
+    public const RESEED_TABLES = ['translations'];
+
+    /**
+     * Migrations that run again after a load, in this order. Each reads the
+     * catalogue or code as it is now and is safe to run twice.
+     */
+    public const RESEED_MIGRATIONS = [
+        '091_seed_auth_translations',
+        '121_seed_translation_catalogues',
+        '124_add_translation_source_provenance',
+        '135_sync_permission_descriptions',
+    ];
+
     /** Stored in place of a "now" timestamp; replaced on load. */
     public const NOW_PLACEHOLDER = '1970-01-02 03:04:05';
 
@@ -58,7 +83,8 @@ final class Baseline
      *     fingerprint: string,
      *     files: array<string, string>,
      *     now_columns: array<string, list<array{0: string, 1: string}>>,
-     *     sqlite_version: ?string
+     *     sqlite_version: ?string,
+     *     reseed: list<string>
      * } $manifest
      */
     private function __construct(private readonly string $dir, private readonly array $manifest)
@@ -87,8 +113,11 @@ final class Baseline
 
         $decoded['now_columns'] = is_array($decoded['now_columns'] ?? null) ? $decoded['now_columns'] : [];
         $decoded['sqlite_version'] = is_string($decoded['sqlite_version'] ?? null) ? $decoded['sqlite_version'] : null;
+        $decoded['reseed'] = is_array($decoded['reseed'] ?? null)
+            ? array_values(array_filter($decoded['reseed'], 'is_string'))
+            : [];
 
-        /** @var array{through: int, last: string, migrations: list<string>, fingerprint: string, files: array<string, string>, now_columns: array<string, list<array{0: string, 1: string}>>, sqlite_version: ?string} $decoded */
+        /** @var array{through: int, last: string, migrations: list<string>, fingerprint: string, files: array<string, string>, now_columns: array<string, list<array{0: string, 1: string}>>, sqlite_version: ?string, reseed: list<string>} $decoded */
         return new self($dir, $decoded);
     }
 
@@ -223,8 +252,9 @@ final class Baseline
      *
      * The caller has checked {@see isFreshDatabase()} and {@see unusableBecause()}.
      */
-    public function apply(Database $db, bool $record = true): void
+    public function apply(Database $db, bool $record = true, ?string $migrationDir = null): void
     {
+        $migrationDir ??= dirname($this->dir) . '/migrations';
         $pdo = $db->getPdo();
         $driver = (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
         $sql = $this->sql($driver);
@@ -264,6 +294,7 @@ final class Baseline
 
             $this->stampNow($pdo, $driver);
             $this->applyInstallSettings($db);
+            $this->reseed($db, $migrationDir);
 
             if ($record) {
                 $insert = $pdo->prepare(
@@ -283,6 +314,54 @@ final class Baseline
             }
 
             throw new RuntimeException('Loading the schema baseline failed, nothing was kept: ' . $e->getMessage(), 0, $e);
+        }
+    }
+
+    /**
+     * Fill what the baseline leaves out from today's files and code: the core
+     * permissions a replay's migration 013 would add, then the manifest's
+     * reseed migrations. Runs inside the load's transaction, through the
+     * normal PDO, as the migrations themselves would.
+     */
+    private function reseed(Database $db, string $migrationDir): void
+    {
+        if ($this->manifest['reseed'] === []) {
+            return;
+        }
+
+        if (in_array('permissions', self::userTables($db->getPdo()), true)) {
+            foreach (CorePermissions::all() as $permission) {
+                // Migration 013's catalogue catch-up; migration 135 below writes
+                // the real description over the placeholder.
+                $db->query(
+                    'INSERT INTO permissions (name, description, created_at)
+                     VALUES (:name, :description, NOW())
+                     ON CONFLICT (name) DO NOTHING',
+                    [':name' => $permission, ':description' => 'Core permission (' . $permission . ')']
+                );
+            }
+        }
+
+        ob_start();
+        try {
+            foreach ($this->manifest['reseed'] as $name) {
+                $parts = explode('_', $name);
+                array_shift($parts);
+                $class = 'Database\\Migrations\\' . implode('', array_map('ucfirst', $parts));
+                $file = $migrationDir . '/' . $name . '.php';
+                if (!class_exists($class, false)) {
+                    if (!is_file($file)) {
+                        throw new RuntimeException("The baseline re-runs {$name}, and {$file} is missing.");
+                    }
+                    require_once $file;
+                }
+                if (!is_callable([$class, 'up'])) {
+                    throw new RuntimeException("Migration class {$class} not found in {$file}.");
+                }
+                $class::up($db);
+            }
+        } finally {
+            ob_end_clean();
         }
     }
 

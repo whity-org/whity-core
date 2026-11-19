@@ -489,7 +489,7 @@ class MigrationsCommand implements CommandHelp, CliCommand
 
         $start = microtime(true);
         echo "  Fresh database: loading the schema baseline (migrations 001 to " . sprintf("%03d", $baseline->through()) . ")... ";
-        $baseline->apply($this->db);
+        $baseline->apply($this->db, true, $this->migrationDir);
         echo "\033[0;32m✓\033[0m " . self::elapsed($start) . "\n";
 
         return count($baseline->migrations());
