@@ -103336,6 +103336,10 @@
                         "type": "integer",
                         "nullable": true
                     },
+                    "nobody_can_approve": {
+                        "type": "boolean",
+                        "description": "Waiting for approval, and nobody can approve it yet: nothing posts until someone holds inventory:settings or a route is chosen, then sending it again routes it (WHIT-1301)."
+                    },
                     "batch_key": {
                         "type": "string",
                         "nullable": true

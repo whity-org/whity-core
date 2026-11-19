@@ -10,6 +10,7 @@ use Whity\Core\Document\RouteTemplate\RouteTemplateRepository;
 use Whity\Core\Document\Routing\DocumentRouter;
 use Whity\Core\Document\Routing\RouteQuorum;
 use Whity\Core\Document\Routing\RoutingRuleRegistry;
+use Whity\Core\Notification\NotificationDispatcher;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Settings\SettingsRegistry;
 
@@ -25,9 +26,17 @@ use Whity\Core\Settings\SettingsRegistry;
  * person). With none chosen, one step goes to everyone with
  * `inventory:settings` other than the person who wrote it, and the first
  * answer decides. Approving is never a permission of its own (IV.19).
+ *
+ * NOBODY TO APPROVE FAILS CLOSED (WHIT-1301). When no one but the person who
+ * wrote it holds `inventory:settings`, {@see issue()} answers null and the
+ * operation keeps waiting; {@see nobodyCanApprove()} tells the settings
+ * holders and the owners how to unblock it.
  */
 final class OperationRoutes implements OperationApprovals
 {
+    /** The notice that an operation waits with nobody to approve it. */
+    public const TYPE_NOBODY_CAN_APPROVE = 'inventory.approval.nobody';
+
     /**
      * @param \Closure(int): array<string, mixed> $settings the workspace's effective settings
      */
@@ -37,7 +46,42 @@ final class OperationRoutes implements OperationApprovals
         private readonly RouteTemplateRepository $templates,
         private readonly RoleChecker $roles,
         private readonly \Closure $settings,
+        private readonly ?NotificationDispatcher $notifications = null,
     ) {
+    }
+
+    public function nobodyCanApprove(int $tenantId, ?int $actor, array $operation): void
+    {
+        if ($this->notifications === null) {
+            return;
+        }
+        $people = $this->deciders($tenantId);
+        foreach ($this->db->all(
+            'SELECT profile_id FROM workspace_owners WHERE tenant_id = :tenant_id ORDER BY profile_id LIMIT 50',
+            [':tenant_id' => $tenantId]
+        ) as $row) {
+            $people[] = (int) $row['profile_id'];
+        }
+        $what = ((string) $operation['kind'] === 'count' ? 'Stock count ' : 'Stock adjustment ') . (string) $operation['number'];
+        foreach (array_values(array_unique($people)) as $profileId) {
+            try {
+                $this->notifications->dispatch($tenantId, $profileId, self::TYPE_NOBODY_CAN_APPROVE, [
+                    'subject' => 'Nobody can approve ' . $what . ' yet',
+                    'body' => $what . ' is waiting for approval, and nobody can approve it yet. '
+                        . 'Give someone the inventory settings permission, or choose an approval route in the inventory settings. '
+                        . 'Then send it again.',
+                    'data' => [
+                        'operation_id' => (int) $operation['id'],
+                        'kind' => (string) $operation['kind'],
+                        'number' => (string) $operation['number'],
+                        'acting_profile_id' => $actor,
+                    ],
+                ]);
+            } catch (\Throwable $e) {
+                // One person who could not be told must not stop the rest.
+                error_log('[OperationRoutes] nobody-can-approve notice to profile ' . $profileId . ' failed: ' . $e->getMessage());
+            }
+        }
     }
 
     public function issue(int $tenantId, ?int $actor, array $operation): ?int

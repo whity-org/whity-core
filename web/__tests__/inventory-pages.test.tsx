@@ -7,7 +7,7 @@
  */
 
 import React, { Suspense } from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
@@ -335,6 +335,29 @@ describe('/inventory/adjustments', () => {
     expect(screen.getAllByText('Waiting for approval').length).toBeGreaterThan(0);
     expect(screen.getByTestId('waste-rules')).toHaveTextContent(/Over \u2066\$25\.00\u2069 a line/);
     expect(screen.getByTestId('waste-rows')).toHaveTextContent('Ibrahim Mansour');
+    expect(screen.queryByTestId('nobody-can-approve-41')).not.toBeInTheDocument();
+  });
+
+  it('says plainly when nobody can approve a change yet, and sends it again (WHIT-1301)', async () => {
+    const stuck = operation({
+      id: 42, kind: 'adjustment', number: 'ADJ-0002', status: 'waiting_approval', reason_code: 'spoiled', value_minor: 3200, currency: 'USD',
+      nobody_can_approve: true,
+      lines: [{ ...operation({}).lines[0], id: 420, change: '-8.000', reason_code: '', value_minor: 3200 }],
+    });
+    GET.mockImplementation(async (path: string, opts?: { params?: { query?: { kind?: string } } }) => {
+      if (path === '/api/v1/inventory/operations' && opts?.params?.query?.kind === 'adjustment') {
+        return ok({ data: [stuck] });
+      }
+      return routeGet(path);
+    });
+    POST.mockResolvedValue(ok({ data: { ...stuck, nobody_can_approve: false, route_id: 7 } }));
+    render(<WasteAndAdjustmentsPage />);
+    const notice = await screen.findByTestId('nobody-can-approve-42');
+    expect(notice).toHaveTextContent('ADJ-0002 is waiting for approval, and nobody can approve it yet');
+    fireEvent.click(within(notice).getByRole('button', { name: 'Send again' }));
+    await waitFor(() =>
+      expect(POST).toHaveBeenCalledWith('/api/v1/inventory/adjustments/{id}/submit', expect.objectContaining({ params: { path: { id: 42 } } }))
+    );
   });
 });
 

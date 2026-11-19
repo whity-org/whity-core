@@ -5625,7 +5625,9 @@ $inventoryOperations = new \Whity\Core\Inventory\StockOperations(
 );
 $routeSubjectRegistry->register(new \Whity\Core\Inventory\OperationRouteSubject(\Whity\Core\Inventory\OperationRouteSubject::ADJUSTMENT, $inventoryDb, $inventoryOperations));
 $routeSubjectRegistry->register(new \Whity\Core\Inventory\OperationRouteSubject(\Whity\Core\Inventory\OperationRouteSubject::COUNT, $inventoryDb, $inventoryOperations));
-$inventoryOperations->useApprovals(new \Whity\Core\Inventory\OperationRoutes($inventoryDb, $documentRouter, $routeTemplateRepository, $roleChecker, $inventorySettings));
+// WHIT-1301: a change nobody can approve keeps waiting, and the people who
+// can fix that are told.
+$inventoryOperations->useApprovals(new \Whity\Core\Inventory\OperationRoutes($inventoryDb, $documentRouter, $routeTemplateRepository, $roleChecker, $inventorySettings, $notificationDispatcher));
 $inventoryReorder = new \Whity\Core\Inventory\ReorderRules($inventoryDb, $inventoryItems, $inventoryLedger, $hookManager);
 $inventoryReorder->subscribe($hookManager);
 // WHIT-1234: purchase orders, what suppliers sell, and receiving against an
