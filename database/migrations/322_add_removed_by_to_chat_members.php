@@ -18,13 +18,16 @@ use Whity\Database\Database;
  * starter removed must not walk back in that way; someone who left may. This
  * column is how the two are told apart.
  *
+ * A plain id, not a foreign key: it is only compared with the person asking,
+ * and a constraint would check every row under a lock (migration lint).
+ *
  * Additive and nullable, so nothing to backfill. Idempotent and reversible.
  */
 class AddRemovedByToChatMembers
 {
     public static function up(Database $db): void
     {
-        $db->exec('ALTER TABLE chat_members ADD COLUMN IF NOT EXISTS removed_by_profile_id INTEGER REFERENCES profiles(id) ON DELETE SET NULL');
+        $db->exec('ALTER TABLE chat_members ADD COLUMN IF NOT EXISTS removed_by_profile_id INTEGER');
     }
 
     public static function down(Database $db): void
