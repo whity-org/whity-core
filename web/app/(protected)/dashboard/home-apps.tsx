@@ -19,7 +19,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@whity/ui/button';
 import { Card } from '@whity/ui/card';
-import { Chart } from '@whity/ui/chart';
+import { Chart } from '@/components/lazy-heavy';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@whity/ui/dropdown-menu';
 import { Icon } from '@whity/ui/icon';
 import { iconNames, type IconName } from '@whity/ui/icon-map';

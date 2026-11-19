@@ -26,7 +26,8 @@
 import { api } from '@/lib/api/client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import * as TablerIcons from '@tabler/icons-react';
+import { IconFile } from '@tabler/icons-react';
+import { namedIcon } from '@/lib/named-icon';
 import type { Icon as TablerIcon } from '@tabler/icons-react';
 import { CommandPalette, type CommandPaletteItem } from '@whity/ui/command-palette';
 import { Icon } from '@whity/ui/icon';
@@ -63,16 +64,9 @@ type SearchGroup = components['schemas']['SearchGroup'];
 /** Fired on `window` to open the palette, e.g. by the top bar's search field. */
 export const OPEN_COMMAND_PALETTE_EVENT = 'whity:open-command-palette';
 
-const tablerIcons = TablerIcons as unknown as Record<string, TablerIcon | undefined>;
-
+/** A nav item's icon by name; any non-curated Tabler icon loads on demand (WHIT-1245). */
 function navIcon(name: string | undefined): TablerIcon {
-  if (!name) return TablerIcons.IconFile;
-  const pascal = name
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join('');
-  return tablerIcons[pascal.startsWith('Icon') ? pascal : `Icon${pascal}`] ?? TablerIcons.IconFile;
+  return namedIcon(name, IconFile);
 }
 
 /** Search starts at two characters, and waits for a pause in typing. */
