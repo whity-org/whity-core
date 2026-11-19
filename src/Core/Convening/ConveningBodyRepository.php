@@ -354,6 +354,21 @@ final class ConveningBodyRepository
             );
         }
 
+        // #2248: profiles are global, so without this a body could seat, invite
+        // and mail somebody from another workspace. Only a person who is an
+        // active member here may hold a seat.
+        $member = $this->db->prepare(
+            "SELECT 1 FROM memberships
+              WHERE tenant_id = :tenant_id AND profile_id = :profile_id AND status = 'active'
+              LIMIT 1"
+        );
+        $member->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId]);
+        if ($member->fetchColumn() === false) {
+            throw ConveningRejectedException::because(
+                'Only an active member of this workspace can hold a seat on one of its bodies.'
+            );
+        }
+
         $stmt = $this->db->prepare(
             'SELECT id FROM convening_body_members
               WHERE tenant_id = :tenant_id AND body_id = :body_id
