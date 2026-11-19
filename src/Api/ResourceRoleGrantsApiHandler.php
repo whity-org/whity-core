@@ -352,6 +352,25 @@ final class ResourceRoleGrantsApiHandler
             return Response::error('A grant id is required', 400);
         }
 
+        // #2313: taking a grant away needs the same standing as giving it. A
+        // caller who does not hold, AT this resource, everything the grant's
+        // role carries may not remove it, or `roles:manage` would let anyone
+        // strip an approver or owner who outranks them.
+        $grant = $this->repository->findById($tenantId, $grantId);
+        if ($grant === null) {
+            return Response::error('Grant not found', 404);
+        }
+        $missing = $this->rolesNotHeldAt(
+            $request,
+            $tenantId,
+            [$grant['role_id']],
+            $grant['resource_type'],
+            $grant['resource_id']
+        );
+        if ($missing !== []) {
+            return RoleGrantGuard::refusal($missing, 'This grant gives access you do not hold here, so you may not remove it');
+        }
+
         if (!$this->repository->revokeById($tenantId, $grantId)) {
             return Response::error('Grant not found', 404);
         }
@@ -442,6 +461,18 @@ final class ResourceRoleGrantsApiHandler
             return Response::error('resource_id is required and must be a positive integer', 422);
         }
 
+        // #2313: the same rule as a single revoke, for every grant here. All or
+        // nothing: a cleanup that removed only the rows the caller outranks
+        // would report a count and leave the rest for a reused id to inherit.
+        $roleIds = array_values(array_unique(array_map(
+            static fn (array $grant): int => $grant['role_id'],
+            $this->repository->listFor($tenantId, $resourceType, $resourceId)
+        )));
+        $missing = $this->rolesNotHeldAt($request, $tenantId, $roleIds, $resourceType, $resourceId);
+        if ($missing !== []) {
+            return RoleGrantGuard::refusal($missing, 'Some grants here give access you do not hold, so you may not remove them');
+        }
+
         $revoked = $this->repository->revokeAllFor($tenantId, $resourceType, $resourceId);
 
         // A DISTINCT event, not N × `rbac.resource_grant.revoked`: that payload
@@ -470,6 +501,37 @@ final class ResourceRoleGrantsApiHandler
                 'revoked' => $revoked,
             ],
         ]);
+    }
+
+    /**
+     * The permissions these roles carry that the caller does not hold at this
+     * resource (#2313), sorted; empty when the caller may remove them.
+     *
+     * @param list<int> $roleIds
+     * @return list<string>
+     */
+    private function rolesNotHeldAt(
+        Request $request,
+        int $tenantId,
+        array $roleIds,
+        string $resourceType,
+        int $resourceId
+    ): array {
+        $actor = self::actorProfileId($request);
+        if ($actor === null) {
+            return ['*'];
+        }
+        $guard = new RoleGrantGuard($this->roleChecker);
+        $missing = [];
+        foreach ($roleIds as $roleId) {
+            foreach ($guard->roleNotHeld($actor, $tenantId, $roleId, $resourceType, $resourceId) as $permission) {
+                $missing[$permission] = true;
+            }
+        }
+        $missing = array_map(strval(...), array_keys($missing));
+        sort($missing);
+
+        return $missing;
     }
 
     /**

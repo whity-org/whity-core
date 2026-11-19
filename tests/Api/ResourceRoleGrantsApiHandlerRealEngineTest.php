@@ -740,6 +740,68 @@ final class ResourceRoleGrantsApiHandlerRealEngineTest extends TestCase
     }
 
     /**
+     * #2313: removing a grant needs the same standing as giving it. A caller
+     * with `roles:manage` who does not hold what the grant's role carries at
+     * that resource cannot take it away, one at a time or all at once, and the
+     * rows survive.
+     */
+    public function testRefusesToRevokeAGrantWhoseRoleOutranksTheCaller(): void
+    {
+        $this->grantPermissionToRole('editor', 'posts:delete');
+        $grantId = $this->seedGrantRow(ResourceTypeRegistry::TYPE_OU, $this->ouA, $this->roleId('editor'), $this->memberProfileId);
+        $before = $this->countGrants();
+
+        $response = $this->handler()->revoke(
+            $this->req('DELETE', '/api/resource-role-grants/' . $grantId),
+            ['id' => (string) $grantId]
+        );
+        self::assertSame(403, $response->getStatusCode(), (string) $response->getBody());
+        $decoded = json_decode((string) $response->getBody(), true);
+        self::assertSame('exceeds_your_access', $decoded['details']['reason'] ?? null);
+        self::assertSame(['posts:delete'], $decoded['details']['permissions'] ?? null);
+
+        $response = $this->revokeAll(ResourceTypeRegistry::TYPE_OU, $this->ouA);
+        self::assertSame(403, $response->getStatusCode(), (string) $response->getBody());
+
+        self::assertSame($before, $this->countGrants(), 'a refused revoke must remove nothing');
+    }
+
+    /** #2313, "at that scope": holding the role AT the resource is enough to remove it there. */
+    public function testAllowsRevokingARoleTheCallerHoldsAtThatResource(): void
+    {
+        $this->grantPermissionToRole('editor', 'posts:delete');
+        $this->seedGrantRow(ResourceTypeRegistry::TYPE_OU, $this->ouA, $this->roleId('editor'), $this->actorProfileId);
+        $grantId = $this->seedGrantRow(ResourceTypeRegistry::TYPE_OU, $this->ouA, $this->roleId('editor'), $this->memberProfileId);
+
+        $response = $this->handler()->revoke(
+            $this->req('DELETE', '/api/resource-role-grants/' . $grantId),
+            ['id' => (string) $grantId]
+        );
+        self::assertSame(204, $response->getStatusCode(), (string) $response->getBody());
+
+        // ...but not at another resource, where the caller holds no such role.
+        $otherOu = $this->seedOu('a-finance', self::TENANT_A);
+        $elsewhere = $this->seedGrantRow(ResourceTypeRegistry::TYPE_OU, $otherOu, $this->roleId('editor'), $this->memberProfileId);
+        $response = $this->handler()->revoke(
+            $this->req('DELETE', '/api/resource-role-grants/' . $elsewhere),
+            ['id' => (string) $elsewhere]
+        );
+        self::assertSame(403, $response->getStatusCode(), (string) $response->getBody());
+    }
+
+    /** A grant row written straight to the table, as a higher-ranked person would have made it. */
+    private function seedGrantRow(string $resourceType, int $resourceId, int $roleId, ?int $profileId): int
+    {
+        $this->pdo->prepare(
+            'INSERT INTO resource_role_assignments (tenant_id, resource_type, resource_id, role_id, profile_id, created_at)
+             VALUES (?, ?, ?, ?, ?, NOW())'
+        )->execute([self::TENANT_A, $resourceType, $resourceId, $roleId, $profileId]);
+        RoleChecker::clearCache();
+
+        return (int) $this->pdo->lastInsertId();
+    }
+
+    /**
      * The rule the whole model rests on: a resource grant WIDENS authority at
      * one resource for someone already in the tenant. It must never be a back
      * door for someone with no ACTIVE membership there.
