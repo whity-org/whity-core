@@ -605,6 +605,7 @@ final class SsoAuthHandler
             $email,
             $request,
             $inviteTenantId ?? ($ctx->isGlobalTrust() ? null : $tenantId),
+            !$ctx->isGlobalTrust(),
         );
         return $this->redirectForLoginResult($result, $profileId, $email, $ctx);
     }
@@ -712,7 +713,7 @@ final class SsoAuthHandler
         }
 
         // Straight into the workspace they joined.
-        $session = $this->auth->completeFederatedLogin($profileId, $email, $request, $joinTenantId);
+        $session = $this->auth->completeFederatedLogin($profileId, $email, $request, $joinTenantId, !$ctx->isGlobalTrust());
 
         return $session->getStatusCode() === 200
             ? new Response(302, '', ['Location' => $this->frontendLink(\Whity\Core\Http\FrontendUrls::SSO_SUCCESS)])

@@ -677,7 +677,8 @@ class AuthHandler
         int $profileId,
         string $email,
         Request $request,
-        ?int $restrictToTenantId = null,
+        ?int $restrictToTenantId,
+        bool $tenantTrust,
     ): Response {
         // A deactivated account (profiles.status = 'inactive') must never get a
         // session, whichever door it uses. Password login and refresh already
@@ -694,8 +695,17 @@ class AuthHandler
             return Response::error('No active membership', 403);
         }
 
+        if ($tenantTrust && $restrictToTenantId === null) {
+            // A workspace's own provider always names its workspace; without one
+            // there is nothing to confine the session to, so there is no session.
+            return Response::error('No active membership', 403);
+        }
+
         if ($restrictToTenantId !== null) {
-            // Tenant-trust: the session may ONLY target the configuring tenant.
+            // The session may ONLY target this tenant. For tenant-trust it is
+            // also CONFINED there for its whole life (#2249): the confinement
+            // rides the signed tokens, so a refresh keeps it, switch-tenant
+            // refuses it, and the person's global account stays out of reach.
             if (!$this->hasActiveMembershipInTenant($profileId, $restrictToTenantId)) {
                 return Response::error('No active membership', 403);
             }
@@ -708,6 +718,7 @@ class AuthHandler
                 self::isTokenMode($request),
                 auditAction: 'auth.login.sso',
                 recordNewSession: true,
+                confinedTenantId: $tenantTrust ? $restrictToTenantId : null,
             );
         }
 
@@ -862,9 +873,17 @@ class AuthHandler
         array $auditMetadata = [],
         bool $recordNewSession = false,
         ?string $rotateSessionFromJti = null,
-        array $extraTokenBody = []
+        array $extraTokenBody = [],
+        ?int $confinedTenantId = null
     ): Response
     {
+        // #2249: a session confined to one workspace is only ever minted INTO
+        // that workspace. Every caller already passes the confined tenant as the
+        // active one; this is the chokepoint that keeps it so.
+        if ($confinedTenantId !== null && $confinedTenantId !== $activeTenantId) {
+            return Response::error(TenantConfinement::REFUSAL, 403);
+        }
+
         // Resolve role from the active membership (post-cutover: no legacy users row).
         // Memberships is the canonical role store (ADR 0005 §6)
         $roleName = '';
@@ -899,7 +918,7 @@ class AuthHandler
         // $enrollmentDeadline is non-null but the session still mints (with a
         // nag flag in the response); at/after it, a refusal Response is
         // returned instead of ever reaching the claim-issuing code below.
-        $refusal = $this->twoFactorPolicyRefusal($profileId, $activeTenantId, $ouId, $email, $profileEpoch, $request);
+        $refusal = $this->twoFactorPolicyRefusal($profileId, $activeTenantId, $ouId, $email, $profileEpoch, $request, $confinedTenantId);
         if ($refusal !== null) {
             return $refusal;
         }
@@ -912,6 +931,9 @@ class AuthHandler
             'role'             => $roleName,
             'token_epoch'      => $profileEpoch,
         ];
+        if ($confinedTenantId !== null) {
+            $claims[TenantConfinement::CLAIM] = $confinedTenantId;
+        }
 
         $accessTokenStr  = $this->jwtParser->create($claims, 900, 'access');
         $refreshTokenStr = $this->jwtParser->create($claims, 604800, 'refresh');
@@ -1033,7 +1055,8 @@ class AuthHandler
         ?int $ouId,
         string $email,
         int $profileEpoch,
-        Request $request
+        Request $request,
+        ?int $confinedTenantId = null
     ): ?Response {
         if ($this->twoFactorPolicyResolver === null) {
             return null;
@@ -1058,6 +1081,10 @@ class AuthHandler
             'email'            => $email,
             'token_epoch'      => $profileEpoch,
         ];
+        if ($confinedTenantId !== null) {
+            // #2249: the enrollment step of a confined sign-in stays confined.
+            $enrollmentClaims[TenantConfinement::CLAIM] = $confinedTenantId;
+        }
         $enrollmentJwt = $this->jwtParser->create($enrollmentClaims, 600, 'two_factor_enrollment');
 
         return Response::json([
@@ -1316,6 +1343,14 @@ class AuthHandler
         $role   = isset($claims['role']) ? (string) $claims['role'] : null;
 
         $memberships = $this->listActiveMemberships($profileId);
+        $confinedTenantId = TenantConfinement::of($claims);
+        if ($confinedTenantId !== null) {
+            // #2249: a confined session sees only its own workspace.
+            $memberships = array_values(array_filter(
+                $memberships,
+                static fn (array $m): bool => $m['tenant_id'] === $confinedTenantId,
+            ));
+        }
 
         return Response::json([
             'user' => [
@@ -1392,6 +1427,12 @@ class AuthHandler
             return Response::error('tenant_id is required', 400);
         }
         $targetTenantId = (int) $body['tenant_id'];
+
+        // #2249: a session from a workspace's own sign-in provider never leaves
+        // that workspace.
+        if (TenantConfinement::of($claims) !== null) {
+            return Response::error(TenantConfinement::REFUSAL, 403);
+        }
 
         // Authorization gate: the profile MUST hold an ACTIVE membership in the
         // target tenant. Never trust the request body alone — this is the
@@ -1490,6 +1531,12 @@ class AuthHandler
 
         if ($profileId === null || $activeTenantId === null) {
             return Response::error('Unauthorized', 401);
+        }
+
+        // #2249: the sign-in email and password belong to the person's global
+        // account, which a workspace's own sign-in provider may not change.
+        if (TenantConfinement::of($claims) !== null) {
+            return Response::error(TenantConfinement::REFUSAL, 403);
         }
 
         $body = JsonBody::parsed($request);
@@ -1745,6 +1792,10 @@ class AuthHandler
         $activeTenantId = isset($claims['active_tenant_id']) && is_int($claims['active_tenant_id']) ? $claims['active_tenant_id'] : null;
         if ($profileId === null || $profileId <= 0 || $activeTenantId === null || $activeTenantId < 0) {
             return Response::error('Unauthorized', 401);
+        }
+        // #2249: signing the person out everywhere reaches every workspace.
+        if (TenantConfinement::of($claims) !== null) {
+            return Response::error(TenantConfinement::REFUSAL, 403);
         }
         $email = isset($claims['email']) && is_string($claims['email']) ? $claims['email'] : '';
         $currentJti = isset($claims['jti']) && is_string($claims['jti']) ? $claims['jti'] : '';
@@ -2152,6 +2203,13 @@ class AuthHandler
             return Response::error('Unauthorized', 401);
         }
 
+        // #2249: a confined session stays confined across every refresh, and
+        // only ever in its own workspace.
+        $confinedTenantId = TenantConfinement::of($claims);
+        if ($confinedTenantId !== null && $confinedTenantId !== $activeTenantId) {
+            return Response::error('Unauthorized', 401);
+        }
+
         $tokenEpoch = $this->currentProfileTokenEpoch($profileId);
         $email = isset($claims['email']) && is_string($claims['email']) ? $claims['email'] : '';
 
@@ -2183,7 +2241,7 @@ class AuthHandler
         // again for the lifetime of the refresh token (up to 7 days, rotating
         // indefinitely). Refuse exactly like a fresh login would.
         $ouId = $this->activeMembershipOuId($profileId, $activeTenantId);
-        $refusal = $this->twoFactorPolicyRefusal($profileId, $activeTenantId, $ouId, $email, $tokenEpoch, $request);
+        $refusal = $this->twoFactorPolicyRefusal($profileId, $activeTenantId, $ouId, $email, $tokenEpoch, $request, $confinedTenantId);
         if ($refusal !== null) {
             return $refusal;
         }
@@ -2196,6 +2254,9 @@ class AuthHandler
             'role'        => $claims['role'] ?? '',
             'token_epoch' => $tokenEpoch,
         ];
+        if ($confinedTenantId !== null) {
+            $newClaims[TenantConfinement::CLAIM] = $confinedTenantId;
+        }
 
         $accessToken     = $this->jwtParser->create($newClaims, 900, 'access');
         $newRefreshToken = $this->jwtParser->create($newClaims, 604800, 'refresh');
