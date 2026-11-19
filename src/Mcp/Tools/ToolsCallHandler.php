@@ -491,11 +491,12 @@ final class ToolsCallHandler implements MethodHandler
             // The gate tools/call enforces is the live Router route's.
             $access  = $this->routeGate($declaration, $arguments) ?? ($this->toolDeriver->buildAccessMap()[$toolName] ?? []);
         } else {
-            $authored = $this->authoredTools?->get($toolName);
-            if ($authored === null || $this->authoredTools === null) {
+            $registry = $this->authoredTools;
+            $authored = $registry === null ? null : $registry->get($toolName);
+            if ($registry === null || $authored === null) {
                 throw new McpException(ErrorCode::METHOD_NOT_FOUND, "Unknown tool: {$toolName}");
             }
-            $toolset = $this->authoredTools->toolsetOf($toolName);
+            $toolset = $registry->toolsetOf($toolName);
             if ($this->workspaceGate?->isToolsetOffForWorkspace($toolset, $principal->tenantId) === true) {
                 throw new McpException(ErrorCode::METHOD_NOT_FOUND, "Unknown tool: {$toolName}");
             }
