@@ -276,7 +276,7 @@ export function SessionsSettings() {
                 <AlertDialogDescription>
                   {t(
                     'sessions.signOutEverywhere.confirm.body',
-                    'This keeps you signed in here but signs you out of every other browser, app, and registered device (they’ll each need to sign in again). This can’t be undone.'
+                    'This keeps you signed in here but signs you out of every other browser, app, and registered device (they’ll each need to sign in again). MCP tokens and agent keys stop working too; make new ones where you still need them. This can’t be undone.'
                   )}
                 </AlertDialogDescription>
               </AlertDialogHeader>

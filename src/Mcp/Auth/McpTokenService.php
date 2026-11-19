@@ -80,6 +80,9 @@ final class McpTokenService
             'aud'              => 'mcp',
             'principal_kind'   => $principalKind,
             'scope'            => $scope,
+            // Bound to the profile's epoch (#2262): a password change, reset or
+            // "Sign out other sessions" ends it, like every other credential.
+            'token_epoch'      => $this->currentEpoch($profileId),
         ], self::TOKEN_LIFETIME_SECONDS, 'mcp');
 
         $claims = $this->jwtParser->parse($token);
@@ -107,6 +110,19 @@ final class McpTokenService
         $this->events?->created((string) $claims['jti'], $tenantId);
 
         return ['token' => $token, 'jti' => (string) $claims['jti']];
+    }
+
+    /**
+     * The profile's current token epoch. `profiles` is a global identity table
+     * (ADR 0005 §1). A missing row reads 0; the validator refuses it anyway.
+     */
+    private function currentEpoch(int $profileId): int
+    {
+        $stmt = $this->db->prepare('SELECT token_epoch FROM profiles WHERE id = ? LIMIT 1');
+        $stmt->execute([$profileId]);
+        $epoch = $stmt->fetchColumn();
+
+        return $epoch === false ? 0 : (int) $epoch;
     }
 
     /**

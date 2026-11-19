@@ -370,6 +370,82 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         self::assertStringContainsString('sso_error=reauth_unavailable', $this->location($res));
     }
 
+    /**
+     * #2194: re-authentication starts from a REAL session token, which carries
+     * `active_tenant_id`, not the retired `tenant_id`. Reading the old claim
+     * refused every signer and approver. Workspace-ownership approvals use the
+     * same fresh sign-in.
+     *
+     * @return iterable<string, array{array<string, string>}>
+     */
+    public static function reauthRequests(): iterable
+    {
+        yield 'sign' => [['reauth' => 'sign', 'route_id' => '5', 'return_to' => '/documents/5']];
+        yield 'gate: password reset' => [['reauth' => 'gate', 'purpose' => 'password-reset:7', 'return_to' => '/admin/approval-gating/password-resets']];
+        yield 'gate: workspace ownership' => [['reauth' => 'gate', 'purpose' => 'workspace-ownership:offer-1-2-transfer', 'return_to' => '/settings/workspace']];
+    }
+
+    /**
+     * @param array<string, string> $query
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('reauthRequests')]
+    public function testReauthStartsFromARealSessionToken(array $query): void
+    {
+        $handler = new SsoAuthHandler(
+            ...$this->handlerArgsWithReauth(),
+        );
+        foreach ([$this->tenantId, 0] as $activeTenant) {
+            if ($activeTenant === 0) {
+                $this->pdo->prepare("INSERT INTO memberships (profile_id, tenant_id, role_id, ou_id, status, created_at)
+                    VALUES (?, 0, (SELECT id FROM roles ORDER BY id ASC LIMIT 1), NULL, 'active', NOW())")
+                    ->execute([$this->profileId]);
+            }
+            $_COOKIE = ['access_token' => $this->jwtParser->create([
+                'profile_id'       => $this->profileId,
+                'active_tenant_id' => $activeTenant,
+                'email'            => 'alice@acme.test',
+                'role'             => 'admin',
+                'token_epoch'      => 0,
+            ], 900, 'access')];
+            $_GET = $query;
+            try {
+                $res = $handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+            } finally {
+                $_GET = [];
+                $_COOKIE = [];
+            }
+
+            self::assertSame(302, $res->getStatusCode());
+            self::assertStringNotContainsString('sso_error', $this->location($res), 'refused in tenant ' . $activeTenant);
+            self::assertStringStartsWith('https://accounts.google.com/o/oauth2/v2/auth', $this->location($res));
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function handlerArgsWithReauth(): array
+    {
+        $prop = new \ReflectionProperty(SsoAuthHandler::class, 'engine');
+        $engine = $prop->getValue($this->handler);
+        $authProp = new \ReflectionProperty(SsoAuthHandler::class, 'auth');
+        $emailRepo = new ProfileEmailRepository($this->pdo);
+
+        return [
+            'engine' => $engine,
+            'providers' => new IdentityProviderRepository($this->pdo),
+            'emails' => $emailRepo,
+            'hostResolver' => new HostResolver(new TenantHostRepository($this->pdo), 'example.test'),
+            'jwtParser' => $this->jwtParser,
+            'secrets' => new EncryptedSecretStore(['v1' => 'sso_test_key_0123456789abcdef0123456789'], 'v1'),
+            'auth' => $authProp->getValue($this->handler),
+            'linker' => new FederatedIdentityLinker($this->pdo, new ExternalIdentityRepository($this->pdo), $emailRepo, new MembershipRepository($this->pdo), new \Whity\Core\Identity\TenantEmailDomainsRepository($this->pdo)),
+            'settings' => $this->settings,
+            'appUrl' => self::APP_URL,
+            'sessions' => new \Whity\Auth\TokenValidator($this->jwtParser, $this->pdo),
+            'identities' => new ExternalIdentityRepository($this->pdo),
+            'signingChallenges' => new \Whity\Core\Document\Signing\SigningChallengeRepository($this->pdo),
+        ];
+    }
+
     // ── headless frontend (WHIT-693) ──────────────────────────────────────────
 
     public function testHeadlessFrontendReceivesTheRedirectsWhileTheCallbackStaysOnTheBackend(): void

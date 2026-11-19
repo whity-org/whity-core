@@ -155,8 +155,8 @@ final class PasswordResetServiceTest extends TestCase
         self::assertNotNull($result);
         $requestId = $result['request_id'];
 
-        $approved = $this->service->approveForTenant($requestId, $tenantId);
-        self::assertNotNull($approved);
+        $approved = $this->service->approveForTenant($requestId, $tenantId, PHP_INT_MAX);
+        self::assertIsArray($approved);
         self::assertSame($profileId, $approved['profile_id']);
         self::assertSame('approve@acme.test', $approved['email']);
 
@@ -184,7 +184,7 @@ final class PasswordResetServiceTest extends TestCase
         $requestId = $result['request_id'];
 
         // TenantB's admin must not be able to approve TenantA's requester.
-        self::assertNull($this->service->approveForTenant($requestId, $tenantB));
+        self::assertNull($this->service->approveForTenant($requestId, $tenantB, PHP_INT_MAX));
 
         $hash = (string) $this->col("SELECT password_hash FROM profiles WHERE id = {$profileId}");
         self::assertFalse(password_verify('should-not-apply', $hash));
@@ -262,7 +262,7 @@ final class PasswordResetServiceTest extends TestCase
         $token = $this->service->issue($profileId);
         $result = $this->service->confirm($token, 'staged-password-2', true);
         self::assertNotNull($result);
-        $this->service->approveForTenant($result['request_id'], $tenantId);
+        $this->service->approveForTenant($result['request_id'], $tenantId, PHP_INT_MAX);
 
         $this->assertTwoFactorUntouched($profileId);
     }

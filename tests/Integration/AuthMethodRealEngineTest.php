@@ -479,7 +479,7 @@ final class AuthMethodRealEngineTest extends TestCase
         $this->becomeIdpOnly($id);
 
         self::assertNull(
-            $service->approveForTenant($confirmed['request_id'], 1),
+            $service->approveForTenant($confirmed['request_id'], 1, PHP_INT_MAX),
             'an approval for an account that no longer takes local passwords finds nothing approvable'
         );
         self::assertSame('', $this->passwordHash($id), 'the staged hash must not be applied');
