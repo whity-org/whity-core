@@ -17851,6 +17851,8 @@ export interface components {
             value_minor?: number | null;
             currency?: string | null;
             route_id?: number | null;
+            /** @description Waiting for approval, and nobody can approve it yet: nothing posts until someone holds inventory:settings or a route is chosen, then sending it again routes it (WHIT-1301). */
+            nobody_can_approve?: boolean;
             batch_key?: string | null;
             sent_batch_key?: string | null;
             source_plugin?: string | null;

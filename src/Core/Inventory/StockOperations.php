@@ -138,8 +138,13 @@ final class StockOperations
     public function submit(int $tenantId, int $id, ?int $actor): array
     {
         $op = $this->row($tenantId, $id) ?? throw InventoryRejectedException::notFound('Stock operation');
-        if (!in_array($op['kind'], ['adjustment', 'count'], true) || $op['status'] !== 'draft') {
+        if (!in_array($op['kind'], ['adjustment', 'count'], true) || ($op['status'] !== 'draft' && !self::nobodyToApprove($op))) {
             throw new InventoryRejectedException('Only a draft adjustment or count can be sent on', 409);
+        }
+        if (self::nobodyToApprove($op)) {
+            // Waiting with nobody to approve it: try the route again, now
+            // someone may hold the permission or a route is chosen (WHIT-1301).
+            return $this->sendForApproval($tenantId, $id, $actor);
         }
         if ($op['kind'] === 'count') {
             return $this->finishCount($tenantId, $id, $actor);
@@ -283,6 +288,9 @@ final class StockOperations
     public function finishCount(int $tenantId, int $id, ?int $actor): array
     {
         $op = $this->row($tenantId, $id) ?? throw InventoryRejectedException::notFound('Count');
+        if ($op['kind'] === 'count' && self::nobodyToApprove($op)) {
+            return $this->sendForApproval($tenantId, $id, $actor);
+        }
         if ($op['kind'] !== 'count' || $op['status'] !== 'draft') {
             throw new InventoryRejectedException('Only a count still being counted can be finished', 409);
         }
@@ -619,31 +627,39 @@ final class StockOperations
         $this->async(Events::INVENTORY_OPERATION_DONE_ASYNC, $payload);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * Sends an operation above the workspace's value to its route. It never
+     * posts from here: only the route's approval posts it ({@see approved()}).
+     *
+     * FAILS CLOSED (WHIT-1301). When nobody can approve it (no route chosen
+     * and no one but the writer holds `inventory:settings`, or approvals are
+     * not wired), it stays `waiting_approval` with no route, the people who
+     * can fix that are told, and sending it again tries the route again.
+     *
+     * @return array<string, mixed>
+     */
     private function sendForApproval(int $tenantId, int $id, ?int $actor): array
     {
-        return $this->db->transaction(fn (): array => $this->routeOrPost($tenantId, $id, $actor));
+        $result = $this->db->transaction(fn (): array => $this->route($tenantId, $id, $actor));
+        if ($result['nobody_can_approve'] === true) {
+            // After the commit: a notice is not part of the operation.
+            $this->approvals?->nobodyCanApprove($tenantId, $actor, $result);
+        }
+
+        return $result;
     }
 
     /** @return array<string, mixed> */
-    private function routeOrPost(int $tenantId, int $id, ?int $actor): array
+    private function route(int $tenantId, int $id, ?int $actor): array
     {
-        $routeId = null;
-        if ($this->approvals !== null) {
-            $this->db->run(
-                "UPDATE inv_operations SET status = 'waiting_approval', submitted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-                  WHERE tenant_id = :tenant_id AND id = :id AND status = 'draft'",
-                [':tenant_id' => $tenantId, ':id' => $id]
-            );
-            $routeId = $this->approvals->issue($tenantId, $actor, $this->get($tenantId, $id));
-            if ($routeId === null) {
-                $this->rejected($tenantId, $id);
-            }
-        }
+        $this->db->run(
+            "UPDATE inv_operations SET status = 'waiting_approval', submitted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+              WHERE tenant_id = :tenant_id AND id = :id AND status = 'draft'",
+            [':tenant_id' => $tenantId, ':id' => $id]
+        );
+        $routeId = $this->approvals?->issue($tenantId, $actor, $this->get($tenantId, $id));
         if ($routeId === null) {
-            // Nobody can approve it here (or approvals are not wired): with no
-            // route, a person with the permission confirms directly (IV.19).
-            return $this->post($tenantId, $id, $actor);
+            return $this->get($tenantId, $id);
         }
         $this->db->run(
             'UPDATE inv_operations SET route_id = :route_id WHERE tenant_id = :tenant_id AND id = :id',
@@ -651,6 +667,18 @@ final class StockOperations
         );
 
         return $this->get($tenantId, $id);
+    }
+
+    /**
+     * Waiting for approval with no route: nobody could approve it when it was
+     * sent (WHIT-1301).
+     *
+     * @param array<string, mixed> $op an inv_operations row
+     */
+    private static function nobodyToApprove(array $op): bool
+    {
+        return $op['status'] === 'waiting_approval' && $op['route_id'] === null
+            && in_array($op['kind'], ['adjustment', 'count'], true);
     }
 
     // ── reading ──────────────────────────────────────────────────────────
@@ -1132,6 +1160,8 @@ final class StockOperations
             'value_minor' => InventoryDb::int($r['value_minor']),
             'currency' => is_string($r['currency']) ? $r['currency'] : null,
             'route_id' => InventoryDb::int($r['route_id']),
+            // Waiting, and nobody can approve it yet (WHIT-1301).
+            'nobody_can_approve' => self::nobodyToApprove($r),
             'batch_key' => is_string($r['batch_key']) ? $r['batch_key'] : null,
             'sent_batch_key' => is_string($r['sent_batch_key']) ? $r['sent_batch_key'] : null,
             'source_plugin' => is_string($r['source_plugin']) ? $r['source_plugin'] : null,

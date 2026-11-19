@@ -38,6 +38,11 @@ use Whity\Core\Inventory\ReorderRules;
 use Whity\Core\Inventory\StockLedger;
 use Whity\Core\Inventory\StockOperations;
 use Whity\Core\Inventory\UnitCatalog;
+use Whity\Core\Notification\CoreTransports;
+use Whity\Core\Notification\NotificationDispatcher;
+use Whity\Core\Notification\NotificationRepository;
+use Whity\Core\Queue\JobRepository;
+use Whity\Core\Queue\QueueService;
 use Whity\Core\RBAC\PermissionRegistry;
 use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Core\Settings\SettingsRegistry;
@@ -139,7 +144,97 @@ final class StockOperationsRealEngineTest extends TestCase
             new RouteTemplateRepository($this->pdo),
             new RoleChecker($database, new PermissionRegistry()),
             $effective,
+            new NotificationDispatcher(new NotificationRepository($this->pdo), CoreTransports::make(), new QueueService(new JobRepository($this->pdo))),
         ));
+    }
+
+    /**
+     * WHIT-1301 (sec-rbac): Amro is the only person who runs the inventory, so
+     * when he writes off more than the value himself nobody else can approve
+     * it. It used to post at once; now it waits, Amro and the owner are told
+     * why, and once Ibrahim may approve, sending it again routes it to him.
+     */
+    public function testAboveTheValueWithNobodyToApproveItKeepsWaitingAndTellsWhoCanFixIt(): void
+    {
+        [$butter, $shop] = $this->butterInAbdoun('20');
+        $this->pdo->exec("INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
+                          VALUES (12, 'Awss Haddad', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        $this->pdo->exec("INSERT INTO workspace_owners (tenant_id, profile_id, created_at) VALUES ({$this->tenant}, 12, CURRENT_TIMESTAMP)");
+
+        $op = $this->operations->adjust($this->tenant, self::AMRO, [
+            'location_id' => $shop, 'reason_code' => 'spoiled', 'lines' => [['variant_id' => $butter, 'change' => '-8']],
+        ])['operation'];
+
+        self::assertSame('waiting_approval', $op['status'], 'fails closed: $32.00 is above $25 and nobody else can approve it');
+        self::assertTrue($op['nobody_can_approve']);
+        self::assertNull($op['route_id']);
+        self::assertSame('20.000', $this->onHand($butter, $shop), 'nothing moves without an approval');
+        self::assertSame([], array_column($this->events, 0), 'no operation-done event');
+        $stmt = $this->pdo->query("SELECT recipient_profile_id, subject FROM notifications WHERE type = 'inventory.approval.nobody' ORDER BY recipient_profile_id");
+        self::assertNotFalse($stmt);
+        $told = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        self::assertSame([self::AMRO, 12], array_map('intval', array_column($told, 'recipient_profile_id')), 'the settings holder and the owner');
+        self::assertSame('Nobody can approve Stock adjustment ADJ-0001 yet', $told[0]['subject']);
+
+        // Still nobody: sending it again keeps it waiting.
+        self::assertSame('waiting_approval', $this->operations->submit($this->tenant, $op['id'], self::AMRO)['status']);
+        self::assertSame('20.000', $this->onHand($butter, $shop));
+
+        // Ibrahim may approve now: sending it again routes it to him.
+        $managers = $this->scalar("SELECT id FROM roles WHERE name = 'stock-managers' AND tenant_id = {$this->tenant}");
+        $this->pdo->exec("UPDATE memberships SET role_id = {$managers} WHERE profile_id = " . self::IBRAHIM);
+        RoleChecker::clearCache();
+        $routed = $this->operations->submit($this->tenant, $op['id'], self::AMRO);
+        self::assertSame('waiting_approval', $routed['status']);
+        self::assertFalse($routed['nobody_can_approve']);
+        $route = $this->routes->findById((int) $routed['route_id'], $this->tenant);
+        self::assertNotNull($route);
+        $this->router->act($this->tenant, self::IBRAHIM, $route, RouteAction::ACKNOWLEDGED, null, RouteVerdict::APPROVED);
+        self::assertSame('12.000', $this->onHand($butter, $shop));
+    }
+
+    public function testACountWithABigDifferenceAndNobodyToApproveItKeepsWaiting(): void
+    {
+        [$butter, $shop] = $this->butterInAbdoun('30');
+        $count = $this->operations->startCount($this->tenant, self::AMRO, ['location_id' => $shop])['operation'];
+        $this->operations->recordCount($this->tenant, $count['id'], self::AMRO, [['variant_id' => $butter, 'counted' => '20']]);
+
+        $waiting = $this->operations->finishCount($this->tenant, $count['id'], self::AMRO);
+
+        self::assertSame('waiting_approval', $waiting['status']);
+        self::assertTrue($waiting['nobody_can_approve']);
+        self::assertSame('30.000', $this->onHand($butter, $shop));
+        self::assertSame('waiting_approval', $this->operations->finishCount($this->tenant, $count['id'], self::AMRO)['status'], 'finishing again tries the route again');
+        self::assertSame('30.000', $this->onHand($butter, $shop));
+    }
+
+    public function testWithApprovalsNotWiredAChangeAboveTheValueStillWaits(): void
+    {
+        [$butter, $shop] = $this->butterInAbdoun('20');
+        $db = new InventoryDb($this->pdo);
+        $workspace = new InventoryWorkspace($db);
+        $bare = new StockOperations($db, $workspace, $this->items, new UnitCatalog($db, $workspace), $this->ledger, $this->reasons, fn (int $t): array => $this->settings->effective($t));
+
+        $op = $bare->adjust($this->tenant, self::IBRAHIM, [
+            'location_id' => $shop, 'reason_code' => 'spoiled', 'lines' => [['variant_id' => $butter, 'change' => '-8']],
+        ])['operation'];
+
+        self::assertSame('waiting_approval', $op['status']);
+        self::assertTrue($op['nobody_can_approve']);
+        self::assertSame('20.000', $this->onHand($butter, $shop));
+    }
+
+    public function testBelowTheValueStillPostsAtOnceWithNobodyToApprove(): void
+    {
+        [$butter, $shop] = $this->butterInAbdoun('20');
+
+        $op = $this->operations->adjust($this->tenant, self::AMRO, [
+            'location_id' => $shop, 'reason_code' => 'unsold', 'lines' => [['variant_id' => $butter, 'change' => '-2']],
+        ])['operation'];
+
+        self::assertSame('done', $op['status'], '$8.00 is under $25 a line');
+        self::assertFalse($op['nobody_can_approve']);
+        self::assertSame('18.000', $this->onHand($butter, $shop));
     }
 
     public function testASmallWasteLinePostsAtOnceWithItsReason(): void
