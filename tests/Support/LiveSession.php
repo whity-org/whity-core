@@ -23,12 +23,20 @@ final class LiveSession
             return $refreshToken;
         }
 
+        $profileId = (int) ($claims['profile_id'] ?? 0);
+        $tenantId = (int) ($claims['active_tenant_id'] ?? 0);
+        if ($profileId <= 0 || $tenantId < 0) {
+            // A malformed claim set a test hands in on purpose: the refresh is
+            // refused on the claims, and no row could reference it anyway.
+            return $refreshToken;
+        }
+
         $pdo->prepare(
             'INSERT INTO sessions (profile_id, tenant_id, refresh_jti, access_jti, expires_at)
              VALUES (?, ?, ?, NULL, ?)'
         )->execute([
-            (int) ($claims['profile_id'] ?? 0),
-            (int) ($claims['active_tenant_id'] ?? 0),
+            $profileId,
+            $tenantId,
             $claims['jti'],
             date('Y-m-d H:i:s', is_int($claims['exp'] ?? null) ? $claims['exp'] : time() + 604800),
         ]);
