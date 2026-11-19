@@ -124,9 +124,13 @@ final class PublicBookingApiHandler
                 'settings' => array_intersect_key($settings->toApi(), array_flip(['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days', 'multi_service_booking'])),
                 'services' => $services,
                 'staff' => array_map(static fn (array $s): array => ['profile_id' => $s['profile_id'], 'display_name' => $s['display_name']], $staff),
-                'bot_check' => $this->bot->isRequired() && $this->bot->provider() !== null
+                // WHIT-1286 (#2203): only a check that is fully set up; never an empty site key.
+                'bot_check' => $this->bot->isRequired() && $this->bot->isReady()
                     ? ['provider' => $this->bot->provider(), 'site_key' => $this->bot->siteKey()]
                     : null,
+                // WHIT-1298 (#2203): false when booking is refused until an admin
+                // sets up the bot check, so the page says so up front.
+                'bot_check_ready' => $this->bot->isReady(),
             ]]);
         });
     }
@@ -227,6 +231,11 @@ final class PublicBookingApiHandler
             $start = Interval::fromApi($body['starts_at'] ?? null) ?? throw new CalendarRejectedException('Choose a time', 422);
             $profileId = is_int($body['profile_id'] ?? null) ? $body['profile_id'] : null;
 
+            // #2203: a bot check that isn't set up refuses, never skips: a provider
+            // half set up (WHIT-1286), or none with "allow without" off (WHIT-1298).
+            if (!$this->bot->isReady()) {
+                return Response::error('Booking is unavailable right now. Try again later.', 503);
+            }
             if ($this->bot->isRequired()) {
                 $verdict = $this->bot->verify(is_string($body['bot_token'] ?? null) ? $body['bot_token'] : '', ClientIp::fromRequest($request));
                 if ($verdict === BotCheck::UNREACHABLE) {

@@ -90,6 +90,8 @@
         "more.then": "ثم",
         "more.total": "المجموع: {time}",
         "noServices": "لا يوجد ما يمكن حجزه عبر الإنترنت هنا بعد. تواصل مع {workspace} لتحجز.",
+        "notReady.description": "ما زالوا يجهّزون هذه الصفحة. حاول لاحقاً، أو تواصل معهم للحجز.",
+        "notReady.title": "{name} لا يستقبل الحجوزات هنا بعد",
         "person.anyone": "أيّ شخص متاح",
         "person.each": "شخص مختلف لكل خدمة",
         "price.free": "بدون رسوم",

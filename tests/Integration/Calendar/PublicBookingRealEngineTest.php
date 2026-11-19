@@ -75,6 +75,8 @@ final class PublicBookingRealEngineTest extends TestCase
         }
 
         $globals = new GlobalSettingsRepository($this->pdo);
+        // No bot provider here, so booking needs "allow without a bot check" (WHIT-1298).
+        $globals->set(BotCheck::SETTING_ALLOW_NONE, '1');
         $this->settings = new SettingsService($globals, new TenantSettingsRepository($this->pdo));
         foreach ([1, 2] as $tenant) {
             $this->settings->setTenant($tenant, 'timezone', 'Asia/Amman');
@@ -317,6 +319,47 @@ final class PublicBookingRealEngineTest extends TestCase
         $second = $this->feed->issue(1, 11);
         self::assertSame(404, $this->handler->feed(self::request('GET', '/x'), ['token' => $first . '.ics'])->getStatusCode());
         self::assertSame(200, $this->handler->feed(self::request('GET', '/x'), ['token' => $second . '.ics'])->getStatusCode());
+    }
+
+    /**
+     * WHIT-1286 (#2203): a chosen bot check missing its site key or secret is
+     * never offered with an empty key, and booking refuses rather than skips.
+     */
+    public function testAHalfSetUpBotCheckRefusesBookingsAndShowsNoEmptyKey(): void
+    {
+        $globals = new GlobalSettingsRepository($this->pdo);
+        $globals->set(BotCheck::SETTING_PROVIDER, 'turnstile');
+
+        $page = self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data'];
+        self::assertNull($page['bot_check']);
+        $booked = $this->handler->book(self::request('POST', '/x', $this->bookingBody() + ['bot_token' => 'anything']), ['workspace' => 'example-bakery']);
+        self::assertSame(503, $booked->getStatusCode(), $booked->getBody());
+
+        $globals->set(BotCheck::SETTING_SITE_KEY, '0x4AAA-site');
+        self::assertNull(self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data']['bot_check'], 'a site key but no secret');
+        self::assertSame(503, $this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery'])->getStatusCode());
+    }
+
+    /**
+     * WHIT-1298 (#2203, owner 2026-11-19): no provider and "allow without a
+     * bot check" off refuses booking until an admin sets one or the other, and
+     * the page says so up front.
+     */
+    public function testNoBotCheckAndNotAllowedWithoutOneRefusesBookings(): void
+    {
+        $globals = new GlobalSettingsRepository($this->pdo);
+        $page = fn (): array => self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data'];
+        self::assertTrue($page()['bot_check_ready']);
+
+        $globals->set(BotCheck::SETTING_ALLOW_NONE, '0');
+        self::assertFalse($page()['bot_check_ready']);
+        self::assertNull($page()['bot_check']);
+        $booked = $this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']);
+        self::assertSame(503, $booked->getStatusCode(), $booked->getBody());
+        self::assertSame([], $this->sent, 'nothing booked, nothing sent');
+
+        $globals->set(BotCheck::SETTING_ALLOW_NONE, '1');
+        self::assertSame(201, $this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery'])->getStatusCode());
     }
 
     /**

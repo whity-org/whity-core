@@ -7618,6 +7618,7 @@ final class CoreApiSchemas
                     'provider' => self::str(),
                     'site_key' => self::str(),
                 ]],
+                'bot_check_ready' => self::bool() + ['description' => 'False when no new chat can start until the bot check is set up (WHIT-1298).'],
                 'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'The brand of the workspace, for the chat box (WHIT-1014).'],
             ], ['workspace_name', 'max_length'])),
             'PublicPlansResponse' => self::object([
@@ -10786,6 +10787,7 @@ final class CoreApiSchemas
                 ], ['id', 'name', 'duration_minutes', 'price_minor', 'currency', 'staff_profile_ids'])],
                 'staff' => ['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'display_name' => self::str()], ['profile_id', 'display_name'])],
                 'bot_check' => ['type' => 'object', 'nullable' => true, 'properties' => ['provider' => self::str(), 'site_key' => self::str()]],
+                'bot_check_ready' => self::bool() + ['description' => 'False when booking is refused until the bot check is set up (WHIT-1298).'],
                 'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'The brand of the workspace, for the page (WHIT-1014).'],
             ], ['workspace', 'settings', 'services', 'staff', 'bot_check']),
             // WHIT-1014: what a workspace's public pages show of its brand. Only

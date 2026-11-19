@@ -111337,6 +111337,10 @@
                             }
                         }
                     },
+                    "bot_check_ready": {
+                        "type": "boolean",
+                        "description": "False when booking is refused until the bot check is set up (WHIT-1298)."
+                    },
                     "brand": {
                         "nullable": true,
                         "allOf": [
@@ -111475,6 +111479,10 @@
                                         "type": "string"
                                     }
                                 }
+                            },
+                            "bot_check_ready": {
+                                "type": "boolean",
+                                "description": "False when no new chat can start until the bot check is set up (WHIT-1298)."
                             },
                             "brand": {
                                 "nullable": true,
