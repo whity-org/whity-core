@@ -370,7 +370,14 @@ final class TenantPluginRepository
         );
         $stmt->execute([':tenant_id' => $tenantId, ':own_tenant_id' => $tenantId]);
 
-        /** @var list<string> */
-        return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        // #2255: never a core permission, whatever a row says. The manifest
+        // policy refuses them now, but a row published before it, or written
+        // some other way, must not hide `users:write` from every workspace.
+        $coreResources = TenantManifestPolicy::coreResources();
+
+        return array_values(array_filter(
+            array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN)),
+            static fn (string $permission): bool => !isset($coreResources[explode(':', $permission, 2)[0]])
+        ));
     }
 }
