@@ -22,6 +22,7 @@ final class SettingsRegistryTest extends TestCase
             ['site_name', 'timezone', 'locale', 'support_email',
              'branding_logo_wide', 'branding_logo_square', 'branding_favicon',
              'branding_main_color',
+             'branding_theme', 'branding_theme_overrides',
              'mcp.enabled',
              'mcp.always_on_plugin_tools',
              'auth.self_registration_enabled', 'auth.registration_approval_required',
@@ -310,7 +311,9 @@ final class SettingsRegistryTest extends TestCase
         // 52 since WHIT-966: calendar.instant_booking.
         // 54 since design 3.4 (P1): company.name_ar and company.address_ar.
         // 55 since WHIT-1173: calendar.multi_service_booking.
-        self::assertCount(55, SettingsRegistry::tenantTextKeys());
+        // 57 since WHIT-1225: branding_theme and branding_theme_overrides,
+        // each workspace's own theme (TH.1).
+        self::assertCount(57, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -482,7 +485,8 @@ final class SettingsRegistryTest extends TestCase
         // 132 since WHIT-1173: calendar.multi_service_booking.
         // 133 since WHIT-1168: auth.password_sign_in.
         // 135 since WHIT-1203: workspaces.additional_plan and additional_trial_days.
-        self::assertCount(135, $describe);
+        // 137 since WHIT-1225: branding_theme and branding_theme_overrides.
+        self::assertCount(137, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

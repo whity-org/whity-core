@@ -181,6 +181,10 @@
     "en": "Delete a workspace",
     "ar": "حذف مساحة عمل"
   },
+  "delete_api_themes_themeid": {
+    "en": "Remove an imported theme",
+    "ar": "إزالة سمة مستوردة"
+  },
   "delete_api_time_window_types_id": {
     "ar": "حذف نوع فترة"
   },
@@ -959,6 +963,10 @@
   "get_api_tenants_id_subscription": {
     "en": "See a workspace's subscription",
     "ar": "عرض اشتراك مساحة عمل"
+  },
+  "get_api_themes": {
+    "en": "List the themes this workspace can choose",
+    "ar": "عرض السمات المتاحة لمساحة العمل"
   },
   "get_api_time_window_types": {
     "en": "List the kinds of period in your workspace",
@@ -1779,6 +1787,10 @@
   "post_api_tenants_id_plan": {
     "en": "Apply a plan to a workspace",
     "ar": "تطبيق باقة على مساحة عمل"
+  },
+  "post_api_themes": {
+    "en": "Import a theme into this workspace",
+    "ar": "استيراد سمة إلى مساحة العمل"
   },
   "post_api_time_window_types": {
     "en": "Add a period kind, or adopt a built-in one",

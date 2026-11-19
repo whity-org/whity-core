@@ -22,7 +22,10 @@ final class ThemeEngineTest extends TestCase
 {
     private const SCHEMA = __DIR__ . '/../../../../schemas/theme/v1.json';
 
-    /** @return array<string, mixed> */
+    /**
+     * @param array<string, mixed> $extra
+     * @return array<string, mixed>
+     */
     private static function theme(array $extra = []): array
     {
         return array_merge(['schemaVersion' => 1, 'id' => 'acme.test', 'version' => '1.0.0', 'name' => ['en' => 'Test']], $extra);
@@ -196,15 +199,18 @@ final class ThemeEngineTest extends TestCase
         self::assertNotSame([], $none['high']['light']);
 
         $harbour = ThemeResolver::resolve([SettingsRegistry::BRANDING_THEME => 'whity.harbour'], $library, 1);
+        self::assertNotNull($harbour['theme']);
         self::assertSame('whity.harbour', $harbour['theme']['id']);
         self::assertSame('#0b6e74', $harbour['theme']['light']['primary']);
         self::assertSame('plex', $harbour['theme']['fonts']['body']);
 
         $seeded = ThemeResolver::resolve([SettingsRegistry::BRANDING_THEME => 'whity.harbour', SettingsRegistry::BRANDING_MAIN_COLOR => '#B74C05'], $library, 1);
+        self::assertNotNull($seeded['theme']);
         self::assertSame('#b74c05', $seeded['theme']['light']['primary']);
         self::assertSame('#b74c05', $seeded['mainColor']);
 
         $missing = ThemeResolver::resolve([SettingsRegistry::BRANDING_THEME => 'acme.gone'], $library, 1);
+        self::assertNotNull($missing['theme']);
         self::assertSame(ThemeLibrary::DEFAULT_ID, $missing['theme']['id']);
         self::assertContains('theme-missing', array_column($missing['theme']['adjustments'], 'change'));
     }
@@ -224,10 +230,13 @@ final class ThemeEngineTest extends TestCase
         self::assertCount(1, $sea);
         self::assertSame('plugin', $sea[0]['source']);
         self::assertSame('acme', $sea[0]['plugin']);
-        self::assertSame('1.0.0', $library->find(1, 'whity.harbour')['version']);
+        $harbour = $library->find(1, 'whity.harbour');
+        self::assertNotNull($harbour);
+        self::assertSame('1.0.0', $harbour['version']);
         self::assertCount(1, array_filter($available, static fn (array $e): bool => $e['theme']['id'] === 'whity.harbour'));
 
         $resolved = ThemeResolver::resolve([SettingsRegistry::BRANDING_THEME => 'acme.sea'], $library, 1);
+        self::assertNotNull($resolved['theme']);
         self::assertSame('#006d77', $resolved['theme']['light']['primary']);
 
         $broken = new ThemeLibrary(null, static fn (): array => throw new \RuntimeException('loader down'));
