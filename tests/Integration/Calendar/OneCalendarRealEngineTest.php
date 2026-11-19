@@ -184,6 +184,55 @@ final class OneCalendarRealEngineTest extends TestCase
         self::assertSame('Back by noon', $mine[0]['event']['notes']);
     }
 
+    /**
+     * WHIT-1285 (#2237): GET /api/calendar/events and /exceptions keep the
+     * grid's privacy. A colleague's synced event is Busy with no notes, place
+     * or source; why someone is away is theirs and their managers'.
+     */
+    public function testTheEventAndExceptionListsKeepColleaguesPrivate(): void
+    {
+        $this->calendar->insertEvent(1, 12, 'Private lunch', 'Somewhere nice', $this->when('2026-11-16T13:00:00+03:00', '2026-11-16T14:00:00+03:00'), false, true, 'google:xyz', 12, kind: CalendarRepository::KIND_EXTERNAL);
+        $this->calendar->addException(1, 12, 'off', $this->when('2026-11-17T09:00:00+03:00', '2026-11-17T17:00:00+03:00'), 'Hospital appointment', 12);
+        $managers = new class () {
+            /** @var list<int> */
+            public array $ids = [];
+        };
+        $roles = $this->createStub(\Whity\Auth\RoleChecker::class);
+        $roles->method('hasPermissionForProfile')->willReturnCallback(static function (int $profileId) use ($managers): bool {
+            return in_array($profileId, $managers->ids, true);
+        });
+        $handler = new \Whity\Api\CalendarApiHandler(
+            $this->calendar, $this->services, $this->bookings, $this->service,
+            new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo)),
+            $roles,
+        );
+        $list = static function (string $what, int $viewer) use ($handler): array {
+            $request = new \Whity\Core\Request('GET', '/api/calendar/' . $what . '?from=' . rawurlencode('2026-11-15T00:00:00+03:00') . '&to=' . rawurlencode('2026-11-20T00:00:00+03:00'));
+            $request->user = (object) ['profile_id' => $viewer];
+            $method = $what === 'events' ? 'listEvents' : 'listExceptions';
+            $response = $handler->{$method}($request);
+            self::assertSame(200, $response->getStatusCode(), $response->getBody());
+
+            return json_decode($response->getBody(), true)['data'];
+        };
+
+        \Whity\Core\Tenant\TenantContext::reset();
+        \Whity\Core\Tenant\TenantContext::setTenantId(1);
+        try {
+            $seen = $list('events', 11);
+            self::assertSame([CalendarItems::BUSY, '', '', null], [$seen[0]['title'], $seen[0]['notes'], $seen[0]['location'], $seen[0]['external_ref']]);
+            self::assertStringNotContainsString('lunch', (string) json_encode($seen));
+            self::assertSame('Private lunch', $list('events', 12)[0]['title'], 'their own');
+
+            self::assertSame('', $list('exceptions', 11)[0]['note']);
+            self::assertSame('Hospital appointment', $list('exceptions', 12)[0]['note'], 'their own');
+            $managers->ids = [11];
+            self::assertSame('Hospital appointment', $list('exceptions', 11)[0]['note'], 'someone who manages the calendar');
+        } finally {
+            \Whity\Core\Tenant\TenantContext::reset();
+        }
+    }
+
     public function testWhatTheViewerMayChange(): void
     {
         $team = $this->event(12, 'Oven service', '2026-11-16T09:00:00+03:00', '2026-11-16T10:00:00+03:00');

@@ -53,8 +53,33 @@ final class CalendarFeed
         $stmt = $this->db->prepare('SELECT tenant_id, profile_id FROM calendar_staff WHERE feed_token_hash = :hash LIMIT 1');
         $stmt->execute([':hash' => PublicToken::hash($raw)]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+        [$tenantId, $profileId] = [(int) $row['tenant_id'], (int) $row['profile_id']];
 
-        return is_array($row) ? [(int) $row['tenant_id'], (int) $row['profile_id']] : null;
+        // WHIT-1285 (#2215): only while they are active staff here. Someone
+        // removed or suspended loses the feed for good: the address is
+        // forgotten, so coming back means turning on a new one.
+        if (!$this->isActiveStaff($tenantId, $profileId)) {
+            $this->revoke($tenantId, $profileId);
+
+            return null;
+        }
+
+        return [$tenantId, $profileId];
+    }
+
+    private function isActiveStaff(int $tenantId, int $profileId): bool
+    {
+        $stmt = $this->db->prepare(
+            "SELECT 1 FROM memberships
+              WHERE tenant_id = :tenant_id AND profile_id = :profile_id AND kind = 'member' AND status = 'active'
+              LIMIT 1"
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId]);
+
+        return $stmt->fetchColumn() !== false;
     }
 
     public function render(int $tenantId, int $profileId, CalendarSettings $settings, DateTimeImmutable $now, string $calendarName): string
