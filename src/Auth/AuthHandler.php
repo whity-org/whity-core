@@ -417,8 +417,11 @@ class AuthHandler
         // returns the selection prompt.
         if (self::dbTruthy($profile['two_factor_enabled'] ?? false)) {
             $tempClaims = [
-                'profile_id' => $profileId,
-                'email'      => $email,
+                'profile_id'  => $profileId,
+                'email'       => $email,
+                // A password change during the 5-minute window voids the
+                // pending second step (#2267).
+                'token_epoch' => $this->currentProfileTokenEpoch($profileId),
             ];
             if (count($memberships) === 1) {
                 $only = $memberships[0]['tenant_id'];
@@ -565,6 +568,11 @@ class AuthHandler
         $profileId = $claims['profile_id'];
         $email     = isset($claims['email']) && is_string($claims['email']) ? $claims['email'] : '';
 
+        // One selection per token (#2267): a used or epoch-stale token is refused.
+        if (!$this->signInStepTokenIsLive($claims)) {
+            return Response::error('Invalid or expired selection token', 401);
+        }
+
         // A profile deactivated during the 5-minute selection window must not
         // get the session it was about to choose (WHIT-672 review).
         if ($this->sessionRefusalReason($profileId) !== null) {
@@ -590,6 +598,12 @@ class AuthHandler
         // Re-read the profile epoch (the selection token is short-lived but the
         // session must carry the current epoch).
         $tokenEpoch = $this->currentProfileTokenEpoch($profileId);
+
+        // Spend the token before minting. Losing the race means another request
+        // already used it (#2267).
+        if (!$this->spendSignInStepToken($claims)) {
+            return Response::error('Invalid or expired selection token', 401);
+        }
 
         // Cookie mode only: clear the selection cookie after use.
         if (!$tokenMode) {
@@ -622,7 +636,7 @@ class AuthHandler
     private function requireTenantSelection(int $profileId, string $email, array $memberships, bool $tokenMode = false): Response
     {
         $selectionToken = $this->jwtParser->create(
-            ['profile_id' => $profileId, 'email' => $email],
+            ['profile_id' => $profileId, 'email' => $email, 'token_epoch' => $this->currentProfileTokenEpoch($profileId)],
             300,
             'tenant_select'
         );
@@ -2488,6 +2502,13 @@ class AuthHandler
             return Response::error('Invalid or expired temporary token', 401);
         }
 
+        // One sign-in per temp token (#2267): a used one, or one minted before a
+        // password change, is refused. A wrong code does not spend it, so a typo
+        // does not send the person back to the password step.
+        if (!$this->signInStepTokenIsLive($claims)) {
+            return Response::error('Invalid or expired temporary token', 401);
+        }
+
         // WC-0abcc29f: throttle check keyed on profile_id (post-cutover).
         $throttleId = null;
         if (isset($claims['profile_id']) && is_numeric($claims['profile_id'])) {
@@ -2593,6 +2614,12 @@ class AuthHandler
             );
             $this->loginThrottle?->recordFailure($throttleId, $ip ?? null);
             return Response::error('Invalid 2FA code', 401);
+        }
+
+        // Spend the temp token now the code is good; losing the race means a
+        // parallel request already finished this sign-in with it (#2267).
+        if (!$this->spendSignInStepToken($claims)) {
+            return Response::error('Invalid or expired temporary token', 401);
         }
 
         // Second factor verified — full login completes.
@@ -2728,6 +2755,54 @@ class AuthHandler
     private function consumeTotpStep(int $profileId, int $step): bool
     {
         return TotpStepFloor::advance($this->db, $profileId, $step);
+    }
+
+    /**
+     * Whether a sign-in step token (type temp or tenant_select) may still be
+     * used: its jti is not spent, and it was minted at the profile's current
+     * epoch (#2267). A token without an epoch claim counts as epoch 0, so one
+     * minted before this check shipped still works for a profile whose epoch
+     * never moved.
+     *
+     * @param array<string, mixed> $claims
+     */
+    private function signInStepTokenIsLive(array $claims): bool
+    {
+        $jti = $claims['jti'] ?? null;
+        if (!is_string($jti) || $jti === '' || $this->isJtiRevoked($jti)) {
+            return false;
+        }
+        $profileId = is_int($claims['profile_id'] ?? null) ? $claims['profile_id'] : 0;
+        $tokenEpoch = is_int($claims['token_epoch'] ?? null) ? $claims['token_epoch'] : 0;
+
+        return $tokenEpoch >= $this->currentProfileTokenEpoch($profileId);
+    }
+
+    /**
+     * Spend a sign-in step token by recording its jti in revoked_tokens, so it
+     * mints at most one session even in token mode, where no cookie is cleared
+     * (#2267). Atomic: of two parallel requests only the one whose insert lands
+     * gets true. Fails closed: an unwritable table refuses the step.
+     *
+     * @param array<string, mixed> $claims
+     */
+    private function spendSignInStepToken(array $claims): bool
+    {
+        $jti = $claims['jti'] ?? null;
+        $exp = $claims['exp'] ?? null;
+        if (!is_string($jti) || $jti === '' || !is_int($exp)) {
+            return false;
+        }
+        try {
+            $stmt = $this->db->prepare(
+                'INSERT INTO revoked_tokens (jti, expires_at) VALUES (?, ?) ON CONFLICT (jti) DO NOTHING'
+            );
+            $stmt->execute([$jti, date('Y-m-d H:i:s', $exp)]);
+
+            return $stmt->rowCount() === 1;
+        } catch (\Exception) {
+            return false;
+        }
     }
 
     /**
