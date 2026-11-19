@@ -19,6 +19,8 @@ use PDO;
 use Whity\Core\i18n\LocalizedTextRejected;
 use Whity\Core\i18n\LocalizedText;
 use Whity\Core\i18n\LocalizedTexts;
+use Whity\Core\RBAC\RoleGrantGuard;
+
 
 /**
  * Organizational Units API Handler
@@ -68,7 +70,10 @@ class OusApiHandler
     private PDO $db;
     private HookManager $hookManager;
 
-    public function __construct(PDO $db, HookManager $hookManager)
+    /**
+     * @param RoleGrantGuard|null $grantGuard #2235: an OU only gets a role the caller holds. `public/index.php` always wires it.
+     */
+    public function __construct(PDO $db, HookManager $hookManager, private readonly ?RoleGrantGuard $grantGuard = null)
     {
         $this->db = $db;
         $this->hookManager = $hookManager;
@@ -884,6 +889,23 @@ class OusApiHandler
                     var_export($roleId, true)
                 ));
                 return Response::error('Role not found', 404);
+            }
+
+            // #2235: every member of the OU and of the OUs under it gains this
+            // role, the caller included if they sit there, so the caller must
+            // already hold everything it grants.
+            if ($this->grantGuard !== null) {
+                $actor = $request->user;
+                $actorId = is_object($actor) && isset($actor->profile_id) && is_int($actor->profile_id)
+                    ? $actor->profile_id
+                    : null;
+                if ($actorId === null || $tenantId === null) {
+                    return RoleGrantGuard::refusal([], 'You may not give roles');
+                }
+                $missing = $this->grantGuard->roleNotHeld($actorId, $tenantId, (int)$roleId);
+                if ($missing !== []) {
+                    return RoleGrantGuard::refusal($missing);
+                }
             }
 
             // Insert role assignment

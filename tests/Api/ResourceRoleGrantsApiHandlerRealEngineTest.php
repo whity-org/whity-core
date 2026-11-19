@@ -678,6 +678,68 @@ final class ResourceRoleGrantsApiHandlerRealEngineTest extends TestCase
     // ==================== the design rule: never a substitute for membership ====================
 
     /**
+     * #2246: `roles:manage` is not a licence to hand out any role. A caller who
+     * does not hold a permission the role carries cannot grant it at a
+     * resource, to one person or to everyone, and nothing is written.
+     */
+    public function testRefusesARoleWithPermissionsTheCallerDoesNotHold(): void
+    {
+        $this->grantPermissionToRole('editor', 'posts:delete');
+        $before = $this->countGrants();
+
+        foreach ([$this->actorProfileId, null] as $beneficiary) {
+            $body = [
+                'resource_type' => ResourceTypeRegistry::TYPE_OU,
+                'resource_id' => $this->ouA,
+                'role_id' => $this->roleId('editor'),
+            ];
+            if ($beneficiary !== null) {
+                $body['profile_id'] = $beneficiary;
+            }
+            $response = $this->handler()->create($this->req('POST', '/api/resource-role-grants', $body));
+
+            self::assertSame(403, $response->getStatusCode(), (string) $response->getBody());
+            $decoded = json_decode((string) $response->getBody(), true);
+            self::assertSame('exceeds_your_access', $decoded['details']['reason'] ?? null);
+            self::assertContains('posts:delete', $decoded['details']['permissions'] ?? []);
+        }
+
+        self::assertSame($before, $this->countGrants(), 'A refused grant must write nothing');
+    }
+
+    /**
+     * #2246, "at that scope": what the caller holds AT the resource counts. A
+     * caller granted a role at this OU may pass that role on at this OU.
+     */
+    public function testAllowsARoleTheCallerHoldsAtThatResource(): void
+    {
+        $this->grantPermissionToRole('editor', 'posts:delete');
+        $this->pdo->prepare(
+            'INSERT INTO resource_role_assignments (tenant_id, resource_type, resource_id, role_id, profile_id, created_at)
+             VALUES (?, ?, ?, ?, ?, NOW())'
+        )->execute([self::TENANT_A, ResourceTypeRegistry::TYPE_OU, $this->ouA, $this->roleId('editor'), $this->actorProfileId]);
+        RoleChecker::clearCache();
+
+        $response = $this->handler()->create($this->req('POST', '/api/resource-role-grants', [
+            'resource_type' => ResourceTypeRegistry::TYPE_OU,
+            'resource_id' => $this->ouA,
+            'role_id' => $this->roleId('editor'),
+            'profile_id' => $this->memberProfileId,
+        ]));
+        self::assertSame(201, $response->getStatusCode(), (string) $response->getBody());
+
+        // ...and not at another resource, where the caller holds no such role.
+        $otherOu = $this->seedOu('a-finance', self::TENANT_A);
+        $response = $this->handler()->create($this->req('POST', '/api/resource-role-grants', [
+            'resource_type' => ResourceTypeRegistry::TYPE_OU,
+            'resource_id' => $otherOu,
+            'role_id' => $this->roleId('editor'),
+            'profile_id' => $this->memberProfileId,
+        ]));
+        self::assertSame(403, $response->getStatusCode(), (string) $response->getBody());
+    }
+
+    /**
      * The rule the whole model rests on: a resource grant WIDENS authority at
      * one resource for someone already in the tenant. It must never be a back
      * door for someone with no ACTIVE membership there.
@@ -693,6 +755,8 @@ final class ResourceRoleGrantsApiHandlerRealEngineTest extends TestCase
             ->execute([$suspended, self::TENANT_A]);
 
         $this->grantPermissionToRole('editor', 'posts:write');
+        // #2246: the actor can only grant a role whose permissions it holds.
+        $this->grantPermissionToRole('admin', 'posts:write');
         $this->createGrant(ResourceTypeRegistry::TYPE_OU, $this->ouA, $this->roleId('editor'), $suspended);
 
         RoleChecker::clearCache();
@@ -717,6 +781,8 @@ final class ResourceRoleGrantsApiHandlerRealEngineTest extends TestCase
     public function testGrantConfersAuthorityForAnActiveMember(): void
     {
         $this->grantPermissionToRole('editor', 'posts:write');
+        // #2246: the actor can only grant a role whose permissions it holds.
+        $this->grantPermissionToRole('admin', 'posts:write');
 
         self::assertFalse(
             $this->checker()->hasPermissionForProfile(

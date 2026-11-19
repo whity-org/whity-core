@@ -14,6 +14,7 @@ use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\RBAC\PermissionCompanions;
 use Whity\Core\RBAC\RecordSectionRequirement;
 use Whity\Core\RBAC\RecordSectionResolver;
+use Whity\Core\RBAC\RoleGrantGuard;
 use Whity\Http\InputLimits;
 use Whity\Http\JsonBody;
 use Whity\Http\ListQuery;
@@ -175,7 +176,8 @@ class RolesApiHandler
         HookManager $hookManager,
         ?LoggerInterface $logger = null,
         ?RecordSectionResolver $sectionResolver = null,
-        private readonly ?TenantPluginRepository $tenantPlugins = null
+        private readonly ?TenantPluginRepository $tenantPlugins = null,
+        private readonly ?RoleGrantGuard $grantGuard = null
     ) {
         $this->db = $db;
         $this->hookManager = $hookManager;
@@ -769,6 +771,13 @@ class RolesApiHandler
             /** @var array<int, string|int> $permissions */
             $permissions = $this->normalizePermissionRefs((array)$roleData['permissions']);
 
+            // #2236: a role can only be built from permissions the caller holds.
+            // After the filter hook, so a plugin cannot widen it past the check.
+            $refused = $this->refuseUnheldPermissions($request, $permissions, null);
+            if ($refused !== null) {
+                return $refused;
+            }
+
             // Insert the role, stamping it with the owning tenant so it is visible
             // to — and only to — this tenant (WC-110). The SYSTEM tenant (id 0) is
             // a real, scopeable owner here; it also sees every role on read. A
@@ -914,6 +923,20 @@ class RolesApiHandler
 
             if (!$role) {
                 return Response::error('Role not found', 404);
+            }
+
+            // #2236: refused before any write, so a body that also renames the
+            // role changes nothing. Only what the replace ADDS is compared: a
+            // manager may still remove a permission they do not hold.
+            if (array_key_exists('permissions', $body) && is_array($body['permissions'])) {
+                $refused = $this->refuseUnheldPermissions(
+                    $request,
+                    $this->normalizePermissionRefs($body['permissions']),
+                    (int)$id
+                );
+                if ($refused !== null) {
+                    return $refused;
+                }
             }
 
             // Filter hook before update.
@@ -1474,6 +1497,11 @@ class RolesApiHandler
             // withCompanionPermissionIds().
             if ($grant) {
                 $permissionIds = $this->withCompanionPermissionIds($permissionIds);
+                // #2236: only what the caller holds. Revoke is never limited.
+                $refused = $this->refuseUnheldPermissions($request, $permissionIds, (int)$id);
+                if ($refused !== null) {
+                    return $refused;
+                }
             }
 
             // Filter hook before the write, mirroring update() so a plugin
@@ -1912,6 +1940,51 @@ class RolesApiHandler
         }
 
         return $set;
+    }
+
+    /**
+     * #2236: the 403 for a grant of permissions the caller does not hold, or
+     * null when the grant may go ahead.
+     *
+     * `$refs` are permission ids and/or names, resolved exactly as the write
+     * will resolve them (companions included), so the check covers precisely
+     * what would be written. With `$roleId`, permissions the role already has
+     * are left out: they are not being granted.
+     *
+     * Without a guard wired (unit tests that build the handler bare) nothing is
+     * checked; `public/index.php` always wires one. With one wired, a request
+     * with no caller is refused rather than waved through.
+     *
+     * @param array<int, string|int> $refs
+     */
+    private function refuseUnheldPermissions(Request $request, array $refs, ?int $roleId): ?Response
+    {
+        if ($this->grantGuard === null || $refs === []) {
+            return null;
+        }
+
+        $tenantId = TenantContext::getTenantId();
+        $actor = self::callerProfileId($request);
+        if ($tenantId === null || $actor === null) {
+            return RoleGrantGuard::refusal([], 'You may not grant permissions');
+        }
+
+        $ids = $this->withCompanionPermissionIds($this->resolvePermissionIds($refs));
+        if ($roleId !== null) {
+            $ids = array_values(array_diff($ids, array_keys($this->linkedPermissionIds($roleId))));
+        }
+        if ($ids === []) {
+            return null;
+        }
+
+        $placeholders = implode(', ', array_fill(0, count($ids), '?'));
+        $stmt = $this->db->prepare('SELECT name FROM permissions WHERE id IN (' . $placeholders . ')');
+        $stmt->execute($ids);
+        $names = array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+
+        $missing = $this->grantGuard->notHeld($actor, $tenantId, $names);
+
+        return $missing === [] ? null : RoleGrantGuard::refusal($missing, 'You can only grant permissions you hold');
     }
 
     /**
