@@ -5716,7 +5716,21 @@ $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $meetingInvitationRepository,
     $meetingAttendanceRepository,
     $meetingService,
-    $decisionRecorder
+    $decisionRecorder,
+    // #2247: the document library's visibility rule, for agenda documents and
+    // a document's convening history.
+    static function (\Whity\Core\Request $request, int $tenantId, int $documentId) use ($documentRepository, $documentVisibilityPolicy, $roleChecker): bool {
+        $callerId = is_object($request->user) && isset($request->user->profile_id) && is_int($request->user->profile_id)
+            ? $request->user->profile_id
+            : null;
+        $document = $callerId === null ? null : $documentRepository->findById($documentId, $tenantId);
+
+        return $document !== null && $documentVisibilityPolicy->canView(
+            $document,
+            $callerId,
+            \Whity\Core\RBAC\ScopedPermissionSet::forProfile($roleChecker, $callerId, $tenantId)
+        );
+    }
 );
 $router->register('GET',    '/api/meetings',                                [$meetingsHandler, 'list'],     null, null, CorePermissions::CONVENING_READ);
 $router->register('POST',   '/api/meetings',                                [$meetingsHandler, 'create'],   null, null, CorePermissions::CONVENING_MANAGE);

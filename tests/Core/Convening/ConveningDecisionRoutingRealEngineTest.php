@@ -864,6 +864,120 @@ final class ConveningDecisionRoutingRealEngineTest extends TestCase
         );
     }
 
+    // -- #2248: a body reaches only people and documents of its own workspace --
+
+    public function testABodyCannotSeatSomebodyFromAnotherWorkspaceOrAnUnknownProfile(): void
+    {
+        // A person who exists, but only in the other workspace.
+        $this->pdo->exec(
+            "INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled,
+                                   two_factor_backup_codes_version, token_epoch, created_at, updated_at)
+             VALUES (90, 'elsewhere', 'x', false, 0, 0, " . $this->now() . ', ' . $this->now() . ')'
+        );
+        $this->pdo->exec(
+            "INSERT INTO memberships (id, profile_id, tenant_id, role_id, ou_id, is_primary, status, created_at)
+             VALUES (1090, 90, 2, 100, NULL, true, 'active', " . $this->now() . ')'
+        );
+
+        foreach ([90, 999999] as $profileId) {
+            try {
+                $this->bodies->addMember(self::TENANT, $this->boardId, $profileId, MemberRole::MEMBER);
+                self::fail("profile {$profileId} must not be seated");
+            } catch (ConveningRejectedException) {
+            }
+        }
+
+        // A suspended member of this workspace cannot be seated either.
+        $this->pdo->exec("UPDATE memberships SET status = 'suspended' WHERE profile_id = " . self::OUTSIDER);
+        $this->expectException(ConveningRejectedException::class);
+        $this->bodies->addMember(self::TENANT, $this->boardId, self::OUTSIDER, MemberRole::MEMBER);
+    }
+
+    public function testAttendanceNamesOnlyPeopleOfThisWorkspaceButTakesGuestsByName(): void
+    {
+        $itemId = $this->heldMeetingWithItem($this->boardId, null);
+        $item = $this->agenda->find(self::TENANT, $itemId);
+        self::assertNotNull($item);
+        $meetingId = (int) $item['meeting_id'];
+        $attendance = new \Whity\Core\Convening\AttendanceRepository($this->pdo);
+
+        $recorded = $attendance->replace(self::TENANT, $meetingId, [
+            ['profile_id' => self::CHAIR, 'attendee_name' => null, 'capacity' => 'member', 'note' => null],
+            ['profile_id' => null, 'attendee_name' => 'Visiting auditor', 'capacity' => 'guest', 'note' => null],
+        ], self::SECRETARY);
+        self::assertSame(2, $recorded);
+
+        try {
+            $attendance->replace(self::TENANT, $meetingId, [
+                ['profile_id' => 999999, 'attendee_name' => null, 'capacity' => 'member', 'note' => null],
+            ], self::SECRETARY);
+            self::fail('a profile that is not a member here must be refused');
+        } catch (ConveningRejectedException) {
+        }
+        self::assertCount(2, $attendance->listForMeeting(self::TENANT, $meetingId), 'a refused list changes nothing');
+    }
+
+    public function testAnAgendaItemCannotCarryAnotherWorkspacesDocument(): void
+    {
+        $this->pdo->exec(
+            'INSERT INTO documents (tenant_id, document_template_id, template_name, title, origin_ou_id, created_by, created_at)
+             VALUES (2, NULL, ' . $this->pdo->quote('Theirs') . ', ' . $this->pdo->quote('Their paper') . ', NULL, NULL, ' . $this->now() . ')'
+        );
+        $theirs = (int) $this->pdo->lastInsertId();
+        $meetingId = $this->meetings->create(self::TENANT, 'standards-board', $this->boardId, ['en' => 'Sitting'], self::SECRETARY);
+
+        $this->expectException(ConveningRejectedException::class);
+        $this->agenda->add(self::TENANT, $meetingId, MeetingStatus::DRAFT, ['en' => 'Their paper'], $theirs, null);
+    }
+
+    /**
+     * #2247: putting a document in front of a body, or reading its convening
+     * history, needs the caller to be able to see the document. An unwired
+     * check refuses.
+     */
+    public function testAgendaDocumentsAndTheirHistoryFollowDocumentVisibility(): void
+    {
+        $documentId = $this->seedDocument();
+        $meetingId = $this->meetings->create(self::TENANT, 'standards-board', $this->boardId, ['en' => 'Sitting'], self::SECRETARY);
+
+        $handler = fn (?\Closure $canView): \Whity\Api\MeetingsApiHandler => new \Whity\Api\MeetingsApiHandler(
+            $this->bodies,
+            $this->meetings,
+            $this->agenda,
+            $this->decisions,
+            $this->invitations,
+            new \Whity\Core\Convening\AttendanceRepository($this->pdo),
+            (new \ReflectionClass(\Whity\Core\Convening\MeetingService::class))->newInstanceWithoutConstructor(),
+            $this->recorder,
+            $canView,
+        );
+        $request = function (string $method, ?array $body = null): \Whity\Core\Request {
+            $r = new \Whity\Core\Request($method, '/x', [], $body === null ? '' : (string) json_encode($body));
+            $r->user = (object) ['profile_id' => self::SECRETARY];
+
+            return $r;
+        };
+        \Whity\Core\Tenant\TenantContext::setTenantId(self::TENANT);
+        try {
+            $hidden = static fn (): bool => false;
+            $add = $handler($hidden)->addAgendaItem($request('POST', ['title' => 'A paper', 'document_id' => $documentId]), ['id' => (string) $meetingId]);
+            self::assertSame(404, $add->getStatusCode(), (string) $add->getBody());
+            self::assertSame(404, $handler($hidden)->forDocument($request('GET'), ['id' => (string) $documentId])->getStatusCode());
+            self::assertSame(404, $handler(null)->forDocument($request('GET'), ['id' => (string) $documentId])->getStatusCode(), 'an unwired check refuses');
+
+            $visible = static fn (): bool => true;
+            $add = $handler($visible)->addAgendaItem($request('POST', ['title' => 'A paper', 'document_id' => $documentId]), ['id' => (string) $meetingId]);
+            self::assertSame(201, $add->getStatusCode(), (string) $add->getBody());
+            self::assertSame(200, $handler($visible)->forDocument($request('GET'), ['id' => (string) $documentId])->getStatusCode());
+
+            // An item with no document needs no visibility answer at all.
+            $plain = $handler(null)->addAgendaItem($request('POST', ['title' => 'Any other business']), ['id' => (string) $meetingId]);
+            self::assertSame(201, $plain->getStatusCode(), (string) $plain->getBody());
+        } finally {
+            \Whity\Core\Tenant\TenantContext::reset();
+        }
+    }
+
     // -- fixtures ------------------------------------------------------------
 
     /**
