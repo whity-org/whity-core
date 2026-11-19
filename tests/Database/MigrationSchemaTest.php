@@ -202,6 +202,15 @@ final class MigrationSchemaTest extends TestCase
             256 => 'unused in the 0.2.29 numbering',
             // Confirmed by the orchestrator (2026-11-18): never used by any lane.
             297 => 'permanently skipped in the 0.2.30 numbering',
+            // Confirmed by the orchestrator (2026-11-19): reserved for 0.2.31 lanes
+            // and released unused. None is in any commit or on any remote branch.
+            309 => 'reserved for the 0.2.31 performance lane, which needed no migration',
+            310 => 'reserved for the 0.2.31 performance lane, which needed no migration',
+            311 => 'reserved for the 0.2.31 performance lane, which needed no migration',
+            313 => 'reserved for the 0.2.31 security lane, which used only 312',
+            314 => 'reserved for the 0.2.31 migrations lane, which shipped a baseline instead',
+            315 => 'reserved for the 0.2.31 migrations lane, which shipped a baseline instead',
+            316 => 'reserved for the 0.2.31 migrations lane, which shipped a baseline instead',
         ];
 
         $deleted = array_values(array_filter(
