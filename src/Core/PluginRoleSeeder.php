@@ -279,6 +279,18 @@ final class PluginRoleSeeder
      */
     public function removeGrants(PluginInterface $plugin, int $tenantId): void
     {
+        // #2256: the core permissions an operator approved for the plugin's
+        // roles go with it, approvals included.
+        try {
+            (new \Whity\Core\Plugin\PluginCoreGrants($this->pdo))->removeAll($plugin->getName(), $tenantId);
+        } catch (PDOException $e) {
+            $this->log(
+                'error',
+                sprintf('PluginRoleSeeder: failed to remove core grants for plugin "%s": %s', $plugin->getName(), $e->getMessage()),
+                ['plugin' => $plugin->getName(), 'tenant_id' => $tenantId]
+            );
+        }
+
         if (!$plugin instanceof PluginRolesInterface) {
             return;
         }

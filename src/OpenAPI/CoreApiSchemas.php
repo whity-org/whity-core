@@ -3697,6 +3697,36 @@ final class CoreApiSchemas
                     422 => self::errorResponse('The plugin does not grant permissions to this role'),
                 ],
             ]),
+            self::permissionRoute('GET', '/api/plugins/{name}/core-grants', 'plugins:read', [
+                'summary' => 'Core permissions a plugin asks for its roles, and what the operator approved, per workspace (tenant_id narrows to one; 0 is the global roles)',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Requests and approvals', 'PluginCoreGrantsResponse'),
+                    403 => self::errorResponse('Not the platform operator'),
+                    404 => self::errorResponse('Plugin not loaded'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/{name}/core-grants/{role}/approve', 'plugins:install', [
+                'summary' => 'Grant a plugin role the core permissions the plugin asks for it in one workspace, all of them or the listed part',
+                'tags' => ['platform-ops'],
+                'request' => 'PluginCoreGrantChangeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Approved', 'PluginCoreGrantChangeResponse'),
+                    403 => self::errorResponse('Not the platform operator, or a permission the operator does not hold'),
+                    404 => self::errorResponse('Plugin not loaded'),
+                    422 => self::errorResponse('The plugin does not ask for this, or the role does not exist there'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/{name}/core-grants/{role}/revoke', 'plugins:install', [
+                'summary' => 'Take back core permissions approved for a plugin role in one workspace, all of them or the listed part',
+                'tags' => ['platform-ops'],
+                'request' => 'PluginCoreGrantChangeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Revoked', 'PluginCoreGrantChangeResponse'),
+                    403 => self::errorResponse('Not the platform operator'),
+                    404 => self::errorResponse('Plugin not loaded'),
+                ],
+            ]),
             self::permissionRoute('GET', '/api/plugins/trust-status', 'plugins:read', [
                 'summary' => 'Whether Verified can work here, and how fresh the signed revocation list is',
                 'tags' => ['platform-ops'],
@@ -11802,6 +11832,34 @@ final class CoreApiSchemas
                     'already_allowed' => self::bool(),
                 ], ['plugin', 'role', 'role_id', 'tenant_id', 'already_allowed']),
             ], ['data']),
+            'PluginCoreGrantsResponse' => self::object([
+                'data' => self::object([
+                    'plugin' => self::str(),
+                    'requests' => ['type' => 'object', 'additionalProperties' => ['type' => 'array', 'items' => self::str()]],
+                    'grants' => ['type' => 'array', 'items' => self::object([
+                        'tenant_id' => self::int(),
+                        'workspace' => self::str(),
+                        'role' => self::str(),
+                        'requested' => ['type' => 'array', 'items' => self::str()],
+                        'granted' => ['type' => 'array', 'items' => self::str()],
+                    ], ['tenant_id', 'workspace', 'role', 'requested', 'granted'])],
+                ], ['plugin', 'requests', 'grants']),
+            ], ['data']),
+            'PluginCoreGrantChangeRequest' => self::object([
+                'tenant_id' => array_merge(self::int(), ['description' => 'The workspace whose role this is; 0 or absent for the global roles.']),
+                'permissions' => ['type' => 'array', 'nullable' => true, 'items' => self::str(), 'description' => 'Only these; absent or null for everything the plugin asks for this role.'],
+            ], []),
+            'PluginCoreGrantChangeResponse' => self::object([
+                'data' => self::object([
+                    'plugin' => self::str(),
+                    'role' => self::str(),
+                    'tenant_id' => self::int(),
+                    'approved' => ['type' => 'array', 'items' => self::str()],
+                    'revoked' => ['type' => 'array', 'items' => self::str()],
+                    'requested' => ['type' => 'array', 'items' => self::str()],
+                    'granted' => ['type' => 'array', 'items' => self::str()],
+                ], ['plugin', 'role', 'tenant_id', 'requested', 'granted']),
+            ], ['data']),
             'PluginUpdatesResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => self::object([
                     'plugin' => self::str(),
@@ -19519,16 +19577,16 @@ final class CoreApiSchemas
                 'parameters' => array_merge($range, [$person]),
                 'responses' => [200 => self::jsonResponse('Exceptions', self::listEnvelope('CalendarTimeOff'))] + self::authErrors(),
             ]),
-            self::permissionRoute('POST', '/api/calendar/time-off', 'calendar:write', [
-                'summary' => 'Add time off (`off`) or extra hours (`open`) for a person',
+            self::ungatedRoute('POST', '/api/calendar/time-off', [
+                'summary' => 'Add time off (`off`) or extra hours (`open`) for a person. Your own time off needs only staff membership; your own extra hours need calendar:write; anybody else\'s needs calendar:write and calendar:manage',
                 'tags' => ['calendar'],
                 'request' => 'CalendarTimeOffRequest',
                 'responses' => [
                     201 => self::jsonResponse('The exception', self::dataEnvelope(SchemaBuilder::ref('CalendarTimeOff'))),
-                    403 => self::errorResponse('Another person\'s calendar without calendar:manage'),
+                    403 => self::errorResponse('Not staff, extra hours without calendar:write, or another person\'s calendar without calendar:write and calendar:manage'),
                 ] + self::authErrors(),
             ]),
-            self::permissionRoute('DELETE', '/api/calendar/time-off/{id:\d+}', 'calendar:write', [
+            self::ungatedRoute('DELETE', '/api/calendar/time-off/{id:\d+}', [
                 'summary' => 'Remove time off or extra hours',
                 'tags' => ['calendar'],
                 'responses' => [

@@ -399,6 +399,26 @@ class RoleChecker
     }
 
     /**
+     * Whether the profile is a member of STAFF here: at least one active
+     * membership that is not a customer one (#2256).
+     */
+    public function isActiveStaff(int $profileId, int $tenantId): bool
+    {
+        try {
+            $statement = $this->db->query(
+                "SELECT 1 FROM memberships
+                  WHERE profile_id = :profileId AND tenant_id = :tenantId AND status = 'active' AND kind <> 'customer'
+                  LIMIT 1",
+                [':profileId' => $profileId, ':tenantId' => $tenantId]
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return $statement->fetchColumn() !== false;
+    }
+
+    /**
      * Whether the profile is ONLY a customer in this workspace: it holds at
      * least one active membership here and every active one is `kind =
      * customer` (WHIT-915). A profile that is both staff and a customer (two

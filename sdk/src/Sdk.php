@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.129).
+ * SDK identity (v1.130).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1479,12 +1479,22 @@ namespace Whity\Sdk;
  * `.async` twin (WHIT-1234, design section 31 §3.7).
  *
  * Purely additive: one new method on Context\InventoryScope, which only the host implements.)
+ *
+ * 1.130 (CORE PERMISSIONS FOR A PLUGIN'S ROLES, with the operator's approval (#2256):
+ * {@see Contribute\CorePermissionRequestsInterface} lets a plugin say which core permissions its roles
+ * need (`['hr' => ['calendar:write', 'calendar:manage']]`). Nothing is granted until an operator
+ * approves it, per role and per workspace; an approval grants exactly what was asked, is recorded with
+ * the operator, can be revoked, and goes when the plugin is turned off. The host service
+ * {@see Contribute\CorePermissionGrants} answers whether a grant is in place. Also: a member of staff now
+ * puts time off on their own calendar through {@see Calendar\TimeOff} with no `calendar:write`.
+ *
+ * Purely additive: one new optional interface and one new host service.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.129.0';
+    public const VERSION = '1.130.0';
 
     /**
      * Static identity only — never instantiated.

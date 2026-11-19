@@ -52,6 +52,9 @@ class PluginsCommand extends BaseCommand implements CliCommand
             'uninstall' => $this->uninstall($argv),
             'agent-context' => $this->agentContext($argv),
             'role-approve' => $this->roleApprove($argv),
+            'core-grants' => $this->coreGrants($argv),
+            'core-grant-approve' => $this->coreGrantChange($argv, true),
+            'core-grant-revoke' => $this->coreGrantChange($argv, false),
             '--help', '-h', 'help' => $this->showHelp(),
             default => $this->unknownAction($action),
         };
@@ -351,6 +354,130 @@ class PluginsCommand extends BaseCommand implements CliCommand
     }
 
     /**
+     * #2256: what core permissions the plugin asks for its roles, and what is
+     * approved, per workspace.
+     *
+     * Usage: plugin core-grants <plugin> [--tenant <workspace id>]
+     *
+     * @param array<mixed> $argv
+     */
+    private function coreGrants(array $argv): int
+    {
+        [$positional, $tenantId, $error] = self::positionalAndTenant($argv);
+        if ($error !== null || count($positional) !== 1) {
+            echo $error ?? "Usage: whity-cli plugin core-grants <plugin> [--tenant <workspace id>]\n";
+            return 1;
+        }
+
+        $path = '/api/plugins/' . rawurlencode($positional[0]) . '/core-grants'
+            . ($tenantId === null ? '' : '?tenant_id=' . $tenantId);
+        $response = $this->callApi('GET', $path);
+        if ($response->getStatusCode() !== 200) {
+            echo "Error: " . $response->getBody() . "\n";
+            return 1;
+        }
+
+        $payload = json_decode($response->getBody(), true);
+        $data = is_array($payload) && is_array($payload['data'] ?? null) ? $payload['data'] : [];
+        $requests = is_array($data['requests'] ?? null) ? $data['requests'] : [];
+        if ($requests === []) {
+            echo "{$positional[0]} asks for no core permissions.\n";
+            return 0;
+        }
+
+        $rows = [];
+        foreach (is_array($data['grants'] ?? null) ? $data['grants'] : [] as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $requested = is_array($row['requested'] ?? null) ? $row['requested'] : [];
+            $granted = is_array($row['granted'] ?? null) ? $row['granted'] : [];
+            $tenant = (int) ($row['tenant_id'] ?? 0);
+            $rows[] = [
+                $tenant === 0 ? 'global roles' : $tenant . ' ' . (string) ($row['workspace'] ?? ''),
+                (string) ($row['role'] ?? ''),
+                implode(', ', array_map('strval', $requested)),
+                $granted === [] ? '-' : implode(', ', array_map('strval', $granted)),
+            ];
+        }
+        $this->renderTable(['Workspace', 'Role', 'Asks for', 'Approved'], $rows);
+        echo "\nApprove with: whity-cli plugin core-grant-approve {$positional[0]} <role> [--tenant <workspace id>]\n";
+
+        return 0;
+    }
+
+    /**
+     * #2256: approve or revoke the core permissions a plugin asks for one role.
+     *
+     * Usage: plugin core-grant-approve|core-grant-revoke <plugin> <role> [--tenant <workspace id>]
+     *
+     * @param array<mixed> $argv
+     */
+    private function coreGrantChange(array $argv, bool $approve): int
+    {
+        $verb = $approve ? 'core-grant-approve' : 'core-grant-revoke';
+        [$positional, $tenantId, $error] = self::positionalAndTenant($argv);
+        if ($error !== null || count($positional) !== 2 || $positional[0] === '' || $positional[1] === '') {
+            echo $error ?? "Usage: whity-cli plugin {$verb} <plugin> <role> [--tenant <workspace id>]\n";
+            return 1;
+        }
+        [$plugin, $role] = $positional;
+
+        $response = $this->callApi(
+            'POST',
+            '/api/plugins/' . rawurlencode($plugin) . '/core-grants/' . rawurlencode($role) . ($approve ? '/approve' : '/revoke'),
+            ['tenant_id' => $tenantId ?? 0]
+        );
+        if ($response->getStatusCode() !== 200) {
+            echo "Error: " . $response->getBody() . "\n";
+            return 1;
+        }
+
+        $payload = json_decode($response->getBody(), true);
+        $data = is_array($payload) && is_array($payload['data'] ?? null) ? $payload['data'] : [];
+        $key = $approve ? 'approved' : 'revoked';
+        $changed = is_array($data[$key] ?? null) ? $data[$key] : [];
+        if ($changed === []) {
+            echo $approve
+                ? "Nothing new to approve: role {$role} already has what {$plugin} asks for.\n"
+                : "Nothing to revoke for role {$role}.\n";
+            return 0;
+        }
+        echo ($approve ? 'Approved' : 'Revoked') . " for role {$role}: " . implode(', ', array_map('strval', $changed)) . "\n";
+
+        return 0;
+    }
+
+    /**
+     * Split arguments into positionals and an optional `--tenant <id>`.
+     *
+     * @param array<mixed> $argv
+     * @return array{0: list<string>, 1: int|null, 2: string|null}
+     */
+    private static function positionalAndTenant(array $argv): array
+    {
+        $positional = [];
+        $tenantId = null;
+        for ($i = 0; $i < count($argv); $i++) {
+            $arg = $argv[$i];
+            if (!is_string($arg)) {
+                continue;
+            }
+            if ($arg === '--tenant' || str_starts_with($arg, '--tenant=')) {
+                $value = $arg === '--tenant' ? ($argv[++$i] ?? '') : substr($arg, strlen('--tenant='));
+                if (!is_string($value) || !ctype_digit($value)) {
+                    return [[], null, "Error: --tenant needs a workspace id.\n"];
+                }
+                $tenantId = (int) $value;
+                continue;
+            }
+            $positional[] = $arg;
+        }
+
+        return [$positional, $tenantId, null];
+    }
+
+    /**
      * Show help for plugins command
      */
     private function showHelp(): int
@@ -366,6 +493,9 @@ class PluginsCommand extends BaseCommand implements CliCommand
         echo "  agent-context grant <name>            Let this Verified plugin's prompts and resources reach AI agents\n";
         echo "  agent-context revoke <name>           Stop them, at once\n";
         echo "  role-approve <plugin> <role> [--tenant <id>]  Let a plugin grant its own permissions to an existing role\n";
+        echo "  core-grants <plugin> [--tenant <id>]  Core permissions the plugin asks for its roles, and what is approved\n";
+        echo "  core-grant-approve <plugin> <role> [--tenant <id>]  Grant a role the core permissions the plugin asks for it\n";
+        echo "  core-grant-revoke <plugin> <role> [--tenant <id>]  Take them back\n";
         return 0;
     }
 

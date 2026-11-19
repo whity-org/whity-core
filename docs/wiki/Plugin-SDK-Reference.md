@@ -128,6 +128,7 @@ Implement the interface next to `PluginInterface`. Each one is optional, and the
 | `PluginMcpToolsInterface`, `PluginMcpToolsetsInterface`, `PluginMcpResourcesInterface`, `PluginMcpInterface` | MCP tools, toolsets, resources, and prompts (`PluginMcpInterface` declares prompts) | Plugin-Development |
 | `PluginAgentsInterface`, `PluginAgentPresetsInterface` | Agents (a persona, toolsets, where a person's grant starts) under your own root; agent presets | Plugin-Development |
 | `PluginInboxSourcesInterface` | Inbox sources (`Inbox\InboxSource`, `Inbox\KeysetInboxSource`) | Plugin-Development |
+| `Contribute\CorePermissionRequestsInterface` | Core permissions your roles need, granted only when an operator approves them per role and workspace (1.130). Check with the host service `Contribute\CorePermissionGrants`. | this page |
 | `Contribute\PluginThemesInterface` | Theme files (the format of `schemas/theme/v1.json`), each checked on load; they appear in the workspace's theme picker, where a person chooses one (1.125). Read the result with `$ctx->themes()`, a `Theme\WorkspaceTheme`. | [30-themes](../design/30-themes.md) |
 | `PluginThemeInterface` | **Deprecated 1.125**, use `PluginThemesInterface`. One of your own GET routes that answers design-token overrides (`{"data": {"primary": "#rrggbb"}}`). The host validates every key and value and falls back to no overrides on any error. | this page |
 | `Rbac\PluginResourceTypesInterface` | Resource types roles can be granted on | Plugin-Development |
