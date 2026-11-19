@@ -351,9 +351,16 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
           onOpenChange={setAdjusting}
           item={item}
           places={places}
-          onDone={() => {
+          onDone={(batch) => {
             setAdjusting(false);
-            toast.addToast(t('inventory.adjusted', 'Stock changed.'), 'success');
+            // WHIT-1233: a change worth more than the workspace's value waits
+            // for approval, and the stock moves only once it is approved.
+            toast.addToast(
+              batch.operation?.status === 'waiting_approval'
+                ? t('inventory.adjustWaiting', 'Sent for approval. The stock changes once it is approved.')
+                : t('inventory.adjusted', 'Stock changed.'),
+              'success'
+            );
             refetch();
           }}
         />

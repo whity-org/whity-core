@@ -53,6 +53,26 @@ final class InventoryWorkspace
         'transit' => ['On the way', 'في الطريق'],
     ];
 
+    /**
+     * Reasons stock changes outside a sale, delivery or transfer (register N5,
+     * IV.14), seeded the first time inventory runs in a workspace (WHIT-1233).
+     * Code => [direction, is waste, English, Arabic].
+     */
+    public const SEEDED_REASONS = [
+        'expired' => ['out', true, 'Expired', 'منتهي الصلاحية'],
+        'damaged' => ['out', true, 'Damaged', 'تالف'],
+        'spoiled' => ['out', true, 'Spoiled', 'فاسد'],
+        'unsold' => ['out', true, 'End of day, unsold', 'غير مباع في آخر اليوم'],
+        'used_in_house' => ['out', false, 'Used in-house', 'استخدام داخلي'],
+        'sample' => ['out', false, 'Sample', 'عينة'],
+        'theft' => ['out', false, 'Theft', 'سرقة'],
+        'lost_in_transit' => ['out', false, 'Lost on the way', 'فُقد في الطريق'],
+        'found' => ['in', false, 'Found', 'عُثر عليه'],
+        'returned' => ['in', false, 'Returned', 'مُرتجع'],
+        'count_correction' => ['both', false, 'Count difference', 'فرق في الجرد'],
+        'other' => ['both', false, 'Other', 'أخرى'],
+    ];
+
     /** @var array<int, true> */
     private array $ready = [];
 
@@ -100,6 +120,27 @@ final class InventoryWorkspace
                 "INSERT INTO inv_locations (tenant_id, kind, virtual_role, name, names)
                  VALUES (:tenant_id, 'virtual', :role, :name, :names)",
                 [':tenant_id' => $tenantId, ':role' => $role, ':name' => $en, ':names' => LocalizedText::encode(['en' => $en, 'ar' => $ar])]
+            ));
+        }
+
+        $reasons = array_column(
+            $this->db->all('SELECT code FROM inv_reasons WHERE tenant_id = :tenant_id', [':tenant_id' => $tenantId]),
+            'code'
+        );
+        $order = 0;
+        foreach (self::SEEDED_REASONS as $code => [$direction, $waste, $en, $ar]) {
+            $order += 10;
+            if (in_array($code, $reasons, true)) {
+                continue;
+            }
+            $this->quietly(fn () => $this->db->run(
+                'INSERT INTO inv_reasons (tenant_id, code, name, names, direction, is_waste, is_seeded, sort_order)
+                 VALUES (:tenant_id, :code, :name, :names, :direction, :waste, TRUE, :sort_order)',
+                [
+                    ':tenant_id' => $tenantId, ':code' => $code, ':name' => $en,
+                    ':names' => LocalizedText::encode(['en' => $en, 'ar' => $ar]),
+                    ':direction' => $direction, ':waste' => $waste, ':sort_order' => $order,
+                ]
             ));
         }
 

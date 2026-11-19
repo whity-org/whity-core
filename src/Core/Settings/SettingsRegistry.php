@@ -912,6 +912,23 @@ final class SettingsRegistry
     public const MESSAGING_WEBCHAT_GREETING = 'messaging.webchat_greeting';
     public const MESSAGING_INBOUND_EMAIL_ADDRESS = 'messaging.inbound_email_address';
 
+    // A workspace's inventory settings (WHIT-1233, design 31 §3.2, register
+    // IV.14-IV.16). Set on Inventory's own settings with inventory:settings, so
+    // these are OWN-SCREEN keys. Per workspace only.
+    //   - approve_adjustments_above: an adjustment line worth more than this, in
+    //     the item's currency at its buying price, waits for approval (N5: 25
+    //     a line). Empty never asks.
+    //   - approve_counts_above: the same for a count's differences (IV.15).
+    //   - adjustment_route_template_id / count_route_template_id: the route
+    //     they travel on; 0 is one step for everyone with inventory:settings.
+    //   - transfers_one_step: a transfer arrives as it is sent, with no time
+    //     "on the way" (IV.16).
+    public const INVENTORY_APPROVE_ADJUSTMENTS_ABOVE = 'inventory.approve_adjustments_above';
+    public const INVENTORY_APPROVE_COUNTS_ABOVE = 'inventory.approve_counts_above';
+    public const INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID = 'inventory.adjustment_route_template_id';
+    public const INVENTORY_COUNT_ROUTE_TEMPLATE_ID = 'inventory.count_route_template_id';
+    public const INVENTORY_TRANSFERS_ONE_STEP = 'inventory.transfers_one_step';
+
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
      * settings API cannot make (a customer-safe role, a permission other than
@@ -930,6 +947,11 @@ final class SettingsRegistry
         self::MESSAGING_WEBCHAT_ENABLED,
         self::MESSAGING_WEBCHAT_GREETING,
         self::MESSAGING_INBOUND_EMAIL_ADDRESS,
+        self::INVENTORY_APPROVE_ADJUSTMENTS_ABOVE,
+        self::INVENTORY_APPROVE_COUNTS_ABOVE,
+        self::INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID,
+        self::INVENTORY_COUNT_ROUTE_TEMPLATE_ID,
+        self::INVENTORY_TRANSFERS_ONE_STEP,
     ];
 
     /**
@@ -1047,6 +1069,7 @@ final class SettingsRegistry
     private const BOOL_KEYS = [
         self::SIGNUP_CUSTOMER_INVITES,
         self::MESSAGING_WEBCHAT_ENABLED,
+        self::INVENTORY_TRANSFERS_ONE_STEP,
         self::MAINTENANCE_ACTIVE,
         self::ERROR_TRACKING_ENABLED,
         self::ERROR_TRACKING_NOTIFY_ADMINS,
@@ -1441,6 +1464,11 @@ final class SettingsRegistry
         self::MESSAGING_WEBCHAT_ENABLED => 'false',
         self::MESSAGING_WEBCHAT_GREETING => '',
         self::MESSAGING_INBOUND_EMAIL_ADDRESS => '',
+        self::INVENTORY_APPROVE_ADJUSTMENTS_ABOVE => '25',
+        self::INVENTORY_APPROVE_COUNTS_ABOVE => '25',
+        self::INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID => '0',
+        self::INVENTORY_COUNT_ROUTE_TEMPLATE_ID => '0',
+        self::INVENTORY_TRANSFERS_ONE_STEP => 'false',
     ];
 
     /**
@@ -1947,6 +1975,13 @@ final class SettingsRegistry
             self::MESSAGING_INBOUND_EMAIL_ADDRESS => $value === '' || (strlen($value) <= 320 && filter_var($value, FILTER_VALIDATE_EMAIL) !== false)
                 ? null
                 : self::MESSAGING_INBOUND_EMAIL_ADDRESS . ' must be an email address, or empty for none.',
+            self::INVENTORY_APPROVE_ADJUSTMENTS_ABOVE, self::INVENTORY_APPROVE_COUNTS_ABOVE => $value === '' || preg_match('/^\d{1,12}(\.\d{1,3})?$/', $value) === 1
+                ? null
+                : $key . ' must be an amount such as 25 or 25.500, or empty to never ask.',
+            self::INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID, self::INVENTORY_COUNT_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
+                ? null
+                : $key . ' must be a route template id, or 0 for the default.',
+            self::INVENTORY_TRANSFERS_ONE_STEP => self::validateBoolean($value, self::INVENTORY_TRANSFERS_ONE_STEP),
             default => "Unknown setting key: {$key}",
         };
     }

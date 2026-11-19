@@ -37,13 +37,7 @@ use Whity\Sdk\Inventory\Quantity;
 final class StockLedger
 {
     /** Core's own source types. A plugin's are `<plugin>.<kind>`. */
-    public const CORE_SOURCES = ['opening', 'adjustment', 'reversal'];
-
-    /** Reasons an adjustment takes (register N5; the reasons list becomes editable in P2). */
-    public const REASONS = [
-        'out' => ['expired', 'damaged', 'spoiled', 'used_in_house', 'sample', 'theft', 'count_correction', 'other'],
-        'in' => ['found', 'count_correction', 'returned', 'other'],
-    ];
+    public const CORE_SOURCES = ['opening', 'adjustment', 'reversal', 'count', 'transfer'];
 
     public const MAX_LINES = 500;
     public const MAX_HISTORY = 200;
@@ -58,6 +52,7 @@ final class StockLedger
         private readonly ItemService $items,
         private readonly UnitCatalog $units,
         private readonly ?HookManager $hooks = null,
+        private readonly ?ReasonCatalog $reasons = null,
     ) {
     }
 
@@ -132,10 +127,9 @@ final class StockLedger
             ], $field);
         }
         if ($kind === 'adjustment') {
+            $reasons = $this->reasons ?? new ReasonCatalog($this->db, $this->workspace);
             foreach (array_keys($directions) as $direction) {
-                if (!in_array($reason, self::REASONS[$direction], true)) {
-                    throw InventoryRejectedException::field('reason_code', 'reason_code must be one of ' . implode(', ', self::REASONS[$direction]) . ' for stock going ' . $direction);
-                }
+                $reasons->usable($tenantId, $reason, $direction);
             }
         }
         $key = $this->idempotencyKey($idempotencyKey);
@@ -196,7 +190,57 @@ final class StockLedger
     }
 
     /**
-     * @param list<array{variant_id: int, lot_id?: ?int, from_location_id: int, to_location_id: int, steps: int, entered_unit_id: ?int, entered_quantity: ?int, unit_cost_minor: ?int, currency: ?string, note: string, reverses_move_id?: ?int}> $lines
+     * Posts lines already in base-unit steps, as stock operations keep them
+     * (WHIT-1233). Each line may carry its own `reason_code` and the
+     * `source_line_id` of the operation line it came from.
+     *
+     * @param list<array{variant_id: int, from_location_id: int, to_location_id: int, steps: int, entered_unit_id?: ?int, entered_quantity?: ?int, unit_cost_minor?: ?int, currency?: ?string, note?: string, reason_code?: string, source_line_id?: ?int}> $lines
+     * @param array{source_type: string, source_id?: ?int, reason_code?: string, note?: string, occurred_at?: ?string, agent_id?: ?int, on_behalf_of?: ?int} $meta
+     * @return array{batch_key: string, moves: list<array<string, mixed>>, repeated: bool}
+     */
+    public function postSteps(int $tenantId, ?int $actor, array $lines, array $meta): array
+    {
+        $this->workspace->ensure($tenantId);
+        if ($lines === [] || count($lines) > StockOperations::MAX_LINES) {
+            throw InventoryRejectedException::field('lines', 'Send 1 to ' . StockOperations::MAX_LINES . ' lines');
+        }
+        $ready = [];
+        foreach ($lines as $line) {
+            if ($line['steps'] <= 0) {
+                throw InventoryRejectedException::field('lines', 'Each line moves more than 0');
+            }
+            $ready[] = $line + ['entered_unit_id' => null, 'entered_quantity' => null, 'unit_cost_minor' => null, 'currency' => null, 'note' => ''];
+        }
+
+        return $this->write($tenantId, $actor, $ready, $meta);
+    }
+
+    /**
+     * One line as a person or plugin writes it, checked and converted to
+     * base-unit steps, without posting it.
+     *
+     * @return array{variant_id: int, from_location_id: int, to_location_id: int, steps: int, entered_unit_id: ?int, entered_quantity: ?int, unit_cost_minor: ?int, currency: ?string, note: string}
+     */
+    public function prepareLine(int $tenantId, mixed $raw, string $field): array
+    {
+        $this->workspace->ensure($tenantId);
+
+        return $this->line($tenantId, $raw, $field);
+    }
+
+    /** On hand now at one place, in base-unit steps, all lots together. */
+    public function onHandSteps(int $tenantId, int $variantId, int $locationId): int
+    {
+        $row = $this->db->one(
+            'SELECT SUM(on_hand) AS on_hand FROM inv_levels WHERE tenant_id = :tenant_id AND variant_id = :variant_id AND location_id = :location_id',
+            [':tenant_id' => $tenantId, ':variant_id' => $variantId, ':location_id' => $locationId]
+        );
+
+        return (int) ($row['on_hand'] ?? 0);
+    }
+
+    /**
+     * @param list<array{variant_id: int, lot_id?: ?int, from_location_id: int, to_location_id: int, steps: int, entered_unit_id: ?int, entered_quantity: ?int, unit_cost_minor: ?int, currency: ?string, note: string, reverses_move_id?: ?int, reason_code?: string, source_line_id?: ?int}> $lines
      * @param array<string, mixed> $meta
      * @return array{batch_key: string, moves: list<array<string, mixed>>, repeated: bool}
      */
@@ -217,6 +261,7 @@ final class StockLedger
                     'lines' => array_map(static fn (array $l): array => [
                         'variant_id' => $l['variant_id'], 'from_location_id' => $l['from_location_id'],
                         'to_location_id' => $l['to_location_id'], 'quantity' => $l['steps'],
+                        'reason_code' => $l['reason_code'] ?? $reason,
                     ], $lines),
                 ]);
 
@@ -225,17 +270,18 @@ final class StockLedger
                 foreach ($lines as $i => $line) {
                     $id = $this->db->insert(
                         'INSERT INTO inv_moves (tenant_id, variant_id, lot_id, from_location_id, to_location_id, quantity, entered_unit_id,
-                                entered_quantity, unit_cost_minor, currency, source_type, source_id, reason_code, note, batch_key,
+                                entered_quantity, unit_cost_minor, currency, source_type, source_id, source_line_id, reason_code, note, batch_key,
                                 idempotency_key, reverses_move_id, posted_by_profile_id, agent_id, on_behalf_of_profile_id, occurred_at, posted_at)
                          VALUES (:tenant_id, :variant_id, :lot_id, :from_id, :to_id, :quantity, :entered_unit_id,
-                                :entered_quantity, :unit_cost, :currency, :source_type, :source_id, :reason, :note, :batch_key,
+                                :entered_quantity, :unit_cost, :currency, :source_type, :source_id, :source_line_id, :reason, :note, :batch_key,
                                 :idempotency_key, :reverses, :actor, :agent_id, :on_behalf_of, :occurred_at, CURRENT_TIMESTAMP)',
                         [
                             ':tenant_id' => $tenantId, ':variant_id' => $line['variant_id'], ':lot_id' => $line['lot_id'] ?? null,
                             ':from_id' => $line['from_location_id'], ':to_id' => $line['to_location_id'], ':quantity' => $line['steps'],
                             ':entered_unit_id' => $line['entered_unit_id'], ':entered_quantity' => $line['entered_quantity'],
                             ':unit_cost' => $line['unit_cost_minor'], ':currency' => $line['currency'],
-                            ':source_type' => $sourceType, ':source_id' => $sourceId, ':reason' => $reason,
+                            ':source_type' => $sourceType, ':source_id' => $sourceId,
+                            ':source_line_id' => $line['source_line_id'] ?? null, ':reason' => $line['reason_code'] ?? $reason,
                             ':note' => $line['note'] !== '' ? mb_substr($line['note'], 0, 500) : $note, ':batch_key' => $batchKey,
                             // The key sits on the first move only: one key, one post.
                             ':idempotency_key' => $i === 0 ? ($meta['idempotency_key'] ?? null) : null,
@@ -643,6 +689,7 @@ final class StockLedger
             'currency' => is_string($r['currency']) ? $r['currency'] : null,
             'source_type' => (string) $r['source_type'],
             'source_id' => InventoryDb::int($r['source_id']),
+            'source_line_id' => InventoryDb::int($r['source_line_id']),
             'reason_code' => (string) $r['reason_code'],
             'note' => (string) $r['note'],
             'batch_key' => (string) $r['batch_key'],

@@ -12,9 +12,15 @@ use Whity\Core\Inventory\InventoryDb;
 use Whity\Core\Inventory\InventoryWorkspace;
 use Whity\Core\Inventory\ItemService;
 use Whity\Core\Inventory\LocationService;
+use Whity\Core\Inventory\ReasonCatalog;
+use Whity\Core\Inventory\ReorderRules;
 use Whity\Core\Inventory\StockLedger;
+use Whity\Core\Inventory\StockOperations;
 use Whity\Core\Inventory\UnitCatalog;
 use Whity\Core\Request;
+use Whity\Core\Settings\GlobalSettingsRepository;
+use Whity\Core\Settings\SettingsService;
+use Whity\Core\Settings\TenantSettingsRepository;
 use Whity\Core\Tenant\TenantContext;
 use Whity\OpenAPI\InventoryApiSchemas;
 
@@ -40,7 +46,21 @@ final class InventoryApiHandlerRealEngineTest extends TestCase
         $workspace = new InventoryWorkspace($db);
         $units = new UnitCatalog($db, $workspace);
         $items = new ItemService($db, $workspace, $units, static fn (int $t): string => 'JOD');
-        $this->handler = new InventoryApiHandler($units, $items, new LocationService($db, $workspace), new StockLedger($db, $workspace, $items, $units));
+        $reasons = new ReasonCatalog($db, $workspace);
+        $ledger = new StockLedger($db, $workspace, $items, $units, null, $reasons);
+        $settings = new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo));
+        $operations = new StockOperations($db, $workspace, $items, $units, $ledger, $reasons, static fn (int $t): array => $settings->effective($t));
+        $this->handler = new InventoryApiHandler(
+            $units,
+            $items,
+            new LocationService($db, $workspace),
+            $ledger,
+            null,
+            $operations,
+            $reasons,
+            new ReorderRules($db, $items, $ledger),
+            $settings,
+        );
     }
 
     protected function tearDown(): void
@@ -57,7 +77,16 @@ final class InventoryApiHandlerRealEngineTest extends TestCase
         self::assertSame('stock:adjust', $byRoute['POST /api/inventory/stock/adjustments']);
         self::assertSame('stock:adjust', $byRoute['POST /api/inventory/stock/batches/{key:[a-f0-9]+}/undo']);
         foreach ($byRoute as $route => $permission) {
-            $expected = str_starts_with($route, 'GET ') ? 'inventory:read' : (str_contains($route, '/stock/') ? 'stock:adjust' : 'inventory:write');
+            // Design 31 §4.1: reading is inventory:read; each kind of stock
+            // change has its own permission (WHIT-1233).
+            $expected = match (true) {
+                str_starts_with($route, 'GET ') => 'inventory:read',
+                str_contains($route, '/stock/'), str_contains($route, '/adjustments') => 'stock:adjust',
+                str_contains($route, '/counts') => 'stock:count',
+                str_contains($route, '/transfers') => 'stock:transfer',
+                str_contains($route, '/reasons'), str_contains($route, '/settings') => 'inventory:settings',
+                default => 'inventory:write',
+            };
             self::assertSame($expected, $permission, $route);
         }
 
@@ -65,7 +94,7 @@ final class InventoryApiHandlerRealEngineTest extends TestCase
         foreach (array_keys($byRoute) as $route) {
             [$method, $path] = explode(' ', $route, 2);
             self::assertMatchesRegularExpression(
-                '#\$router->register\(\'' . $method . '\',\s+\'' . preg_quote($path, '#') . '\',\s+\[\$inventoryHandler, \'\w+\'\],\s+null, null, CorePermissions::(INVENTORY_READ|INVENTORY_WRITE|STOCK_ADJUST)\);#',
+                '#\$router->register\(\'' . $method . '\',\s+\'' . preg_quote($path, '#') . '\',\s+\[\$inventoryHandler, \'\w+\'\],\s+null, null, CorePermissions::(INVENTORY_READ|INVENTORY_WRITE|STOCK_ADJUST|STOCK_COUNT|STOCK_TRANSFER|INVENTORY_SETTINGS)\);#',
                 $index,
                 $route . ' is registered with its permission'
             );
@@ -105,6 +134,61 @@ final class InventoryApiHandlerRealEngineTest extends TestCase
         TenantContext::setTenantId(2);
         self::assertSame(404, $this->call('showItem', 'GET', '/api/inventory/items/' . $created['body']['data']['id'], null, ['id' => (string) $created['body']['data']['id']])['status']);
         self::assertSame(0, $this->call('listItems', 'GET', '/api/inventory/items')['body']['pagination']['total']);
+    }
+
+    public function testAdjustmentsCountsTransfersAndSettingsThroughTheRoutes(): void
+    {
+        TenantContext::setTenantId(1);
+        $variant = $this->call('createItem', 'POST', '/api/inventory/items', ['name' => 'Butter', 'unit' => 'kg', 'purchase_price_minor' => 4000])['body']['data']['variants'][0]['id'];
+        $abdoun = $this->call('createLocation', 'POST', '/api/inventory/locations', ['name' => 'Abdoun'])['body']['data']['id'];
+        $sweifieh = $this->call('createLocation', 'POST', '/api/inventory/locations', ['name' => 'Sweifieh'])['body']['data']['id'];
+        $this->call('adjust', 'POST', '/api/inventory/stock/adjustments', ['kind' => 'opening', 'lines' => [['variant_id' => $variant, 'location_id' => $abdoun, 'change' => '10']]]);
+
+        // The P1 route now makes an operation, and still answers with the batch.
+        $waste = $this->call('adjust', 'POST', '/api/inventory/stock/adjustments', [
+            'reason_code' => 'damaged', 'lines' => [['variant_id' => $variant, 'location_id' => $abdoun, 'change' => '-1']],
+        ]);
+        self::assertSame(201, $waste['status']);
+        self::assertSame('ADJ-0001', $waste['body']['data']['operation']['number']);
+        self::assertSame('done', $waste['body']['data']['operation']['status'], 'JOD 4.000 is under 25');
+        self::assertCount(1, $waste['body']['data']['moves']);
+        $twoPlaces = $this->call('adjust', 'POST', '/api/inventory/stock/adjustments', ['reason_code' => 'damaged', 'lines' => [
+            ['variant_id' => $variant, 'location_id' => $abdoun, 'change' => '-1'],
+            ['variant_id' => $variant, 'location_id' => $sweifieh, 'change' => '-1'],
+        ]]);
+        self::assertSame(422, $twoPlaces['status']);
+
+        $sent = $this->call('createTransfer', 'POST', '/api/inventory/transfers', [
+            'from_location_id' => $abdoun, 'to_location_id' => $sweifieh, 'lines' => [['variant_id' => $variant, 'quantity' => '2']],
+        ]);
+        self::assertSame(201, $sent['status']);
+        self::assertSame('in_transit', $sent['body']['data']['status']);
+        $id = (string) $sent['body']['data']['id'];
+        self::assertSame(404, $this->call('finishCount', 'POST', '/api/inventory/counts/' . $id . '/finish', [], ['id' => $id])['status'], 'a transfer is not a count');
+        self::assertSame('done', $this->call('receiveTransfer', 'POST', '/api/inventory/transfers/' . $id . '/receive', [], ['id' => $id])['body']['data']['status']);
+
+        $count = $this->call('startCount', 'POST', '/api/inventory/counts', ['location_id' => $sweifieh]);
+        $countId = (string) $count['body']['data']['id'];
+        $this->call('recordCount', 'PUT', '/api/inventory/counts/' . $countId . '/lines', ['lines' => [['variant_id' => $variant, 'counted' => '2']]], ['id' => $countId]);
+        self::assertSame('done', $this->call('finishCount', 'POST', '/api/inventory/counts/' . $countId . '/finish', [], ['id' => $countId])['body']['data']['status']);
+        self::assertCount(3, $this->call('listOperations', 'GET', '/api/inventory/operations')['body']['data'], 'opening stock is not an operation');
+
+        self::assertSame('25', $this->call('showSettings', 'GET', '/api/inventory/settings')['body']['data']['approve_adjustments_above']);
+        $changed = $this->call('updateSettings', 'PATCH', '/api/inventory/settings', ['approve_adjustments_above' => null, 'transfers_one_step' => true]);
+        self::assertNull($changed['body']['data']['approve_adjustments_above']);
+        self::assertTrue($changed['body']['data']['transfers_one_step']);
+        self::assertSame(422, $this->call('updateSettings', 'PATCH', '/api/inventory/settings', ['approve_counts_above' => 'lots'])['status']);
+        self::assertSame(422, $this->call('updateSettings', 'PATCH', '/api/inventory/settings', ['currency' => 'USD'])['status']);
+
+        $rule = $this->call('setReorderRule', 'PUT', '/api/inventory/reorder-rules', ['variant_id' => $variant, 'location_id' => $sweifieh, 'min_quantity' => '5']);
+        self::assertTrue($rule['body']['data']['is_below']);
+        self::assertSame('3.000', $rule['body']['data']['suggested_quantity']);
+        self::assertSame('unsold', $this->call('listReasons', 'GET', '/api/inventory/reasons')['body']['data'][3]['code']);
+
+        TenantContext::reset();
+        TenantContext::setTenantId(2);
+        self::assertSame([], $this->call('listOperations', 'GET', '/api/inventory/operations')['body']['data']);
+        self::assertSame(404, $this->call('showOperation', 'GET', '/api/inventory/operations/' . $id, null, ['id' => $id])['status']);
     }
 
     public function testTheSystemTenantHasNoInventory(): void

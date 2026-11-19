@@ -102,6 +102,10 @@
     "en": "Delete a sign-in provider",
     "ar": "حذف مزود تسجيل دخول"
   },
+  "delete_api_inventory_reorder_rules_id": {
+    "en": "Remove a reorder level",
+    "ar": "حذف حد إعادة الطلب"
+  },
   "delete_api_invitations_id": {
     "ar": "سحب دعوة معلقة"
   },
@@ -672,6 +676,26 @@
     "en": "Get a place",
     "ar": "عرض موقع"
   },
+  "get_api_inventory_operations": {
+    "en": "List stock adjustments, counts and transfers",
+    "ar": "عرض تسويات المخزون والجرد والتحويلات"
+  },
+  "get_api_inventory_operations_id": {
+    "en": "Show a stock adjustment, count or transfer",
+    "ar": "عرض تسوية أو جرد أو تحويل"
+  },
+  "get_api_inventory_reasons": {
+    "en": "List reasons for stock changes",
+    "ar": "عرض أسباب تغيير المخزون"
+  },
+  "get_api_inventory_reorder_rules": {
+    "en": "List reorder levels",
+    "ar": "عرض حدود إعادة الطلب"
+  },
+  "get_api_inventory_settings": {
+    "en": "Show the inventory settings",
+    "ar": "عرض إعدادات المخزون"
+  },
   "get_api_inventory_stock": {
     "en": "See stock in each place",
     "ar": "عرض المخزون في كل موقع"
@@ -1176,6 +1200,14 @@
     "en": "Change a place",
     "ar": "تعديل موقع"
   },
+  "patch_api_inventory_reasons_id": {
+    "en": "Change a reason for stock changes",
+    "ar": "تعديل سبب تغيير المخزون"
+  },
+  "patch_api_inventory_settings": {
+    "en": "Change the inventory settings",
+    "ar": "تعديل إعدادات المخزون"
+  },
   "patch_api_languages_id": {
     "en": "Change a language's name or switch it on or off",
     "ar": "تعديل اسم لغة أو تشغيلها وإيقافها"
@@ -1626,9 +1658,33 @@
     "en": "Finish the first-time setup",
     "ar": "إنهاء الإعداد الأولي"
   },
+  "post_api_inventory_adjustments": {
+    "en": "Adjust stock with a reason",
+    "ar": "تسوية المخزون مع السبب"
+  },
+  "post_api_inventory_adjustments_id_cancel": {
+    "en": "Cancel a stock adjustment",
+    "ar": "إلغاء تسوية المخزون"
+  },
+  "post_api_inventory_adjustments_id_submit": {
+    "en": "Send a draft stock adjustment again",
+    "ar": "إعادة إرسال مسودة تسوية المخزون"
+  },
   "post_api_inventory_categories": {
     "en": "Add an item category",
     "ar": "إضافة فئة أصناف"
+  },
+  "post_api_inventory_counts": {
+    "en": "Start a stock count",
+    "ar": "بدء جرد المخزون"
+  },
+  "post_api_inventory_counts_id_cancel": {
+    "en": "Cancel a stock count",
+    "ar": "إلغاء جرد المخزون"
+  },
+  "post_api_inventory_counts_id_finish": {
+    "en": "Finish a stock count",
+    "ar": "إنهاء جرد المخزون"
   },
   "post_api_inventory_items": {
     "en": "Add an item",
@@ -1646,6 +1702,10 @@
     "en": "Add a place",
     "ar": "إضافة موقع"
   },
+  "post_api_inventory_reasons": {
+    "en": "Add a reason for stock changes",
+    "ar": "إضافة سبب لتغيير المخزون"
+  },
   "post_api_inventory_stock_adjustments": {
     "en": "Set opening stock or adjust stock",
     "ar": "إدخال رصيد افتتاحي أو تسوية المخزون"
@@ -1653,6 +1713,22 @@
   "post_api_inventory_stock_batches_key_undo": {
     "en": "Undo a stock change",
     "ar": "التراجع عن تغيير في المخزون"
+  },
+  "post_api_inventory_transfers": {
+    "en": "Move stock to another place",
+    "ar": "تحويل المخزون إلى موقع آخر"
+  },
+  "post_api_inventory_transfers_id_cancel": {
+    "en": "Cancel a stock transfer",
+    "ar": "إلغاء تحويل المخزون"
+  },
+  "post_api_inventory_transfers_id_receive": {
+    "en": "Receive a stock transfer",
+    "ar": "استلام تحويل المخزون"
+  },
+  "post_api_inventory_transfers_id_send": {
+    "en": "Send a stock transfer",
+    "ar": "إرسال تحويل المخزون"
   },
   "post_api_inventory_units": {
     "en": "Add a unit of measure",
@@ -1996,6 +2072,14 @@
   },
   "put_api_forms_id_fields": {
     "ar": "حفظ كل حقول نموذج دفعة واحدة"
+  },
+  "put_api_inventory_counts_id_lines": {
+    "en": "Record counted stock",
+    "ar": "تسجيل الكميات المعدودة"
+  },
+  "put_api_inventory_reorder_rules": {
+    "en": "Set a reorder level",
+    "ar": "ضبط حد إعادة الطلب"
   },
   "put_api_me_notification_preferences": {
     "en": "Change your notification preferences",

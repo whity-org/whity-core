@@ -1573,6 +1573,7 @@
         "inventory.adjust.out": "إخراج",
         "inventory.adjust.save": "تغيير المخزون",
         "inventory.adjust.title": "تغيير المخزون",
+        "inventory.adjustWaiting": "أُرسل للموافقة. يتغير المخزون بعد الموافقة عليه.",
         "inventory.adjusted": "تم تغيير المخزون.",
         "inventory.archive": "أرشفة",
         "inventory.archived": "مؤرشف",
