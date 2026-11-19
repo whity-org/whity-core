@@ -19121,7 +19121,9 @@ final class CoreApiSchemas
                 'description' => 'By id rather than by (resource, role, profile): over HTTP an omitted '
                     . '`profile_id` and an explicit null are indistinguishable, so a tuple-addressed revoke '
                     . 'would let a dropped parameter silently revoke the everyone-grant instead of one '
-                    . 'profile\'s. The ids come from the list route.',
+                    . 'profile\'s. The ids come from the list route. The caller must hold, at that resource, '
+                    . 'every permission the grant\'s role carries, the same rule as granting it; otherwise 403 '
+                    . '`exceeds_your_access` and the grant stays.',
                 'tags' => ['rbac'],
                 'responses' => [
                     204 => ['description' => 'Grant revoked'],
@@ -19138,7 +19140,9 @@ final class CoreApiSchemas
                     . 'make unconditionally from a delete path and safe to retry. Unlike the create route this '
                     . 'does NOT ask the owning plugin to vouch for the resource: by cleanup time the record is '
                     . 'usually already deleted, so a fails-closed check would refuse exactly the calls that '
-                    . 'matter. The tenant predicate still confines it to the caller\'s own grants.',
+                    . 'matter. The tenant predicate still confines it to the caller\'s own grants. The caller must '
+                    . 'hold, at that resource, every permission each grant\'s role carries; otherwise 403 '
+                    . '`exceeds_your_access` and nothing is removed.',
                 'tags' => ['rbac'],
                 'parameters' => [
                     self::queryParam('resource_type', 'string', 'A registered resource type (e.g. `ou`, `acme:record`)', true),

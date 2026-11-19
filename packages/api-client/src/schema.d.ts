@@ -10005,7 +10005,7 @@ export interface paths {
         post?: never;
         /**
          * Revoke every role grant at one resource
-         * @description The cleanup an owner runs when it deletes the record itself. `resource_id` carries no foreign key, so core is never told a record disappeared and its grants outlive it — a later record reusing that id would silently inherit them. Takes the SAME parameters as the list route, so a caller can GET exactly what this removes. Returns the number of grants revoked; 0 is a successful no-op, never a 404, so the call is safe to make unconditionally from a delete path and safe to retry. Unlike the create route this does NOT ask the owning plugin to vouch for the resource: by cleanup time the record is usually already deleted, so a fails-closed check would refuse exactly the calls that matter. The tenant predicate still confines it to the caller's own grants.
+         * @description The cleanup an owner runs when it deletes the record itself. `resource_id` carries no foreign key, so core is never told a record disappeared and its grants outlive it — a later record reusing that id would silently inherit them. Takes the SAME parameters as the list route, so a caller can GET exactly what this removes. Returns the number of grants revoked; 0 is a successful no-op, never a 404, so the call is safe to make unconditionally from a delete path and safe to retry. Unlike the create route this does NOT ask the owning plugin to vouch for the resource: by cleanup time the record is usually already deleted, so a fails-closed check would refuse exactly the calls that matter. The tenant predicate still confines it to the caller's own grants. The caller must hold, at that resource, every permission each grant's role carries; otherwise 403 `exceeds_your_access` and nothing is removed.
          */
         delete: operations["delete_api_v1_resource_role_grants_all"];
         options?: never;
@@ -10025,7 +10025,7 @@ export interface paths {
         post?: never;
         /**
          * Revoke one resource role grant by its id
-         * @description By id rather than by (resource, role, profile): over HTTP an omitted `profile_id` and an explicit null are indistinguishable, so a tuple-addressed revoke would let a dropped parameter silently revoke the everyone-grant instead of one profile's. The ids come from the list route.
+         * @description By id rather than by (resource, role, profile): over HTTP an omitted `profile_id` and an explicit null are indistinguishable, so a tuple-addressed revoke would let a dropped parameter silently revoke the everyone-grant instead of one profile's. The ids come from the list route. The caller must hold, at that resource, every permission the grant's role carries, the same rule as granting it; otherwise 403 `exceeds_your_access` and the grant stays.
          */
         delete: operations["delete_api_v1_resource_role_grants_id"];
         options?: never;
