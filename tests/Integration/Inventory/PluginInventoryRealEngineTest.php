@@ -137,14 +137,14 @@ final class PluginInventoryRealEngineTest extends TestCase
         $pos = self::plugin('Pos');
         PluginIdentity::bind($pos, 'Pos');
 
-        $maamoul = $this->items->create(['name' => ['en' => 'Maamoul, box of 12', 'ar' => 'معمول، علبة ١٢'], 'barcodes' => ['6251000000012']], 11);
+        $maamoul = $this->items->create(['name' => ['en' => 'Maamoul, box of 12', 'ar' => 'معمول، علبة 12'], 'barcodes' => ['6251000000012']], 11);
         $shop = $this->locations->create(['name' => 'Abdoun'], 11);
         $customer = $this->locations->virtual('customer');
         self::assertTrue($customer->isVirtual());
 
         $match = $this->items->findByBarcode('6251000000012');
         self::assertNotNull($match);
-        self::assertSame('معمول، علبة ١٢', $match['item']->names['ar']);
+        self::assertSame('معمول، علبة 12', $match['item']->names['ar']);
         $variant = $match['variant_id'];
 
         $opening = $this->locations->virtual('opening');

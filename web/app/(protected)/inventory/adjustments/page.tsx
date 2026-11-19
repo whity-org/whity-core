@@ -28,11 +28,12 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 import { useReasons } from '@/lib/inventory/use-reasons';
+import { useWorkspaceCurrency } from '@/lib/branding-context';
 import { Button } from '@whity/ui/button';
 import { Icon } from '@whity/ui/icon';
 import { KpiStrip } from '@whity/ui/kpi-strip';
 import { Money } from '@whity/ui/money/money';
-import { currencyExponent, moneyText } from '@whity/ui/money/currency';
+import { currencyExponent, moneyText, parseMoney } from '@whity/ui/money/currency';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import {
@@ -46,6 +47,9 @@ import {
 } from '@/lib/inventory/api';
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** An amount kept left to right inside a sentence in either language (IV.21): "$25.00", never "25.00$". */
+const ltr = (text: string) => `\u2066${text}\u2069`;
 
 interface Row {
   key: string;
@@ -69,6 +73,7 @@ export default function WasteAndAdjustmentsPage() {
   const { has, loading: accessLoading } = useCapabilities();
   const canAdjust = has(STOCK_ADJUST);
   const { reasons, reasonName } = useReasons();
+  const workspaceCurrency = useWorkspaceCurrency();
   const [recording, setRecording] = useState(false);
 
   const { data, error, forbidden, loading, refetch } = useFetch(async () => {
@@ -130,6 +135,15 @@ export default function WasteAndAdjustmentsPage() {
   };
   const money = (minor: number) => (numbers.currency ? moneyText(minor, numbers.currency) : '–');
   const firstWaiting = numbers.waiting[0];
+  // The approval value is stored as an amount ("25"); shown as money in the
+  // workspace's currency with its decimals (CU.1-CU.4): $25.00, JOD 25.000.
+  const limitText = (amount: string) => {
+    try {
+      return ltr(moneyText(parseMoney(amount, workspaceCurrency), workspaceCurrency));
+    } catch {
+      return ltr(amount);
+    }
+  };
   // "19 Nov 21:05": short enough for the column, as on the card.
   const when = (value: string | null | undefined) =>
     [dates.calendarLabel(value, 'dayMonth'), dates.time(value)].filter((part) => part).join(' ');
@@ -174,7 +188,7 @@ export default function WasteAndAdjustmentsPage() {
                   value: String(numbers.waiting.length),
                   note:
                     firstWaiting !== undefined
-                      ? [firstWaiting.lines?.[0] ? nameIn(firstWaiting.lines[0].item_names, firstWaiting.lines[0].item_name, language) : null, firstWaiting.value_minor != null && firstWaiting.currency ? moneyText(firstWaiting.value_minor, firstWaiting.currency) : null]
+                      ? [firstWaiting.lines?.[0] ? nameIn(firstWaiting.lines[0].item_names, firstWaiting.lines[0].item_name, language) : null, firstWaiting.value_minor != null && firstWaiting.currency ? ltr(moneyText(firstWaiting.value_minor, firstWaiting.currency)) : null]
                           .filter((part) => part)
                           .join(', ')
                       : undefined,
@@ -272,7 +286,9 @@ export default function WasteAndAdjustmentsPage() {
                     <dt className="text-muted-foreground">{t('inventory.waste.needsApproval', 'Needs approval')}</dt>
                     <dd>
                       {data?.settings?.approve_adjustments_above
-                        ? t('inventory.waste.over', 'Over {amount} a line, at the buying price', { amount: data.settings.approve_adjustments_above })
+                        ? t('inventory.waste.over', 'Over {amount} a line, at the buying price', {
+                            amount: limitText(data.settings.approve_adjustments_above),
+                          })
                         : t('inventory.waste.never', 'Never')}
                     </dd>
                   </div>
