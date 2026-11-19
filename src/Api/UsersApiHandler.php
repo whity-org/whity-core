@@ -14,6 +14,7 @@ use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\AuthMethod;
 use Whity\Core\Identity\PersonName;
 use Whity\Core\Identity\ProfileProvisioner;
+use Whity\Core\RBAC\RoleGrantGuard;
 use Whity\Http\InputLimits;
 use Whity\Http\JsonBody;
 use Whity\Http\ListQuery;
@@ -150,12 +151,40 @@ class UsersApiHandler
      * @param PDO                  $db          Database connection.
      * @param HookManager          $hookManager Hook dispatcher for user lifecycle events.
      * @param LoggerInterface|null $logger      Optional PSR-3 logger for structured logs.
+     * @param RoleGrantGuard|null  $grantGuard  #2235: a caller only gives a role they hold. `public/index.php` always wires it.
      */
-    public function __construct(PDO $db, HookManager $hookManager, ?LoggerInterface $logger = null)
-    {
+    public function __construct(
+        PDO $db,
+        HookManager $hookManager,
+        ?LoggerInterface $logger = null,
+        private readonly ?RoleGrantGuard $grantGuard = null
+    ) {
         $this->db = $db;
         $this->hookManager = $hookManager;
         $this->logger = $logger;
+    }
+
+    /**
+     * #2235: the 403 when the caller is giving somebody a role with permissions
+     * the caller does not hold in the tenant they act in, or null to go ahead.
+     * This also stops a caller raising their own role. With a guard wired, a
+     * request with no caller is refused.
+     */
+    private function refuseRoleGrant(Request $request, int $roleId, int $actingTenantId): ?Response
+    {
+        if ($this->grantGuard === null) {
+            return null;
+        }
+        $actor = $request->user;
+        $actorId = is_object($actor) && isset($actor->profile_id) && is_int($actor->profile_id)
+            ? $actor->profile_id
+            : null;
+        if ($actorId === null) {
+            return RoleGrantGuard::refusal([], 'You may not give roles');
+        }
+        $missing = $this->grantGuard->roleNotHeld($actorId, $actingTenantId, $roleId);
+
+        return $missing === [] ? null : RoleGrantGuard::refusal($missing);
     }
 
     /**
@@ -619,6 +648,11 @@ class UsersApiHandler
             if ($roleNamed && $roleId === null) {
                 return Response::error('Role not found', 404);
             }
+            // #2235: a role the caller names must be one they hold. The default
+            // role is the workspace's choice, not the caller's, so it is not asked.
+            if ($roleId !== null && ($refused = $this->refuseRoleGrant($request, $roleId, $tenantId)) !== null) {
+                return $refused;
+            }
             if ($roleId === null) {
                 $roleDefaulted = true;
                 $roleId = $this->resolveVisibleRoleId('user', $tenantId, $tenantId);
@@ -988,6 +1022,11 @@ class UsersApiHandler
                     return Response::error('Role not found', 404);
                 }
                 if ($resolved !== (int)$membership['role_id']) {
+                    // #2235: after visibility, so a private role still reads 404.
+                    $refused = $this->refuseRoleGrant($request, $resolved, $currentTenantId);
+                    if ($refused !== null) {
+                        return $refused;
+                    }
                     $newRoleId = $resolved;
                     $roleChanged = true;
                 }
@@ -1589,6 +1628,10 @@ class UsersApiHandler
                 : $this->resolveVisibleRoleId($roleRef, $currentTenantId, $ownerTenantId);
             if ($roleId === null) {
                 return Response::error('Role not found', 404);
+            }
+            // #2235: a second role is a grant like any other.
+            if (($refused = $this->refuseRoleGrant($request, $roleId, $currentTenantId)) !== null) {
+                return $refused;
             }
 
             // Reuses the create/update gate, so a foreign OU is a 403 here too.

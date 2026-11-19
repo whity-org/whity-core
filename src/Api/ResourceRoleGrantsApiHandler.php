@@ -12,6 +12,8 @@ use Whity\Core\RBAC\InvalidResourceTypeException;
 use Whity\Core\RBAC\ResourceRoleAssignmentRepository;
 use Whity\Core\RBAC\ResourceTypeRegistry;
 use Whity\Core\RBAC\RoleNotVisibleException;
+use Whity\Core\RBAC\RoleGrantGuard;
+use Whity\Core\Identity\AssignableRole;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
@@ -167,6 +169,19 @@ final class ResourceRoleGrantsApiHandler
         // grant that works.
         if ($profileId !== null && !$this->profileBelongsToTenant($profileId, $tenantId)) {
             return Response::error('Profile not found', 404);
+        }
+
+        // #2246: the caller must hold, AT this resource, everything the role
+        // grants. Visibility first, so another workspace's private role still
+        // reads as not found rather than as "has permissions you do not hold".
+        // authorize() above already proved there is a caller.
+        if (!(new AssignableRole($this->db))->isAssignable($roleId, $tenantId)) {
+            return Response::error('Role not found', 404);
+        }
+        $missing = (new RoleGrantGuard($this->roleChecker))
+            ->roleNotHeld((int) self::actorProfileId($request), $tenantId, $roleId, $resourceType, $resourceId);
+        if ($missing !== []) {
+            return RoleGrantGuard::refusal($missing);
         }
 
         try {

@@ -12,6 +12,7 @@ use Whity\Core\Identity\InvitationService;
 use Whity\Core\RateLimit\RateLimited;
 use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\RBAC\CorePermissions;
+use Whity\Core\RBAC\RoleGrantGuard;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Settings\SettingsRegistry;
@@ -105,9 +106,18 @@ final class InvitationsApiHandler
             return Response::error('A valid email address is required', 422);
         }
 
-        $roleId = $this->resolveRoleId($body['role_id'] ?? $body['role'] ?? null, $ctx['tenantId']);
+        $roleRef = $body['role_id'] ?? $body['role'] ?? null;
+        $roleId = $this->resolveRoleId($roleRef, $ctx['tenantId']);
         if ($roleId === null) {
             return Response::error('That role does not exist in this tenant', 422);
+        }
+        // #2235: an invitation hands out its role on accept, so the inviter must
+        // hold it. The default role is the workspace's choice, not the caller's.
+        if ($roleRef !== null && $roleRef !== '') {
+            $missing = (new RoleGrantGuard($this->roleChecker))->roleNotHeld($ctx['userId'], $ctx['tenantId'], $roleId);
+            if ($missing !== []) {
+                return RoleGrantGuard::refusal($missing);
+            }
         }
 
         $ouId = $this->resolveOuId($body['ou_id'] ?? null, $ctx['tenantId']);

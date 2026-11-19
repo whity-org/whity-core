@@ -121,6 +121,31 @@ final class InvitationsApiRealEngineTest extends TestCase
 
     // ==================== create ====================
 
+    /**
+     * #2235: `users:write` lets a person invite, not make admins. The invitation
+     * hands its role out on accept, so the inviter must hold every permission
+     * the role carries; a role they do hold still goes through.
+     */
+    public function testInviterCanOnlyGiveARoleTheyHold(): void
+    {
+        $this->pdo->exec("INSERT INTO roles (id, name, description, tenant_id, created_at) VALUES (150, 'hr', '', " . self::TENANT_A . ", datetime('now'))");
+        $this->pdo->exec("INSERT INTO role_permissions (role_id, permission_id, created_at)
+            SELECT 150, id, datetime('now') FROM permissions WHERE name IN ('users:read', 'users:write')");
+        $this->pdo->exec('UPDATE memberships SET role_id = 150 WHERE profile_id = ' . self::NOPERM_A);
+        RoleChecker::clearCache();
+
+        $refused = $this->create(self::TENANT_A, self::NOPERM_A, ['email' => 'mallory@example.test', 'role' => 'admin']);
+        self::assertSame(403, $refused->getStatusCode(), $refused->getBody());
+        self::assertSame('exceeds_your_access', $this->decode($refused)['details']['reason'] ?? null);
+        $sent = $this->pdo->prepare('SELECT COUNT(*) FROM invitations WHERE email = ?');
+        $sent->execute(['mallory@example.test']);
+        self::assertSame(0, (int) $sent->fetchColumn());
+
+        $allowed = $this->create(self::TENANT_A, self::NOPERM_A, ['email' => 'colleague@example.test', 'role' => 'hr']);
+        self::assertSame(201, $allowed->getStatusCode(), $allowed->getBody());
+    }
+
+
     public function testAdminCanInviteAndTheLinkIsMailed(): void
     {
         $res = $this->create(self::TENANT_A, self::ADMIN_A, ['email' => 'new@example.test', 'role' => 'user']);
