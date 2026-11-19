@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Chat;
 
 use PDO;
+use Whity\Core\RBAC\CorePermissions;
 
 /**
  * Blocks inside chat messages (design 3.5, UC.5, WHIT-1096): a poll, or a
@@ -21,18 +22,24 @@ final class ChatBlocks
 {
     public const MAX_OPTIONS = 10;
 
-    public function __construct(private readonly PDO $db)
+    /**
+     * `$access` (WHIT-1266, #2232): who may see each booking and document. Null
+     * means nobody: record blocks can't be added or found, and the ones already
+     * in a chat show as unavailable.
+     */
+    public function __construct(private readonly PDO $db, private readonly ?ChatRecordAccess $access = null)
     {
     }
 
     /**
-     * The block to store, from what the poster sent, or why it is refused.
+     * The block to store, from what the poster sent, or why it is refused. A
+     * record must be one the poster may see (WHIT-1266, #2232).
      *
      * @return array<string, mixed>
      *
      * @throws ChatException
      */
-    public function normalise(int $tenantId, mixed $block): array
+    public function normalise(int $tenantId, mixed $block, int $posterProfileId): array
     {
         if (!is_array($block)) {
             throw new ChatException('That block is not one Chat knows.');
@@ -63,7 +70,7 @@ final class ChatBlocks
         if ($type === 'record') {
             $kind = $block['record'] ?? null;
             $id = is_numeric($block['id'] ?? null) ? (int) $block['id'] : 0;
-            if (!in_array($kind, ['booking', 'document'], true) || $id <= 0 || $this->records($tenantId, [$kind => [$id]]) === []) {
+            if (!in_array($kind, ['booking', 'document'], true) || $id <= 0 || !$this->maySee($tenantId, $posterProfileId, $kind, $id)) {
                 throw new ChatException('That record is not in this workspace.');
             }
 
@@ -74,12 +81,16 @@ final class ChatBlocks
     }
 
     /**
-     * Each message's block as the viewer sees it now.
+     * Each message's block as the viewer sees it now. A record the viewer may
+     * not see shows as unavailable, the same as one that was deleted
+     * (WHIT-1266, #2232): being in the chat is not access to the record.
      *
-     * @param array<int, array<string, mixed>> $blocks message id => stored block
+     * @param array<int, array<string, mixed>> $blocks          message id => stored block
+     * @param int                              $viewerProfileId the person whose votes are "mine", 0 for an agent
+     * @param int                              $recordsFor      whose access decides which records show: the person, or the one an agent works for
      * @return array<int, array<string, mixed>>
      */
-    public function present(int $tenantId, array $blocks, int $viewerProfileId): array
+    public function present(int $tenantId, array $blocks, int $viewerProfileId, int $recordsFor): array
     {
         if ($blocks === []) {
             return [];
@@ -90,7 +101,11 @@ final class ChatBlocks
             if (($b['type'] ?? null) === 'poll') {
                 $pollIds[] = $messageId;
             } elseif (($b['type'] ?? null) === 'record' && isset($wanted[$b['record'] ?? ''])) {
-                $wanted[(string) $b['record']][] = (int) ($b['id'] ?? 0);
+                $kind = (string) $b['record'];
+                $id = (int) ($b['id'] ?? 0);
+                if (!in_array($id, $wanted[$kind], true) && $this->maySee($tenantId, $recordsFor, $kind, $id)) {
+                    $wanted[$kind][] = $id;
+                }
             }
         }
         $votes = $this->votes($tenantId, $pollIds);
@@ -164,25 +179,52 @@ final class ChatBlocks
 
     /**
      * Records to put in a message, newest first: upcoming and recent bookings,
-     * the latest documents, matching the words.
+     * the latest documents, matching the words. Only what the person may see
+     * (WHIT-1266, #2232): bookings with `calendar:read`, documents with
+     * `documents:read` and {@see \Whity\Core\Document\DocumentVisibilityPolicy}.
      *
      * @return list<array<string, mixed>>
      */
-    public function find(int $tenantId, string $kind, string $q, int $limit = 20): array
+    public function find(int $tenantId, string $kind, string $q, int $profileId, int $limit = 20): array
     {
+        if ($this->access === null) {
+            return [];
+        }
         $q = mb_strtolower(trim(mb_substr($q, 0, 80)));
         $like = '%' . strtr($q, ['!' => '!!', '%' => '!%', '_' => '!_']) . '%';
         if ($kind === 'booking') {
+            if (!$this->access->can($tenantId, $profileId, CorePermissions::CALENDAR_READ)) {
+                return [];
+            }
             $stmt = $this->db->prepare("SELECT b.id FROM calendar_bookings b LEFT JOIN calendar_services s ON s.id = b.service_id AND s.tenant_id = b.tenant_id
                 WHERE b.tenant_id = :tid AND b.starts_at >= :since
                   AND (:q = '' OR LOWER(COALESCE(b.customer_name, '')) LIKE :like ESCAPE '!' OR LOWER(COALESCE(s.name, '')) LIKE :like2 ESCAPE '!')
                 ORDER BY b.starts_at ASC LIMIT :limit");
             $stmt->bindValue(':since', gmdate('Y-m-d H:i:s', time() - 7 * 86400));
         } elseif ($kind === 'document') {
+            $restrictTo = $this->access->documentScope($tenantId, $profileId);
+            if ($restrictTo === null) {
+                return [];
+            }
+            // A restricted person sees what they raised, what a route sent
+            // them and what they were granted: DocumentVisibilityPolicy's rule,
+            // as DocumentRepository's list puts it in SQL.
             $stmt = $this->db->prepare("SELECT d.id FROM documents d
                 WHERE d.tenant_id = :tid
                   AND (:q = '' OR LOWER(COALESCE(d.title, '')) LIKE :like ESCAPE '!' OR LOWER(COALESCE(d.number, '')) LIKE :like2 ESCAPE '!')
+                  AND (:all = 1
+                       OR d.created_by = :me
+                       OR EXISTS (SELECT 1 FROM document_route_recipients r
+                                   WHERE r.tenant_id = :tid2 AND r.document_id = d.id AND r.profile_id = :me2)
+                       OR EXISTS (SELECT 1 FROM resource_role_assignments rra
+                                   WHERE rra.tenant_id = :tid3 AND rra.resource_type = 'document' AND rra.resource_id = d.id AND rra.profile_id = :me3))
                 ORDER BY d.created_at DESC, d.id DESC LIMIT :limit");
+            $stmt->bindValue(':all', $restrictTo === 0 ? 1 : 0, PDO::PARAM_INT);
+            $stmt->bindValue(':tid2', $tenantId, PDO::PARAM_INT);
+            $stmt->bindValue(':tid3', $tenantId, PDO::PARAM_INT);
+            foreach ([':me', ':me2', ':me3'] as $mark) {
+                $stmt->bindValue($mark, $restrictTo, PDO::PARAM_INT);
+            }
         } else {
             return [];
         }
@@ -273,6 +315,11 @@ final class ChatBlocks
         }
 
         return $out;
+    }
+
+    private function maySee(int $tenantId, int $profileId, string $kind, int $id): bool
+    {
+        return $this->access !== null && $this->access->canSee($tenantId, $profileId, $kind, $id);
     }
 
     private static function iso(mixed $at): ?string

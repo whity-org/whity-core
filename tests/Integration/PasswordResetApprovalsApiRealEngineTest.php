@@ -181,6 +181,56 @@ final class PasswordResetApprovalsApiRealEngineTest extends TestCase
         self::assertSame(['sysA@acme.test', 'sysB@acme.test'], $emails);
     }
 
+    /** #2226: the approval exists so that somebody else checks the reset. */
+    public function testAnAdminCannotApproveTheirOwnParkedReset(): void
+    {
+        $requestId = $this->stageRequest(self::ADMIN_A, 'self-approved-password');
+
+        TenantContext::setTenantId(self::TENANT_A);
+        $res = $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A), ['id' => (string) $requestId]);
+        self::assertSame(403, $res->getStatusCode(), $res->getBody());
+        self::assertSame(0, $this->epochOf(self::ADMIN_A));
+        self::assertSame(
+            PasswordResetService::STATUS_AWAITING_APPROVAL,
+            $this->col("SELECT status FROM password_resets WHERE id = {$requestId}")
+        );
+    }
+
+    /**
+     * #2226: a password is the person's everywhere. A workspace can't reset it
+     * for somebody who also belongs to another workspace (here the platform
+     * one), nor for its customers; the platform workspace still can.
+     */
+    public function testAWorkspaceCannotResetSomeoneItDoesNotAloneAnswerFor(): void
+    {
+        $alsoPlatform = $this->seedProfile('super@acme.test', self::TENANT_A);
+        $this->pdo->exec(
+            "INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at)
+             VALUES ({$alsoPlatform}, " . self::SYSTEM_TENANT . ", 1, 'active', datetime('now'))"
+        );
+        $customer = $this->seedProfile('customer@acme.test', self::TENANT_A);
+        $this->pdo->exec("UPDATE memberships SET kind = 'customer' WHERE profile_id = {$customer}");
+
+        foreach ([$alsoPlatform, $customer] as $target) {
+            $requestId = $this->stageRequest($target, 'must-not-apply');
+
+            TenantContext::reset();
+            TenantContext::setTenantId(self::TENANT_A);
+            $listed = $this->decode($this->handler->listPending($this->req(self::ADMIN_A, self::TENANT_A)))['data'];
+            self::assertNotContains($requestId, array_column($listed, 'id'));
+            $res = $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A), ['id' => (string) $requestId]);
+            self::assertSame(404, $res->getStatusCode());
+            $res = $this->handler->reject($this->req(self::ADMIN_A, self::TENANT_A), ['id' => (string) $requestId]);
+            self::assertSame(404, $res->getStatusCode());
+            self::assertSame(0, $this->epochOf($target));
+
+            TenantContext::reset();
+            TenantContext::setTenantId(self::SYSTEM_TENANT);
+            $res = $this->handler->approve($this->req(self::ADMIN_SYS, self::SYSTEM_TENANT), ['id' => (string) $requestId]);
+            self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        }
+    }
+
     public function testSystemTenantOperatorCanApproveAnotherTenantsPendingReset(): void
     {
         // The deadlock this exists to break: tenant A's ONLY approver is the

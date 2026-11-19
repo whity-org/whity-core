@@ -62,6 +62,9 @@ final class TwoFactorRecoveryService
 
     /** AG.1: why an admin's approval was refused. */
     public const REFUSED_OWN_REQUEST = 'own_request';
+
+    /** The platform workspace, whose break-glass reaches every request (#2226). */
+    public const SYSTEM_TENANT_ID = 0;
     public const REFUSED_SAME_ADMIN = 'same_admin';
 
     /**
@@ -213,16 +216,20 @@ final class TwoFactorRecoveryService
      */
     public function listPendingForTenant(int $tenantId, int $limit = PHP_INT_MAX, int $offset = 0): array
     {
-        // Joins the global two_factor_recovery_requests/profiles tables to memberships, scoped by the tenant_id predicate below
+        // The platform workspace's break-glass sees every request; its last
+        // sign-in is the person's last sign-in anywhere.
+        $sessionScope = $tenantId === self::SYSTEM_TENANT_ID ? '' : ' AND s.tenant_id = m.tenant_id';
+        // Joins the global two_factor_recovery_requests/profiles tables to memberships via scopeJoin(); sessions are scoped to that tenant except for the platform break-glass
+        // @tenant-guard-ignore: platform (system tenant 0) break-glass sees every request and the person's last sign-in anywhere; every other tenant binds :tenant_id through scopeJoin() and $sessionScope
         $stmt = $this->db->prepare(
             "SELECT DISTINCT tfr.id, tfr.profile_id, tfr.created_at, tfr.reason, tfr.requested_from, tfr.checks,
                     tfr.first_approver_profile_id, tfr.first_approver_tenant_id, tfr.first_approved_at, tfr.first_approval_method,
                     p.display_name, fa.display_name AS first_approver_name,
                     pe.email AS email,
                     (SELECT MAX(s.created_at) FROM sessions s
-                      WHERE s.profile_id = tfr.profile_id AND s.tenant_id = m.tenant_id) AS last_signed_in_at
+                      WHERE s.profile_id = tfr.profile_id" . $sessionScope . ") AS last_signed_in_at
              FROM two_factor_recovery_requests tfr
-             JOIN memberships m ON m.profile_id = tfr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
+             " . $this->scopeJoin($tenantId, 'tfr.profile_id') . "
              JOIN profiles p ON p.id = tfr.profile_id
              LEFT JOIN profiles fa ON fa.id = tfr.first_approver_profile_id
              LEFT JOIN profile_emails pe ON pe.profile_id = tfr.profile_id AND pe.is_primary = TRUE
@@ -230,7 +237,9 @@ final class TwoFactorRecoveryService
              ORDER BY tfr.created_at ASC, tfr.id ASC
              LIMIT :limit OFFSET :offset"
         );
-        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        if ($tenantId !== self::SYSTEM_TENANT_ID) {
+            $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        }
         $stmt->bindValue(':now', gmdate('Y-m-d H:i:s'), PDO::PARAM_STR);
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
@@ -292,10 +301,10 @@ final class TwoFactorRecoveryService
         $stmt = $this->db->prepare(
             "SELECT COUNT(DISTINCT tfr.id)
              FROM two_factor_recovery_requests tfr
-             JOIN memberships m ON m.profile_id = tfr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
+             " . $this->scopeJoin($tenantId, 'tfr.profile_id') . "
              WHERE tfr.status = '" . self::STATUS_PENDING . "' AND tfr.expires_at > :now"
         );
-        $stmt->execute([':tenant_id' => $tenantId, ':now' => gmdate('Y-m-d H:i:s')]);
+        $stmt->execute($this->scopeParams($tenantId) + [':now' => gmdate('Y-m-d H:i:s')]);
 
         return (int) $stmt->fetchColumn();
     }
@@ -342,13 +351,13 @@ final class TwoFactorRecoveryService
                 "SELECT tfr.id, tfr.profile_id, tfr.first_approver_profile_id, tfr.first_approver_tenant_id,
                         pe.email, p.two_factor_backup_codes_version
                  FROM two_factor_recovery_requests tfr
-                 JOIN memberships m ON m.profile_id = tfr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
+                 " . $this->scopeJoin($tenantId, 'tfr.profile_id') . "
                  JOIN profiles p ON p.id = tfr.profile_id
                  LEFT JOIN profile_emails pe ON pe.profile_id = tfr.profile_id AND pe.is_primary = TRUE
                  WHERE tfr.id = :id AND tfr.status = '" . self::STATUS_PENDING . "' AND tfr.expires_at > :now
                  LIMIT 1"
             );
-            $stmt->execute([':id' => $requestId, ':tenant_id' => $tenantId, ':now' => gmdate('Y-m-d H:i:s')]);
+            $stmt->execute($this->scopeParams($tenantId) + [':id' => $requestId, ':now' => gmdate('Y-m-d H:i:s')]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
             $outcome = $this->decide($row, $requestId, $tenantId, $approverProfileId, $method, $mayStillApprove);
@@ -473,11 +482,11 @@ final class TwoFactorRecoveryService
         $stmt = $this->db->prepare(
             "SELECT tfr.checks
              FROM two_factor_recovery_requests tfr
-             JOIN memberships m ON m.profile_id = tfr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
+             " . $this->scopeJoin($tenantId, 'tfr.profile_id') . "
              WHERE tfr.id = :id AND tfr.status = '" . self::STATUS_PENDING . "' AND tfr.expires_at > :now
              LIMIT 1"
         );
-        $stmt->execute([':id' => $requestId, ':tenant_id' => $tenantId, ':now' => gmdate('Y-m-d H:i:s')]);
+        $stmt->execute($this->scopeParams($tenantId) + [':id' => $requestId, ':now' => gmdate('Y-m-d H:i:s')]);
         $current = $stmt->fetchColumn();
         if ($current === false) {
             return false;
@@ -512,11 +521,11 @@ final class TwoFactorRecoveryService
         $lookup = $this->db->prepare(
             "SELECT tfr.profile_id
              FROM two_factor_recovery_requests tfr
-             JOIN memberships m ON m.profile_id = tfr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
+             " . $this->scopeJoin($tenantId, 'tfr.profile_id') . "
              WHERE tfr.id = :id AND tfr.status = '" . self::STATUS_PENDING . "'
              LIMIT 1"
         );
-        $lookup->execute([':id' => $requestId, ':tenant_id' => $tenantId]);
+        $lookup->execute($this->scopeParams($tenantId) + [':id' => $requestId]);
         $row = $lookup->fetch(PDO::FETCH_ASSOC);
         if ($row === false) {
             return null;
@@ -527,15 +536,12 @@ final class TwoFactorRecoveryService
             "UPDATE two_factor_recovery_requests
                 SET status = '" . self::STATUS_REJECTED . "', updated_at = NOW()
               WHERE id = :id
-                AND status = '" . self::STATUS_PENDING . "'
-                AND EXISTS (
-                    SELECT 1 FROM memberships m
-                    WHERE m.profile_id = two_factor_recovery_requests.profile_id
-                      AND m.tenant_id = :tenant_id
-                      AND m.status = 'active'
-                )"
+                AND status = '" . self::STATUS_PENDING . "'"
+                . ($tenantId === self::SYSTEM_TENANT_ID
+                    ? ''
+                    : ' AND ' . CredentialRecoveryScope::governs('two_factor_recovery_requests.profile_id'))
         );
-        $stmt->execute([':id' => $requestId, ':tenant_id' => $tenantId]);
+        $stmt->execute($this->scopeParams($tenantId) + [':id' => $requestId]);
 
         return $stmt->rowCount() > 0 ? ['profile_id' => (int) $row['profile_id']] : null;
     }
@@ -566,11 +572,11 @@ final class TwoFactorRecoveryService
         $stmt = $this->db->prepare(
             "SELECT p.id
              FROM profiles p
-             JOIN memberships m ON m.profile_id = p.id AND m.tenant_id = :tenant_id AND m.status = 'active'
+             " . $this->scopeJoin($tenantId, 'p.id') . "
              WHERE p.id = :pid
              LIMIT 1"
         );
-        $stmt->execute([':pid' => $targetProfileId, ':tenant_id' => $tenantId]);
+        $stmt->execute($this->scopeParams($tenantId) + [':pid' => $targetProfileId]);
         if ($stmt->fetchColumn() === false) {
             return null;
         }
@@ -619,6 +625,24 @@ final class TwoFactorRecoveryService
             }
             throw $e;
         }
+    }
+
+    /**
+     * The membership JOIN that scopes a workspace's queue (#2226): staff the
+     * workspace alone answers for ({@see CredentialRecoveryScope}). The platform
+     * workspace's break-glass is unscoped, as
+     * {@see PasswordResetService::listPendingForTenant()} documents: somebody
+     * with several workspaces, or a customer, is helped from there.
+     */
+    private function scopeJoin(int $tenantId, string $profileColumn): string
+    {
+        return $tenantId === self::SYSTEM_TENANT_ID ? '' : CredentialRecoveryScope::membershipJoin($profileColumn);
+    }
+
+    /** @return array<string, int> the parameters {@see self::scopeJoin()} binds */
+    private function scopeParams(int $tenantId): array
+    {
+        return $tenantId === self::SYSTEM_TENANT_ID ? [] : [':tenant_id' => $tenantId];
     }
 
     /**

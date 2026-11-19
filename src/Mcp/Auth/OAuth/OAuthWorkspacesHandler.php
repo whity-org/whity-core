@@ -133,6 +133,7 @@ final class OAuthWorkspacesHandler
 
     /**
      * The profile's active workspaces, never the system tenant, in id order.
+     * A deactivated profile has none (#2261).
      *
      * @return list<array{id: int, name: string, slug: string|null}>
      */
@@ -141,7 +142,9 @@ final class OAuthWorkspacesHandler
         // Lists which tenants a profile belongs to before any tenant is chosen, so there is none to scope by; scoped by the profile the issuer-signed assertion resolved to
         $stmt = $this->db->prepare(
             "SELECT DISTINCT t.id, t.name, t.slug FROM memberships m JOIN tenants t ON t.id = m.tenant_id
+             JOIN profiles p ON p.id = m.profile_id
              WHERE m.profile_id = ? AND m.status = 'active' AND m.tenant_id <> 0
+               AND p.status <> 'inactive'
              ORDER BY t.id"
         );
         $stmt->execute([$profileId]);

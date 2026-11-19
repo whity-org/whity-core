@@ -76,6 +76,11 @@ final class StockOperationsRealEngineTest extends TestCase
 
     protected function setUp(): void
     {
+        // RoleChecker caches each role's permissions in a static, keyed by
+        // role id alone: another test's role with the same id would decide who
+        // may approve here, the operation would find no approver and post at
+        // once (WHIT-1288).
+        RoleChecker::clearCache();
         $this->pdo = SchemaFromMigrations::make(true);
         $this->seed();
         $database = Database::withFactory(fn (): PDO => $this->pdo);

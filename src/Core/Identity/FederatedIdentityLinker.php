@@ -109,11 +109,19 @@ final class FederatedIdentityLinker
         string $email,
         ?array $profileEmail,
     ): array {
+        if ($profileEmail !== null && $profileEmail['verified'] === true) {
+            return $this->linkOrResolve($identity, $ctx, $email, (int) $profileEmail['profile_id'], null);
+        }
         if ($profileEmail !== null) {
-            if ($profileEmail['verified'] !== true) {
+            // #2245: the operator's provider verified that this person holds the
+            // address; another account only CLAIMED it, unconfirmed. Release a
+            // pending secondary claim so it can't block the real owner. An
+            // unconfirmed sign-in address of another account still refuses.
+            try {
+                (new ProfileProvisioner($this->db))->releaseUnconfirmedClaim($email);
+            } catch (UnconfirmedEmailClaimException) {
                 return ['status' => 'refused_conflict'];
             }
-            return $this->linkOrResolve($identity, $ctx, $email, (int) $profileEmail['profile_id'], null);
         }
         return $this->provision($identity, $ctx, $email);
     }
