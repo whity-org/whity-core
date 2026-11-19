@@ -14,6 +14,9 @@ use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\MembershipRepository;
 use Whity\Core\Identity\NullEmailVerificationProvider;
 use Whity\Core\PasswordPolicy;
+use Whity\Http\Validation\Field;
+use Whity\Http\Validation\FieldValidator;
+use Whity\Http\Validation\Messages;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Settings\SettingsRegistry;
@@ -106,39 +109,44 @@ final class RegisterApiHandler
 
             $body = JsonBody::parsed($request);
 
-            $email       = strtolower(trim((string) ($body['email'] ?? '')));
-            $password    = (string) ($body['password'] ?? '');
-            $tenantName  = trim((string) ($body['tenant_name'] ?? $body['tenantName'] ?? ''));
-            $displayName = trim((string) ($body['display_name'] ?? $body['displayName'] ?? ''));
+            // ── Validate inputs (#2174: the shared field validator) ─────────────
+            // Lengths are capped to the backing VARCHAR(255) columns: an
+            // over-long value would otherwise surface as a Postgres 22001 → a
+            // generic 500. The top-level sentence for the first problem is the
+            // one this route has always answered with; every field's problem is
+            // listed alongside, in English and Arabic.
+            $checked = FieldValidator::check($body, [
+                'email'        => Field::email()->required()->maxBytes(255),
+                'tenant_name'  => Field::text()->from('tenant_name', 'tenantName')->required()->maxBytes(255),
+                'display_name' => Field::text()->from('display_name', 'displayName')->maxBytes(255),
+                'password'     => Field::password()->required(),
+            ]);
+            if (!$checked->ok()) {
+                $first = (string) $checked->first();
 
-            // ── Validate inputs (422 with a generic, safe message) ──────────────
-            if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-                return Response::error('A valid email address is required', 422);
+                return $checked->refusal(match (true) {
+                    // An address too long for its column that is still an address
+                    // was always reported as the length problem.
+                    $first === 'email' && !($checked->code('email') === Messages::TOO_LONG && Field::isEmail($checked->value('email')))
+                        => 'A valid email address is required',
+                    $first === 'tenant_name' && $checked->code('tenant_name') === Messages::REQUIRED => 'A workspace name is required',
+                    $first === 'password' => 'Password must be at least ' . PasswordPolicy::MIN_LENGTH . ' characters',
+                    default => 'Email, workspace name, and display name must each be 255 characters or fewer',
+                });
             }
-            if ($tenantName === '') {
-                return Response::error('A workspace name is required', 422);
-            }
-            // Cap inputs to the backing VARCHAR(255) columns: an over-long value
-            // would otherwise surface as a Postgres 22001 → generic 500 (and would
-            // diverge from the length-less SQLite test shim). FILTER_VALIDATE_EMAIL
-            // imposes no length bound of its own.
-            if (strlen($email) > 255 || strlen($tenantName) > 255 || strlen($displayName) > 255) {
-                return Response::error('Email, workspace name, and display name must each be 255 characters or fewer', 422);
-            }
-            try {
-                PasswordPolicy::validate($password);
-            } catch (\InvalidArgumentException) {
-                // Return a controlled message built from the policy constant — never
-                // the raw exception text (WC-186: no handler may leak $e->getMessage()
-                // into a client response).
-                return Response::error(
-                    'Password must be at least ' . PasswordPolicy::MIN_LENGTH . ' characters',
-                    422
-                );
-            }
+            $email       = $checked->value('email');
+            $password    = $checked->value('password');
+            $tenantName  = $checked->value('tenant_name');
+            $displayName = $checked->value('display_name');
+
             $slug = self::slugify($tenantName);
             if ($slug === '') {
-                return Response::error('Workspace name must contain letters or numbers', 422);
+                return FieldValidator::refusal('Workspace name must contain letters or numbers', [
+                    'tenant_name' => Messages::problem(Messages::INVALID, [
+                        'Use some letters or numbers in the workspace name.',
+                        'استخدم بعض الحروف أو الأرقام في اسم مساحة العمل.',
+                    ]),
+                ]);
             }
             if ($displayName === '') {
                 $displayName = self::localPart($email);

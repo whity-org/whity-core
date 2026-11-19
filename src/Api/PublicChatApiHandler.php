@@ -22,6 +22,8 @@ use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\Field;
+use Whity\Http\Validation\FieldValidator;
 use Whity\Sdk\Messaging\InboundMessage;
 use Whity\Core\Security\PublicToken;
 
@@ -167,12 +169,17 @@ final class PublicChatApiHandler
             return RateLimited::response($openRule->window);
         }
 
-        $name = trim((string) ($body['name'] ?? ''));
-        $name = $name !== '' ? mb_substr($name, 0, self::MAX_NAME) : null;
-        $email = trim((string) ($body['email'] ?? ''));
-        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-            return Response::error('The email address is not valid.', 422);
+        // #2174: the shared field validator. The name is cut to length rather
+        // than refused, and the email address is kept as typed.
+        $checked = FieldValidator::check($body, [
+            'name' => Field::text()->truncate(self::MAX_NAME),
+            'email' => Field::email(lowercase: false),
+        ]);
+        if (!$checked->ok()) {
+            return $checked->refusal('The email address is not valid.');
         }
+        $name = $checked->value('name') !== '' ? $checked->value('name') : null;
+        $email = $checked->value('email');
 
         $token = PublicToken::makeUrlSafe();
         $visitorAddress = 'visitor:' . substr(PublicToken::hash($token), 0, 24);

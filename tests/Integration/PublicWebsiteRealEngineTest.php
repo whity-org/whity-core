@@ -209,6 +209,22 @@ final class PublicWebsiteRealEngineTest extends TestCase
         self::assertSame(0, $this->messageCount());
     }
 
+    /**
+     * #2174: `details.fields` keeps the English sentences the website shows;
+     * the Arabic and the codes come alongside.
+     */
+    public function testFieldProblemsComeInEnglishAndArabicWithCodes(): void
+    {
+        $this->globals->set(SettingsRegistry::WEBSITE_CONTACT_WORKSPACE, 'whity-team');
+
+        $details = json_decode($this->contact(['name' => '', 'contact' => 'not a contact', 'message' => ''])->getBody(), true)['details'];
+
+        self::assertSame('Please write your name.', $details['fields']['name']);
+        self::assertSame('That doesn\'t look like an email address or a phone number.', $details['fields']['contact']);
+        self::assertSame('يرجى كتابة اسمك.', $details['fields_ar']['name']);
+        self::assertSame(['name' => 'required', 'contact' => 'invalid_contact', 'message' => 'required'], $details['field_codes']);
+    }
+
     public function testWithNoInboxNamedTheFormSaysItCannotReceive(): void
     {
         $response = $this->contact(['name' => 'Ahmad', 'contact' => '+962 79 000 0000', 'message' => 'Hello']);

@@ -29,6 +29,8 @@ use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\Field;
+use Whity\Http\Validation\FieldValidator;
 
 /**
  * The public booking page, the customer's manage link and the staff ICS feed
@@ -212,19 +214,27 @@ final class PublicBookingApiHandler
                 return $limited;
             }
 
-            $name = is_string($body['name'] ?? null) ? trim($body['name']) : '';
-            $email = is_string($body['email'] ?? null) ? strtolower(trim($body['email'])) : '';
-            $phone = is_string($body['phone'] ?? null) ? trim($body['phone']) : '';
-            $note = is_string($body['note'] ?? null) ? mb_substr(trim($body['note']), 0, 1000) : '';
-            if ($name === '' || mb_strlen($name) > 200) {
-                return Response::error('Your name is required', 422, ['field' => 'name']);
+            // #2174: the shared field validator. The booking page reads
+            // `details.field` to mark the field, so that key stays; every
+            // field's problem follows it in English and Arabic.
+            $checked = FieldValidator::check($body, [
+                'name' => Field::text()->required()->max(200),
+                'email' => Field::email()->required()->max(320),
+                'phone' => Field::phone('/^\+?[0-9 ()-]{6,40}$/'),
+                'note' => Field::text()->truncate(1000),
+            ]);
+            $sentence = [
+                'name' => 'Your name is required',
+                'email' => 'Your email address does not look right',
+                'phone' => 'Your phone number does not look right',
+            ];
+            if (($first = $checked->first()) !== null) {
+                return $checked->refusal($sentence[$first] ?? 'Please check the form.', ['field' => $first]);
             }
-            if ($email === '' || mb_strlen($email) > 320 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-                return Response::error('Your email address does not look right', 422, ['field' => 'email']);
-            }
-            if ($phone !== '' && preg_match('/^\+?[0-9 ()-]{6,40}$/', $phone) !== 1) {
-                return Response::error('Your phone number does not look right', 422, ['field' => 'phone']);
-            }
+            $name = $checked->value('name');
+            $email = $checked->value('email');
+            $phone = $checked->value('phone');
+            $note = $checked->value('note');
             // WHIT-1173: `services` books several back to back, when the workspace allows it.
             $many = ServiceChoices::fromBody($body);
             $serviceId = $many[0]['service_id'] ?? (is_int($body['service_id'] ?? null) ? $body['service_id'] : throw new CalendarRejectedException('Choose a service', 422));

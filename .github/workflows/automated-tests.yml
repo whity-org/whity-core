@@ -626,6 +626,11 @@ jobs:
       - name: Grant-by-role-name guard
         run: php scripts/ci-grant-by-role-name-guard.php
 
+      # #2174: request fields are checked by the shared field validator;
+      # hand-written email checks outside it may only go down.
+      - name: Email-validation guard
+        run: php scripts/ci-email-validation-guard.php
+
       # Emitted-URL version guard (#1046): fail when a URL RETURNED to a client
       # is missing the /v1 the router serves it at.
       #
