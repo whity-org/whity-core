@@ -612,9 +612,10 @@ final class StockOperations
 
     /**
      * @param array{kind?: ?string, status?: ?string, location_id?: ?int} $filter
-     * @return list<array<string, mixed>> operations without their lines, newest first
+     * @param bool $withLines true adds each operation's lines (for the waste and adjustments list)
+     * @return list<array<string, mixed>> newest first
      */
-    public function list(int $tenantId, array $filter = [], int $limit = 50, int $offset = 0): array
+    public function list(int $tenantId, array $filter = [], int $limit = 50, int $offset = 0, bool $withLines = false): array
     {
         $where = [];
         $params = [':tenant_id' => $tenantId];
@@ -641,14 +642,23 @@ final class StockOperations
         if ($rows !== []) {
             $ids = array_map(static fn (array $r): int => (int) $r['id'], $rows);
             foreach ($this->db->all(
-                'SELECT operation_id, COUNT(*) AS n FROM inv_operation_lines WHERE tenant_id = :tenant_id AND operation_id IN (' . implode(',', $ids) . ') GROUP BY operation_id',
+                'SELECT operation_id, COUNT(*) AS n, COUNT(counted_at) AS counted FROM inv_operation_lines
+                  WHERE tenant_id = :tenant_id AND operation_id IN (' . implode(',', $ids) . ') GROUP BY operation_id',
                 [':tenant_id' => $tenantId]
             ) as $c) {
-                $counts[(int) $c['operation_id']] = (int) $c['n'];
+                $counts[(int) $c['operation_id']] = [(int) $c['n'], (int) $c['counted']];
             }
         }
 
-        return array_map(fn (array $r): array => $this->present($r) + ['line_count' => $counts[(int) $r['id']] ?? 0], $rows);
+        return array_map(function (array $r) use ($counts, $tenantId, $withLines): array {
+            [$lines, $counted] = $counts[(int) $r['id']] ?? [0, 0];
+            $op = $this->present($r) + ['line_count' => $lines, 'counted_count' => $counted];
+            if ($withLines) {
+                $op['lines'] = $this->get($tenantId, (int) $r['id'], true)['lines'];
+            }
+
+            return $op;
+        }, $rows);
     }
 
     /**
@@ -663,7 +673,7 @@ final class StockOperations
         $op['lines'] = array_map(function (array $l) use ($op, $hideExpected): array {
             $q = static fn (?int $steps): ?string => $steps === null ? null : (new Quantity($steps, $l['decimals']))->toDecimal();
             $line = [
-                'id' => $l['id'], 'variant_id' => $l['variant_id'], 'item_id' => $l['item_id'], 'item_name' => $l['item_name'],
+                'id' => $l['id'], 'variant_id' => $l['variant_id'], 'item_id' => $l['item_id'], 'item_name' => $l['item_name'], 'item_names' => $l['item_names'],
                 'sku' => $l['sku'], 'unit' => $l['unit'], 'decimals' => $l['decimals'],
                 'entered_unit' => $l['entered_unit'],
                 'entered_quantity' => $l['entered_quantity'] !== null && $l['entered_unit'] !== null
@@ -951,7 +961,7 @@ final class StockOperations
         $rows = $this->db->all(
             'SELECT l.id, l.variant_id, l.quantity, l.entered_unit_id, l.entered_quantity, l.expected_quantity, l.counted_at,
                     l.counted_by_profile_id, l.received_quantity, l.reason_code, l.note, l.value_minor,
-                    v.item_id, v.sku, v.purchase_price_minor AS variant_price, i.name AS item_name, i.purchase_price_minor AS item_price,
+                    v.item_id, v.sku, v.purchase_price_minor AS variant_price, i.name AS item_name, i.names AS item_names, i.purchase_price_minor AS item_price,
                     i.currency, u.code AS unit, u.decimals, eu.code AS entered_unit, eu.decimals AS entered_decimals
                FROM inv_operation_lines l
                JOIN inv_variants v ON v.tenant_id = l.tenant_id AND v.id = l.variant_id
@@ -965,7 +975,8 @@ final class StockOperations
 
         return array_map(static fn (array $r): array => [
             'id' => (int) $r['id'], 'variant_id' => (int) $r['variant_id'], 'item_id' => (int) $r['item_id'],
-            'item_name' => (string) $r['item_name'], 'sku' => (string) $r['sku'],
+            'item_name' => (string) $r['item_name'], 'item_names' => InventoryNames::decode($r['item_names'], (string) $r['item_name']),
+            'sku' => (string) $r['sku'],
             'quantity' => InventoryDb::int($r['quantity']), 'expected' => InventoryDb::int($r['expected_quantity']),
             'received' => InventoryDb::int($r['received_quantity']),
             'entered_unit_id' => InventoryDb::int($r['entered_unit_id']), 'entered_quantity' => InventoryDb::int($r['entered_quantity']),
@@ -1037,6 +1048,14 @@ final class StockOperations
     private function present(array $r): array
     {
         $kind = (string) $r['kind'];
+        $name = function (mixed $profileId): ?string {
+            if (!is_numeric($profileId)) {
+                return null;
+            }
+            $row = $this->db->one('SELECT display_name FROM profiles WHERE id = :id', [':id' => (int) $profileId]);
+
+            return is_string($row['display_name'] ?? null) ? $row['display_name'] : null;
+        };
 
         return [
             'id' => (int) $r['id'],
@@ -1057,9 +1076,11 @@ final class StockOperations
             'sent_batch_key' => is_string($r['sent_batch_key']) ? $r['sent_batch_key'] : null,
             'source_plugin' => is_string($r['source_plugin']) ? $r['source_plugin'] : null,
             'created_by_profile_id' => InventoryDb::int($r['created_by_profile_id']),
+            'created_by_name' => $name($r['created_by_profile_id']),
             'agent_id' => InventoryDb::int($r['agent_id']),
             'on_behalf_of_profile_id' => InventoryDb::int($r['on_behalf_of_profile_id']),
             'done_by_profile_id' => InventoryDb::int($r['done_by_profile_id']),
+            'done_by_name' => $name($r['done_by_profile_id']),
             'occurred_at' => is_string($r['occurred_at']) ? $r['occurred_at'] : null,
             'submitted_at' => is_string($r['submitted_at']) ? $r['submitted_at'] : null,
             'sent_at' => is_string($r['sent_at']) ? $r['sent_at'] : null,

@@ -62,9 +62,11 @@ export function resolveIcon(name: string | undefined): Icon {
  */
 const NAV_GROUP_ORDER = [
   'overview',
-  // Register, section 27: Work follows the top items. Operations, which held
-  // only Contacts, folded into Work (WHIT-1082).
+  // Register, section 27: Work follows the top items, then Operations.
+  // WHIT-1082 folded Operations into Work while it held only Contacts; with
+  // Inventory it holds two, as the register says (IV.23, WHIT-1233).
   'work',
+  'operations',
   'people',
   'ai',
   'documents',
@@ -80,7 +82,6 @@ const NAV_GROUP_ORDER = [
  * heading of its own.
  */
 const LEGACY_NAV_GROUPS: Readonly<Record<string, string>> = {
-  operations: 'work',
   access: 'people',
   records: 'documents',
   extend: 'platform',

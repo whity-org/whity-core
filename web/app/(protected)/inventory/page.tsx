@@ -1,28 +1,39 @@
 'use client';
 
 /**
- * /inventory (WHIT-1232, design section 31, `TplInventory`): stock in every
- * place. Three tabs for now (Batches, Recipes, Counts and Transfers join with
- * their phases):
+ * /inventory (WHIT-1232, WHIT-1233, design section 31, `TplInventory`): stock
+ * in every place. As on the card, the tabs sit under the header and the
+ * numbers under the tabs:
  *
- * - Stock: each item against each place, as on the card; a figure below zero
- *   is red (register IV.8).
+ * - Stock: each item against each place, with its reorder level; a figure
+ *   below zero or under its place's level is red, with "Low at <place>" or
+ *   "Below reorder" beside it (IV.8, IV.11). Items and Below reorder lead the
+ *   numbers; Expiring and Stock value join with lots (P4) and cost (P7).
  * - Items: the list, with search over names in both languages, SKUs and
  *   barcodes, and a kind filter.
  * - Places: warehouses, shops and vans.
+ * - Counts and Transfers (P2): newest first; a count opens its page, a
+ *   transfer on the way opens to be received.
  *
- * New item is the one main button (New place on the Places tab). Reorder
- * levels, expiry and stock value join the tiles in P2, P4 and P7.
+ * Count stock and Transfer are outline buttons beside the one main button,
+ * New item (New place on the Places tab). Waste and adjustments has its own
+ * page, linked beside the tabs.
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
 import { ItemFormDialog, kindLabel } from '@/components/inventory/item-form-dialog';
 import { PlaceFormDialog } from '@/components/inventory/place-form-dialog';
+import { CountStartDialog } from '@/components/inventory/count-start-dialog';
+import { CountsTab, TransfersTab } from '@/components/inventory/operations-tabs';
+import { ReceiveTransferDialog } from '@/components/inventory/receive-transfer-dialog';
+import { TransferDialog } from '@/components/inventory/transfer-dialog';
+import { useToast } from '@/lib/toast-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { Badge } from '@whity/ui/badge';
@@ -39,15 +50,21 @@ import {
   INVENTORY_READ,
   INVENTORY_WRITE,
   ITEM_KINDS,
+  STOCK_COUNT,
+  STOCK_TRANSFER,
   inventoryApi,
+  inventoryErrorText,
   nameIn,
   quantityText,
   type InventoryItem,
   type InventoryLocation,
+  type InventoryOperation,
+  type InventoryReorderRule,
   type ItemKind,
 } from '@/lib/inventory/api';
 
-type Tab = 'stock' | 'items' | 'places';
+type Tab = 'stock' | 'items' | 'places' | 'counts' | 'transfers';
+const TABS: Tab[] = ['stock', 'items', 'places', 'counts', 'transfers'];
 const PER_PAGE = 50;
 
 export default function InventoryPage() {
@@ -57,8 +74,17 @@ export default function InventoryPage() {
   const { has, loading: accessLoading } = useCapabilities();
   const canRead = has(INVENTORY_READ);
   const canWrite = has(INVENTORY_WRITE);
+  const canCount = has(STOCK_COUNT);
+  const canTransfer = has(STOCK_TRANSFER);
+  const toast = useToast();
 
-  const [tab, setTab] = useState<Tab>('stock');
+  // A tab can be linked to (?tab=counts), as the count page's way back does.
+  const wanted = useSearchParams().get('tab');
+  const [tab, setTab] = useState<Tab>(wanted !== null && (TABS as string[]).includes(wanted) ? (wanted as Tab) : 'stock');
+  const [counting, setCounting] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+  const [receiving, setReceiving] = useState<InventoryOperation | null>(null);
+
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<ItemKind | null>(null);
@@ -75,14 +101,31 @@ export default function InventoryPage() {
   }, [search]);
 
   const meta = useFetch(async () => {
-    const [units, places, levels, firstItems] = await Promise.all([
+    const [units, places, levels, firstItems, rules, categories, settings] = await Promise.all([
       inventoryApi.units(),
       inventoryApi.locations(),
       inventoryApi.levels({ nonzero: true }),
       inventoryApi.items({ perPage: 200 }),
+      inventoryApi.reorderRules(),
+      inventoryApi.categories(),
+      inventoryApi.settings().catch(() => null),
     ]);
-    return { units, places, levels, stockItems: firstItems.data, itemTotal: firstItems.pagination.total };
+    return {
+      units,
+      places,
+      levels,
+      rules,
+      categories,
+      settings,
+      stockItems: firstItems.data,
+      itemTotal: firstItems.pagination.total,
+    };
   }, []);
+  const counts = useFetch(() => (tab === 'counts' ? inventoryApi.operations({ kind: 'count' }) : Promise.resolve(null)), [tab]);
+  const transfers = useFetch(
+    () => (tab === 'transfers' ? inventoryApi.operations({ kind: 'transfer' }) : Promise.resolve(null)),
+    [tab]
+  );
 
   const list = useFetch(
     () => inventoryApi.items({ q: query, kind, page, perPage: PER_PAGE }),
@@ -98,7 +141,16 @@ export default function InventoryPage() {
     }
     return map;
   }, [meta.data]);
-  const belowZero = (meta.data?.levels ?? []).filter((l) => Number(l.on_hand) < 0).length;
+  // Reorder levels by item and place, and the items under one now (IV.11).
+  const rules = useMemo(() => {
+    const byItemPlace = new Map<string, InventoryReorderRule>();
+    for (const rule of meta.data?.rules ?? []) {
+      if (rule.is_active) byItemPlace.set(`${rule.item_id}:${rule.location_id}`, rule);
+    }
+    return byItemPlace;
+  }, [meta.data]);
+  const belowRules = (meta.data?.rules ?? []).filter((r) => r.is_active && r.is_below);
+  const belowItems = [...new Map(belowRules.map((r) => [r.item_id, r])).values()];
 
   if (!accessLoading && !canRead) {
     return <NoAccess area={t('inventory.area', 'inventory')} permission={INVENTORY_READ} />;
@@ -127,14 +179,19 @@ export default function InventoryPage() {
     </div>
   );
 
-  const quantityCell = (value: number | null, unit: string) =>
+  const quantityCell = (value: number | null, unit: string, low = false) =>
     value === null ? (
-      <span className="text-muted-foreground">–</span>
+      <span className={low ? 'text-destructive' : 'text-muted-foreground'}>–</span>
     ) : (
-      <bdi dir="ltr" className={`font-mono tabular-nums ${value < 0 ? 'text-destructive' : ''}`}>
+      <bdi dir="ltr" className={`font-mono tabular-nums ${value < 0 || low ? 'text-destructive' : ''}`}>
         {quantityText(String(Math.round(value * 1000) / 1000))} <span className="text-xs text-muted-foreground">{unit}</span>
       </bdi>
     );
+  const placeName = (id: number) => {
+    const place = places.find((p) => p.id === id);
+    return place ? nameIn(place.names, place.name, language) : '';
+  };
+  const itemRules = (item: InventoryItem) => places.map((p) => rules.get(`${item.id}:${p.id}`)).filter((r) => r !== undefined);
 
   const stockColumns: DataTableColumn<InventoryItem>[] = [
     { id: 'item', header: t('inventory.column.item', 'Item'), cell: nameCell },
@@ -144,14 +201,41 @@ export default function InventoryPage() {
         header: nameIn(place.names, place.name, language),
         cell: (row) => {
           const value = onHand.get(`${row.id}:${place.id}`);
-          return quantityCell(value === undefined ? null : value, row.base_unit.code);
+          return quantityCell(value === undefined ? null : value, row.base_unit.code, rules.get(`${row.id}:${place.id}`)?.is_below === true);
         },
       })
     ),
     {
-      id: 'total',
-      header: t('inventory.column.total', 'All places'),
-      cell: (row) => quantityCell(Number(row.on_hand), row.base_unit.code),
+      id: 'reorder',
+      header: t('inventory.column.reorderAt', 'Reorder at'),
+      cell: (row) => {
+        // The low place's level when one place is low (as on the card), else each level once.
+        const ruled = itemRules(row);
+        const low = ruled.filter((r) => r.is_below);
+        const levels = [...new Set((low.length === 1 ? low : ruled).map((r) => quantityText(r.min_quantity)))];
+        if (levels.length === 0) return <span className="text-muted-foreground">–</span>;
+        return (
+          <bdi dir="ltr" className="font-mono tabular-nums">
+            {levels.join(' / ')} <span className="text-xs text-muted-foreground">{row.base_unit.code}</span>
+          </bdi>
+        );
+      },
+    },
+    {
+      id: 'badge',
+      header: '',
+      cell: (row) => {
+        const ruled = itemRules(row);
+        const low = ruled.filter((r) => r.is_below);
+        if (low.length === 0) return null;
+        return (
+          <Badge variant="destructive">
+            {low.length === 1 && ruled.length > 1
+              ? t('inventory.badge.lowAt', 'Low at {place}', { place: placeName(low[0].location_id) })
+              : t('inventory.badge.belowReorder', 'Below reorder')}
+          </Badge>
+        );
+      },
     },
   ];
 
@@ -232,43 +316,87 @@ export default function InventoryPage() {
             {t('inventory.item.new', 'New item')}
           </Button>
         );
+  const actions = (
+    <div className="flex flex-wrap items-center gap-2">
+      {canCount && places.length > 0 && (
+        <Button variant="outline" onClick={() => setCounting(true)} data-testid="inventory-count">
+          <Icon name="checkbox" />
+          {t('inventory.count.title', 'Count stock')}
+        </Button>
+      )}
+      {canTransfer && places.length > 1 && (
+        <Button variant="outline" onClick={() => setTransferring(true)} data-testid="inventory-transfer">
+          <Icon name="transfer" />
+          {t('inventory.transfer.button', 'Transfer')}
+        </Button>
+      )}
+      {mainAction}
+    </div>
+  );
+
+  const openTransfer = async (row: InventoryOperation) => {
+    try {
+      setReceiving(await inventoryApi.operation(row.id));
+    } catch (error) {
+      toast.addToast(inventoryErrorText(error), 'error');
+    }
+  };
 
   return (
     <div className="space-y-4">
       <AdminHeader
         title={t('inventory.title', 'Inventory')}
-        description={t('inventory.description', 'What you keep, in every place')}
-        action={mainAction || undefined}
+        description={
+          places.length > 0
+            ? t('inventory.descriptionPlaces', 'Stock in {count} places', { count: String(places.length) })
+            : t('inventory.description', 'What you keep, in every place')
+        }
+        action={actions}
       />
 
-      {meta.data && (
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+          <TabsList>
+            <TabsTrigger value="stock">{t('inventory.tab.stock', 'Stock')}</TabsTrigger>
+            <TabsTrigger value="items">
+              {t('inventory.tab.items', 'Items')}
+              {meta.data && <span className="ms-2 font-mono text-xs">{meta.data.itemTotal}</span>}
+            </TabsTrigger>
+            <TabsTrigger value="places">
+              {t('inventory.tab.places', 'Places')}
+              {meta.data && <span className="ms-2 font-mono text-xs">{places.length}</span>}
+            </TabsTrigger>
+            <TabsTrigger value="counts">{t('inventory.tab.counts', 'Counts')}</TabsTrigger>
+            <TabsTrigger value="transfers">{t('inventory.tab.transfers', 'Transfers')}</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <Link href="/inventory/adjustments" className="text-sm font-medium text-primary hover:underline" data-testid="inventory-waste-link">
+          {t('inventory.waste.link', 'Waste and adjustments')}
+        </Link>
+      </div>
+
+      {meta.data && tab === 'stock' && (
         <KpiStrip
+          className="pb-4"
           items={[
             { label: t('inventory.kpi.items', 'Items'), value: String(meta.data.itemTotal) },
-            { label: t('inventory.kpi.places', 'Places'), value: String(places.length) },
             {
-              label: t('inventory.kpi.belowZero', 'Below zero'),
-              value: String(belowZero),
-              note: belowZero > 0 ? t('inventory.kpi.belowZeroNote', 'Count these to set them right') : undefined,
-              tone: belowZero > 0 ? 'bad' : undefined,
+              label: t('inventory.kpi.belowReorder', 'Below reorder'),
+              value: String(belowItems.length),
+              note:
+                belowItems.length > 0
+                  ? belowItems
+                      .slice(0, 3)
+                      .map((r) => nameIn(r.item_names, r.item_name ?? '', language))
+                      .join(language === 'ar' ? '، ' : ', ') + (belowItems.length > 3 ? '…' : '')
+                  : meta.data.rules.length === 0
+                    ? t('inventory.kpi.noReorder', 'Set reorder levels on an item’s page')
+                    : t('inventory.kpi.allAbove', 'Everything is above its level'),
+              tone: belowItems.length > 0 ? 'bad' : undefined,
             },
           ]}
         />
       )}
-
-      <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
-        <TabsList>
-          <TabsTrigger value="stock">{t('inventory.tab.stock', 'Stock')}</TabsTrigger>
-          <TabsTrigger value="items">
-            {t('inventory.tab.items', 'Items')}
-            {meta.data && <span className="ms-2 font-mono text-xs">{meta.data.itemTotal}</span>}
-          </TabsTrigger>
-          <TabsTrigger value="places">
-            {t('inventory.tab.places', 'Places')}
-            {meta.data && <span className="ms-2 font-mono text-xs">{places.length}</span>}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
 
       {meta.error ? (
         <LoadProblem
@@ -370,6 +498,10 @@ export default function InventoryPage() {
             />
           )}
         </>
+      ) : tab === 'counts' ? (
+        <CountsTab counts={counts} places={places} />
+      ) : tab === 'transfers' ? (
+        <TransfersTab transfers={transfers} places={places} onOpen={(row) => void openTransfer(row)} />
       ) : (
         <DataTable
           columns={placeColumns}
@@ -392,6 +524,54 @@ export default function InventoryPage() {
           units={meta.data.units}
           places={places}
           onSaved={(item) => router.push(`/inventory/items/${item.id}`)}
+        />
+      )}
+      {counting && meta.data && (
+        <CountStartDialog
+          open={counting}
+          onOpenChange={setCounting}
+          places={places}
+          categories={meta.data.categories}
+          onStarted={(count) => router.push(`/inventory/counts/${count.id}`)}
+        />
+      )}
+      {transferring && meta.data && (
+        <TransferDialog
+          open={transferring}
+          onOpenChange={setTransferring}
+          places={places}
+          oneStepByDefault={meta.data.settings?.transfers_one_step === true}
+          onDone={(transfer) => {
+            setTransferring(false);
+            toast.addToast(
+              transfer.status === 'in_transit'
+                ? t('inventory.transfer.sent', '{number} is on the way. Receive it when it arrives.', { number: transfer.number })
+                : t('inventory.transfer.moved', '{number}: the stock has moved.', { number: transfer.number }),
+              'success'
+            );
+            meta.refetch();
+            if (tab === 'transfers') transfers.refetch();
+          }}
+        />
+      )}
+      {receiving !== null && (
+        <ReceiveTransferDialog
+          transfer={receiving}
+          route={`${placeName(receiving.from_location_id ?? 0)} → ${placeName(receiving.to_location_id ?? 0)}`}
+          onOpenChange={(open) => {
+            if (!open) setReceiving(null);
+          }}
+          onDone={(transfer) => {
+            setReceiving(null);
+            toast.addToast(
+              transfer.status === 'cancelled'
+                ? t('inventory.receive.sentBack', '{number} went back to where it left.', { number: transfer.number })
+                : t('inventory.receive.done', '{number} received.', { number: transfer.number }),
+              'success'
+            );
+            meta.refetch();
+            transfers.refetch();
+          }}
         />
       )}
       {editingPlace !== null && (

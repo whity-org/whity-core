@@ -780,11 +780,12 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Contacts',
         'href' => '/contacts',
         'icon' => 'customer',
-        // Customers and suppliers (WHIT-955, design 3.3 A8). In Work since
-        // WHIT-1082: Operations held nothing else, so it was a heading for one
-        // link. Tasks, Boards and Calendar hold orders 1-3.
-        'group' => 'work',
-        'order' => 4,
+        // Customers and suppliers (WHIT-955, design 3.3 A8). First in
+        // Operations (register, Work and operations): WHIT-1082 had folded it
+        // into Work while it was Operations' only link; Inventory joined it
+        // (IV.23, WHIT-1233).
+        'group' => 'operations',
+        'order' => 1,
         // Mirrors GET /api/contacts.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CONTACTS_READ,
     ];
@@ -793,10 +794,10 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Inventory',
         'href' => '/inventory',
         'icon' => 'package',
-        // Items, places and stock (WHIT-1232, design section 31, IV.23): after
-        // Contacts in Work, as Operations still holds nothing else.
-        'group' => 'work',
-        'order' => 5,
+        // Items, places and stock (WHIT-1232, design section 31): Operations ›
+        // Inventory, after Contacts (IV.23).
+        'group' => 'operations',
+        'order' => 2,
         // Mirrors GET /api/inventory/items.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::INVENTORY_READ,
     ];

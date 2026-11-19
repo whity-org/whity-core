@@ -26,17 +26,31 @@ export type InventoryMove = Schemas['InventoryMove'];
 export type InventoryBatch = Schemas['InventoryBatch'];
 export type InventoryAdjustmentRequest = Schemas['InventoryAdjustmentRequest'];
 export type InventoryPagination = Schemas['Pagination'];
+export type InventoryOperation = Schemas['InventoryOperation'];
+export type InventoryOperationLine = Schemas['InventoryOperationLine'];
+export type InventoryReason = Schemas['InventoryReason'];
+export type InventoryReorderRule = Schemas['InventoryReorderRule'];
+export type InventorySettings = Schemas['InventorySettings'];
+export type InventoryTransferRequest = Schemas['InventoryTransferRequest'];
+export type InventoryCountRequest = Schemas['InventoryCountRequest'];
+export type InventoryOperationAdjustmentRequest = Schemas['InventoryOperationAdjustmentRequest'];
+export type OperationKind = InventoryOperation['kind'];
+export type OperationStatus = InventoryOperation['status'];
 
 export const INVENTORY_READ = 'inventory:read';
 export const INVENTORY_WRITE = 'inventory:write';
 export const STOCK_ADJUST = 'stock:adjust';
+export const STOCK_COUNT = 'stock:count';
+export const STOCK_TRANSFER = 'stock:transfer';
+export const INVENTORY_SETTINGS = 'inventory:settings';
 
 export const ITEM_KINDS = ['stocked', 'consumable', 'service', 'made'] as const;
 export type ItemKind = (typeof ITEM_KINDS)[number];
 
-/** Reasons an adjustment takes, by direction (register N5). */
-export const REASONS_OUT = ['expired', 'damaged', 'spoiled', 'used_in_house', 'sample', 'theft', 'count_correction', 'other'] as const;
-export const REASONS_IN = ['found', 'count_correction', 'returned', 'other'] as const;
+/** The workspace's reasons that take stock this way (register N5, WHIT-1233). */
+export function reasonsFor(reasons: InventoryReason[], direction: 'out' | 'in'): InventoryReason[] {
+  return reasons.filter((r) => !r.archived && (r.direction === 'both' || r.direction === direction));
+}
 
 /** A refused inventory request, with the HTTP status the screen branches on. */
 export class InventoryRequestError extends Error {
@@ -196,6 +210,81 @@ export const inventoryApi = {
       await api.POST('/api/v1/inventory/stock/batches/{key}/undo', { params: { path: { key } }, body: {} as never }),
       'The change could not be undone'
     ),
+
+  // ── operations: adjustments, counts, transfers (WHIT-1233) ──
+  operations: async (p: { kind?: OperationKind; status?: OperationStatus; locationId?: number; lines?: boolean; limit?: number } = {}) =>
+    read<InventoryOperation[]>(
+      await api.GET('/api/v1/inventory/operations', {
+        params: {
+          query: query({ kind: p.kind, status: p.status, location_id: p.locationId, lines: p.lines ? 'true' : null, limit: p.limit }),
+        },
+      }),
+      'The stock changes could not be loaded'
+    ),
+  operation: async (id: number) =>
+    read<InventoryOperation>(
+      await api.GET('/api/v1/inventory/operations/{id}', { params: { path: { id } } }),
+      'This stock change could not be loaded'
+    ),
+  createAdjustment: async (body: InventoryOperationAdjustmentRequest) =>
+    send<InventoryOperation>(await api.POST('/api/v1/inventory/adjustments', { body }), 'The stock could not be changed'),
+  submitAdjustment: async (id: number) =>
+    send<InventoryOperation>(
+      await api.POST('/api/v1/inventory/adjustments/{id}/submit', { params: { path: { id } }, body: {} as never }),
+      'The adjustment could not be sent'
+    ),
+  cancelAdjustment: async (id: number) =>
+    send<InventoryOperation>(
+      await api.POST('/api/v1/inventory/adjustments/{id}/cancel', { params: { path: { id } }, body: {} as never }),
+      'The adjustment could not be cancelled'
+    ),
+  startCount: async (body: InventoryCountRequest) =>
+    send<InventoryOperation>(await api.POST('/api/v1/inventory/counts', { body }), 'The count could not be started'),
+  recordCount: async (id: number, lines: { variant_id: number; counted: string; unit?: string }[]) =>
+    send<InventoryOperation>(
+      await api.PUT('/api/v1/inventory/counts/{id}/lines', { params: { path: { id } }, body: { lines } }),
+      'What you counted could not be saved'
+    ),
+  finishCount: async (id: number) =>
+    send<InventoryOperation>(
+      await api.POST('/api/v1/inventory/counts/{id}/finish', { params: { path: { id } }, body: {} as never }),
+      'The count could not be finished'
+    ),
+  cancelCount: async (id: number) =>
+    send<InventoryOperation>(
+      await api.POST('/api/v1/inventory/counts/{id}/cancel', { params: { path: { id } }, body: {} as never }),
+      'The count could not be cancelled'
+    ),
+  createTransfer: async (body: InventoryTransferRequest) =>
+    send<InventoryOperation>(await api.POST('/api/v1/inventory/transfers', { body }), 'The transfer could not be sent'),
+  receiveTransfer: async (id: number, lines: { line_id: number; received: string }[] = []) =>
+    send<InventoryOperation>(
+      await api.POST('/api/v1/inventory/transfers/{id}/receive', { params: { path: { id } }, body: { lines } }),
+      'The transfer could not be received'
+    ),
+  cancelTransfer: async (id: number) =>
+    send<InventoryOperation>(
+      await api.POST('/api/v1/inventory/transfers/{id}/cancel', { params: { path: { id } }, body: {} as never }),
+      'The transfer could not be cancelled'
+    ),
+
+  // ── reasons, reorder levels, settings ──
+  reasons: async () => read<InventoryReason[]>(await api.GET('/api/v1/inventory/reasons'), 'The reasons could not be loaded'),
+  reorderRules: async (p: { variantId?: number; locationId?: number; below?: boolean } = {}) =>
+    read<InventoryReorderRule[]>(
+      await api.GET('/api/v1/inventory/reorder-rules', {
+        params: { query: query({ variant_id: p.variantId, location_id: p.locationId, below: p.below ? 'true' : null }) },
+      }),
+      'The reorder levels could not be loaded'
+    ),
+  setReorderRule: async (body: { variant_id: number; location_id: number; min_quantity: string; order_up_to?: string | null }) =>
+    send<InventoryReorderRule>(await api.PUT('/api/v1/inventory/reorder-rules', { body }), 'The reorder level could not be saved'),
+  deleteReorderRule: async (id: number) =>
+    send<{ deleted: boolean }>(
+      await api.DELETE('/api/v1/inventory/reorder-rules/{id}', { params: { path: { id } } }),
+      'The reorder level could not be removed'
+    ),
+  settings: async () => read<InventorySettings>(await api.GET('/api/v1/inventory/settings'), 'The inventory settings could not be loaded'),
 };
 
 /** The sentence to show for a refused request. */

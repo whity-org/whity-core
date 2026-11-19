@@ -2,10 +2,12 @@
 
 /**
  * Changing stock by hand (WHIT-1232, register IV.14, `TplAdjustments`): a
- * variant, a place, how much more or less, and why. Taking stock out asks for
- * one of the reasons (expired, damaged, spoiled...); adding it asks for found,
- * returned or a count correction. The change goes into the stock history and
- * can be undone from there. One main button.
+ * variant, a place, how much more or less, and why, from the workspace's own
+ * reasons that go that way (WHIT-1233): taking stock out offers expired,
+ * damaged, end of day unsold...; adding it offers found, returned or a count
+ * difference. A change worth more than the workspace's value waits for
+ * approval; the rest goes into the stock history at once and can be undone
+ * from there. One main button.
  */
 
 import { useMemo, useState } from 'react';
@@ -23,32 +25,16 @@ import { Button } from '@whity/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
+import { useReasons } from '@/lib/inventory/use-reasons';
 import {
-  REASONS_IN,
-  REASONS_OUT,
   inventoryApi,
   inventoryErrorText,
   nameIn,
+  reasonsFor,
   type InventoryBatch,
   type InventoryItem,
   type InventoryLocation,
 } from '@/lib/inventory/api';
-
-export function reasonLabel(t: ReturnType<typeof useTranslation>, reason: string): string {
-  const labels: Record<string, string> = {
-    expired: t('inventory.reason.expired', 'Expired'),
-    damaged: t('inventory.reason.damaged', 'Damaged'),
-    spoiled: t('inventory.reason.spoiled', 'Spoiled'),
-    used_in_house: t('inventory.reason.usedInHouse', 'Used in-house'),
-    sample: t('inventory.reason.sample', 'Sample'),
-    theft: t('inventory.reason.theft', 'Theft'),
-    count_correction: t('inventory.reason.countCorrection', 'Count correction'),
-    found: t('inventory.reason.found', 'Found'),
-    returned: t('inventory.reason.returned', 'Returned'),
-    other: t('inventory.reason.other', 'Other'),
-  };
-  return labels[reason] ?? reason;
-}
 
 type Direction = 'out' | 'in';
 
@@ -74,12 +60,13 @@ export function AdjustStockDialog({
   const [placeId, setPlaceId] = useState(String(initialPlaceId ?? places[0]?.id ?? ''));
   const [direction, setDirection] = useState<Direction>('out');
   const [amount, setAmount] = useState('');
+  const { reasons: allReasons } = useReasons();
   const [reason, setReason] = useState<string>('damaged');
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const reasons = useMemo(() => (direction === 'out' ? REASONS_OUT : REASONS_IN), [direction]);
+  const reasons = useMemo(() => reasonsFor(allReasons, direction), [allReasons, direction]);
   const unit = item.base_unit.code;
 
   const variantName = (id: number) => {
@@ -125,7 +112,7 @@ export function AdjustStockDialog({
         <DialogHeader>
           <DialogTitle>{t('inventory.adjust.title', 'Change stock')}</DialogTitle>
           <DialogDescription>
-            {t('inventory.adjust.hint', '{item}. The change is kept in the history and can be undone.', {
+            {t('inventory.adjust.hint2', '{item}. Kept in the history; above the approval value it waits for approval.', {
               item: nameIn(item.names, item.name, language),
             })}
           </DialogDescription>
@@ -207,8 +194,8 @@ export function AdjustStockDialog({
               </SelectTrigger>
               <SelectContent>
                 {reasons.map((r) => (
-                  <SelectItem key={r} value={r}>
-                    {reasonLabel(t, r)}
+                  <SelectItem key={r.code} value={r.code}>
+                    {nameIn(r.names, r.name, language)}
                   </SelectItem>
                 ))}
               </SelectContent>

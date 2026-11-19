@@ -105,7 +105,7 @@ final class ReorderRules
         }
 
         return array_map(fn (array $r): array => $this->present($tenantId, $r), $this->db->all(
-            'SELECT ' . self::COLUMNS . ', v.item_id, v.sku, i.name AS item_name, u.code AS unit, u.decimals
+            'SELECT ' . self::COLUMNS . ', v.item_id, v.sku, i.name AS item_name, i.names AS item_names, u.code AS unit, u.decimals
                FROM inv_reorder_rules r
                JOIN inv_variants v ON v.tenant_id = r.tenant_id AND v.id = r.variant_id
                JOIN inv_items i ON i.tenant_id = v.tenant_id AND i.id = v.item_id
@@ -190,7 +190,7 @@ final class ReorderRules
     public function show(int $tenantId, int $id): array
     {
         $row = $this->db->one(
-            'SELECT ' . self::COLUMNS . ', v.item_id, v.sku, i.name AS item_name, u.code AS unit, u.decimals
+            'SELECT ' . self::COLUMNS . ', v.item_id, v.sku, i.name AS item_name, i.names AS item_names, u.code AS unit, u.decimals
                FROM inv_reorder_rules r
                JOIN inv_variants v ON v.tenant_id = r.tenant_id AND v.id = r.variant_id
                JOIN inv_items i ON i.tenant_id = v.tenant_id AND i.id = v.item_id
@@ -292,6 +292,7 @@ final class ReorderRules
             'id' => (int) $r['id'],
             'item_id' => (int) $r['item_id'],
             'item_name' => (string) $r['item_name'],
+            'item_names' => InventoryNames::decode($r['item_names'], (string) $r['item_name']),
             'variant_id' => (int) $r['variant_id'],
             'sku' => (string) $r['sku'],
             'location_id' => (int) $r['location_id'],

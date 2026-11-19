@@ -58,6 +58,8 @@ final class CoreNavigationRegistrationTest extends TestCase
     private const KNOWN_GROUPS = [
         'overview',
         'work',
+        // Contacts and Inventory (IV.23, WHIT-1233).
+        'operations',
         'people',
         'ai',
         'documents',
