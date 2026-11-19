@@ -139,6 +139,12 @@ test.describe('Sidebar navigation (admin)', () => {
     // login/refresh churn -> the e2e suite times out). So mint a FRESH,
     // throwaway admin session in this context and log THAT out instead; the
     // shared storage-state token is never revoked.
+    //
+    // Drop the shared session's cookies from THIS context first (the file on
+    // disk is untouched). A signed-in visit to /login redirects to /dashboard,
+    // and once the dashboard loads fast enough that redirect wins the race
+    // against the sign-in click: the button detaches and the login never fires.
+    await page.context().clearCookies();
     const login = new LoginPage(page);
     await login.loginExpectingSuccess(ADMIN);
 
