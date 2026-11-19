@@ -965,7 +965,7 @@ Decided by the owner on 19 November 2026 (WHIT-1228, section 31): D1–D8, D10 a
 | IV.21 | Language | Names are bilingual through the one bilingual text; SKUs, barcodes, lot codes, quantities and amounts stay Western digits and left to right in Arabic; quantity before unit in both languages |
 | IV.22 | SDK | Services Items, Locations, Stock, Lots, Orders, Operations, Units; events from `stock.moving` (can veto) and `stock.moved` to `stock.level.below_reorder` and `inventory.order.*`; extension points for costing, accounting export, operation kinds, item fields, barcode parsing, price lists and reorder policy. Plugin moves are namespaced by the host |
 | IV.23 | Sidebar | Operations › Inventory, with Purchases and Sales as tabs inside it until Money arrives (D10) |
-| IV.24 | Plans | Everything works on Free with up to 100 items, each variant counted separately; Team and above have no item limit (D9) |
+| IV.24 | Plans | Everything works on Free with up to 100 items, each variant counted separately; Team and above have no item limit. The limit only warns, like every limit since WHIT-932 (SC.14): past it, an amber banner for the people who can change the plan and a meter on Billing; items are still added (D9; warn-only by the owner, 19 November 2026) |
 
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.
