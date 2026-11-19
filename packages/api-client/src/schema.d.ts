@@ -17697,9 +17697,11 @@ export interface components {
             sent_batch_key?: string | null;
             source_plugin?: string | null;
             created_by_profile_id?: number | null;
+            created_by_name?: string | null;
             agent_id?: number | null;
             on_behalf_of_profile_id?: number | null;
             done_by_profile_id?: number | null;
+            done_by_name?: string | null;
             occurred_at?: string | null;
             submitted_at?: string | null;
             sent_at?: string | null;
@@ -17708,6 +17710,8 @@ export interface components {
             created_at: string;
             updated_at: string;
             line_count?: number;
+            /** @description Counts: lines counted so far. */
+            counted_count?: number;
             lines?: components["schemas"]["InventoryOperationLine"][];
         };
         InventoryOperationAdjustmentRequest: {
@@ -53577,6 +53581,8 @@ export interface operations {
                 limit?: number;
                 /** @description How many to skip. */
                 offset?: number;
+                /** @description `true` to include each one's lines. */
+                lines?: string;
             };
             header?: never;
             path?: never;
@@ -53584,7 +53590,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Operations, without their lines */
+            /** @description Operations, with their lines when asked */
             200: {
                 headers: {
                     [name: string]: unknown;

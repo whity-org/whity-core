@@ -40087,11 +40087,20 @@
                         "schema": {
                             "type": "integer"
                         }
+                    },
+                    {
+                        "name": "lines",
+                        "in": "query",
+                        "required": false,
+                        "description": "`true` to include each one's lines.",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Operations, without their lines",
+                        "description": "Operations, with their lines when asked",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -102003,6 +102012,10 @@
                         "type": "integer",
                         "nullable": true
                     },
+                    "created_by_name": {
+                        "type": "string",
+                        "nullable": true
+                    },
                     "agent_id": {
                         "type": "integer",
                         "nullable": true
@@ -102013,6 +102026,10 @@
                     },
                     "done_by_profile_id": {
                         "type": "integer",
+                        "nullable": true
+                    },
+                    "done_by_name": {
+                        "type": "string",
                         "nullable": true
                     },
                     "occurred_at": {
@@ -102043,6 +102060,10 @@
                     },
                     "line_count": {
                         "type": "integer"
+                    },
+                    "counted_count": {
+                        "type": "integer",
+                        "description": "Counts: lines counted so far."
                     },
                     "lines": {
                         "type": "array",

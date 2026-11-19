@@ -17,7 +17,9 @@ import Link from 'next/link';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
-import { AdjustStockDialog, reasonLabel } from '@/components/inventory/adjust-stock-dialog';
+import { AdjustStockDialog } from '@/components/inventory/adjust-stock-dialog';
+import { useReasons } from '@/lib/inventory/use-reasons';
+import { ReorderLevels } from '@/components/inventory/reorder-levels';
 import { ItemFormDialog, kindLabel } from '@/components/inventory/item-form-dialog';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -47,6 +49,7 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
   const dates = useDateDisplay();
   const language = useLanguageCode();
   const toast = useToast();
+  const { reasonName } = useReasons();
   const { has, loading: accessLoading } = useCapabilities();
   const canWrite = has(INVENTORY_WRITE);
   const canAdjust = has(STOCK_ADJUST);
@@ -56,15 +59,16 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
   const [problem, setProblem] = useState<string | null>(null);
 
   const { data, loading, error, forbidden, refetch } = useFetch(async () => {
-    const [item, levels, moves, places, allPlaces, units] = await Promise.all([
+    const [item, levels, moves, places, allPlaces, units, rules] = await Promise.all([
       inventoryApi.item(itemId),
       inventoryApi.levels({ itemId }),
       inventoryApi.moves({ itemId, limit: 50 }),
       inventoryApi.locations(),
       inventoryApi.locations({ virtual: true, inactive: true }),
       inventoryApi.units(),
+      inventoryApi.reorderRules(),
     ]);
-    return { item, levels, moves: moves.data, places, allPlaces, units };
+    return { item, levels, moves: moves.data, places, allPlaces, units, rules: rules.filter((r) => r.item_id === itemId) };
   }, [itemId]);
 
   if (!accessLoading && !has(INVENTORY_READ)) {
@@ -84,7 +88,7 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
     return <div className="h-48 animate-pulse rounded-lg bg-muted" aria-busy="true" />;
   }
 
-  const { item, levels, moves, places, allPlaces, units } = data;
+  const { item, levels, moves, places, allPlaces, units, rules } = data;
   const unit = item.base_unit.code;
   const placeName = (placeId: number) => {
     const place = allPlaces.find((p) => p.id === placeId);
@@ -133,7 +137,8 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
   const why = (move: InventoryMove) => {
     if (move.reverses_move_id != null) return t('inventory.history.undo', 'Undo');
     if (move.source_type === 'opening') return t('inventory.history.opening', 'Opening stock');
-    if (move.source_type === 'adjustment') return reasonLabel(t, move.reason_code ?? '');
+    if (move.reason_code) return reasonName(move.reason_code);
+    if (move.source_type === 'transfer') return t('inventory.history.transfer', 'Transfer');
     return move.source_type;
   };
 
@@ -275,6 +280,10 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
         </section>
       </div>
 
+      {item.kind !== 'service' && !item.archived && (
+        <ReorderLevels item={item} places={places} rules={rules} canEdit={canWrite} onSaved={refetch} />
+      )}
+
       {item.kind !== 'service' && (
         <section className="space-y-3 rounded-lg border border-border p-5" data-testid="item-history">
           <h2 className="text-sm font-semibold text-muted-foreground">{t('inventory.history', 'History')}</h2>
@@ -287,7 +296,7 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
                   canAdjust &&
                   move.reverses_move_id == null &&
                   !reversed.has(move.id) &&
-                  (move.source_type === 'adjustment' || move.source_type === 'opening');
+                  (move.source_type === 'adjustment' || move.source_type === 'opening' || move.source_type === 'count');
                 return (
                   <li key={move.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
                     <div className="min-w-0 space-y-0.5">
@@ -301,9 +310,8 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {dates.dateTime(move.occurred_at) ?? ''}
-                        {move.posted_by_name ? ` · ${move.posted_by_name}` : ''}
-                        {move.note ? ` · ${move.note}` : ''}
+                        {/* Parts that are there, joined: a workspace that hides dates leaves no leading dot. */}
+                        {[dates.dateTime(move.occurred_at), move.posted_by_name, move.note].filter((part) => part).join(' · ')}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
