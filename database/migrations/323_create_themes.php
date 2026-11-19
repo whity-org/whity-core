@@ -29,6 +29,7 @@ final class CreateThemes
             'CREATE TABLE IF NOT EXISTS themes (
                 id                     SERIAL       PRIMARY KEY,
                 tenant_id              INTEGER      NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+                -- @reference-lint-ignore: the id the theme file gives itself (vendor.name), not a row in another table
                 theme_id               VARCHAR(100) NOT NULL,
                 version                VARCHAR(32)  NOT NULL,
                 source                 VARCHAR(16)  NOT NULL DEFAULT \'import\',
