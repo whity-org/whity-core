@@ -275,4 +275,96 @@ final class TwoFactorProofRealEngineTest extends TestCase
 
         self::assertSame(400, $this->disable(['password' => self::PASSWORD])->getStatusCode());
     }
+
+    // ==================== confirm (#2196) ====================
+
+    /** Two-step off, so confirm() may run. */
+    private function turnOffForConfirm(): void
+    {
+        $this->pdo->prepare(
+            'UPDATE profiles SET two_factor_enabled = false, two_factor_secret = NULL, two_factor_backup_codes_version = 0 WHERE id = ?'
+        )->execute([$this->profileId]);
+    }
+
+    /** @param array<string, mixed> $body */
+    private function confirm(array $body, ?TwoFactorHandler $handler = null): Response
+    {
+        return ($handler ?? $this->handler())->confirm($this->post('/api/auth/2fa/confirm', $body));
+    }
+
+    public function testConfirmRefusesNonStringFieldsWith400NotA500(): void
+    {
+        $this->turnOffForConfirm();
+
+        foreach ([['code' => ['123456'], 'secret' => self::TOTP_SECRET], ['code' => '123456', 'secret' => ['x']], ['code' => 123456, 'secret' => self::TOTP_SECRET]] as $body) {
+            self::assertSame(400, $this->confirm($body)->getStatusCode(), (string) json_encode($body));
+        }
+        self::assertFalse($this->stillEnabled());
+    }
+
+    public function testConfirmRefusesAShortOrNonBase32Secret(): void
+    {
+        $this->turnOffForConfirm();
+
+        // 5 bits, 80 bits, and not Base32: refused before any code is checked.
+        foreach (['A', 'JBSWY3DPEHPK3PXP', str_repeat('1', 32)] as $secret) {
+            self::assertSame(400, $this->confirm(['code' => '123456', 'secret' => $secret])->getStatusCode(), $secret);
+        }
+        self::assertFalse($this->stillEnabled());
+    }
+
+    public function testConfirmAcceptsTheSecretSetupIssues(): void
+    {
+        $this->turnOffForConfirm();
+        $secret = $this->totp->generateSecret();
+        if ($secret === '') {
+            self::fail('no secret generated');
+        }
+
+        $response = $this->confirm(['code' => TOTP::create($secret)->now(), 'secret' => $secret]);
+
+        self::assertSame(200, $response->getStatusCode(), $response->getBody());
+        self::assertTrue($this->stillEnabled());
+    }
+
+    public function testWrongConfirmCodesAreCountedAndThrottled(): void
+    {
+        $this->turnOffForConfirm();
+        $handler = $this->handler(2);
+
+        self::assertSame(401, $this->confirm(['code' => '000000', 'secret' => self::TOTP_SECRET], $handler)->getStatusCode());
+        self::assertSame(401, $this->confirm(['code' => '000001', 'secret' => self::TOTP_SECRET], $handler)->getStatusCode());
+
+        $throttled = $this->confirm(['code' => $this->currentCode(), 'secret' => self::TOTP_SECRET], $handler);
+        self::assertSame(429, $throttled->getStatusCode());
+        self::assertSame('throttled', $this->reason($throttled));
+        self::assertFalse($this->stillEnabled());
+    }
+
+    /**
+     * #2197: the "two-step was turned off" email is sent as the workspace the
+     * person is in. Access tokens carry active_tenant_id; reading tenant_id sent
+     * it as the instance (tenant 0), without the workspace's language or brand.
+     */
+    public function testTheTurnedOffEmailUsesTheActiveWorkspace(): void
+    {
+        $settings = new \Whity\Core\Settings\SettingsService(
+            new \Whity\Core\Settings\GlobalSettingsRepository($this->pdo),
+            new \Whity\Core\Settings\TenantSettingsRepository($this->pdo)
+        );
+        $settings->setTenant(self::TENANT, \Whity\Core\Settings\SettingsRegistry::LOCALE, 'ar');
+        $mail = new \Tests\Unit\Core\Mail\CapturingMailer();
+        $handler = $this->handler();
+        $handler->setSecurityMailer(new \Whity\Core\Mail\AccountSecurityMailer(
+            new \Whity\Core\Mail\BrandedEmailSender($mail, new \Whity\Core\Mail\EmailLayout(), $settings),
+            new \Whity\Core\Identity\ProfileEmailRepository($this->pdo),
+            $this->pdo,
+            'https://app.example.test/settings/security'
+        ));
+
+        self::assertSame(200, $this->disable(['password' => self::PASSWORD], $handler)->getStatusCode());
+
+        self::assertCount(1, $mail->sent);
+        self::assertSame('أُوقف الدخول بخطوتين', $mail->sent[0][1]);
+    }
 }
