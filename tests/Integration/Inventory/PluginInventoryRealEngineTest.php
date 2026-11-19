@@ -11,15 +11,18 @@ use Whity\Core\Inventory\Host\HostInventoryGuard;
 use Whity\Core\Inventory\Host\HostItems;
 use Whity\Core\Inventory\Host\HostLocations;
 use Whity\Core\Inventory\Host\HostOperations;
+use Whity\Core\Inventory\Host\HostOrders;
 use Whity\Core\Inventory\Host\HostStock;
 use Whity\Core\Inventory\Host\HostUnits;
 use Whity\Core\Inventory\InventoryDb;
 use Whity\Core\Inventory\InventoryWorkspace;
 use Whity\Core\Inventory\ItemService;
 use Whity\Core\Inventory\LocationService;
+use Whity\Core\Inventory\PurchaseOrders;
 use Whity\Core\Inventory\ReasonCatalog;
 use Whity\Core\Inventory\StockLedger;
 use Whity\Core\Inventory\StockOperations;
+use Whity\Core\Inventory\SupplierItems;
 use Whity\Core\Inventory\UnitCatalog;
 use Whity\Core\Plugin\HostPluginScope;
 use Whity\Core\Plugin\PluginIdentity;
@@ -28,6 +31,7 @@ use Whity\Sdk\Inventory\InventoryRejected;
 use Whity\Sdk\Inventory\MoveLine;
 use Whity\Sdk\Inventory\MoveRequest;
 use Whity\Sdk\Inventory\Operation;
+use Whity\Database\SequenceCounters;
 use Whity\Sdk\PluginInterface;
 
 /**
@@ -48,6 +52,7 @@ final class PluginInventoryRealEngineTest extends TestCase
     private HostStock $stock;
     private HostUnits $units;
     private HostOperations $operations;
+    private HostOrders $orders;
 
     /** The workspace the plugin's call runs in, as TenantContext would say. */
     private ?int $workspace = 1;
@@ -80,10 +85,49 @@ final class PluginInventoryRealEngineTest extends TestCase
         $this->stock = new HostStock($ledger, $guard);
         $this->units = new HostUnits($units, $items, $guard);
         $reasons = new ReasonCatalog($db, $workspace);
-        $this->operations = new HostOperations(
-            new StockOperations($db, $workspace, $items, $units, $ledger, $reasons, static fn (int $t): array => []),
+        $stockOperations = new StockOperations($db, $workspace, $items, $units, $ledger, $reasons, static fn (int $t): array => []);
+        $this->operations = new HostOperations($stockOperations, $guard);
+        $this->pdo->exec("INSERT INTO contacts (id, tenant_id, name, is_customer, is_supplier) VALUES (41, 1, 'Jordan Flour Mills', false, true)");
+        $suppliers = new SupplierItems($db, $items, $units);
+        $this->orders = new HostOrders(
+            new PurchaseOrders($db, $workspace, $items, $units, $stockOperations, $suppliers, new SequenceCounters($this->pdo), static fn (int $t): array => [], static fn (int $t): string => 'USD'),
             $guard,
         );
+    }
+
+    public function testAShopPluginOrdersFromASupplierAndReceivesIt(): void
+    {
+        $shop = self::plugin('Shop');
+        PluginIdentity::bind($shop, 'Shop');
+        $flour = $this->items->create(['name' => 'Flour', 'unit' => 'kg', 'units' => [['unit' => 'bag', 'per' => '25']]], 11);
+        $kitchen = $this->locations->create(['name' => 'Central kitchen'], 11);
+        $buyer = $this->orders->for($shop);
+
+        $order = $buyer->createPurchase(41, $kitchen->id, [['variant_id' => $flour->variants[0]->id, 'quantity' => '4', 'unit' => 'bag', 'price_minor' => 1600]], 11, ['idempotency_key' => 'cart-7']);
+        $again = $buyer->createPurchase(41, $kitchen->id, [['variant_id' => $flour->variants[0]->id, 'quantity' => '4', 'unit' => 'bag', 'price_minor' => 1600]], 11, ['idempotency_key' => 'cart-7']);
+        self::assertSame('PO-0001', $order->number);
+        self::assertSame('shop', $order->sourcePlugin);
+        self::assertSame($order->id, $again->id, 'the same key drafts one');
+        self::assertSame(6400, $order->totalMinor);
+
+        self::assertSame('approved', $buyer->submit($order->id, 11)->status);
+        $receipt = $buyer->receive($order->id, [['line_id' => $order->lines[0]->id, 'quantity' => '4']], 11);
+        self::assertSame('receipt', $receipt->kind);
+        self::assertSame('done', $this->orders->get($order->id)->status);
+        self::assertSame(100000, $this->stock->available($flour->variants[0]->id, $kitchen->id)->steps, '100 kg');
+
+        try {
+            $this->orders->createPurchase(41, $kitchen->id, [['variant_id' => $flour->variants[0]->id, 'quantity' => '1']], 11);
+            self::fail('the container\'s orders wrote');
+        } catch (InventoryRejected $e) {
+            self::assertSame(InventoryRejected::USE_PLUGIN_CONTEXT, $e->reason);
+        }
+        try {
+            $buyer->createPurchase(41, $kitchen->id, [['variant_id' => $flour->variants[0]->id, 'quantity' => '1']], 12);
+            self::fail('a person who only reads ordered stock');
+        } catch (InventoryRejected $e) {
+            self::assertSame(InventoryRejected::FORBIDDEN, $e->reason);
+        }
     }
 
     public function testATillWritesOffAndCountsThroughOperationsUnderItsOwnName(): void

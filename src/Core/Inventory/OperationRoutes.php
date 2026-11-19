@@ -16,7 +16,8 @@ use Whity\Core\Settings\SettingsRegistry;
 /**
  * Issues the route an adjustment or a count's differences travels when it is
  * worth more than the workspace's value (WHIT-1233, design 31 §4.2, register
- * IV.14, IV.15, IV.19).
+ * IV.14, IV.15, IV.19), and the route a purchase order travels when the
+ * workspace chose one (WHIT-1234, IV.12).
  *
  * The workspace picks a route template per kind in the inventory settings
  * (`inventory.adjustment_route_template_id`, `inventory.count_route_template_id`),
@@ -42,10 +43,23 @@ final class OperationRoutes implements OperationApprovals
     public function issue(int $tenantId, ?int $actor, array $operation): ?int
     {
         $kind = (string) $operation['kind'];
-        $key = $kind === 'count' ? SettingsRegistry::INVENTORY_COUNT_ROUTE_TEMPLATE_ID : SettingsRegistry::INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID;
+        $key = match ($kind) {
+            'count' => SettingsRegistry::INVENTORY_COUNT_ROUTE_TEMPLATE_ID,
+            'purchase' => SettingsRegistry::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID,
+            default => SettingsRegistry::INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID,
+        };
         $templateId = (int) (($this->settings)($tenantId)[$key] ?? 0);
         $template = $templateId > 0 ? $this->templates->findById($templateId, $tenantId) : null;
-        $title = ($kind === 'count' ? 'Stock count ' : 'Stock adjustment ') . (string) $operation['number'];
+        $title = match ($kind) {
+            'count' => 'Stock count ',
+            'purchase' => 'Purchase order ',
+            default => 'Stock adjustment ',
+        } . (string) $operation['number'];
+        if ($template === null && $kind === 'purchase') {
+            // A purchase order travels only the route the workspace chose; with
+            // none, the person sending it confirms it directly (IV.12, IV.19).
+            return null;
+        }
 
         if ($template !== null) {
             $steps = RouteTemplateInstantiation::toRouteSteps(
@@ -69,7 +83,7 @@ final class OperationRoutes implements OperationApprovals
         $issued = $this->router->issueOnSubject(
             $tenantId,
             $actor,
-            OperationRouteSubject::typeFor($kind),
+            $kind === 'purchase' ? OrderRouteSubject::PURCHASE_ORDER : OperationRouteSubject::typeFor($kind),
             (int) $operation['id'],
             null,
             $title,

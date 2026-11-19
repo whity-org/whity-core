@@ -5615,6 +5615,25 @@ $routeSubjectRegistry->register(new \Whity\Core\Inventory\OperationRouteSubject(
 $inventoryOperations->useApprovals(new \Whity\Core\Inventory\OperationRoutes($inventoryDb, $documentRouter, $routeTemplateRepository, $roleChecker, $inventorySettings));
 $inventoryReorder = new \Whity\Core\Inventory\ReorderRules($inventoryDb, $inventoryItems, $inventoryLedger, $hookManager);
 $inventoryReorder->subscribe($hookManager);
+// WHIT-1234: purchase orders, what suppliers sell, and receiving against an
+// order. A purchase order travels the workspace's purchase route when one is
+// chosen (inventory.purchase_order); with none it is approved on sending.
+$inventorySuppliers = new \Whity\Core\Inventory\SupplierItems($inventoryDb, $inventoryItems, $inventoryUnits);
+$inventoryPurchases = new \Whity\Core\Inventory\PurchaseOrders(
+    $inventoryDb,
+    $inventoryWorkspace,
+    $inventoryItems,
+    $inventoryUnits,
+    $inventoryOperations,
+    $inventorySuppliers,
+    new \Whity\Database\SequenceCounters($db->getPdo()),
+    $inventorySettings,
+    $inventoryItems->currencyFor(...),
+    $hookManager,
+);
+$routeSubjectRegistry->register(new \Whity\Core\Inventory\OrderRouteSubject($inventoryDb, $inventoryPurchases));
+$inventoryPurchases->useApprovals(new \Whity\Core\Inventory\OperationRoutes($inventoryDb, $documentRouter, $routeTemplateRepository, $roleChecker, $inventorySettings));
+\Whity\register_service(\Whity\Sdk\Inventory\Orders::class, new \Whity\Core\Inventory\Host\HostOrders($inventoryPurchases, $inventoryGuard)); // @phpstan-ignore-line
 $inventoryGuard = new \Whity\Core\Inventory\Host\HostInventoryGuard(
     $inventoryDb,
     static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
@@ -5634,6 +5653,8 @@ $inventoryHandler = new \Whity\Api\InventoryApiHandler(
     $inventoryReasons,
     $inventoryReorder,
     $settingsService,
+    $inventoryPurchases,
+    $inventorySuppliers,
 );
 $router->register('GET',    '/api/inventory/units',                              [$inventoryHandler, 'listUnits'],      null, null, CorePermissions::INVENTORY_READ);
 $router->register('POST',   '/api/inventory/units',                              [$inventoryHandler, 'createUnit'],     null, null, CorePermissions::INVENTORY_WRITE);
@@ -5675,6 +5696,17 @@ $router->register('PUT',    '/api/inventory/reorder-rules',                     
 $router->register('DELETE', '/api/inventory/reorder-rules/{id:\d+}',             [$inventoryHandler, 'deleteReorderRule'], null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/settings',                           [$inventoryHandler, 'showSettings'],     null, null, CorePermissions::INVENTORY_READ);
 $router->register('PATCH',  '/api/inventory/settings',                           [$inventoryHandler, 'updateSettings'],   null, null, CorePermissions::INVENTORY_SETTINGS);
+$router->register('GET',    '/api/inventory/purchase-orders',                    [$inventoryHandler, 'listPurchaseOrders'],     null, null, CorePermissions::PURCHASES_READ);
+$router->register('POST',   '/api/inventory/purchase-orders',                    [$inventoryHandler, 'createPurchaseOrder'],    null, null, CorePermissions::PURCHASES_WRITE);
+$router->register('GET',    '/api/inventory/purchase-orders/{id:\d+}',           [$inventoryHandler, 'showPurchaseOrder'],      null, null, CorePermissions::PURCHASES_READ);
+$router->register('PATCH',  '/api/inventory/purchase-orders/{id:\d+}',           [$inventoryHandler, 'updatePurchaseOrder'],    null, null, CorePermissions::PURCHASES_WRITE);
+$router->register('POST',   '/api/inventory/purchase-orders/{id:\d+}/submit',    [$inventoryHandler, 'submitPurchaseOrder'],    null, null, CorePermissions::PURCHASES_WRITE);
+$router->register('POST',   '/api/inventory/purchase-orders/{id:\d+}/cancel',    [$inventoryHandler, 'cancelPurchaseOrder'],    null, null, CorePermissions::PURCHASES_WRITE);
+$router->register('POST',   '/api/inventory/purchase-orders/{id:\d+}/receive',   [$inventoryHandler, 'receivePurchaseOrder'],   null, null, CorePermissions::PURCHASES_WRITE);
+$router->register('POST',   '/api/inventory/purchase-orders/{id:\d+}/lines/{line:\d+}/close', [$inventoryHandler, 'closePurchaseOrderLine'], null, null, CorePermissions::PURCHASES_WRITE);
+$router->register('GET',    '/api/inventory/supplier-items',                     [$inventoryHandler, 'listSupplierItems'],      null, null, CorePermissions::PURCHASES_READ);
+$router->register('PUT',    '/api/inventory/supplier-items',                     [$inventoryHandler, 'setSupplierItem'],        null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('DELETE', '/api/inventory/supplier-items/{id:\d+}',            [$inventoryHandler, 'deleteSupplierItem'],     null, null, CorePermissions::INVENTORY_WRITE);
 
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,

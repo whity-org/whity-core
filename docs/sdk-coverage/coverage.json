@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.128.0",
+    "sdk_version": "1.129.0",
     "core_version": "0.2.30",
     "updated": "2026-11-19",
     "ratings": {
@@ -148,11 +148,19 @@
                 {
                     "what": "Events inventory.operation.done, inventory.count.differences, stock.level.below_reorder and stock.level.restored",
                     "since": "1.128"
+                },
+                {
+                    "what": "Inventory\\Orders: purchase orders for a supplier contact, sent on the workspace's purchase route (or approved at once) and received in parts at the order's cost, through $ctx->inventory()->orders(), bound to the loaded plugin; the container copy only reads",
+                    "since": "1.129"
+                },
+                {
+                    "what": "Events inventory.order.submitting (filter, can veto) and inventory.order.created, approved, rejected, partly_done, done and cancelled",
+                    "since": "1.129"
                 }
             ],
             "missing": [
                 "Reorder levels and reasons as SDK services (they are on the API and MCP)",
-                "Purchase and sales orders, reservations (P3, P5)",
+                "Sales orders and reservations (P5); supplier prices as an SDK service (they are on the API and MCP)",
                 "Lots and expiry (P4)",
                 "Costing, accounting export, operation kinds, item fields, barcode parsers and price lists as extension points (P7)"
             ],

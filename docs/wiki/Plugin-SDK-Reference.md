@@ -96,8 +96,9 @@ $inventory->stock()->move(new MoveRequest(
 | `Inventory\Stock` | Levels, available and the append-only ledger. `move()` and `reverse()` post as your plugin, idempotent by key, only through `$ctx->inventory()->stock()`; the container copy reads and refuses writes (`use_plugin_context`). | current | 1.127 |
 | `Inventory\Units` | The workspace's units and exact conversions (`Inventory\Quantity`, never floats). | current | 1.127 |
 | `Inventory\Operations` | Adjustments with a reason, counts and transfers, each an `Inventory\Operation` with its lines. Through `$ctx->inventory()->operations()`, bound to your plugin; the container copy reads. Above the workspace's value an adjustment or a count's differences wait for approval. | current | 1.128 |
+| `Inventory\Orders` | Purchase orders: draft for a supplier contact, send (the workspace's route or approved at once), receive in parts at the order's cost, cancel. Through `$ctx->inventory()->orders()`, bound to your plugin; the container copy reads. | current | 1.129 |
 
-`Context\InventoryScope` (`$ctx->inventory()`) holds the five (`operations()` since 1.128). Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
+`Context\InventoryScope` (`$ctx->inventory()`) holds the six (`operations()` since 1.128, `orders()` since 1.129). Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
 
 ## Contribution points: what a plugin declares
 

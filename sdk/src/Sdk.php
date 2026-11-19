@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.128).
+ * SDK identity (v1.129).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1468,12 +1468,23 @@ namespace Whity\Sdk;
  * section 31 §3.6, §3.9).
  *
  * Purely additive: one new method on Context\InventoryScope, which only the host implements.)
+ *
+ * 1.129 (PURCHASE ORDERS: {@see Inventory\Orders} drafts a purchase order for a supplier contact, sends it
+ * (to the workspace's purchase route when one is chosen, else approved at once) and receives it in parts,
+ * each receipt an {@see Inventory\Operation} posting `supplier → place` at the order's cost; more than
+ * ordered past the workspace's tolerance is refused unless allowed. {@see Inventory\Order} and
+ * {@see Inventory\OrderLine} carry it. A plugin writes through `$ctx->inventory()->orders()`, bound to the
+ * loaded plugin; the container's copy only reads. New events: the filter `inventory.order.submitting`
+ * (can veto) and `inventory.order.created|approved|rejected|partly_done|done|cancelled`, each with an
+ * `.async` twin (WHIT-1234, design section 31 §3.7).
+ *
+ * Purely additive: one new method on Context\InventoryScope, which only the host implements.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.128.0';
+    public const VERSION = '1.129.0';
 
     /**
      * Static identity only — never instantiated.

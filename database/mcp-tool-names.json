@@ -106,6 +106,10 @@
     "en": "Remove a reorder level",
     "ar": "حذف حد إعادة الطلب"
   },
+  "delete_api_inventory_supplier_items_id": {
+    "en": "Remove a supplier price",
+    "ar": "حذف سعر مورد"
+  },
   "delete_api_invitations_id": {
     "ar": "سحب دعوة معلقة"
   },
@@ -684,6 +688,14 @@
     "en": "Show a stock adjustment, count or transfer",
     "ar": "عرض تسوية أو جرد أو تحويل"
   },
+  "get_api_inventory_purchase_orders": {
+    "en": "List purchase orders",
+    "ar": "عرض أوامر الشراء"
+  },
+  "get_api_inventory_purchase_orders_id": {
+    "en": "Show a purchase order",
+    "ar": "عرض أمر شراء"
+  },
   "get_api_inventory_reasons": {
     "en": "List reasons for stock changes",
     "ar": "عرض أسباب تغيير المخزون"
@@ -703,6 +715,10 @@
   "get_api_inventory_stock_moves": {
     "en": "See stock history",
     "ar": "عرض حركات المخزون"
+  },
+  "get_api_inventory_supplier_items": {
+    "en": "List supplier prices",
+    "ar": "عرض أسعار الموردين"
   },
   "get_api_inventory_units": {
     "en": "List units of measure",
@@ -1199,6 +1215,10 @@
   "patch_api_inventory_locations_id": {
     "en": "Change a place",
     "ar": "تعديل موقع"
+  },
+  "patch_api_inventory_purchase_orders_id": {
+    "en": "Change a draft purchase order",
+    "ar": "تعديل مسودة أمر شراء"
   },
   "patch_api_inventory_reasons_id": {
     "en": "Change a reason for stock changes",
@@ -1702,6 +1722,26 @@
     "en": "Add a place",
     "ar": "إضافة موقع"
   },
+  "post_api_inventory_purchase_orders": {
+    "en": "Draft a purchase order",
+    "ar": "إنشاء مسودة أمر شراء"
+  },
+  "post_api_inventory_purchase_orders_id_cancel": {
+    "en": "Cancel a purchase order",
+    "ar": "إلغاء أمر شراء"
+  },
+  "post_api_inventory_purchase_orders_id_lines_line_close": {
+    "en": "Close a purchase order line that won't come",
+    "ar": "إغلاق سطر لن يصل في أمر الشراء"
+  },
+  "post_api_inventory_purchase_orders_id_receive": {
+    "en": "Receive goods against a purchase order",
+    "ar": "استلام بضاعة على أمر شراء"
+  },
+  "post_api_inventory_purchase_orders_id_submit": {
+    "en": "Send a purchase order for approval",
+    "ar": "إرسال أمر شراء للموافقة"
+  },
   "post_api_inventory_reasons": {
     "en": "Add a reason for stock changes",
     "ar": "إضافة سبب لتغيير المخزون"
@@ -2080,6 +2120,10 @@
   "put_api_inventory_reorder_rules": {
     "en": "Set a reorder level",
     "ar": "ضبط حد إعادة الطلب"
+  },
+  "put_api_inventory_supplier_items": {
+    "en": "Set a supplier price",
+    "ar": "ضبط سعر مورد"
   },
   "put_api_me_notification_preferences": {
     "en": "Change your notification preferences",

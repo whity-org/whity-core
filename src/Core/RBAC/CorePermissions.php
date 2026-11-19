@@ -506,6 +506,10 @@ final class CorePermissions
     // workspace (migration 320, WHIT-1233).
     public const STOCK_COUNT = 'stock:count';
     public const STOCK_TRANSFER = 'stock:transfer';
+    // Purchase orders and what suppliers sell (migration 321, WHIT-1234): the
+    // roles that run the workspace.
+    public const PURCHASES_READ = 'purchases:read';
+    public const PURCHASES_WRITE = 'purchases:write';
     // TASKS on Taskaat (A10, T.3). Tasks and boards live in the workspace's
     // Taskaat; these gate Whity's way into them. Read and write go to every
     // staff role (anchor documents:read); manage (connecting the workspace to
@@ -631,6 +635,8 @@ final class CorePermissions
             self::INVENTORY_SETTINGS,
             self::STOCK_COUNT,
             self::STOCK_TRANSFER,
+            self::PURCHASES_READ,
+            self::PURCHASES_WRITE,
             self::FIELDS_MANAGE,
             self::TASKS_READ,
             self::TASKS_WRITE,

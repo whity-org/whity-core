@@ -364,6 +364,19 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `stock.level.below_reorder.async` | `STOCK_LEVEL_BELOW_REORDER_ASYNC` | queued |  |
 | `stock.level.restored` | `STOCK_LEVEL_RESTORED` | observe | Back at or above the reorder level. Payload: `tenant_id`, `rule_id`, `variant_id`, `location_id`, `available`, `min_quantity`. |
 | `stock.level.restored.async` | `STOCK_LEVEL_RESTORED_ASYNC` | queued |  |
+| `inventory.order.submitting` | `INVENTORY_ORDER_SUBMITTING` | veto | Before an order goes to its route or is approved (SDK 1.129). Payload: `tenant_id`, `order_id`, `kind`, `number`, `contact_id`, `location_id`, `currency`, `total_minor`, `acting_profile_id`, `lines` (`variant_id`, `quantity`, `price_minor`, `line_total_minor`). Throw `HookVetoException` to refuse it (409 with your reason). |
+| `inventory.order.created` | `INVENTORY_ORDER_CREATED` | observe | An order was drafted. Every `inventory.order.*` notification carries `tenant_id`, `order_id`, `kind`, `number`, `contact_id`, `status`, `acting_profile_id`. |
+| `inventory.order.created.async` | `INVENTORY_ORDER_CREATED_ASYNC` | queued |  |
+| `inventory.order.approved` | `INVENTORY_ORDER_APPROVED` | observe | Approved by its route, or on sending when the workspace has none. |
+| `inventory.order.approved.async` | `INVENTORY_ORDER_APPROVED_ASYNC` | queued |  |
+| `inventory.order.rejected` | `INVENTORY_ORDER_REJECTED` | observe | Turned down on its route; back in draft. |
+| `inventory.order.rejected.async` | `INVENTORY_ORDER_REJECTED_ASYNC` | queued |  |
+| `inventory.order.partly_done` | `INVENTORY_ORDER_PARTLY_DONE` | observe | Part of it was received. Also `operation_id` (the receipt). |
+| `inventory.order.partly_done.async` | `INVENTORY_ORDER_PARTLY_DONE_ASYNC` | queued |  |
+| `inventory.order.done` | `INVENTORY_ORDER_DONE` | observe | Every line received or closed. Also `operation_id` when a receipt finished it. |
+| `inventory.order.done.async` | `INVENTORY_ORDER_DONE_ASYNC` | queued |  |
+| `inventory.order.cancelled` | `INVENTORY_ORDER_CANCELLED` | observe | Cancelled before anything arrived. |
+| `inventory.order.cancelled.async` | `INVENTORY_ORDER_CANCELLED_ASYNC` | queued |  |
 
 ### Deletion is transactional (WC-713)
 

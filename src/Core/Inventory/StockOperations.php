@@ -39,15 +39,15 @@ use Whity\Sdk\Inventory\Quantity;
  */
 final class StockOperations
 {
-    public const KINDS = ['adjustment', 'count', 'transfer'];
+    public const KINDS = ['adjustment', 'count', 'transfer', 'receipt'];
     public const STATUSES = ['draft', 'waiting_approval', 'in_transit', 'done', 'cancelled'];
 
-    private const PREFIX = ['adjustment' => 'ADJ', 'count' => 'CNT', 'transfer' => 'TRF'];
+    private const PREFIX = ['adjustment' => 'ADJ', 'count' => 'CNT', 'transfer' => 'TRF', 'receipt' => 'GRN'];
 
     /** Lines one operation may hold. A count of a whole shop can be long. */
     public const MAX_LINES = 2000;
 
-    private const COLUMNS = 'id, kind, number, status, from_location_id, to_location_id, category_id, reason_code, note, is_blind,
+    private const COLUMNS = 'id, kind, number, status, order_id, from_location_id, to_location_id, category_id, reason_code, note, is_blind,
         value_minor, currency, route_id, batch_key, sent_batch_key, idempotency_key, source_plugin, created_by_profile_id, agent_id,
         on_behalf_of_profile_id, done_by_profile_id, occurred_at, submitted_at, sent_at, done_at, cancelled_at, created_at, updated_at';
 
@@ -465,6 +465,51 @@ final class StockOperations
         return $this->get($tenantId, $id);
     }
 
+    // ── receipts (WHIT-1234) ─────────────────────────────────────────────
+
+    /**
+     * A goods receipt against a purchase order (IV.12): its lines post
+     * `supplier → place` at once, each move carrying the order's unit cost, so
+     * costing can use it. The order keeps its own count of what arrived;
+     * {@see PurchaseOrders::receive()} calls this inside its transaction.
+     *
+     * @param list<array{variant_id: int, steps: int, entered_unit_id: ?int, entered_quantity: ?int, order_line_id: int, unit_cost_minor: ?int, currency: ?string, note: string}> $lines
+     * @param array{agent_id?: ?int, on_behalf_of?: ?int, idempotency_key?: ?string, source_plugin?: ?string} $meta
+     * @return array<string, mixed> the receipt
+     */
+    public function receipt(int $tenantId, ?int $actor, int $orderId, int $placeId, array $lines, string $note, ?string $occurredAt, array $meta = []): array
+    {
+        $this->workspace->ensure($tenantId);
+        if ($lines === []) {
+            throw InventoryRejectedException::field('lines', 'Receive at least one line');
+        }
+        $supplier = $this->workspace->virtualId($tenantId, 'supplier');
+
+        return $this->db->transaction(function () use ($tenantId, $actor, $orderId, $placeId, $lines, $note, $occurredAt, $meta, $supplier): array {
+            $id = $this->insert($tenantId, $actor, 'receipt', [
+                'to_location_id' => $placeId, 'note' => $note, 'occurred_at' => $this->occurredAt($occurredAt), 'order_id' => $orderId,
+            ], array_map(static fn (array $l): array => [
+                'variant_id' => $l['variant_id'], 'quantity' => $l['steps'], 'entered_unit_id' => $l['entered_unit_id'],
+                'entered_quantity' => $l['entered_quantity'], 'note' => $l['note'], 'order_line_id' => $l['order_line_id'],
+            ], $lines), $meta);
+            $op = $this->row($tenantId, $id) ?? throw InventoryRejectedException::notFound('Receipt');
+            $lineIds = array_column($this->lineRows($tenantId, $id), 'id');
+            $post = [];
+            foreach ($lines as $i => $l) {
+                $post[] = [
+                    'variant_id' => $l['variant_id'], 'from_location_id' => $supplier, 'to_location_id' => $placeId,
+                    'steps' => $l['steps'], 'entered_unit_id' => $l['entered_unit_id'], 'entered_quantity' => $l['entered_quantity'],
+                    'unit_cost_minor' => $l['unit_cost_minor'], 'currency' => $l['currency'], 'note' => $l['note'],
+                    'source_line_id' => $lineIds[$i] ?? null, 'reason_code' => '',
+                ];
+            }
+            $posted = $this->ledger->postSteps($tenantId, $actor, $post, $this->postMeta($op, 'receipt'));
+            $this->markDone($tenantId, $id, $actor, $posted['batch_key'], 'draft');
+
+            return $this->get($tenantId, $id);
+        });
+    }
+
     // ── approval, posting, cancelling ────────────────────────────────────
 
     /**
@@ -611,7 +656,7 @@ final class StockOperations
     // ── reading ──────────────────────────────────────────────────────────
 
     /**
-     * @param array{kind?: ?string, status?: ?string, location_id?: ?int} $filter
+     * @param array{kind?: ?string, status?: ?string, location_id?: ?int, order_id?: ?int} $filter
      * @param bool $withLines true adds each operation's lines (for the waste and adjustments list)
      * @return list<array<string, mixed>> newest first
      */
@@ -627,6 +672,10 @@ final class StockOperations
                 $where[] = $key . ' = :' . $key;
                 $params[':' . $key] = $filter[$key];
             }
+        }
+        if (($filter['order_id'] ?? null) !== null) {
+            $where[] = 'order_id = :order_id';
+            $params[':order_id'] = (int) $filter['order_id'];
         }
         if (($filter['location_id'] ?? null) !== null) {
             $where[] = '(from_location_id = :place OR to_location_id = :place2)';
@@ -693,6 +742,9 @@ final class StockOperations
                 $line += ['change' => $q($l['quantity'])];
             } else {
                 $line += ['quantity' => $q($l['quantity']), 'received' => $q($l['received'])];
+                if ($op['kind'] === 'receipt') {
+                    $line += ['order_line_id' => $l['order_line_id']];
+                }
             }
 
             return $line;
@@ -732,12 +784,13 @@ final class StockOperations
             try {
                 return $this->db->transaction(function () use ($tenantId, $actor, $kind, $head, $lines, $meta, $key, $note): int {
                     $id = $this->db->insert(
-                        'INSERT INTO inv_operations (tenant_id, kind, number, status, from_location_id, to_location_id, category_id, reason_code, note,
+                        'INSERT INTO inv_operations (tenant_id, kind, number, status, order_id, from_location_id, to_location_id, category_id, reason_code, note,
                                 is_blind, idempotency_key, source_plugin, created_by_profile_id, agent_id, on_behalf_of_profile_id, occurred_at)
-                         VALUES (:tenant_id, :kind, :number, \'draft\', :from_id, :to_id, :category_id, :reason, :note,
+                         VALUES (:tenant_id, :kind, :number, \'draft\', :order_id, :from_id, :to_id, :category_id, :reason, :note,
                                 :blind, :key, :plugin, :actor, :agent_id, :on_behalf_of, :occurred_at)',
                         [
                             ':tenant_id' => $tenantId, ':kind' => $kind, ':number' => $this->nextNumber($tenantId, $kind),
+                            ':order_id' => $head['order_id'] ?? null,
                             ':from_id' => $head['from_location_id'] ?? null, ':to_id' => $head['to_location_id'] ?? null,
                             ':category_id' => $head['category_id'] ?? null, ':reason' => (string) ($head['reason_code'] ?? ''),
                             ':note' => $note, ':blind' => ($head['is_blind'] ?? false) === true, ':key' => $key,
@@ -748,12 +801,13 @@ final class StockOperations
                     );
                     foreach ($lines as $i => $l) {
                         $this->db->run(
-                            'INSERT INTO inv_operation_lines (tenant_id, operation_id, variant_id, quantity, entered_unit_id, entered_quantity, reason_code, note, sort_order)
-                             VALUES (:tenant_id, :op, :variant_id, :quantity, :unit_id, :entered, :reason, :note, :sort_order)',
+                            'INSERT INTO inv_operation_lines (tenant_id, operation_id, variant_id, quantity, entered_unit_id, entered_quantity, reason_code, note, sort_order, order_line_id)
+                             VALUES (:tenant_id, :op, :variant_id, :quantity, :unit_id, :entered, :reason, :note, :sort_order, :order_line_id)',
                             [
                                 ':tenant_id' => $tenantId, ':op' => $id, ':variant_id' => $l['variant_id'], ':quantity' => $l['quantity'],
                                 ':unit_id' => $l['entered_unit_id'] ?? null, ':entered' => $l['entered_quantity'] ?? null,
                                 ':reason' => (string) ($l['reason_code'] ?? ''), ':note' => (string) ($l['note'] ?? ''), ':sort_order' => $i + 1,
+                                ':order_line_id' => $l['order_line_id'] ?? null,
                             ]
                         );
                     }
@@ -959,7 +1013,7 @@ final class StockOperations
     private function lineRows(int $tenantId, int $id): array
     {
         $rows = $this->db->all(
-            'SELECT l.id, l.variant_id, l.quantity, l.entered_unit_id, l.entered_quantity, l.expected_quantity, l.counted_at,
+            'SELECT l.id, l.variant_id, l.order_line_id, l.quantity, l.entered_unit_id, l.entered_quantity, l.expected_quantity, l.counted_at,
                     l.counted_by_profile_id, l.received_quantity, l.reason_code, l.note, l.value_minor,
                     v.item_id, v.sku, v.purchase_price_minor AS variant_price, i.name AS item_name, i.names AS item_names, i.purchase_price_minor AS item_price,
                     i.currency, u.code AS unit, u.decimals, eu.code AS entered_unit, eu.decimals AS entered_decimals
@@ -975,6 +1029,7 @@ final class StockOperations
 
         return array_map(static fn (array $r): array => [
             'id' => (int) $r['id'], 'variant_id' => (int) $r['variant_id'], 'item_id' => (int) $r['item_id'],
+            'order_line_id' => InventoryDb::int($r['order_line_id']),
             'item_name' => (string) $r['item_name'], 'item_names' => InventoryNames::decode($r['item_names'], (string) $r['item_name']),
             'sku' => (string) $r['sku'],
             'quantity' => InventoryDb::int($r['quantity']), 'expected' => InventoryDb::int($r['expected_quantity']),
@@ -1062,7 +1117,12 @@ final class StockOperations
             'kind' => $kind,
             'number' => (string) $r['number'],
             'status' => (string) $r['status'],
-            'location_id' => $kind === 'transfer' ? null : InventoryDb::int($r['from_location_id']),
+            'order_id' => InventoryDb::int($r['order_id']),
+            'location_id' => match ($kind) {
+                'transfer' => null,
+                'receipt' => InventoryDb::int($r['to_location_id']),
+                default => InventoryDb::int($r['from_location_id']),
+            },
             'from_location_id' => $kind === 'transfer' ? InventoryDb::int($r['from_location_id']) : null,
             'to_location_id' => InventoryDb::int($r['to_location_id']),
             'category_id' => InventoryDb::int($r['category_id']),

@@ -502,6 +502,40 @@ final class Events
     public const STOCK_LEVEL_RESTORED = 'stock.level.restored';
     public const STOCK_LEVEL_RESTORED_ASYNC = 'stock.level.restored.async';
 
+    // ---- orders: purchase orders now, sales orders later (SDK 1.129, WHIT-1234) ----
+    /**
+     * FILTER hook, before an order goes to its route or is approved. Payload:
+     * `tenant_id`, `order_id`, `kind` (`purchase`), `number`, `contact_id`,
+     * `location_id`, `currency`, `total_minor`, `acting_profile_id`, and `lines`
+     * (each `variant_id`, `quantity` as a base-unit decimal, `price_minor`,
+     * `line_total_minor`). Return the payload unchanged; refuse with
+     * {@see HookVetoException} (a buyer's budget, a blocked supplier): the
+     * caller gets 409 and your reason.
+     */
+    public const INVENTORY_ORDER_SUBMITTING = 'inventory.order.submitting';
+    /**
+     * An order was drafted. This and every `inventory.order.*` notification
+     * below carry `tenant_id`, `order_id`, `kind`, `number`, `contact_id`,
+     * `status` and `acting_profile_id`.
+     */
+    public const INVENTORY_ORDER_CREATED = 'inventory.order.created';
+    public const INVENTORY_ORDER_CREATED_ASYNC = 'inventory.order.created.async';
+    /** Approved, by its route or on sending when no route is set; for a purchase order, it can now be sent to the supplier. */
+    public const INVENTORY_ORDER_APPROVED = 'inventory.order.approved';
+    public const INVENTORY_ORDER_APPROVED_ASYNC = 'inventory.order.approved.async';
+    /** Turned down on its route; back in draft. */
+    public const INVENTORY_ORDER_REJECTED = 'inventory.order.rejected';
+    public const INVENTORY_ORDER_REJECTED_ASYNC = 'inventory.order.rejected.async';
+    /** Part of it was received (purchase) or delivered (sale). Also carries `operation_id` (the receipt). */
+    public const INVENTORY_ORDER_PARTLY_DONE = 'inventory.order.partly_done';
+    public const INVENTORY_ORDER_PARTLY_DONE_ASYNC = 'inventory.order.partly_done.async';
+    /** Every line received (or closed short). Also carries `operation_id` when a receipt finished it. */
+    public const INVENTORY_ORDER_DONE = 'inventory.order.done';
+    public const INVENTORY_ORDER_DONE_ASYNC = 'inventory.order.done.async';
+    /** Cancelled before anything was received. */
+    public const INVENTORY_ORDER_CANCELLED = 'inventory.order.cancelled';
+    public const INVENTORY_ORDER_CANCELLED_ASYNC = 'inventory.order.cancelled.async';
+
     /**
      * The event name to dispatch for one of THIS plugin's own events (SDK 1.29).
      *

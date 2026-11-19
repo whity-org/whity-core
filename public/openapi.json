@@ -40047,7 +40047,7 @@
                         "name": "kind",
                         "in": "query",
                         "required": false,
-                        "description": "`adjustment`, `count` or `transfer`.",
+                        "description": "`adjustment`, `count`, `transfer` or `receipt`.",
                         "schema": {
                             "type": "string"
                         }
@@ -40247,6 +40247,991 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/purchase-orders": {
+            "get": {
+                "operationId": "get_api_v1_inventory_purchase_orders",
+                "summary": "List purchase orders, newest first",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "description": "`draft`, `waiting_approval`, `approved`, `partly_done`, `done` or `cancelled`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "contact_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this supplier.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "location_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only those received into this place.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "At most 200. Default 50.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "description": "How many to skip.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Purchase orders, without their lines",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventoryPurchaseOrder"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_inventory_purchase_orders",
+                "summary": "Draft a purchase order",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "A supplier (a contact marked as one), the place it is received into, and lines in the unit they are bought in. A line without a price takes what the supplier sells it for in that unit. It stays a draft until sent.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryPurchaseOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The same key was sent before",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryPurchaseOrder"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "The purchase order",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryPurchaseOrder"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate SKU or barcode, or a rule",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/purchase-orders/{id}": {
+            "get": {
+                "operationId": "get_api_v1_inventory_purchase_orders_id",
+                "summary": "A purchase order with its lines and receipts",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The purchase order",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryPurchaseOrder"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "patch_api_v1_inventory_purchase_orders_id",
+                "summary": "Change a draft purchase order",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Any field; `lines` replaces every line. Only a draft can change.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryPurchaseOrderUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The purchase order",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryPurchaseOrder"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate SKU or barcode, or a rule",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/purchase-orders/{id}/cancel": {
+            "post": {
+                "operationId": "post_api_v1_inventory_purchase_orders_id_cancel",
+                "summary": "Cancel a purchase order nothing has arrived against",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The purchase order",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryPurchaseOrder"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Part of it arrived, or it is done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/purchase-orders/{id}/lines/{line}/close": {
+            "post": {
+                "operationId": "post_api_v1_inventory_purchase_orders_id_lines_line_close",
+                "summary": "Close a line that won't come",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "What has not arrived of it is no longer expected. When every line is received or closed, the order is done.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "line",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The purchase order",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryPurchaseOrder"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The order is not approved",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/purchase-orders/{id}/receive": {
+            "post": {
+                "operationId": "post_api_v1_inventory_purchase_orders_id_receive",
+                "summary": "Receive what arrived against a purchase order",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Posts the stock into the order's place at the order's cost, as a receipt (`GRN-0001`). More than ordered past the workspace's tolerance is refused (409, `over_receipt`) unless `allow_over` is true.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryReceiveOrderRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The same key was sent before",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryPurchaseOrder"
+                                        },
+                                        "receipt": {
+                                            "$ref": "#/components/schemas/InventoryOperation"
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "receipt"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "The purchase order, and the receipt",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryPurchaseOrder"
+                                        },
+                                        "receipt": {
+                                            "$ref": "#/components/schemas/InventoryOperation"
+                                        }
+                                    },
+                                    "required": [
+                                        "data",
+                                        "receipt"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate SKU or barcode, or a rule",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/purchase-orders/{id}/submit": {
+            "post": {
+                "operationId": "post_api_v1_inventory_purchase_orders_id_submit",
+                "summary": "Send a purchase order for approval",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "It travels the workspace's purchase route when one is chosen (`status: waiting_approval`); with none it is approved at once.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The purchase order",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryPurchaseOrder"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not a draft, or a rule refused it",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -41637,6 +42622,347 @@
                                         "next_before_id": {
                                             "type": "integer",
                                             "nullable": true
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/supplier-items": {
+            "get": {
+                "operationId": "get_api_v1_inventory_supplier_items",
+                "summary": "What suppliers sell, and at what price",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "variant_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this variant.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "item_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this item's variants.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "contact_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this supplier.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Supplier prices",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventorySupplierItem"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "operationId": "put_api_v1_inventory_supplier_items",
+                "summary": "Set what a supplier sells an item for",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Adds it or changes it; one per item variant and supplier. The preferred one fills new purchase orders.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventorySupplierItemRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The supplier price",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventorySupplierItem"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate SKU or barcode, or a rule",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/supplier-items/{id}": {
+            "delete": {
+                "operationId": "delete_api_v1_inventory_supplier_items_id",
+                "summary": "Remove a supplier price",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Removed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "deleted": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "deleted"
+                                            ]
                                         }
                                     },
                                     "required": [
@@ -101943,11 +103269,16 @@
                         "enum": [
                             "adjustment",
                             "count",
-                            "transfer"
+                            "transfer",
+                            "receipt"
                         ]
                     },
                     "number": {
                         "type": "string"
+                    },
+                    "order_id": {
+                        "type": "integer",
+                        "nullable": true
                     },
                     "status": {
                         "type": "string",
@@ -102243,6 +103574,10 @@
                     "counted_by_profile_id": {
                         "type": "integer",
                         "nullable": true
+                    },
+                    "order_line_id": {
+                        "type": "integer",
+                        "nullable": true
                     }
                 },
                 "required": [
@@ -102254,6 +103589,415 @@
                     "unit",
                     "decimals"
                 ]
+            },
+            "InventoryPurchaseOrder": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "number": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "draft",
+                            "waiting_approval",
+                            "approved",
+                            "partly_done",
+                            "done",
+                            "cancelled"
+                        ]
+                    },
+                    "contact_id": {
+                        "type": "integer"
+                    },
+                    "contact_name": {
+                        "type": "string"
+                    },
+                    "location_id": {
+                        "type": "integer"
+                    },
+                    "expected_on": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "subtotal_minor": {
+                        "type": "integer"
+                    },
+                    "tax_minor": {
+                        "type": "integer"
+                    },
+                    "total_minor": {
+                        "type": "integer"
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "external_ref": {
+                        "type": "string"
+                    },
+                    "route_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "document_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "source_plugin": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "created_by_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "created_by_name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "agent_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "on_behalf_of_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "approved_by_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "approved_by_name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "submitted_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "approved_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "done_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "cancelled_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    },
+                    "line_count": {
+                        "type": "integer"
+                    },
+                    "received_percent": {
+                        "type": "integer"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/InventoryPurchaseOrderLine"
+                        }
+                    },
+                    "receipts": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "number": {
+                                    "type": "string"
+                                },
+                                "status": {
+                                    "type": "string"
+                                },
+                                "batch_key": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "done_at": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "created_by_name": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "line_count": {
+                                    "type": "integer"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "number"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "number",
+                    "status",
+                    "contact_id",
+                    "location_id",
+                    "currency",
+                    "total_minor",
+                    "created_at"
+                ]
+            },
+            "InventoryPurchaseOrderLine": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "variant_id": {
+                        "type": "integer"
+                    },
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "item_name": {
+                        "type": "string"
+                    },
+                    "item_names": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "The name in each language, such as `{\"en\": \"Flour\", \"ar\": \"\u0637\u062d\u064a\u0646\"}`."
+                    },
+                    "sku": {
+                        "type": "string"
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "description": "Ordered, in `unit`."
+                    },
+                    "received": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "description": "Received so far, in `unit`."
+                    },
+                    "base_unit": {
+                        "type": "string"
+                    },
+                    "base_quantity": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "description": "Ordered, in the item's base unit."
+                    },
+                    "price_minor": {
+                        "type": "integer"
+                    },
+                    "discount_bp": {
+                        "type": "integer"
+                    },
+                    "tax_bp": {
+                        "type": "integer"
+                    },
+                    "line_total_minor": {
+                        "type": "integer",
+                        "description": "Quantity times price, less the discount; tax not included."
+                    },
+                    "is_closed": {
+                        "type": "boolean"
+                    },
+                    "is_over": {
+                        "type": "boolean",
+                        "description": "More arrived than ordered."
+                    },
+                    "note": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "variant_id",
+                    "item_id",
+                    "item_name",
+                    "unit",
+                    "quantity",
+                    "received",
+                    "price_minor",
+                    "line_total_minor",
+                    "is_closed"
+                ]
+            },
+            "InventoryPurchaseOrderRequest": {
+                "type": "object",
+                "properties": {
+                    "contact_id": {
+                        "type": "integer",
+                        "description": "The supplier: a contact marked as a supplier."
+                    },
+                    "location_id": {
+                        "type": "integer",
+                        "description": "The place it is received into."
+                    },
+                    "expected_on": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When it should arrive, such as 2026-11-26."
+                    },
+                    "currency": {
+                        "type": "string",
+                        "description": "A 3-letter code; the workspace's currency when left out."
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Notes for the supplier and the people receiving it."
+                    },
+                    "external_ref": {
+                        "type": "string",
+                        "description": "The supplier's or another system's reference."
+                    },
+                    "lines": {
+                        "description": "What is ordered: `{variant_id, quantity, unit, price_minor, discount_bp, tax_bp}`.",
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 500,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "variant_id": {
+                                    "type": "integer"
+                                },
+                                "quantity": {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+(\\.\\d+)?$",
+                                    "description": "How many, in `unit`."
+                                },
+                                "unit": {
+                                    "type": "string",
+                                    "description": "The unit it is bought in, such as `bag`; the item's base unit when left out."
+                                },
+                                "price_minor": {
+                                    "type": "integer",
+                                    "description": "The price of one `unit` in minor units; what the supplier sells it for when left out."
+                                },
+                                "discount_bp": {
+                                    "type": "integer",
+                                    "description": "Discount in basis points (500 is 5%)."
+                                },
+                                "tax_bp": {
+                                    "type": "integer",
+                                    "description": "Tax in basis points, on top."
+                                },
+                                "note": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "variant_id",
+                                "quantity"
+                            ]
+                        }
+                    },
+                    "idempotency_key": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "description": "Any unique text; sending the same key again drafts nothing new."
+                    }
+                },
+                "required": [
+                    "contact_id",
+                    "location_id",
+                    "lines"
+                ]
+            },
+            "InventoryPurchaseOrderUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "contact_id": {
+                        "type": "integer",
+                        "description": "The supplier: a contact marked as a supplier."
+                    },
+                    "location_id": {
+                        "type": "integer",
+                        "description": "The place it is received into."
+                    },
+                    "expected_on": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When it should arrive."
+                    },
+                    "currency": {
+                        "type": "string",
+                        "description": "A 3-letter code."
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Notes for the supplier and the people receiving it."
+                    },
+                    "external_ref": {
+                        "type": "string",
+                        "description": "The supplier's or another system's reference."
+                    },
+                    "lines": {
+                        "description": "Every line, replacing the old ones.",
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 500,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "variant_id": {
+                                    "type": "integer"
+                                },
+                                "quantity": {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+(\\.\\d+)?$",
+                                    "description": "How many, in `unit`."
+                                },
+                                "unit": {
+                                    "type": "string",
+                                    "description": "The unit it is bought in, such as `bag`; the item's base unit when left out."
+                                },
+                                "price_minor": {
+                                    "type": "integer",
+                                    "description": "The price of one `unit` in minor units; what the supplier sells it for when left out."
+                                },
+                                "discount_bp": {
+                                    "type": "integer",
+                                    "description": "Discount in basis points (500 is 5%)."
+                                },
+                                "tax_bp": {
+                                    "type": "integer",
+                                    "description": "Tax in basis points, on top."
+                                },
+                                "note": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "variant_id",
+                                "quantity"
+                            ]
+                        }
+                    }
+                }
             },
             "InventoryReason": {
                 "type": "object",
@@ -102390,6 +104134,61 @@
                         "description": "True to stop offering it; old changes keep it."
                     }
                 }
+            },
+            "InventoryReceiveOrderRequest": {
+                "type": "object",
+                "properties": {
+                    "lines": {
+                        "description": "What arrived: `{line_id, quantity, unit, note}`, in the line's unit unless `unit` says.",
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 500,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "line_id": {
+                                    "type": "integer"
+                                },
+                                "quantity": {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+(\\.\\d+)?$",
+                                    "description": "How many arrived."
+                                },
+                                "unit": {
+                                    "type": "string",
+                                    "description": "The unit counted in; the line's unit when left out."
+                                },
+                                "note": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "line_id",
+                                "quantity"
+                            ]
+                        }
+                    },
+                    "allow_over": {
+                        "type": "boolean",
+                        "description": "True to receive more than ordered past the workspace's tolerance."
+                    },
+                    "note": {
+                        "type": "string",
+                        "description": "A note kept with the receipt, such as the delivery note number."
+                    },
+                    "occurred_at": {
+                        "type": "string",
+                        "description": "When it arrived, if earlier than now (ISO 8601)."
+                    },
+                    "idempotency_key": {
+                        "type": "string",
+                        "maxLength": 128,
+                        "description": "Any unique text; sending the same key again receives nothing twice."
+                    }
+                },
+                "required": [
+                    "lines"
+                ]
             },
             "InventoryReceiveRequest": {
                 "type": "object",
@@ -102569,6 +104368,13 @@
                     },
                     "transfers_one_step": {
                         "type": "boolean"
+                    },
+                    "purchase_route_template_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "over_receipt_percent": {
+                        "type": "integer"
                     }
                 },
                 "required": [
@@ -102576,7 +104382,9 @@
                     "approve_counts_above",
                     "adjustment_route_template_id",
                     "count_route_template_id",
-                    "transfers_one_step"
+                    "transfers_one_step",
+                    "purchase_route_template_id",
+                    "over_receipt_percent"
                 ]
             },
             "InventorySettingsRequest": {
@@ -102605,8 +104413,135 @@
                     "transfers_one_step": {
                         "type": "boolean",
                         "description": "True to have transfers arrive as they are sent."
+                    },
+                    "purchase_route_template_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The route template purchase orders travel; null approves them on sending."
+                    },
+                    "over_receipt_percent": {
+                        "type": "integer",
+                        "description": "How far past the order a receipt may go before it asks, 0 to 100 (0: anything over asks)."
                     }
                 }
+            },
+            "InventorySupplierItem": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "variant_id": {
+                        "type": "integer"
+                    },
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "item_name": {
+                        "type": "string"
+                    },
+                    "item_names": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "The name in each language, such as `{\"en\": \"Flour\", \"ar\": \"\u0637\u062d\u064a\u0646\"}`."
+                    },
+                    "sku": {
+                        "type": "string"
+                    },
+                    "contact_id": {
+                        "type": "integer"
+                    },
+                    "contact_name": {
+                        "type": "string"
+                    },
+                    "supplier_sku": {
+                        "type": "string"
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "price_minor": {
+                        "type": "integer"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "min_quantity": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "lead_days": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "is_preferred": {
+                        "type": "boolean"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "variant_id",
+                    "item_id",
+                    "contact_id",
+                    "unit",
+                    "price_minor",
+                    "currency",
+                    "is_preferred"
+                ]
+            },
+            "InventorySupplierItemRequest": {
+                "type": "object",
+                "properties": {
+                    "variant_id": {
+                        "type": "integer",
+                        "description": "The item variant."
+                    },
+                    "contact_id": {
+                        "type": "integer",
+                        "description": "The supplier: a contact marked as a supplier."
+                    },
+                    "unit": {
+                        "type": "string",
+                        "description": "The unit they sell it in, such as `bag`; the item's base unit when left out."
+                    },
+                    "price_minor": {
+                        "type": "integer",
+                        "description": "The price of one `unit`, in minor units."
+                    },
+                    "currency": {
+                        "type": "string",
+                        "description": "A 3-letter code; the workspace's currency when left out."
+                    },
+                    "supplier_sku": {
+                        "type": "string",
+                        "description": "The supplier's own code for it."
+                    },
+                    "min_quantity": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "description": "The least they take, in `unit`.",
+                        "nullable": true
+                    },
+                    "lead_days": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Days they take to deliver."
+                    },
+                    "is_preferred": {
+                        "type": "boolean",
+                        "description": "True to have new purchase orders use this supplier's price."
+                    }
+                },
+                "required": [
+                    "variant_id",
+                    "contact_id",
+                    "price_minor"
+                ]
             },
             "InventoryTransferRequest": {
                 "type": "object",

@@ -928,6 +928,12 @@ final class SettingsRegistry
     public const INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID = 'inventory.adjustment_route_template_id';
     public const INVENTORY_COUNT_ROUTE_TEMPLATE_ID = 'inventory.count_route_template_id';
     public const INVENTORY_TRANSFERS_ONE_STEP = 'inventory.transfers_one_step';
+    //   - purchase_route_template_id: the route a purchase order travels before
+    //     it is approved (WHIT-1234, IV.12); 0 approves on sending.
+    //   - over_receipt_percent: how far past the order a receipt may go before
+    //     it asks (IV.12: 0 by default, so anything over asks).
+    public const INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID = 'inventory.purchase_route_template_id';
+    public const INVENTORY_OVER_RECEIPT_PERCENT = 'inventory.over_receipt_percent';
 
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
@@ -952,6 +958,8 @@ final class SettingsRegistry
         self::INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID,
         self::INVENTORY_COUNT_ROUTE_TEMPLATE_ID,
         self::INVENTORY_TRANSFERS_ONE_STEP,
+        self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID,
+        self::INVENTORY_OVER_RECEIPT_PERCENT,
     ];
 
     /**
@@ -1469,6 +1477,8 @@ final class SettingsRegistry
         self::INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID => '0',
         self::INVENTORY_COUNT_ROUTE_TEMPLATE_ID => '0',
         self::INVENTORY_TRANSFERS_ONE_STEP => 'false',
+        self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID => '0',
+        self::INVENTORY_OVER_RECEIPT_PERCENT => '0',
     ];
 
     /**
@@ -1978,10 +1988,11 @@ final class SettingsRegistry
             self::INVENTORY_APPROVE_ADJUSTMENTS_ABOVE, self::INVENTORY_APPROVE_COUNTS_ABOVE => $value === '' || preg_match('/^\d{1,12}(\.\d{1,3})?$/', $value) === 1
                 ? null
                 : $key . ' must be an amount such as 25 or 25.500, or empty to never ask.',
-            self::INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID, self::INVENTORY_COUNT_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
+            self::INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID, self::INVENTORY_COUNT_ROUTE_TEMPLATE_ID, self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
                 ? null
                 : $key . ' must be a route template id, or 0 for the default.',
             self::INVENTORY_TRANSFERS_ONE_STEP => self::validateBoolean($value, self::INVENTORY_TRANSFERS_ONE_STEP),
+            self::INVENTORY_OVER_RECEIPT_PERCENT => self::validateWholeNumberBetween($value, self::INVENTORY_OVER_RECEIPT_PERCENT, 0, 100),
             default => "Unknown setting key: {$key}",
         };
     }

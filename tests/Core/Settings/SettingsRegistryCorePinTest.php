@@ -227,6 +227,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             'inventory.adjustment_route_template_id',
             'inventory.count_route_template_id',
             'inventory.transfers_one_step',
+            // WHIT-1234: purchasing.
+            'inventory.purchase_route_template_id',
+            'inventory.over_receipt_percent',
         ];
     }
 
@@ -472,6 +475,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'inventory.adjustment_route_template_id' => '0',
             'inventory.count_route_template_id' => '0',
             'inventory.transfers_one_step' => 'false',
+            'inventory.purchase_route_template_id' => '0',
+            'inventory.over_receipt_percent' => '0',
         ];
     }
 
