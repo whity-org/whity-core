@@ -1942,7 +1942,7 @@ class AuthHandler
             if ($accessJti === '' || $refreshJti === '') {
                 return false;
             }
-            $family = is_array($rf) && isset($rf['fam']) && is_string($rf['fam']) ? $rf['fam'] : null;
+            $family = isset($rf['fam']) && is_string($rf['fam']) ? $rf['fam'] : null;
             $expiresAt = isset($rf['exp'])
                 ? date('Y-m-d H:i:s', (int) $rf['exp'])
                 : date('Y-m-d H:i:s', time() + 604800);

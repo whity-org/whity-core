@@ -218,7 +218,9 @@ final class RefreshReuseRevokesSessionRealEngineTest extends TestCase
     /** @return array<string, mixed> */
     private function sessionRow(): array
     {
-        $rows = $this->pdo->query('SELECT * FROM sessions')->fetchAll(PDO::FETCH_ASSOC);
+        $stmt = $this->pdo->query('SELECT * FROM sessions');
+        self::assertNotFalse($stmt);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         self::assertCount(1, $rows, 'one sign-in is one session row');
 
         return $rows[0];
@@ -240,9 +242,11 @@ final class RefreshReuseRevokesSessionRealEngineTest extends TestCase
 
     private function lastReuseOutcome(): ?string
     {
-        $metadata = $this->pdo->query(
+        $stmt = $this->pdo->query(
             "SELECT metadata FROM audit_log WHERE action = 'auth.refresh_token_reuse_detected' ORDER BY id DESC LIMIT 1"
-        )->fetchColumn();
+        );
+        self::assertNotFalse($stmt);
+        $metadata = $stmt->fetchColumn();
         $decoded = is_string($metadata) ? json_decode($metadata, true) : null;
 
         return is_array($decoded) && is_string($decoded['outcome'] ?? null) ? $decoded['outcome'] : null;
