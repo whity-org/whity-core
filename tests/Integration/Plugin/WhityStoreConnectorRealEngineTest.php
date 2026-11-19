@@ -121,6 +121,15 @@ final class WhityStoreConnectorRealEngineTest extends TestCase
     private function connect(): WhityStoreConnector
     {
         [$connector, $query] = $this->startedConnect();
+        $this->queueToken($query);
+        $connector->complete('the-code', $query['state'], 7);
+
+        return $connector;
+    }
+
+    /** @param array<string, string> $query */
+    private function queueToken(array $query): void
+    {
         $this->replies[self::ISSUER . '/oauth/token'][] = [
             'access_token' => 'access-1',
             'refresh_token' => 'refresh-1',
@@ -134,9 +143,6 @@ final class WhityStoreConnectorRealEngineTest extends TestCase
                 'email' => 'rania@example-bakery.test',
             ]),
         ];
-        $connector->complete('the-code', $query['state'], 7);
-
-        return $connector;
     }
 
     public function testStartRegistersOnceAndAsksForTheStoreResource(): void
@@ -189,6 +195,10 @@ final class WhityStoreConnectorRealEngineTest extends TestCase
             self::assertSame(422, $e->status);
         }
 
+        // WHIT-1304 (#2222): the wrong state did not cancel the connect in
+        // progress; the right one finishes it, and only once.
+        $this->queueToken($query);
+        $connector->complete('the-code', $query['state'], 7);
         $this->expectException(WhityStoreConnectException::class);
         $connector->complete('the-code', $query['state'], 7);
     }
@@ -197,8 +207,19 @@ final class WhityStoreConnectorRealEngineTest extends TestCase
     {
         [$connector, $query] = $this->startedConnect();
 
-        $this->expectException(WhityStoreConnectException::class);
-        $connector->complete('the-code', $query['state'], 8);
+        // WHIT-1304 (#2222): nor can a caller with no person behind it, and
+        // neither refusal cancels the operator's own connect.
+        foreach ([8, null] as $actor) {
+            try {
+                $connector->complete('the-code', $query['state'], $actor);
+                self::fail('only the operator who started may finish');
+            } catch (WhityStoreConnectException $e) {
+                self::assertSame(403, $e->status);
+            }
+        }
+        $this->queueToken($query);
+        $connector->complete('the-code', $query['state'], 7);
+        self::assertNotEmpty(array_filter($this->calls, static fn (array $c): bool => $c[1] === self::ISSUER . '/oauth/token'));
     }
 
     public function testAnExpiredConnectIsRefused(): void
