@@ -315,6 +315,18 @@ class TwoFactorHandler
     }
 
     /**
+     * The submitted TOTP secret as stored, or null when it is not one setup()
+     * could have issued: Base32 (spaces and padding dropped, any case), 26 to
+     * 128 characters, so at least 128 bits (#2196). setup() issues 103.
+     */
+    private static function normalisedSecret(string $secret): ?string
+    {
+        $secret = strtoupper((string) preg_replace('/[\s=]+/', '', $secret));
+
+        return preg_match('/^[A-Z2-7]{26,128}$/', $secret) === 1 ? $secret : null;
+    }
+
+    /**
      * Record a 2FA audit entry when an audit logger is configured.
      *
      * The 2FA routes run behind tenant isolation, so the tenant, actor and IP are
@@ -442,17 +454,36 @@ class TwoFactorHandler
             // Parse request body (envelope validated upstream, WC-189).
             $body = JsonBody::parsed($request);
 
-            if (empty($body['code']) || empty($body['secret'])) {
+            // Strings only (#2196): an array here used to throw a TypeError past
+            // the catch below and answer 500.
+            $code = is_string($body['code'] ?? null) ? trim($body['code']) : '';
+            $rawSecret = is_string($body['secret'] ?? null) ? $body['secret'] : '';
+            if ($code === '' || $rawSecret === '') {
                 return Response::error('Code and secret are required', 400);
             }
 
-            $code = $body['code'];
-            $secret = $body['secret'];
+            // The secret is the one setup() handed out: Base32 and at least 128
+            // bits (#2196). A client-picked short secret ("A" is 5 bits) would
+            // make the second factor guessable.
+            $secret = self::normalisedSecret($rawSecret);
+            if ($secret === null) {
+                return Response::error('The secret is not valid. Start two-step setup again.', 400);
+            }
+
+            // Wrong codes count, like the other proof checks here (#2196).
+            $ip = ClientIp::fromRequest($request);
+            if ($this->proofThrottle?->isThrottled($profileId, $ip) === true) {
+                return Response::error('Too many attempts', 429, ['reason' => 'throttled']);
+            }
 
             // Validate the code against the plaintext secret the client just submitted.
             if (!$this->totpService->verifyPlainCode($secret, $code)) {
+                $this->proofThrottle?->recordFailure($profileId, $ip);
+                $this->audit('auth.2fa.verify_failure', $profileId);
+
                 return Response::error('Invalid authentication code', 401);
             }
+            $this->proofThrottle?->clearUser($profileId);
 
             // Encrypt and store the secret.
             $encryptedSecret = $this->totpService->encryptSecret($secret);
@@ -547,7 +578,9 @@ class TwoFactorHandler
             $this->audit('auth.2fa.disabled', $profileId);
             // EM.1 `two-step-off`: a security email, never turned off.
             try {
-                $this->securityMailer?->twoStepTurnedOff($profileId, (int) ($claims['tenant_id'] ?? 0));
+                // The workspace the person is in, for its branding (#2197).
+                // Access tokens carry active_tenant_id, never tenant_id.
+                $this->securityMailer?->twoStepTurnedOff($profileId, (int) ($claims['active_tenant_id'] ?? 0));
             } catch (\Throwable) {
             }
 
