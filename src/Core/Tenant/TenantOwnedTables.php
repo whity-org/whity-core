@@ -658,6 +658,9 @@ final class TenantOwnedTables
         'inv_operations' => '320_create_inventory_operations.php',
         'inv_operation_lines' => '320_create_inventory_operations.php',
         'inv_reorder_rules' => '320_create_inventory_operations.php',
+        'inv_orders' => '321_create_inventory_orders.php',
+        'inv_order_lines' => '321_create_inventory_orders.php',
+        'inv_supplier_items' => '321_create_inventory_orders.php',
     ];
 
     /**

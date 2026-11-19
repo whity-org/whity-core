@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.128.0',
+            '1.129.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.128 ADDS Inventory\\Operations: adjustments, counts and transfers for plugins, with approval above the workspace\'s value (WHIT-1233). '
+            'SDK 1.129 ADDS Inventory\\Orders: purchase orders for plugins, sent on the workspace\'s route and received in parts (WHIT-1234). '
+            . 'SDK 1.128 ADDS Inventory\\Operations: adjustments, counts and transfers for plugins, with approval above the workspace\'s value (WHIT-1233). '
             . 'SDK 1.127 ADDS Inventory\\Items, Locations, Stock and Units: core items, places and an append-only stock ledger for plugins (WHIT-1232). '
             . 'SDK 1.125 ADDS Contribute\PluginThemesInterface and Theme\WorkspaceTheme (PluginScope::themes()): plugins ship theme files and read the workspace theme; deprecates PluginThemeInterface (WHIT-1225). '
             . 'SDK 1.124 (release 0.2.31) ADDS PluginContext, Context\\PluginScope and Secrets\\WorkspaceSecrets, deprecates the seven ->for($this) factories and PluginHomeCardInterface, and fires submission.reviewed again (WHIT-1243). '

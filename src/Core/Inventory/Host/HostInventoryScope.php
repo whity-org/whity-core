@@ -9,6 +9,7 @@ use Whity\Sdk\Context\ServiceUnavailable;
 use Whity\Sdk\Inventory\Items;
 use Whity\Sdk\Inventory\Locations;
 use Whity\Sdk\Inventory\Operations;
+use Whity\Sdk\Inventory\Orders;
 use Whity\Sdk\Inventory\Stock;
 use Whity\Sdk\Inventory\Units;
 use Whity\Sdk\PluginInterface;
@@ -24,6 +25,7 @@ final class HostInventoryScope implements InventoryScope
 {
     private ?Stock $stock = null;
     private ?Operations $operations = null;
+    private ?Orders $orders = null;
 
     public function __construct(private readonly PluginInterface $plugin)
     {
@@ -68,6 +70,19 @@ final class HostInventoryScope implements InventoryScope
         }
 
         return $this->operations;
+    }
+
+    public function orders(): Orders
+    {
+        if ($this->orders === null) {
+            $host = self::resolve(Orders::class);
+            if (!$host instanceof HostOrders) {
+                throw ServiceUnavailable::named(Orders::class);
+            }
+            $this->orders = $host->for($this->plugin);
+        }
+
+        return $this->orders;
     }
 
     /**

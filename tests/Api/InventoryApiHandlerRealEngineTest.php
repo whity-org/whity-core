@@ -12,16 +12,19 @@ use Whity\Core\Inventory\InventoryDb;
 use Whity\Core\Inventory\InventoryWorkspace;
 use Whity\Core\Inventory\ItemService;
 use Whity\Core\Inventory\LocationService;
+use Whity\Core\Inventory\PurchaseOrders;
 use Whity\Core\Inventory\ReasonCatalog;
 use Whity\Core\Inventory\ReorderRules;
 use Whity\Core\Inventory\StockLedger;
 use Whity\Core\Inventory\StockOperations;
+use Whity\Core\Inventory\SupplierItems;
 use Whity\Core\Inventory\UnitCatalog;
 use Whity\Core\Request;
 use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Core\Settings\SettingsService;
 use Whity\Core\Settings\TenantSettingsRepository;
 use Whity\Core\Tenant\TenantContext;
+use Whity\Database\SequenceCounters;
 use Whity\OpenAPI\InventoryApiSchemas;
 
 /**
@@ -50,6 +53,8 @@ final class InventoryApiHandlerRealEngineTest extends TestCase
         $ledger = new StockLedger($db, $workspace, $items, $units, null, $reasons);
         $settings = new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo));
         $operations = new StockOperations($db, $workspace, $items, $units, $ledger, $reasons, static fn (int $t): array => $settings->effective($t));
+        $suppliers = new SupplierItems($db, $items, $units);
+        $purchases = new PurchaseOrders($db, $workspace, $items, $units, $operations, $suppliers, new SequenceCounters($this->pdo), static fn (int $t): array => $settings->effective($t), static fn (int $t): string => 'JOD');
         $this->handler = new InventoryApiHandler(
             $units,
             $items,
@@ -60,6 +65,8 @@ final class InventoryApiHandlerRealEngineTest extends TestCase
             $reasons,
             new ReorderRules($db, $items, $ledger),
             $settings,
+            $purchases,
+            $suppliers,
         );
     }
 
@@ -80,6 +87,8 @@ final class InventoryApiHandlerRealEngineTest extends TestCase
             // Design 31 §4.1: reading is inventory:read; each kind of stock
             // change has its own permission (WHIT-1233).
             $expected = match (true) {
+                str_starts_with($route, 'GET ') && (str_contains($route, '/purchase-orders') || str_contains($route, '/supplier-items')) => 'purchases:read',
+                str_contains($route, '/purchase-orders') => 'purchases:write',
                 str_starts_with($route, 'GET ') => 'inventory:read',
                 str_contains($route, '/stock/'), str_contains($route, '/adjustments') => 'stock:adjust',
                 str_contains($route, '/counts') => 'stock:count',
@@ -94,7 +103,7 @@ final class InventoryApiHandlerRealEngineTest extends TestCase
         foreach (array_keys($byRoute) as $route) {
             [$method, $path] = explode(' ', $route, 2);
             self::assertMatchesRegularExpression(
-                '#\$router->register\(\'' . $method . '\',\s+\'' . preg_quote($path, '#') . '\',\s+\[\$inventoryHandler, \'\w+\'\],\s+null, null, CorePermissions::(INVENTORY_READ|INVENTORY_WRITE|STOCK_ADJUST|STOCK_COUNT|STOCK_TRANSFER|INVENTORY_SETTINGS)\);#',
+                '#\$router->register\(\'' . $method . '\',\s+\'' . preg_quote($path, '#') . '\',\s+\[\$inventoryHandler, \'\w+\'\],\s+null, null, CorePermissions::(INVENTORY_READ|INVENTORY_WRITE|STOCK_ADJUST|STOCK_COUNT|STOCK_TRANSFER|INVENTORY_SETTINGS|PURCHASES_READ|PURCHASES_WRITE)\);#',
                 $index,
                 $route . ' is registered with its permission'
             );
@@ -189,6 +198,39 @@ final class InventoryApiHandlerRealEngineTest extends TestCase
         TenantContext::setTenantId(2);
         self::assertSame([], $this->call('listOperations', 'GET', '/api/inventory/operations')['body']['data']);
         self::assertSame(404, $this->call('showOperation', 'GET', '/api/inventory/operations/' . $id, null, ['id' => $id])['status']);
+    }
+
+    public function testAPurchaseOrderIsDraftedSentAndReceivedThroughTheRoutes(): void
+    {
+        TenantContext::setTenantId(1);
+        $this->pdo->exec("INSERT INTO contacts (id, tenant_id, name, is_customer, is_supplier) VALUES (51, 1, 'Example Dairy', false, true)");
+        $butter = $this->call('createItem', 'POST', '/api/inventory/items', ['name' => 'Butter', 'unit' => 'kg'])['body']['data']['variants'][0]['id'];
+        $kitchen = $this->call('createLocation', 'POST', '/api/inventory/locations', ['name' => 'Central kitchen'])['body']['data']['id'];
+
+        $price = $this->call('setSupplierItem', 'PUT', '/api/inventory/supplier-items', ['variant_id' => $butter, 'contact_id' => 51, 'price_minor' => 4200, 'is_preferred' => true]);
+        self::assertSame('JOD', $price['body']['data']['currency']);
+
+        $created = $this->call('createPurchaseOrder', 'POST', '/api/inventory/purchase-orders', [
+            'contact_id' => 51, 'location_id' => $kitchen, 'lines' => [['variant_id' => $butter, 'quantity' => '6']],
+        ]);
+        self::assertSame(201, $created['status']);
+        self::assertSame(25200, $created['body']['data']['total_minor'], "the supplier's price filled the line");
+        $id = (string) $created['body']['data']['id'];
+
+        $sent = $this->call('submitPurchaseOrder', 'POST', '/api/inventory/purchase-orders/' . $id . '/submit', [], ['id' => $id]);
+        self::assertSame('approved', $sent['body']['data']['status']);
+        $line = $sent['body']['data']['lines'][0]['id'];
+
+        $over = $this->call('receivePurchaseOrder', 'POST', '/api/inventory/purchase-orders/' . $id . '/receive', ['lines' => [['line_id' => $line, 'quantity' => '7']]], ['id' => $id]);
+        self::assertSame(409, $over['status'], 'more than ordered asks first');
+        $got = $this->call('receivePurchaseOrder', 'POST', '/api/inventory/purchase-orders/' . $id . '/receive', ['lines' => [['line_id' => $line, 'quantity' => '6']]], ['id' => $id]);
+        self::assertSame(201, $got['status']);
+        self::assertSame('done', $got['body']['data']['status']);
+        self::assertSame('GRN-0001', $got['body']['receipt']['number']);
+
+        TenantContext::reset();
+        TenantContext::setTenantId(2);
+        self::assertSame(404, $this->call('showPurchaseOrder', 'GET', '/api/inventory/purchase-orders/' . $id, null, ['id' => $id])['status']);
     }
 
     public function testTheSystemTenantHasNoInventory(): void

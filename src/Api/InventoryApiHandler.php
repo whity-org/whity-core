@@ -9,10 +9,12 @@ use Whity\Core\Contacts\ContactRejectedException;
 use Whity\Core\Inventory\InventoryRejectedException;
 use Whity\Core\Inventory\ItemService;
 use Whity\Core\Inventory\LocationService;
+use Whity\Core\Inventory\PurchaseOrders;
 use Whity\Core\Inventory\ReasonCatalog;
 use Whity\Core\Inventory\ReorderRules;
 use Whity\Core\Inventory\StockLedger;
 use Whity\Core\Inventory\StockOperations;
+use Whity\Core\Inventory\SupplierItems;
 use Whity\Core\Inventory\UnitCatalog;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Settings\SettingsRegistry;
@@ -51,6 +53,8 @@ final class InventoryApiHandler
         private readonly ?ReasonCatalog $reasons = null,
         private readonly ?ReorderRules $reorder = null,
         private readonly ?SettingsService $settings = null,
+        private readonly ?PurchaseOrders $purchases = null,
+        private readonly ?SupplierItems $suppliers = null,
     ) {
     }
 
@@ -61,6 +65,8 @@ final class InventoryApiHandler
         'adjustment_route_template_id' => SettingsRegistry::INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID,
         'count_route_template_id' => SettingsRegistry::INVENTORY_COUNT_ROUTE_TEMPLATE_ID,
         'transfers_one_step' => SettingsRegistry::INVENTORY_TRANSFERS_ONE_STEP,
+        'purchase_route_template_id' => SettingsRegistry::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID,
+        'over_receipt_percent' => SettingsRegistry::INVENTORY_OVER_RECEIPT_PERCENT,
     ];
 
     // ── units and categories ────────────────────────────────────────────
@@ -501,7 +507,8 @@ final class InventoryApiHandler
             $value = (string) ($effective[$key] ?? $defaults[$key]);
             $out[$field] = match ($field) {
                 'transfers_one_step' => $value === 'true',
-                'adjustment_route_template_id', 'count_route_template_id' => (int) $value === 0 ? null : (int) $value,
+                'adjustment_route_template_id', 'count_route_template_id', 'purchase_route_template_id' => (int) $value === 0 ? null : (int) $value,
+                'over_receipt_percent' => (int) $value,
                 default => $value === '' ? null : $value,
             };
         }
@@ -559,6 +566,137 @@ final class InventoryApiHandler
     private function reorderRules(): ReorderRules
     {
         return $this->reorder ?? throw new \LogicException('Reorder levels are not wired');
+    }
+
+    // ── purchase orders and supplier prices (WHIT-1234) ─────────────────
+
+    public function listPurchaseOrders(Request $request): Response
+    {
+        return $this->run($request, 'purchase orders', function (int $tenantId) use ($request): Response {
+            $q = self::query($request);
+
+            return Response::json(['data' => $this->purchaseOrders()->list($tenantId, [
+                'status' => $q['status'] ?? null,
+                'contact_id' => isset($q['contact_id']) ? (int) $q['contact_id'] : null,
+                'location_id' => isset($q['location_id']) ? (int) $q['location_id'] : null,
+            ], max(1, min(self::MAX_PER_PAGE, (int) ($q['limit'] ?? 50))), max(0, (int) ($q['offset'] ?? 0)))]);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function showPurchaseOrder(Request $request, array $params): Response
+    {
+        return $this->run($request, 'purchase order', fn (int $tenantId): Response => Response::json(['data' => $this->purchaseOrders()->get($tenantId, (int) $params['id'])]));
+    }
+
+    public function createPurchaseOrder(Request $request): Response
+    {
+        return $this->run($request, 'purchase order', function (int $tenantId, ?int $actor) use ($request): Response {
+            $body = JsonBody::parsed($request);
+            $result = $this->purchaseOrders()->create($tenantId, $actor, $body, $this->meta($request, $body));
+
+            return Response::json(['data' => $result['order']], $result['repeated'] ? 200 : 201);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function updatePurchaseOrder(Request $request, array $params): Response
+    {
+        return $this->run($request, 'purchase order', fn (int $tenantId): Response => Response::json([
+            'data' => $this->purchaseOrders()->update($tenantId, (int) $params['id'], JsonBody::parsed($request)),
+        ]));
+    }
+
+    /** @param array<string, string> $params */
+    public function submitPurchaseOrder(Request $request, array $params): Response
+    {
+        return $this->run($request, 'purchase order', fn (int $tenantId, ?int $actor): Response => Response::json([
+            'data' => $this->purchaseOrders()->submit($tenantId, (int) $params['id'], $actor),
+        ]));
+    }
+
+    /** @param array<string, string> $params */
+    public function cancelPurchaseOrder(Request $request, array $params): Response
+    {
+        return $this->run($request, 'purchase order', fn (int $tenantId, ?int $actor): Response => Response::json([
+            'data' => $this->purchaseOrders()->cancel($tenantId, (int) $params['id'], $actor),
+        ]));
+    }
+
+    /** @param array<string, string> $params */
+    public function closePurchaseOrderLine(Request $request, array $params): Response
+    {
+        return $this->run($request, 'purchase order', fn (int $tenantId, ?int $actor): Response => Response::json([
+            'data' => $this->purchaseOrders()->closeLine($tenantId, (int) $params['id'], (int) $params['line'], $actor),
+        ]));
+    }
+
+    /** @param array<string, string> $params */
+    public function receivePurchaseOrder(Request $request, array $params): Response
+    {
+        return $this->run($request, 'receipt', function (int $tenantId, ?int $actor) use ($request, $params): Response {
+            $body = JsonBody::parsed($request);
+            $lines = $body['lines'] ?? null;
+            if (!is_array($lines) || !array_is_list($lines)) {
+                throw InventoryRejectedException::field('lines', 'lines is a list of {line_id, quantity}');
+            }
+            $allowOver = $body['allow_over'] ?? false;
+            if (!is_bool($allowOver)) {
+                throw InventoryRejectedException::field('allow_over', 'allow_over is true or false');
+            }
+            $result = $this->purchaseOrders()->receive(
+                $tenantId,
+                (int) $params['id'],
+                $actor,
+                $lines,
+                $allowOver,
+                is_string($body['note'] ?? null) ? $body['note'] : '',
+                is_string($body['occurred_at'] ?? null) ? $body['occurred_at'] : null,
+                $this->meta($request, $body),
+            );
+
+            return Response::json(['data' => $result['order'], 'receipt' => $result['receipt']], $result['repeated'] ? 200 : 201);
+        });
+    }
+
+    public function listSupplierItems(Request $request): Response
+    {
+        return $this->run($request, 'supplier prices', function (int $tenantId) use ($request): Response {
+            $q = self::query($request);
+
+            return Response::json(['data' => $this->supplierItems()->list($tenantId, [
+                'variant_id' => isset($q['variant_id']) ? (int) $q['variant_id'] : null,
+                'contact_id' => isset($q['contact_id']) ? (int) $q['contact_id'] : null,
+                'item_id' => isset($q['item_id']) ? (int) $q['item_id'] : null,
+            ])]);
+        });
+    }
+
+    public function setSupplierItem(Request $request): Response
+    {
+        return $this->run($request, 'supplier price', fn (int $tenantId): Response => Response::json([
+            'data' => $this->supplierItems()->set($tenantId, JsonBody::parsed($request), $this->items->currencyFor(...)),
+        ]));
+    }
+
+    /** @param array<string, string> $params */
+    public function deleteSupplierItem(Request $request, array $params): Response
+    {
+        return $this->run($request, 'supplier price', function (int $tenantId) use ($params): Response {
+            $this->supplierItems()->remove($tenantId, (int) $params['id']);
+
+            return Response::json(['data' => ['deleted' => true]]);
+        });
+    }
+
+    private function purchaseOrders(): PurchaseOrders
+    {
+        return $this->purchases ?? throw new \LogicException('Purchase orders are not wired');
+    }
+
+    private function supplierItems(): SupplierItems
+    {
+        return $this->suppliers ?? throw new \LogicException('Supplier prices are not wired');
     }
 
     // ── plumbing ────────────────────────────────────────────────────────

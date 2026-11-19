@@ -105,6 +105,12 @@ final class ItemService
         return $this->presentMany($tenantId, [$row])[0];
     }
 
+    /** The workspace's currency, for prices given without one (CU.1). */
+    public function currencyFor(int $tenantId): string
+    {
+        return ($this->defaultCurrency)($tenantId);
+    }
+
     /** @return array<string, mixed>|null */
     public function row(int $tenantId, int $itemId): ?array
     {

@@ -5867,6 +5867,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inventory/purchase-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List purchase orders, newest first */
+        get: operations["get_api_v1_inventory_purchase_orders"];
+        put?: never;
+        /**
+         * Draft a purchase order
+         * @description A supplier (a contact marked as one), the place it is received into, and lines in the unit they are bought in. A line without a price takes what the supplier sells it for in that unit. It stays a draft until sent.
+         */
+        post: operations["post_api_v1_inventory_purchase_orders"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/purchase-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A purchase order with its lines and receipts */
+        get: operations["get_api_v1_inventory_purchase_orders_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a draft purchase order
+         * @description Any field; `lines` replaces every line. Only a draft can change.
+         */
+        patch: operations["patch_api_v1_inventory_purchase_orders_id"];
+        trace?: never;
+    };
+    "/api/v1/inventory/purchase-orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a purchase order nothing has arrived against */
+        post: operations["post_api_v1_inventory_purchase_orders_id_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/purchase-orders/{id}/lines/{line}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close a line that won't come
+         * @description What has not arrived of it is no longer expected. When every line is received or closed, the order is done.
+         */
+        post: operations["post_api_v1_inventory_purchase_orders_id_lines_line_close"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/purchase-orders/{id}/receive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Receive what arrived against a purchase order
+         * @description Posts the stock into the order's place at the order's cost, as a receipt (`GRN-0001`). More than ordered past the workspace's tolerance is refused (409, `over_receipt`) unless `allow_over` is true.
+         */
+        post: operations["post_api_v1_inventory_purchase_orders_id_receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/purchase-orders/{id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a purchase order for approval
+         * @description It travels the workspace's purchase route when one is chosen (`status: waiting_approval`); with none it is approved at once.
+         */
+        post: operations["post_api_v1_inventory_purchase_orders_id_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/reasons": {
         parameters: {
             query?: never;
@@ -6030,6 +6149,44 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/supplier-items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What suppliers sell, and at what price */
+        get: operations["get_api_v1_inventory_supplier_items"];
+        /**
+         * Set what a supplier sells an item for
+         * @description Adds it or changes it; one per item variant and supplier. The preferred one fills new purchase orders.
+         */
+        put: operations["put_api_v1_inventory_supplier_items"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/supplier-items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a supplier price */
+        delete: operations["delete_api_v1_inventory_supplier_items_id"];
         options?: never;
         head?: never;
         patch?: never;
@@ -17679,8 +17836,9 @@ export interface components {
         InventoryOperation: {
             id: number;
             /** @enum {string} */
-            kind: "adjustment" | "count" | "transfer";
+            kind: "adjustment" | "count" | "transfer" | "receipt";
             number: string;
+            order_id?: number | null;
             /** @enum {string} */
             status: "draft" | "waiting_approval" | "in_transit" | "done" | "cancelled";
             location_id?: number | null;
@@ -17770,6 +17928,139 @@ export interface components {
             difference?: string | null;
             counted_at?: string | null;
             counted_by_profile_id?: number | null;
+            order_line_id?: number | null;
+        };
+        InventoryPurchaseOrder: {
+            id: number;
+            kind?: string;
+            number: string;
+            /** @enum {string} */
+            status: "draft" | "waiting_approval" | "approved" | "partly_done" | "done" | "cancelled";
+            contact_id: number;
+            contact_name?: string;
+            location_id: number;
+            expected_on?: string | null;
+            currency: string;
+            subtotal_minor?: number;
+            tax_minor?: number;
+            total_minor: number;
+            notes?: string;
+            external_ref?: string;
+            route_id?: number | null;
+            document_id?: number | null;
+            source_plugin?: string | null;
+            created_by_profile_id?: number | null;
+            created_by_name?: string | null;
+            agent_id?: number | null;
+            on_behalf_of_profile_id?: number | null;
+            approved_by_profile_id?: number | null;
+            approved_by_name?: string | null;
+            submitted_at?: string | null;
+            approved_at?: string | null;
+            done_at?: string | null;
+            cancelled_at?: string | null;
+            created_at: string;
+            updated_at?: string;
+            line_count?: number;
+            received_percent?: number;
+            lines?: components["schemas"]["InventoryPurchaseOrderLine"][];
+            receipts?: {
+                id: number;
+                number: string;
+                status?: string;
+                batch_key?: string | null;
+                done_at?: string | null;
+                created_by_name?: string | null;
+                line_count?: number;
+            }[];
+        };
+        InventoryPurchaseOrderLine: {
+            id: number;
+            variant_id: number;
+            item_id: number;
+            item_name: string;
+            /** @description The name in each language, such as `{"en": "Flour", "ar": "طحين"}`. */
+            item_names?: {
+                [key: string]: string;
+            };
+            sku?: string;
+            unit: string;
+            /** @description Ordered, in `unit`. */
+            quantity: string;
+            /** @description Received so far, in `unit`. */
+            received: string;
+            base_unit?: string;
+            /** @description Ordered, in the item's base unit. */
+            base_quantity?: string;
+            price_minor: number;
+            discount_bp?: number;
+            tax_bp?: number;
+            /** @description Quantity times price, less the discount; tax not included. */
+            line_total_minor: number;
+            is_closed: boolean;
+            /** @description More arrived than ordered. */
+            is_over?: boolean;
+            note?: string;
+        };
+        InventoryPurchaseOrderRequest: {
+            /** @description The supplier: a contact marked as a supplier. */
+            contact_id: number;
+            /** @description The place it is received into. */
+            location_id: number;
+            /** @description When it should arrive, such as 2026-11-26. */
+            expected_on?: string | null;
+            /** @description A 3-letter code; the workspace's currency when left out. */
+            currency?: string;
+            /** @description Notes for the supplier and the people receiving it. */
+            notes?: string;
+            /** @description The supplier's or another system's reference. */
+            external_ref?: string;
+            /** @description What is ordered: `{variant_id, quantity, unit, price_minor, discount_bp, tax_bp}`. */
+            lines: {
+                variant_id: number;
+                /** @description How many, in `unit`. */
+                quantity: string;
+                /** @description The unit it is bought in, such as `bag`; the item's base unit when left out. */
+                unit?: string;
+                /** @description The price of one `unit` in minor units; what the supplier sells it for when left out. */
+                price_minor?: number;
+                /** @description Discount in basis points (500 is 5%). */
+                discount_bp?: number;
+                /** @description Tax in basis points, on top. */
+                tax_bp?: number;
+                note?: string;
+            }[];
+            /** @description Any unique text; sending the same key again drafts nothing new. */
+            idempotency_key?: string;
+        };
+        InventoryPurchaseOrderUpdateRequest: {
+            /** @description The supplier: a contact marked as a supplier. */
+            contact_id?: number;
+            /** @description The place it is received into. */
+            location_id?: number;
+            /** @description When it should arrive. */
+            expected_on?: string | null;
+            /** @description A 3-letter code. */
+            currency?: string;
+            /** @description Notes for the supplier and the people receiving it. */
+            notes?: string;
+            /** @description The supplier's or another system's reference. */
+            external_ref?: string;
+            /** @description Every line, replacing the old ones. */
+            lines?: {
+                variant_id: number;
+                /** @description How many, in `unit`. */
+                quantity: string;
+                /** @description The unit it is bought in, such as `bag`; the item's base unit when left out. */
+                unit?: string;
+                /** @description The price of one `unit` in minor units; what the supplier sells it for when left out. */
+                price_minor?: number;
+                /** @description Discount in basis points (500 is 5%). */
+                discount_bp?: number;
+                /** @description Tax in basis points, on top. */
+                tax_bp?: number;
+                note?: string;
+            }[];
         };
         InventoryReason: {
             id: number;
@@ -17816,6 +18107,25 @@ export interface components {
             is_waste?: boolean;
             /** @description True to stop offering it; old changes keep it. */
             archived?: boolean;
+        };
+        InventoryReceiveOrderRequest: {
+            /** @description What arrived: `{line_id, quantity, unit, note}`, in the line's unit unless `unit` says. */
+            lines: {
+                line_id: number;
+                /** @description How many arrived. */
+                quantity: string;
+                /** @description The unit counted in; the line's unit when left out. */
+                unit?: string;
+                note?: string;
+            }[];
+            /** @description True to receive more than ordered past the workspace's tolerance. */
+            allow_over?: boolean;
+            /** @description A note kept with the receipt, such as the delivery note number. */
+            note?: string;
+            /** @description When it arrived, if earlier than now (ISO 8601). */
+            occurred_at?: string;
+            /** @description Any unique text; sending the same key again receives nothing twice. */
+            idempotency_key?: string;
         };
         InventoryReceiveRequest: {
             /** @description Only lines that arrived short: `{line_id, received}`. Every other line arrives in full. */
@@ -17876,6 +18186,8 @@ export interface components {
             adjustment_route_template_id: number | null;
             count_route_template_id: number | null;
             transfers_one_step: boolean;
+            purchase_route_template_id: number | null;
+            over_receipt_percent: number;
         };
         InventorySettingsRequest: {
             /** @description An amount such as 25, in each item's currency; null never asks. */
@@ -17888,6 +18200,51 @@ export interface components {
             count_route_template_id?: number | null;
             /** @description True to have transfers arrive as they are sent. */
             transfers_one_step?: boolean;
+            /** @description The route template purchase orders travel; null approves them on sending. */
+            purchase_route_template_id?: number | null;
+            /** @description How far past the order a receipt may go before it asks, 0 to 100 (0: anything over asks). */
+            over_receipt_percent?: number;
+        };
+        InventorySupplierItem: {
+            id: number;
+            variant_id: number;
+            item_id: number;
+            item_name?: string;
+            /** @description The name in each language, such as `{"en": "Flour", "ar": "طحين"}`. */
+            item_names?: {
+                [key: string]: string;
+            };
+            sku?: string;
+            contact_id: number;
+            contact_name?: string;
+            supplier_sku?: string;
+            unit: string;
+            price_minor: number;
+            currency: string;
+            min_quantity?: string | null;
+            lead_days?: number | null;
+            is_preferred: boolean;
+            updated_at?: string;
+        };
+        InventorySupplierItemRequest: {
+            /** @description The item variant. */
+            variant_id: number;
+            /** @description The supplier: a contact marked as a supplier. */
+            contact_id: number;
+            /** @description The unit they sell it in, such as `bag`; the item's base unit when left out. */
+            unit?: string;
+            /** @description The price of one `unit`, in minor units. */
+            price_minor: number;
+            /** @description A 3-letter code; the workspace's currency when left out. */
+            currency?: string;
+            /** @description The supplier's own code for it. */
+            supplier_sku?: string;
+            /** @description The least they take, in `unit`. */
+            min_quantity?: string | null;
+            /** @description Days they take to deliver. */
+            lead_days?: number | null;
+            /** @description True to have new purchase orders use this supplier's price. */
+            is_preferred?: boolean;
         };
         InventoryTransferRequest: {
             /** @description The place it leaves. */
@@ -53579,7 +53936,7 @@ export interface operations {
     get_api_v1_inventory_operations: {
         parameters: {
             query?: {
-                /** @description `adjustment`, `count` or `transfer`. */
+                /** @description `adjustment`, `count`, `transfer` or `receipt`. */
                 kind?: string;
                 /** @description `draft`, `waiting_approval`, `in_transit`, `done` or `cancelled`. */
                 status?: string;
@@ -53707,6 +54064,710 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_purchase_orders: {
+        parameters: {
+            query?: {
+                /** @description `draft`, `waiting_approval`, `approved`, `partly_done`, `done` or `cancelled`. */
+                status?: string;
+                /** @description Only this supplier. */
+                contact_id?: number;
+                /** @description Only those received into this place. */
+                location_id?: number;
+                /** @description At most 200. Default 50. */
+                limit?: number;
+                /** @description How many to skip. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Purchase orders, without their lines */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryPurchaseOrder"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_purchase_orders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryPurchaseOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description The same key was sent before */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryPurchaseOrder"];
+                    };
+                };
+            };
+            /** @description The purchase order */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryPurchaseOrder"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate SKU or barcode, or a rule */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_purchase_orders_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The purchase order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryPurchaseOrder"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_inventory_purchase_orders_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryPurchaseOrderUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The purchase order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryPurchaseOrder"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate SKU or barcode, or a rule */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_purchase_orders_id_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The purchase order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryPurchaseOrder"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Part of it arrived, or it is done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_purchase_orders_id_lines_line_close: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                line: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The purchase order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryPurchaseOrder"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The order is not approved */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_purchase_orders_id_receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryReceiveOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description The same key was sent before */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryPurchaseOrder"];
+                        receipt: components["schemas"]["InventoryOperation"];
+                    };
+                };
+            };
+            /** @description The purchase order, and the receipt */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryPurchaseOrder"];
+                        receipt: components["schemas"]["InventoryOperation"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate SKU or barcode, or a rule */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_purchase_orders_id_submit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The purchase order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryPurchaseOrder"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a draft, or a rule refused it */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -54697,6 +55758,249 @@ export interface operations {
                     "application/json": {
                         data: components["schemas"]["InventoryMove"][];
                         next_before_id?: number | null;
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_supplier_items: {
+        parameters: {
+            query?: {
+                /** @description Only this variant. */
+                variant_id?: number;
+                /** @description Only this item's variants. */
+                item_id?: number;
+                /** @description Only this supplier. */
+                contact_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Supplier prices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventorySupplierItem"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_inventory_supplier_items: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventorySupplierItemRequest"];
+            };
+        };
+        responses: {
+            /** @description The supplier price */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventorySupplierItem"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate SKU or barcode, or a rule */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    delete_api_v1_inventory_supplier_items_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            deleted: boolean;
+                        };
                     };
                 };
             };
