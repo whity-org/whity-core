@@ -294,6 +294,34 @@ final class BillingLifecycleRealEngineTest extends TestCase
         self::assertSame(3000, $this->reconciler->balanceFor(self::TENANT, $invoiceId));
     }
 
+    /**
+     * #2217: 5000 minor units of another currency are not 5000 of the
+     * invoice's. The payment is recorded and flagged, the invoice stays open,
+     * and a later payment in the right currency still settles it.
+     */
+    public function testAPaymentInAnotherCurrencyDoesNotSettleTheInvoice(): void
+    {
+        $invoiceId = $this->issuedInvoice(minor: 5000);
+
+        $result = $this->reconciler->apply(
+            $this->event(PaymentEventType::Succeeded, 'mock-usd', 5000, $invoiceId, currency: 'USD'),
+            $this->at('2026-09-05')
+        );
+
+        self::assertFalse($result['settled']);
+        self::assertSame(PaymentReconciler::CURRENCY_MISMATCH, $result['outcome']);
+        self::assertSame(InvoiceRepository::STATUS_OPEN, $this->invoiceRow($invoiceId)['status']);
+        self::assertSame(0, $this->ledger->amountSettledMinor(self::TENANT, $invoiceId));
+        self::assertSame(5000, $this->reconciler->balanceFor(self::TENANT, $invoiceId));
+        self::assertSame(['USD'], array_column($this->ledger->historyFor(self::TENANT, $invoiceId), 'currency'), 'the money is still recorded');
+
+        $paid = $this->reconciler->apply(
+            $this->event(PaymentEventType::Succeeded, 'mock-jod', 5000, $invoiceId),
+            $this->at('2026-09-06')
+        );
+        self::assertTrue($paid['settled']);
+    }
+
     /** Two instalments that together cover it do settle it. */
     public function testTwoPartialPaymentsTogetherSettleTheInvoice(): void
     {
@@ -747,12 +775,13 @@ final class BillingLifecycleRealEngineTest extends TestCase
         int $minor,
         ?int $invoiceId,
         ?string $reason = null,
+        string $currency = 'JOD',
     ): PaymentEvent {
         return new PaymentEvent(
             $type,
             'mock',
             $reference,
-            Money::of($minor, 'JOD'),
+            Money::of($minor, $currency),
             new DateTimeImmutable('2026-09-05 12:00:00'),
             $invoiceId,
             null,

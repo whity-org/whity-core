@@ -37,6 +37,9 @@ use Whity\Core\Payment\PaymentLedger;
  */
 final class PaymentReconciler
 {
+    /** A payment recorded against an invoice in another currency (#2217). */
+    public const CURRENCY_MISMATCH = 'currency_mismatch';
+
     public function __construct(
         private readonly InvoiceRepository $invoices,
         private readonly PaymentLedger $ledger,
@@ -86,6 +89,16 @@ final class PaymentReconciler
             // today and is exactly the kind of "harmless" that stops being so
             // when settlement grows a side effect — an email, a webhook out.
             return ['outcome' => $outcome, 'invoice_id' => $invoiceId, 'settled' => false];
+        }
+
+        $invoice = $this->invoices->findById($tenantId, $invoiceId);
+        if ($invoice !== null
+            && strtoupper($event->amount->currency) !== strtoupper((string) $invoice['currency'])
+        ) {
+            // #2217: money in another currency is recorded, never counted
+            // against this invoice ({@see PaymentLedger::amountSettledMinor()}),
+            // and named so it is not mistaken for an ordinary partial payment.
+            return ['outcome' => self::CURRENCY_MISMATCH, 'invoice_id' => $invoiceId, 'settled' => false];
         }
 
         return [
