@@ -928,12 +928,12 @@ class AuthHandler
         if ($membershipRow === false) {
             // Fail closed: no ACTIVE membership in the target tenant means it was
             // revoked/suspended (possibly during the 2FA challenge window) or never
-            // existed. Never mint a session on a stale claim — critically, for the
-            // system tenant (0) the ActiveTenantMembershipGuard bypasses the
-            // per-request membership check, so a stale active_tenant_id=0 claim here
-            // would otherwise grant lingering system authority. Every other caller
-            // pre-verifies membership; this is the chokepoint that also covers the
-            // single-membership 2FA branch, which trusts the temp-token claim.
+            // existed. Never mint a session on a stale claim — the system tenant
+            // (0) included, whose cross-tenant authority is the costliest to leave
+            // lingering (the per-request guard checks it too since #2229). Every
+            // other caller pre-verifies membership; this is the chokepoint that
+            // also covers the single-membership 2FA branch, which trusts the
+            // temp-token claim.
             return Response::json(['error' => 'No active membership for the requested tenant'], 401);
         }
         $roleName = (string) ($membershipRow['role'] ?? '');
