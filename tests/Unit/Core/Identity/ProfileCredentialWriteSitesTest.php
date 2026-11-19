@@ -58,6 +58,13 @@ final class ProfileCredentialWriteSitesTest extends TestCase
      */
     private const CREDENTIAL_WRITERS = [
         'src/Core/Identity/AuthMethod.php',
+        // WHIT-1240: a fresh install's schema baseline gives the bootstrap
+        // administrator the password migration 036 would have (from
+        // INITIAL_SYSTEM_ADMIN_PASSWORD). It only replaces the baseline's
+        // placeholder hash, inside the install transaction, and refuses `idp`
+        // and `service` accounts in its WHERE clause. It can't use AuthMethod:
+        // that moves token_epoch on, and the install must equal the replay.
+        'src/Database/Migration/Baseline.php',
     ];
 
     /**
