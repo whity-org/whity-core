@@ -322,6 +322,18 @@ Free engine in core, one PR per step where it helps review:
 
 Studio, store theme listings and the SDK interface follow as their own pieces of work.
 
+### 12.1 What phase 2 built (WHIT-1225), and where it differs from the plan
+
+- **Schema and validator:** `schemas/theme/v1.json` and `ThemeValidator` (PHP), kept in step by `ThemeEngineTest`. The schema ships as `@whity/tokens/theme.schema.json`. The TypeScript validator and compiler wait for Studio, which is where a browser needs them; core's picker previews what the server compiles.
+- **Compiler:** `ThemeCompiler` (OKLCH, on `TenantTheme`'s maths). Calm reproduces `TenantTheme` exactly for the tokens 2.8 derives; the guard rails can now also fix the tint text, the sidebar text and the focus ring, which 2.8 never checked (a very light main colour used to leave them under 4.5:1 and 3:1). Springs become a CSS `linear()` curve, with fast, base and slow capped at 200, 350 and 500ms so hover stays quick.
+- **Whity's own themes:** Whity (default), Harbour, Ink, Bloom and Desert, in `src/Core/Theme/themes/`.
+- **Storage:** migration 323 `themes` (a workspace's imported themes). The choice and the overrides are settings, `branding_theme` and `branding_theme_overrides`, so the global value is the installation theme with no extra table. **The main colour stays `branding_main_color`** and is read as the primary seed, rather than moved into the overrides: everything that already reads it (sign-up, templates, documents, push) keeps working. Migration 324 adds `profiles.contrast` for Higher contrast.
+- **API:** the resolved theme rides on the existing `GET /api/v1/branding` (`theme` with `vars`, `fonts`, `adjustments`, and `themeHigh`) instead of a new `GET /api/v1/theme`, so the web app, public pages and the phone read one endpoint. `GET/POST /api/v1/themes` and `DELETE /api/v1/themes/{themeId}` list, import and remove. Choosing is `PATCH /api/v1/settings`.
+- **Web and `packages/ui`:** one `<style>` from `brandThemeCss`, every value re-checked by pattern; Higher contrast under `[data-contrast="high"]`; the radius utilities read `--wy-radius-*`; the font pairs load through next/font without preloading.
+- **Fonts:** Tajawal and Almarai are left out for now: they have no 600 weight, so semi-bold would show at 700 (3.6). The list in code is Noto, IBM Plex, Readex Pro, Cairo, and Noto Sans with Noto Kufi Arabic.
+- **Not applied yet:** `shape.morph`, `type.titleWeight` and `type.emphasis` are stored and validated but no component reads them; they land with the components that morph and the title styles. The `documents` block is stored but does not yet set the document theme's defaults.
+- **Plugin themes (SDK 1.125):** `Whity\Sdk\Contribute\PluginThemesInterface::getThemes()` returns theme files, checked on load (ids under `whity.` refused, the first plugin keeps a shared id) and listed as "From <plugin>" in workspaces where the plugin is on. Plugins read the result through their context, `$ctx->themes()` (`Theme\WorkspaceTheme`: `current()` and `installed()`), with no workspace argument (D2) and no way to apply a theme. `PluginThemeInterface` is deprecated, working through 2.0.x. The CLI and the queue worker list Whity's own and imported themes only, since they pass no plugin loader yet.
+
 ## 13. Owner's decisions (19 Nov 2026)
 
 | # | Question | Answer |

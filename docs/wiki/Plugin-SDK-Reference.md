@@ -29,6 +29,7 @@ $ctx->notify()->toRole('order.shipped', $roleId, $notice);
 $ctx->jobs()->enqueue('catalog.sync');
 $ctx->audit()->record('order.refunded', 'order', $orderId);
 $ctx->http(AddressPolicy::publicOnly())->send('GET', $urlSomeoneTyped, []);
+$ctx->themes()->current()['light']['primary'] ?? null;   // 1.125: Theme\WorkspaceTheme, read-only
 $ctx->workspaceId();                          // null outside a workspace
 ```
 
@@ -100,7 +101,8 @@ Implement the interface next to `PluginInterface`. Each one is optional, and the
 | `PluginMcpToolsInterface`, `PluginMcpToolsetsInterface`, `PluginMcpResourcesInterface`, `PluginMcpInterface` | MCP tools, toolsets, resources, and prompts (`PluginMcpInterface` declares prompts) | Plugin-Development |
 | `PluginAgentsInterface`, `PluginAgentPresetsInterface` | Agents (a persona, toolsets, where a person's grant starts) under your own root; agent presets | Plugin-Development |
 | `PluginInboxSourcesInterface` | Inbox sources (`Inbox\InboxSource`, `Inbox\KeysetInboxSource`) | Plugin-Development |
-| `PluginThemeInterface` | One of your own GET routes that answers design-token overrides (`{"data": {"primary": "#rrggbb"}}`). The host validates every key and value and falls back to no overrides on any error. | this page |
+| `Contribute\PluginThemesInterface` | Theme files (the format of `schemas/theme/v1.json`), each checked on load; they appear in the workspace's theme picker, where a person chooses one (1.125). Read the result with `$ctx->themes()`, a `Theme\WorkspaceTheme`. | [30-themes](../design/30-themes.md) |
+| `PluginThemeInterface` | **Deprecated 1.125**, use `PluginThemesInterface`. One of your own GET routes that answers design-token overrides (`{"data": {"primary": "#rrggbb"}}`). The host validates every key and value and falls back to no overrides on any error. | this page |
 | `Rbac\PluginResourceTypesInterface` | Resource types roles can be granted on | Plugin-Development |
 | `Ou\PluginOuTypesInterface` | Kinds of organisational unit (campus, faculty, clinic), so a consumer can ask for "every unit of kind X" | this page |
 | `Routing\PluginRoutingRulesInterface` | Routing rule kinds for document routes, each a `Routing\RoutingRuleResolverInterface`; one that also implements `Audience\AudienceRuleResolverInterface` promises it needs only the workspace, actor and config, so it can define a named user group | this page |

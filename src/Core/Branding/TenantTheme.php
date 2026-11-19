@@ -132,7 +132,7 @@ final class TenantTheme
     }
 
     /** @return array{0: float, 1: float, 2: float} L, C, H */
-    private static function toOklch(string $hex): array
+    public static function toOklch(string $hex): array
     {
         [$r, $g, $b] = self::linearRgb($hex);
         $l = (0.4122214708 * $r + 0.5363325363 * $g + 0.0514459929 * $b) ** (1 / 3);
@@ -147,7 +147,7 @@ final class TenantTheme
     }
 
     /** OKLCH to #rrggbb, lowering chroma until the colour fits in sRGB (as the reference does). */
-    private static function oklchHex(float $l, float $c, float $h): string
+    public static function oklchHex(float $l, float $c, float $h): string
     {
         $rgb = self::oklchToLinear($l, $c, $h);
         while ($c > 0 && self::outOfGamut($rgb)) {

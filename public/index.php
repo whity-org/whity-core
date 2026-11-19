@@ -4182,7 +4182,11 @@ $brandingService = new \Whity\Core\Branding\BrandingService(
     $settingsService,
     $storageDriver,
     new \Whity\Core\Branding\BrandingAssetValidator(new \Whity\Core\Branding\SvgSanitizer()),
-    $entitlementService
+    $entitlementService,
+    // WHIT-1225: themes a workspace imported, beside Whity's own.
+    new \Whity\Core\Theme\ThemeRepository($db->getPdo()),
+    // SDK 1.125: and the themes plugins ship.
+    static fn (): array => $pluginLoader->getPluginThemes(),
 );
 $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     $documentQrService,
@@ -5166,7 +5170,7 @@ $notificationDispatcher = new \Whity\Core\Notification\NotificationDispatcher(
     $brandedEmailSender->gate()
 );
 $notificationDispatcher->subscribe($hookManager);
-\Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger, $logger);
+\Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger, $logger, static fn (): array => $pluginLoader->getPluginThemes());
 
 // Comments and suggestions on editor documents (editor M5; E.4, E.6, E.10,
 // E.29, E.37). Registered here, after the notification dispatcher, because a
@@ -6131,6 +6135,16 @@ $router->register('GET', '/api/ui/preferences', [$uiPreferencesHandler, 'get'], 
 // erroring, so this route itself is unprotected at the router level.
 $themeHandler = new \Whity\Api\ThemeApiHandler($pluginLoader, $roleChecker);
 $router->register('GET', '/api/theme', [$themeHandler, 'get'], null, null, null);
+// WHIT-1225: the themes a workspace can choose, and importing a theme file.
+// Choosing one is the branding_theme setting (PATCH /api/settings).
+$themesHandler = new \Whity\Api\ThemesApiHandler(
+    new \Whity\Core\Theme\ThemeRepository($db->getPdo()),
+    $settingsService,
+    static fn (): array => $pluginLoader->getPluginThemes(),
+);
+$router->register('GET',    '/api/themes',            [$themesHandler, 'list'],   null, null, CorePermissions::SETTINGS_READ);
+$router->register('POST',   '/api/themes',            [$themesHandler, 'import'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('DELETE', '/api/themes/{themeId}',  [$themesHandler, 'delete'], null, null, CorePermissions::SETTINGS_WRITE);
 
 // 13c-bis. Register the pending-registration review API (WC-235). Gated on
 // registrations:approve (6th positional arg) AND — inside the handler — on the

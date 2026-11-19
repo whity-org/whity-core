@@ -32,7 +32,7 @@
  *     dart          - regenerate generated/tokens.dart (+ the Flutter package copy)
  *     web           - sync web/app/globals.css
  *     theme         - regenerate generated/theme.json
- *     tokensPackage - regenerate packages/tokens/generated/{tokens.json,theme.css,base.css,fonts.css,site.css} and packages/tokens/logos/
+ *     tokensPackage - regenerate packages/tokens/generated/{tokens.json,theme.css,base.css,fonts.css,site.css,theme.schema.json} and packages/tokens/logos/
  *     check         - regenerate in-memory and fail (exit 1) if any target is stale
  */
 
@@ -51,6 +51,7 @@ const FLUTTER_TOKENS_DART_PATH = path.join(
 // The brand team's handoff (WHIT-1055): the websites' token CSS and the logo
 // set. @whity/tokens carries copies so other repos install them instead of
 // keeping their own; the handoff stays the place the brand team updates.
+const THEME_SCHEMA_PATH = path.join(__dirname, '..', '..', '..', 'schemas', 'theme', 'v1.json');
 const HANDOFF_SITE_CSS_PATH = path.join(__dirname, '..', '..', '..', 'docs', 'design', 'handoff', 'web', 'tokens.css');
 const HANDOFF_LOGOS_DIR = path.join(__dirname, '..', '..', '..', 'docs', 'design', 'handoff', 'logos');
 const TOKENS_PACKAGE_FONTS_DIR = path.join(__dirname, '..', '..', '..', 'packages', 'tokens', 'fonts');
@@ -519,9 +520,11 @@ function generateThemeInlineBlock(base) {
   }
   // Radii are literal (decision 4.2: ¼ of the control height, cards 12, dialogs
   // 16), not ratios of --radius, so a tenant changing --radius can't bend them.
+  // A workspace theme's shape preset (TH.8, WHIT-1225) sets --wy-radius-*;
+  // only the theme engine writes those, and `full` stays a pill.
   for (const [name, value] of Object.entries(base.borderRadius)) {
     if (name === 'base') continue;
-    lines.push(`  --radius-${name}: ${value};`);
+    lines.push(name === 'full' ? `  --radius-${name}: ${value};` : `  --radius-${name}: var(--wy-radius-${name}, ${value});`);
   }
   // The plane (decision 4.3) and the float shadow (4.4).
   lines.push('  --shadow-plane: var(--plane-rest);');
@@ -897,6 +900,12 @@ function buildTargets(base, { json = true, dart = true, web = true, theme = true
     targets.push({
       path: path.join(TOKENS_PACKAGE_DIR, 'site.css'),
       content: generateSiteCss(fs.readFileSync(HANDOFF_SITE_CSS_PATH, 'utf8')),
+    });
+    // WHIT-1225: the theme file format, so Studio, plugins and other repos
+    // validate against the same schema core does.
+    targets.push({
+      path: path.join(TOKENS_PACKAGE_DIR, 'theme.schema.json'),
+      content: fs.readFileSync(THEME_SCHEMA_PATH, 'utf8'),
     });
     for (const rel of listFiles(HANDOFF_LOGOS_DIR)) {
       targets.push({

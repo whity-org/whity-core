@@ -1,0 +1,9 @@
+{
+  "$schema": "https://whity.dev/schema/theme/v1.json",
+  "schemaVersion": 1,
+  "id": "whity.default",
+  "version": "1.0.0",
+  "name": { "en": "Whity", "ar": "Whity" },
+  "description": { "en": "Whity's own look: one main colour, grey everything else, calm motion.", "ar": "مظهر Whity: لون رئيسي واحد، والباقي رمادي، وحركة هادئة." },
+  "author": { "name": "Whity" }
+}

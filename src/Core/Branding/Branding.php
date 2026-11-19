@@ -18,7 +18,7 @@ final readonly class Branding
         public ?string $logoSquareUrl,
         public ?string $faviconUrl,
         public ?string $mainColor = null,
-        /** @var array{light: array<string, string>, dark: array<string, string>}|null */
+        /** @var array<string, mixed>|null The resolved theme (ThemeResolver): light, dark, vars, fonts, id, version, adjustments. */
         public ?array $theme = null,
         /**
          * Whether the web app offers itself as an installable app (#1733). An
@@ -35,6 +35,9 @@ final readonly class Branding
          * start in when a screen has no row of its own. USD by default.
          */
         public string $currency = 'USD',
+        // WHIT-1225 (TH.12): the tokens Higher contrast changes, per mode.
+        /** @var array{light: array<string, string>, dark: array<string, string>} */
+        public array $themeHigh = ['light' => [], 'dark' => []],
     ) {
     }
 
@@ -42,7 +45,7 @@ final readonly class Branding
      * The main colour (2.8) and the light and dark token sets derived from it
      * are null until the workspace sets one; clients then keep Whity Blue.
      *
-     * @return array{siteName: string, logoWideUrl: ?string, logoSquareUrl: ?string, faviconUrl: ?string, mainColor: ?string, theme: array{light: array<string, string>, dark: array<string, string>}|null, installable: bool, builtOnWhity: bool, currency: string}
+     * @return array{siteName: string, logoWideUrl: ?string, logoSquareUrl: ?string, faviconUrl: ?string, mainColor: ?string, theme: array<string, mixed>|null, installable: bool, builtOnWhity: bool, currency: string, themeHigh: array{light: array<string, string>, dark: array<string, string>}}
      */
     public function toArray(): array
     {
@@ -56,6 +59,7 @@ final readonly class Branding
             'installable' => $this->installable,
             'builtOnWhity' => $this->builtOnWhity,
             'currency' => $this->currency,
+            'themeHigh' => $this->themeHigh,
         ];
     }
 }

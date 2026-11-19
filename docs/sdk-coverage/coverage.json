@@ -1,8 +1,8 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.124.0",
+    "sdk_version": "1.125.0",
     "core_version": "0.2.30",
-    "updated": "2026-11-18",
+    "updated": "2026-11-19",
     "ratings": {
         "full": "A plugin can read, change, react to and extend this area through a published SDK contract.",
         "partial": "Some of it is in the SDK; the rest is missing or reachable only through internal core classes.",
@@ -865,14 +865,21 @@
                 {
                     "what": "Theme token override from a plugin route",
                     "since": "1.12"
+                },
+                {
+                    "what": "Ship theme files a workspace can choose (Contribute\\PluginThemesInterface)",
+                    "since": "1.125"
+                },
+                {
+                    "what": "Read the workspace's compiled theme and the themes it can choose (Theme\\WorkspaceTheme, from the context)",
+                    "since": "1.125"
                 }
             ],
             "missing": [
-                "Reading workspace branding",
-                "Choosing which plugin's override applies per workspace",
-                "Fonts, logos and radii"
+                "Reading the workspace logo and name",
+                "Theme events (a workspace changed its theme)"
             ],
-            "security": "The theme route is public and runs on every page. Per-workspace overrides need a design.",
+            "security": "Themes are data checked against a closed schema and the host runs the contrast guard rails on the result; no CSS reaches the page. Logos and names still need a design for a read API.",
             "plan": "later"
         },
         {

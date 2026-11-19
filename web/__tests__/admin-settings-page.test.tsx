@@ -90,6 +90,10 @@ jest.mock('@/components/branding-settings', () => ({
     <div data-testid="branding-form" data-scope={scope} data-can-write={String(canWrite)} />
   ),
 }));
+// The Theme picker has its own tests (theme-picker.test.tsx).
+jest.mock('@/components/theme-picker', () => ({
+  ThemePicker: () => <div data-testid="theme-picker" />,
+}));
 import BrandingSettingsPage from '@/app/(protected)/admin/settings/branding/page';
 import SignupSettingsPage from '@/app/(protected)/admin/settings/signup/page';
 import FeatureFlagsSettingsPage from '@/app/(protected)/admin/settings/feature-flags/page';

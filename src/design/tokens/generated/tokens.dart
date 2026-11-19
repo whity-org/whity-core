@@ -68,6 +68,19 @@ class AppTokens {
     'primaryTint': Color(0xFFEBF3FC),
     'primaryTintForeground': Color(0xFF0961BB),
     'chart6': Color(0xFF3A3A3A),
+    'surface1': Color(0xFFFFFFFF),
+    'surface2': Color(0xFFFAFAFA),
+    'surface3': Color(0xFFF5F5F5),
+    'surface4': Color(0xFFF0F0F0),
+    'surface5': Color(0xFFEBEBEB),
+    'primaryContainer': Color(0xFFC4E1FF),
+    'onPrimaryContainer': Color(0xFF001F50),
+    'secondaryContainer': Color(0xFFCFE7FF),
+    'onSecondaryContainer': Color(0xFF102239),
+    'tertiary': Color(0xFF745583),
+    'tertiaryForeground': Color(0xFFFFFFFF),
+    'tertiaryContainer': Color(0xFFF1DBFC),
+    'onTertiaryContainer': Color(0xFF2C1835),
   };
 
   // Dark mode colors
@@ -133,6 +146,19 @@ class AppTokens {
     'primaryTint': Color(0xFF182E4B),
     'primaryTintForeground': Color(0xFF59A0F9),
     'chart6': Color(0xFF858585),
+    'surface1': Color(0xFF141414),
+    'surface2': Color(0xFF191919),
+    'surface3': Color(0xFF1F1F1F),
+    'surface4': Color(0xFF252525),
+    'surface5': Color(0xFF2B2B2B),
+    'primaryContainer': Color(0xFF13335A),
+    'onPrimaryContainer': Color(0xFFD3E7FF),
+    'secondaryContainer': Color(0xFF1C2F46),
+    'onSecondaryContainer': Color(0xFFCFE7FF),
+    'tertiary': Color(0xFFC19FD1),
+    'tertiaryForeground': Color(0xFF171717),
+    'tertiaryContainer': Color(0xFF392442),
+    'onTertiaryContainer': Color(0xFFF4D9FF),
   };
 
   // Font families
