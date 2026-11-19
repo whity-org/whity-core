@@ -132,6 +132,7 @@ final class CreateInventoryOrders
 
         $db->exec('ALTER TABLE inv_operations ADD COLUMN IF NOT EXISTS order_id INTEGER REFERENCES inv_orders(id) ON DELETE SET NULL');
         $db->exec('ALTER TABLE inv_operation_lines ADD COLUMN IF NOT EXISTS order_line_id INTEGER REFERENCES inv_order_lines(id) ON DELETE SET NULL');
+        // migration-lint: allow index-not-concurrent (inv_operations arrived in migration 320 one phase ago and holds a handful of rows; there are no customers yet)
         $db->exec('CREATE INDEX IF NOT EXISTS idx_inv_operations_order ON inv_operations(tenant_id, order_id)');
 
         foreach (self::PERMISSIONS as $name => $description) {

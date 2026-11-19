@@ -5633,7 +5633,6 @@ $inventoryPurchases = new \Whity\Core\Inventory\PurchaseOrders(
 );
 $routeSubjectRegistry->register(new \Whity\Core\Inventory\OrderRouteSubject($inventoryDb, $inventoryPurchases));
 $inventoryPurchases->useApprovals(new \Whity\Core\Inventory\OperationRoutes($inventoryDb, $documentRouter, $routeTemplateRepository, $roleChecker, $inventorySettings));
-\Whity\register_service(\Whity\Sdk\Inventory\Orders::class, new \Whity\Core\Inventory\Host\HostOrders($inventoryPurchases, $inventoryGuard)); // @phpstan-ignore-line
 $inventoryGuard = new \Whity\Core\Inventory\Host\HostInventoryGuard(
     $inventoryDb,
     static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
@@ -5643,6 +5642,7 @@ $inventoryGuard = new \Whity\Core\Inventory\Host\HostInventoryGuard(
 \Whity\register_service(\Whity\Sdk\Inventory\Stock::class, new \Whity\Core\Inventory\Host\HostStock($inventoryLedger, $inventoryGuard)); // @phpstan-ignore-line
 \Whity\register_service(\Whity\Sdk\Inventory\Units::class, new \Whity\Core\Inventory\Host\HostUnits($inventoryUnits, $inventoryItems, $inventoryGuard)); // @phpstan-ignore-line
 \Whity\register_service(\Whity\Sdk\Inventory\Operations::class, new \Whity\Core\Inventory\Host\HostOperations($inventoryOperations, $inventoryGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Inventory\Orders::class, new \Whity\Core\Inventory\Host\HostOrders($inventoryPurchases, $inventoryGuard)); // @phpstan-ignore-line
 $inventoryHandler = new \Whity\Api\InventoryApiHandler(
     $inventoryUnits,
     $inventoryItems,
