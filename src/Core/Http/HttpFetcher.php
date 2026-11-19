@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Whity\Core\Http;
 
+use Whity\Sdk\Http\Outbound\AddressPolicy;
+
 /**
  * SSRF-guarded outbound HTTP client (WC-ae16 / OIDC engine).
  *
@@ -149,7 +151,12 @@ final class HttpFetcher implements HttpClient
     public static function isPubliclyRoutableUrl(string $url): bool
     {
         $parts = parse_url($url);
-        if ($parts === false || ($parts['scheme'] ?? '') !== 'https') {
+        if ($parts === false || strtolower($parts['scheme'] ?? '') !== 'https') {
+            return false;
+        }
+        // WHIT-1284 (#2214): no credentials in the authority. `https://a@b`
+        // reads as host b to one parser and a to a careless reader.
+        if (isset($parts['user']) || isset($parts['pass'])) {
             return false;
         }
         $host = $parts['host'] ?? '';
@@ -174,7 +181,9 @@ final class HttpFetcher implements HttpClient
     }
 
     /**
-     * Whether one IP literal is on the public internet (WHIT-1248).
+     * Whether one IP literal is on the public internet (WHIT-1248), by the
+     * SDK's {@see AddressPolicy} (WHIT-1284), so core and plugins agree on it.
+     * It also refuses multicast. NAT64 is refused here outright.
      *
      * FILTER_FLAG_GLOBAL_RANGE (RFC 6890) refuses everything the older
      * NO_PRIV_RANGE | NO_RES_RANGE pair did (private, loopback, link-local,
@@ -193,19 +202,14 @@ final class HttpFetcher implements HttpClient
         if ($packed === false) {
             return false;
         }
-        if (strlen($packed) === 16) {
-            $mapped = str_repeat("\0", 10) . "\xff\xff";
-            if (str_starts_with($packed, $mapped)) {
-                return self::isGlobalIp((string) inet_ntop(substr($packed, 12)));
-            }
-            if (str_starts_with($packed, "\x00\x64\xff\x9b")) {
-                // 64:ff9b::/96 and the local-use 64:ff9b:1::/48: never fetch
-                // through a translator, whatever it embeds.
-                return false;
-            }
+        if (strlen($packed) === 16 && str_starts_with($packed, "\x00\x64\xff\x9b")) {
+            // 64:ff9b::/96 and the local-use 64:ff9b:1::/48: never fetch
+            // through a translator, whatever it embeds.
+            return false;
         }
 
-        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_GLOBAL_RANGE) !== false;
+        // WHIT-1284 (#2214): the one rule for "public", shared with plugins.
+        return AddressPolicy::publicOnly()->permits($ip);
     }
 
     /**
