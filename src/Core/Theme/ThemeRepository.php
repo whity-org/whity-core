@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Theme;
 
 use PDO;
+use Whity\Core\Db\DbBool;
 
 /**
  * The `themes` table (migration 323): theme files a workspace imported or
@@ -25,7 +26,7 @@ final class ThemeRepository
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $theme = json_decode((string) $row['document'], true);
             if (is_array($theme) && ThemeValidator::validate($theme) === []) {
-                $out[] = ['theme' => $theme, 'source' => (string) $row['source'], 'signature_verified' => (bool) $row['signature_verified']];
+                $out[] = ['theme' => $theme, 'source' => (string) $row['source'], 'signature_verified' => DbBool::of($row['signature_verified'])];
             }
         }
 
