@@ -143,17 +143,28 @@ final class PaymentLedger
      * Only SETTLED movements count. A pending transfer is money that has not
      * arrived, and treating it as paid marks an invoice settled on the strength
      * of somebody having opened the payment screen.
+     *
+     * Only money in the INVOICE'S currency counts (#2217). Minor units of two
+     * currencies are not the same amount, so 5000 in one currency settling a
+     * 5000 invoice in another would be the payer's number read in the wrong
+     * unit. Such a payment stays recorded for a person to sort out; it just
+     * does not pay this invoice.
      */
     public function amountSettledMinor(int $tenantId, int $invoiceId): int
     {
         $statement = $this->pdo->prepare(
-            'SELECT COALESCE(SUM(amount_minor), 0)
-               FROM payment_transactions
-              WHERE tenant_id = :tenant_id
-                AND invoice_id = :invoice_id
-                AND status = :status'
+            'SELECT COALESCE(SUM(pt.amount_minor), 0)
+               FROM payment_transactions pt
+               JOIN invoices i
+                 ON i.id = pt.invoice_id
+                AND i.tenant_id = :invoice_tenant_id
+              WHERE pt.tenant_id = :tenant_id
+                AND pt.invoice_id = :invoice_id
+                AND pt.status = :status
+                AND UPPER(pt.currency) = UPPER(i.currency)'
         );
         $statement->execute([
+            ':invoice_tenant_id' => $tenantId,
             ':tenant_id' => $tenantId,
             ':invoice_id' => $invoiceId,
             ':status' => 'succeeded',
