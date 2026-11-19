@@ -362,6 +362,23 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertSame(201, $this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery'])->getStatusCode());
     }
 
+    /**
+     * WHIT-1285 (#2215): someone removed or suspended stops getting the feed,
+     * and coming back doesn't bring the old address back.
+     */
+    public function testTheFeedStopsForGoodWhenThePersonIsNoLongerActiveStaff(): void
+    {
+        $this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']);
+        $token = $this->feed->issue(1, 11);
+        self::assertSame(200, $this->handler->feed(self::request('GET', '/x'), ['token' => $token . '.ics'])->getStatusCode());
+
+        $this->pdo->exec("UPDATE memberships SET status = 'suspended' WHERE tenant_id = 1 AND profile_id = 11");
+        self::assertSame(404, $this->handler->feed(self::request('GET', '/x'), ['token' => $token . '.ics'])->getStatusCode());
+
+        $this->pdo->exec("UPDATE memberships SET status = 'active' WHERE tenant_id = 1 AND profile_id = 11");
+        self::assertSame(404, $this->handler->feed(self::request('GET', '/x'), ['token' => $token . '.ics'])->getStatusCode(), 'the old address is forgotten');
+    }
+
     public function testTheConfirmationCarriesTheBookingAsAnIcsAttachment(): void
     {
         $captured = [];

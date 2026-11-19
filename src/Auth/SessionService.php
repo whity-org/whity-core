@@ -133,6 +133,24 @@ final class SessionService
     }
 
     /**
+     * Whether $refreshJti is the CURRENT refresh jti of a session that is not
+     * revoked and not expired. handleRefresh() requires it (#2265), so a
+     * refresh token rotates only inside a recorded, revocable session.
+     */
+    public function isLiveRefresh(string $refreshJti): bool
+    {
+        // @tenant-guard-ignore: refresh_jti is a 128-bit random handle unique platform-wide, carried by the caller's own validated refresh token.
+        $stmt = $this->db->prepare(
+            'SELECT 1 FROM sessions
+              WHERE refresh_jti = ? AND revoked_at IS NULL AND expires_at > NOW()
+              LIMIT 1'
+        );
+        $stmt->execute([$refreshJti]);
+
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /**
      * List a profile+tenant's active (non-revoked, non-expired) sessions, newest
      * first, flagging the caller's own current session (matched by access jti).
      *
@@ -252,6 +270,37 @@ final class SessionService
         }
 
         return count($rows);
+    }
+
+    /**
+     * Revoke the session whose CURRENT access or refresh jti is $jti: both of
+     * its jtis are listed in revoked_tokens and the row is stamped. Used on
+     * sign-out (#2264), so signing out with only the access token also ends the
+     * paired 7-day refresh token, and the session leaves the list. Returns false
+     * when no live row matched.
+     */
+    public function revokeByJti(string $jti): bool
+    {
+        // @tenant-guard-ignore: matched by a jti the caller presented on sign-out; jtis are 128-bit random handles unique platform-wide.
+        $stmt = $this->db->prepare(
+            'SELECT id, access_jti, refresh_jti, expires_at FROM sessions
+              WHERE (access_jti = :jti OR refresh_jti = :jti) AND revoked_at IS NULL
+              LIMIT 1'
+        );
+        $stmt->execute([':jti' => $jti]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return false;
+        }
+
+        $this->blacklistAndStamp(
+            (int) $row['id'],
+            $row['access_jti'] !== null ? (string) $row['access_jti'] : null,
+            (string) $row['refresh_jti'],
+            (string) $row['expires_at']
+        );
+
+        return true;
     }
 
     /**

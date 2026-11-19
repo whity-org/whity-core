@@ -196,7 +196,9 @@ final class PluginTrust
     /** A `kill` entry stands against this version, so no one may turn it back on. */
     public function isKilled(string $plugin, string $version): bool
     {
-        return ($this->revocationOf($plugin, $version)['action'] ?? null) === 'kill';
+        $state = $this->state();
+
+        return $state !== null && self::kills(self::entries((string) $state['body']), $plugin, $version);
     }
 
     /** @return array{keys: int, sequence: int|null, issued_at: int|null, expires_at: int|null, stale: bool} */
@@ -279,23 +281,75 @@ final class PluginTrust
     private function revocationOf(string $plugin, string $version): ?array
     {
         $state = $this->state();
-        if ($state === null) {
-            return null;
-        }
-        $outer = json_decode((string) $state['body'], true);
-        $payload = is_array($outer) && is_string($outer['payload'] ?? null) ? base64_decode($outer['payload'], true) : false;
-        $list = $payload === false ? null : json_decode($payload, true);
-        foreach (is_array($list) && is_array($list['revoked'] ?? null) ? $list['revoked'] : [] as $entry) {
+
+        return $state === null ? null : self::entryFor(self::entries((string) $state['body']), $plugin, $version);
+    }
+
+    /**
+     * The entries of the revocation list this installation accepted, read from
+     * `plugin_revocation_state` (WHIT-1277, #2233). The list was verified when
+     * it was applied, so reading it needs no keys: code that has only the
+     * database (the code plugin gate, the queue worker) can ask it too.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public static function acceptedEntries(PDO $pdo): array
+    {
+        $stmt = $pdo->prepare('SELECT body FROM plugin_revocation_state WHERE id = 1');
+        $stmt->execute();
+        $body = $stmt->fetchColumn();
+
+        return $body === false || $body === null ? [] : self::entries((string) $body);
+    }
+
+    /**
+     * The entry naming this plugin's version, if any. `$version` null (a code
+     * plugin with no recorded install) matches only entries for every version.
+     *
+     * @param list<array<string, mixed>> $entries
+     * @return array<string, mixed>|null
+     */
+    public static function entryFor(array $entries, string $plugin, ?string $version): ?array
+    {
+        foreach ($entries as $entry) {
             if (
-                is_array($entry)
-                && ($entry['plugin'] ?? null) === $plugin
-                && (($entry['version'] ?? null) === null || $entry['version'] === $version)
+                ($entry['plugin'] ?? null) === $plugin
+                && (($entry['version'] ?? null) === null || ($version !== null && $entry['version'] === $version))
             ) {
                 return $entry;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Whether a `kill` entry names this plugin's version.
+     *
+     * @param list<array<string, mixed>> $entries
+     */
+    public static function kills(array $entries, string $plugin, ?string $version): bool
+    {
+        foreach ($entries as $entry) {
+            if (($entry['action'] ?? null) === 'kill' && self::entryFor([$entry], $plugin, $version) !== null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private static function entries(string $body): array
+    {
+        $outer = json_decode($body, true);
+        $payload = is_array($outer) && is_string($outer['payload'] ?? null) ? base64_decode($outer['payload'], true) : false;
+        $list = $payload === false ? null : json_decode($payload, true);
+
+        return array_values(array_filter(
+            is_array($list) && is_array($list['revoked'] ?? null) ? $list['revoked'] : [],
+            static fn (mixed $entry): bool => is_array($entry),
+        ));
     }
 
     /** @return array<string, mixed>|null */

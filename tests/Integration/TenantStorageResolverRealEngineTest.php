@@ -77,6 +77,34 @@ final class TenantStorageResolverRealEngineTest extends TestCase
         self::assertNotSame($this->default, $driver);
     }
 
+    /**
+     * WHIT-1284 (#2240): the endpoint was public when it was saved, but DNS
+     * now answers with an internal address. The workspace's driver refuses to
+     * send anything there, before any connection is made.
+     */
+    public function testAWorkspaceEndpointThatNowResolvesInsideIsRefusedOnEveryRequest(): void
+    {
+        $resolver = new TenantStorageResolver(
+            $this->default,
+            $this->configs,
+            $this->entitlements,
+            $this->secrets,
+            \Whity\Sdk\Http\Outbound\AddressPolicy::publicOnly(static fn (string $host): array => ['169.254.169.254']),
+        );
+        $this->entitle(1);
+        $this->configure(1);
+        $driver = $resolver->forTenant(1);
+
+        foreach ([fn () => $driver->put('a.txt', 'x'), fn () => $driver->get('a.txt'), fn () => $driver->exists('a.txt')] as $call) {
+            try {
+                $call();
+                self::fail('the request went out');
+            } catch (\Whity\Storage\StorageException $e) {
+                self::assertStringContainsString('not on the public internet', $e->getMessage());
+            }
+        }
+    }
+
     public function testConfiguredButNotEntitledFallsBackToDefault(): void
     {
         // Config present but the tenant lacks storage.custom_backend → default.

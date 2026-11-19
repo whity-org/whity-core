@@ -191,12 +191,13 @@ final class TenantSwitcherTest extends TestCase
      */
     public function testSwitchToSuspendedMembershipReturns403(): void
     {
-        // Use system-tenant (id=0) for the current token: the membership guard
-        // skips tenant-0 (cross-tenant authority by convention), so validateAccessToken
-        // succeeds and the request reaches our handleSwitchTenant logic.
+        // Bob's current session is in Tenant C, where he is active, so the token
+        // validates and the request reaches handleSwitchTenant. (It used to sit
+        // in tenant 0, which needed no membership until #2229.)
+        $this->seedMembership($this->bobProfileId, self::TENANT_C, 1, 'active');
         $token = $this->jwtParser->create([
             'profile_id'       => $this->bobProfileId,
-            'active_tenant_id' => 0, // system tenant — no membership row required
+            'active_tenant_id' => self::TENANT_C,
             'email'            => 'bob@example.com',
             'role'             => '',
             'token_epoch'      => 0,
@@ -404,11 +405,12 @@ final class TenantSwitcherTest extends TestCase
      */
     public function testGetMeExcludesSuspendedMemberships(): void
     {
-        // Give Bob a valid session (he has no active memberships — the real app
-        // would block login; here we mint directly to test the /api/me shape).
+        // Bob's session is in Tenant C, his only active membership; his
+        // suspended Tenant A membership must not be listed beside it.
+        $this->seedMembership($this->bobProfileId, self::TENANT_C, 1, 'active');
         $token = $this->jwtParser->create([
             'profile_id'       => $this->bobProfileId,
-            'active_tenant_id' => 0, // system tenant for this token so it passes validation
+            'active_tenant_id' => self::TENANT_C,
             'email'            => 'bob@example.com',
             'role'             => '',
             'token_epoch'      => 0,
@@ -424,7 +426,11 @@ final class TenantSwitcherTest extends TestCase
         self::assertArrayHasKey('memberships', $body);
 
         // Bob's suspended membership must not appear.
-        self::assertEmpty($body['memberships'], 'Suspended memberships must not appear in GET /api/me.');
+        self::assertSame(
+            [self::TENANT_C],
+            array_map(static fn (array $m): int => (int) $m['tenant_id'], $body['memberships']),
+            'Suspended memberships must not appear in GET /api/me.'
+        );
     }
 
     /**

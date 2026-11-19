@@ -17,6 +17,8 @@ use Whity\Core\Plugin\Tenant\RecordWriter;
 use Whity\Core\Plugin\Tenant\TenantManifestPublisher;
 use Whity\Core\Plugin\Tenant\TenantPluginRepository;
 use Whity\Core\Plugin\Tenant\TenantRecordRepository;
+use Whity\Core\Plugin\Trust\PluginTrust;
+use Whity\Core\Plugin\Trust\TrustedKeys;
 use Whity\Core\PluginRoleSeeder;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -36,6 +38,7 @@ final class TenantPluginVersionsRealEngineTest extends TestCase
     private PDO $pdo;
     private TenantPluginRepository $plugins;
     private TenantRecordRepository $records;
+    private ?PluginTrust $trust = null;
 
     protected function setUp(): void
     {
@@ -193,6 +196,46 @@ final class TenantPluginVersionsRealEngineTest extends TestCase
     }
 
     /**
+     * WHIT-1277 (#2244): a version a signed revocation list killed can't go
+     * live again in a workspace: not by publishing it, not by rolling back to
+     * it, and not by any other path that points the workspace at it.
+     */
+    public function testAKilledVersionIsNeitherPublishedNorRolledBackTo(): void
+    {
+        $v1 = RecordTypeValidatorTest::manifest();
+        $first = $this->json($this->call('publish', self::A, ['manifest' => $v1]))['data'];
+        $v2 = $v1;
+        $v2['plugin']['version'] = '1.1.0';
+        self::assertSame(201, $this->call('publish', self::A, ['manifest' => $v2])->getStatusCode());
+
+        $pair = sodium_crypto_sign_keypair();
+        $public = base64_encode(sodium_crypto_sign_publickey($pair));
+        $this->trust = new PluginTrust($this->pdo, new TrustedKeys([$public]));
+        $payload = (string) json_encode([
+            'format' => PluginTrust::REVOCATIONS, 'sequence' => 1, 'issued_at' => time(), 'expires_at' => time() + 86400,
+            'revoked' => [['plugin' => 'CakeOrders', 'version' => '1.0.0', 'action' => 'kill', 'reason' => 'bad']],
+        ]);
+        $applied = $this->trust->applyRevocationList((string) json_encode([
+            'key' => $public,
+            'payload' => base64_encode($payload),
+            'signature' => base64_encode(sodium_crypto_sign_detached(PluginTrust::REVOCATIONS . "
+" . $payload, sodium_crypto_sign_secretkey($pair))),
+        ]));
+        self::assertTrue($applied['ok'], $applied['reason']);
+
+        $back = $this->call('activate', self::A, params: ['plugin' => 'cakeorders', 'id' => (string) $first['version_id']]);
+        self::assertSame(409, $back->getStatusCode(), $back->getBody());
+        self::assertSame(409, $this->call('publish', self::A, ['manifest' => $v1])->getStatusCode(), 'publishing it again');
+        self::assertSame(409, $this->call('publish', self::B, ['manifest' => $v1])->getStatusCode(), 'publishing it in another workspace');
+        self::assertSame(3, $this->auditCount(TenantPluginVersionsApiHandler::AUDIT_REFUSED));
+        self::assertSame('1.1.0', $this->plugins->liveManifest(self::A, 'CakeOrders')?->version());
+
+        // However it is pointed at the killed version, it doesn't run.
+        $this->pdo->prepare('UPDATE tenant_plugins SET active_version_id = ?, enabled = ? WHERE tenant_id = ?')->execute([$first['version_id'], true, self::A]);
+        self::assertSame([], $this->plugins->active(self::A));
+    }
+
+    /**
      * @param array<string, mixed>|null $body
      * @param array<string, string> $params
      * @param list<string> $installed
@@ -208,6 +251,7 @@ final class TenantPluginVersionsRealEngineTest extends TestCase
             new ManifestImpact($this->records),
             new ManifestTestRunner($this->pdo, $this->records, new RecordWriter($this->pdo, $this->records, $this->createMock(RoleChecker::class))),
             $audit,
+            $this->trust,
         );
         $request = new Request($body === null ? 'GET' : 'POST', '/api/workspace-plugins', [], $body === null ? '' : (string) json_encode($body));
         $request->user = (object) ['profile_id' => self::MANAGER];

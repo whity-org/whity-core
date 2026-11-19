@@ -14,7 +14,8 @@ use Whity\Core\Plugin\Store\StoreMarks;
  * source: the Whity store's signed mark ({@see StoreMarks}, WHIT-1014, read from
  * its cache), or a Whity mark in `plugin_version_marks` ({@see PluginTrust}) with
  * the same plugin name, version and package sha256 that `plugin_installs`
- * recorded, not revoked. A plugin copied into `plugins/` by hand, or uploaded,
+ * recorded, not revoked. Neither counts while the accepted revocation list
+ * names the installed version (WHIT-1277). A plugin copied into `plugins/` by hand, or uploaded,
  * has no recorded package a mark could match, so it is never Verified. Asked on
  * every call, so a revoked mark applies as soon as it is known.
  */
@@ -29,6 +30,15 @@ final class CodePluginVerification
     /** @phpstan-impure */
     public function isVerified(string $plugin): bool
     {
+        // WHIT-1277 (#2233): a revocation list naming the installed version
+        // wins over everything, including a store mark cached before it.
+        $installed = $this->db->prepare('SELECT version FROM plugin_installs WHERE plugin_name = ?');
+        $installed->execute([$plugin]);
+        $version = $installed->fetchColumn();
+        if (PluginTrust::entryFor(PluginTrust::acceptedEntries($this->db), $plugin, is_string($version) ? $version : null) !== null) {
+            return false;
+        }
+
         if ($this->storeMarks !== null && $this->storeMarks->isVerified($plugin)) {
             return true;
         }
