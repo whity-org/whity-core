@@ -34,6 +34,11 @@ export type InventorySettings = Schemas['InventorySettings'];
 export type InventoryTransferRequest = Schemas['InventoryTransferRequest'];
 export type InventoryCountRequest = Schemas['InventoryCountRequest'];
 export type InventoryOperationAdjustmentRequest = Schemas['InventoryOperationAdjustmentRequest'];
+export type InventoryPurchaseOrder = Schemas['InventoryPurchaseOrder'];
+export type InventoryPurchaseOrderLine = Schemas['InventoryPurchaseOrderLine'];
+export type InventoryPurchaseOrderRequest = Schemas['InventoryPurchaseOrderRequest'];
+export type InventorySupplierItem = Schemas['InventorySupplierItem'];
+export type PurchaseOrderStatus = InventoryPurchaseOrder['status'];
 export type OperationKind = InventoryOperation['kind'];
 export type OperationStatus = InventoryOperation['status'];
 
@@ -43,6 +48,8 @@ export const STOCK_ADJUST = 'stock:adjust';
 export const STOCK_COUNT = 'stock:count';
 export const STOCK_TRANSFER = 'stock:transfer';
 export const INVENTORY_SETTINGS = 'inventory:settings';
+export const PURCHASES_READ = 'purchases:read';
+export const PURCHASES_WRITE = 'purchases:write';
 
 export const ITEM_KINDS = ['stocked', 'consumable', 'service', 'made'] as const;
 export type ItemKind = (typeof ITEM_KINDS)[number];
@@ -212,11 +219,20 @@ export const inventoryApi = {
     ),
 
   // ── operations: adjustments, counts, transfers (WHIT-1233) ──
-  operations: async (p: { kind?: OperationKind; status?: OperationStatus; locationId?: number; lines?: boolean; limit?: number } = {}) =>
+  operations: async (
+    p: { kind?: OperationKind; status?: OperationStatus; locationId?: number; orderId?: number; lines?: boolean; limit?: number } = {}
+  ) =>
     read<InventoryOperation[]>(
       await api.GET('/api/v1/inventory/operations', {
         params: {
-          query: query({ kind: p.kind, status: p.status, location_id: p.locationId, lines: p.lines ? 'true' : null, limit: p.limit }),
+          query: query({
+            kind: p.kind,
+            status: p.status,
+            location_id: p.locationId,
+            order_id: p.orderId,
+            lines: p.lines ? 'true' : null,
+            limit: p.limit,
+          }),
         },
       }),
       'The stock changes could not be loaded'
@@ -285,6 +301,64 @@ export const inventoryApi = {
       'The reorder level could not be removed'
     ),
   settings: async () => read<InventorySettings>(await api.GET('/api/v1/inventory/settings'), 'The inventory settings could not be loaded'),
+
+  // ── purchase orders and supplier prices (WHIT-1234) ──
+  purchaseOrders: async (p: { status?: PurchaseOrderStatus; contactId?: number; limit?: number } = {}) =>
+    read<InventoryPurchaseOrder[]>(
+      await api.GET('/api/v1/inventory/purchase-orders', {
+        params: { query: query({ status: p.status, contact_id: p.contactId, limit: p.limit }) },
+      }),
+      'The purchase orders could not be loaded'
+    ),
+  purchaseOrder: async (id: number) =>
+    read<InventoryPurchaseOrder>(
+      await api.GET('/api/v1/inventory/purchase-orders/{id}', { params: { path: { id } } }),
+      'The purchase order could not be loaded'
+    ),
+  createPurchaseOrder: async (body: InventoryPurchaseOrderRequest) =>
+    send<InventoryPurchaseOrder>(await api.POST('/api/v1/inventory/purchase-orders', { body }), 'The purchase order could not be saved'),
+  submitPurchaseOrder: async (id: number) =>
+    send<InventoryPurchaseOrder>(
+      await api.POST('/api/v1/inventory/purchase-orders/{id}/submit', { params: { path: { id } }, body: {} as never }),
+      'The purchase order could not be sent'
+    ),
+  cancelPurchaseOrder: async (id: number) =>
+    send<InventoryPurchaseOrder>(
+      await api.POST('/api/v1/inventory/purchase-orders/{id}/cancel', { params: { path: { id } }, body: {} as never }),
+      'The purchase order could not be cancelled'
+    ),
+  closePurchaseOrderLine: async (id: number, line: number) =>
+    send<InventoryPurchaseOrder>(
+      await api.POST('/api/v1/inventory/purchase-orders/{id}/lines/{line}/close', { params: { path: { id, line } }, body: {} as never }),
+      'The line could not be closed'
+    ),
+  receivePurchaseOrder: async (id: number, lines: { line_id: number; quantity: string }[], allowOver = false, note?: string) =>
+    send<InventoryPurchaseOrder>(
+      await api.POST('/api/v1/inventory/purchase-orders/{id}/receive', {
+        params: { path: { id } },
+        body: { lines, allow_over: allowOver, note },
+      }),
+      'What arrived could not be received'
+    ),
+  supplierItems: async (p: { itemId?: number; contactId?: number } = {}) =>
+    read<InventorySupplierItem[]>(
+      await api.GET('/api/v1/inventory/supplier-items', { params: { query: query({ item_id: p.itemId, contact_id: p.contactId }) } }),
+      'The supplier prices could not be loaded'
+    ),
+  setSupplierItem: async (body: {
+    variant_id: number;
+    contact_id: number;
+    unit?: string;
+    price_minor: number;
+    currency?: string;
+    supplier_sku?: string;
+    is_preferred?: boolean;
+  }) => send<InventorySupplierItem>(await api.PUT('/api/v1/inventory/supplier-items', { body }), 'The supplier price could not be saved'),
+  deleteSupplierItem: async (id: number) =>
+    send<{ deleted: boolean }>(
+      await api.DELETE('/api/v1/inventory/supplier-items/{id}', { params: { path: { id } } }),
+      'The supplier price could not be removed'
+    ),
 };
 
 /** The sentence to show for a refused request. */

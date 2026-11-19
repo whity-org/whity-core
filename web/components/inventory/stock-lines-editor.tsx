@@ -1,17 +1,21 @@
 'use client';
 
 /**
- * Lines of items and quantities for a transfer or for waste (WHIT-1233):
- * find an item by name in either language, SKU or barcode (a scanner types
- * into the same field), give the quantity in its base unit, add the next. A
- * variant shows its options beside the name. Quantities stay Western digits,
- * left to right (IV.21).
+ * Lines of items and quantities for a transfer, for waste (WHIT-1233) or for
+ * a purchase order (WHIT-1234): find an item by name in either language, SKU
+ * or barcode (a scanner types into the same field), give the quantity, add the
+ * next. A variant shows its options beside the name. A purchase order also
+ * chooses the unit it is bought in (a 25 kg bag) and may give a price; left
+ * empty, the supplier's price for that unit is used. Quantities stay Western
+ * digits, left to right (IV.21).
  */
 
 import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@whity/ui/button';
 import { Icon } from '@whity/ui/icon';
+import { MoneyInput } from '@whity/ui/money/money-input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import { inventoryApi, nameIn, type InventoryItem } from '@/lib/inventory/api';
 
@@ -22,6 +26,10 @@ export interface StockLine {
   sku: string;
   unit: string;
   quantity: string;
+  /** The units it can be bought in, base unit first (purchase orders). */
+  units?: string[];
+  /** The price of one `unit`, as typed; empty for the supplier's (purchase orders). */
+  price?: string;
 }
 
 interface Choice {
@@ -29,6 +37,7 @@ interface Choice {
   label: string;
   sku: string;
   unit: string;
+  units: string[];
 }
 
 function choicesOf(items: InventoryItem[], language: string | null): Choice[] {
@@ -43,6 +52,7 @@ function choicesOf(items: InventoryItem[], language: string | null): Choice[] {
         label: options.length > 0 ? `${name} · ${options.join(' · ')}` : name,
         sku: v.sku,
         unit: item.base_unit.code,
+        units: [item.base_unit.code, ...item.units.filter((u) => u.purpose !== 'sale').map((u) => u.unit)],
       });
     }
   }
@@ -53,10 +63,13 @@ export function StockLinesEditor({
   lines,
   onChange,
   idPrefix,
+  priceCurrency,
 }: {
   lines: StockLine[];
   onChange: (lines: StockLine[]) => void;
   idPrefix: string;
+  /** For a purchase order: the unit is chosen and a price may be given, in this currency. */
+  priceCurrency?: string;
 }) {
   const t = useTranslation('admin');
   const language = useLanguageCode();
@@ -89,7 +102,9 @@ export function StockLinesEditor({
     setSearch('');
     setChoices([]);
     if (lines.some((l) => l.variantId === choice.variantId)) return;
-    onChange([...lines, { key: `${choice.variantId}`, ...choice, quantity: '' }]);
+    // A purchase is usually in the bigger unit it is bought in (a bag, not kg).
+    const unit = priceCurrency ? (choice.units[1] ?? choice.unit) : choice.unit;
+    onChange([...lines, { key: `${choice.variantId}`, ...choice, unit, quantity: '', price: '' }]);
   };
 
   return (
@@ -116,6 +131,36 @@ export function StockLinesEditor({
                   onChange={(e) => onChange(lines.map((l) => (l.key === line.key ? { ...l, quantity: e.target.value } : l)))}
                 />
               </div>
+              {priceCurrency && (line.units?.length ?? 0) > 1 && (
+                <div className="w-24">
+                  <Select
+                    value={line.unit}
+                    onValueChange={(unit) => onChange(lines.map((l) => (l.key === line.key ? { ...l, unit } : l)))}
+                  >
+                    <SelectTrigger aria-label={t('inventory.lines.unit', 'Unit for {item}', { item: line.label })}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(line.units ?? []).map((u) => (
+                        <SelectItem key={u} value={u}>
+                          {u}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {priceCurrency && (
+                <div className="w-36">
+                  <MoneyInput
+                    currency={priceCurrency}
+                    value={line.price ?? ''}
+                    onValueChange={(price) => onChange(lines.map((l) => (l.key === line.key ? { ...l, price } : l)))}
+                    aria-label={t('inventory.lines.price', 'Price of one {unit}', { unit: line.unit })}
+                    placeholder={t('inventory.lines.supplierPrice', 'Supplier’s')}
+                  />
+                </div>
+              )}
               <Button
                 type="button"
                 variant="ghost"

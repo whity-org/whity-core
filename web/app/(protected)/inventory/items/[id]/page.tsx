@@ -20,6 +20,8 @@ import { NoAccess } from '@/components/no-access';
 import { AdjustStockDialog } from '@/components/inventory/adjust-stock-dialog';
 import { useReasons } from '@/lib/inventory/use-reasons';
 import { ReorderLevels } from '@/components/inventory/reorder-levels';
+import { SupplierPrices } from '@/components/inventory/supplier-prices';
+import { useWorkspaceCurrency } from '@/lib/branding-context';
 import { ItemFormDialog, kindLabel } from '@/components/inventory/item-form-dialog';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -34,6 +36,7 @@ import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import {
   INVENTORY_READ,
   INVENTORY_WRITE,
+  PURCHASES_READ,
   STOCK_ADJUST,
   inventoryApi,
   inventoryErrorText,
@@ -50,6 +53,7 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
   const language = useLanguageCode();
   const toast = useToast();
   const { reasonName } = useReasons();
+  const currency = useWorkspaceCurrency();
   const { has, loading: accessLoading } = useCapabilities();
   const canWrite = has(INVENTORY_WRITE);
   const canAdjust = has(STOCK_ADJUST);
@@ -283,6 +287,8 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
       {item.kind !== 'service' && !item.archived && (
         <ReorderLevels item={item} places={places} rules={rules} canEdit={canWrite} onSaved={refetch} />
       )}
+
+      {item.kind !== 'service' && has(PURCHASES_READ) && <SupplierPrices item={item} currency={currency} canEdit={canWrite && !item.archived} />}
 
       {item.kind !== 'service' && (
         <section className="space-y-3 rounded-lg border border-border p-5" data-testid="item-history">

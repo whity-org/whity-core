@@ -40096,6 +40096,15 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "order_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only the receipts of this purchase order.",
+                        "schema": {
+                            "type": "integer"
+                        }
                     }
                 ],
                 "responses": {
@@ -103753,13 +103762,19 @@
                 },
                 "required": [
                     "id",
+                    "kind",
                     "number",
                     "status",
                     "contact_id",
+                    "contact_name",
                     "location_id",
                     "currency",
+                    "subtotal_minor",
+                    "tax_minor",
                     "total_minor",
-                    "created_at"
+                    "notes",
+                    "created_at",
+                    "updated_at"
                 ]
             },
             "InventoryPurchaseOrderLine": {
@@ -104487,11 +104502,17 @@
                     "id",
                     "variant_id",
                     "item_id",
+                    "item_name",
+                    "item_names",
+                    "sku",
                     "contact_id",
+                    "contact_name",
+                    "supplier_sku",
                     "unit",
                     "price_minor",
                     "currency",
-                    "is_preferred"
+                    "is_preferred",
+                    "updated_at"
                 ]
             },
             "InventorySupplierItemRequest": {

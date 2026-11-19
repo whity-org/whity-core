@@ -7,6 +7,7 @@
  * person in Whity the contact is linked to. Change is the main button;
  * archiving can be undone, so it asks nothing and offers Restore.
  *
+ * A supplier shows what they supply and their purchase orders (WHIT-1234).
  * Money (owes us, this year) and New invoice come with Front Office.
  */
 
@@ -17,6 +18,7 @@ import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
 import { ContactFormDialog } from '@/components/contacts/contact-form-dialog';
 import { CustomerActivity } from '@/components/contacts/customer-activity';
+import { SupplierActivity } from '@/components/contacts/supplier-activity';
 import { fieldLabel, isEditableHere } from '@/components/contacts/field-input';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
@@ -247,6 +249,7 @@ export default function ContactPage({ params }: { params: Promise<{ id: string }
       </div>
 
       {contact.is_customer && <CustomerActivity contactId={contact.id} />}
+      {contact.is_supplier && <SupplierActivity contactId={contact.id} />}
 
       {canWrite && !contact.archived && (
         <div className="border-t border-border pt-4">
