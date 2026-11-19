@@ -73,6 +73,18 @@ final class ScheduleRunCommandRealEngineTest extends TestCase
         self::assertNotNull($row['last_run_at']);
     }
 
+    /**
+     * #2205: the scheduler holds the raw connection, so it recycles once it has
+     * run as long as a connection may live. Without --once this loop would
+     * otherwise never return.
+     */
+    public function testRecyclesWhenTheDatabaseConnectionLifetimeIsReached(): void
+    {
+        $this->command->recycleAfterConnectionAge(0);
+
+        self::assertSame(0, $this->command->execute([]));
+    }
+
     public function testATickWithNothingDueStillRecordsTheHeartbeat(): void
     {
         // WHIT-1013: no schedules at all, yet the tick is alive and must say so.
