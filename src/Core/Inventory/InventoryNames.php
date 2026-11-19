@@ -34,12 +34,24 @@ final class InventoryNames
         } catch (LocalizedTextRejected $e) {
             throw InventoryRejectedException::field($field, $e->clientMessage);
         }
+        // Numbers stay Western digits in both languages (IV.21): a name typed
+        // with Arabic-Indic digits ("كيس ٢٥ كغ") is kept as "كيس 25 كغ".
+        $names = array_map(static fn (string $name): string => self::westernDigits($name), $names);
         $original = $bare !== null ? ($names[$bare] ?? '') : ($names['en'] ?? $names['ar'] ?? (string) reset($names));
         if (trim($original) === '') {
             throw InventoryRejectedException::field($field, $field . ' must not be empty');
         }
 
         return ['name' => $original, 'names' => LocalizedText::encode($names)];
+    }
+
+    /** Arabic-Indic and Persian digits as Western ones. */
+    public static function westernDigits(string $text): string
+    {
+        return strtr($text, [
+            '٠' => '0', '١' => '1', '٢' => '2', '٣' => '3', '٤' => '4', '٥' => '5', '٦' => '6', '٧' => '7', '٨' => '8', '٩' => '9',
+            '۰' => '0', '۱' => '1', '۲' => '2', '۳' => '3', '۴' => '4', '۵' => '5', '۶' => '6', '۷' => '7', '۸' => '8', '۹' => '9',
+        ]);
     }
 
     /** @return array<string, string> */

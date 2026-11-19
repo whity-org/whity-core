@@ -62,6 +62,10 @@ final class InventoryLedgerRealEngineTest extends TestCase
             'purchase_price_minor' => 1600,
         ], 11);
         self::assertSame(['en' => 'Flour', 'ar' => 'طحين'], $flour['names']);
+
+        // IV.21: digits in a name stay Western in Arabic too.
+        $bag = $this->items->create(1, ['name' => ['en' => 'Flour, 25 kg bag', 'ar' => 'طحين، كيس ٢٥ كغ'], 'unit' => 'bag'], 11);
+        self::assertSame('طحين، كيس 25 كغ', $bag['names']['ar']);
         self::assertSame('USD', $flour['currency']);
         self::assertSame('6251234567890', $flour['variants'][0]['barcodes'][0]['code']);
         self::assertSame('ean13', $flour['variants'][0]['barcodes'][0]['symbology']);

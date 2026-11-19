@@ -235,7 +235,7 @@ describe('/inventory/adjustments', () => {
     render(<WasteAndAdjustmentsPage />);
     expect(await screen.findByText('Spoiled')).toBeInTheDocument();
     expect(screen.getAllByText('Waiting for approval').length).toBeGreaterThan(0);
-    expect(screen.getByTestId('waste-rules')).toHaveTextContent('Over 25 a line');
+    expect(screen.getByTestId('waste-rules')).toHaveTextContent(/Over \u2066\$25\.00\u2069 a line/);
     expect(screen.getByTestId('waste-rows')).toHaveTextContent('Ibrahim Mansour');
   });
 });
