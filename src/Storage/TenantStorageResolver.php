@@ -11,6 +11,7 @@ use Whity\Core\Security\EncryptedSecretStore;
 use Whity\Storage\S3\S3Config;
 use Whity\Storage\S3\S3StorageDriver;
 use Whity\Storage\S3\StreamObjectHttpTransport;
+use Whity\Sdk\Http\Outbound\AddressPolicy;
 
 /**
  * Resolves the {@see StorageDriverInterface} to use for a given tenant
@@ -38,6 +39,7 @@ final class TenantStorageResolver
     private TenantStorageConfigRepository $configs;
     private EntitlementService $entitlements;
     private EncryptedSecretStore $secrets;
+    private AddressPolicy $endpoints;
 
     /** @var array<int, StorageDriverInterface> Per-tenant driver memo. */
     private array $cache = [];
@@ -47,7 +49,11 @@ final class TenantStorageResolver
         TenantStorageConfigRepository $configs,
         EntitlementService $entitlements,
         EncryptedSecretStore $secrets,
+        // WHIT-1284 (#2240): a workspace's own endpoint is a person's input,
+        // unlike the operator's: public addresses only. Null: that default.
+        ?AddressPolicy $endpoints = null,
     ) {
+        $this->endpoints = $endpoints ?? AddressPolicy::publicOnly();
         $this->default = $default;
         $this->configs = $configs;
         $this->entitlements = $entitlements;
@@ -122,6 +128,6 @@ final class TenantStorageResolver
             publicBaseUrl: is_string($publicBaseUrl) && $publicBaseUrl !== '' ? $publicBaseUrl : null,
         );
 
-        return new S3StorageDriver($s3, new StreamObjectHttpTransport());
+        return new S3StorageDriver($s3, new StreamObjectHttpTransport(addressPolicy: $this->endpoints));
     }
 }
