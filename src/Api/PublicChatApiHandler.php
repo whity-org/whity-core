@@ -70,6 +70,16 @@ final class PublicChatApiHandler
         return $this->bot->isRequired() && $this->bot->isReady();
     }
 
+    /**
+     * A provider is chosen but its secret or site key is missing (WHIT-1286,
+     * #2203): nobody can pass the check, and skipping it would leave the
+     * chat open to bots, so no chat starts until it is set up.
+     */
+    private function botCheckHalfSetUp(): bool
+    {
+        return $this->bot->isRequired() && !$this->bot->isReady();
+    }
+
     /** @param array<string, string> $params */
     public function info(Request $request, array $params = []): Response
     {
@@ -132,6 +142,9 @@ final class PublicChatApiHandler
             return Response::json(['data' => ['token' => PublicToken::make(32), 'messages' => []]], 201);
         }
 
+        if ($this->botCheckHalfSetUp()) {
+            return Response::error('Chat is not available right now. Please try again later.', 503);
+        }
         if ($this->needsBotCheck()) {
             $verdict = $this->bot->verify((string) ($body['bot_token'] ?? ''), $ip);
             if ($verdict === BotCheck::UNREACHABLE) {

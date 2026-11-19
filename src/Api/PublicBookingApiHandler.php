@@ -124,7 +124,8 @@ final class PublicBookingApiHandler
                 'settings' => array_intersect_key($settings->toApi(), array_flip(['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days', 'multi_service_booking'])),
                 'services' => $services,
                 'staff' => array_map(static fn (array $s): array => ['profile_id' => $s['profile_id'], 'display_name' => $s['display_name']], $staff),
-                'bot_check' => $this->bot->isRequired() && $this->bot->provider() !== null
+                // WHIT-1286 (#2203): only a check that is fully set up; never an empty site key.
+                'bot_check' => $this->bot->isRequired() && $this->bot->isReady()
                     ? ['provider' => $this->bot->provider(), 'site_key' => $this->bot->siteKey()]
                     : null,
             ]]);
@@ -228,6 +229,10 @@ final class PublicBookingApiHandler
             $profileId = is_int($body['profile_id'] ?? null) ? $body['profile_id'] : null;
 
             if ($this->bot->isRequired()) {
+                // WHIT-1286 (#2203): a chosen check that is half set up refuses, never skips.
+                if (!$this->bot->isReady()) {
+                    return Response::error('Booking is unavailable right now. Try again later.', 503);
+                }
                 $verdict = $this->bot->verify(is_string($body['bot_token'] ?? null) ? $body['bot_token'] : '', ClientIp::fromRequest($request));
                 if ($verdict === BotCheck::UNREACHABLE) {
                     return Response::error('Booking is unavailable right now. Try again later.', 503);

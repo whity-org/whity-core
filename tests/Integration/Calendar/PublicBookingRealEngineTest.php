@@ -319,6 +319,25 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertSame(200, $this->handler->feed(self::request('GET', '/x'), ['token' => $second . '.ics'])->getStatusCode());
     }
 
+    /**
+     * WHIT-1286 (#2203): a chosen bot check missing its site key or secret is
+     * never offered with an empty key, and booking refuses rather than skips.
+     */
+    public function testAHalfSetUpBotCheckRefusesBookingsAndShowsNoEmptyKey(): void
+    {
+        $globals = new GlobalSettingsRepository($this->pdo);
+        $globals->set(BotCheck::SETTING_PROVIDER, 'turnstile');
+
+        $page = self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data'];
+        self::assertNull($page['bot_check']);
+        $booked = $this->handler->book(self::request('POST', '/x', $this->bookingBody() + ['bot_token' => 'anything']), ['workspace' => 'example-bakery']);
+        self::assertSame(503, $booked->getStatusCode(), $booked->getBody());
+
+        $globals->set(BotCheck::SETTING_SITE_KEY, '0x4AAA-site');
+        self::assertNull(self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data']['bot_check'], 'a site key but no secret');
+        self::assertSame(503, $this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery'])->getStatusCode());
+    }
+
     public function testTheConfirmationCarriesTheBookingAsAnIcsAttachment(): void
     {
         $captured = [];
