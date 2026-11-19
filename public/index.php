@@ -7209,7 +7209,18 @@ $pluginLoader->collectJobs($jobsRegistry);
 // plugin's job, async listener or command resolves is the one its routes get.
 // They stop here: nothing below serves a request.
 if (defined('WHITY_HOST_KERNEL_BOOT')) {
-    return ['db' => $db, 'hookManager' => $hookManager, 'pluginLoader' => $pluginLoader];
+    return [
+        'db' => $db,
+        'hookManager' => $hookManager,
+        'pluginLoader' => $pluginLoader,
+        // #2205: what a worker resets between jobs, as the request loop does
+        // between requests (the job runner resets RoleChecker's caches itself).
+        'resetRequest' => static function () use ($tenantManifestHost, $codePluginActivation, $documentFieldRegistry): void {
+            $tenantManifestHost->resetRequest();
+            $codePluginActivation->resetRequest();
+            $documentFieldRegistry->resetRequest();
+        },
+    ];
 }
 
 // Handle requests (persistent worker mode or fallback single-request mode)
