@@ -135,7 +135,7 @@ final class AgentGrantOnResourcesAndPromptsTest extends TestCase
         $result = ($this->reader(self::agent(['grant:documents:read=allow'])))(['uri' => 'whity-api:///api/documents'], 'bearer');
 
         self::assertIsArray($result);
-        $user = (array) ($this->seen?->user ?? []);
+        $user = (array) ($this->seen->user ?? []);
         self::assertSame(self::PROFILE, $user['profile_id'] ?? null);
         self::assertSame(self::TENANT, $user['active_tenant_id'] ?? null);
         self::assertSame('agent:12', $user['agent_principal_id'] ?? null);
