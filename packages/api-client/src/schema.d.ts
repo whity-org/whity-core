@@ -22718,7 +22718,7 @@ export interface components {
              */
             state: "on" | "read_only" | "off";
             /** @enum {string|null} */
-            reason?: "free_for_all" | "entitled" | "cash" | "trial" | "grace" | "lapsed" | "installation_unlicensed" | "installation_grace" | null;
+            reason?: "free_for_all" | "entitled" | "cash" | "trial" | "grace" | "lapsed" | "installation_unlicensed" | "installation_grace" | "withdrawn" | null;
             graceUntil?: string | null;
             trialEndsAt?: string | null;
             paid: boolean;
