@@ -2506,6 +2506,7 @@ class AuthHandler
             $exp = $claims['exp'] ?? null;
             if ($jti !== null && $exp !== null) {
                 $this->revokeJti((string) $jti, (int) $exp);
+                $this->endSessionOf((string) $jti);
             }
         }
 
@@ -2517,6 +2518,20 @@ class AuthHandler
         return Response::json([
             'status' => 'logged out'
         ], 200);
+    }
+
+    /**
+     * End the session a signed-out token belongs to (#2264): its paired access
+     * or refresh jti is revoked too, and the row leaves the sessions list.
+     * Best-effort, like the rest of sign-out.
+     */
+    private function endSessionOf(string $jti): void
+    {
+        try {
+            $this->sessions()->revokeByJti($jti);
+        } catch (\Throwable $e) {
+            error_log('[sessions] sign-out revoke failed: ' . $e->getMessage());
+        }
     }
 
     /**
