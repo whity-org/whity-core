@@ -85,8 +85,14 @@ const SIGN_IN_PATHS = [
  * Endpoints whose token-mode success body can carry a fresh token pair.
  * `PATCH /me` is one: changing the email or password bumps the token epoch,
  * so the pair the caller held stops working the moment it succeeds.
+ * `POST /me/logout-others` bumps it too, and re-issues this caller's pair.
  */
-const ISSUING_PATHS = [...SIGN_IN_PATHS, '/api/v1/auth/switch-tenant', '/api/v1/me'];
+const ISSUING_PATHS = [
+  ...SIGN_IN_PATHS,
+  '/api/v1/auth/switch-tenant',
+  '/api/v1/me',
+  '/api/v1/me/logout-others',
+];
 
 const LOGOUT_PATH = '/api/v1/auth/logout';
 

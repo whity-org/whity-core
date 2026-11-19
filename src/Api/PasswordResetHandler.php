@@ -104,7 +104,10 @@ final class PasswordResetHandler
 
         if ($this->selfServiceEnabled()) {
             $row = $this->emails->findByEmail($email);
-            if ($row !== null) {
+            // #2245: only a CONFIRMED address may receive a credential link. An
+            // unconfirmed one may be a typo or somebody else's address, and the
+            // link would hand them this account. The answer stays the same.
+            if ($row !== null && ($row['verified'] ?? false) === true) {
                 try {
                     $profileId = (int) $row['profile_id'];
 
