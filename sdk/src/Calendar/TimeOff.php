@@ -17,8 +17,11 @@ namespace Whity\Sdk\Calendar;
  * {@see CalendarEvents::upsertExternal()} is not time off.
  *
  * WHO MAY. Writes run as `$actingProfileId`, with the same check as the HTTP
- * route: a person may put time off on their own calendar; anybody else's needs
- * `calendar:manage` in that workspace. A leave plugin passes the person who
+ * route: any member of staff may put time off on their own calendar (since
+ * 1.130; before, they needed `calendar:write`); anybody else's needs
+ * `calendar:write` and `calendar:manage` in that workspace. An approver who
+ * lacks those can get them for a plugin role through
+ * {@see \Whity\Sdk\Contribute\CorePermissionRequestsInterface}. A leave plugin passes the person who
  * gave the final approval (HR, say). The person must be a member of staff of
  * the workspace.
  *

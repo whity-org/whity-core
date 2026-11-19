@@ -472,6 +472,13 @@ final class CodePluginActivation
         $stmt->bindValue(':enabled', $enabled, PDO::PARAM_BOOL);
         $stmt->bindValue(':profile', $profileId, $profileId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
         $stmt->execute();
+        // #2256: turning a plugin off in a workspace takes back the core
+        // permissions the operator approved for its roles there. Turning it on
+        // again does not bring them back: approving is the operator's.
+        if (!$enabled) {
+            (new \Whity\Core\Plugin\PluginCoreGrants($this->db))->removeAll($pluginName, $tenantId);
+            \Whity\Auth\RoleChecker::clearCache();
+        }
         $this->forget($tenantId);
     }
 

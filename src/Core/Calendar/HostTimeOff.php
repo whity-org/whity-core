@@ -15,9 +15,9 @@ use Whity\Sdk\Calendar\TimeOffRejected;
  *
  * It is the time-off route without HTTP: an event of kind `time_off`, busy,
  * written through the booking service so it takes the person's lock and fires
- * `calendar.event.*` like any other. The checks are the route's: the acting
- * person needs `calendar:write`, and `calendar:manage` too when it is someone
- * else's calendar; the person must be staff.
+ * `calendar.event.*` like any other. The checks are the route's: anybody on
+ * the staff may write their own time off (#2256); someone else's needs
+ * `calendar:write` and `calendar:manage`; the person must be staff.
  *
  * A plugin's reference makes `create()` idempotent. It is looked up first,
  * and migration 307's unique index catches two retries racing past the
@@ -124,9 +124,16 @@ final class HostTimeOff implements TimeOff
 
     private function assertMay(int $tenantId, int $actor, int $profileId): void
     {
-        $may = $actor > 0
-            && $this->roles->hasPermissionForProfile($actor, CorePermissions::CALENDAR_WRITE, $tenantId)
-            && ($actor === $profileId || $this->roles->hasPermissionForProfile($actor, CorePermissions::CALENDAR_MANAGE, $tenantId));
+        // #2256: every member of staff keeps their OWN time off, with no grant
+        // from an admin; a customer never does. Anybody else's still needs
+        // calendar:write and calendar:manage.
+        $may = $actor > 0 && (
+            $actor === $profileId
+                ? ($this->roles->isActiveStaff($actor, $tenantId)
+                    || $this->roles->hasPermissionForProfile($actor, CorePermissions::CALENDAR_WRITE, $tenantId))
+                : ($this->roles->hasPermissionForProfile($actor, CorePermissions::CALENDAR_WRITE, $tenantId)
+                    && $this->roles->hasPermissionForProfile($actor, CorePermissions::CALENDAR_MANAGE, $tenantId))
+        );
         if (!$may) {
             throw new TimeOffRejected(TimeOffRejected::FORBIDDEN, "Only someone who manages the calendar can change another person's time off.");
         }

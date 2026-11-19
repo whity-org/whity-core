@@ -82,6 +82,9 @@ final class TimeOffSdkRealEngineTest extends TestCase
         $roles->method('hasPermissionForProfile')->willReturnCallback(
             fn (int $profileId, string $permission, int $tenantId): bool => $tenantId === self::TENANT && in_array($permission, $this->grants[$profileId] ?? [], true)
         );
+        $roles->method('isActiveStaff')->willReturnCallback(
+            static fn (int $profileId, int $tenantId): bool => $tenantId === self::TENANT && in_array($profileId, [self::AMRO, self::AWSS, self::AHMAD], true)
+        );
         $this->timeOff = new HostTimeOff($this->bookings, $this->calendar, $roles);
         $this->awayService = new AwayService($this->pdo);
         $this->away = new HostAway($this->awayService, $this->calendar);
@@ -187,7 +190,7 @@ final class TimeOffSdkRealEngineTest extends TestCase
 
     public function testWritesUseTheTimeOffRoutesChecks(): void
     {
-        // One's own time off needs calendar:write.
+        // One's own time off (any member of staff since #2256).
         self::assertGreaterThan(0, $this->timeOff->create(self::TENANT, self::AHMAD, '2026-11-22T00:00:00Z', '2026-11-23T00:00:00Z', '', self::AHMAD));
 
         // Somebody else's needs calendar:manage too.
@@ -204,6 +207,22 @@ final class TimeOffSdkRealEngineTest extends TestCase
         self::assertFalse($this->timeOff->cancel(self::OTHER_TENANT, $mine, self::AWSS));
         self::assertNull($this->timeOff->byExternalRef(self::OTHER_TENANT, 'keyhub.leave:10'));
         self::assertSame(1, $this->rowsWhere("SELECT COUNT(*) FROM calendar_events WHERE id = {$mine} AND status = 'confirmed'"));
+    }
+
+    /**
+     * #2256: a member of staff keeps their OWN time off with no calendar
+     * permission at all; somebody else's still needs calendar:write and
+     * calendar:manage.
+     */
+    public function testAMemberOfStaffWritesTheirOwnTimeOffWithNoGrant(): void
+    {
+        $this->grants[self::AMRO] = [];
+
+        $id = $this->timeOff->create(self::TENANT, self::AMRO, '2026-11-22T00:00:00Z', '2026-11-23T00:00:00Z', 'Leave', self::AMRO);
+        self::assertGreaterThan(0, $id);
+        self::assertTrue($this->timeOff->cancel(self::TENANT, $id, self::AMRO));
+
+        self::assertSame(TimeOffRejected::FORBIDDEN, $this->reason(fn () => $this->timeOff->create(self::TENANT, self::AHMAD, '2026-11-22T00:00:00Z', '2026-11-23T00:00:00Z', '', self::AMRO)));
     }
 
     public function testRefusalsWriteNothing(): void

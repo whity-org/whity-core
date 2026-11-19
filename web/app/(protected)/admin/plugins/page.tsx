@@ -18,6 +18,7 @@ import { AdminHeader } from '@/components/admin/admin-header';
 import { PluginsTabs } from '@/components/plugins/plugins-tabs';
 import { PluginWorkspaceAccess, WorkspaceCodePlugins } from '@/components/plugins/workspace-code-plugins';
 import { PluginUpdateDialog, type PluginUpdateTarget } from '@/components/plugins/plugin-update-dialog';
+import { PluginCoreAccess } from '@/components/plugins/plugin-core-access';
 import { useDateDisplay } from '@whity/features/datetime';
 import { Button } from '@whity/ui/button';
 import { Badge } from '@whity/ui/badge';
@@ -961,6 +962,11 @@ export default function PluginsPage() {
                     </Badge>
                   </div>
                 )}
+
+                {/* #2256: core permissions the plugin asks for its roles, approved per role and workspace. */}
+                {isOperator ? (
+                  <PluginCoreAccess pluginName={detailPlugin.name} canChange={hasPermission(PLUGINS_INSTALL)} />
+                ) : null}
 
                 <TechnicalDetails>
                   <div>

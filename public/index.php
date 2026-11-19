@@ -2543,6 +2543,13 @@ $router->register('POST', '/api/plugins/{name}/reinstall', [$pluginsHandler, 're
 // #1907: approve an existing role for a plugin's own grants (migration 221).
 // It widens what the plugin can do, so it takes the install permission.
 $router->register('POST', '/api/plugins/{name}/roles/{role}/approve', [$pluginsHandler, 'approveRole'], null, null, CorePermissions::PLUGINS_INSTALL);
+// #2256: core permissions a plugin asks for its roles, approved by the operator
+// per role and per workspace. Granting is widening, so the install permission.
+$pluginCoreGrantsHandler = new \Whity\Api\PluginCoreGrantsApiHandler($db->getPdo(), $pluginLoader, $roleChecker, $auditLogger);
+$router->register('GET', '/api/plugins/{name}/core-grants', [$pluginCoreGrantsHandler, 'list'], null, null, CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/plugins/{name}/core-grants/{role}/approve', [$pluginCoreGrantsHandler, 'approve'], null, null, CorePermissions::PLUGINS_INSTALL);
+$router->register('POST', '/api/plugins/{name}/core-grants/{role}/revoke', [$pluginCoreGrantsHandler, 'revoke'], null, null, CorePermissions::PLUGINS_INSTALL);
+\Whity\register_service(\Whity\Sdk\Contribute\CorePermissionGrants::class, new \Whity\Core\Plugin\HostCorePermissionGrants(new \Whity\Core\Plugin\PluginCoreGrants($db->getPdo()), $pluginLoader));
 // WC-install-from-store: fetch a package from a TRUSTED plugin store (host must
 // be on the operator `plugins.store_allowed_hosts` allowlist; empty ⇒ disabled)
 // and stage it through the SAME hardened installer as an upload (lands DISABLED).
@@ -5475,8 +5482,11 @@ $router->register('DELETE', '/api/calendar/staff/{profileId:\d+}/feed',     [$ca
 $router->register('GET',    '/api/calendar/staff/{profileId:\d+}/hours',    [$calendarHandler, 'getHours'],        null, null, CorePermissions::CALENDAR_READ);
 $router->register('PUT',    '/api/calendar/staff/{profileId:\d+}/hours',    [$calendarHandler, 'putHours'],        null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('GET',    '/api/calendar/time-off',                       [$calendarHandler, 'listExceptions'],  null, null, CorePermissions::CALENDAR_READ);
-$router->register('POST',   '/api/calendar/time-off',                       [$calendarHandler, 'createException'], null, null, CorePermissions::CALENDAR_WRITE);
-$router->register('DELETE', '/api/calendar/time-off/{id:\d+}',              [$calendarHandler, 'deleteException'], null, null, CorePermissions::CALENDAR_WRITE);
+// #2256: every member of staff keeps their own time off with no grant, so these
+// two check in the handler (CalendarApiHandler::assertMayChangeTimeOff()):
+// anybody else's still needs calendar:write and calendar:manage.
+$router->register('POST',   '/api/calendar/time-off',                       [$calendarHandler, 'createException'], null);
+$router->register('DELETE', '/api/calendar/time-off/{id:\d+}',              [$calendarHandler, 'deleteException'], null);
 $router->register('GET',    '/api/calendar/services',                       [$calendarHandler, 'listServices'],    null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/services',                       [$calendarHandler, 'createService'],   null, null, CorePermissions::CALENDAR_MANAGE);
 $router->register('GET',    '/api/calendar/services/{id:\d+}',              [$calendarHandler, 'showService'],     null, null, CorePermissions::CALENDAR_READ);

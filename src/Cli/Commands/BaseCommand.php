@@ -787,6 +787,11 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $router->register('POST', '/api/plugins/{id}/uninstall', [$pluginsHandler, 'uninstall'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_UNINSTALL);
         // #1907: `plugin role-approve`, mirroring public/index.php.
         $router->register('POST', '/api/plugins/{name}/roles/{role}/approve', [$pluginsHandler, 'approveRole'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_INSTALL);
+        // #2256: `plugin core-grants`, `core-grant-approve`, `core-grant-revoke`, mirroring public/index.php.
+        $pluginCoreGrantsHandler = new \Whity\Api\PluginCoreGrantsApiHandler($db->getPdo(), $pluginLoader, $roleChecker, $auditLogger);
+        $router->register('GET', '/api/plugins/{name}/core-grants', [$pluginCoreGrantsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+        $router->register('POST', '/api/plugins/{name}/core-grants/{role}/approve', [$pluginCoreGrantsHandler, 'approve'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_INSTALL);
+        $router->register('POST', '/api/plugins/{name}/core-grants/{role}/revoke', [$pluginCoreGrantsHandler, 'revoke'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_INSTALL);
 
         $migrationsHandler = new MigrationsApiHandler($db, $baseDir . '/database/migrations');
         // #990: gated on the `migrations:*` slugs (migration 220). The list
