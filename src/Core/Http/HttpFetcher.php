@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Http;
 
+use Whity\Sdk\Http\Outbound\HttpFailure;
 use Whity\Sdk\Http\Outbound\AddressPolicy;
 
 /**
@@ -23,17 +24,27 @@ use Whity\Sdk\Http\Outbound\AddressPolicy;
  * to an internal one, TLS peer verification is on, and responses are size- and
  * time-bounded.
  *
- * LIMITATION: DNS is resolved for the guard and again by the fetch, so a
- * determined attacker controlling DNS could in theory race the two (TOCTOU).
- * Full protection needs a pinned-IP connect, which the file_get_contents
- * transport cannot express; given the URL is admin-configured (not arbitrary
- * user input) the range-block is the pragmatic, documented mitigation.
+ * PINNED (WHIT-1303, #2188): the host is resolved ONCE, the addresses are
+ * checked, and the request connects to that checked address, with the original
+ * host in `Host` and as the TLS peer name (so the certificate is still checked
+ * against it, and SNI still names it). A host whose DNS answers the check with
+ * a public address and the fetch with 169.254.169.254 never gets a second
+ * lookup to rebind. Same pinning as the S3 transport (WHIT-1284).
  */
 final class HttpFetcher implements HttpClient
 {
+    /**
+     * @param (\Closure(string): list<string>)|null $resolver host => its
+     *        addresses; the system's DNS by default. Tests pass their own.
+     * @param (\Closure(string, array<string, mixed>): array{0: string|false, 1: list<string>})|null $transport
+     *        (pinned url, stream context options) => [body or false, response
+     *        header lines]; file_get_contents by default. Tests pass their own.
+     */
     public function __construct(
         private readonly int $timeoutSeconds = 5,
         private readonly int $maxBytes = 1048576,
+        private readonly ?\Closure $resolver = null,
+        private readonly ?\Closure $transport = null,
     ) {
     }
 
@@ -84,22 +95,21 @@ final class HttpFetcher implements HttpClient
      */
     public function getBinary(string $url, array $headers = []): ?string
     {
-        if (!self::isPubliclyRoutableUrl($url)) {
-            throw new \RuntimeException('HttpFetcher: refused non-public or non-https URL');
-        }
+        [$target, $hostHeader, $peer] = $this->pinned($url);
 
-        $headerLines = "Accept: application/octet-stream, application/zip\r\n";
+        $headerLines = 'Host: ' . $hostHeader . "\r\n";
+        $headerLines .= "Accept: application/octet-stream, application/zip\r\n";
         foreach ($headers as $name => $value) {
             // Strip CR/LF so a crafted header name/value cannot inject additional
             // request headers (header-splitting).
             $name = str_replace(["\r", "\n"], '', $name);
             $value = str_replace(["\r", "\n"], '', $value);
-            if ($name !== '') {
+            if ($name !== '' && strtolower($name) !== 'host') {
                 $headerLines .= $name . ': ' . $value . "\r\n";
             }
         }
 
-        $context = stream_context_create([
+        [$raw, $responseHeaders] = $this->send($target, [
             'http' => [
                 'method'          => 'GET',
                 'header'          => $headerLines,
@@ -108,19 +118,12 @@ final class HttpFetcher implements HttpClient
                 'max_redirects'   => 0,      // never follow a redirect to a new host
                 'follow_location' => 0,
             ],
-            'ssl' => [
-                'verify_peer'      => true,
-                'verify_peer_name' => true,
-            ],
+            'ssl' => self::tls($peer),
         ]);
-
-        $raw = @file_get_contents($url, false, $context, 0, max(0, $this->maxBytes));
         if ($raw === false) {
             return null;
         }
-        // $http_response_header is populated by the stream wrapper on any completed
-        // response (we only reach here after a non-false read).
-        $status = self::statusFromHeaders($http_response_header);
+        $status = self::statusFromHeaders($responseHeaders);
         if ($status < 200 || $status >= 300) {
             return null;
         }
@@ -251,14 +254,13 @@ final class HttpFetcher implements HttpClient
         string $contentType = 'application/x-www-form-urlencoded',
     ): ?string
     {
-        if (!self::isPubliclyRoutableUrl($url)) {
-            // A blocked URL is a configuration/security problem, not a transient
-            // failure — surface it distinctly so the caller can log + 502 rather
-            // than silently treating it like an unreachable host.
-            throw new \RuntimeException('HttpFetcher: refused non-public or non-https URL');
-        }
+        // A blocked URL is a configuration/security problem, not a transient
+        // failure: pinned() throws so the caller can log + 502 rather than
+        // treating it like an unreachable host.
+        [$target, $hostHeader, $peer] = $this->pinned($url);
 
-        $headers = "Accept: application/json\r\n";
+        $headers = 'Host: ' . $hostHeader . "\r\n";
+        $headers .= "Accept: application/json\r\n";
         if ($body !== null) {
             $headers .= 'Content-Type: ' . $contentType . "\r\n";
         }
@@ -266,12 +268,12 @@ final class HttpFetcher implements HttpClient
             // Strip CR/LF so a header name or value cannot split the request.
             $name = str_replace(["\r", "\n"], '', (string) $name);
             $value = str_replace(["\r", "\n"], '', (string) $value);
-            if ($name !== '') {
+            if ($name !== '' && strtolower($name) !== 'host') {
                 $headers .= $name . ': ' . $value . "\r\n";
             }
         }
 
-        $context = stream_context_create([
+        [$raw] = $this->send($target, [
             'http' => [
                 'method'        => $method,
                 'header'        => $headers,
@@ -281,14 +283,91 @@ final class HttpFetcher implements HttpClient
                 'max_redirects' => 0,      // never follow a redirect to a new host
                 'follow_location' => 0,
             ],
-            'ssl' => [
-                'verify_peer'      => true,
-                'verify_peer_name' => true,
-            ],
+            'ssl' => self::tls($peer),
         ]);
 
-        $raw = @file_get_contents($url, false, $context, 0, max(0, $this->maxBytes));
         return $raw === false ? null : $raw;
+    }
+
+    /**
+     * The URL with its host replaced by the one checked address, the `Host`
+     * header value, and the TLS peer name (WHIT-1303, #2188). The host is
+     * resolved here and nowhere else.
+     *
+     * @return array{0: string, 1: string, 2: string}
+     * @throws \RuntimeException when the URL is not https with a plain public host
+     */
+    private function pinned(string $url): array
+    {
+        $refused = new \RuntimeException('HttpFetcher: refused non-public or non-https URL');
+        $parts = parse_url($url);
+        if (!is_array($parts) || strtolower($parts['scheme'] ?? '') !== 'https' || isset($parts['user']) || isset($parts['pass'])) {
+            throw $refused;
+        }
+        $host = (string) ($parts['host'] ?? '');
+        $bare = trim($host, '[]');
+        if ($bare === '') {
+            throw $refused;
+        }
+
+        $resolver = $this->resolver ?? self::resolveIps(...);
+        $policy = AddressPolicy::publicOnly(static function (string $name) use ($resolver): array {
+            $addresses = $resolver($name);
+            foreach ($addresses as $address) {
+                if (!self::isGlobalIp($address)) {
+                    return []; // NAT64 and the like: refuse the host, not just pick another address
+                }
+            }
+
+            return $addresses;
+        });
+        try {
+            $address = $policy->resolve($bare);
+        } catch (HttpFailure) {
+            throw $refused;
+        }
+        if (!self::isGlobalIp($address)) {
+            throw $refused;
+        }
+
+        $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+        $target = str_contains($address, ':') ? '[' . $address . ']' : $address;
+        $at = (int) strpos($url, $host, strlen('https://'));
+        $pinnedUrl = substr($url, 0, $at) . $target . substr($url, $at + strlen($host));
+
+        return [$pinnedUrl, (str_contains($bare, ':') ? '[' . $bare . ']' : $bare) . $port, $bare];
+    }
+
+    /**
+     * TLS checked against the original host, not the address connected to.
+     *
+     * @return array<string, mixed>
+     */
+    private static function tls(string $peer): array
+    {
+        return [
+            'verify_peer'      => true,
+            'verify_peer_name' => true,
+            'peer_name'        => $peer,
+            'SNI_enabled'      => true,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     * @return array{0: string|false, 1: list<string>}
+     */
+    private function send(string $pinnedUrl, array $options): array
+    {
+        if ($this->transport !== null) {
+            return ($this->transport)($pinnedUrl, $options);
+        }
+        $http_response_header = [];
+        $raw = @file_get_contents($pinnedUrl, false, stream_context_create($options), 0, max(0, $this->maxBytes));
+        /** @var list<string> $lines */
+        $lines = $http_response_header;
+
+        return [$raw, $lines];
     }
 
     /**
