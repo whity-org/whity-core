@@ -1293,6 +1293,8 @@ function systemText(m: ChatMessage, t: TranslateFn): string {
       });
     case 'left':
       return t('sys.left', '{by} left.', { by });
+    case 'joined':
+      return t('sys.joined', '{by} joined.', { by });
     case 'agent_removed':
       return t('sys.agentRemoved', '{by} removed {agent}.', {
         by,
