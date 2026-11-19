@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.127.0",
+    "sdk_version": "1.128.0",
     "core_version": "0.2.30",
     "updated": "2026-11-19",
     "ratings": {
@@ -136,10 +136,22 @@
                 {
                     "what": "PluginContext: $ctx->inventory() (Context\\InventoryScope) with items(), locations(), stock() and units()",
                     "since": "1.127"
+                },
+                {
+                    "what": "Inventory\\Operations: adjustments with the workspace's reasons, counts (expected taken per line, blind optional) and transfers (sent, on the way, received), through $ctx->inventory()->operations(), bound to the loaded plugin; the container copy only reads",
+                    "since": "1.128"
+                },
+                {
+                    "what": "Approval above the workspace's value: an adjustment or a count's differences travel their route (inventory.adjustment, inventory.count) before posting",
+                    "since": "1.128"
+                },
+                {
+                    "what": "Events inventory.operation.done, inventory.count.differences, stock.level.below_reorder and stock.level.restored",
+                    "since": "1.128"
                 }
             ],
             "missing": [
-                "Counts, transfers and reorder levels (P2)",
+                "Reorder levels and reasons as SDK services (they are on the API and MCP)",
                 "Purchase and sales orders, reservations (P3, P5)",
                 "Lots and expiry (P4)",
                 "Costing, accounting export, operation kinds, item fields, barcode parsers and price lists as extension points (P7)"

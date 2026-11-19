@@ -162,6 +162,8 @@ final class CorePermissionDescriptions
         CorePermissions::INVENTORY_WRITE              => 'Add and change items, units, barcodes and places',
         CorePermissions::STOCK_ADJUST                 => 'Set opening stock and adjust stock, waste included',
         CorePermissions::INVENTORY_SETTINGS           => 'Change the inventory settings',
+        CorePermissions::STOCK_COUNT                  => 'Count stock and finish counts',
+        CorePermissions::STOCK_TRANSFER               => 'Send and receive stock between places',
         CorePermissions::FIELDS_MANAGE                => 'Add, change and archive the workspace\'s own fields on its records',
         CorePermissions::TASKS_READ                   => 'See tasks and boards in the workspace\'s Taskaat',
         CorePermissions::TASKS_WRITE                  => 'Create and change tasks in the workspace\'s Taskaat: checks, evidence and reviews',

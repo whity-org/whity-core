@@ -502,6 +502,10 @@ final class CorePermissions
     public const INVENTORY_WRITE = 'inventory:write';
     public const STOCK_ADJUST = 'stock:adjust';
     public const INVENTORY_SETTINGS = 'inventory:settings';
+    // Counts go to every staff role, transfers to the roles that run the
+    // workspace (migration 320, WHIT-1233).
+    public const STOCK_COUNT = 'stock:count';
+    public const STOCK_TRANSFER = 'stock:transfer';
     // TASKS on Taskaat (A10, T.3). Tasks and boards live in the workspace's
     // Taskaat; these gate Whity's way into them. Read and write go to every
     // staff role (anchor documents:read); manage (connecting the workspace to
@@ -625,6 +629,8 @@ final class CorePermissions
             self::INVENTORY_WRITE,
             self::STOCK_ADJUST,
             self::INVENTORY_SETTINGS,
+            self::STOCK_COUNT,
+            self::STOCK_TRANSFER,
             self::FIELDS_MANAGE,
             self::TASKS_READ,
             self::TASKS_WRITE,

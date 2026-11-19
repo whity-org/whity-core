@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.127).
+ * SDK identity (v1.128).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1456,12 +1456,24 @@ namespace Whity\Sdk;
  * `inventory.item.created|updated|archived` (WHIT-1232, design section 31).
  *
  * Purely additive.)
+ *
+ * 1.128 (STOCK OPERATIONS: {@see Inventory\Operations} adjusts stock with a reason from the workspace's
+ * list, counts it (expected taken as each line is counted, blind counts optional) and moves it between
+ * places (sent, on the way, received), each as an {@see Inventory\Operation} with its
+ * {@see Inventory\OperationLine}s. An adjustment or a count's differences worth more than the workspace's
+ * value waits for approval on its route before it posts. A plugin writes through
+ * `$ctx->inventory()->operations()`, bound to the loaded plugin like `stock()`; the container's copy only
+ * reads. New events `inventory.operation.done`, `inventory.count.differences`,
+ * `stock.level.below_reorder` and `stock.level.restored`, each with an `.async` twin (WHIT-1233, design
+ * section 31 §3.6, §3.9).
+ *
+ * Purely additive: one new method on Context\InventoryScope, which only the host implements.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.127.0';
+    public const VERSION = '1.128.0';
 
     /**
      * Static identity only — never instantiated.

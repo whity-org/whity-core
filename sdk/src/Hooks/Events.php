@@ -471,6 +471,37 @@ final class Events
     public const INVENTORY_ITEM_ARCHIVED = 'inventory.item.archived';
     public const INVENTORY_ITEM_ARCHIVED_ASYNC = 'inventory.item.archived.async';
 
+    // ---- stock operations and reorder levels (SDK 1.128, WHIT-1233) ----
+    /**
+     * An adjustment, count or transfer is done: its stock has moved (for a
+     * transfer, it has arrived). Payload: `tenant_id`, `operation_id`, `kind`
+     * (`adjustment`, `count`, `transfer`), `number`, `batch_key`,
+     * `acting_profile_id`.
+     */
+    public const INVENTORY_OPERATION_DONE = 'inventory.operation.done';
+    public const INVENTORY_OPERATION_DONE_ASYNC = 'inventory.operation.done.async';
+    /**
+     * A count was finished and found differences, before they post (or before
+     * they wait for approval). Payload: `tenant_id`, `operation_id`, `number`,
+     * `location_id`, `waiting_approval` (bool), and `lines` (each `variant_id`,
+     * `expected`, `counted`, `difference` as base-unit decimals, `value_minor`,
+     * `currency`).
+     */
+    public const INVENTORY_COUNT_DIFFERENCES = 'inventory.count.differences';
+    public const INVENTORY_COUNT_DIFFERENCES_ASYNC = 'inventory.count.differences.async';
+    /**
+     * Stock available at a place went under its reorder level. Fires once,
+     * until it comes back. Payload: `tenant_id`, `rule_id`, `variant_id`,
+     * `location_id`, `available`, `min_quantity`, `order_up_to` (base-unit
+     * decimals; `order_up_to` may be null), `suggested_quantity`,
+     * `supplier_contact_id`.
+     */
+    public const STOCK_LEVEL_BELOW_REORDER = 'stock.level.below_reorder';
+    public const STOCK_LEVEL_BELOW_REORDER_ASYNC = 'stock.level.below_reorder.async';
+    /** Stock is back at or above its reorder level. Payload: `tenant_id`, `rule_id`, `variant_id`, `location_id`, `available`, `min_quantity`. */
+    public const STOCK_LEVEL_RESTORED = 'stock.level.restored';
+    public const STOCK_LEVEL_RESTORED_ASYNC = 'stock.level.restored.async';
+
     /**
      * The event name to dispatch for one of THIS plugin's own events (SDK 1.29).
      *

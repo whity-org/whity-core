@@ -356,6 +356,14 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `inventory.item.updated.async` | `INVENTORY_ITEM_UPDATED_ASYNC` | queued |  |
 | `inventory.item.archived` | `INVENTORY_ITEM_ARCHIVED` | observe | Payload: `tenant_id`, `item_id`, `acting_profile_id`. |
 | `inventory.item.archived.async` | `INVENTORY_ITEM_ARCHIVED_ASYNC` | queued |  |
+| `inventory.operation.done` | `INVENTORY_OPERATION_DONE` | observe | An adjustment, count or transfer is done: its stock has moved, or for a transfer arrived (SDK 1.128). Payload: `tenant_id`, `operation_id`, `kind`, `number`, `batch_key`, `acting_profile_id`. |
+| `inventory.operation.done.async` | `INVENTORY_OPERATION_DONE_ASYNC` | queued |  |
+| `inventory.count.differences` | `INVENTORY_COUNT_DIFFERENCES` | observe | A finished count found differences, before they post or wait for approval. Payload: `tenant_id`, `operation_id`, `number`, `location_id`, `waiting_approval`, `lines` (`variant_id`, `expected`, `counted`, `difference`, `value_minor`, `currency`). |
+| `inventory.count.differences.async` | `INVENTORY_COUNT_DIFFERENCES_ASYNC` | queued |  |
+| `stock.level.below_reorder` | `STOCK_LEVEL_BELOW_REORDER` | observe | Available stock at a place went under its reorder level; once, until it comes back. Payload: `tenant_id`, `rule_id`, `variant_id`, `location_id`, `available`, `min_quantity`, `order_up_to`, `suggested_quantity`, `supplier_contact_id`. |
+| `stock.level.below_reorder.async` | `STOCK_LEVEL_BELOW_REORDER_ASYNC` | queued |  |
+| `stock.level.restored` | `STOCK_LEVEL_RESTORED` | observe | Back at or above the reorder level. Payload: `tenant_id`, `rule_id`, `variant_id`, `location_id`, `available`, `min_quantity`. |
+| `stock.level.restored.async` | `STOCK_LEVEL_RESTORED_ASYNC` | queued |  |
 
 ### Deletion is transactional (WC-713)
 

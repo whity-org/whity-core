@@ -142,7 +142,10 @@ final class SettingsRegistryTest extends TestCase
              // WHIT-1035: customer sign-up, moved from workspace_signup_settings.
              'signup.mode', 'signup.role_id', 'signup.allowed_domains', 'signup.customer_invites',
              // WHIT-1043.
-             'signup.invites_per_customer', 'signup.route_template_id', 'messaging.webchat_enabled', 'messaging.webchat_greeting', 'messaging.inbound_email_address'],
+             'signup.invites_per_customer', 'signup.route_template_id', 'messaging.webchat_enabled', 'messaging.webchat_greeting', 'messaging.inbound_email_address',
+             // WHIT-1233: inventory approvals and transfers.
+             'inventory.approve_adjustments_above', 'inventory.approve_counts_above', 'inventory.adjustment_route_template_id',
+             'inventory.count_route_template_id', 'inventory.transfers_one_step'],
             SettingsRegistry::keys()
         );
     }
@@ -486,7 +489,8 @@ final class SettingsRegistryTest extends TestCase
         // 133 since WHIT-1168: auth.password_sign_in.
         // 135 since WHIT-1203: workspaces.additional_plan and additional_trial_days.
         // 137 since WHIT-1225: branding_theme and branding_theme_overrides.
-        self::assertCount(137, $describe);
+        // 142 since WHIT-1233: five inventory.* keys.
+        self::assertCount(142, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

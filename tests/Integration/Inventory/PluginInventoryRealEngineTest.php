@@ -10,13 +10,16 @@ use Tests\Support\SchemaFromMigrations;
 use Whity\Core\Inventory\Host\HostInventoryGuard;
 use Whity\Core\Inventory\Host\HostItems;
 use Whity\Core\Inventory\Host\HostLocations;
+use Whity\Core\Inventory\Host\HostOperations;
 use Whity\Core\Inventory\Host\HostStock;
 use Whity\Core\Inventory\Host\HostUnits;
 use Whity\Core\Inventory\InventoryDb;
 use Whity\Core\Inventory\InventoryWorkspace;
 use Whity\Core\Inventory\ItemService;
 use Whity\Core\Inventory\LocationService;
+use Whity\Core\Inventory\ReasonCatalog;
 use Whity\Core\Inventory\StockLedger;
+use Whity\Core\Inventory\StockOperations;
 use Whity\Core\Inventory\UnitCatalog;
 use Whity\Core\Plugin\HostPluginScope;
 use Whity\Core\Plugin\PluginIdentity;
@@ -24,6 +27,7 @@ use Whity\Core\RBAC\CorePermissions;
 use Whity\Sdk\Inventory\InventoryRejected;
 use Whity\Sdk\Inventory\MoveLine;
 use Whity\Sdk\Inventory\MoveRequest;
+use Whity\Sdk\Inventory\Operation;
 use Whity\Sdk\PluginInterface;
 
 /**
@@ -43,6 +47,7 @@ final class PluginInventoryRealEngineTest extends TestCase
     private HostLocations $locations;
     private HostStock $stock;
     private HostUnits $units;
+    private HostOperations $operations;
 
     /** The workspace the plugin's call runs in, as TenantContext would say. */
     private ?int $workspace = 1;
@@ -74,6 +79,57 @@ final class PluginInventoryRealEngineTest extends TestCase
         $this->locations = new HostLocations(new LocationService($db, $workspace), $guard);
         $this->stock = new HostStock($ledger, $guard);
         $this->units = new HostUnits($units, $items, $guard);
+        $reasons = new ReasonCatalog($db, $workspace);
+        $this->operations = new HostOperations(
+            new StockOperations($db, $workspace, $items, $units, $ledger, $reasons, static fn (int $t): array => []),
+            $guard,
+        );
+    }
+
+    public function testATillWritesOffAndCountsThroughOperationsUnderItsOwnName(): void
+    {
+        $pos = self::plugin('Pos');
+        PluginIdentity::bind($pos, 'Pos');
+        $bread = $this->items->create(['name' => 'Bread'], 11);
+        $variant = $bread->variants[0]->id;
+        $shop = $this->locations->create(['name' => 'Abdoun'], 11);
+        $till = $this->operations->for($pos);
+
+        $waste = $till->adjust($shop->id, 'unsold', [['variant_id' => $variant, 'change' => '-4']], 11, 'End of day', 'close-2026-11-19');
+        $again = $till->adjust($shop->id, 'unsold', [['variant_id' => $variant, 'change' => '-4']], 11, 'End of day', 'close-2026-11-19');
+        self::assertSame(Operation::ADJUSTMENT, $waste->kind);
+        self::assertSame('done', $waste->status, 'bread has no buying price, so nothing to approve');
+        self::assertSame('pos', $waste->sourcePlugin);
+        self::assertSame($waste->id, $again->id, 'the same key makes one');
+        self::assertSame('-4', $waste->lines[0]->change?->toDecimal());
+        self::assertSame(-4, $this->stock->available($variant, $shop->id)->steps);
+
+        $count = $till->startCount($shop->id, 11, ['variant_ids' => [$variant]]);
+        $till->recordCount($count->id, [['variant_id' => $variant, 'counted' => '0']], 11);
+        $done = $till->finishCount($count->id, 11);
+        self::assertSame('done', $done->status);
+        self::assertSame(0, $this->stock->available($variant, $shop->id)->steps);
+        self::assertCount(2, $this->operations->list(['location_id' => $shop->id]));
+
+        try {
+            $this->operations->adjust($shop->id, 'unsold', [['variant_id' => $variant, 'change' => '-1']], 11);
+            self::fail('the container\'s operations wrote');
+        } catch (InventoryRejected $e) {
+            self::assertSame(InventoryRejected::USE_PLUGIN_CONTEXT, $e->reason);
+        }
+        try {
+            $till->transfer($shop->id, $this->locations->create(['name' => 'Sweifieh'], 11)->id, [['variant_id' => $variant, 'quantity' => '1']], 12);
+            self::fail('a person who only reads moved stock');
+        } catch (InventoryRejected $e) {
+            self::assertSame(InventoryRejected::FORBIDDEN, $e->reason);
+        }
+        $this->workspace = 2;
+        try {
+            $this->operations->get($waste->id);
+            self::fail('another workspace read it');
+        } catch (InventoryRejected $e) {
+            self::assertSame(InventoryRejected::NOT_FOUND, $e->reason);
+        }
     }
 
     public function testATillSellsUnderItsOwnNameRetriesSafelyAndUndoes(): void

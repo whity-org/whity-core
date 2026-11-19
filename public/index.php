@@ -5593,7 +5593,27 @@ $customFieldRecordTypes->register(new \Whity\Core\CustomFields\CustomFieldRecord
     \Whity\Core\Inventory\ItemService::RESERVED_KEYS,
 ));
 $inventoryLocations = new \Whity\Core\Inventory\LocationService($inventoryDb, $inventoryWorkspace);
-$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager);
+$inventoryReasons = new \Whity\Core\Inventory\ReasonCatalog($inventoryDb, $inventoryWorkspace);
+$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager, $inventoryReasons);
+// WHIT-1233: adjustments, counts and transfers as records. Above the
+// workspace's value an adjustment or a count's differences travel a route
+// (inventory.adjustment, inventory.count); reorder levels watch every posting.
+$inventorySettings = static fn (int $tenantId): array => $settingsService->effective($tenantId);
+$inventoryOperations = new \Whity\Core\Inventory\StockOperations(
+    $inventoryDb,
+    $inventoryWorkspace,
+    $inventoryItems,
+    $inventoryUnits,
+    $inventoryLedger,
+    $inventoryReasons,
+    $inventorySettings,
+    $hookManager,
+);
+$routeSubjectRegistry->register(new \Whity\Core\Inventory\OperationRouteSubject(\Whity\Core\Inventory\OperationRouteSubject::ADJUSTMENT, $inventoryDb, $inventoryOperations));
+$routeSubjectRegistry->register(new \Whity\Core\Inventory\OperationRouteSubject(\Whity\Core\Inventory\OperationRouteSubject::COUNT, $inventoryDb, $inventoryOperations));
+$inventoryOperations->useApprovals(new \Whity\Core\Inventory\OperationRoutes($inventoryDb, $documentRouter, $routeTemplateRepository, $roleChecker, $inventorySettings));
+$inventoryReorder = new \Whity\Core\Inventory\ReorderRules($inventoryDb, $inventoryItems, $inventoryLedger, $hookManager);
+$inventoryReorder->subscribe($hookManager);
 $inventoryGuard = new \Whity\Core\Inventory\Host\HostInventoryGuard(
     $inventoryDb,
     static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
@@ -5602,7 +5622,18 @@ $inventoryGuard = new \Whity\Core\Inventory\Host\HostInventoryGuard(
 \Whity\register_service(\Whity\Sdk\Inventory\Locations::class, new \Whity\Core\Inventory\Host\HostLocations($inventoryLocations, $inventoryGuard)); // @phpstan-ignore-line
 \Whity\register_service(\Whity\Sdk\Inventory\Stock::class, new \Whity\Core\Inventory\Host\HostStock($inventoryLedger, $inventoryGuard)); // @phpstan-ignore-line
 \Whity\register_service(\Whity\Sdk\Inventory\Units::class, new \Whity\Core\Inventory\Host\HostUnits($inventoryUnits, $inventoryItems, $inventoryGuard)); // @phpstan-ignore-line
-$inventoryHandler = new \Whity\Api\InventoryApiHandler($inventoryUnits, $inventoryItems, $inventoryLocations, $inventoryLedger, $roleChecker);
+\Whity\register_service(\Whity\Sdk\Inventory\Operations::class, new \Whity\Core\Inventory\Host\HostOperations($inventoryOperations, $inventoryGuard)); // @phpstan-ignore-line
+$inventoryHandler = new \Whity\Api\InventoryApiHandler(
+    $inventoryUnits,
+    $inventoryItems,
+    $inventoryLocations,
+    $inventoryLedger,
+    $roleChecker,
+    $inventoryOperations,
+    $inventoryReasons,
+    $inventoryReorder,
+    $settingsService,
+);
 $router->register('GET',    '/api/inventory/units',                              [$inventoryHandler, 'listUnits'],      null, null, CorePermissions::INVENTORY_READ);
 $router->register('POST',   '/api/inventory/units',                              [$inventoryHandler, 'createUnit'],     null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/categories',                         [$inventoryHandler, 'listCategories'], null, null, CorePermissions::INVENTORY_READ);
@@ -5622,6 +5653,27 @@ $router->register('GET',    '/api/inventory/stock',                             
 $router->register('GET',    '/api/inventory/stock/moves',                        [$inventoryHandler, 'moves'],          null, null, CorePermissions::INVENTORY_READ);
 $router->register('POST',   '/api/inventory/stock/adjustments',                  [$inventoryHandler, 'adjust'],         null, null, CorePermissions::STOCK_ADJUST);
 $router->register('POST',   '/api/inventory/stock/batches/{key:[a-f0-9]+}/undo', [$inventoryHandler, 'undo'],         null, null, CorePermissions::STOCK_ADJUST);
+$router->register('GET',    '/api/inventory/operations',                         [$inventoryHandler, 'listOperations'],   null, null, CorePermissions::INVENTORY_READ);
+$router->register('GET',    '/api/inventory/operations/{id:\d+}',                [$inventoryHandler, 'showOperation'],    null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/adjustments',                        [$inventoryHandler, 'createAdjustment'], null, null, CorePermissions::STOCK_ADJUST);
+$router->register('POST',   '/api/inventory/adjustments/{id:\d+}/submit',        [$inventoryHandler, 'submitAdjustment'], null, null, CorePermissions::STOCK_ADJUST);
+$router->register('POST',   '/api/inventory/adjustments/{id:\d+}/cancel',        [$inventoryHandler, 'cancelAdjustment'], null, null, CorePermissions::STOCK_ADJUST);
+$router->register('POST',   '/api/inventory/counts',                             [$inventoryHandler, 'startCount'],       null, null, CorePermissions::STOCK_COUNT);
+$router->register('PUT',    '/api/inventory/counts/{id:\d+}/lines',              [$inventoryHandler, 'recordCount'],      null, null, CorePermissions::STOCK_COUNT);
+$router->register('POST',   '/api/inventory/counts/{id:\d+}/finish',             [$inventoryHandler, 'finishCount'],      null, null, CorePermissions::STOCK_COUNT);
+$router->register('POST',   '/api/inventory/counts/{id:\d+}/cancel',             [$inventoryHandler, 'cancelCount'],      null, null, CorePermissions::STOCK_COUNT);
+$router->register('POST',   '/api/inventory/transfers',                          [$inventoryHandler, 'createTransfer'],   null, null, CorePermissions::STOCK_TRANSFER);
+$router->register('POST',   '/api/inventory/transfers/{id:\d+}/send',            [$inventoryHandler, 'sendTransfer'],     null, null, CorePermissions::STOCK_TRANSFER);
+$router->register('POST',   '/api/inventory/transfers/{id:\d+}/receive',         [$inventoryHandler, 'receiveTransfer'],  null, null, CorePermissions::STOCK_TRANSFER);
+$router->register('POST',   '/api/inventory/transfers/{id:\d+}/cancel',          [$inventoryHandler, 'cancelTransfer'],   null, null, CorePermissions::STOCK_TRANSFER);
+$router->register('GET',    '/api/inventory/reasons',                            [$inventoryHandler, 'listReasons'],      null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/reasons',                            [$inventoryHandler, 'createReason'],     null, null, CorePermissions::INVENTORY_SETTINGS);
+$router->register('PATCH',  '/api/inventory/reasons/{id:\d+}',                   [$inventoryHandler, 'updateReason'],     null, null, CorePermissions::INVENTORY_SETTINGS);
+$router->register('GET',    '/api/inventory/reorder-rules',                      [$inventoryHandler, 'listReorderRules'], null, null, CorePermissions::INVENTORY_READ);
+$router->register('PUT',    '/api/inventory/reorder-rules',                      [$inventoryHandler, 'setReorderRule'],   null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('DELETE', '/api/inventory/reorder-rules/{id:\d+}',             [$inventoryHandler, 'deleteReorderRule'], null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/settings',                           [$inventoryHandler, 'showSettings'],     null, null, CorePermissions::INVENTORY_READ);
+$router->register('PATCH',  '/api/inventory/settings',                           [$inventoryHandler, 'updateSettings'],   null, null, CorePermissions::INVENTORY_SETTINGS);
 
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,

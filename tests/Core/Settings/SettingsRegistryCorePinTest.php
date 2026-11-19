@@ -221,6 +221,12 @@ final class SettingsRegistryCorePinTest extends TestCase
             'messaging.webchat_enabled',
             'messaging.webchat_greeting',
             'messaging.inbound_email_address',
+            // WHIT-1233: inventory approvals and transfers.
+            'inventory.approve_adjustments_above',
+            'inventory.approve_counts_above',
+            'inventory.adjustment_route_template_id',
+            'inventory.count_route_template_id',
+            'inventory.transfers_one_step',
         ];
     }
 
@@ -461,6 +467,11 @@ final class SettingsRegistryCorePinTest extends TestCase
             'messaging.webchat_enabled' => 'false',
             'messaging.webchat_greeting' => '',
             'messaging.inbound_email_address' => '',
+            'inventory.approve_adjustments_above' => '25',
+            'inventory.approve_counts_above' => '25',
+            'inventory.adjustment_route_template_id' => '0',
+            'inventory.count_route_template_id' => '0',
+            'inventory.transfers_one_step' => 'false',
         ];
     }
 

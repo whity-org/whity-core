@@ -654,6 +654,10 @@ final class TenantOwnedTables
         'inv_locations' => '318_create_inventory_stock_ledger.php',
         'inv_moves' => '318_create_inventory_stock_ledger.php',
         'inv_levels' => '318_create_inventory_stock_ledger.php',
+        'inv_reasons' => '320_create_inventory_operations.php',
+        'inv_operations' => '320_create_inventory_operations.php',
+        'inv_operation_lines' => '320_create_inventory_operations.php',
+        'inv_reorder_rules' => '320_create_inventory_operations.php',
     ];
 
     /**

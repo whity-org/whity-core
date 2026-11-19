@@ -6,6 +6,7 @@ namespace Whity\Sdk\Context;
 
 use Whity\Sdk\Inventory\Items;
 use Whity\Sdk\Inventory\Locations;
+use Whity\Sdk\Inventory\Operations;
 use Whity\Sdk\Inventory\Stock;
 use Whity\Sdk\Inventory\Units;
 
@@ -29,4 +30,10 @@ interface InventoryScope
     public function stock(): Stock;
 
     public function units(): Units;
+
+    /**
+     * Adjustments, counts and transfers, bound to the plugin like `stock()`
+     * (SDK 1.128, WHIT-1233).
+     */
+    public function operations(): Operations;
 }

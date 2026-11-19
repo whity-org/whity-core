@@ -95,8 +95,9 @@ $inventory->stock()->move(new MoveRequest(
 | `Inventory\Locations` | Real places and the virtual ones (supplier, customer, loss, found, production, consumed, opening, transit); create a place. | current | 1.127 |
 | `Inventory\Stock` | Levels, available and the append-only ledger. `move()` and `reverse()` post as your plugin, idempotent by key, only through `$ctx->inventory()->stock()`; the container copy reads and refuses writes (`use_plugin_context`). | current | 1.127 |
 | `Inventory\Units` | The workspace's units and exact conversions (`Inventory\Quantity`, never floats). | current | 1.127 |
+| `Inventory\Operations` | Adjustments with a reason, counts and transfers, each an `Inventory\Operation` with its lines. Through `$ctx->inventory()->operations()`, bound to your plugin; the container copy reads. Above the workspace's value an adjustment or a count's differences wait for approval. | current | 1.128 |
 
-`Context\InventoryScope` (`$ctx->inventory()`) holds the four. Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
+`Context\InventoryScope` (`$ctx->inventory()`) holds the five (`operations()` since 1.128). Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
 
 ## Contribution points: what a plugin declares
 
