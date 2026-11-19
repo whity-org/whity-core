@@ -106,6 +106,24 @@ final class PasswordResetHandlerRealEngineTest extends TestCase
         self::assertSame(0, $this->auditCount('auth.password_reset.requested'));
     }
 
+    /**
+     * #2245: an UNCONFIRMED address on an account may be a typo or somebody
+     * else's address; a reset link sent there would hand them the account.
+     */
+    public function testForgotForAnUnconfirmedAddressSendsNothing(): void
+    {
+        $profileId = $this->seedProfile('owner@acme.test', 'old-password');
+        $this->pdo->prepare(
+            "INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
+             VALUES (?, 'typo@acme.test', false, false, CURRENT_TIMESTAMP)"
+        )->execute([$profileId]);
+
+        $res = $this->forgot('typo@acme.test');
+        self::assertSame(202, $res->getStatusCode());
+        self::assertSame([], $this->mailer->sent);
+        self::assertSame(0, $this->auditCount('auth.password_reset.requested'));
+    }
+
     public function testForgotResponseIsIdenticalForKnownAndUnknownAddresses(): void
     {
         $this->seedProfile('exists@acme.test', 'x');

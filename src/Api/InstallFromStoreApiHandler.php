@@ -706,7 +706,7 @@ final class InstallFromStoreApiHandler
                 // A declarative plugin goes into one workspace, so any workspace may.
                 'can_install_declarative' => (TenantContext::getTenantId() ?? 0) > 0,
                 // WHIT-1003: whether this installation is connected to a store through Whity ID.
-                'connection' => $this->connector?->status() ?? ['connected' => false],
+                'connection' => $this->connectionForCaller(),
             ],
         ]);
     }
@@ -891,6 +891,11 @@ final class InstallFromStoreApiHandler
      */
     public function licenceStatus(Request $request, array $params = []): Response
     {
+        // WHIT-1275 (#2242): an installation's licences are the operator's.
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
         if ($this->licence === null) {
             return Response::json(['data' => \Whity\Sdk\Licensing\LicenceState::unlicensed('Licences are unavailable.')->toArray()]);
         }
@@ -908,7 +913,25 @@ final class InstallFromStoreApiHandler
      */
     public function connection(Request $request, array $params = []): Response
     {
-        return Response::json(['data' => $this->connector?->status() ?? ['connected' => false]]);
+        return Response::json(['data' => $this->connectionForCaller()]);
+    }
+
+    /**
+     * The store connection as this caller may see it (WHIT-1275, #2242). It is
+     * the operator's own Whity ID account, so a workspace learns only whether
+     * the installation is connected, to which store, and whether it needs
+     * signing in again: never the account, its issuer or when it connected.
+     *
+     * @return array<string, mixed>
+     */
+    private function connectionForCaller(): array
+    {
+        $status = $this->connector?->status() ?? ['connected' => false];
+        if (PluginOperatorGate::isOperator()) {
+            return $status;
+        }
+
+        return array_intersect_key($status, array_flip(['connected', 'store_host', 'needs_reconnect']));
     }
 
     /**
