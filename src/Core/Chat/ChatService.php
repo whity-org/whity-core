@@ -360,6 +360,11 @@ final class ChatService
     {
         $this->personOnly($viewer);
         [, $members] = $this->open($tenantId, $viewer, $chatId);
+        // #2252: an agent is its person's delegate, so only that person decides
+        // where it goes, what it reads and whether its posts wait for them.
+        if ($worksFor !== $viewer->profileId) {
+            throw new ChatException('Only the person an agent works for can add it to a chat.', 403);
+        }
         $agent = $this->agentOrFail($tenantId, $agentId);
         if (!in_array($reads, self::READS, true)) {
             throw new ChatException('Choose what it can read: from now on, the last 7 days or everything.');

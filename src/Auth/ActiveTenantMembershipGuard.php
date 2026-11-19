@@ -104,7 +104,11 @@ final class ActiveTenantMembershipGuard
 
         // System tenant (id 0): cross-tenant authority by platform convention —
         // no membership row required (mirrors EnforceTenantIsolation's bypass).
+        // A deactivated profile is still refused (#2261).
         if ($activeTenantId === self::SYSTEM_TENANT_ID) {
+            if (!$this->profileIsActive($profileId)) {
+                throw new InvalidMembershipException(401, 'Profile is deactivated');
+            }
             return;
         }
 
@@ -123,13 +127,21 @@ final class ActiveTenantMembershipGuard
      * id and the tenant id (tenant-predicate invariant). 'invited' and
      * 'suspended' rows do not grant access (ADR 0005 §3). Fails closed on any
      * database error.
+     *
+     * The profile itself must not be deactivated (#2227, #2261). Deactivation
+     * is a GLOBAL switch on `profiles.status` that leaves memberships alone, so
+     * without the join every token already issued (access, refresh, device,
+     * 90-day MCP, OAuth MCP) kept working after "Deactivate". Only 'inactive'
+     * refuses, matching the sign-in gate in AuthHandler.
      */
     private function hasActiveMembership(int $profileId, int $tenantId): bool
     {
         try {
             $stmt = $this->db->prepare(
-                "SELECT 1 FROM memberships
-                 WHERE profile_id = ? AND tenant_id = ? AND status = 'active'
+                "SELECT 1 FROM memberships m
+                 JOIN profiles p ON p.id = m.profile_id
+                 WHERE m.profile_id = ? AND m.tenant_id = ? AND m.status = 'active'
+                   AND p.status <> 'inactive'
                  LIMIT 1"
             );
             $stmt->execute([$profileId, $tenantId]);
@@ -137,6 +149,24 @@ final class ActiveTenantMembershipGuard
             return (bool) $stmt->fetchColumn();
         } catch (\Exception) {
             // Fail closed: an unreadable membership table must not grant access.
+            return false;
+        }
+    }
+
+    /**
+     * Whether the profile exists and is not deactivated. Used for the system
+     * tenant, which has no membership join to carry the check. `profiles` is a
+     * global identity table (ADR 0005 §1). Fails closed on a database error.
+     */
+    private function profileIsActive(int $profileId): bool
+    {
+        try {
+            $stmt = $this->db->prepare('SELECT status FROM profiles WHERE id = ? LIMIT 1');
+            $stmt->execute([$profileId]);
+            $status = $stmt->fetchColumn();
+
+            return $status !== false && (string) $status !== 'inactive';
+        } catch (\Exception) {
             return false;
         }
     }

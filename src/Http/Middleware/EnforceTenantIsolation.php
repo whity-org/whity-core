@@ -565,6 +565,26 @@ class EnforceTenantIsolation
             }
         }
 
+        // #2249: a session from a workspace's own sign-in provider is confined to
+        // that workspace. It may act there, but not on the person's global
+        // account nor in any other workspace — System Tenant 0 included.
+        if ($payload !== null) {
+            $confinedTenantId = \Whity\Auth\TenantConfinement::of($payload);
+            if ($confinedTenantId !== null
+                && (($payload['active_tenant_id'] ?? null) !== $confinedTenantId
+                    || !\Whity\Auth\TenantConfinement::allows($request->getMethod(), $path))
+            ) {
+                $this->logger->warning('Tenant isolation: confined session refused', [
+                    'event' => 'tenant_isolation.confined_session_refused',
+                    'tenant_id' => $confinedTenantId,
+                    'user_id' => $this->userIdFromPayload($payload),
+                    'path' => $path,
+                ]);
+
+                return Response::error(\Whity\Auth\TenantConfinement::REFUSAL, 403);
+            }
+        }
+
         // Delegate token -> tenant extraction and validation to the context. Any
         // failure (missing/invalid token, missing/invalid tenant claim) collapses
         // to a generic 401 so internals are never leaked to the client.

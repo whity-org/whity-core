@@ -611,6 +611,7 @@ final class SsoAuthHandler
             $email,
             $request,
             $inviteTenantId ?? ($ctx->isGlobalTrust() ? null : $tenantId),
+            !$ctx->isGlobalTrust(),
         );
         return $this->redirectForLoginResult($result, $profileId, $email, $ctx);
     }
@@ -635,8 +636,13 @@ final class SsoAuthHandler
             if ($preview === null) {
                 return null;
             }
+            // #2245: only a CONFIRMED address is theirs. An unconfirmed row is a
+            // claim anyone signed in can make on any address.
             $owner = $this->emails->findByEmail(strtolower(trim($preview['email'])));
-            if ($owner === null || (int) ($owner['profile_id'] ?? 0) !== $profileId) {
+            if ($owner === null
+                || ($owner['verified'] ?? false) !== true
+                || (int) ($owner['profile_id'] ?? 0) !== $profileId
+            ) {
                 return -1;
             }
 
@@ -718,7 +724,7 @@ final class SsoAuthHandler
         }
 
         // Straight into the workspace they joined.
-        $session = $this->auth->completeFederatedLogin($profileId, $email, $request, $joinTenantId);
+        $session = $this->auth->completeFederatedLogin($profileId, $email, $request, $joinTenantId, !$ctx->isGlobalTrust());
 
         return $session->getStatusCode() === 200
             ? new Response(302, '', ['Location' => $this->frontendLink(\Whity\Core\Http\FrontendUrls::SSO_SUCCESS)])
