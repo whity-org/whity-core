@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { backendUrl } from '@/lib/backend-url';
-import { CLIENT_IP_HEADER, stripClientIpHeaders, trustedClientIp } from '@/lib/trusted-client-ip';
+import { CLIENT_IP_HEADER, stripClientIpHeaders, trustedClientIp, trustedForwardedHost } from '@/lib/trusted-client-ip';
 
 /**
  * HTTP statuses that, per the Fetch spec, MUST NOT carry a response body.
@@ -61,9 +61,15 @@ async function proxyRequest(request: Request, method: string): Promise<Response>
     // ONLY the internal header, so a browser can neither spoof its IP nor preset
     // the internal header.
     const clientIp = trustedClientIp(request);
+    const forwardedHost = trustedForwardedHost(request);
     stripClientIpHeaders(headers);
     if (clientIp) {
       headers.set(CLIENT_IP_HEADER, clientIp);
+    }
+    // WHIT-1287 (#2195): the host the browser asked for, never one it claimed.
+    // The backend picks the workspace from it (custom domains, branding).
+    if (forwardedHost) {
+      headers.set('X-Forwarded-Host', forwardedHost);
     }
 
     // Force an identity (uncompressed) response on the proxy->backend leg.

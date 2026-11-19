@@ -344,6 +344,7 @@
         "sys.agentAddedQuiet": "{by} added {agent}. It works for {for} here, reads this chat {reads} and cannot post.",
         "sys.agentRemoved": "{by} removed {agent}.",
         "sys.created": "{by} started {title}.",
+        "sys.joined": "{by} joined.",
         "sys.left": "{by} left.",
         "sys.linked": "{by} linked the chat to {label}.",
         "sys.personAdded": "{by} added {person}.",
