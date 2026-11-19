@@ -428,6 +428,59 @@ final class DelegationServiceRealEngineTest extends TestCase
         );
     }
 
+    // ==================== #2254: only active memberships count ====================
+
+    public function testASuspendedMemberKeepsNoDirectDelegation(): void
+    {
+        $this->grant('admin', 'users:read');
+        $grantorId = $this->seedUser('admin@example.com', 'admin', 1);
+        $grantee = $this->seedUser('leaver@example.com', 'user', 1);
+
+        $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $grantee, ['users:read'], null);
+        RoleChecker::clearCache();
+        $this->assertTrue($this->delegationAwareChecker()->hasPermissionForProfile($grantee, 'users:read', 1), 'precondition');
+
+        $this->pdo->prepare("UPDATE memberships SET status = 'suspended' WHERE profile_id = ?")->execute([$grantee]);
+        RoleChecker::clearCache();
+
+        $this->assertSame(
+            [],
+            $this->delegationAwareChecker()->getEffectivePermissionsForProfile($grantee, 1),
+            'A suspended member must hold nothing here, delegations included.'
+        );
+    }
+
+    public function testASuspendedPrimaryMembershipsOuStopsCountingAndTheActiveOnesOuDoes(): void
+    {
+        $this->grant('admin', 'users:read');
+        $this->grant('admin', 'users:write');
+        $grantorId = $this->seedUser('admin@example.com', 'admin', 1);
+        $this->seedOu(300, 1, null, 'finance');
+        $this->seedOu(400, 1, null, 'support');
+
+        // Primary membership in Finance (suspended), second one in Support (active).
+        $person = $this->seedUser('doctor@example.com', 'user', 1, 300);
+        $this->pdo->prepare("UPDATE memberships SET is_primary = true, status = 'suspended' WHERE profile_id = ?")->execute([$person]);
+        $this->pdo->prepare(
+            "INSERT INTO memberships (profile_id, tenant_id, role_id, ou_id, is_primary, status, created_at)
+             VALUES (?, 1, (SELECT id FROM roles WHERE name = 'user'), 400, false, 'active', NOW())"
+        )->execute([$person]);
+
+        $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $person, ['users:write'], 300);
+        $this->service()->delegate(1, $grantorId, DelegationRepository::GRANTEE_PROFILE, $person, ['users:read'], 400);
+        RoleChecker::clearCache();
+
+        $checker = $this->delegationAwareChecker();
+        $this->assertFalse(
+            $checker->hasPermissionForProfile($person, 'users:write', 1),
+            'A delegation scoped to the OU of the suspended membership must not apply.'
+        );
+        $this->assertTrue(
+            $checker->hasPermissionForProfile($person, 'users:read', 1),
+            'A delegation scoped to the OU of the active membership must apply.'
+        );
+    }
+
     // ==================== Helpers ====================
 
     private function service(): DelegationService

@@ -328,6 +328,16 @@ class RoleChecker
             return self::$effectiveUserPermissionCache[$cacheKey];
         }
 
+        // #2254: no ACTIVE membership here means nothing here — not a role, not
+        // a resource grant, and not a delegation either. Roles already stopped
+        // at this gate; delegations did not, so a suspended or removed member
+        // kept every live delegation made to them.
+        if ($this->getActiveMembershipRows($profileId, $tenantId) === []) {
+            self::$effectiveUserPermissionCache[$cacheKey] = [];
+
+            return [];
+        }
+
         $permissions = [];
 
         $effectiveRoleIds = $this->getEffectiveRoleIdsForProfile($profileId, $tenantId, $resourceType, $resourceId);
@@ -714,10 +724,9 @@ class RoleChecker
     /**
      * Every ACTIVE membership a profile holds in a tenant.
      *
-     * `getMembershipRow()` answers "what is this profile HERE?" and must give
-     * exactly one answer — the primary row — because callers render it as the
-     * person's role and OU. This answers a different question: "everything this
-     * profile is here", which is a set.
+     * Not "what is this profile HERE?" (the primary row, which screens render
+     * as the person's role and OU) but "everything this profile is here",
+     * which is a set — and the only question authorization asks.
      *
      * A doctor attending in Emergency and part-timing in Family Medicine holds
      * two rows with two OUs; both contribute roles, and both OU chains are in
@@ -751,63 +760,32 @@ class RoleChecker
     }
 
     /**
-     * The ONE membership row that speaks for this profile in this tenant.
+     * Collect the OU ids in scope for a profile: the OU of every ACTIVE
+     * membership and every ancestor of each (walking
+     * organizational_units.parent_id up to the root), tenant scoped. The same
+     * set of rows {@see self::getEffectiveRoleIdsForProfile()} reads roles from.
      *
-     * Distinct from {@see self::getActiveMembershipRows()}, which answers the
-     * set-valued question. Callers here render a single role and a single OU,
-     * so they need exactly one answer: the primary row.
-     *
-     * @param int $profileId The profile id.
-     * @param int $tenantId  The tenant id.
-     * @return array{role_id: int|null, ou_id: int|null, status: string}|null
-     */
-    private function getMembershipRow(int $profileId, int $tenantId): ?array
-    {
-        $statement = $this->db->query(
-            // ORDER BY, not bare LIMIT 1: once a profile may hold more than
-            // one membership in a tenant (migration 094), an unordered pick
-            // returns whichever row the plan reaches first, so "what is my
-            // role here?" and "which OU am I in?" would answer differently
-            // between runs. The PRIMARY row is the answer; `id` breaks ties
-            // so the result is stable even if the partial unique index were
-            // ever missing.
-            'SELECT role_id, ou_id, status FROM memberships
-             WHERE profile_id = :profileId AND tenant_id = :tenantId
-             ORDER BY is_primary DESC, id ASC
-             LIMIT 1',
-            [':profileId' => $profileId, ':tenantId' => $tenantId]
-        );
-        $result = $statement->fetch();
-
-        if ($result === false) {
-            return null;
-        }
-
-        return [
-            'role_id' => $result['role_id'] !== null ? (int) $result['role_id'] : null,
-            'ou_id'   => $result['ou_id']   !== null ? (int) $result['ou_id']   : null,
-            'status'  => (string) $result['status'],
-        ];
-    }
-
-    /**
-     * Collect the OU ids in scope for a profile's membership: the membership's
-     * own OU and every ancestor OU (walking organizational_units.parent_id up to
-     * the root), tenant scoped. Returns an empty list when the profile's
-     * membership has no OU assignment.
+     * #2254: this used to read only the primary row, whatever its status, so a
+     * suspended primary membership kept its OU's delegations live while an
+     * active second membership's OU was ignored.
      *
      * @param int $profileId The profile id.
      * @param int $tenantId  The tenant id.
-     * @return array<int, int> Distinct OU ids (own OU + ancestors).
+     * @return array<int, int> Distinct OU ids (own OUs + ancestors).
      */
     private function getOuChainIdsForProfile(int $profileId, int $tenantId): array
     {
-        $membership = $this->getMembershipRow($profileId, $tenantId);
-        if ($membership === null || $membership['ou_id'] === null) {
-            return [];
+        $ouIds = [];
+        foreach ($this->getActiveMembershipRows($profileId, $tenantId) as $membership) {
+            if ($membership['ou_id'] === null) {
+                continue;
+            }
+            foreach ($this->buildOuChainIds($membership['ou_id'], $tenantId) as $ouId) {
+                $ouIds[$ouId] = true;
+            }
         }
 
-        return $this->buildOuChainIds((int) $membership['ou_id'], $tenantId);
+        return array_keys($ouIds);
     }
 
     // =========================================================================
