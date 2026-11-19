@@ -217,6 +217,33 @@ final class SessionService
     }
 
     /**
+     * Revoke every active session a profile holds, in every workspace. Used
+     * when the account is deactivated (#2238): deactivation is a global switch
+     * on the profile, so its sessions end everywhere. Returns the number revoked.
+     */
+    public function revokeAllForProfile(int $profileId): int
+    {
+        // @tenant-guard-ignore: deactivation is a GLOBAL profile switch (ADR 0005 §1); every session of this one profile ends, whatever workspace it is in.
+        $stmt = $this->db->prepare(
+            'SELECT id, access_jti, refresh_jti, expires_at FROM sessions
+             WHERE profile_id = ? AND revoked_at IS NULL'
+        );
+        $stmt->execute([$profileId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as $row) {
+            $this->blacklistAndStamp(
+                (int) $row['id'],
+                $row['access_jti'] !== null ? (string) $row['access_jti'] : null,
+                (string) $row['refresh_jti'],
+                (string) $row['expires_at']
+            );
+        }
+
+        return count($rows);
+    }
+
+    /**
      * Blacklist a session's current jti(s) into the shared revoked_tokens table
      * (so validateAccessToken rejects them immediately) and stamp revoked_at.
      */
