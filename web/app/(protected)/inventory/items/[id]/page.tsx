@@ -20,6 +20,7 @@ import { NoAccess } from '@/components/no-access';
 import { AdjustStockDialog, reasonLabel } from '@/components/inventory/adjust-stock-dialog';
 import { ItemFormDialog, kindLabel } from '@/components/inventory/item-form-dialog';
 import { useCapabilities } from '@/hooks/useCapabilities';
+import { useDateDisplay } from '@whity/features/datetime';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 import { Alert, AlertDescription } from '@whity/ui/alert';
@@ -43,6 +44,7 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
   const { id } = use(params);
   const itemId = Number(id);
   const t = useTranslation('admin');
+  const dates = useDateDisplay();
   const language = useLanguageCode();
   const toast = useToast();
   const { has, loading: accessLoading } = useCapabilities();
@@ -299,9 +301,7 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        <bdi dir="ltr" className="font-mono">
-                          {move.occurred_at}
-                        </bdi>
+                        {dates.dateTime(move.occurred_at) ?? ''}
                         {move.posted_by_name ? ` · ${move.posted_by_name}` : ''}
                         {move.note ? ` · ${move.note}` : ''}
                       </div>
