@@ -6,6 +6,8 @@ namespace Whity\Mcp\Resources;
 
 use Whity\Core\Router;
 use Whity\Mcp\McpExposure;
+use Whity\Mcp\Tools\ToolDeriver;
+use Whity\Mcp\Tools\ToolSurface;
 
 /**
  * Derives MCP resource definitions from GET route declarations (WC-30513809).
@@ -94,7 +96,11 @@ final class ResourceDeriver
      * Values carry the requiredRole and requiredPermission from the declaration or
      * router route — both null means the resource is open (no RBAC required).
      *
-     * @return array<string, array{requiredRole: ?string, requiredPermission: ?string}>
+     * Each entry also carries the route's `agentPolicy` ceiling and its
+     * toolset, so resources/list and resources/read apply an agent's grant and
+     * a token's toolset narrowing exactly as tools/list and tools/call do (#2266).
+     *
+     * @return array<string, array{requiredRole: ?string, requiredPermission: ?string, agentPolicy: string, toolset: string}>
      */
     public function buildAccessMap(bool $exposedOnly = false): array
     {
@@ -113,10 +119,7 @@ final class ResourceDeriver
             $path = $this->versionedPath((string) ($decl['path'] ?? ''));
             $uri  = self::URI_SCHEME . $this->cleanPathConstraints($path);
 
-            $accessMap[$uri] = [
-                'requiredRole'       => is_string($decl['requiredRole'] ?? null) ? $decl['requiredRole'] : null,
-                'requiredPermission' => is_string($decl['requiredPermission'] ?? null) ? $decl['requiredPermission'] : null,
-            ];
+            $accessMap[$uri] = self::accessOf($decl, $schema);
         }
 
         // Router-native routes: paths already versioned by Router::register().
@@ -131,14 +134,39 @@ final class ResourceDeriver
                 }
                 $uri = self::URI_SCHEME . $this->cleanPathConstraints($route['path']);
 
-                $accessMap[$uri] = [
-                    'requiredRole'       => is_string($route['requiredRole'] ?? null) ? $route['requiredRole'] : null,
-                    'requiredPermission' => is_string($route['requiredPermission'] ?? null) ? $route['requiredPermission'] : null,
-                ];
+                $accessMap[$uri] = self::accessOf($route, $schema);
             }
         }
 
         return $accessMap;
+    }
+
+    /**
+     * The access entry of the route with this (versioned) path pattern when it
+     * is on the resource surface, else null. resources/read takes this as the
+     * answer to "may this be read here at all": an opt-out declared in the
+     * static schemas counts even for a gated Router route (#2202).
+     *
+     * @return array{requiredRole: ?string, requiredPermission: ?string, agentPolicy: string, toolset: string}|null
+     */
+    public function accessForRoute(string $routePath): ?array
+    {
+        return $this->buildAccessMap(true)[self::URI_SCHEME . $this->cleanPathConstraints($routePath)] ?? null;
+    }
+
+    /**
+     * @param array<string, mixed> $route
+     * @param array<string, mixed> $schema
+     * @return array{requiredRole: ?string, requiredPermission: ?string, agentPolicy: string, toolset: string}
+     */
+    private static function accessOf(array $route, array $schema): array
+    {
+        return [
+            'requiredRole'       => is_string($route['requiredRole'] ?? null) ? $route['requiredRole'] : null,
+            'requiredPermission' => is_string($route['requiredPermission'] ?? null) ? $route['requiredPermission'] : null,
+            'agentPolicy'        => ToolSurface::routeOptions($schema)['agentPolicy'] ?? ToolSurface::AGENT_ALLOW,
+            'toolset'            => ToolDeriver::toolsetForRoute($route),
+        ];
     }
 
     /**

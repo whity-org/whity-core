@@ -98,7 +98,7 @@ final class TenantPluginVersionsApiHandler
             if ($enabled && $this->trust !== null) {
                 foreach ($this->plugins->plugins($tenantId) as $row) {
                     if ($row['plugin'] === $plugin && $this->trust->isKilled($plugin, $row['version'])) {
-                        return Response::error('This version was withdrawn for a security reason.', 409);
+                        return self::withdrawn();
                     }
                 }
             }
@@ -189,6 +189,12 @@ final class TenantPluginVersionsApiHandler
 
                 return self::invalid($e->getErrors());
             }
+            // WHIT-1277 (#2244): a version a signed list killed doesn't go live again.
+            if ($this->trust?->isKilled($draft->name(), $draft->version()) === true) {
+                $this->refused($tenantId, $actor, $draft->name(), 'withdrawn', ['version' => $draft->version()]);
+
+                return self::withdrawn();
+            }
 
             $tests = $this->tests->run($tenantId, $draft);
             if ($tests['failed'] > 0) {
@@ -278,6 +284,11 @@ final class TenantPluginVersionsApiHandler
             if ($target->name() !== $plugin) {
                 return self::notFound();
             }
+            if ($this->trust?->isKilled($plugin, $target->version()) === true) {
+                $this->refused($tenantId, $actor, $plugin, 'withdrawn', ['version_id' => $id, 'version' => $target->version()]);
+
+                return self::withdrawn();
+            }
 
             $plan = $this->impact->plan($tenantId, $this->plugins->liveManifest($tenantId, $plugin), $target);
             if ($plan['level'] === ManifestImpact::DESTRUCTIVE && (JsonBody::parsed($request)['confirmDestructive'] ?? false) !== true) {
@@ -292,6 +303,11 @@ final class TenantPluginVersionsApiHandler
                 ? self::notFound()
                 : Response::json(['data' => $activated + ['impact' => $plan]]);
         });
+    }
+
+    private static function withdrawn(): Response
+    {
+        return Response::error('This version was withdrawn for a security reason.', 409);
     }
 
     /**

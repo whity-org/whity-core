@@ -10,6 +10,7 @@ use Whity\Core\Response;
 use Whity\Core\Search\SearchContext;
 use Whity\Core\Search\SearchService;
 use Whity\Core\Tenant\TenantContext;
+use Whity\Mcp\Auth\McpCallerScope;
 
 /**
  * `GET /api/search?q=&types=&limit=` (WHIT-783, docs/design/MCP-TOOL-SURFACE.md §5.13).
@@ -27,6 +28,10 @@ use Whity\Core\Tenant\TenantContext;
  *
  * `GET /api/search/types` lists the types this caller could search, for a
  * client that offers a filter.
+ *
+ * Over MCP the credential narrows this further (#2253): a type whose list
+ * permission the token leaves out, or an agent's grant does not leave
+ * Allowed, is neither searched nor listed.
  */
 final class SearchApiHandler
 {
@@ -87,11 +92,15 @@ final class SearchApiHandler
             return Response::error('Unauthenticated', 401);
         }
 
+        // #2253: over MCP, a type is searched only when the credential also
+        // reaches its permission: a narrowed token's scope, and an agent's grant
+        // (a read, so only Allowed). The person's RBAC alone is not enough.
         $checker = $this->roleChecker;
         return new SearchContext(
             $tenantId,
             $profile,
-            static fn (string $permission): bool => $checker->hasPermissionForProfile($profile, $permission, $tenantId),
+            static fn (string $permission): bool => McpCallerScope::permits($actor, $permission, true)
+                && $checker->hasPermissionForProfile($profile, $permission, $tenantId),
         );
     }
 

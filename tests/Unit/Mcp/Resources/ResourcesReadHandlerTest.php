@@ -67,7 +67,7 @@ final class ResourcesReadHandlerTest extends TestCase
         $this->tokenValidator = $this->createMock(TokenValidator::class);
 
         $principal = new McpPrincipal(self::USER_ID, self::USER_ID, self::TENANT_ID, 'user', ['resources:read'], 'jti-xyz');
-        $this->tokenValidator->method('validateMcpToken')->willReturn($principal);
+        $this->tokenValidator->method('validateBearerForMcp')->willReturn($principal);
 
         $this->handler = new ResourcesReadHandler(
             $this->router,
@@ -90,7 +90,6 @@ final class ResourcesReadHandlerTest extends TestCase
     {
         $validator = $this->createMock(TokenValidator::class);
         $principal = new McpPrincipal(self::USER_ID, self::USER_ID, self::TENANT_ID, 'user', $scope, 'jti-scope');
-        $validator->method('validateMcpToken')->willReturn($principal);
         $validator->method('validateBearerForMcp')->willReturn($principal);
 
         return new ResourcesReadHandler($this->router, $this->roleChecker, $validator, resourceDeriver: $deriver);

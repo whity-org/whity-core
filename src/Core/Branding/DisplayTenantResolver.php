@@ -50,7 +50,7 @@ final class DisplayTenantResolver
             return $fromToken;
         }
 
-        $host = $request->getHeader('X-Forwarded-Host') ?? $request->getHeader('Host') ?? '';
+        $host = \Whity\Core\Http\RequestHost::fromRequest($request);
 
         return $this->hostResolver->resolveTenantIdByHost($host) ?? 0;
     }

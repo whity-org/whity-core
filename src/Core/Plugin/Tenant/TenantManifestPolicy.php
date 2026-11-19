@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Core\Plugin\Tenant;
 
+use Whity\Core\RBAC\CorePermissions;
 use Whity\Sdk\Manifest\PluginManifest;
 use Whity\Sdk\PluginNamespace;
 
@@ -26,6 +27,11 @@ use Whity\Sdk\PluginNamespace;
  * - permissions only under its own name (`cake_orders:read` for a plugin
  *   called CakeOrders or cake_orders), so it can't declare a slug core or
  *   another plugin gates something with;
+ * - a name that is not a core permission resource (`users`, `roles`,
+ *   `settings`, ...), and no permission whose resource is one (#2255). Without
+ *   this a plugin named `users` could declare `users:write`, and the catalogue
+ *   would then hide that core permission from every other workspace as
+ *   "another workspace's plugin";
  * - roles whose parent is one of its own roles, so a role it suggests can't
  *   inherit an administrator's permissions;
  * - screens that read and write only its own record routes, `/api/x/<slug>/`.
@@ -69,10 +75,18 @@ final class TenantManifestPolicy
             }
         }
 
+        $coreResources = self::coreResources();
+        if ($slug !== null && isset($coreResources[$slug])) {
+            $errors[] = "plugin.name: \"{$name}\" is a name Whity itself uses for permissions";
+        }
+
         foreach ($manifest->permissions() as $i => $permission) {
             $resource = explode(':', $permission, 2)[0];
             if ($slug === null || ($resource !== $slug && !str_starts_with($resource, $slug . '_'))) {
                 $errors[] = "permissions[{$i}].slug: \"{$permission}\" must start with \"{$slug}:\" or \"{$slug}_\"";
+            } elseif (isset($coreResources[$resource])) {
+                // `email` passes the prefix rule for `email_domains:manage`.
+                $errors[] = "permissions[{$i}].slug: \"{$permission}\" is a permission Whity itself uses";
             }
         }
 
@@ -94,6 +108,23 @@ final class TenantManifestPolicy
         }
 
         return $errors;
+    }
+
+    /**
+     * The resource part of every core permission (`users` for `users:read`),
+     * as a set. Shared with {@see TenantPluginRepository::permissionsOfOtherTenants()},
+     * which never hides one of these.
+     *
+     * @return array<string, true>
+     */
+    public static function coreResources(): array
+    {
+        $resources = [];
+        foreach (CorePermissions::all() as $permission) {
+            $resources[explode(':', $permission, 2)[0]] = true;
+        }
+
+        return $resources;
     }
 
     /**

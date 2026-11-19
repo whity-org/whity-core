@@ -508,7 +508,7 @@ final class PublicBookingApiHandler
         if ($tenantId === null || $tenantId === self::SYSTEM_TENANT_ID) {
             return null;
         }
-        $host = $request->getHeader('X-Forwarded-Host') ?? $request->getHeader('Host') ?? '';
+        $host = \Whity\Core\Http\RequestHost::fromRequest($request);
         $hostTenant = $this->hosts->resolveTenantIdByHost($host);
         if ($hostTenant !== null && $hostTenant !== $tenantId) {
             return null;

@@ -244,7 +244,7 @@ final class SsoAuthHandler
             return null;
         }
 
-        $host = $request->getHeader('X-Forwarded-Host') ?? $request->getHeader('Host') ?? '';
+        $host = \Whity\Core\Http\RequestHost::fromRequest($request);
         $hostTenant = $this->hostResolver->resolveTenantIdByHost($host);
         if ($hostTenant !== null && $hostTenant !== $tenantId) {
             return null;
@@ -783,7 +783,7 @@ final class SsoAuthHandler
      */
     private function resolveTenantId(Request $request): int
     {
-        $host = $request->getHeader('X-Forwarded-Host') ?? $request->getHeader('Host') ?? '';
+        $host = \Whity\Core\Http\RequestHost::fromRequest($request);
         return $this->hostResolver->resolveTenantIdByHost($host) ?? 0;
     }
 

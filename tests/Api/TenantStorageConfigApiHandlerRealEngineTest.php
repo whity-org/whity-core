@@ -36,7 +36,9 @@ final class TenantStorageConfigApiHandlerRealEngineTest extends TestCase
         $this->pdo = SchemaFromMigrations::make(true);
         $this->secrets = new EncryptedSecretStore(['v1' => self::KEY], 'v1');
         $this->entitlements = new EntitlementService(new TenantEntitlementRepository($this->pdo));
-        $this->handler = new TenantStorageConfigApiHandler($this->pdo, $this->secrets, $this->entitlements);
+        // Name resolution without the network: s3.example.com is public,
+        // the others are on the deployment's own network.
+        $this->handler = new TenantStorageConfigApiHandler($this->pdo, $this->secrets, $this->entitlements, self::endpoints());
 
         $stmt = $this->pdo->prepare('INSERT INTO tenants (name, slug, created_at) VALUES (:n, :s, NOW())');
         self::assertNotFalse($stmt);
@@ -141,6 +143,37 @@ final class TenantStorageConfigApiHandlerRealEngineTest extends TestCase
     {
         $this->entitle();
         self::assertSame(422, $this->put($this->validBody(['endpoint' => 'http://insecure.example']))->getStatusCode());
+    }
+
+    /**
+     * WHIT-1284 (#2240): the server itself talks to a workspace's endpoint,
+     * so one on the deployment's own network is refused.
+     */
+    public function testPutRefusesAnEndpointThatIsNotOnThePublicInternet(): void
+    {
+        $this->entitle();
+        foreach ([
+            'https://minio.internal',
+            'https://127.0.0.1',
+            'https://169.254.169.254',
+            'https://[::ffff:10.0.0.1]',
+            'https://kubernetes.default.svc:443',
+            'https://unresolvable.example',
+            'https://AKIA:secret@s3.example.com',
+        ] as $endpoint) {
+            self::assertSame(422, $this->put($this->validBody(['endpoint' => $endpoint]))->getStatusCode(), $endpoint);
+        }
+        self::assertSame(200, $this->put($this->validBody())->getStatusCode());
+    }
+
+    public static function endpoints(): \Whity\Sdk\Http\Outbound\AddressPolicy
+    {
+        return \Whity\Sdk\Http\Outbound\AddressPolicy::publicOnly(static fn (string $host): array => match ($host) {
+            's3.example.com' => ['93.184.215.14'],
+            'minio.internal' => ['10.0.0.7'],
+            'kubernetes.default.svc' => ['10.96.0.1'],
+            default => [],
+        });
     }
 
     public function testPutRequiresCoreFields(): void

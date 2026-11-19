@@ -39,6 +39,13 @@ final class HttpFetcherTest extends TestCase
             ['https://[64:ff9b::a9fe:a9fe]/x'],            // NAT64 of 169.254.169.254
             ['https://[fe80::1]/x'],                       // IPv6 link-local
             ['https://[fc00::1]/x'],                       // IPv6 unique local
+            // WHIT-1284 (#2214): credentials in the authority, multicast.
+            ['https://user:pass@8.8.8.8/x'],
+            ['https://user@8.8.8.8/x'],
+            ['https://8.8.8.8@127.0.0.1/x'],
+            ['https://224.0.0.1/x'],                       // IPv4 multicast
+            ['https://[ff02::1]/x'],                       // IPv6 multicast
+            ['https://[64:ff9b::808:808]/x'],              // NAT64, even of a public address
             ['https://localhost/x'],                       // resolves to loopback
             ['https:///no-host'],                          // no host
             ['not-a-url'],                                 // unparseable
@@ -60,6 +67,7 @@ final class HttpFetcherTest extends TestCase
             ['https://8.8.8.8/x'],           // public IPv4 literal
             ['https://1.1.1.1/'],            // public IPv4 literal
             ['https://[2001:4860:4860::8888]/x'], // public IPv6 literal (Google DNS)
+            ['HTTPS://8.8.8.8/x'],           // the scheme is not case-sensitive
         ];
     }
 

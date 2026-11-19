@@ -7,6 +7,8 @@ namespace Whity\Mcp\Prompts;
 use Whity\Auth\RoleChecker;
 use Whity\Auth\TokenValidator;
 use Whity\Core\Tenant\TenantContext;
+use Whity\Mcp\Auth\AgentScopeGrant;
+use Whity\Mcp\Auth\OAuth\OAuthTokenRefusedException;
 use Whity\Mcp\JsonRpc\ErrorCode;
 use Whity\Mcp\JsonRpc\McpException;
 use Whity\Mcp\JsonRpc\MethodHandler;
@@ -54,9 +56,12 @@ final class PromptsGetHandler implements MethodHandler
 
         // 3. Enforce RBAC for protected prompts.
         if (!$prompt->isOpen()) {
-            $principal = $bearerToken !== null
-                ? $this->tokenValidator->validateMcpToken($bearerToken)
-                : null;
+            try {
+                // #2202: every bearer the Dispatcher accepts, not only MCP tokens.
+                $principal = $bearerToken !== null ? $this->tokenValidator->validateBearerForMcp($bearerToken) : null;
+            } catch (OAuthTokenRefusedException) {
+                $principal = null;
+            }
             if ($principal === null) {
                 throw new McpException(ErrorCode::UNAUTHENTICATED, 'Unauthenticated');
             }
@@ -66,6 +71,11 @@ final class PromptsGetHandler implements MethodHandler
             }
             if (!McpScope::of($principal)->allowsPermission($prompt->requiredPermission)) {
                 throw new McpException(ErrorCode::FORBIDDEN, 'Forbidden');
+            }
+            // #2266: an agent's grant holds here as on tools/call. No approval
+            // flow, so only Allowed passes.
+            if (!AgentScopeGrant::permitsRead($principal, $prompt->requiredPermission)) {
+                throw new McpException(ErrorCode::FORBIDDEN, 'This agent is not granted this operation.');
             }
             if ($prompt->requiredPermission !== null) {
                 if (!$this->roleChecker->hasPermissionForProfile($principal->userId, $prompt->requiredPermission, $tenantId)) {

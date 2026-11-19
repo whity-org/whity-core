@@ -7,7 +7,10 @@ namespace Tests\Integration\Queue;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
+use Whity\Auth\RoleChecker;
 use Whity\Core\Queue\JobRegistry;
+use Whity\Core\RBAC\PermissionRegistry;
+use Whity\Database\Database;
 use Whity\Core\Queue\JobRepository;
 use Whity\Core\Queue\JobRunner;
 use Whity\Core\Tenant\TenantContext;
@@ -68,6 +71,41 @@ final class JobRunnerRealEngineTest extends TestCase
 
         self::assertSame(2, $seenTenant, 'the handler saw its job\'s origin tenant');
         self::assertNull(TenantContext::getTenantId(), 'tenant context is reset after the job');
+    }
+
+    /**
+     * #2205: a permission revoked between two jobs must be gone in the second.
+     * RoleChecker's caches are process-wide, so without a reset per job a
+     * long-running worker kept serving the old answer until it recycled.
+     */
+    public function testAPermissionRevokedBetweenJobsIsGoneInTheNextJob(): void
+    {
+        $pdo = $this->pdo;
+        $this->pdo->exec("INSERT INTO roles (name, description, tenant_id, created_at) VALUES ('clerk', '', 1, NOW())");
+        $roleId = (int) $this->pdo->lastInsertId();
+        $this->pdo->exec("INSERT OR IGNORE INTO permissions (name, created_at) VALUES ('users:read', NOW())");
+        $this->pdo->exec("INSERT INTO role_permissions (role_id, permission_id, created_at)
+            SELECT {$roleId}, id, NOW() FROM permissions WHERE name = 'users:read'");
+
+        $checker = new RoleChecker(Database::withFactory(static fn (): PDO => $pdo), new PermissionRegistry());
+        $seen = [];
+        $this->registry->register('check', $this->handler(static function () use ($checker, $roleId, &$seen): void {
+            $seen[] = $checker->getEffectivePermissionsForRole($roleId);
+        }));
+        $resets = 0;
+        $this->runner->setAfterJob(static function () use (&$resets): void {
+            $resets++;
+        });
+
+        $this->repo->enqueue(self::TENANT, 'check', []);
+        $this->runner->processNext();
+        $this->pdo->exec("DELETE FROM role_permissions WHERE role_id = {$roleId}");
+        $this->repo->enqueue(self::TENANT, 'check', []);
+        $this->runner->processNext();
+
+        self::assertSame([['users:read'], []], $seen, 'the second job must not see the revoked permission');
+        self::assertSame(2, $resets, 'the kernel\'s per-request reads are reset after every job');
+        RoleChecker::clearCache();
     }
 
     public function testFailingHandlerIsRetriedThenDeadLettered(): void

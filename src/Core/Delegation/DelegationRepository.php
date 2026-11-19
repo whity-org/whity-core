@@ -412,7 +412,7 @@ class DelegationRepository
      * ({@see DelegationService::delegatedPermissionsForUser()}).
      *
      * @param array<int,int> $inScopeOuIds
-     * @return list<array{permission: string, grantor: int}>
+     * @return list<array{permission: string, grantor: int, ou: int|null}>
      */
     public function liveGrantsForGrantee(
         int $tenantId,
@@ -420,7 +420,7 @@ class DelegationRepository
         int $granteeId,
         array $inScopeOuIds
     ): array {
-        $sql = 'SELECT DISTINCT permission, grantor_profile_id
+        $sql = 'SELECT DISTINCT permission, grantor_profile_id, ou_id
                 FROM permission_delegations
                 WHERE tenant_id = :tenant_id
                   AND grantee_type = :grantee_type
@@ -453,7 +453,11 @@ class DelegationRepository
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         return array_values(array_map(
-            static fn (array $row): array => ['permission' => (string) $row['permission'], 'grantor' => (int) $row['grantor_profile_id']],
+            static fn (array $row): array => [
+                'permission' => (string) $row['permission'],
+                'grantor' => (int) $row['grantor_profile_id'],
+                'ou' => $row['ou_id'] !== null ? (int) $row['ou_id'] : null,
+            ],
             $rows
         ));
     }

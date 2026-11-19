@@ -157,6 +157,17 @@ final class AgendaRepository
             );
         }
 
+        // #2248: the document must be this workspace's own. Not found, and not
+        // "belongs to somebody else", so the refusal says nothing about ids
+        // outside the workspace.
+        if ($documentId !== null) {
+            $document = $this->db->prepare('SELECT 1 FROM documents WHERE id = :id AND tenant_id = :tenant_id');
+            $document->execute([':id' => $documentId, ':tenant_id' => $tenantId]);
+            if ($document->fetchColumn() === false) {
+                throw ConveningRejectedException::because('That document was not found in this workspace.');
+            }
+        }
+
         $position = $this->nextPosition($tenantId, $meetingId);
 
         $stmt = $this->db->prepare(

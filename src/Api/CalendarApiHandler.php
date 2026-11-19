@@ -96,7 +96,13 @@ final class CalendarApiHandler
     public function disableFeed(Request $request, array $params): Response
     {
         return $this->run($request, 'feed', function (int $tenantId, int $actor) use ($params): Response {
-            $profileId = $this->staffOr404($tenantId, (int) $params['profileId']);
+            // WHIT-1285 (#2215): someone who manages the calendar can turn off
+            // the feed of a person who has left too; the feed itself already
+            // stops answering once they are not active staff.
+            $profileId = (int) $params['profileId'];
+            if ($profileId <= 0) {
+                throw new CalendarRejectedException('Staff member not found', 404);
+            }
             $this->assertOwnOrManage($tenantId, $actor, $profileId);
             $this->feed?->revoke($tenantId, $profileId);
 
@@ -255,10 +261,13 @@ final class CalendarApiHandler
 
     public function listExceptions(Request $request): Response
     {
-        return $this->run($request, 'exceptions', function (int $tenantId) use ($request): Response {
+        return $this->run($request, 'exceptions', function (int $tenantId, int $actor) use ($request): Response {
             [$from, $to] = $this->range($request);
             $profileId = $this->optionalInt($request, 'profile_id');
             $rows = $this->calendar->exceptions($tenantId, $profileId, $from, $to);
+            // WHIT-1285 (#2237): why someone is away is theirs, and for the
+            // people who manage the calendar; colleagues see only that they are.
+            $manages = $actor > 0 && $this->roleChecker->hasPermissionForProfile($actor, CorePermissions::CALENDAR_MANAGE, $tenantId);
 
             return Response::json(['data' => array_map(static fn (array $r): array => [
                 'id' => $r['id'],
@@ -266,7 +275,7 @@ final class CalendarApiHandler
                 'kind' => $r['kind'],
                 'starts_at' => Interval::toApi($r['interval']->start),
                 'ends_at' => Interval::toApi($r['interval']->end),
-                'note' => $r['note'],
+                'note' => $r['kind'] === 'off' && !$manages && (int) $r['profile_id'] !== $actor ? '' : $r['note'],
             ], $rows)]);
         });
     }
@@ -660,14 +669,20 @@ final class CalendarApiHandler
 
     public function listEvents(Request $request): Response
     {
-        return $this->run($request, 'events', function (int $tenantId) use ($request): Response {
+        return $this->run($request, 'events', function (int $tenantId, int $actor) use ($request): Response {
             [$from, $to] = $this->range($request);
             $profileId = $this->optionalInt($request, 'profile_id');
 
             // Time off and extra hours have their own route; meetings arrive with T4.
-            return Response::json(['data' => $this->calendar->listEvents($tenantId, $profileId !== null ? [$profileId] : [], $from, $to, [
+            $events = $this->calendar->listEvents($tenantId, $profileId !== null ? [$profileId] : [], $from, $to, [
                 CalendarRepository::KIND_EVENT, CalendarRepository::KIND_EXTERNAL, CalendarRepository::KIND_MEETING,
-            ])]);
+            ]);
+
+            // WHIT-1285 (#2237): the same privacy as the grid (CalendarItems).
+            return Response::json(['data' => array_map(
+                static fn (array $e): array => CalendarItems::redactedFor($e, $actor),
+                $events,
+            )]);
         });
     }
 

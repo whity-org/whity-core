@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { backendUrl } from '@/lib/backend-url';
+import { trustedForwardedHostFrom } from '@/lib/trusted-client-ip';
 
 /** Token name -> '#rrggbb' hex value. Empty when no plugin contributes overrides. */
 export type ThemeOverrides = Record<string, string>;
@@ -24,12 +25,13 @@ export const getThemeOverrides = cache(async (): Promise<ThemeOverrides> => {
       .getAll()
       .map((c) => `${c.name}=${c.value}`)
       .join('; ');
-    const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
+    // Never the browser's own X-Forwarded-Host (WHIT-1295, #2195).
+    const host = trustedForwardedHostFrom(h);
 
     const res = await fetch(`${backendUrl()}/api/v1/theme`, {
       headers: {
         cookie: cookieHeader,
-        'X-Forwarded-Host': host,
+        ...(host !== null ? { 'X-Forwarded-Host': host } : {}),
       },
       cache: 'no-store',
     });

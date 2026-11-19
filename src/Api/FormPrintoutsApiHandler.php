@@ -30,6 +30,11 @@ use Whity\Http\JsonBody;
  *    the body. A free workspace sees the standard layout, as it would print.
  *
  * Each preview is one render against the workspace's render limits.
+ *
+ * The theme preview prints a REAL response, so it needs `forms:read` on top of
+ * the route's `documents:themes` (#2243): without it a person allowed to style
+ * documents could read every response, office-only steps and decisions
+ * included, by walking `submissionId`.
  */
 final class FormPrintoutsApiHandler
 {
@@ -38,6 +43,14 @@ final class FormPrintoutsApiHandler
         private readonly FormPrintoutService $printouts,
         private readonly ?FlowDocumentRenderer $renderer,
         private readonly ?MeterService $meters = null,
+        /**
+         * Whether the caller may read form responses in this workspace
+         * (`forms:read`). Null refuses every theme preview: the preview shows a
+         * real response, so an unwired check must not read as "allowed".
+         *
+         * @var (\Closure(Request, int): bool)|null
+         */
+        private readonly ?\Closure $mayReadResponses = null,
     ) {
     }
 
@@ -75,6 +88,15 @@ final class FormPrintoutsApiHandler
         $errors = DocumentThemeTokens::errors($theme);
         if ($errors !== []) {
             return Response::error('Some options are not valid', 422, ['errors' => $errors]);
+        }
+        // #2243: before any response is looked up, so the answer never says
+        // whether one exists.
+        if ($this->mayReadResponses === null || !($this->mayReadResponses)($request, $tenantId)) {
+            return Response::error(
+                'The preview prints a real form response, so it needs permission to read form responses',
+                403,
+                ['required' => 'forms:read']
+            );
         }
         $submissionId = is_int($body['submissionId'] ?? null) ? $body['submissionId'] : $this->latestSubmission($tenantId);
         if ($submissionId === null) {
