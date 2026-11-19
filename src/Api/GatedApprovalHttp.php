@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use Whity\Core\Response;
 use Whity\Core\Security\GatedApproval;
+use Whity\Core\Security\IdentityCheckThrottledException;
 
 /**
  * The HTTP side of {@see GatedApproval}, shared by every handler with a gated
@@ -14,11 +15,14 @@ use Whity\Core\Security\GatedApproval;
  *  - starting the check: 200 `{method, email_hint}`, 429 when too many codes
  *    were sent, 503 when the gate isn't available;
  *  - approving: the code comes as `code` in the body; a missing, wrong or used
- *    one is 403 with `reason: identity_check_failed`, and nothing changes.
+ *    one is 403 with `reason: identity_check_failed`, and nothing changes;
+ *    after too many wrong codes, 429 with `reason: identity_check_throttled`
+ *    and the code is not checked (#2223).
  */
 final class GatedApprovalHttp
 {
     public const REASON_FAILED = 'identity_check_failed';
+    public const REASON_THROTTLED = 'identity_check_throttled';
 
     private function __construct()
     {
@@ -48,7 +52,12 @@ final class GatedApprovalHttp
             return self::unavailable();
         }
         $code = is_string($body['code'] ?? null) ? $body['code'] : null;
-        $method = $gate->confirm($tenantId, $approverId, $kind, $subject, $code);
+        try {
+            $method = $gate->confirm($tenantId, $approverId, $kind, $subject, $code);
+        } catch (IdentityCheckThrottledException) {
+            return Response::error('Too many tries. Wait a few minutes and try again.', 429, ['reason' => self::REASON_THROTTLED])
+                ->withHeaders(['Retry-After' => '900']);
+        }
         if ($method === null) {
             return Response::error('Confirm it is you first: that code is not correct or has expired.', 403, ['reason' => self::REASON_FAILED]);
         }

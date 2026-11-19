@@ -81,6 +81,8 @@ final class GatedApproval
     /**
      * Make the check, using up the code. Returns the method that proved it, or
      * null when the code is missing, wrong, used or expired.
+     *
+     * @throws IdentityCheckThrottledException after too many wrong codes (#2223)
      */
     public function confirm(int $tenantId, int $approverId, string $kind, string $subject, ?string $code): ?string
     {
