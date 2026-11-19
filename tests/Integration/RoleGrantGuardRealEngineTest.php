@@ -103,6 +103,29 @@ final class RoleGrantGuardRealEngineTest extends TestCase
         self::assertSame($this->managerRole, $this->membershipRole($this->member));
     }
 
+    /**
+     * #2314: the single-user edit refuses moving someone who outranks the
+     * caller onto a lower role, as the bulk role change does. The person keeps
+     * their role; a peer at the caller's own level can still be moved.
+     */
+    public function testUsersUpdateRefusesChangingTheRoleOfSomeoneWhoOutranksYou(): void
+    {
+        $boss = $this->profile('boss', $this->adminRole);
+
+        $refused = $this->users()->update($this->req(['role_id' => $this->helperRole]), ['id' => (string) $boss]);
+        self::assertSame(403, $refused->getStatusCode(), $refused->getBody());
+        $details = $this->decode($refused)['details'] ?? [];
+        self::assertSame('exceeds_your_access', $details['reason'] ?? null);
+        self::assertContains('settings:write', $details['permissions'] ?? []);
+        self::assertContains('audit:read', $details['permissions'] ?? []);
+        self::assertSame($this->adminRole, $this->membershipRole($boss));
+
+        $peer = $this->profile('peer', $this->managerRole);
+        $allowed = $this->users()->update($this->req(['role_id' => $this->helperRole]), ['id' => (string) $peer]);
+        self::assertSame(200, $allowed->getStatusCode(), $allowed->getBody());
+        self::assertSame($this->helperRole, $this->membershipRole($peer));
+    }
+
     public function testAddingASecondRoleIsAGrantToo(): void
     {
         $res = $this->users()->addMembership($this->req(['role_id' => $this->adminRole]), ['id' => (string) $this->manager]);

@@ -189,6 +189,31 @@ class UsersApiHandler
     }
 
     /**
+     * #2314: the 403 when the person's current role carries permissions the
+     * caller does not hold, so changing it would take away access the caller
+     * could never give back; or null to go ahead. Same rule and order as the
+     * new role's check: with a guard wired, a request with no caller is refused.
+     */
+    private function refuseOutranked(Request $request, int $currentRoleId, int $actingTenantId): ?Response
+    {
+        if ($this->grantGuard === null) {
+            return null;
+        }
+        $actor = $request->user;
+        $actorId = is_object($actor) && isset($actor->profile_id) && is_int($actor->profile_id)
+            ? $actor->profile_id
+            : null;
+        if ($actorId === null) {
+            return RoleGrantGuard::refusal([], 'You may not change roles');
+        }
+        $missing = $this->grantGuard->roleNotHeld($actorId, $actingTenantId, $currentRoleId);
+
+        return $missing === []
+            ? null
+            : RoleGrantGuard::refusal($missing, 'This person has access you do not hold, so you may not change their role');
+    }
+
+    /**
      * What `GET /api/users` lets a caller sort and search by.
      *
      * The keys are the columns the users screen actually RENDERS — name, email,
@@ -1031,6 +1056,13 @@ class UsersApiHandler
                     return Response::error('Role not found', 404);
                 }
                 if ($resolved !== (int)$membership['role_id']) {
+                    // #2314: the person's CURRENT role must not outrank the
+                    // caller, or a people manager could move an admin onto a
+                    // lower role. The bulk role change refuses the same thing.
+                    $refused = $this->refuseOutranked($request, (int)$membership['role_id'], $currentTenantId);
+                    if ($refused !== null) {
+                        return $refused;
+                    }
                     // #2235: after visibility, so a private role still reads 404.
                     $refused = $this->refuseRoleGrant($request, $resolved, $currentTenantId);
                     if ($refused !== null) {
