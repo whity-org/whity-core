@@ -891,6 +891,20 @@ class AuthHandler
         ?int $confinedTenantId = null
     ): Response
     {
+        // A deactivated profile gets no session, whichever path got here (#2227).
+        // Login, refresh and tenant selection checked this themselves; the
+        // device-credential exchange and the 2FA step did not, so a desktop app
+        // holding a device credential kept minting sessions after "Deactivate".
+        // Generic wording: a deactivation-specific error is an enumeration oracle.
+        $refusalReason = $this->sessionRefusalReason($profileId);
+        if ($refusalReason !== null) {
+            $this->audit('auth.login.failure', $request, $activeTenantId, $profileId, [
+                'reason' => $refusalReason,
+            ]);
+
+            return Response::error('Invalid credentials', 401);
+        }
+
         // #2249: a session confined to one workspace is only ever minted INTO
         // that workspace. Every caller already passes the confined tenant as the
         // active one; this is the chokepoint that keeps it so.
@@ -1921,7 +1935,7 @@ class AuthHandler
                 } catch (\Throwable) {
                 }
             } elseif ($rotateFromJti !== null) {
-                $sessions->rotate($rotateFromJti, $accessJti, $refreshJti, $expiresAt);
+                $sessions->rotate($rotateFromJti, $accessJti, $refreshJti, $expiresAt, $activeTenantId);
             }
         } catch (\Throwable $e) {
             error_log('[sessions] record/rotate failed: ' . $e->getMessage());
@@ -2187,6 +2201,15 @@ class AuthHandler
                         if ($this->isJtiRevoked($jti)) {
                             // This token has been reused → log security event
                             $this->audit('auth.refresh_token_reuse_detected', $request, $activeTenantId, $profileId);
+                        } elseif (($parsedToken['type'] ?? null) === 'refresh'
+                            && $this->sessionRefusalReason($profileId) === 'profile_inactive'
+                        ) {
+                            // The membership guard now refuses a deactivated
+                            // profile before we get here (#2227); keep the
+                            // record that a deactivated person tried to stay in.
+                            $this->audit('auth.refresh.failure', $request, $activeTenantId, $profileId, [
+                                'reason' => 'profile_inactive',
+                            ]);
                         }
                     }
                 }

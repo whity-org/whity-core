@@ -123,8 +123,12 @@ final class PasswordResetApprovalsApiHandler
         }
 
         try {
-            $result = $this->service->approveForTenant($requestId, $ctx['tenantId']);
-            if ($result === null) {
+            $result = $this->service->approveForTenant($requestId, $ctx['tenantId'], $ctx['userId']);
+            if ($result === PasswordResetService::REFUSED_OWN_REQUEST) {
+                // #2226: the approval exists so that somebody else checks it.
+                return Response::error('You can\'t approve a password reset for your own account. Another admin has to.', 403, ['reason' => $result]);
+            }
+            if (!is_array($result)) {
                 return Response::error('No pending password-reset request found for that id', 404);
             }
 
