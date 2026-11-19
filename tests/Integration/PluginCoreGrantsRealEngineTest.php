@@ -159,6 +159,13 @@ final class PluginCoreGrantsRealEngineTest extends TestCase
         self::assertSame(['users:write'], json_decode((string) $refused->getBody(), true)['details']['permissions'] ?? null);
         self::assertSame([], $this->rolePermissions('hr', self::TENANT, core: true), 'a refused approval writes nothing');
 
+        // Refusals are plain words with a reason, never exception text (WC-186).
+        $notAsked = $handler->approve($this->req(['tenant_id' => self::TENANT, 'permissions' => ['audit:read']]), $params);
+        self::assertSame(422, $notAsked->getStatusCode());
+        self::assertSame(['audit:read'], json_decode((string) $notAsked->getBody(), true)['details']['permissions'] ?? null);
+        $otherRole = $handler->approve($this->req(['tenant_id' => self::TENANT]), ['name' => 'AcmeLeave', 'role' => 'nobody']);
+        self::assertSame('not_requested', json_decode((string) $otherRole->getBody(), true)['details']['reason'] ?? null);
+
         $approved = $handler->approve($this->req(['tenant_id' => self::TENANT, 'permissions' => ['calendar:write', 'calendar:manage']]), $params);
         self::assertSame(200, $approved->getStatusCode(), (string) $approved->getBody());
         self::assertSame(['calendar:manage', 'calendar:write'], json_decode((string) $approved->getBody(), true)['data']['granted']);

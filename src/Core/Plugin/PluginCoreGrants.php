@@ -51,6 +51,9 @@ final class PluginCoreGrants
             return [];
         }
         try {
+            // A plugin is third-party code: its answer is checked, not trusted
+            // to match the interface's declared shape.
+            /** @var array<mixed, mixed> $raw */
             $raw = $plugin->getCorePermissionRequests();
         } catch (\Throwable) {
             return [];

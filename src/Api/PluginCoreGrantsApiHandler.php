@@ -126,9 +126,24 @@ final class PluginCoreGrantsApiHandler
         $grants = new PluginCoreGrants($this->db);
 
         if ($approve) {
+            // Plain-words refusals decided here, so no exception text reaches
+            // the client (WC-186). An approval grants exactly what was asked.
+            $requested = PluginCoreGrants::requests($plugin)[$role] ?? null;
+            if ($requested === null) {
+                return Response::error('This plugin does not ask for core permissions for that role', 422, [
+                    'reason' => 'not_requested',
+                ]);
+            }
+            $extra = array_values(array_diff($permissions ?? [], $requested));
+            if ($extra !== []) {
+                return Response::error('The plugin did not ask for some of these permissions', 422, [
+                    'reason' => 'not_requested',
+                    'permissions' => $extra,
+                ]);
+            }
             // The grant guard: the approving operator can only hand out what
             // they hold themselves.
-            $wanted = $permissions ?? (PluginCoreGrants::requests($plugin)[$role] ?? []);
+            $wanted = $permissions ?? $requested;
             $held = $actor === null ? [] : array_fill_keys(
                 $this->roleChecker->getEffectivePermissionsForProfile($actor, (int) TenantContext::getTenantId()),
                 true
@@ -142,8 +157,12 @@ final class PluginCoreGrantsApiHandler
             }
             try {
                 $changed = $grants->approve($plugin, $role, $tenantId, $actor, $permissions);
-            } catch (\InvalidArgumentException $e) {
-                return Response::error($e->getMessage(), 422);
+            } catch (\InvalidArgumentException) {
+                // What is left after the checks above: the role is not in
+                // that workspace.
+                return Response::error('That role does not exist in that workspace', 422, [
+                    'reason' => 'role_not_found',
+                ]);
             }
         } else {
             $changed = $grants->revoke($plugin->getName(), $role, $tenantId, $permissions);
