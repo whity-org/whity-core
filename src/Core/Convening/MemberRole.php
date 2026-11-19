@@ -15,14 +15,11 @@ namespace Whity\Core\Convening;
  * much as read the tenant's meetings, and that would be a configuration mistake
  * rather than a privilege escalation.
  *
- * What the seat IS for is {@see DecisionRouteBridge}: when a body's decision has
- * to be answered to the routing engine, the engine will only accept it from
- * somebody the route actually asked, and the seats give a defensible ORDER in
- * which to look for such a person. A chair speaks for the body by construction;
- * a secretary is who minutes it; an ordinary member is the last resort. That
- * order decides only WHOSE NAME goes on the routing act among people who ALL
- * already hold an open recipient row — it can never manufacture authority for
- * somebody the route did not reach.
+ * The seat is a label in the minute-book, not a way to act for someone. A
+ * body's decision answers a document's approval only as the person who
+ * records it ({@see DecisionRouteBridge}, #2247): being chair does not let the
+ * secretary approve in the chair's name, and being on the body does not put
+ * anyone's name on a routing act they did not perform.
  *
  * Three values and no more. `deputy chair`, `observer` and `co-opted member` are
  * all real seats in real institutions and all of them are the same three
@@ -58,7 +55,7 @@ final class MemberRole
     /**
      * How strongly a seat speaks for the body, lower first.
      *
-     * Used ONLY to order candidates in {@see DecisionRouteBridge}. It is a
+     * Orders a body's member list, chair first. It is a
      * function rather than a bare array so a caller cannot accidentally sort by
      * the alphabetical order of the constants, which would put `chair` after
      * neither and `member` before `secretary` — an order with no meaning that

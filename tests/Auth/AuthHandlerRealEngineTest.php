@@ -317,13 +317,13 @@ final class AuthHandlerRealEngineTest extends TestCase
 
     private function mintRefresh(int $profileId, int $tenantId, string $email, string $role): string
     {
-        return $this->jwtParser->create([
+        return \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $this->jwtParser->create([
             'profile_id'       => $profileId,
             'active_tenant_id' => $tenantId,
             'email'            => $email,
             'role'             => $role,
             'token_epoch'      => 0,
-        ], 604800, 'refresh');
+        ], 604800, 'refresh'));
     }
 
     /**

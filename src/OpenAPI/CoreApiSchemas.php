@@ -20256,7 +20256,7 @@ final class CoreApiSchemas
                 'changedAt' => ['type' => 'string', 'nullable' => true],
                 'changedBy' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'name' => self::str()]],
                 'state' => ['type' => 'string', 'enum' => ['on', 'read_only', 'off'], 'description' => 'read_only: a paid plugin whose access ended; reads work, writes are refused'],
-                'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['free_for_all', 'entitled', 'cash', 'trial', 'grace', 'lapsed', 'installation_unlicensed', 'installation_grace', null]],
+                'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['free_for_all', 'entitled', 'cash', 'trial', 'grace', 'lapsed', 'installation_unlicensed', 'installation_grace', 'withdrawn', null]],
                 'graceUntil' => ['type' => 'string', 'nullable' => true],
                 'trialEndsAt' => ['type' => 'string', 'nullable' => true],
                 'paid' => self::bool(),

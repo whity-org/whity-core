@@ -166,6 +166,24 @@ final class CustomerSignupSsoJoinRealEngineTest extends TestCase
         self::assertSame('https://app.test/join/bakery?sso=closed', $this->location($this->start('other.whity.test')));
     }
 
+    /**
+     * #2195 / WHIT-1294: a malformed X-Forwarded-Host (a list, here) named no
+     * workspace, so the check that the host belongs to the workspace in
+     * `?join=` was skipped. It now falls back to Host, which names "other".
+     */
+    public function testAMalformedForwardedHostCannotSkipTheDomainCheck(): void
+    {
+        $this->open('open');
+        $_GET = ['join' => 'bakery'];
+
+        $res = $this->handler->start(new Request('GET', '/api/v1/auth/sso/whity_id/start', [
+            'Host' => 'other.whity.test',
+            'X-Forwarded-Host' => 'localhost, other.whity.test',
+        ], ''), ['provider' => 'whity_id']);
+
+        self::assertSame('https://app.test/join/bakery?sso=closed', $this->location($res));
+    }
+
     // ── callback ──────────────────────────────────────────────────────────────
 
     public function testOpenModeJoinsANewPersonAsACustomerAndSignsThemIn(): void

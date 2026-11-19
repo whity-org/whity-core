@@ -79,6 +79,11 @@ final class SessionService
      * working until it expired, so signing out, which revokes only the tokens it
      * is handed, left an older access token alive for up to 15 minutes.
      *
+     * The row moves to the workspace the new tokens act in (#2218): after a
+     * switch-tenant it kept the sign-in workspace, so the person's own session
+     * vanished from GET /api/v1/me/sessions in the new one and could not be
+     * revoked there. Null keeps the row's workspace.
+     *
      * @param string $matchJti  The caller's CURRENT access or refresh jti.
      * @param string $expiresAt 'Y-m-d H:i:s' of the new refresh token's expiry.
      */
@@ -87,6 +92,7 @@ final class SessionService
         string $newAccessJti,
         string $newRefreshJti,
         string $expiresAt,
+        ?int $tenantId = null,
     ): bool {
         // @tenant-guard-ignore: matched by the caller's own current jti (access OR refresh), unique platform-wide.
         $previous = $this->db->prepare(
@@ -96,19 +102,24 @@ final class SessionService
         $previous->execute([':match' => $matchJti]);
         $replacedAccessJti = $previous->fetchColumn();
 
-        // @tenant-guard-ignore: matched by the caller's own current jti (access OR refresh) — each is a platform-wide UNIQUE handle, so it cannot touch another tenant's session row.
+        // Matched by the caller's own current jti (access OR refresh) — each is a platform-wide UNIQUE handle, so it cannot touch another tenant's session row.
         $stmt = $this->db->prepare(
             'UPDATE sessions
                 SET refresh_jti = :new_refresh, access_jti = :new_access,
-                    last_seen_at = NOW(), expires_at = :expires_at
+                    last_seen_at = NOW(), expires_at = :expires_at'
+                . ($tenantId !== null ? ', tenant_id = :tenant_id' : '') . '
               WHERE (refresh_jti = :match OR access_jti = :match) AND revoked_at IS NULL'
         );
-        $stmt->execute([
+        $params = [
             ':new_refresh' => $newRefreshJti,
             ':new_access'  => $newAccessJti,
             ':expires_at'  => $expiresAt,
             ':match'       => $matchJti,
-        ]);
+        ];
+        if ($tenantId !== null) {
+            $params[':tenant_id'] = $tenantId;
+        }
+        $stmt->execute($params);
         $rotated = $stmt->rowCount() > 0;
 
         if ($rotated && is_string($replacedAccessJti) && $replacedAccessJti !== '' && $replacedAccessJti !== $newAccessJti) {
@@ -119,6 +130,24 @@ final class SessionService
         }
 
         return $rotated;
+    }
+
+    /**
+     * Whether $refreshJti is the CURRENT refresh jti of a session that is not
+     * revoked and not expired. handleRefresh() requires it (#2265), so a
+     * refresh token rotates only inside a recorded, revocable session.
+     */
+    public function isLiveRefresh(string $refreshJti): bool
+    {
+        // @tenant-guard-ignore: refresh_jti is a 128-bit random handle unique platform-wide, carried by the caller's own validated refresh token.
+        $stmt = $this->db->prepare(
+            'SELECT 1 FROM sessions
+              WHERE refresh_jti = ? AND revoked_at IS NULL AND expires_at > NOW()
+              LIMIT 1'
+        );
+        $stmt->execute([$refreshJti]);
+
+        return $stmt->fetchColumn() !== false;
     }
 
     /**
@@ -214,6 +243,64 @@ final class SessionService
         }
 
         return count($rows);
+    }
+
+    /**
+     * Revoke every active session a profile holds, in every workspace. Used
+     * when the account is deactivated (#2238): deactivation is a global switch
+     * on the profile, so its sessions end everywhere. Returns the number revoked.
+     */
+    public function revokeAllForProfile(int $profileId): int
+    {
+        // @tenant-guard-ignore: deactivation is a GLOBAL profile switch (ADR 0005 §1); every session of this one profile ends, whatever workspace it is in.
+        $stmt = $this->db->prepare(
+            'SELECT id, access_jti, refresh_jti, expires_at FROM sessions
+             WHERE profile_id = ? AND revoked_at IS NULL'
+        );
+        $stmt->execute([$profileId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as $row) {
+            $this->blacklistAndStamp(
+                (int) $row['id'],
+                $row['access_jti'] !== null ? (string) $row['access_jti'] : null,
+                (string) $row['refresh_jti'],
+                (string) $row['expires_at']
+            );
+        }
+
+        return count($rows);
+    }
+
+    /**
+     * Revoke the session whose CURRENT access or refresh jti is $jti: both of
+     * its jtis are listed in revoked_tokens and the row is stamped. Used on
+     * sign-out (#2264), so signing out with only the access token also ends the
+     * paired 7-day refresh token, and the session leaves the list. Returns false
+     * when no live row matched.
+     */
+    public function revokeByJti(string $jti): bool
+    {
+        // @tenant-guard-ignore: matched by a jti the caller presented on sign-out; jtis are 128-bit random handles unique platform-wide.
+        $stmt = $this->db->prepare(
+            'SELECT id, access_jti, refresh_jti, expires_at FROM sessions
+              WHERE (access_jti = :jti OR refresh_jti = :jti) AND revoked_at IS NULL
+              LIMIT 1'
+        );
+        $stmt->execute([':jti' => $jti]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row === false) {
+            return false;
+        }
+
+        $this->blacklistAndStamp(
+            (int) $row['id'],
+            $row['access_jti'] !== null ? (string) $row['access_jti'] : null,
+            (string) $row['refresh_jti'],
+            (string) $row['expires_at']
+        );
+
+        return true;
     }
 
     /**

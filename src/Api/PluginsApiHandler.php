@@ -1306,12 +1306,7 @@ class PluginsApiHandler
     {
         // Reject empty, separators, and any dot (no relative components, no
         // dotted traversal). A plugin id is a single bare name segment.
-        if (
-            $identifier === ''
-            || str_contains($identifier, '/')
-            || str_contains($identifier, '\\')
-            || str_contains($identifier, '.')
-        ) {
+        if (!self::isBareName($identifier)) {
             return null;
         }
 
@@ -1341,6 +1336,19 @@ class PluginsApiHandler
     }
 
     /**
+     * A plugin id that names one thing inside the plugin folder: not empty, no
+     * separator, no dot, and no NUL byte (which some filesystem calls cut at).
+     */
+    private static function isBareName(string $identifier): bool
+    {
+        return $identifier !== ''
+            && !str_contains($identifier, '/')
+            && !str_contains($identifier, '\\')
+            && !str_contains($identifier, '.')
+            && !str_contains($identifier, "\0");
+    }
+
+    /**
      * Enable a plugin by renaming its `.php.disabled` file back to `.php`.
      *
      * @param string $id The filesystem-derived plugin id.
@@ -1348,18 +1356,21 @@ class PluginsApiHandler
      */
     private function enableOnDisk(string $id): Response
     {
-        $disabledPath = $this->pluginDir . '/' . $id . '.php.disabled';
-        $enabledPath = $this->pluginDir . '/' . $id . '.php';
-
-        if (file_exists($enabledPath)) {
+        // WHIT-1273 (#2251): the router percent-decodes `{name}`, so it can
+        // carry `/` and `..`. Only a bare name inside the plugin folder.
+        if (!self::isBareName($id)) {
+            return Response::error('Invalid plugin identifier', 400);
+        }
+        if ($this->safePluginPath($id, '.php') !== null) {
             return Response::json(['data' => ['message' => 'Plugin already enabled']], 200);
         }
 
-        if (!file_exists($disabledPath)) {
+        $disabledPath = $this->safePluginPath($id, '.php.disabled');
+        if ($disabledPath === null) {
             return Response::error('Plugin not found', 404);
         }
 
-        if (rename($disabledPath, $enabledPath)) {
+        if (rename($disabledPath, $this->pluginDir . '/' . $id . '.php')) {
             return Response::json(['data' => ['message' => "Plugin {$id} enabled"]], 200);
         }
 
@@ -1374,18 +1385,20 @@ class PluginsApiHandler
      */
     private function disableOnDisk(string $id): Response
     {
-        $enabledPath = $this->pluginDir . '/' . $id . '.php';
-        $disabledPath = $this->pluginDir . '/' . $id . '.php.disabled';
-
-        if (file_exists($disabledPath)) {
+        // WHIT-1273 (#2251): see enableOnDisk().
+        if (!self::isBareName($id)) {
+            return Response::error('Invalid plugin identifier', 400);
+        }
+        if ($this->safePluginPath($id, '.php.disabled') !== null) {
             return Response::json(['data' => ['message' => 'Plugin already disabled']], 200);
         }
 
-        if (!file_exists($enabledPath)) {
+        $enabledPath = $this->safePluginPath($id, '.php');
+        if ($enabledPath === null) {
             return Response::error('Plugin not found', 404);
         }
 
-        if (rename($enabledPath, $disabledPath)) {
+        if (rename($enabledPath, $this->pluginDir . '/' . $id . '.php.disabled')) {
             return Response::json(['data' => ['message' => "Plugin {$id} disabled"]], 200);
         }
 

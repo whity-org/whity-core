@@ -111,7 +111,7 @@ final class AwayService
         if ($delegateProfileId === $profileId) {
             return 'self';
         }
-        if (!$this->isActiveMember($tenantId, $delegateProfileId)) {
+        if (!$this->isActiveStaff($tenantId, $delegateProfileId)) {
             return 'delegate';
         }
         if (!self::isDate($startsOn) || !self::isDate($backOn) || $backOn <= $startsOn || $backOn <= $today
@@ -165,17 +165,39 @@ final class AwayService
     /**
      * Who the delegate decides for today, for one kind of decision.
      *
+     * #2221: only while BOTH people are still active staff here. A period can
+     * run for a year; a person suspended or removed in the meantime must stop
+     * having their approvals made for them, and a delegate who has gone must
+     * stop making them, without anybody remembering to end the period.
+     *
      * @return list<int> profile ids of the people away
      */
     public function coveredBy(int $tenantId, int $delegateProfileId, string $cover, ?string $today = null): array
     {
         $today ??= self::today();
         $stmt = $this->db->prepare(
-            'SELECT profile_id, covers FROM away_periods
-              WHERE tenant_id = :tenant_id AND delegate_profile_id = :delegate
-                AND ended_at IS NULL AND starts_on <= :today AND back_on > :today'
+            "SELECT a.profile_id, a.covers FROM away_periods a
+              WHERE a.tenant_id = :tenant_id AND a.delegate_profile_id = :delegate
+                AND a.ended_at IS NULL AND a.starts_on <= :today AND a.back_on > :today2
+                AND EXISTS (
+                    SELECT 1 FROM memberships m
+                     WHERE m.tenant_id = :tenant_away AND m.profile_id = a.profile_id
+                       AND m.status = 'active' AND m.kind <> 'customer'
+                )
+                AND EXISTS (
+                    SELECT 1 FROM memberships m
+                     WHERE m.tenant_id = :tenant_delegate AND m.profile_id = a.delegate_profile_id
+                       AND m.status = 'active' AND m.kind <> 'customer'
+                )"
         );
-        $stmt->execute([':tenant_id' => $tenantId, ':delegate' => $delegateProfileId, ':today' => $today]);
+        $stmt->execute([
+            ':tenant_id' => $tenantId,
+            ':delegate' => $delegateProfileId,
+            ':today' => $today,
+            ':today2' => $today,
+            ':tenant_away' => $tenantId,
+            ':tenant_delegate' => $tenantId,
+        ]);
         $ids = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
             if (in_array($cover, self::decodeCovers($row['covers']), true)) {
@@ -230,10 +252,16 @@ final class AwayService
         return $stmt->rowCount();
     }
 
-    private function isActiveMember(int $tenantId, int $profileId): bool
+    /**
+     * #2221: an active STAFF membership. A customer is never a delegate: the
+     * delegate sees and acts on the absent person's internal approvals.
+     */
+    private function isActiveStaff(int $tenantId, int $profileId): bool
     {
         $stmt = $this->db->prepare(
-            "SELECT 1 FROM memberships WHERE tenant_id = :tenant_id AND profile_id = :profile_id AND status = 'active' LIMIT 1"
+            "SELECT 1 FROM memberships
+              WHERE tenant_id = :tenant_id AND profile_id = :profile_id AND status = 'active' AND kind <> 'customer'
+              LIMIT 1"
         );
         $stmt->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId]);
 

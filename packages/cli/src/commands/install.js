@@ -20,7 +20,10 @@ const CERTIFICATE_POLL_MS = 5_000;
 
 const DOMAIN = /^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,62}$/;
 // No quotes or spaces: the address is also used in a database lookup and the Caddyfile.
-const EMAIL = /^[^@\s'"\\]+@[^@\s'"\\]+\.[^@\s'"\\]+$/;
+// No quotes or backslashes (it goes into SQL and the .env), and no `#`, which
+// docker compose reads as the start of a comment in an unquoted .env value
+// (WHIT-1290, #2208).
+const EMAIL = /^[^@\s'"\\#]+@[^@\s'"\\#]+\.[^@\s'"\\#]+$/;
 
 function projectName(dir) {
   const name = basename(dir).toLowerCase().replace(/[^a-z0-9_-]/g, '');
@@ -44,6 +47,11 @@ function assertUsableUrl(url) {
   try {
     parsed = new URL(url);
   } catch {
+    throw new CliError(m.badUrl(url), 2);
+  }
+  // Written unquoted to .env, where `#` starts a comment for docker compose
+  // (WHIT-1290, #2208); a site address has no use for one, or for spaces or quotes.
+  if (/[#\s'"\\]/.test(url)) {
     throw new CliError(m.badUrl(url), 2);
   }
   const local = ['localhost', '127.0.0.1'].includes(parsed.hostname);
@@ -128,6 +136,10 @@ export async function install(options, deps) {
     // The database may already use these secrets, so an earlier attempt's stay.
     envText = existingEnv;
     version = parseEnv(envText).WHITY_VERSION;
+    // The .env may have been edited since: its email goes into SQL, so it is
+    // checked like a typed one (WHIT-1290, #2208).
+    const resumedEmail = parseEnv(envText).INITIAL_SYSTEM_ADMIN_EMAIL ?? '';
+    if (!EMAIL.test(resumedEmail)) throw new CliError(m.badEmail(resumedEmail), 2);
     deps.log(m.installContinuing(version));
   } else {
     version = options.version ? normalizeVersion(options.version) : await latestVersion(deps);
@@ -263,7 +275,9 @@ async function waitForCertificate(url, deps) {
 
 /** The seed made the owner account: a row answers; otherwise the step fails with what psql said. */
 async function ownerExists(run, env) {
-  const sql = `SELECT 1 FROM profile_emails WHERE lower(email) = lower('${env.INITIAL_SYSTEM_ADMIN_EMAIL}')`;
+  // A SQL literal, quotes doubled, even though EMAIL already refuses them (WHIT-1290).
+  const literal = String(env.INITIAL_SYSTEM_ADMIN_EMAIL).replaceAll("'", "''");
+  const sql = `SELECT 1 FROM profile_emails WHERE lower(email) = lower('${literal}')`;
   const result = await run.compose(['exec', '-T', 'postgres', 'psql', '-U', env.DB_USER, '-d', env.DB_NAME, '-tAc', sql]);
   if (result.code === 0 && result.stdout.trim() !== '1') {
     return { code: 1, stdout: '', stderr: `${env.INITIAL_SYSTEM_ADMIN_EMAIL}: no account` };

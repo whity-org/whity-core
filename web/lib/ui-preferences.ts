@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { backendUrl } from '@/lib/backend-url';
+import { trustedForwardedHostFrom } from '@/lib/trusted-client-ip';
 
 /**
  * How this tenant wants its interface to present itself (#1068), resolved on
@@ -49,12 +50,13 @@ export const getUiPreferences = cache(async (): Promise<UiPreferences> => {
       .getAll()
       .map((c) => `${c.name}=${c.value}`)
       .join('; ');
-    const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
+    // Never the browser's own X-Forwarded-Host (WHIT-1295, #2195).
+    const host = trustedForwardedHostFrom(h);
 
     const res = await fetch(`${backendUrl()}/api/v1/ui/preferences`, {
       headers: {
         cookie: cookieHeader,
-        'X-Forwarded-Host': host,
+        ...(host !== null ? { 'X-Forwarded-Host': host } : {}),
       },
       cache: 'no-store',
     });

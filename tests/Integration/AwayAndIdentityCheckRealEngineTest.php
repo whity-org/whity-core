@@ -105,6 +105,10 @@ final class AwayAndIdentityCheckRealEngineTest extends TestCase
         self::assertSame('dates', $this->away->start(self::TENANT, self::AMRO, self::EMAD, '2026-11-01', '2026-11-12', ['flows'], null, self::TODAY), 'already back');
         self::assertSame('dates', $this->away->start(self::TENANT, self::AMRO, self::EMAD, '2026-11-15', 'soon', ['flows'], null, self::TODAY));
         self::assertSame('covers', $this->away->start(self::TENANT, self::AMRO, self::EMAD, '2026-11-15', '2026-11-20', ['everything'], null, self::TODAY));
+
+        // #2221: a customer of the workspace is never a delegate.
+        $this->pdo->exec("UPDATE memberships SET kind = 'customer' WHERE profile_id = " . self::EMAD);
+        self::assertSame('delegate', $this->away->start(self::TENANT, self::AMRO, self::EMAD, '2026-11-15', '2026-11-20', ['flows'], null, self::TODAY), 'a customer');
     }
 
     public function testThePersonSetsOnlyTheirOwn(): void

@@ -534,6 +534,32 @@ final class CustomerSignupRealEngineTest extends TestCase
         self::assertSame([self::TENANT_A => 'customer', self::TENANT_B => 'member'], array_map('strval', $kinds));
     }
 
+    /**
+     * #2245: somebody who only CLAIMED an address (an unconfirmed secondary
+     * email on their own account) must not receive the membership when the
+     * real owner confirms a sign-up for it.
+     */
+    public function testAnUnconfirmedClaimOnTheAddressNeverReceivesTheMembership(): void
+    {
+        $this->statement(
+            "INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
+             VALUES ({$this->existingProfileId}, 'victim@example.test', false, false, NOW())"
+        );
+        $this->configure(self::TENANT_A, self::ADMIN_A, 'open', $this->customerRole);
+        $this->request('tenant-a', 'victim@example.test', 'Victim');
+        $token = $this->tokenFromMail(0);
+
+        self::assertTrue($this->decode($this->preview($token))['data']['requires_password']);
+        $res = $this->confirm($token, 'a-long-enough-password');
+        self::assertSame('joined', $this->decode($res)['data']['status']);
+
+        $joined = $this->membership(self::TENANT_A, 'victim@example.test');
+        self::assertNotSame($this->existingProfileId, (int) $joined['profile_id']);
+        self::assertSame(0, (int) $this->scalar(
+            'SELECT COUNT(*) FROM memberships WHERE tenant_id = ' . self::TENANT_A . ' AND profile_id = ' . $this->existingProfileId
+        ));
+    }
+
     public function testStaffWhoSignUpStayStaff(): void
     {
         $this->configure(self::TENANT_A, self::ADMIN_A, 'open', $this->customerRole);

@@ -195,7 +195,7 @@ final class MembershipRepository
      * `ou_id` every query is then scoped by varies between calls. The primary row
      * is the answer and `id` breaks ties, so the result stays stable even if the
      * partial index were ever missing — identical to
-     * {@see \Whity\Auth\RoleChecker::getMembershipRow()}, which was given this
+     * RoleChecker's old primary-row lookup, which was given this
      * ordering when 094 landed while this method was overlooked.
      *
      * @return array<string, mixed>|null

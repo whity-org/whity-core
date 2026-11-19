@@ -269,10 +269,10 @@ final class AuthHandlerAuditTrailMutationTest extends TestCase
             'profile_id' => $profileId, 'active_tenant_id' => self::TENANT,
             'email' => 'cookierevoke@example.com', 'role' => 'user', 'token_epoch' => 0,
         ], 900, 'access');
-        $oldRefresh = $this->jwtParser->create([
+        $oldRefresh = \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $this->jwtParser->create([
             'profile_id' => $profileId, 'active_tenant_id' => self::TENANT,
             'email' => 'cookierevoke@example.com', 'role' => 'user', 'token_epoch' => 0,
-        ], 604800, 'refresh');
+        ], 604800, 'refresh'));
         $accessClaims = $this->jwtParser->parse($oldAccess);
         $refreshClaims = $this->jwtParser->parse($oldRefresh);
         $this->assertIsArray($accessClaims);
@@ -310,10 +310,10 @@ final class AuthHandlerAuditTrailMutationTest extends TestCase
             'profile_id' => $profileId, 'active_tenant_id' => self::TENANT,
             'email' => 'tokenrevoke@example.com', 'role' => 'user', 'token_epoch' => 0,
         ], 900, 'access');
-        $refreshToken = $this->jwtParser->create([
+        $refreshToken = \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $this->jwtParser->create([
             'profile_id' => $profileId, 'active_tenant_id' => self::TENANT,
             'email' => 'tokenrevoke@example.com', 'role' => 'user', 'token_epoch' => 0,
-        ], 604800, 'refresh');
+        ], 604800, 'refresh'));
         $accessClaims = $this->jwtParser->parse($accessToken);
         $refreshClaims = $this->jwtParser->parse($refreshToken);
         $this->assertIsArray($accessClaims);
@@ -354,10 +354,10 @@ final class AuthHandlerAuditTrailMutationTest extends TestCase
     public function testRefreshTokenReuseIsAudited(): void
     {
         $profileId = $this->seedProfile('reuse-audit@example.com', 'active');
-        $refreshToken = $this->jwtParser->create([
+        $refreshToken = \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $this->jwtParser->create([
             'profile_id' => $profileId, 'active_tenant_id' => self::TENANT,
             'email' => 'reuse-audit@example.com', 'role' => 'user', 'token_epoch' => 0,
-        ], 604800, 'refresh');
+        ], 604800, 'refresh'));
 
         // First use: succeeds and revokes this refresh jti.
         $_COOKIE['refresh_token'] = $refreshToken;

@@ -1427,6 +1427,9 @@ $delegationRepository = new DelegationRepository($db->getPdo());
 $delegationService = new DelegationService($delegationRepository, $baseRoleChecker, $permissionRegistry);
 
 $roleChecker = new RoleChecker($db, $permissionRegistry, null, $delegationService);
+// #2235/#2236/#2241/#2246: every path that grants a role or a permission asks
+// this first, so a caller only grants what they hold.
+$roleGrantGuard = new \Whity\Core\RBAC\RoleGrantGuard($roleChecker);
 
 // 5b. Expose permission RESOLUTION to plugins (WC-712, issue #712).
 //     A route's `requiredPermission` is a flat, one-shot gate: it answers a
@@ -1946,6 +1949,8 @@ $gatedApproval = new \Whity\Core\Security\GatedApproval(
         new \Whity\Core\Document\Signing\SigningChallengeRepository($db->getPdo()),
         $totpService,
         new \Whity\Core\Security\IdentityCheckMailer($brandedEmailSender),
+        // #2223: the signing limiter, so both "confirm it's you" checks share one budget.
+        new \Whity\Core\Document\Signing\SigningAttemptLimiter(new DatabaseSharedStore($db->getPdo())),
     )
 );
 
@@ -2060,7 +2065,7 @@ $router->register('POST',   '/api/invitations/{id:\d+}/resend',  [$invitationsHa
 $router->register('DELETE', '/api/invitations/{id:\d+}',         [$invitationsHandler, 'revoke'], null, null, CorePermissions::USERS_WRITE);
 
 // 11. Register API handlers
-$usersHandler = new UsersApiHandler($db->getPdo(), $hookManager);
+$usersHandler = new UsersApiHandler($db->getPdo(), $hookManager, null, $roleGrantGuard);
 $usersBulkHandler = new \Whity\Api\UsersBulkApiHandler($db->getPdo(), $roleChecker, $hookManager, $auditLogger);
 // WC-203: gate users routes on fine-grained permission grants instead of the
 // bare 'admin' role. requiredRole is cleared (null) so the check is driven
@@ -2110,7 +2115,8 @@ $rolesHandler = new RolesApiHandler(
     $hookManager,
     null,
     new \Whity\Core\RBAC\RecordSectionResolver($roleChecker),
-    $tenantPluginRepository
+    $tenantPluginRepository,
+    $roleGrantGuard
 );
 // Roles are gated on PERMISSION SLUGS, not on the `admin` role name (#977).
 //
@@ -2652,7 +2658,7 @@ $router->register('GET', '/api/admin/stats', [$adminHandler, 'stats'], null, nul
 // them outright; ous:write is the create/update slug the admin UI's capability
 // check already uses. ous:assign gates the two routes that ASSIGN roles to an
 // OU — verbatim what migration 005 seeded it for.
-$ousHandler = new OusApiHandler($db->getPdo(), $hookManager);
+$ousHandler = new OusApiHandler($db->getPdo(), $hookManager, $roleGrantGuard);
 $router->register('GET', '/api/ous', [$ousHandler, 'list'], null, null, CorePermissions::OUS_READ);
 $router->register('POST', '/api/ous', [$ousHandler, 'create'], null, null, CorePermissions::OUS_WRITE);
 $router->register('GET', '/api/ous/{id:\d+}', [$ousHandler, 'get'], null, null, CorePermissions::OUS_READ);
@@ -4762,6 +4768,14 @@ $formPrintoutsHandler = new \Whity\Api\FormPrintoutsApiHandler(
     new \Whity\Core\Form\Print\FormPrintoutService($db->getPdo(), $sourceDocumentPrinter, $entitlementService, $settingsService),
     $flowDocumentRenderer,
     $documentRenderMeters,
+    // #2243: the theme preview prints a real response, so it needs forms:read too.
+    static function (\Whity\Core\Request $request, int $tenantId) use ($roleChecker): bool {
+        $profileId = is_object($request->user) && isset($request->user->profile_id) && is_int($request->user->profile_id)
+            ? $request->user->profile_id
+            : null;
+
+        return $profileId !== null && $roleChecker->hasPermissionForProfile($profileId, CorePermissions::FORMS_READ, $tenantId);
+    },
 );
 $router->register('GET', '/api/form-submissions/{id:\d+}/printout', [$formPrintoutsHandler, 'submission'], null, null, CorePermissions::FORMS_READ);
 $router->register('POST', '/api/document-themes/form-printout-preview', [$formPrintoutsHandler, 'themePreview'], null, null, CorePermissions::DOCUMENTS_THEMES);
@@ -5389,8 +5403,7 @@ $decisionRecorder = new \Whity\Core\Convening\DecisionRecorder(
         $documentRouter,
         $routeRepository,
         $routeStepRepository,
-        $routeRecipientRepository,
-        $conveningBodyRepository
+        $routeRecipientRepository
     )
 );
 
@@ -5716,7 +5729,21 @@ $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $meetingInvitationRepository,
     $meetingAttendanceRepository,
     $meetingService,
-    $decisionRecorder
+    $decisionRecorder,
+    // #2247: the document library's visibility rule, for agenda documents and
+    // a document's convening history.
+    static function (\Whity\Core\Request $request, int $tenantId, int $documentId) use ($documentRepository, $documentVisibilityPolicy, $roleChecker): bool {
+        $callerId = is_object($request->user) && isset($request->user->profile_id) && is_int($request->user->profile_id)
+            ? $request->user->profile_id
+            : null;
+        $document = $callerId === null ? null : $documentRepository->findById($documentId, $tenantId);
+
+        return $document !== null && $documentVisibilityPolicy->canView(
+            $document,
+            $callerId,
+            \Whity\Core\RBAC\ScopedPermissionSet::forProfile($roleChecker, $callerId, $tenantId)
+        );
+    }
 );
 $router->register('GET',    '/api/meetings',                                [$meetingsHandler, 'list'],     null, null, CorePermissions::CONVENING_READ);
 $router->register('POST',   '/api/meetings',                                [$meetingsHandler, 'create'],   null, null, CorePermissions::CONVENING_MANAGE);
@@ -6112,13 +6139,22 @@ $chatRepository = new \Whity\Core\Chat\ChatRepository($db->getPdo());
 // WHIT-1077: each chat line is pushed to the chat's other people who have a
 // device on and aren't looking at that chat.
 $chatStore = new \Whity\Core\Store\DatabaseSharedStore($db->getPdo());
+// WHIT-1266 (#2231, #2232): a record a chat talks about is shown, found or
+// joined only by people its own screen would show it to.
+$chatRecordAccess = new \Whity\Core\Chat\ChatRecordAccess(
+    $db->getPdo(),
+    $permissionResolver,
+    $documentRepository,
+    $documentVisibilityPolicy,
+    $routeRecipientRepository,
+);
 $chatService = new \Whity\Core\Chat\ChatService($chatRepository, new \Whity\Core\Chat\ChatPushNotifier(
     $notificationDispatcher,
     $chatRepository,
     new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
     $chatStore,
     $logger,
-), $chatStore, new \Whity\Core\Chat\ChatAttachments($db->getPdo(), $storageDriver), new \Whity\Core\Chat\ChatBlocks($db->getPdo()));
+), $chatStore, new \Whity\Core\Chat\ChatAttachments($db->getPdo(), $storageDriver), new \Whity\Core\Chat\ChatBlocks($db->getPdo(), $chatRecordAccess), $chatRecordAccess);
 // One chat (UC.1, WHIT-1093): team chats and, for people with messages.read,
 // the customer conversations, in one list with each person's pins.
 $chatHandler = new \Whity\Api\ChatApiHandler(
@@ -6316,7 +6352,8 @@ $router->register('POST', '/api/registrations/{id}/reject',  [$registrationsHand
 // in the handler via TenantContext so a caller can only manage its own domains.
 $emailDomainHandler = new TenantEmailDomainApiHandler(
     $db->getPdo(),
-    new \Whity\Core\Identity\DomainOwnershipVerifier(new \Whity\Core\Identity\SystemDnsTxtResolver())
+    new \Whity\Core\Identity\DomainOwnershipVerifier(new \Whity\Core\Identity\SystemDnsTxtResolver()),
+    $roleGrantGuard
 );
 // #990: gated on `email_domains:manage` (6th positional arg; the role stays
 // null so RbacMiddleware enforces the permission). Migration 156 grants it to
@@ -7177,7 +7214,18 @@ $pluginLoader->collectJobs($jobsRegistry);
 // plugin's job, async listener or command resolves is the one its routes get.
 // They stop here: nothing below serves a request.
 if (defined('WHITY_HOST_KERNEL_BOOT')) {
-    return ['db' => $db, 'hookManager' => $hookManager, 'pluginLoader' => $pluginLoader];
+    return [
+        'db' => $db,
+        'hookManager' => $hookManager,
+        'pluginLoader' => $pluginLoader,
+        // #2205: what a worker resets between jobs, as the request loop does
+        // between requests (the job runner resets RoleChecker's caches itself).
+        'resetRequest' => static function () use ($tenantManifestHost, $codePluginActivation, $documentFieldRegistry): void {
+            $tenantManifestHost->resetRequest();
+            $codePluginActivation->resetRequest();
+            $documentFieldRegistry->resetRequest();
+        },
+    ];
 }
 
 // Handle requests (persistent worker mode or fallback single-request mode)

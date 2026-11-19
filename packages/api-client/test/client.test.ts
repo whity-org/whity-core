@@ -280,6 +280,24 @@ test('token mode picks up the pair PATCH /me re-issues, and GET /me still refres
   assert.deepEqual(JSON.parse(backend.calls('/api/v1/auth/refresh')[0].body), { refresh_token: 'refresh-2' });
 });
 
+test('token mode keeps the pair logout-others re-issues, so this device stays signed in', async () => {
+  const backend = fakeBackend({
+    '/api/v1/me/logout-others': () => json({ user: {}, ...tokenBody(2) }),
+    '/api/v1/me': meAcceptingOnly('access-2'),
+  });
+  const store = createMemoryTokenStore(pair(1));
+  const api = createApiClient({ baseUrl: BASE, fetch: backend.fetch, auth: 'token', tokenStore: store });
+
+  // Not in the published spec yet, so the typed client does not know the path.
+  // @ts-expect-error -- /api/v1/me/logout-others is undocumented
+  await api.POST('/api/v1/me/logout-others');
+  assert.deepEqual(await store.get(), pair(2));
+
+  const { response } = await api.GET('/api/v1/me');
+  assert.equal(response.status, 200);
+  assert.equal(backend.calls('/api/v1/auth/refresh').length, 0);
+});
+
 test('token mode logout revokes the refresh token too and clears the store', async () => {
   const backend = fakeBackend({ '/api/v1/auth/logout': () => json({ message: 'ok' }) });
   const store = createMemoryTokenStore(pair(1));

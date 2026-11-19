@@ -118,9 +118,9 @@ class SecurityHeadersResponseMergeTest extends TestCase
 
         $headers = $merged->getHeaders();
         $this->assertSame(
-            "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'",
+            "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; sandbox allow-scripts allow-forms",
             $headers['content-security-policy'],
-            'The plugin-set CSP must survive the merge, not the strict JSON-API default.'
+            'The plugin-set CSP must survive the merge, not the strict JSON-API default, and run sandboxed (WHIT-1283).'
         );
         // Every other hardening header is still enforced.
         $this->assertSame('nosniff', $headers['x-content-type-options']);
