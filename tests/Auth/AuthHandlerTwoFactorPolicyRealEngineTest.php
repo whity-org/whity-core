@@ -272,13 +272,17 @@ final class AuthHandlerTwoFactorPolicyRealEngineTest extends TestCase
 
     private function mintToken(int $profileId, int $tenantId, string $email, string $type, int $ttl): string
     {
-        return $this->jwtParser->create([
+        $token = $this->jwtParser->create([
             'profile_id'       => $profileId,
             'active_tenant_id' => $tenantId,
             'email'            => $email,
             'role'             => 'user',
             'token_epoch'      => 0,
         ], $ttl, $type);
+
+        return $type === 'refresh'
+            ? \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $token)
+            : $token;
     }
 
     private function login(string $email): \Whity\Core\Response

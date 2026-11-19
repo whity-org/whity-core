@@ -295,6 +295,14 @@ PHP);
         $grants->grant('Crm', self::OPERATOR);
         self::assertTrue($grants->isGranted('Crm'));
 
+        // WHIT-1277 (#2233): a revocation list naming the installed version
+        // wins over the store mark cached before it, with no refresh.
+        $this->pdo->prepare('INSERT INTO plugin_revocation_state (id, sequence, issued_at, expires_at, body) VALUES (1, 1, ?, ?, ?)')
+            ->execute([$now, $now + 86400, (string) json_encode(['payload' => base64_encode((string) json_encode(['revoked' => [['plugin' => 'Crm', 'version' => '1.2.0', 'action' => 'revoke']]]))])]);
+        self::assertFalse($grants->isGranted('Crm'), 'the list revoked it');
+        $this->pdo->exec('DELETE FROM plugin_revocation_state');
+        self::assertTrue($grants->isGranted('Crm'));
+
         $state = 'revoked';
         $marks->refresh(force: true);
         self::assertFalse($grants->isGranted('Crm'), 'the store revoked its mark');
@@ -328,7 +336,7 @@ PHP);
     private function tokens(): TokenValidator
     {
         $tokens = $this->createMock(TokenValidator::class);
-        $tokens->method('validateMcpToken')->willReturnCallback(fn (): McpPrincipal => $this->caller);
+        $tokens->method('validateBearerForMcp')->willReturnCallback(fn (): McpPrincipal => $this->caller);
 
         return $tokens;
     }

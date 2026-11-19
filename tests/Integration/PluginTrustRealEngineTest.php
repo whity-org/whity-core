@@ -9,7 +9,9 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Core\Plugin\Tenant\TenantManifestPublisher;
 use Whity\Core\Plugin\Tenant\TenantPluginRepository;
+use Whity\Core\Plugin\Trust\CodePluginVerification;
 use Whity\Core\Plugin\Trust\PluginTrust;
+use Whity\Core\Plugin\Workspace\CodePluginActivation;
 use Whity\Core\Plugin\Trust\TrustedKeys;
 use Whity\Core\PluginRoleSeeder;
 
@@ -198,6 +200,39 @@ final class PluginTrustRealEngineTest extends TestCase
 
         self::assertCount(1, (new TenantPluginRepository($this->pdo))->active($tenant));
         self::assertFalse($this->trust->isKilled('CakeOrders', '1.0.0'));
+    }
+
+    /**
+     * WHIT-1277 (#2233): a kill reaches an installed code plugin too. It is off
+     * in every workspace, the system one included, and no longer Verified,
+     * however the mark was granted. Another version's kill leaves it alone.
+     */
+    public function testAKillTurnsAnInstalledCodePluginOffEverywhereAndUnverifiesIt(): void
+    {
+        $this->pdo->exec("INSERT INTO tenants (id, name, slug) VALUES (1, 'Example Bakery', 'example-bakery')");
+        $this->pdo->prepare("INSERT INTO plugin_installs (plugin_name, source, version, package_sha256) VALUES ('CakeOrders', 'store', '1.0.0', ?)")->execute([self::SHA]);
+        $this->applyFreshList();
+        $this->trust->grant($this->attestation(), 'CakeOrders', '1.0.0', self::SHA, self::MANIFEST_HASH, null);
+        $activation = new CodePluginActivation($this->pdo);
+        $verification = new CodePluginVerification($this->pdo);
+        self::assertSame(CodePluginActivation::STATE_ON, $activation->stateFor('CakeOrders', 1)['state']);
+        self::assertTrue($verification->isVerified('CakeOrders'));
+
+        $this->applyList(10, [['plugin' => 'CakeOrders', 'version' => '9.9.9', 'action' => 'kill']]);
+        $activation->resetRequest();
+        self::assertTrue($activation->isOn('CakeOrders', 1), 'a kill for another version');
+
+        $this->applyList(11, [['plugin' => 'CakeOrders', 'version' => '1.0.0', 'action' => 'kill', 'reason' => 'bad update']]);
+        $activation->resetRequest();
+        self::assertSame(['state' => 'off', 'reason' => 'withdrawn'], array_intersect_key($activation->stateFor('CakeOrders', 1), ['state' => 1, 'reason' => 1]));
+        self::assertFalse($activation->isVisible('CakeOrders', 0), 'the system workspace too');
+        self::assertFalse($verification->isVerified('CakeOrders'));
+        self::assertTrue($activation->isOn('OtherPlugin', 1), 'other plugins stay on');
+
+        // A plugin copied in by hand has no recorded version: a kill for every version reaches it.
+        $this->applyList(12, [['plugin' => 'HandCopied', 'version' => null, 'action' => 'kill']]);
+        $activation->resetRequest();
+        self::assertFalse($activation->isOn('HandCopied', 1));
     }
 
     public function testOnlyPluginTrustWritesTheMarkTables(): void

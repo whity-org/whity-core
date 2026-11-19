@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Plugin\Tenant;
 
 use PDO;
+use Whity\Core\Plugin\Trust\PluginTrust;
 use Throwable;
 use Whity\Core\Db\DbBool;
 use Whity\Sdk\Manifest\InvalidManifestException;
@@ -87,14 +88,16 @@ final class TenantPluginRepository
 
     /**
      * The live version of each switched-on plugin in this workspace: one cheap
-     * read per request, whose hashes key the parsed-manifest cache.
+     * read per request, whose hashes key the parsed-manifest cache. A version
+     * a signed revocation list killed is left out, however it got there
+     * (WHIT-1277, #2244).
      *
      * @return list<array{plugin_key: string, version_id: int, hash: string}>
      */
     public function active(int $tenantId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT tp.plugin_key, v.id AS version_id, v.hash
+            'SELECT tp.plugin_key, v.id AS version_id, v.hash, v.version
                FROM tenant_plugins tp
                JOIN plugin_manifest_versions v ON v.id = tp.active_version_id AND v.tenant_id = tp.tenant_id
               WHERE tp.tenant_id = :tenant_id AND tp.enabled = :enabled
@@ -105,7 +108,12 @@ final class TenantPluginRepository
         $stmt->execute();
 
         $rows = [];
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $all = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $revoked = $all === [] ? [] : PluginTrust::acceptedEntries($this->db);
+        foreach ($all as $row) {
+            if (PluginTrust::kills($revoked, (string) $row['plugin_key'], (string) $row['version'])) {
+                continue;
+            }
             $rows[] = [
                 'plugin_key' => (string) $row['plugin_key'],
                 'version_id' => (int) $row['version_id'],
@@ -370,7 +378,14 @@ final class TenantPluginRepository
         );
         $stmt->execute([':tenant_id' => $tenantId, ':own_tenant_id' => $tenantId]);
 
-        /** @var list<string> */
-        return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+        // #2255: never a core permission, whatever a row says. The manifest
+        // policy refuses them now, but a row published before it, or written
+        // some other way, must not hide `users:write` from every workspace.
+        $coreResources = TenantManifestPolicy::coreResources();
+
+        return array_values(array_filter(
+            array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN)),
+            static fn (string $permission): bool => !isset($coreResources[explode(':', $permission, 2)[0]])
+        ));
     }
 }

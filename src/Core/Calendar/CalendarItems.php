@@ -184,6 +184,28 @@ final class CalendarItems
     }
 
     /**
+     * An event as `GET /api/calendar/events` lists it (WHIT-1285, #2237):
+     * another person's synced event or time off says only Busy or Away, with
+     * no notes, place or link to where it came from, as on the grid.
+     *
+     * @param array<string, mixed> $e an event as {@see CalendarRepository::eventToApi()} gives it
+     * @return array<string, mixed>
+     */
+    public static function redactedFor(array $e, int $viewerId): array
+    {
+        $kind = (string) ($e['kind'] ?? '');
+        if ((int) ($e['profile_id'] ?? 0) === $viewerId) {
+            return $e;
+        }
+        $e['external_ref'] = null;
+        if (!in_array($kind, [CalendarRepository::KIND_TIME_OFF, CalendarRepository::KIND_EXTERNAL], true)) {
+            return $e;
+        }
+
+        return ['title' => $kind === CalendarRepository::KIND_TIME_OFF ? self::AWAY : self::BUSY, 'notes' => '', 'location' => ''] + $e;
+    }
+
+    /**
      * @param array<string, mixed> $e an event as {@see CalendarRepository::eventToApi()} gives it, with people
      * @return array<string, mixed>
      */

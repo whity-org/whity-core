@@ -22,11 +22,14 @@ use Whity\Auth\Exception\InvalidMembershipException;
  *    memberships row for (profile_id, active_tenant_id) — this is the
  *    mechanism that enforces per-membership suspension without waiting for
  *    token expiry (ADR 0005 §5).
- *  - active_tenant_id = 0 is the SYSTEM tenant: by the platform id-0
- *    convention it carries cross-tenant authority and needs no membership row.
- *    profile_id, however, must always be a POSITIVE int — profile_id=0 is
- *    rejected so it can never be paired with active_tenant_id=0 to borrow
- *    system authority.
+ *  - active_tenant_id = 0 is the SYSTEM tenant: it carries cross-tenant
+ *    authority, so it needs an ACTIVE tenant-0 membership like any other
+ *    tenant (#2229). It used to need none, so an operator whose tenant-0
+ *    membership was suspended or removed kept system authority for as long
+ *    as they kept refreshing. Code that runs as the system without a person
+ *    uses TenantContext::isSystemMode(), never these claims. profile_id must
+ *    always be a POSITIVE int — profile_id=0 is rejected so it can never be
+ *    paired with active_tenant_id=0 to borrow system authority.
  *  - PARTIAL / non-integer / non-positive-profile claim sets fail closed.
  *
  * Stateless service (per-request instance data only — FrankenPHP worker-safe;
@@ -36,9 +39,6 @@ use Whity\Auth\Exception\InvalidMembershipException;
  */
 final class ActiveTenantMembershipGuard
 {
-    /** The reserved identifier for the system tenant (cross-tenant authority). */
-    private const SYSTEM_TENANT_ID = 0;
-
     private PDO $db;
 
     public function __construct(PDO $db)
@@ -102,16 +102,9 @@ final class ActiveTenantMembershipGuard
             );
         }
 
-        // System tenant (id 0): cross-tenant authority by platform convention —
-        // no membership row required (mirrors EnforceTenantIsolation's bypass).
-        // A deactivated profile is still refused (#2261).
-        if ($activeTenantId === self::SYSTEM_TENANT_ID) {
-            if (!$this->profileIsActive($profileId)) {
-                throw new InvalidMembershipException(401, 'Profile is deactivated');
-            }
-            return;
-        }
-
+        // The system tenant (id 0) is checked like every other tenant (#2229):
+        // its cross-tenant authority is exactly why a lapsed membership there
+        // must not keep working.
         if (!$this->hasActiveMembership($profileId, $activeTenantId)) {
             throw new InvalidMembershipException(
                 403,
@@ -149,24 +142,6 @@ final class ActiveTenantMembershipGuard
             return (bool) $stmt->fetchColumn();
         } catch (\Exception) {
             // Fail closed: an unreadable membership table must not grant access.
-            return false;
-        }
-    }
-
-    /**
-     * Whether the profile exists and is not deactivated. Used for the system
-     * tenant, which has no membership join to carry the check. `profiles` is a
-     * global identity table (ADR 0005 §1). Fails closed on a database error.
-     */
-    private function profileIsActive(int $profileId): bool
-    {
-        try {
-            $stmt = $this->db->prepare('SELECT status FROM profiles WHERE id = ? LIMIT 1');
-            $stmt->execute([$profileId]);
-            $status = $stmt->fetchColumn();
-
-            return $status !== false && (string) $status !== 'inactive';
-        } catch (\Exception) {
             return false;
         }
     }

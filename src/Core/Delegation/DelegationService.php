@@ -123,6 +123,13 @@ class DelegationService implements DelegatedPermissionResolver
             // registered permission — cannot be delegated.
             if (!isset($effectiveLookup[$permission]) || !$this->registry->exists($permission)) {
                 $denied[] = $permission;
+                continue;
+            }
+            // #2224: and only as widely as they hold it. A permission that comes
+            // from a role on Branch A can be delegated within Branch A, not
+            // across the workspace and not into Branch B.
+            if (!$this->roleChecker->holdsPermissionOver($grantorProfileId, $tenantId, $permission, $ouId)) {
+                $denied[] = $permission;
             }
         }
 
@@ -341,12 +348,15 @@ class DelegationService implements DelegatedPermissionResolver
 
         $heldBy = [];
         $permissions = [];
-        foreach ($grants as ['permission' => $permission, 'grantor' => $grantor]) {
+        foreach ($grants as ['permission' => $permission, 'grantor' => $grantor, 'ou' => $ouId]) {
             $heldBy[$grantor] ??= array_fill_keys(
                 $this->roleChecker->getEffectivePermissionsForProfile($grantor, $tenantId),
                 true
             );
-            if (isset($heldBy[$grantor][$permission])) {
+            // #2224: still held, and still held over the grant's scope. A
+            // grantor moved out of Branch A stops granting there.
+            if (isset($heldBy[$grantor][$permission])
+                && $this->roleChecker->holdsPermissionOver($grantor, $tenantId, $permission, $ouId)) {
                 $permissions[$permission] = true;
             }
         }

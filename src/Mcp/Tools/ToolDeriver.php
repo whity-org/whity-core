@@ -397,6 +397,29 @@ final class ToolDeriver
     }
 
     /**
+     * The toolset a route's operation belongs to (WHIT-747): the one its tool
+     * carries in tools/list, and the one resources/read checks a token's
+     * toolset narrowing against (#2266).
+     *
+     * @param array<string, mixed> $route
+     */
+    public static function toolsetForRoute(array $route): string
+    {
+        $schema  = is_array($route['schema'] ?? null) ? $route['schema'] : [];
+        $options = ToolSurface::routeOptions($schema);
+        $prefix  = $route['namespacePrefix'] ?? null;
+
+        if (is_string($prefix) && $prefix !== '') {
+            $root = CoreToolsets::pluginToolsetId($prefix);
+            return $options['toolset'] !== null && ToolSurface::isWithin($options['toolset'], $root)
+                ? $options['toolset']
+                : $root;
+        }
+        $named = $options['toolset'];
+        return $named !== null && self::isCoreToolset($named) ? $named : CoreToolsets::forCoreRoute($route);
+    }
+
+    /**
      * Toolset, visibility and agent policy for one derived operation (WHIT-747),
      * as the `_meta` keys {@see ToolSurface} names.
      *
@@ -415,15 +438,10 @@ final class ToolDeriver
         $options = ToolSurface::routeOptions($schema);
         $prefix  = $route['namespacePrefix'] ?? null;
 
+        $toolset = self::toolsetForRoute($route);
         if (is_string($prefix) && $prefix !== '') {
-            $root    = CoreToolsets::pluginToolsetId($prefix);
-            $toolset = $options['toolset'] !== null && ToolSurface::isWithin($options['toolset'], $root)
-                ? $options['toolset']
-                : $root;
             $visibility = $options['visibility'] ?? ToolSurface::VISIBILITY_DISCOVERABLE;
         } else {
-            $named   = $options['toolset'];
-            $toolset = $named !== null && self::isCoreToolset($named) ? $named : CoreToolsets::forCoreRoute($route);
             $visibility = $options['visibility']
                 ?? (CoreToolsets::isAlwaysOn($name) ? ToolSurface::VISIBILITY_ALWAYS_ON : ToolSurface::VISIBILITY_DISCOVERABLE);
         }

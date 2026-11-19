@@ -126,12 +126,12 @@ final class SystemTenantRefreshRealEngineTest extends TestCase
     public function testRefreshWithMissingTenantClaimIsRefused(): void
     {
         $this->seedSystemAdmin('sysadmin-missing@example.test');
-        $_COOKIE['refresh_token'] = $this->jwtParser->create([
+        $_COOKIE['refresh_token'] = \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $this->jwtParser->create([
             'profile_id' => $this->profileIdOf('sysadmin-missing@example.test'),
             'email'      => 'sysadmin-missing@example.test',
             'role'       => 'admin',
             'token_epoch' => 0,
-        ], 604800, 'refresh');
+        ], 604800, 'refresh'));
 
         $response = $this->authHandler->handleRefresh(new Request('POST', '/api/auth/refresh', []));
 
@@ -153,13 +153,13 @@ final class SystemTenantRefreshRealEngineTest extends TestCase
 
     private function mintRefresh(string $email, int $tenantId): string
     {
-        return $this->jwtParser->create([
+        return \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $this->jwtParser->create([
             'profile_id'       => $this->profileIdOf($email),
             'active_tenant_id' => $tenantId,
             'email'            => $email,
             'role'             => 'admin',
             'token_epoch'      => 0,
-        ], 604800, 'refresh');
+        ], 604800, 'refresh'));
     }
 
     private function profileIdOf(string $email): int

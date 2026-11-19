@@ -114,6 +114,31 @@ final class SessionsRealEngineTest extends TestCase
         self::assertNull($this->validator()->validateAccessTokenFromBearer($newAccess));
     }
 
+    /**
+     * #2264: signing out with only the access token (what a token-mode client
+     * or a browser without its refresh cookie sends) ends the whole session:
+     * the paired 7-day refresh token stops rotating and the row leaves the list.
+     */
+    public function testSigningOutWithOnlyTheAccessTokenEndsTheRefreshTokenToo(): void
+    {
+        $this->seedProfile('a@example.com');
+        [$access, $refresh] = $this->login('a@example.com');
+
+        $logout = $this->authHandler()->handleLogout(
+            new Request('POST', '/api/auth/logout', ['Authorization' => 'Bearer ' . $access, 'X-Auth-Mode' => 'token'])
+        );
+        self::assertSame(200, $logout->getStatusCode());
+
+        self::assertNull($this->validator()->validateRefreshTokenFromString($refresh), 'the paired refresh token is revoked');
+        $refreshRes = $this->authHandler()->handleRefresh(
+            new Request('POST', '/api/auth/refresh', ['Authorization' => 'Bearer ' . $refresh, 'X-Auth-Mode' => 'token'])
+        );
+        self::assertSame(401, $refreshRes->getStatusCode());
+        $open = $this->pdo->query('SELECT COUNT(*) FROM sessions WHERE revoked_at IS NULL');
+        self::assertNotFalse($open);
+        self::assertSame(0, (int) $open->fetchColumn(), 'the session is no longer listed');
+    }
+
     public function testRevokingASessionRejectsItsLiveAccessToken(): void
     {
         $this->seedProfile('a@example.com');

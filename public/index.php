@@ -4768,6 +4768,14 @@ $formPrintoutsHandler = new \Whity\Api\FormPrintoutsApiHandler(
     new \Whity\Core\Form\Print\FormPrintoutService($db->getPdo(), $sourceDocumentPrinter, $entitlementService, $settingsService),
     $flowDocumentRenderer,
     $documentRenderMeters,
+    // #2243: the theme preview prints a real response, so it needs forms:read too.
+    static function (\Whity\Core\Request $request, int $tenantId) use ($roleChecker): bool {
+        $profileId = is_object($request->user) && isset($request->user->profile_id) && is_int($request->user->profile_id)
+            ? $request->user->profile_id
+            : null;
+
+        return $profileId !== null && $roleChecker->hasPermissionForProfile($profileId, CorePermissions::FORMS_READ, $tenantId);
+    },
 );
 $router->register('GET', '/api/form-submissions/{id:\d+}/printout', [$formPrintoutsHandler, 'submission'], null, null, CorePermissions::FORMS_READ);
 $router->register('POST', '/api/document-themes/form-printout-preview', [$formPrintoutsHandler, 'themePreview'], null, null, CorePermissions::DOCUMENTS_THEMES);
@@ -5395,8 +5403,7 @@ $decisionRecorder = new \Whity\Core\Convening\DecisionRecorder(
         $documentRouter,
         $routeRepository,
         $routeStepRepository,
-        $routeRecipientRepository,
-        $conveningBodyRepository
+        $routeRecipientRepository
     )
 );
 
@@ -5722,7 +5729,21 @@ $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $meetingInvitationRepository,
     $meetingAttendanceRepository,
     $meetingService,
-    $decisionRecorder
+    $decisionRecorder,
+    // #2247: the document library's visibility rule, for agenda documents and
+    // a document's convening history.
+    static function (\Whity\Core\Request $request, int $tenantId, int $documentId) use ($documentRepository, $documentVisibilityPolicy, $roleChecker): bool {
+        $callerId = is_object($request->user) && isset($request->user->profile_id) && is_int($request->user->profile_id)
+            ? $request->user->profile_id
+            : null;
+        $document = $callerId === null ? null : $documentRepository->findById($documentId, $tenantId);
+
+        return $document !== null && $documentVisibilityPolicy->canView(
+            $document,
+            $callerId,
+            \Whity\Core\RBAC\ScopedPermissionSet::forProfile($roleChecker, $callerId, $tenantId)
+        );
+    }
 );
 $router->register('GET',    '/api/meetings',                                [$meetingsHandler, 'list'],     null, null, CorePermissions::CONVENING_READ);
 $router->register('POST',   '/api/meetings',                                [$meetingsHandler, 'create'],   null, null, CorePermissions::CONVENING_MANAGE);
@@ -7193,7 +7214,18 @@ $pluginLoader->collectJobs($jobsRegistry);
 // plugin's job, async listener or command resolves is the one its routes get.
 // They stop here: nothing below serves a request.
 if (defined('WHITY_HOST_KERNEL_BOOT')) {
-    return ['db' => $db, 'hookManager' => $hookManager, 'pluginLoader' => $pluginLoader];
+    return [
+        'db' => $db,
+        'hookManager' => $hookManager,
+        'pluginLoader' => $pluginLoader,
+        // #2205: what a worker resets between jobs, as the request loop does
+        // between requests (the job runner resets RoleChecker's caches itself).
+        'resetRequest' => static function () use ($tenantManifestHost, $codePluginActivation, $documentFieldRegistry): void {
+            $tenantManifestHost->resetRequest();
+            $codePluginActivation->resetRequest();
+            $documentFieldRegistry->resetRequest();
+        },
+    ];
 }
 
 // Handle requests (persistent worker mode or fallback single-request mode)

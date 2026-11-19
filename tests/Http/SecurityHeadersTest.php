@@ -152,10 +152,10 @@ class SecurityHeadersTest extends TestCase
 
         $merged = SecurityHeaders::respectingHandlerCsp($securityHeaders, $responseHeaders);
 
-        $this->assertArrayNotHasKey(
-            'Content-Security-Policy',
-            $merged,
-            'The strict default CSP must be dropped so the handler-set one survives array_merge().'
+        $this->assertSame(
+            "default-src 'self'; script-src 'unsafe-inline'; sandbox allow-scripts allow-forms",
+            $merged['Content-Security-Policy'] ?? null,
+            'The strict default CSP is replaced by the handler-set one, sent sandboxed (WHIT-1283).'
         );
     }
 
@@ -256,16 +256,39 @@ class SecurityHeadersTest extends TestCase
         $csp = $merged['Content-Security-Policy'] ?? '';
         $this->assertStringNotContainsString('allow-same-origin', $csp);
         $this->assertStringNotContainsString('allow-top-navigation', $csp);
-        $this->assertStringEndsWith('sandbox allow-scripts allow-forms', $csp);
+        $this->assertStringEndsWith('sandbox allow-scripts', $csp, 'only the flags the app allows are kept');
     }
 
-    public function testAHandlerCspThatRefusesFramingIsLeftAsItIs(): void
+    /**
+     * WHIT-1283 (#2228): a page that refuses framing, or says nothing about
+     * it, can still be opened on its own in a tab. Its CSP is sent sandboxed
+     * too, so its scripts never run in the app's origin.
+     */
+    public function testAHandlerCspThatRefusesFramingIsSentSandboxedAndStaysUnframable(): void
+    {
+        foreach (["default-src 'self'; script-src 'unsafe-inline'; frame-ancestors 'none'", "default-src 'self'; script-src 'unsafe-inline'"] as $handlerCsp) {
+            $merged = SecurityHeaders::respectingHandlerCsp(
+                SecurityHeaders::headers('production'),
+                ['content-security-policy' => $handlerCsp]
+            );
+
+            $this->assertSame($handlerCsp . '; sandbox allow-scripts allow-forms', $merged['Content-Security-Policy'] ?? null);
+            $this->assertSame('DENY', $merged['X-Frame-Options'] ?? null, $handlerCsp);
+        }
+    }
+
+    public function testAStricterSandboxOfTheHandlersOwnIsKept(): void
     {
         $merged = SecurityHeaders::respectingHandlerCsp(
             SecurityHeaders::headers('production'),
-            ['content-security-policy' => "default-src 'self'; frame-ancestors 'none'"]
+            ['content-security-policy' => "default-src 'none'; sandbox"]
         );
+        $this->assertSame("default-src 'none'; sandbox", $merged['Content-Security-Policy'] ?? null, 'a bare sandbox stays bare');
 
-        $this->assertArrayNotHasKey('Content-Security-Policy', $merged);
+        $merged = SecurityHeaders::respectingHandlerCsp(
+            SecurityHeaders::headers('production'),
+            ['content-security-policy' => "default-src 'self'; SANDBOX allow-forms allow-popups; sandbox allow-forms allow-scripts"]
+        );
+        $this->assertSame("default-src 'self'; sandbox allow-forms", $merged['Content-Security-Policy'] ?? null, 'two sandboxes: the strictest');
     }
 }

@@ -59,6 +59,18 @@ final class QueueWorkCommand implements CliCommand
     private \Closure $sleeper;
 
     /**
+     * #2205: the worker's services hold the raw PDO, so `Database`'s own
+     * connection lifetime never rotates it. The worker recycles instead once it
+     * has run that long. Null: never, as when a test injects its own deps.
+     */
+    private ?int $connectionMaxAge = null;
+
+    public function recycleAfterConnectionAge(?int $seconds): void
+    {
+        $this->connectionMaxAge = $seconds;
+    }
+
+    /**
      * @param \Closure(int): void|null $sleeper Idle sleeper (seconds); default sleep(), a no-op in tests.
      */
     public function __construct(
@@ -75,8 +87,10 @@ final class QueueWorkCommand implements CliCommand
             // hook manager and document services replace the kernel's where
             // it registers them).
             // One connection for both, as in a request.
-            $database = \Whity\Core\Kernel\HostKernel::boot()['db'];
+            $kernel = \Whity\Core\Kernel\HostKernel::boot();
+            $database = $kernel['db'];
             $pdo = $database->getPdo();
+            $this->connectionMaxAge = $database->getMaxLifetimeSeconds() > 0 ? $database->getMaxLifetimeSeconds() : null;
             // A plugin builds its own job handlers and resolves what they need
             // from the host service container — the documented data-access seam.
             // The worker is a bare CLI process that registers nothing, so without
@@ -303,6 +317,7 @@ final class QueueWorkCommand implements CliCommand
                     }
                 });
                 $runner->setWorkspaceActivation($activation);
+                $runner->setAfterJob($kernel['resetRequest']);
             }
         }
         $this->repo = $repo;
@@ -357,6 +372,10 @@ final class QueueWorkCommand implements CliCommand
 
             if ($opts['maxRuntime'] > 0 && (time() - $startedAt) >= $opts['maxRuntime']) {
                 $this->logger->info('[queue:work] recycling (max-runtime reached)', ['seconds' => time() - $startedAt]);
+                break;
+            }
+            if ($this->connectionMaxAge !== null && (time() - $startedAt) >= $this->connectionMaxAge) {
+                $this->logger->info('[queue:work] recycling (database connection lifetime reached)', ['seconds' => time() - $startedAt]);
                 break;
             }
         }

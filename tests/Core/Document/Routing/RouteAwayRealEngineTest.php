@@ -124,6 +124,30 @@ final class RouteAwayRealEngineTest extends TestCase
         self::assertSame(0, $inbox->count(self::TENANT, self::AWSS, true));
     }
 
+    /**
+     * #2221: an away period only works while both people are still active
+     * staff. Suspending the person away, or the delegate, stops the cover at
+     * once, without anybody ending the period.
+     */
+    public function testCoverStopsWhenEitherPersonIsNoLongerActiveStaff(): void
+    {
+        $this->away(['flows']);
+        $documentId = $this->seedDocument();
+        $this->issueGate($documentId);
+        $inbox = new DocumentRoutingInboxSource($this->recipients);
+        self::assertSame(1, $inbox->count(self::TENANT, self::AWSS, true), 'precondition: Awss covers Amro');
+
+        foreach ([self::AMRO, self::AWSS] as $gone) {
+            $this->pdo->exec("UPDATE memberships SET status = 'suspended' WHERE profile_id = {$gone}");
+            self::assertSame(0, $inbox->count(self::TENANT, self::AWSS, true), "no cover while {$gone} is suspended");
+            self::assertFalse($this->recipients->hasAnyForProfile(self::TENANT, $documentId, self::AWSS));
+            $this->pdo->exec("UPDATE memberships SET status = 'active' WHERE profile_id = {$gone}");
+        }
+
+        $this->pdo->exec("UPDATE memberships SET kind = 'customer' WHERE profile_id = " . self::AWSS);
+        self::assertSame(0, $inbox->count(self::TENANT, self::AWSS, true), 'a customer covers nobody');
+    }
+
     public function testOnlyAnAwayPeriodThatCoversApprovalsCounts(): void
     {
         $this->away(['proposals']);

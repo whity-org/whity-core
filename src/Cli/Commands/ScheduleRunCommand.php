@@ -58,6 +58,18 @@ final class ScheduleRunCommand implements CliCommand
     private ?SchedulerHeartbeat $heartbeat;
 
     /**
+     * #2205: the scheduler's repositories hold the raw PDO, so `Database`'s
+     * own connection lifetime never rotates it; the scheduler recycles once it
+     * has run that long. Null: never, as when a test injects its own deps.
+     */
+    private ?int $connectionMaxAge = null;
+
+    public function recycleAfterConnectionAge(?int $seconds): void
+    {
+        $this->connectionMaxAge = $seconds;
+    }
+
+    /**
      * @param \Closure(int): void|null $sleeper Idle sleeper (seconds); default sleep(), a no-op in tests.
      * @param (\Closure(): void)|null $syncPluginSchedules Reconciles plugins' declared schedules (WHIT-1031).
      * @param SchedulerHeartbeat|null $heartbeat Where each completed tick is recorded (WHIT-1013).
@@ -75,7 +87,9 @@ final class ScheduleRunCommand implements CliCommand
     ) {
         $this->logger = $logger ?? new NullLogger();
         if ($schedules === null || $queue === null || $store === null || $jobs === null) {
-            $pdo = Database::connect()->getPdo();
+            $database = Database::connect();
+            $pdo = $database->getPdo();
+            $this->connectionMaxAge = $database->getMaxLifetimeSeconds() > 0 ? $database->getMaxLifetimeSeconds() : null;
             $this->pluginRecords ??= new \Whity\Core\Plugin\PluginRecords($pdo);
             $schedules ??= new ScheduledJobRepository($pdo);
             $syncPluginSchedules ??= $this->pluginScheduleSync($schedules);
@@ -109,6 +123,8 @@ final class ScheduleRunCommand implements CliCommand
 
         while (true) {
             $this->tick($opts['lockTtl'], $opts['retention']);
+            // #2205: nothing resolved during one tick is trusted in the next.
+            \Whity\Auth\RoleChecker::clearCache();
 
             if ($opts['once']) {
                 break;
@@ -117,6 +133,10 @@ final class ScheduleRunCommand implements CliCommand
 
             if ($opts['maxRuntime'] > 0 && (time() - $startedAt) >= $opts['maxRuntime']) {
                 $this->logger->info('[schedule:run] recycling (max-runtime reached)', ['seconds' => time() - $startedAt]);
+                break;
+            }
+            if ($this->connectionMaxAge !== null && (time() - $startedAt) >= $this->connectionMaxAge) {
+                $this->logger->info('[schedule:run] recycling (database connection lifetime reached)', ['seconds' => time() - $startedAt]);
                 break;
             }
         }

@@ -12,6 +12,8 @@ use Whity\Core\Response;
 use Whity\Core\Security\EncryptedSecretStore;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\JsonBody;
+use Whity\Sdk\Http\Outbound\AddressPolicy;
+use Whity\Sdk\Http\Outbound\HttpFailure;
 use Whity\Storage\TenantStorageConfigRepository;
 
 /**
@@ -58,9 +60,15 @@ final class TenantStorageConfigApiHandler
         PDO $db,
         private readonly EncryptedSecretStore $secrets,
         private readonly EntitlementService $entitlements,
+        // WHIT-1284 (#2240): where a workspace's own object store may be.
+        // Null: the public internet only.
+        ?AddressPolicy $endpoints = null,
     ) {
         $this->repo = new TenantStorageConfigRepository($db);
+        $this->endpoints = $endpoints ?? AddressPolicy::publicOnly();
     }
+
+    private readonly AddressPolicy $endpoints;
 
     public function get(Request $request): Response
     {
@@ -106,6 +114,18 @@ final class TenantStorageConfigApiHandler
         }
         if (!$this->isHttpsUrl($endpoint)) {
             return Response::error('endpoint must be an https URL', 422);
+        }
+        // WHIT-1284 (#2240): the server itself talks to this address, so it
+        // must be on the public internet, not the deployment's own network.
+        // The transport checks again on every request (DNS can change).
+        $endpointParts = parse_url($endpoint);
+        if (!is_array($endpointParts) || isset($endpointParts['user']) || isset($endpointParts['pass'])) {
+            return Response::error('endpoint must be an https URL without a user name or password', 422);
+        }
+        try {
+            $this->endpoints->resolve((string) ($endpointParts['host'] ?? ''));
+        } catch (HttpFailure) {
+            return Response::error('endpoint must be an address on the public internet', 422);
         }
 
         $publicBaseUrl = isset($body['public_base_url']) ? trim((string) $body['public_base_url']) : '';
