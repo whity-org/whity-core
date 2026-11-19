@@ -131,11 +131,13 @@ final class SsoAuthHandler
         }
         $claims = $this->sessions->validateAccessToken();
         $profileId = $claims['profile_id'] ?? null;
-        $tenantId = $claims['tenant_id'] ?? null;
+        // #2194: sessions carry `active_tenant_id`; `tenant_id` is the claim
+        // retired at the identity cut-over, so reading it refused everyone.
+        $tenantId = $claims['active_tenant_id'] ?? null;
         $returnTo = (string) ($this->query('return_to') ?? '');
         // The route the signer is signing on: the sign-in counts only there.
         $routeId = (string) ($this->query('route_id') ?? '');
-        if (!is_int($profileId) || !is_int($tenantId) || $tenantId <= 0
+        if (!is_int($profileId) || $profileId <= 0 || !is_int($tenantId) || $tenantId < 0
             || preg_match('/^[1-9]\d{0,18}$/', $routeId) !== 1
             || preg_match('#^/(?!/)[A-Za-z0-9/_\-.~%]{0,500}$#', $returnTo) !== 1
         ) {
@@ -158,11 +160,15 @@ final class SsoAuthHandler
         }
         $claims = $this->sessions->validateAccessToken();
         $profileId = $claims['profile_id'] ?? null;
-        $tenantId = $claims['tenant_id'] ?? null;
+        // #2194: sessions carry `active_tenant_id`; `tenant_id` is the claim
+        // retired at the identity cut-over, so reading it refused everyone.
+        $tenantId = $claims['active_tenant_id'] ?? null;
         $returnTo = (string) ($this->query('return_to') ?? '');
         $purpose = (string) ($this->query('purpose') ?? '');
-        if (!is_int($profileId) || !is_int($tenantId) || $tenantId <= 0
-            || preg_match('/^(2fa-recovery|password-reset|agent-proposal):[A-Za-z0-9_\-]{1,64}$/', $purpose) !== 1
+        // The platform workspace (0) approves too: its break-glass resets are
+        // gated approvals like any other.
+        if (!is_int($profileId) || $profileId <= 0 || !is_int($tenantId) || $tenantId < 0
+            || preg_match('/^(2fa-recovery|password-reset|agent-proposal|workspace-ownership):[A-Za-z0-9_\-]{1,64}$/', $purpose) !== 1
             || preg_match('#^/(?!/)[A-Za-z0-9/_\-.~%]{0,500}$#', $returnTo) !== 1
         ) {
             return null;
@@ -182,7 +188,7 @@ final class SsoAuthHandler
     private function completeReauth(array $flow, int $providerId, int $tenantId, \Whity\Sdk\Auth\ExternalIdentity $identity): Response
     {
         $profileId = (int) $flow['reauth_profile_id'];
-        $signingTenantId = (int) ($flow['reauth_tenant_id'] ?? 0);
+        $signingTenantId = is_int($flow['reauth_tenant_id'] ?? null) ? $flow['reauth_tenant_id'] : -1;
         $routeId = (int) ($flow['reauth_route_id'] ?? 0);
         $purpose = is_string($flow['reauth_purpose'] ?? null) ? $flow['reauth_purpose'] : null;
         $returnTo = (string) ($flow['reauth_return_to'] ?? '/');
@@ -191,7 +197,7 @@ final class SsoAuthHandler
             'Location' => $base . $returnTo . ($purpose !== null ? '?identity_check=' : '?signing=') . rawurlencode($outcome),
         ]);
 
-        if ($this->identities === null || $this->signingChallenges === null || $signingTenantId <= 0 || ($routeId <= 0 && $purpose === null)) {
+        if ($this->identities === null || $this->signingChallenges === null || $signingTenantId < 0 || ($routeId <= 0 && $purpose === null)) {
             return $back('sign_in_failed');
         }
 
