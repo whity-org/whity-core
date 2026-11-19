@@ -1946,6 +1946,8 @@ $gatedApproval = new \Whity\Core\Security\GatedApproval(
         new \Whity\Core\Document\Signing\SigningChallengeRepository($db->getPdo()),
         $totpService,
         new \Whity\Core\Security\IdentityCheckMailer($brandedEmailSender),
+        // #2223: the signing limiter, so both "confirm it's you" checks share one budget.
+        new \Whity\Core\Document\Signing\SigningAttemptLimiter(new DatabaseSharedStore($db->getPdo())),
     )
 );
 
@@ -6122,13 +6124,22 @@ $chatRepository = new \Whity\Core\Chat\ChatRepository($db->getPdo());
 // WHIT-1077: each chat line is pushed to the chat's other people who have a
 // device on and aren't looking at that chat.
 $chatStore = new \Whity\Core\Store\DatabaseSharedStore($db->getPdo());
+// WHIT-1266 (#2231, #2232): a record a chat talks about is shown, found or
+// joined only by people its own screen would show it to.
+$chatRecordAccess = new \Whity\Core\Chat\ChatRecordAccess(
+    $db->getPdo(),
+    $permissionResolver,
+    $documentRepository,
+    $documentVisibilityPolicy,
+    $routeRecipientRepository,
+);
 $chatService = new \Whity\Core\Chat\ChatService($chatRepository, new \Whity\Core\Chat\ChatPushNotifier(
     $notificationDispatcher,
     $chatRepository,
     new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
     $chatStore,
     $logger,
-), $chatStore, new \Whity\Core\Chat\ChatAttachments($db->getPdo(), $storageDriver), new \Whity\Core\Chat\ChatBlocks($db->getPdo()));
+), $chatStore, new \Whity\Core\Chat\ChatAttachments($db->getPdo(), $storageDriver), new \Whity\Core\Chat\ChatBlocks($db->getPdo(), $chatRecordAccess), $chatRecordAccess);
 // One chat (UC.1, WHIT-1093): team chats and, for people with messages.read,
 // the customer conversations, in one list with each person's pins.
 $chatHandler = new \Whity\Api\ChatApiHandler(

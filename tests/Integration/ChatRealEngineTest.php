@@ -96,8 +96,16 @@ final class ChatRealEngineTest extends TestCase
         $this->ok($this->handler->post($this->person(self::AHMAD, ['body' => 'Before the agent joined']), ['id' => $id]), 201);
 
         // An agent can only work for someone who set it up.
-        $refused = $this->handler->addMember($this->person(self::AHMAD, ['agent_id' => $this->stockAgent, 'works_for' => self::AMRO]), ['id' => $id]);
+        $refused = $this->handler->addMember($this->person(self::AHMAD, ['agent_id' => $this->billingAgent, 'works_for' => self::AHMAD]), ['id' => $id]);
         self::assertSame(422, $refused->getStatusCode());
+
+        // #2252: and only that person adds it. Amro set the billing agent up and
+        // is in this chat, but Ahmad cannot bring it in for him, choose what it
+        // reads, or switch off the hold on its lines.
+        $notHis = $this->handler->addMember($this->person(self::AHMAD, [
+            'agent_id' => $this->billingAgent, 'works_for' => self::AMRO, 'reads' => 'all', 'actions' => ['post' => 'allowed'],
+        ]), ['id' => $id]);
+        self::assertSame(403, $notHis->getStatusCode(), $notHis->getBody());
 
         $added = $this->ok($this->handler->addMember($this->person(self::AHMAD, [
             'agent_id' => $this->stockAgent, 'works_for' => self::AHMAD, 'reads' => 'now', 'actions' => ['post' => 'allowed', 'order_stock' => 'ask'],

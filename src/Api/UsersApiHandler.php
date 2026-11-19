@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use Psr\Log\LoggerInterface;
 use Whity\Auth\RoleChecker;
+use Whity\Auth\SessionService;
 use Whity\Auth\TwoFactorRequirementReader;
 use Whity\Core\PasswordPolicy;
 use Whity\Core\Request;
@@ -680,7 +681,15 @@ class UsersApiHandler
 
             try {
                 // Find-or-create the global profile for this (globally-unique) email.
-                $profileId = $this->findOrCreateProfile($email, $passwordHash);
+                try {
+                    $profileId = $this->findOrCreateProfile($email, $passwordHash);
+                } catch (\Whity\Core\Identity\UnconfirmedEmailClaimException) {
+                    // #2245: another account's unconfirmed sign-in address.
+                    if ($ownTx && $this->db->inTransaction()) {
+                        $this->db->rollBack();
+                    }
+                    return Response::error('This email address is waiting to be confirmed on another account', 409, ['code' => 'email_unconfirmed_elsewhere']);
+                }
 
                 // Reject when an ACTIVE membership already exists for this profile
                 // in the tenant (a profile may be re-added after being removed, but
@@ -1110,10 +1119,22 @@ class UsersApiHandler
                     )->execute([$newDisplayName, $profileId]);
                 }
                 if ($accountStatusChanged) {
-                    // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
-                    $this->db->prepare(
-                        'UPDATE profiles SET status = ?, updated_at = NOW() WHERE id = ?'
-                    )->execute([$newAccountStatus, $profileId]);
+                    if ($newAccountStatus === 'inactive') {
+                        // Deactivating ends every session now, not at token
+                        // expiry (#2238). The epoch bump kills every access,
+                        // refresh, device and MCP token the person holds; the
+                        // session rows are stamped so the lists agree.
+                        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+                        $this->db->prepare(
+                            'UPDATE profiles SET status = ?, token_epoch = token_epoch + 1, updated_at = NOW() WHERE id = ?'
+                        )->execute([$newAccountStatus, $profileId]);
+                        (new SessionService($this->db))->revokeAllForProfile($profileId);
+                    } else {
+                        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+                        $this->db->prepare(
+                            'UPDATE profiles SET status = ?, updated_at = NOW() WHERE id = ?'
+                        )->execute([$newAccountStatus, $profileId]);
+                    }
                 }
 
                 // Membership writes (tenant-owned). The UPDATE carries the tenant

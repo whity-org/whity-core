@@ -581,7 +581,13 @@ final class InvitationService
             }
 
             if ($profileId === null) {
-                $profileId = $this->profiles->findOrCreate($email, (string) $passwordHash);
+                try {
+                    $profileId = $this->profiles->findOrCreate($email, (string) $passwordHash);
+                } catch (UnconfirmedEmailClaimException) {
+                    // #2245: the address is another account's unconfirmed sign-in
+                    // address. Nothing was written; the invitation stays as it is.
+                    return $this->finish($ownTx, ['result' => self::ACCEPT_INVALID, 'tenant_id' => null, 'profile_id' => null]);
+                }
             }
 
             $statuses = $this->membershipStatuses($profileId, $tenantId);
@@ -920,15 +926,13 @@ final class InvitationService
         return $stmt->fetchColumn() !== false;
     }
 
-    /** The profile owning an address, or null when the address is unknown. */
+    /**
+     * The profile owning an address through a CONFIRMED row, or null (#2245).
+     * An unconfirmed row is a claim anyone can make, never an owner.
+     */
     private function profileIdForEmail(string $email): ?int
     {
-        // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email)
-        $stmt = $this->db->prepare('SELECT profile_id FROM profile_emails WHERE email = :email LIMIT 1');
-        $stmt->execute([':email' => $email]);
-        $profileId = $stmt->fetchColumn();
-
-        return $profileId !== false ? (int) $profileId : null;
+        return $this->profiles->verifiedOwner($email);
     }
 
     /**

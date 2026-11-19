@@ -1,4 +1,4 @@
-import { CLIENT_IP_HEADER, stripClientIpHeaders, trustedClientIp, trustedProxyHops } from '@/lib/trusted-client-ip';
+import { CLIENT_IP_HEADER, stripClientIpHeaders, trustedClientIp, trustedForwardedHost, trustedProxyHops } from '@/lib/trusted-client-ip';
 
 /**
  * Minimal Headers-like backing the stripClientIpHeaders tests, so they do not
@@ -162,5 +162,34 @@ describe('stripClientIpHeaders', () => {
 describe('CLIENT_IP_HEADER', () => {
   it('is the internal header the backend trusts', () => {
     expect(CLIENT_IP_HEADER).toBe('x-whity-client-ip');
+  });
+});
+
+/**
+ * WHIT-1287 (#2195): the host the backend picks the workspace from is the one
+ * the browser asked for, never an X-Forwarded-Host it made up.
+ */
+describe('trustedForwardedHost', () => {
+  it('uses Host and ignores a client X-Forwarded-Host with no trusted proxy in front', () => {
+    expect(trustedForwardedHost(req({ host: 'Bakery.Example.com', 'x-forwarded-host': 'localhost' }), 0)).toBe('bakery.example.com');
+  });
+
+  it("takes the nearest trusted proxy's value, the last one", () => {
+    expect(trustedForwardedHost(req({ host: 'web:3000', 'x-forwarded-host': 'localhost, bakery.example.com' }), 1)).toBe('bakery.example.com');
+    expect(trustedForwardedHost(req({ host: 'bakery.example.com:443' }), 1)).toBe('bakery.example.com:443');
+  });
+
+  it('sends nothing for a host that is not a plain name or address', () => {
+    expect(trustedForwardedHost(req({ host: 'evil.example/../x' }), 0)).toBeNull();
+    expect(trustedForwardedHost(req({ host: 'a b' }), 0)).toBeNull();
+    expect(trustedForwardedHost(req({}), 0)).toBeNull();
+    expect(trustedForwardedHost(req({ host: '[::1]:8080' }), 0)).toBe('[::1]:8080');
+  });
+
+  it('is stripped from what the client sent', () => {
+    const headers = new FakeHeaders({ 'x-forwarded-host': 'localhost', accept: 'application/json' });
+    stripClientIpHeaders(headers as unknown as Headers);
+    expect(headers.has('x-forwarded-host')).toBe(false);
+    expect(headers.has('accept')).toBe(true);
   });
 });
