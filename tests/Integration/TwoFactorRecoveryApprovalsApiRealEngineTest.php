@@ -319,13 +319,15 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
 
     public function testAFirstApprovalFromAnotherWorkspaceDoesNotCount(): void
     {
+        // Since #2226 the only other workspace that can act for A's staff is the
+        // platform one. B's admin is a platform admin and an admin in A too, so
+        // only the workspace the approval was given in tells them apart.
         $target = $this->seedProfileWithTwoFactor('both@acme.test', self::TENANT_A);
-        $this->pdo->exec("INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES ({$target}, " . self::TENANT_B . ", 1, 'active', datetime('now'))");
-        // B's admin is an admin in A too, so only the workspace it was given in tells the approvals apart.
         $this->pdo->exec('INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES (' . self::ADMIN_B . ', ' . self::TENANT_A . ", 1, 'active', datetime('now'))");
+        $this->pdo->exec('INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES (' . self::ADMIN_B . ", 0, 1, 'active', datetime('now'))");
 
-        TenantContext::setTenantId(self::TENANT_B);
-        $started = $this->decode($this->handler->forceReset($this->req(self::ADMIN_B, self::TENANT_B, ['profile_id' => $target, 'code' => self::CODE])))['data'];
+        TenantContext::setTenantId(0);
+        $started = $this->decode($this->handler->forceReset($this->req(self::ADMIN_B, 0, ['profile_id' => $target, 'code' => self::CODE])))['data'];
 
         TenantContext::reset();
         TenantContext::setTenantId(self::TENANT_A);
@@ -383,15 +385,53 @@ final class TwoFactorRecoveryApprovalsApiRealEngineTest extends TestCase
     public function testChecksMadeInAnotherWorkspaceAreNotShown(): void
     {
         $target = $this->seedProfileWithTwoFactor('checks@acme.test', self::TENANT_A);
-        $this->pdo->exec("INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES ({$target}, " . self::TENANT_B . ", 1, 'active', datetime('now'))");
+        $this->pdo->exec('INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES (' . self::ADMIN_B . ", 0, 1, 'active', datetime('now'))");
         $requestId = $this->confirmRequestFor($target);
 
-        TenantContext::setTenantId(self::TENANT_B);
-        $this->handler->addCheck($this->req(self::ADMIN_B, self::TENANT_B, ['text' => 'Called the number on file']), ['id' => (string) $requestId]);
+        TenantContext::setTenantId(0);
+        $this->handler->addCheck($this->req(self::ADMIN_B, 0, ['text' => 'Called the number on file']), ['id' => (string) $requestId]);
 
         TenantContext::reset();
         TenantContext::setTenantId(self::TENANT_A);
         self::assertSame([], $this->decode($this->handler->listPending($this->req(self::ADMIN_A, self::TENANT_A)))['data'][0]['checks']);
+    }
+
+    /**
+     * #2226: two-step sign-in is the person's everywhere. Two admins of one
+     * workspace can't clear it for somebody who also belongs to another
+     * workspace (here the platform one) or who is only their customer. Only the
+     * platform workspace's break-glass can.
+     */
+    public function testAWorkspaceCannotClearTwoStepForSomeoneItDoesNotAloneAnswerFor(): void
+    {
+        $platformAdmin = $this->seedProfileWithTwoFactor('super@acme.test', self::TENANT_A);
+        $this->pdo->exec("INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES ({$platformAdmin}, 0, 1, 'active', datetime('now'))");
+        $customer = $this->seedProfileWithTwoFactor('customer@acme.test', self::TENANT_A);
+        $this->pdo->exec("UPDATE memberships SET kind = 'customer' WHERE profile_id = {$customer}");
+
+        foreach ([$platformAdmin, $customer] as $target) {
+            TenantContext::reset();
+            TenantContext::setTenantId(self::TENANT_A);
+            $res = $this->handler->forceReset($this->req(self::ADMIN_A, self::TENANT_A, ['profile_id' => $target, 'code' => self::CODE]));
+            self::assertSame(404, $res->getStatusCode(), $res->getBody());
+
+            $requestId = $this->confirmRequestFor($target);
+            $listed = $this->decode($this->handler->listPending($this->req(self::ADMIN_A, self::TENANT_A)))['data'];
+            self::assertNotContains($requestId, array_column($listed, 'id'));
+            $this->handler->approve($this->req(self::ADMIN_A, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
+            $res = $this->handler->approve($this->req(self::ADMIN_A2, self::TENANT_A, ['code' => self::CODE]), ['id' => (string) $requestId]);
+            self::assertSame(404, $res->getStatusCode());
+            $this->assertTwoFactorOn($target);
+        }
+
+        // The platform workspace can still help them.
+        $this->pdo->exec('INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES (' . self::ADMIN_B . ", 0, 1, 'active', datetime('now'))");
+        $this->pdo->exec('INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES (' . self::ADMIN_A2 . ", 0, 1, 'active', datetime('now'))");
+        TenantContext::reset();
+        TenantContext::setTenantId(0);
+        $started = $this->decode($this->handler->forceReset($this->req(self::ADMIN_B, 0, ['profile_id' => $customer, 'code' => self::CODE])))['data'];
+        $res = $this->handler->approve($this->req(self::ADMIN_A2, 0, ['code' => self::CODE]), ['id' => (string) $started['id']]);
+        self::assertSame('approved', $this->decode($res)['data']['status'], $res->getBody());
     }
 
     private function assertTwoFactorOn(int $profileId): void
