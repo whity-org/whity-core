@@ -80,6 +80,12 @@ final class Dispatcher implements McpRequestHandlerInterface, McpNotificationSou
     public const TOOL_SURFACE_HEADER = 'x-whity-tool-surface';
 
     /**
+     * The most requests one JSON-RPC batch may hold (#2260). Batching exists
+     * only for 2025-03-26 clients, which send a handful at most.
+     */
+    public const MAX_BATCH_SIZE = 20;
+
+    /**
      * @param array<string, MethodHandler>    $handlers          Keyed by method name.
      * @param TokenValidator|null             $tokenValidator    When provided, every request must carry
      *                                                            a valid MCP bearer token; null disables
@@ -212,6 +218,20 @@ final class Dispatcher implements McpRequestHandlerInterface, McpNotificationSou
                 if (McpProtocol::atLeast($declared, '2025-06-18')) {
                     $this->httpStatus = 400;
                     return $this->encode($this->makeError(null, ErrorCode::INVALID_REQUEST, 'Batching is not part of protocol version ' . $declared));
+                }
+                // #2260: a batch is as many calls as it holds. Capped, so one
+                // request cannot pin a worker for a thousand tool calls, and
+                // charged to the rate limiter per item, up front, so batching
+                // never multiplies the budget and an over-budget batch runs
+                // nothing (429). The request itself was charged once above.
+                if (count($decoded) > self::MAX_BATCH_SIZE) {
+                    $this->httpStatus = 400;
+                    return $this->encode($this->makeError(null, ErrorCode::INVALID_REQUEST, 'A batch may hold at most ' . self::MAX_BATCH_SIZE . ' requests'));
+                }
+                if ($principal !== null && $this->rateLimiter !== null) {
+                    for ($i = 1; $i < count($decoded); $i++) {
+                        $this->rateLimiter->checkAndRecord($principal->tenantId, $principal->userId);
+                    }
                 }
                 return $this->handleBatch($decoded, $bearerToken, $principal);
             }
