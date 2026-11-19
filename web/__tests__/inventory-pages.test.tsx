@@ -37,6 +37,7 @@ import InventoryPage from '@/app/(protected)/inventory/page';
 import InventoryItemPage from '@/app/(protected)/inventory/items/[id]/page';
 import InventoryCountPage from '@/app/(protected)/inventory/counts/[id]/page';
 import WasteAndAdjustmentsPage from '@/app/(protected)/inventory/adjustments/page';
+import userEvent from '@testing-library/user-event';
 import PurchaseOrderPage from '@/app/(protected)/inventory/purchase-orders/[id]/page';
 import { nameIn, quantityText } from '@/lib/inventory/api';
 
@@ -312,6 +313,39 @@ describe('a purchase order page', () => {
     expect(history).toHaveTextContent('Drafted by Amro Saleh');
     expect(history).toHaveTextContent('Sent for approval');
     expect(history).toHaveTextContent('Approved by Emad Nasser');
+  });
+
+  it('prints the order in Arabic from the workspace template and saves the PDF (IV.20)', async () => {
+    permissions = ['purchases:read'];
+    GET.mockImplementation(async (path: string) =>
+      path === '/api/v1/inventory/purchase-orders/{id}' ? ok({ data: purchaseOrder({ status: 'approved' }) }) : routeGet(path)
+    );
+    const pdf = new Blob(['%PDF-1.7'], { type: 'application/pdf' });
+    POST.mockResolvedValue({ data: pdf, error: undefined, response: new Response(null, { status: 200, headers: { 'X-Document-Id': '91' } }) });
+    const createObjectURL = jest.fn(() => 'blob:po');
+    Object.assign(URL, { createObjectURL, revokeObjectURL: jest.fn() });
+    const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <PurchaseOrderPage params={Promise.resolve({ id: '60' })} />
+        </Suspense>
+      );
+    });
+
+    await userEvent.click(await screen.findByTestId('po-print'));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'In Arabic' }));
+
+    await waitFor(() =>
+      expect(POST).toHaveBeenCalledWith('/api/v1/inventory/purchase-orders/{id}/print', {
+        params: { path: { id: 60 } },
+        body: { lang: 'ar' },
+        parseAs: 'blob',
+      })
+    );
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledWith(pdf));
+    expect(click).toHaveBeenCalled();
+    click.mockRestore();
   });
 });
 

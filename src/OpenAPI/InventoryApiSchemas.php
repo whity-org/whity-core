@@ -382,6 +382,39 @@ final class InventoryApiSchemas
                     200 => self::json('The same key was sent before', self::object(['data' => SchemaBuilder::ref('InventoryPurchaseOrder'), 'receipt' => SchemaBuilder::ref('InventoryOperation')], ['data', 'receipt'])),
                 ] + $refused + $notFound + self::auth(),
             ]),
+            self::route('POST', '/api/inventory/purchase-orders/{id:\d+}/print', 'purchases:read', [
+                'summary' => 'Print a purchase order',
+                'description' => 'Issues the purchase order from the workspace\'s template in that language (seeded and published the first time) '
+                    . 'and answers with its PDF; the document\'s id is in `X-Document-Id`. Printing again returns the same document until the '
+                    . 'order or the template changes. When this instance can\'t make PDFs, the document is still issued and the answer is 202.',
+                'tags' => $tags,
+                'request' => 'InventoryPrintRequest',
+                'responses' => [
+                    200 => ['description' => 'The PDF', 'content' => ['application/pdf' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                    202 => self::json('Issued, with no PDF on this instance', self::object(['data' => SchemaBuilder::ref('InventoryPrinted')], ['data'])),
+                ] + $refused + $notFound + self::auth(),
+            ]),
+            self::route('POST', '/api/inventory/receipts/{id:\d+}/print', 'purchases:read', [
+                'summary' => 'Print a goods received note',
+                'description' => 'Issues the goods received note for one receipt (`GRN-0001`) and answers with its PDF, as purchase orders print.',
+                'tags' => $tags,
+                'request' => 'InventoryPrintRequest',
+                'responses' => [
+                    200 => ['description' => 'The PDF', 'content' => ['application/pdf' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                    202 => self::json('Issued, with no PDF on this instance', self::object(['data' => SchemaBuilder::ref('InventoryPrinted')], ['data'])),
+                ] + $refused + $notFound + self::auth(),
+            ]),
+            self::route('GET', '/api/inventory/print-templates', 'inventory:read', [
+                'summary' => 'The templates inventory prints from',
+                'description' => 'By document (`inventory.purchase-order`, `inventory.goods-received`, `inventory.item-labels`) and language, '
+                    . 'seeding any the workspace lacks. Item labels print through `POST /api/document-sources/{id}/print-labels` '
+                    . 'with records `inventory.variant:<id>`.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('Template ids', self::object(['data' => [
+                    'type' => 'object',
+                    'additionalProperties' => self::object(['en' => self::int(), 'ar' => self::int()], ['en', 'ar']),
+                ]], ['data']))] + self::auth(),
+            ]),
             self::route('POST', '/api/inventory/purchase-orders/{id:\d+}/lines/{line:\d+}/close', 'purchases:write', [
                 'summary' => 'Close a line that won\'t come',
                 'description' => 'What has not arrived of it is no longer expected. When every line is received or closed, the order is done.',
@@ -867,6 +900,15 @@ final class InventoryApiSchemas
                     'note' => self::str(),
                 ], ['variant_id', 'quantity'])],
             ], []),
+            'InventoryPrintRequest' => self::object([
+                'lang' => ['type' => 'string', 'enum' => ['en', 'ar'], 'description' => 'The template\'s language. English when left out.'],
+            ], []),
+            'InventoryPrinted' => self::object([
+                'document_id' => self::int(),
+                'number' => self::str() + ['nullable' => true],
+                'title' => self::str(),
+                'pdf' => self::bool(),
+            ], ['document_id', 'number', 'title', 'pdf']),
             'InventoryReceiveOrderRequest' => self::object([
                 'lines' => ['description' => 'What arrived: `{line_id, quantity, unit, note}`, in the line\'s unit unless `unit` says.', 'type' => 'array', 'minItems' => 1, 'maxItems' => 500, 'items' => self::object([
                     'line_id' => self::int(),

@@ -107,6 +107,38 @@ function send<T>(result: Result, fallback: string): T {
   return (result.data as { data: T }).data;
 }
 
+/** The language a paper prints in: its template's, not the reader's. */
+export type PrintLanguage = 'en' | 'ar';
+
+/** A printed paper: its PDF, or none when this server makes no PDFs (it is still issued). */
+export interface Printed {
+  pdf: Blob | null;
+  documentId: number;
+  number: string | null;
+}
+
+async function printed(result: Result, fallback: string): Promise<Printed> {
+  if (result.response.status === 403) throw new ForbiddenError();
+  if (!result.response.ok) {
+    throw new InventoryRequestError(fallback, result.response.status, serverText(result.error), serverCode(result.error));
+  }
+  if (result.response.status === 202) {
+    const body = JSON.parse(await (result.data as Blob).text()) as { data: { document_id: number; number: string | null } };
+    return { pdf: null, documentId: body.data.document_id, number: body.data.number };
+  }
+  return { pdf: result.data as Blob, documentId: Number(result.response.headers.get('X-Document-Id') ?? 0), number: null };
+}
+
+/** Saves a printed PDF under its name. */
+export function savePdf(blob: Blob, name: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${name || 'document'}.pdf`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 /** Drops the empty values (null, undefined, '', false) so they are not sent. */
 function query(params: Record<string, string | number | boolean | null | undefined>): never {
   const out: Record<string, string | number | boolean> = {};
@@ -354,6 +386,36 @@ export const inventoryApi = {
     supplier_sku?: string;
     is_preferred?: boolean;
   }) => send<InventorySupplierItem>(await api.PUT('/api/v1/inventory/supplier-items', { body }), 'The supplier price could not be saved'),
+  // ── printing (IV.20, WHIT-1234) ──
+  printPurchaseOrder: async (id: number, lang: PrintLanguage) =>
+    printed(
+      await api.POST('/api/v1/inventory/purchase-orders/{id}/print', { params: { path: { id } }, body: { lang }, parseAs: 'blob' }),
+      'The purchase order could not be printed'
+    ),
+  printReceipt: async (id: number, lang: PrintLanguage) =>
+    printed(
+      await api.POST('/api/v1/inventory/receipts/{id}/print', { params: { path: { id } }, body: { lang }, parseAs: 'blob' }),
+      'The goods received note could not be printed'
+    ),
+  printTemplates: async () =>
+    read<Record<string, { en: number; ar: number }>>(await api.GET('/api/v1/inventory/print-templates'), 'The print templates could not be loaded'),
+  /** A sheet of labels, one per variant, from the workspace's item label sheet. */
+  printLabels: async (variantIds: number[], lang: PrintLanguage): Promise<Blob> => {
+    const templates = await inventoryApi.printTemplates();
+    const id = templates['inventory.item-labels']?.[lang];
+    if (id === undefined) throw new InventoryRequestError('The label sheet could not be found', 404, null);
+    const { data, error, response } = await api.POST('/api/v1/document-sources/{id}/print-labels', {
+      params: { path: { id } },
+      body: { records: variantIds.map((v) => `inventory.variant:${v}`) },
+      parseAs: 'blob',
+    });
+    if (response.status === 403) throw new ForbiddenError();
+    if (data === undefined || !response.ok) {
+      throw new InventoryRequestError('The labels could not be printed', response.status, serverText(error), serverCode(error));
+    }
+    return data as Blob;
+  },
+
   deleteSupplierItem: async (id: number) =>
     send<{ deleted: boolean }>(
       await api.DELETE('/api/v1/inventory/supplier-items/{id}', { params: { path: { id } } }),
