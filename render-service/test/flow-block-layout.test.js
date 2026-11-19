@@ -131,13 +131,13 @@ describe('validating the layout keys', () => {
   });
 
   test('refuses a width outside the readable range', () => {
-    expect(validateFlowPayload(withBlock({ type: 'figure', src: 'data:,x', widthPercent: 5 }))).toMatch(
+    expect(validateFlowPayload(withBlock({ type: 'figure', src: 'data:image/png;base64,AA', widthPercent: 5 }))).toMatch(
       /widthPercent/
     );
-    expect(validateFlowPayload(withBlock({ type: 'figure', src: 'data:,x', widthPercent: 120 }))).toMatch(
+    expect(validateFlowPayload(withBlock({ type: 'figure', src: 'data:image/png;base64,AA', widthPercent: 120 }))).toMatch(
       /widthPercent/
     );
-    expect(validateFlowPayload(withBlock({ type: 'figure', src: 'data:,x', widthPercent: 100 }))).toBeNull();
+    expect(validateFlowPayload(withBlock({ type: 'figure', src: 'data:image/png;base64,AA', widthPercent: 100 }))).toBeNull();
   });
 
   /**

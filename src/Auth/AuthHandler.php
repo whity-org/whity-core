@@ -417,8 +417,11 @@ class AuthHandler
         // returns the selection prompt.
         if (self::dbTruthy($profile['two_factor_enabled'] ?? false)) {
             $tempClaims = [
-                'profile_id' => $profileId,
-                'email'      => $email,
+                'profile_id'  => $profileId,
+                'email'       => $email,
+                // A password change during the 5-minute window voids the
+                // pending second step (#2267).
+                'token_epoch' => $this->currentProfileTokenEpoch($profileId),
             ];
             if (count($memberships) === 1) {
                 $only = $memberships[0]['tenant_id'];
@@ -565,6 +568,11 @@ class AuthHandler
         $profileId = $claims['profile_id'];
         $email     = isset($claims['email']) && is_string($claims['email']) ? $claims['email'] : '';
 
+        // One selection per token (#2267): a used or epoch-stale token is refused.
+        if (!$this->signInStepTokenIsLive($claims)) {
+            return Response::error('Invalid or expired selection token', 401);
+        }
+
         // A profile deactivated during the 5-minute selection window must not
         // get the session it was about to choose (WHIT-672 review).
         if ($this->sessionRefusalReason($profileId) !== null) {
@@ -590,6 +598,12 @@ class AuthHandler
         // Re-read the profile epoch (the selection token is short-lived but the
         // session must carry the current epoch).
         $tokenEpoch = $this->currentProfileTokenEpoch($profileId);
+
+        // Spend the token before minting. Losing the race means another request
+        // already used it (#2267).
+        if (!$this->spendSignInStepToken($claims)) {
+            return Response::error('Invalid or expired selection token', 401);
+        }
 
         // Cookie mode only: clear the selection cookie after use.
         if (!$tokenMode) {
@@ -622,7 +636,7 @@ class AuthHandler
     private function requireTenantSelection(int $profileId, string $email, array $memberships, bool $tokenMode = false): Response
     {
         $selectionToken = $this->jwtParser->create(
-            ['profile_id' => $profileId, 'email' => $email],
+            ['profile_id' => $profileId, 'email' => $email, 'token_epoch' => $this->currentProfileTokenEpoch($profileId)],
             300,
             'tenant_select'
         );
@@ -677,7 +691,8 @@ class AuthHandler
         int $profileId,
         string $email,
         Request $request,
-        ?int $restrictToTenantId = null,
+        ?int $restrictToTenantId,
+        bool $tenantTrust,
     ): Response {
         // A deactivated account (profiles.status = 'inactive') must never get a
         // session, whichever door it uses. Password login and refresh already
@@ -694,8 +709,17 @@ class AuthHandler
             return Response::error('No active membership', 403);
         }
 
+        if ($tenantTrust && $restrictToTenantId === null) {
+            // A workspace's own provider always names its workspace; without one
+            // there is nothing to confine the session to, so there is no session.
+            return Response::error('No active membership', 403);
+        }
+
         if ($restrictToTenantId !== null) {
-            // Tenant-trust: the session may ONLY target the configuring tenant.
+            // The session may ONLY target this tenant. For tenant-trust it is
+            // also CONFINED there for its whole life (#2249): the confinement
+            // rides the signed tokens, so a refresh keeps it, switch-tenant
+            // refuses it, and the person's global account stays out of reach.
             if (!$this->hasActiveMembershipInTenant($profileId, $restrictToTenantId)) {
                 return Response::error('No active membership', 403);
             }
@@ -708,6 +732,7 @@ class AuthHandler
                 self::isTokenMode($request),
                 auditAction: 'auth.login.sso',
                 recordNewSession: true,
+                confinedTenantId: $tenantTrust ? $restrictToTenantId : null,
             );
         }
 
@@ -862,9 +887,31 @@ class AuthHandler
         array $auditMetadata = [],
         bool $recordNewSession = false,
         ?string $rotateSessionFromJti = null,
-        array $extraTokenBody = []
+        array $extraTokenBody = [],
+        ?int $confinedTenantId = null
     ): Response
     {
+        // A deactivated profile gets no session, whichever path got here (#2227).
+        // Login, refresh and tenant selection checked this themselves; the
+        // device-credential exchange and the 2FA step did not, so a desktop app
+        // holding a device credential kept minting sessions after "Deactivate".
+        // Generic wording: a deactivation-specific error is an enumeration oracle.
+        $refusalReason = $this->sessionRefusalReason($profileId);
+        if ($refusalReason !== null) {
+            $this->audit('auth.login.failure', $request, $activeTenantId, $profileId, [
+                'reason' => $refusalReason,
+            ]);
+
+            return Response::error('Invalid credentials', 401);
+        }
+
+        // #2249: a session confined to one workspace is only ever minted INTO
+        // that workspace. Every caller already passes the confined tenant as the
+        // active one; this is the chokepoint that keeps it so.
+        if ($confinedTenantId !== null && $confinedTenantId !== $activeTenantId) {
+            return Response::error(TenantConfinement::REFUSAL, 403);
+        }
+
         // Resolve role from the active membership (post-cutover: no legacy users row).
         // Memberships is the canonical role store (ADR 0005 §6)
         $roleName = '';
@@ -899,7 +946,7 @@ class AuthHandler
         // $enrollmentDeadline is non-null but the session still mints (with a
         // nag flag in the response); at/after it, a refusal Response is
         // returned instead of ever reaching the claim-issuing code below.
-        $refusal = $this->twoFactorPolicyRefusal($profileId, $activeTenantId, $ouId, $email, $profileEpoch, $request);
+        $refusal = $this->twoFactorPolicyRefusal($profileId, $activeTenantId, $ouId, $email, $profileEpoch, $request, $confinedTenantId);
         if ($refusal !== null) {
             return $refusal;
         }
@@ -912,6 +959,9 @@ class AuthHandler
             'role'             => $roleName,
             'token_epoch'      => $profileEpoch,
         ];
+        if ($confinedTenantId !== null) {
+            $claims[TenantConfinement::CLAIM] = $confinedTenantId;
+        }
 
         $accessTokenStr  = $this->jwtParser->create($claims, 900, 'access');
         $refreshTokenStr = $this->jwtParser->create($claims, 604800, 'refresh');
@@ -1033,7 +1083,8 @@ class AuthHandler
         ?int $ouId,
         string $email,
         int $profileEpoch,
-        Request $request
+        Request $request,
+        ?int $confinedTenantId = null
     ): ?Response {
         if ($this->twoFactorPolicyResolver === null) {
             return null;
@@ -1058,6 +1109,10 @@ class AuthHandler
             'email'            => $email,
             'token_epoch'      => $profileEpoch,
         ];
+        if ($confinedTenantId !== null) {
+            // #2249: the enrollment step of a confined sign-in stays confined.
+            $enrollmentClaims[TenantConfinement::CLAIM] = $confinedTenantId;
+        }
         $enrollmentJwt = $this->jwtParser->create($enrollmentClaims, 600, 'two_factor_enrollment');
 
         return Response::json([
@@ -1316,6 +1371,14 @@ class AuthHandler
         $role   = isset($claims['role']) ? (string) $claims['role'] : null;
 
         $memberships = $this->listActiveMemberships($profileId);
+        $confinedTenantId = TenantConfinement::of($claims);
+        if ($confinedTenantId !== null) {
+            // #2249: a confined session sees only its own workspace.
+            $memberships = array_values(array_filter(
+                $memberships,
+                static fn (array $m): bool => $m['tenant_id'] === $confinedTenantId,
+            ));
+        }
 
         return Response::json([
             'user' => [
@@ -1392,6 +1455,12 @@ class AuthHandler
             return Response::error('tenant_id is required', 400);
         }
         $targetTenantId = (int) $body['tenant_id'];
+
+        // #2249: a session from a workspace's own sign-in provider never leaves
+        // that workspace.
+        if (TenantConfinement::of($claims) !== null) {
+            return Response::error(TenantConfinement::REFUSAL, 403);
+        }
 
         // Authorization gate: the profile MUST hold an ACTIVE membership in the
         // target tenant. Never trust the request body alone — this is the
@@ -1490,6 +1559,12 @@ class AuthHandler
 
         if ($profileId === null || $activeTenantId === null) {
             return Response::error('Unauthorized', 401);
+        }
+
+        // #2249: the sign-in email and password belong to the person's global
+        // account, which a workspace's own sign-in provider may not change.
+        if (TenantConfinement::of($claims) !== null) {
+            return Response::error(TenantConfinement::REFUSAL, 403);
         }
 
         $body = JsonBody::parsed($request);
@@ -1746,6 +1821,10 @@ class AuthHandler
         if ($profileId === null || $profileId <= 0 || $activeTenantId === null || $activeTenantId < 0) {
             return Response::error('Unauthorized', 401);
         }
+        // #2249: signing the person out everywhere reaches every workspace.
+        if (TenantConfinement::of($claims) !== null) {
+            return Response::error(TenantConfinement::REFUSAL, 403);
+        }
         $email = isset($claims['email']) && is_string($claims['email']) ? $claims['email'] : '';
         $currentJti = isset($claims['jti']) && is_string($claims['jti']) ? $claims['jti'] : '';
 
@@ -1856,7 +1935,7 @@ class AuthHandler
                 } catch (\Throwable) {
                 }
             } elseif ($rotateFromJti !== null) {
-                $sessions->rotate($rotateFromJti, $accessJti, $refreshJti, $expiresAt);
+                $sessions->rotate($rotateFromJti, $accessJti, $refreshJti, $expiresAt, $activeTenantId);
             }
         } catch (\Throwable $e) {
             error_log('[sessions] record/rotate failed: ' . $e->getMessage());
@@ -2122,6 +2201,15 @@ class AuthHandler
                         if ($this->isJtiRevoked($jti)) {
                             // This token has been reused → log security event
                             $this->audit('auth.refresh_token_reuse_detected', $request, $activeTenantId, $profileId);
+                        } elseif (($parsedToken['type'] ?? null) === 'refresh'
+                            && $this->sessionRefusalReason($profileId) === 'profile_inactive'
+                        ) {
+                            // The membership guard now refuses a deactivated
+                            // profile before we get here (#2227); keep the
+                            // record that a deactivated person tried to stay in.
+                            $this->audit('auth.refresh.failure', $request, $activeTenantId, $profileId, [
+                                'reason' => 'profile_inactive',
+                            ]);
                         }
                     }
                 }
@@ -2149,6 +2237,13 @@ class AuthHandler
         if (!is_int($profileId) || $profileId <= 0
             || !is_int($activeTenantId) || $activeTenantId < 0
         ) {
+            return Response::error('Unauthorized', 401);
+        }
+
+        // #2249: a confined session stays confined across every refresh, and
+        // only ever in its own workspace.
+        $confinedTenantId = TenantConfinement::of($claims);
+        if ($confinedTenantId !== null && $confinedTenantId !== $activeTenantId) {
             return Response::error('Unauthorized', 401);
         }
 
@@ -2183,7 +2278,7 @@ class AuthHandler
         // again for the lifetime of the refresh token (up to 7 days, rotating
         // indefinitely). Refuse exactly like a fresh login would.
         $ouId = $this->activeMembershipOuId($profileId, $activeTenantId);
-        $refusal = $this->twoFactorPolicyRefusal($profileId, $activeTenantId, $ouId, $email, $tokenEpoch, $request);
+        $refusal = $this->twoFactorPolicyRefusal($profileId, $activeTenantId, $ouId, $email, $tokenEpoch, $request, $confinedTenantId);
         if ($refusal !== null) {
             return $refusal;
         }
@@ -2196,6 +2291,9 @@ class AuthHandler
             'role'        => $claims['role'] ?? '',
             'token_epoch' => $tokenEpoch,
         ];
+        if ($confinedTenantId !== null) {
+            $newClaims[TenantConfinement::CLAIM] = $confinedTenantId;
+        }
 
         $accessToken     = $this->jwtParser->create($newClaims, 900, 'access');
         $newRefreshToken = $this->jwtParser->create($newClaims, 604800, 'refresh');
@@ -2488,6 +2586,13 @@ class AuthHandler
             return Response::error('Invalid or expired temporary token', 401);
         }
 
+        // One sign-in per temp token (#2267): a used one, or one minted before a
+        // password change, is refused. A wrong code does not spend it, so a typo
+        // does not send the person back to the password step.
+        if (!$this->signInStepTokenIsLive($claims)) {
+            return Response::error('Invalid or expired temporary token', 401);
+        }
+
         // WC-0abcc29f: throttle check keyed on profile_id (post-cutover).
         $throttleId = null;
         if (isset($claims['profile_id']) && is_numeric($claims['profile_id'])) {
@@ -2593,6 +2698,12 @@ class AuthHandler
             );
             $this->loginThrottle?->recordFailure($throttleId, $ip ?? null);
             return Response::error('Invalid 2FA code', 401);
+        }
+
+        // Spend the temp token now the code is good; losing the race means a
+        // parallel request already finished this sign-in with it (#2267).
+        if (!$this->spendSignInStepToken($claims)) {
+            return Response::error('Invalid or expired temporary token', 401);
         }
 
         // Second factor verified — full login completes.
@@ -2728,6 +2839,54 @@ class AuthHandler
     private function consumeTotpStep(int $profileId, int $step): bool
     {
         return TotpStepFloor::advance($this->db, $profileId, $step);
+    }
+
+    /**
+     * Whether a sign-in step token (type temp or tenant_select) may still be
+     * used: its jti is not spent, and it was minted at the profile's current
+     * epoch (#2267). A token without an epoch claim counts as epoch 0, so one
+     * minted before this check shipped still works for a profile whose epoch
+     * never moved.
+     *
+     * @param array<string, mixed> $claims
+     */
+    private function signInStepTokenIsLive(array $claims): bool
+    {
+        $jti = $claims['jti'] ?? null;
+        if (!is_string($jti) || $jti === '' || $this->isJtiRevoked($jti)) {
+            return false;
+        }
+        $profileId = is_int($claims['profile_id'] ?? null) ? $claims['profile_id'] : 0;
+        $tokenEpoch = is_int($claims['token_epoch'] ?? null) ? $claims['token_epoch'] : 0;
+
+        return $tokenEpoch >= $this->currentProfileTokenEpoch($profileId);
+    }
+
+    /**
+     * Spend a sign-in step token by recording its jti in revoked_tokens, so it
+     * mints at most one session even in token mode, where no cookie is cleared
+     * (#2267). Atomic: of two parallel requests only the one whose insert lands
+     * gets true. Fails closed: an unwritable table refuses the step.
+     *
+     * @param array<string, mixed> $claims
+     */
+    private function spendSignInStepToken(array $claims): bool
+    {
+        $jti = $claims['jti'] ?? null;
+        $exp = $claims['exp'] ?? null;
+        if (!is_string($jti) || $jti === '' || !is_int($exp)) {
+            return false;
+        }
+        try {
+            $stmt = $this->db->prepare(
+                'INSERT INTO revoked_tokens (jti, expires_at) VALUES (?, ?) ON CONFLICT (jti) DO NOTHING'
+            );
+            $stmt->execute([$jti, date('Y-m-d H:i:s', $exp)]);
+
+            return $stmt->rowCount() === 1;
+        } catch (\Exception) {
+            return false;
+        }
     }
 
     /**

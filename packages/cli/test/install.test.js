@@ -234,3 +234,30 @@ test('it waits only for services with a healthcheck, which Compose 2.33 insists 
   assert.match(wait, /--wait-timeout 180 postgres web$/);
   assert.ok(indexOfCall(deps.calls, 'compose up -d') < indexOfCall(deps.calls, 'up -d --wait --wait-timeout'));
 });
+
+// WHIT-1290 (#2208): what goes into the unquoted .env and into psql.
+test('an address or email with # in it is refused, since .env would cut it off', async (t) => {
+  const dir = tempDir(t);
+  const deps = fakeDeps();
+  await assert.rejects(install({ dir, url: 'https://app.example.com/#x' }, deps), /not a valid address/);
+  await assert.rejects(
+    install({ dir, version: 'v0.2.22', domain: 'office.example.jo', adminEmail: 'owner#1@example.jo' }, fakeDeps()),
+    /isn't an email address/,
+  );
+  assert.equal(deps.calls.length, 0);
+  assert.equal(existsSync(join(dir, '.env')), false);
+});
+
+test('a resumed install checks the email in its .env before using it', async (t) => {
+  const dir = tempDir(t);
+  await assert.rejects(
+    install({ dir, version: 'v0.2.22' }, fakeDeps({ fail: { 'migrate run': { code: 1, stdout: 'boom' } } })),
+    /Migrations failed/,
+  );
+  const envPath = join(dir, '.env');
+  writeFileSync(envPath, readFileSync(envPath, 'utf8').replace(/^INITIAL_SYSTEM_ADMIN_EMAIL=.*$/m, "INITIAL_SYSTEM_ADMIN_EMAIL=x') OR 1=1 --@example.jo"));
+
+  const deps = fakeDeps({ running: '0.2.22' });
+  await assert.rejects(install({ dir }, deps), /isn't an email address/);
+  assert.equal(deps.calls.some((call) => String(call).includes('psql')), false, 'nothing reached psql');
+});

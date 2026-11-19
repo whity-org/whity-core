@@ -76,6 +76,21 @@ final class OAuthWorkspacesRealEngineTest extends TestCase
         self::assertSame('no-store', self::header($response, 'Cache-Control'));
     }
 
+    public function testADeactivatedPersonIsOfferedNoWorkspace(): void
+    {
+        // #2261: deactivation is a profile switch that leaves memberships
+        // alone, so the list reads the profile too, or the authorization
+        // server keeps minting MCP tokens for a person who was let go.
+        $profileId = $this->linkedProfile('sub-1');
+        $this->member($profileId, 3, 'Example Bakery', 'example-bakery');
+        $this->pdo->prepare("UPDATE profiles SET status = 'inactive' WHERE id = ?")->execute([$profileId]);
+
+        $response = $this->call($this->assertion(['sub' => 'sub-1']));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(['linked' => true, 'workspaces' => []], json_decode($response->getBody(), true));
+    }
+
     public function testAnArrayAudienceContainingTheEndpointIsAccepted(): void
     {
         $this->member($this->linkedProfile('sub-1'), 3, 'Example Bakery', 'example-bakery');

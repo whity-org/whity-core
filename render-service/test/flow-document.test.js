@@ -68,6 +68,16 @@ describe('validateFlowPayload', () => {
     expect(validateFlowPayload({ content: [{ type: 'figure', src: 'data:image/png;base64,AA' }] })).toBeNull();
   });
 
+  // WHIT-1289 (#2201): a figure is an image of a known type, and a bounded one.
+  test('rejects a figure that is not an image, or too large', () => {
+    for (const src of ['data:text/html,<script>alert(1)</script>', 'data:,x', 'data:application/pdf;base64,AA', 'data:image/x-icon;base64,AA']) {
+      expect(validateFlowPayload({ content: [{ type: 'figure', src }] })).toMatch(/must be a data:image/);
+    }
+    expect(validateFlowPayload({ content: [{ type: 'figure', src: 'data:image/gif;base64,R0lGOD' }] })).toBeNull();
+    const huge = 'data:image/png;base64,' + 'A'.repeat(8 * 1024 * 1024);
+    expect(validateFlowPayload({ content: [{ type: 'figure', src: huge }] })).toMatch(/exceeds/);
+  });
+
   test('rejects malformed table rows', () => {
     expect(validateFlowPayload({ content: [{ type: 'table', rows: {} }] })).toMatch(/rows/);
     expect(validateFlowPayload({ content: [{ type: 'table', rows: ['a'] }] })).toMatch(/arrays of cell values/);
