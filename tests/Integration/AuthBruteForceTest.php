@@ -89,6 +89,35 @@ final class AuthBruteForceTest extends TestCase
         }
     }
 
+    /**
+     * #2190: the limit counts the address typed, registered or not, so a
+     * registered address and an unknown one hit it after the same number of
+     * tries and get the same answer. Each try comes from its own client, so
+     * the per-IP limit never fires.
+     */
+    public function testKnownAndUnknownAddressesAreLimitedAlike(): void
+    {
+        foreach ([self::TEST_EMAIL, 'nobody-here@example.com'] as $email) {
+            for ($i = 0; $i < 10; $i++) {
+                $r = $this->loginAttemptEmail($email, self::WRONG_PASSWORD, "10.1.{$i}.1");
+                self::assertSame(401, $r->getStatusCode(), "{$email} try {$i}");
+            }
+            $r = $this->loginAttemptEmail($email, self::WRONG_PASSWORD, '10.2.0.1');
+            self::assertSame(429, $r->getStatusCode(), $email);
+        }
+    }
+
+    public function testTheRightPasswordClearsTheAddressCounter(): void
+    {
+        for ($i = 0; $i < 9; $i++) {
+            $this->loginAttempt(self::WRONG_PASSWORD, "10.3.{$i}.1");
+        }
+        self::assertSame(200, $this->loginAttempt(self::VALID_PASSWORD, '10.4.0.1')->getStatusCode());
+        for ($i = 0; $i < 9; $i++) {
+            self::assertSame(401, $this->loginAttempt(self::WRONG_PASSWORD, "10.5.{$i}.1")->getStatusCode(), "try {$i}");
+        }
+    }
+
     // ── per-IP throttle on POST /api/login ───────────────────────────────────
 
     public function testLoginReturns429AfterIpThreshold(): void

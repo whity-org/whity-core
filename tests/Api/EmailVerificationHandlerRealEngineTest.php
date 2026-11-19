@@ -228,6 +228,34 @@ final class EmailVerificationHandlerRealEngineTest extends TestCase
         self::assertSame(1, $this->auditCount('email.verification.failed'));
     }
 
+    /**
+     * #2190: every failed try writes an audit row, so one address gets 30
+     * tries an hour; the 31st is refused before the token is read or audited.
+     */
+    public function testFailedConfirmsAreLimitedPerAddress(): void
+    {
+        for ($i = 0; $i < 30; $i++) {
+            self::assertSame(400, $this->confirmFrom('bad-token-' . $i, '203.0.113.9')->getStatusCode(), "try {$i}");
+        }
+
+        $refused = $this->confirmFrom('bad-token-30', '203.0.113.9');
+        self::assertSame(429, $refused->getStatusCode());
+        self::assertSame(30, $this->auditCount('email.verification.failed'));
+
+        // Another address is not affected.
+        self::assertSame(400, $this->confirmFrom('bad-token-31', '203.0.113.10')->getStatusCode());
+    }
+
+    private function confirmFrom(string $token, string $ip): \Whity\Sdk\Http\Response
+    {
+        return $this->handler->confirm(new Request(
+            'POST',
+            '/api/email/verify',
+            [\Whity\Core\RateLimit\ClientIp::HEADER => $ip],
+            (string) json_encode(['token' => $token])
+        ));
+    }
+
     public function testConfirmEmptyTokenIs422(): void
     {
         self::assertSame(422, $this->confirm('')->getStatusCode());

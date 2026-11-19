@@ -92,6 +92,10 @@ This holds **only if the backend is reachable exclusively through the proxy** â€
 an attacker with direct network access to the FrankenPHP port could set the
 header themselves. Enforce that isolation at the network layer (do not publish
 the backend port to the internet), the same way the database port is private.
+The same holds for `X-Forwarded-Host`, which the proxy also sets itself and the
+backend reads through `\Whity\Core\Http\RequestHost` to choose a workspace by
+host (#2195), and for every per-address limit (sign-in, email and two-step
+recovery confirmations, #2190).
 
 ### `TRUSTED_PROXY_HOPS` (Next.js app env var)
 

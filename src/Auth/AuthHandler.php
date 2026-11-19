@@ -221,6 +221,13 @@ class AuthHandler
      * @param Request $request The incoming request.
      * @return string|null The client IP, or null.
      */
+    /** A failed sign-in counts against the profile, the address typed and the client (#2190). */
+    private function recordLoginFailure(?int $profileId, ?string $ip, string $email): void
+    {
+        $this->loginThrottle?->recordFailure($profileId, $ip);
+        $this->loginThrottle?->recordEmailFailure($email);
+    }
+
     private function clientIp(Request $request): ?string
     {
         return ClientIp::fromRequest($request);
@@ -278,6 +285,14 @@ class AuthHandler
             return RateLimited::response(60);
         }
 
+        // #2190: the per-address limit is checked before the database is read
+        // and counts every failure, so it answers a registered address and an
+        // unknown one alike. The per-profile check below still guards an account
+        // reached through several addresses.
+        if ($this->loginThrottle !== null && $this->loginThrottle->isEmailThrottled($email)) {
+            return RateLimited::response(60);
+        }
+
         // ── Step 1: resolve profile from the globally-unique verified email ────
         // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email) makes this unambiguous across all tenants — this is the structural fix for #181
         $peStmt = $this->db->prepare(
@@ -304,7 +319,7 @@ class AuthHandler
                 'email'  => $email,
                 'reason' => 'profile_not_found',
             ]);
-            $this->loginThrottle?->recordFailure(null, $ip);
+            $this->recordLoginFailure(null, $ip, $email);
             return Response::error('Invalid credentials', 401);
         }
 
@@ -334,7 +349,7 @@ class AuthHandler
                 'email'  => $email,
                 'reason' => 'email_not_verified',
             ]);
-            $this->loginThrottle?->recordFailure($profileId, $ip);
+            $this->recordLoginFailure($profileId, $ip, $email);
             return Response::error('Invalid credentials', 401);
         }
 
@@ -361,7 +376,7 @@ class AuthHandler
                 'email'  => $email,
                 'reason' => 'profile_row_missing',
             ]);
-            $this->loginThrottle?->recordFailure($profileId, $ip);
+            $this->recordLoginFailure($profileId, $ip, $email);
             return Response::error('Invalid credentials', 401);
         }
 
@@ -379,7 +394,7 @@ class AuthHandler
                 'email'  => $email,
                 'reason' => 'profile_inactive',
             ]);
-            $this->loginThrottle?->recordFailure($profileId, $ip);
+            $this->recordLoginFailure($profileId, $ip, $email);
             return Response::error('Invalid credentials', 401);
         }
 
@@ -388,9 +403,12 @@ class AuthHandler
                 'email'  => $email,
                 'reason' => 'invalid_password',
             ]);
-            $this->loginThrottle?->recordFailure($profileId, $ip);
+            $this->recordLoginFailure($profileId, $ip, $email);
             return Response::error('Invalid credentials', 401);
         }
+        // The password is right: earlier wrong tries at this address stop counting.
+        $this->loginThrottle?->clearEmail($email);
+
 
         // ── Step 4: resolve active memberships (ADR 0005 §6) ─────────────────
         // Zero → refuse; exactly one → log in directly (INCLUDING a single
@@ -403,7 +421,7 @@ class AuthHandler
             // Zero active memberships (none, or all suspended/invited). Return a
             // GENERIC 401 rather than a distinct status: a membership-specific
             // error is a user-enumeration oracle.
-            $this->loginThrottle?->recordFailure($profileId, $ip);
+            $this->recordLoginFailure($profileId, $ip, $email);
             return Response::error('Invalid credentials', 401);
         }
 

@@ -132,6 +132,15 @@ final class TwoFactorRecoveryHandler
      */
     public function confirm(Request $request): Response
     {
+        // #2190: every failed try writes an audit row, so each address gets a
+        // limit of its own before the token is looked at.
+        $ip = ClientIp::fromRequest($request);
+        if ($ip !== null
+            && ($limited = RateLimits::twoFactorRecoveryConfirmPerAddress()->take($this->store, '2farecovery:confirm:ip:' . $ip)) !== null
+        ) {
+            return $limited;
+        }
+
         $body  = JsonBody::parsed($request);
         $token = (string) ($body['token'] ?? '');
 

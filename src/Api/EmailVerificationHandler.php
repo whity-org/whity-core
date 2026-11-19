@@ -114,10 +114,20 @@ final class EmailVerificationHandler
      *
      * Generic 400 for any unknown/expired/replayed token (no distinction that
      * could aid probing). 200 on success. The global pre-auth per-IP limiter
-     * already backstops brute force (a 256-bit token is infeasible to guess).
+     * backstops brute force (a 256-bit token is infeasible to guess); the
+     * per-address confirm limit keeps failed tries from flooding the audit log.
      */
     public function confirm(Request $request): Response
     {
+        // #2190: every failed try writes an audit row, so each address gets a
+        // limit of its own before the token is looked at.
+        $ip = ClientIp::fromRequest($request);
+        if ($ip !== null
+            && ($limited = RateLimits::emailVerificationConfirmPerAddress()->take($this->store, 'emailverify:confirm:ip:' . $ip)) !== null
+        ) {
+            return $limited;
+        }
+
         $body  = JsonBody::parsed($request);
         $token = (string) ($body['token'] ?? '');
 
