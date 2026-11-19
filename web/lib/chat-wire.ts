@@ -68,7 +68,7 @@ export interface ChatProposal {
 }
 
 export interface ChatEvent {
-  event: 'created' | 'renamed' | 'linked' | 'unlinked' | 'person_added' | 'person_removed' | 'left' | 'agent_added' | 'agent_removed';
+  event: 'created' | 'renamed' | 'linked' | 'unlinked' | 'person_added' | 'person_removed' | 'left' | 'joined' | 'agent_added' | 'agent_removed';
   by?: ChatPerson;
   person?: ChatPerson;
   agent?: { id: number; name: string; name_ar?: string };

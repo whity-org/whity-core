@@ -56,6 +56,10 @@ final class ChatService
         private readonly ?ChatAttachments $attachments = null,
         // UC.5: polls and Whity records inside messages. Null: no blocks.
         private readonly ?ChatBlocks $blocks = null,
+        // WHIT-1266 (#2231): who may see the record a chat is linked to. Null:
+        // no record kind is known, so "Discuss in chat" may start a record's
+        // chat but never joins anyone to one that already exists.
+        private readonly ?ChatRecordAccess $records = null,
     ) {
     }
 
@@ -208,7 +212,7 @@ final class ChatService
     {
         $this->personOnly($viewer);
         $title = self::title($title);
-        $link = self::link($link);
+        $link = $this->visibleLink($tenantId, $viewer, self::link($link));
         $people = array_values(array_unique(array_filter(array_map('intval', $people), static fn (int $id): bool => $id > 0 && $id !== $viewer->profileId)));
         foreach ($people as $pid) {
             $this->staffOrFail($tenantId, $pid);
@@ -231,6 +235,13 @@ final class ChatService
      * after it. The viewer joins it if they aren't in it yet, so everyone who
      * opens the record's chat talks in the same place.
      *
+     * Only people who may see the record (WHIT-1266, #2231,
+     * {@see ChatRecordAccess}): anyone else is told the chat does not exist,
+     * the 404 of a chat you are not in. Someone the chat's starter removed is
+     * not let back in this way; a member can add them again. A record of a
+     * kind core cannot check (a plugin's) may have its chat started, but only
+     * its members are in it: nobody joins it through here.
+     *
      * @param array<string, mixed> $link
      * @return array{id: int, created: bool}
      */
@@ -241,9 +252,21 @@ final class ChatService
         if ($link === null) {
             throw new ChatException('A chat can be linked to a board, a meeting or a record, with its id and name.');
         }
+        $maySee = $this->records?->canSeeLink($tenantId, $viewer->profileId, $link['type'], $link['id']);
+        if ($maySee === false) {
+            throw ChatException::notFound();
+        }
         $existing = $this->repo->findLinked($tenantId, $link['type'], $link['id']);
         if ($existing !== null) {
-            $this->rejoin($tenantId, $existing, $viewer->profileId);
+            if ($this->isPersonIn($tenantId, $existing, $viewer->profileId)) {
+                return ['id' => $existing, 'created' => false];
+            }
+            if ($maySee !== true || $this->repo->wasRemovedByOther($tenantId, $existing, $viewer->profileId)) {
+                throw ChatException::notFound();
+            }
+            $this->repo->addPerson($tenantId, $existing, $viewer->profileId, null);
+            $by = $this->who($viewer->profileId);
+            $this->system($tenantId, $existing, $viewer->profileId, ['event' => 'joined', 'by' => $by], "{$by['name']} joined.");
 
             return ['id' => $existing, 'created' => false];
         }
@@ -316,7 +339,7 @@ final class ChatService
             $this->system($tenantId, $chatId, $viewer->profileId, ['event' => 'renamed', 'by' => $by, 'title' => $title], "{$by['name']} named the chat {$title}.");
         }
         if ($setLink) {
-            $link = self::link($link);
+            $link = $this->visibleLink($tenantId, $viewer, self::link($link));
             $this->repo->setLink($tenantId, $chatId, $link);
             $this->system(
                 $tenantId,
@@ -438,7 +461,7 @@ final class ChatService
         }
         $pid = (int) $target['profile_id'];
         if ($pid === $viewer->profileId) {
-            $this->repo->removeMember($tenantId, $memberId);
+            $this->repo->removeMember($tenantId, $memberId, $viewer->profileId);
             $this->system($tenantId, $chatId, $viewer->profileId, ['event' => 'left', 'by' => $by], "{$by['name']} left.");
 
             return;
@@ -446,7 +469,7 @@ final class ChatService
         if ((string) $chat['type'] !== 'group' || (int) ($chat['created_by_profile_id'] ?? 0) !== $viewer->profileId) {
             throw new ChatException('Only the person who started this chat can remove people.', 403);
         }
-        $this->repo->removeMember($tenantId, $memberId);
+        $this->repo->removeMember($tenantId, $memberId, $viewer->profileId);
         $person = $this->who($pid);
         $this->system($tenantId, $chatId, $viewer->profileId, ['event' => 'person_removed', 'by' => $by, 'person' => $person], "{$by['name']} removed {$person['name']}.");
     }
@@ -498,7 +521,7 @@ final class ChatService
             if ($viewer->isAgent() || $this->blocks === null) {
                 throw new ChatException('Only people add polls and records to a chat.', 403);
             }
-            $stored = $this->blocks->normalise($tenantId, $block);
+            $stored = $this->blocks->normalise($tenantId, $block, $viewer->profileId);
         }
         if ($body === '' && $attachmentIds === [] && $stored === null) {
             throw new ChatException('The message is empty.');
@@ -762,7 +785,7 @@ final class ChatService
                 $stored[(int) $r['id']] = $r['chat_meta']['block'];
             }
         }
-        $blocks = $this->blocks?->present($tenantId, $stored, $viewer->isAgent() ? 0 : $viewer->profileId) ?? [];
+        $blocks = $this->blocks?->present($tenantId, $stored, $viewer->isAgent() ? 0 : $viewer->profileId, $viewer->profileId) ?? [];
 
         return array_map(function (array $r) use ($proposals, $viewer, $quoted, $threads, $reactions, $files, $blocks): array {
             $meta = $r['chat_meta'];
@@ -906,12 +929,37 @@ final class ChatService
 
     private function rejoin(int $tenantId, int $chatId, int $profileId): void
     {
+        if (!$this->isPersonIn($tenantId, $chatId, $profileId)) {
+            $this->repo->addPerson($tenantId, $chatId, $profileId, null);
+        }
+    }
+
+    private function isPersonIn(int $tenantId, int $chatId, int $profileId): bool
+    {
         foreach ($this->repo->membersOf($tenantId, [$chatId])[$chatId] ?? [] as $m) {
             if ($m['profile_id'] !== null && (int) $m['profile_id'] === $profileId) {
-                return;
+                return true;
             }
         }
-        $this->repo->addPerson($tenantId, $chatId, $profileId, null);
+
+        return false;
+    }
+
+    /**
+     * A link the viewer may put on a chat (WHIT-1266): not to a record they
+     * cannot see, which would also claim that record's chat before the people
+     * who can see it open it. Kinds core cannot check pass.
+     *
+     * @param array{type: string, id: string, label: string}|null $link
+     * @return array{type: string, id: string, label: string}|null
+     */
+    private function visibleLink(int $tenantId, ChatViewer $viewer, ?array $link): ?array
+    {
+        if ($link !== null && $this->records?->canSeeLink($tenantId, $viewer->profileId, $link['type'], $link['id']) === false) {
+            throw new ChatException('That record is not in this workspace.', 404);
+        }
+
+        return $link;
     }
 
     private function mentionsSince(int $tenantId, int $chatId, int $mark, int $agentId): int
@@ -1303,7 +1351,7 @@ final class ChatService
     {
         $this->personOnly($viewer);
 
-        return $this->blocks?->find($tenantId, $kind, $q) ?? [];
+        return $this->blocks?->find($tenantId, $kind, $q, $viewer->profileId) ?? [];
     }
 
     /**
