@@ -986,7 +986,7 @@ final class RouteFinaliseRealEngineTest extends TestCase
             null,
             $this->settings,
         );
-        $api = new \Whity\Api\FormPrintoutsApiHandler($this->pdo, $printouts, new FlowDocumentRenderer($this->settings, $this->render));
+        $api = new \Whity\Api\FormPrintoutsApiHandler($this->pdo, $printouts, new FlowDocumentRenderer($this->settings, $this->render), null, static fn (): bool => true);
 
             $none = $api->themePreview(new \Whity\Core\Request('POST', '/x', [], '{}'));
             self::assertSame(404, $none->getStatusCode(), 'nothing to preview yet');
@@ -1014,6 +1014,18 @@ final class RouteFinaliseRealEngineTest extends TestCase
             self::assertSame(422, $bad->getStatusCode());
             self::assertSame(404, $api->submission(new \Whity\Core\Request('GET', '/x'), ['id' => '999999'])->getStatusCode());
             self::assertSame($documents, $this->scalar('SELECT COUNT(*) FROM documents'), 'previews make no documents');
+
+            // #2243: the preview prints a real response, so styling documents
+            // alone (no forms:read) is not enough, with or without an id.
+            $calls = count($this->render->flowCalls);
+            $themesOnly = new \Whity\Api\FormPrintoutsApiHandler($this->pdo, $printouts, new FlowDocumentRenderer($this->settings, $this->render), null, static fn (): bool => false);
+            foreach (['{}', (string) json_encode(['submissionId' => (int) $submission['id']])] as $body) {
+                $refused = $themesOnly->themePreview(new \Whity\Core\Request('POST', '/x', [], $body));
+                self::assertSame(403, $refused->getStatusCode());
+            }
+            $unwired = new \Whity\Api\FormPrintoutsApiHandler($this->pdo, $printouts, new FlowDocumentRenderer($this->settings, $this->render));
+            self::assertSame(403, $unwired->themePreview(new \Whity\Core\Request('POST', '/x', [], '{}'))->getStatusCode(), 'an unwired check refuses');
+            self::assertSame($calls, count($this->render->flowCalls), 'a refused preview renders nothing');
     }
 
     public function testTheTemplateDefaultsToTheFormSettingAndIsRequiredSomewhere(): void

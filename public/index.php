@@ -4764,6 +4764,14 @@ $formPrintoutsHandler = new \Whity\Api\FormPrintoutsApiHandler(
     new \Whity\Core\Form\Print\FormPrintoutService($db->getPdo(), $sourceDocumentPrinter, $entitlementService, $settingsService),
     $flowDocumentRenderer,
     $documentRenderMeters,
+    // #2243: the theme preview prints a real response, so it needs forms:read too.
+    static function (\Whity\Core\Request $request, int $tenantId) use ($roleChecker): bool {
+        $profileId = is_object($request->user) && isset($request->user->profile_id) && is_int($request->user->profile_id)
+            ? $request->user->profile_id
+            : null;
+
+        return $profileId !== null && $roleChecker->hasPermissionForProfile($profileId, CorePermissions::FORMS_READ, $tenantId);
+    },
 );
 $router->register('GET', '/api/form-submissions/{id:\d+}/printout', [$formPrintoutsHandler, 'submission'], null, null, CorePermissions::FORMS_READ);
 $router->register('POST', '/api/document-themes/form-printout-preview', [$formPrintoutsHandler, 'themePreview'], null, null, CorePermissions::DOCUMENTS_THEMES);
