@@ -175,7 +175,7 @@ final class RequestContextRealEngineTest extends TestCase
         $router = new Router('');
         $router->registerUnversioned('GET', '/api/acme/things', $this->capture(...), null, null, 'acme:read', ['mcp' => true]);
         $tokens = $this->createMock(TokenValidator::class);
-        $tokens->method('validateMcpToken')->willReturn($principal);
+        $tokens->method('validateBearerForMcp')->willReturn($principal);
         TenantContext::setTenantId(self::WORKSPACE);
 
         (new ResourcesReadHandler($router, $this->roles(), $tokens, languages: $this->resolver))(['uri' => 'whity-api:///api/acme/things'], 'token');

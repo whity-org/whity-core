@@ -101,6 +101,24 @@ final class AgentScopeGrant
         return self::fromScope(array_values(array_filter($principal->scope, 'is_string')));
     }
 
+    /**
+     * Whether this principal may READ an item gated by $permission on a path
+     * that has no approval flow: resources/list, resources/read, prompts/list,
+     * prompts/get (#2266). Anyone but an agent: yes, RBAC and the token scope
+     * decide. An agent: only when its effective mode is Allowed. Ask first is
+     * refused too, since there is nothing here for its person to approve, and
+     * Off is refused as on tools/call.
+     */
+    public static function permitsRead(McpPrincipal $principal, ?string $permission, ?string $agentPolicy = null): bool
+    {
+        if (!self::appliesTo($principal)) {
+            return true;
+        }
+        $permission = $permission === '' ? null : $permission;
+
+        return self::of($principal)->effectiveMode($permission, true, $agentPolicy ?? ToolSurface::AGENT_ALLOW, false) === self::ALLOW;
+    }
+
     /** The mode the grant gives a permission, or the default for an undeclared one. */
     public function modeFor(?string $permission, bool $readOnly): string
     {

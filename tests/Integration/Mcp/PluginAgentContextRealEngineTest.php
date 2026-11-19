@@ -336,7 +336,7 @@ PHP);
     private function tokens(): TokenValidator
     {
         $tokens = $this->createMock(TokenValidator::class);
-        $tokens->method('validateMcpToken')->willReturnCallback(fn (): McpPrincipal => $this->caller);
+        $tokens->method('validateBearerForMcp')->willReturnCallback(fn (): McpPrincipal => $this->caller);
 
         return $tokens;
     }

@@ -51,7 +51,7 @@ final class ResourcesListHandlerTest extends TestCase
         $this->tokenValidator  = $this->createMock(TokenValidator::class);
 
         $principal = new McpPrincipal(self::USER_ID, self::USER_ID, self::TENANT_ID, 'user', ['resources:list'], 'jti-res');
-        $this->tokenValidator->method('validateMcpToken')->willReturn($principal);
+        $this->tokenValidator->method('validateBearerForMcp')->willReturn($principal);
 
         $this->handler = new ResourcesListHandler(
             $this->resourceDeriver,
@@ -99,7 +99,7 @@ final class ResourcesListHandlerTest extends TestCase
     public function testInvoke_includesOpenResource_whenBearerTokenInvalid(): void
     {
         $this->tokenValidator = $this->createMock(TokenValidator::class);
-        $this->tokenValidator->method('validateMcpToken')->willReturn(null);
+        $this->tokenValidator->method('validateBearerForMcp')->willReturn(null);
         $this->handler = new ResourcesListHandler($this->resourceDeriver, $this->roleChecker, $this->tokenValidator);
 
         $result = ($this->handler)(null, 'invalid-token');

@@ -7,7 +7,9 @@ namespace Whity\Mcp\Resources;
 use Whity\Auth\RoleChecker;
 use Whity\Auth\TokenValidator;
 use Whity\Core\Tenant\TenantContext;
+use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpPrincipal;
+use Whity\Mcp\Auth\OAuth\OAuthTokenRefusedException;
 use Whity\Mcp\JsonRpc\MethodHandler;
 use Whity\Mcp\Auth\McpScope;
 
@@ -40,9 +42,7 @@ final class ResourcesListHandler implements MethodHandler
     /** @param array<string, mixed>|null $params */
     public function __invoke(?array $params, ?string $bearerToken): mixed
     {
-        $principal = $bearerToken !== null
-            ? $this->tokenValidator->validateMcpToken($bearerToken)
-            : null;
+        $principal = $this->principalOf($bearerToken);
         $tenantId = TenantContext::getTenantId();
 
         // Only the agent surface (ADR-0006 §4, WHIT-695): gated routes and
@@ -87,6 +87,23 @@ final class ResourcesListHandler implements MethodHandler
         return ['resources' => $resources, 'resourceTemplates' => $resourceTemplates];
     }
 
+    /**
+     * The caller, validated the way the Dispatcher validated it (an MCP token,
+     * a session bearer or an OAuth access token, #2202), or null. Soft: a bad
+     * token only narrows what is listed.
+     */
+    private function principalOf(?string $bearerToken): ?McpPrincipal
+    {
+        if ($bearerToken === null) {
+            return null;
+        }
+        try {
+            return $this->tokenValidator->validateBearerForMcp($bearerToken);
+        } catch (OAuthTokenRefusedException) {
+            return null;
+        }
+    }
+
     /** @param array<string, mixed> $access */
     private function callerCanUse(array $access, ?McpPrincipal $principal, ?int $tenantId): bool
     {
@@ -97,6 +114,19 @@ final class ResourcesListHandler implements MethodHandler
         // one of them. Applied before the open-item shortcut, which is exactly
         // what narrowing removes.
         if ($principal !== null && !McpScope::of($principal)->allowsPermission($requiredPermission)) {
+            return false;
+        }
+        // #2266: what resources/read would refuse is not listed either: a
+        // token's toolset narrowing, and an agent's grant and agentPolicy.
+        if ($principal !== null && array_key_exists('toolset', $access)
+            && !McpScope::of($principal)->allowsToolset(is_string($access['toolset']) ? $access['toolset'] : null)) {
+            return false;
+        }
+        if ($principal !== null && !AgentScopeGrant::permitsRead(
+            $principal,
+            $requiredPermission,
+            is_string($access['agentPolicy'] ?? null) ? $access['agentPolicy'] : null,
+        )) {
             return false;
         }
         if ($requiredPermission === null && $requiredRole === null) {
