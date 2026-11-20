@@ -133,6 +133,9 @@ async function proxyRequest(request: Request, method: string): Promise<Response>
     // We requested identity encoding from the backend, so no decompression is
     // needed. Drop content-encoding anyway to avoid any client confusion.
     responseHeaders.delete('content-encoding');
+    // `new Headers(response.headers)` already carries every Set-Cookie; drop
+    // them here and re-append each one exactly once below (#2234).
+    responseHeaders.delete('set-cookie');
     // content-length is forwarded as-is; arrayBuffer() reads the exact bytes
     // the backend sent, so the length remains accurate. If the backend omits it
     // (chunked), it stays absent — which is fine.
@@ -156,7 +159,7 @@ async function proxyRequest(request: Request, method: string): Promise<Response>
       headers: responseHeaders,
     });
 
-    // Forward Set-Cookie headers
+    // Forward Set-Cookie headers, one per cookie (never comma-joined)
     response.headers.getSetCookie().forEach(cookie => {
       result.headers.append('Set-Cookie', cookie);
     });
