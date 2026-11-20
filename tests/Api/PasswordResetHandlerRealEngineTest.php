@@ -15,6 +15,7 @@ use Whity\Core\Identity\PasswordResetService;
 use Whity\Core\Identity\ProfileEmailRepository;
 use Whity\Core\Mail\EmailLayout;
 use Whity\Core\Mail\Mailer;
+use Whity\Core\PasswordPolicy;
 use Whity\Core\Request;
 use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Core\Settings\SettingsRegistry;
@@ -101,6 +102,24 @@ final class PasswordResetHandlerRealEngineTest extends TestCase
     public function testForgotForUnknownEmailIsGenericAndSendsNothing(): void
     {
         $res = $this->forgot('nobody@acme.test');
+        self::assertSame(202, $res->getStatusCode());
+        self::assertSame([], $this->mailer->sent);
+        self::assertSame(0, $this->auditCount('auth.password_reset.requested'));
+    }
+
+    /**
+     * #2245: an UNCONFIRMED address on an account may be a typo or somebody
+     * else's address; a reset link sent there would hand them the account.
+     */
+    public function testForgotForAnUnconfirmedAddressSendsNothing(): void
+    {
+        $profileId = $this->seedProfile('owner@acme.test', 'old-password');
+        $this->pdo->prepare(
+            "INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
+             VALUES (?, 'typo@acme.test', false, false, CURRENT_TIMESTAMP)"
+        )->execute([$profileId]);
+
+        $res = $this->forgot('typo@acme.test');
         self::assertSame(202, $res->getStatusCode());
         self::assertSame([], $this->mailer->sent);
         self::assertSame(0, $this->auditCount('auth.password_reset.requested'));
@@ -394,6 +413,41 @@ final class PasswordResetHandlerRealEngineTest extends TestCase
         $this->emails->insert($profileId, $email, true, true);
 
         return $profileId;
+    }
+
+    /**
+     * #2174 part 2: the shared field validator. The sentences and statuses are
+     * unchanged; every field's problem is listed with a code, in English and
+     * Arabic. A token is read exactly as sent, so one of spaces is missing.
+     */
+    public function testFieldProblemsAreListedAndTheSentencesAreUnchanged(): void
+    {
+        foreach ([['email' => ['x@example.com']], ['email' => str_repeat('a', 250) . '@x.example']] as $body) {
+            $res = $this->handler->forgot(new Request('POST', '/api/auth/password/forgot', [], (string) json_encode($body)));
+            self::assertSame(422, $res->getStatusCode());
+            $json = json_decode($res->getBody(), true);
+            self::assertSame('A valid email address is required', $json['error']);
+            self::assertArrayHasKey('email', $json['details']['fields_ar']);
+        }
+        self::assertSame(['email' => 'too_long'], $json['details']['field_codes']);
+
+        $spaces = $this->resetBody(['token' => '   ', 'password' => 'a-strong-password-here']);
+        self::assertSame(422, $spaces->getStatusCode());
+        self::assertSame('A reset token is required', json_decode($spaces->getBody(), true)['error']);
+
+        foreach (['short' => 'too_short', str_repeat('p', PasswordPolicy::MAX_LENGTH + 1) => 'too_long'] as $password => $code) {
+            $res = $this->resetBody(['token' => 'some-token', 'password' => (string) $password]);
+            self::assertSame(422, $res->getStatusCode());
+            $json = json_decode($res->getBody(), true);
+            self::assertSame('Password must be at least ' . PasswordPolicy::MIN_LENGTH . ' characters', $json['error']);
+            self::assertSame(['password' => $code], $json['details']['field_codes']);
+        }
+    }
+
+    /** @param array<string, mixed> $body */
+    private function resetBody(array $body): \Whity\Sdk\Http\Response
+    {
+        return $this->handler->reset(new Request('POST', '/api/auth/password/reset', [], (string) json_encode($body)));
     }
 
     private function forgot(string $email): \Whity\Sdk\Http\Response

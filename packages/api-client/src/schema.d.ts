@@ -1776,7 +1776,7 @@ export interface paths {
         /** List time off and extra opening hours in a range */
         get: operations["get_api_v1_calendar_time_off"];
         put?: never;
-        /** Add time off (`off`) or extra hours (`open`) for a person */
+        /** Add time off (`off`) or extra hours (`open`) for a person. Your own time off needs only staff membership; your own extra hours need calendar:write; anybody else's needs calendar:write and calendar:manage */
         post: operations["post_api_v1_calendar_time_off"];
         delete?: never;
         options?: never;
@@ -9214,6 +9214,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/plugins/{name}/core-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Core permissions a plugin asks for its roles, and what the operator approved, per workspace (tenant_id narrows to one; 0 is the global roles) */
+        get: operations["get_api_v1_plugins_name_core_grants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{name}/core-grants/{role}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Grant a plugin role the core permissions the plugin asks for it in one workspace, all of them or the listed part */
+        post: operations["post_api_v1_plugins_name_core_grants_role_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/plugins/{name}/core-grants/{role}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take back core permissions approved for a plugin role in one workspace, all of them or the listed part */
+        post: operations["post_api_v1_plugins_name_core_grants_role_revoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/plugins/{name}/disable": {
         parameters: {
             query?: never;
@@ -10065,7 +10116,7 @@ export interface paths {
         post?: never;
         /**
          * Revoke every role grant at one resource
-         * @description The cleanup an owner runs when it deletes the record itself. `resource_id` carries no foreign key, so core is never told a record disappeared and its grants outlive it — a later record reusing that id would silently inherit them. Takes the SAME parameters as the list route, so a caller can GET exactly what this removes. Returns the number of grants revoked; 0 is a successful no-op, never a 404, so the call is safe to make unconditionally from a delete path and safe to retry. Unlike the create route this does NOT ask the owning plugin to vouch for the resource: by cleanup time the record is usually already deleted, so a fails-closed check would refuse exactly the calls that matter. The tenant predicate still confines it to the caller's own grants.
+         * @description The cleanup an owner runs when it deletes the record itself. `resource_id` carries no foreign key, so core is never told a record disappeared and its grants outlive it — a later record reusing that id would silently inherit them. Takes the SAME parameters as the list route, so a caller can GET exactly what this removes. Returns the number of grants revoked; 0 is a successful no-op, never a 404, so the call is safe to make unconditionally from a delete path and safe to retry. Unlike the create route this does NOT ask the owning plugin to vouch for the resource: by cleanup time the record is usually already deleted, so a fails-closed check would refuse exactly the calls that matter. The tenant predicate still confines it to the caller's own grants. The caller must hold, at that resource, every permission each grant's role carries; otherwise 403 `exceeds_your_access` and nothing is removed.
          */
         delete: operations["delete_api_v1_resource_role_grants_all"];
         options?: never;
@@ -10085,7 +10136,7 @@ export interface paths {
         post?: never;
         /**
          * Revoke one resource role grant by its id
-         * @description By id rather than by (resource, role, profile): over HTTP an omitted `profile_id` and an explicit null are indistinguishable, so a tuple-addressed revoke would let a dropped parameter silently revoke the everyone-grant instead of one profile's. The ids come from the list route.
+         * @description By id rather than by (resource, role, profile): over HTTP an omitted `profile_id` and an explicit null are indistinguishable, so a tuple-addressed revoke would let a dropped parameter silently revoke the everyone-grant instead of one profile's. The ids come from the list route. The caller must hold, at that resource, every permission the grant's role carries, the same rule as granting it; otherwise 403 `exceeds_your_access` and the grant stays.
          */
         delete: operations["delete_api_v1_resource_role_grants_id"];
         options?: never;
@@ -17911,6 +17962,8 @@ export interface components {
             value_minor?: number | null;
             currency?: string | null;
             route_id?: number | null;
+            /** @description Waiting for approval, and nobody can approve it yet: nothing posts until someone holds inventory:settings or a route is chosen, then sending it again routes it (WHIT-1301). */
+            nobody_can_approve?: boolean;
             batch_key?: string | null;
             sent_batch_key?: string | null;
             source_plugin?: string | null;
@@ -19867,6 +19920,38 @@ export interface components {
                 state?: string | null;
             };
         };
+        PluginCoreGrantChangeRequest: {
+            /** @description The workspace whose role this is; 0 or absent for the global roles. */
+            tenant_id?: number;
+            /** @description Only these; absent or null for everything the plugin asks for this role. */
+            permissions?: string[] | null;
+        };
+        PluginCoreGrantChangeResponse: {
+            data: {
+                plugin: string;
+                role: string;
+                tenant_id: number;
+                approved?: string[];
+                revoked?: string[];
+                requested: string[];
+                granted: string[];
+            };
+        };
+        PluginCoreGrantsResponse: {
+            data: {
+                plugin: string;
+                requests: {
+                    [key: string]: string[];
+                };
+                grants: {
+                    tenant_id: number;
+                    workspace: string;
+                    role: string;
+                    requested: string[];
+                    granted: string[];
+                }[];
+            };
+        };
         PluginEntry: {
             id: string;
             name: string;
@@ -20098,6 +20183,8 @@ export interface components {
                 provider?: string;
                 site_key?: string;
             } | null;
+            /** @description False when booking is refused until the bot check is set up (WHIT-1298). */
+            bot_check_ready?: boolean;
             /** @description The brand of the workspace, for the page (WHIT-1014). */
             brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
         };
@@ -20145,6 +20232,8 @@ export interface components {
                     provider?: string;
                     site_key?: string;
                 } | null;
+                /** @description False when no new chat can start until the bot check is set up (WHIT-1298). */
+                bot_check_ready?: boolean;
                 /** @description The brand of the workspace, for the chat box (WHIT-1014). */
                 brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
             };
@@ -22791,7 +22880,7 @@ export interface components {
              */
             state: "on" | "read_only" | "off";
             /** @enum {string|null} */
-            reason?: "free_for_all" | "entitled" | "cash" | "trial" | "grace" | "lapsed" | "installation_unlicensed" | "installation_grace" | null;
+            reason?: "free_for_all" | "entitled" | "cash" | "trial" | "grace" | "lapsed" | "installation_unlicensed" | "installation_grace" | "withdrawn" | null;
             graceUntil?: string | null;
             trialEndsAt?: string | null;
             paid: boolean;
@@ -32282,7 +32371,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description Another person's calendar without calendar:manage */
+            /** @description Not staff, extra hours without calendar:write, or another person's calendar without calendar:write and calendar:manage */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -71917,6 +72006,244 @@ export interface operations {
             };
             /** @description Database connection unavailable */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_plugins_name_core_grants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Requests and approvals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginCoreGrantsResponse"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the platform operator */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Plugin not loaded */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_plugins_name_core_grants_role_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                role: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginCoreGrantChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Approved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginCoreGrantChangeResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the platform operator, or a permission the operator does not hold */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Plugin not loaded */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The plugin does not ask for this, or the role does not exist there */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_plugins_name_core_grants_role_revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                role: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginCoreGrantChangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Revoked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginCoreGrantChangeResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the platform operator */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Plugin not loaded */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

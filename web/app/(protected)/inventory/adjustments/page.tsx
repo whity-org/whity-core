@@ -24,6 +24,7 @@ import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
 import { UserText } from '@/components/ui/user-text';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
+import { NobodyCanApprove } from '@/components/inventory/nobody-can-approve';
 import { OperationStatus } from '@/components/inventory/operation-status';
 import { RecordWasteDialog } from '@/components/inventory/record-waste-dialog';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -137,6 +138,22 @@ export default function WasteAndAdjustmentsPage() {
   };
   const money = (minor: number) => (numbers.currency ? moneyText(minor, numbers.currency) : '–');
   const firstWaiting = numbers.waiting[0];
+  // Waiting with nobody to approve them: nothing changed in stock (WHIT-1301).
+  const stuck = numbers.waiting.filter((o) => o.nobody_can_approve);
+  const sendAgain = async (id: number) => {
+    try {
+      const sent = await inventoryApi.submitAdjustment(id);
+      toast.addToast(
+        sent.nobody_can_approve
+          ? t('inventory.approval.stillNobody', 'Still nobody can approve it, so it keeps waiting.')
+          : t('inventory.adjustWaiting', 'Sent for approval. The stock changes once it is approved.'),
+        sent.nobody_can_approve ? 'warning' : 'success'
+      );
+    } catch (e) {
+      toast.addToast(e instanceof Error ? e.message : t('inventory.approval.sendFailed', 'It could not be sent again.'), 'error');
+    }
+    refetch();
+  };
   // The approval value is stored as an amount ("25"); shown as money in the
   // workspace's currency with its decimals (CU.1-CU.4): $25.00, JOD 25.000.
   const limitText = (amount: string) => {
@@ -209,6 +226,15 @@ export default function WasteAndAdjustmentsPage() {
               />
             </div>
           )}
+
+          {stuck.map((o) => (
+            <NobodyCanApprove
+              key={o.id}
+              number={o.number}
+              onSendAgain={canAdjust ? () => sendAgain(o.id) : undefined}
+              testId={`nobody-can-approve-${o.id}`}
+            />
+          ))}
 
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="overflow-x-auto rounded-lg border border-border">
@@ -327,10 +353,12 @@ export default function WasteAndAdjustmentsPage() {
           onDone={(adjustment) => {
             setRecording(false);
             toast.addToast(
-              adjustment.status === 'waiting_approval'
-                ? t('inventory.adjustWaiting', 'Sent for approval. The stock changes once it is approved.')
-                : t('inventory.waste.recorded', 'Waste recorded.'),
-              'success'
+              adjustment.nobody_can_approve
+                ? t('inventory.approval.nobodyToast', 'Saved, but nobody can approve it yet, so the stock hasn’t changed. Someone who runs the inventory settings has been told.')
+                : adjustment.status === 'waiting_approval'
+                  ? t('inventory.adjustWaiting', 'Sent for approval. The stock changes once it is approved.')
+                  : t('inventory.waste.recorded', 'Waste recorded.'),
+              adjustment.nobody_can_approve ? 'warning' : 'success'
             );
             refetch();
           }}

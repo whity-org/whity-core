@@ -136,8 +136,9 @@ final class SecurityHeaders
      * at all leaves X-Frame-Options as the only clickjacking defense in
      * force, and dropping it there would be a real regression, not a feature.
      *
-     * Sandbox (WHIT-1217): a response that opts into framing is a plugin's
-     * `screen: 'embed'` page, and it must never run as the app. The iframe
+     * Sandbox (WHIT-1217, WHIT-1283): any response that brings its own CSP is
+     * a page (a plugin's `screen: 'embed'` or `custom` page, a checkout page),
+     * and it must never run as the app, framable or not. The iframe
      * already leaves out `allow-same-origin`, but the same URL can be opened
      * on its own in a tab, where no iframe attribute applies. So the handler's
      * CSP is sent with `sandbox allow-scripts allow-forms` added: the page gets
@@ -160,35 +161,48 @@ final class SecurityHeaders
             return $securityHeaders;
         }
 
-        unset($securityHeaders[self::CSP_HEADER_NAME]);
-
         if (self::cspAllowsFraming($handlerCsp)) {
             unset($securityHeaders[self::FRAME_OPTIONS_HEADER_NAME]);
-            // Merged after the response's own headers, so this value is the one
-            // the browser receives.
-            $securityHeaders[self::CSP_HEADER_NAME] = self::sandboxed($handlerCsp);
         }
+        // WHIT-1283 (#2228): every handler CSP is sent sandboxed, framable or
+        // not. A page that refuses framing can still be opened in a tab, and
+        // without the sandbox its scripts would run as the app. Merged after
+        // the response's own headers, so this value is the one the browser
+        // receives.
+        $securityHeaders[self::CSP_HEADER_NAME] = self::sandboxed($handlerCsp);
 
         return $securityHeaders;
     }
 
     /**
-     * A handler CSP with its own `sandbox` directive (if any) replaced by
-     * {@see self::FRAMED_SANDBOX}.
+     * A handler CSP with a sandbox no looser than {@see self::FRAMED_SANDBOX}.
+     * With no `sandbox` directive of its own it gets that one. A handler that
+     * wrote its own keeps only the flags that one allows, so it can be
+     * stricter (a bare `sandbox` stays bare) but never asks for its origin,
+     * top navigation or popups back (WHIT-1283).
      *
      * @param string $csp A Content-Security-Policy header value.
      */
     public static function sandboxed(string $csp): string
     {
+        $allowed = array_slice(explode(' ', self::FRAMED_SANDBOX), 1);
         $directives = [];
+        $own = null;
         foreach (explode(';', $csp) as $directive) {
             $directive = trim($directive);
-            if ($directive === '' || preg_match('/^sandbox(\s|$)/i', $directive) === 1) {
+            if ($directive === '') {
+                continue;
+            }
+            if (preg_match('/^sandbox(\s|$)/i', $directive) === 1) {
+                $flags = preg_split('/\s+/', strtolower(trim(substr($directive, 7)))) ?: [];
+                $kept = array_values(array_intersect($allowed, $flags));
+                // Several sandbox directives: the strictest wins.
+                $own = $own === null ? $kept : array_values(array_intersect($own, $kept));
                 continue;
             }
             $directives[] = $directive;
         }
-        $directives[] = self::FRAMED_SANDBOX;
+        $directives[] = $own === null ? self::FRAMED_SANDBOX : trim('sandbox ' . implode(' ', $own));
 
         return implode('; ', $directives);
     }

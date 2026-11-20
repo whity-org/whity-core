@@ -107,6 +107,29 @@ final class AttendanceRepository
      */
     public function replace(int $tenantId, int $meetingId, array $attendees, ?int $recordedBy): int
     {
+        // #2248: a person named by profile must belong to this workspace. Any
+        // membership counts, not only an active one: attendance is a record of
+        // the past, and somebody who has left since was still in the room. A
+        // guest is named by `attendee_name` and needs no profile at all.
+        $profileIds = array_values(array_unique(array_filter(
+            array_map(static fn (array $a): ?int => $a['profile_id'], $attendees),
+            static fn (?int $id): bool => $id !== null
+        )));
+        if ($profileIds !== []) {
+            $placeholders = implode(', ', array_fill(0, count($profileIds), '?'));
+            $known = $this->db->prepare(
+                "SELECT DISTINCT profile_id FROM memberships WHERE tenant_id = ? AND profile_id IN ({$placeholders})"
+            );
+            $known->execute([$tenantId, ...$profileIds]);
+            $members = array_map('intval', $known->fetchAll(\PDO::FETCH_COLUMN));
+            if (array_diff($profileIds, $members) !== []) {
+                throw ConveningRejectedException::because(
+                    'Everyone recorded by name must be a member of this workspace. Record a guest by '
+                    . 'their name instead.'
+                );
+            }
+        }
+
         $owned = !$this->db->inTransaction();
         if ($owned) {
             $this->db->beginTransaction();

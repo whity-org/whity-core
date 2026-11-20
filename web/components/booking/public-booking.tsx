@@ -64,7 +64,7 @@ function nowMs(): number {
   return Date.now();
 }
 
-type Phase = 'loading' | 'closed' | 'error' | 'tooMany' | 'ready' | 'booked';
+type Phase = 'loading' | 'closed' | 'notReady' | 'error' | 'tooMany' | 'ready' | 'booked';
 type Field = 'name' | 'email' | 'phone';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -90,7 +90,8 @@ export function PublicBookingScreen({ workspace }: { workspace: string }) {
       .then((found) => {
         if (cancelled) return;
         setPage(found);
-        setPhase('ready');
+        // WHIT-1298 (#2203): booking is refused until the bot check is set up.
+        setPhase(found.bot_check_ready === false ? 'notReady' : 'ready');
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -117,6 +118,23 @@ export function PublicBookingScreen({ workspace }: { workspace: string }) {
               <Skeleton key={i} className="h-16 rounded-card" />
             ))}
           </CardContent>
+        </Card>
+      </PublicShell>
+    );
+  }
+
+  if (phase === 'notReady') {
+    return (
+      <PublicShell wide brand={page?.brand}>
+        <Card className="border-t-4 border-t-primary text-sm" data-testid="book-notReady">
+          <CardHeader>
+            <CardTitle className="text-xl font-semibold">
+              {t('notReady.title', '{name} isn’t taking bookings here yet', { name: page?.workspace.name ?? '' })}
+            </CardTitle>
+            <CardDescription className="text-sm">
+              {t('notReady.description', 'They’re still setting up this page. Try again later, or contact them to book.')}
+            </CardDescription>
+          </CardHeader>
         </Card>
       </PublicShell>
     );

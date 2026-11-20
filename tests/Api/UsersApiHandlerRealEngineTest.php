@@ -768,6 +768,42 @@ final class UsersApiHandlerRealEngineTest extends TestCase
     }
 
     /**
+     * #2238: deactivating ends every session at once. The epoch moves (so
+     * every token already issued fails its epoch check) and every session row
+     * the person holds, in every workspace, is revoked with its jtis listed.
+     * Reactivating does not move the epoch again.
+     */
+    public function testDeactivationBumpsTheEpochAndRevokesEverySession(): void
+    {
+        $this->seedProfile(204, 'leaver@example.com');
+        $this->seedMembership(204, 1, 2);
+        $sessions = new \Whity\Auth\SessionService($this->pdo);
+        $future = date('Y-m-d H:i:s', time() + 86400);
+        $sessions->start(204, 1, 'acc-204-a', 'ref-204-a', $future, 'ua', '127.0.0.1');
+        $sessions->start(204, 2, 'acc-204-b', 'ref-204-b', $future, 'ua', '127.0.0.1');
+        $epochBefore = (int) $this->profileColumn(204, 'token_epoch');
+
+        $response = $this->handler()->update(
+            $this->authedRequest('PATCH', '/api/users/204', ['accountStatus' => 'inactive']),
+            ['id' => '204']
+        );
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame($epochBefore + 1, (int) $this->profileColumn(204, 'token_epoch'));
+        $this->assertSame(0, $this->countRows('SELECT COUNT(*) FROM sessions WHERE profile_id = 204 AND revoked_at IS NULL'));
+        $this->assertSame(4, $this->countRows(
+            "SELECT COUNT(*) FROM revoked_tokens WHERE jti IN ('acc-204-a', 'ref-204-a', 'acc-204-b', 'ref-204-b')"
+        ));
+
+        $reactivate = $this->handler()->update(
+            $this->authedRequest('PATCH', '/api/users/204', ['accountStatus' => 'active']),
+            ['id' => '204']
+        );
+        $this->assertSame(200, $reactivate->getStatusCode());
+        $this->assertSame($epochBefore + 1, (int) $this->profileColumn(204, 'token_epoch'));
+    }
+
+    /**
      * A deactivated account can be reactivated the same way (round-trip).
      */
     public function testUpdateCanReactivateAccount(): void

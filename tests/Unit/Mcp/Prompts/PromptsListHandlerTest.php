@@ -42,7 +42,7 @@ final class PromptsListHandlerTest extends TestCase
         $this->tokenValidator = $this->createMock(TokenValidator::class);
 
         $principal = new McpPrincipal(self::USER_ID, self::USER_ID, self::TENANT_ID, 'user', ['prompts:list'], 'jti-list');
-        $this->tokenValidator->method('validateMcpToken')->willReturn($principal);
+        $this->tokenValidator->method('validateBearerForMcp')->willReturn($principal);
 
         $this->handler = new PromptsListHandler(
             $this->registry,
@@ -100,7 +100,7 @@ final class PromptsListHandlerTest extends TestCase
     public function testInvoke_includesOpenPrompt_whenBearerTokenInvalid(): void
     {
         $this->tokenValidator = $this->createMock(TokenValidator::class);
-        $this->tokenValidator->method('validateMcpToken')->willReturn(null);
+        $this->tokenValidator->method('validateBearerForMcp')->willReturn(null);
         $this->handler = new PromptsListHandler($this->registry, $this->roleChecker, $this->tokenValidator);
 
         $this->registry->register(new Prompt('open-prompt', 'An open prompt'));

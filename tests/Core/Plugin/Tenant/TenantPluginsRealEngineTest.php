@@ -195,6 +195,21 @@ final class TenantPluginsRealEngineTest extends TestCase
         self::assertContains('cakeorders:read', $names);
     }
 
+    /**
+     * #2255, defence in depth: a row naming a core permission, however it got
+     * there, never hides that permission from another workspace.
+     */
+    public function testACoreSlugInAnotherWorkspacesPluginRowIsNeverHidden(): void
+    {
+        $this->publisher->publish(self::A, self::workspaceManifest(), 7);
+        $this->pdo->prepare('INSERT INTO tenant_plugin_permissions (tenant_id, plugin_key, permission) VALUES (?, ?, ?)')
+            ->execute([self::A, 'users', 'users:write']);
+
+        $hidden = $this->repository->permissionsOfOtherTenants(self::B);
+        self::assertNotContains('users:write', $hidden);
+        self::assertContains('cakeorders:read', $hidden, 'a real plugin slug is still hidden');
+    }
+
     public function testTheFeaturesEndpointServesTheWorkspacesScreensThroughThePermissionFilter(): void
     {
         $this->publisher->publish(self::A, self::workspaceManifest(), 7);
@@ -262,6 +277,22 @@ final class TenantPluginsRealEngineTest extends TestCase
             $m['permissions'][] = ['slug' => 'users:delete', 'label' => ['en' => 'x', 'ar' => 'س']];
             return $m;
         }, '"users:delete" must start with "cakeorders:"'];
+        // #2255: a plugin named after a core resource could declare core slugs,
+        // and other workspaces' catalogues would then hide them.
+        yield 'a name Whity uses for core permissions' => [static function (array $m): array {
+            $m['plugin']['name'] = 'users';
+            $m['permissions'] = [['slug' => 'users:write', 'label' => ['en' => 'w', 'ar' => 'ك']]];
+            $m['roles'] = [];
+            $m['screens'] = [];
+            return $m;
+        }, 'is a name Whity itself uses for permissions'];
+        yield 'a core permission under its own prefix' => [static function (array $m): array {
+            $m['plugin']['name'] = 'email';
+            $m['permissions'] = [['slug' => 'email_domains:manage', 'label' => ['en' => 'm', 'ar' => 'د']]];
+            $m['roles'] = [];
+            $m['screens'] = [];
+            return $m;
+        }, '"email_domains:manage" is a permission Whity itself uses'];
         yield 'a role inheriting from an admin role' => [static function (array $m): array {
             $m['roles']['baker']['parent'] = 'admin';
             return $m;

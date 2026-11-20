@@ -394,6 +394,13 @@ final class SettingsRegistry
     // invoices for free is the sharpest possible privilege escalation.
     public const PAYMENTS_MOCK_ENABLED = 'payments.mock_enabled';
 
+    // #2206: whether `schedule:run` starts the local billing run (issues
+    // invoices for subscriptions core bills itself) and the dunning sweep
+    // (locks tenants with overdue invoices). OFF and global-only: a
+    // deployment whose subscriptions belong to the billing service (Whity
+    // Pay) must not start invoicing or locking anyone because it upgraded.
+    public const BILLING_LOCAL_RUNS_ENABLED = 'billing.local_runs_enabled';
+
     // DUNNING (#billing). One setting says the whole retry policy: a list of
     // day offsets FROM THE DUE DATE, so "1,3,7" is three attempts on days 1,
     // 3 and 7 rather than 1, 4 and 11. Locking is separate from the last
@@ -462,6 +469,13 @@ final class SettingsRegistry
     // their prompts stop with it on. GLOBAL-ONLY: code plugins are install-wide. Tools are not
     // gated by this; they keep their own permission checks.
     public const PLUGINS_MCP_PROMPTS_REQUIRE_MARK = 'plugins.mcp_prompts_require_mark';
+
+    // WHIT-1308 (#2189): let a code plugin from a trusted store install without a valid
+    // Whity attestation. OFF by default, so an unsigned package is refused. A temporary
+    // override, owner decision 2026-11-20, until Whity signs store packages; turning it on
+    // or off and every unsigned install it lets through are in the audit log. GLOBAL-ONLY:
+    // code plugins are install-wide, and only the operator installs them.
+    public const PLUGINS_STORE_ALLOW_UNSIGNED = 'plugins.store_allow_unsigned';
 
     // SDK 1.102 (WHIT-985): the code plugins the operator lets send Whity's own billing
     // emails (receipts, failed payments) to a workspace's payers, in the INSTANCE's brand
@@ -1038,6 +1052,7 @@ final class SettingsRegistry
         self::BILLING_INVOICE_NUMBER_SCOPE,
         self::BILLING_INVOICE_NUMBER_RESET,
         self::PAYMENTS_MOCK_ENABLED,
+        self::BILLING_LOCAL_RUNS_ENABLED,
         self::AFFILIATE_CLAWBACK_ON_REFUND,
         self::AFFILIATE_WITHHOLDING_BP,
         self::LICENSING_BILLING_BASIS,
@@ -1048,6 +1063,7 @@ final class SettingsRegistry
         self::PLUGINS_STORE_ALLOWED_HOSTS,
         self::PLUGINS_STORE_ENABLED,
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK,
+        self::PLUGINS_STORE_ALLOW_UNSIGNED,
         self::PLUGINS_BILLING_EMAIL_SENDERS,
         // Master on/off switch for the render tier: infrastructure-level (is the
         // whole optional subsystem available on this instance), not a per-tenant
@@ -1101,6 +1117,7 @@ final class SettingsRegistry
         self::MAIL_EVENT_PASSWORD_RESET,
         self::PLUGINS_STORE_ENABLED,
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK,
+        self::PLUGINS_STORE_ALLOW_UNSIGNED,
         self::DOCUMENTS_RENDER_ENABLED,
         self::DOCUMENTS_PERSIST_ENABLED,
         self::DOCUMENTS_QR_ENABLED,
@@ -1112,6 +1129,7 @@ final class SettingsRegistry
         self::CALENDAR_MULTI_SERVICE_BOOKING,
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
+        self::BILLING_LOCAL_RUNS_ENABLED,
         self::AFFILIATE_CLAWBACK_ON_REFUND,
         self::APP_INSTALLABLE,
     ];
@@ -1332,6 +1350,8 @@ final class SettingsRegistry
         // that is on by default is one that can take money before anybody
         // decided it should.
         self::PAYMENTS_MOCK_ENABLED => 'false',
+        // Off until the operator decides core bills its own subscriptions.
+        self::BILLING_LOCAL_RUNS_ENABLED => 'false',
         // Claws back by default. See the constant for why absorbing a refund
         // is a decision rather than a default.
         self::AFFILIATE_CLAWBACK_ON_REFUND => 'true',
@@ -1350,6 +1370,7 @@ final class SettingsRegistry
         // before this flag existed.
         self::PLUGINS_STORE_ENABLED => 'true',
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => 'false',
+        self::PLUGINS_STORE_ALLOW_UNSIGNED => 'false',
         self::PLUGINS_BILLING_EMAIL_SENDERS => '',
         // Heavyweight optional add-on (a whole separate Chromium-bearing
         // container) — opt-in, not opt-out. A sovereign deploy that never runs
@@ -1872,6 +1893,7 @@ final class SettingsRegistry
             self::BILLING_INVOICE_NUMBER_SCOPE => self::validateEnum($key, $value),
             self::BILLING_INVOICE_NUMBER_RESET => self::validateEnum($key, $value),
             self::PAYMENTS_MOCK_ENABLED => self::validateBoolean($value, self::PAYMENTS_MOCK_ENABLED),
+            self::BILLING_LOCAL_RUNS_ENABLED => self::validateBoolean($value, self::BILLING_LOCAL_RUNS_ENABLED),
             self::DUNNING_RETRY_SCHEDULE_DAYS => \Whity\Core\Billing\DunningSchedule::parseProblem($value),
             self::DUNNING_LOCK_AFTER_DAYS => self::validateLockAfterDays($value),
             self::AFFILIATE_CLAWBACK_ON_REFUND => self::validateBoolean($value, self::AFFILIATE_CLAWBACK_ON_REFUND),
@@ -1891,6 +1913,7 @@ final class SettingsRegistry
             self::PLUGINS_STORE_ALLOWED_HOSTS => null, // free-form strings
             self::PLUGINS_STORE_ENABLED => self::validateBoolean($value, self::PLUGINS_STORE_ENABLED),
             self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => self::validateBoolean($value, self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK),
+            self::PLUGINS_STORE_ALLOW_UNSIGNED => self::validateBoolean($value, self::PLUGINS_STORE_ALLOW_UNSIGNED),
             self::PLUGINS_BILLING_EMAIL_SENDERS => self::validatePluginNameList($value, self::PLUGINS_BILLING_EMAIL_SENDERS),
             self::DOCUMENTS_RENDER_ENABLED => self::validateBoolean($value, self::DOCUMENTS_RENDER_ENABLED),
             self::DOCUMENTS_RENDER_MAX_ROWS => self::validateRenderMaxRows($value),

@@ -17,6 +17,9 @@ use Whity\Core\Settings\GlobalSettingsRepository;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Store\SharedStoreInterface;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\Field;
+use Whity\Http\Validation\FieldCheck;
+use Whity\Http\Validation\FieldValidator;
 use Whity\Http\Middleware\RequestBodyValidator;
 use Whity\Http\WebsiteCors;
 use Whity\Sdk\Messaging\InboundMessage;
@@ -92,12 +95,13 @@ final class PublicContactApiHandler
             return $form ? $this->back($lang, true) : self::saved();
         }
 
-        $fields = self::fields($body);
-        if (isset($fields['errors'])) {
+        $checked = self::check($body);
+        if (!$checked->ok()) {
             return $form
                 ? $this->back($lang, false)
-                : Response::error('Please check the form.', 422, ['fields' => $fields['errors']]);
+                : $checked->refusal('Please check the form.');
         }
+        $fields = self::fields($body, $checked);
 
         $tenantId = $this->inbox();
         if ($tenantId === null) {
@@ -146,45 +150,45 @@ final class PublicContactApiHandler
     }
 
     /**
+     * The form's fields through the shared validator (#2174). `details.fields`
+     * keeps the English sentences the website has always shown; the Arabic and
+     * the codes come alongside.
+     *
      * @param array<string, mixed> $body
-     * @return array{topic: string, name: string, company: string, contact: string, message: string}|array{errors: array<string, string>}
      */
-    private static function fields(array $body): array
+    private static function check(array $body): FieldCheck
     {
-        $get = static fn (string $k, int $max): string => mb_substr(trim(is_string($body[$k] ?? null) ? $body[$k] : ''), 0, $max + 1);
-        $topic = is_string($body['topic'] ?? null) && in_array($body['topic'], self::TOPICS, true) ? $body['topic'] : 'other';
-        $name = $get('name', self::MAX_NAME);
-        $company = $get('company', self::MAX_COMPANY);
-        $contact = $get('contact', self::MAX_CONTACT);
-        $message = $get('message', self::MAX_MESSAGE);
+        return FieldValidator::check($body, [
+            'name' => Field::text()->required()->max(self::MAX_NAME)
+                ->say('required', 'Please write your name.', 'يرجى كتابة اسمك.')
+                ->say('too_long', 'Your name is too long.', 'اسمك طويل جدًا.'),
+            'company' => Field::text()->max(self::MAX_COMPANY)
+                ->say('too_long', 'The company name is too long.', 'اسم الشركة طويل جدًا.'),
+            'contact' => Field::emailOrPhone('/^\+?[0-9 ()\-]{6,24}$/')->required()->max(self::MAX_CONTACT)
+                ->say('required', 'Please write an email address or a phone number.', 'يرجى كتابة عنوان بريد إلكتروني أو رقم هاتف.'),
+            'message' => Field::text()->required()->max(self::MAX_MESSAGE)
+                ->say('required', 'Please write your message.', 'يرجى كتابة رسالتك.')
+                ->say(
+                    'too_long',
+                    'Your message is too long. Please keep it under ' . self::MAX_MESSAGE . ' characters.',
+                    'رسالتك طويلة جدًا. يرجى إبقاءها أقل من ' . self::MAX_MESSAGE . ' حرف.'
+                ),
+        ]);
+    }
 
-        $errors = [];
-        if ($name === '') {
-            $errors['name'] = 'Please write your name.';
-        } elseif (mb_strlen($name) > self::MAX_NAME) {
-            $errors['name'] = 'Your name is too long.';
-        }
-        if (mb_strlen($company) > self::MAX_COMPANY) {
-            $errors['company'] = 'The company name is too long.';
-        }
-        if ($contact === '') {
-            $errors['contact'] = 'Please write an email address or a phone number.';
-        } elseif (
-            filter_var($contact, FILTER_VALIDATE_EMAIL) === false
-            && preg_match('/^\+?[0-9 ()\-]{6,24}$/', $contact) !== 1
-        ) {
-            $errors['contact'] = 'That doesn\'t look like an email address or a phone number.';
-        }
-        if ($message === '') {
-            $errors['message'] = 'Please write your message.';
-        } elseif (mb_strlen($message) > self::MAX_MESSAGE) {
-            $errors['message'] = 'Your message is too long. Please keep it under ' . self::MAX_MESSAGE . ' characters.';
-        }
-        if ($errors !== []) {
-            return ['errors' => $errors];
-        }
-
-        return compact('topic', 'name', 'company', 'contact', 'message');
+    /**
+     * @param array<string, mixed> $body
+     * @return array{topic: string, name: string, company: string, contact: string, message: string}
+     */
+    private static function fields(array $body, FieldCheck $checked): array
+    {
+        return [
+            'topic' => is_string($body['topic'] ?? null) && in_array($body['topic'], self::TOPICS, true) ? $body['topic'] : 'other',
+            'name' => $checked->value('name'),
+            'company' => $checked->value('company'),
+            'contact' => $checked->value('contact'),
+            'message' => $checked->value('message'),
+        ];
     }
 
     /** The operator's inbox workspace, or null when none is named or it is gone. */

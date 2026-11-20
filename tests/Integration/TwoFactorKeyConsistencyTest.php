@@ -205,6 +205,12 @@ class TwoFactorKeyConsistencyTest extends TestCase
                     // atomic advance always wins in this mock (fresh profile, no
                     // prior step recorded), matching a first-time valid TOTP login.
                     $stmt->method('rowCount')->willReturn(1);
+                } elseif (str_contains($sql, 'INSERT INTO revoked_tokens')) {
+                    // Spending the temp token (#2267): the first use lands.
+                    $stmt->method('rowCount')->willReturn(1);
+                } elseif (str_contains($sql, 'SELECT status FROM profiles')) {
+                    // issueSessionForProfile refuses a deactivated profile (#2227).
+                    $stmt->method('fetchColumn')->willReturn('active');
                 } elseif (str_contains($sql, 'UPDATE backup_codes')) {
                     // The atomic single-use burn (WHERE id AND used = false): the
                     // row is flipped, so exactly one row is affected.

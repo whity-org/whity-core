@@ -208,8 +208,8 @@ export default function PublicFormsPage() {
           <AlertDescription>
             {isOperator
               ? t(
-                  'settings.publicForms.closed.operator',
-                  'Every public form is closed until you set up the bot check below, or choose to allow forms without one.'
+                  'settings.publicForms.closed.operatorAll',
+                  'Every public form, public chat and online booking is closed until you set up the bot check below, or choose to allow them without one.'
                 )
               : t(
                   'settings.publicForms.closed.memberKeys',
@@ -864,8 +864,8 @@ function BotCheckForm({ settings, onSaved }: { settings: BotSettings; onSaved: (
           </div>
           <p className="text-xs text-muted-foreground">
             {t(
-              'settings.publicForms.bot.allowNone.risk',
-              'Off: public forms close while no bot check is set. Turning it on lets spam through, unless something else in front of this Whity stops bots.'
+              'settings.publicForms.bot.allowNone.riskAll',
+              'Off: public forms, public chat and online booking close while no bot check is set. Turning it on lets spam through, unless something else in front of this Whity stops bots.'
             )}
           </p>
         </div>

@@ -626,6 +626,16 @@ jobs:
       - name: Grant-by-role-name guard
         run: php scripts/ci-grant-by-role-name-guard.php
 
+      # #2174: request fields are checked by the shared field validator;
+      # hand-written email checks outside it may only go down.
+      - name: Email-validation guard
+        run: php scripts/ci-email-validation-guard.php
+
+      # #2198: a request body field is read as text through the validator, not
+      # cast; (string) of a JSON list stores "Array". The count may not go up.
+      - name: Body string-cast guard
+        run: php scripts/ci-body-string-cast-guard.php
+
       # Emitted-URL version guard (#1046): fail when a URL RETURNED to a client
       # is missing the /v1 the router serves it at.
       #

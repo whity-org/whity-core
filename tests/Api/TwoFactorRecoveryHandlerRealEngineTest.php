@@ -194,12 +194,56 @@ final class TwoFactorRecoveryHandlerRealEngineTest extends TestCase
         self::assertSame(1, $this->auditCount('auth.2fa_recovery.confirm_failed'));
     }
 
+    /**
+     * #2190: every failed try writes an audit row, so one address gets 30
+     * tries an hour; the 31st is refused before the token is read or audited.
+     */
+    public function testFailedConfirmsAreLimitedPerAddress(): void
+    {
+        for ($i = 0; $i < 30; $i++) {
+            self::assertSame(400, $this->confirmFrom('bad-token-' . $i, '203.0.113.9')->getStatusCode(), "try {$i}");
+        }
+
+        $refused = $this->confirmFrom('bad-token-30', '203.0.113.9');
+        self::assertSame(429, $refused->getStatusCode());
+        self::assertSame(30, $this->auditCount('auth.2fa_recovery.confirm_failed'));
+
+        // Another address is not affected.
+        self::assertSame(400, $this->confirmFrom('bad-token-31', '203.0.113.10')->getStatusCode());
+    }
+
+    private function confirmFrom(string $token, string $ip): \Whity\Sdk\Http\Response
+    {
+        return $this->handler->confirm(new Request(
+            'POST',
+            '/api/auth/2fa-recovery/confirm',
+            [\Whity\Core\RateLimit\ClientIp::HEADER => $ip],
+            (string) json_encode(['token' => $token])
+        ));
+    }
+
     public function testConfirmEmptyTokenIs422(): void
     {
         self::assertSame(422, $this->confirm('')->getStatusCode());
     }
 
     // ==================== helpers ====================
+
+    /**
+     * #2174 part 2: the shared field validator; the sentences and statuses are
+     * unchanged.
+     */
+    public function testFieldProblemsAreListedAndTheSentencesAreUnchanged(): void
+    {
+        $json = json_decode($this->request('not-an-email')->getBody(), true);
+        self::assertSame('A valid email address is required', $json['error']);
+        self::assertSame(['email' => 'invalid_email'], $json['details']['field_codes']);
+        self::assertNotSame('', $json['details']['fields_ar']['email']);
+
+        $res = $this->handler->confirm(new Request('POST', '/api/auth/2fa-recovery/confirm', [], (string) json_encode(['token' => ['x']])));
+        self::assertSame(422, $res->getStatusCode());
+        self::assertSame('A confirmation token is required', json_decode($res->getBody(), true)['error']);
+    }
 
     private function seedProfileWithTwoFactor(string $email): int
     {

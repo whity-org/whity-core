@@ -69,6 +69,9 @@ final class PasswordResetService
     public const STATUS_APPROVED = 'approved';
     public const STATUS_REJECTED = 'rejected';
 
+    /** #2226: the approver is the person whose reset it is. */
+    public const REFUSED_OWN_REQUEST = 'own_request';
+
     public function __construct(private readonly PDO $db) {}
 
     /**
@@ -335,7 +338,7 @@ final class PasswordResetService
                         p.display_name,
                         pe.email AS email
                  FROM password_resets pr
-                 JOIN memberships m ON m.profile_id = pr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
+                 " . CredentialRecoveryScope::membershipJoin('pr.profile_id') . "
                  JOIN profiles p ON p.id = pr.profile_id
                  LEFT JOIN profile_emails pe ON pe.profile_id = pr.profile_id AND pe.is_primary = TRUE
                  WHERE pr.status = '" . self::STATUS_AWAITING_APPROVAL . "'
@@ -381,7 +384,7 @@ final class PasswordResetService
             $stmt = $this->db->prepare(
                 "SELECT COUNT(DISTINCT pr.id)
                  FROM password_resets pr
-                 JOIN memberships m ON m.profile_id = pr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
+                 " . CredentialRecoveryScope::membershipJoin('pr.profile_id') . "
                  WHERE pr.status = '" . self::STATUS_AWAITING_APPROVAL . "'"
             );
             $stmt->execute([':tenant_id' => $tenantId]);
@@ -404,10 +407,15 @@ final class PasswordResetService
      * tenants — see {@see self::listPendingForTenant()} for why that break-glass
      * exists and why it does not widen any tenant administrator's reach.
      *
-     * @return array{profile_id:int, email:string}|null null = not found, not
-     *   awaiting approval, or the target is not a member of $tenantId.
+     * #2226: a workspace (other than the platform one) approves only for staff
+     * it alone answers for ({@see CredentialRecoveryScope}), and nobody approves
+     * their own reset.
+     *
+     * @return array{profile_id:int, email:string}|string|null
+     *   REFUSED_OWN_REQUEST for the approver's own reset; null = not found, not
+     *   awaiting approval, or not somebody $tenantId may reset.
      */
-    public function approveForTenant(int $requestId, int $tenantId): ?array
+    public function approveForTenant(int $requestId, int $tenantId, int $approverProfileId): array|string|null
     {
         $ownTx = !$this->db->inTransaction();
         if ($ownTx) {
@@ -430,7 +438,7 @@ final class PasswordResetService
                 $stmt = $this->db->prepare(
                     "SELECT pr.id, pr.profile_id, pr.staged_password_hash, pe.email
                      FROM password_resets pr
-                     JOIN memberships m ON m.profile_id = pr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
+                     " . CredentialRecoveryScope::membershipJoin('pr.profile_id') . "
                      LEFT JOIN profile_emails pe ON pe.profile_id = pr.profile_id AND pe.is_primary = TRUE
                      WHERE pr.id = :id AND pr.status = '" . self::STATUS_AWAITING_APPROVAL . "'
                      LIMIT 1"
@@ -448,6 +456,16 @@ final class PasswordResetService
             }
 
             $profileId = (int) $row['profile_id'];
+
+            // #2226: nobody approves their own reset (WC-797 §4d). That is the
+            // whole point of the approval; a parked request of the only admin
+            // goes to the platform workspace instead.
+            if ($profileId === $approverProfileId) {
+                if ($ownTx) {
+                    $this->db->commit();
+                }
+                return self::REFUSED_OWN_REQUEST;
+            }
 
             // #917: a staged hash can outlive the state it was staged under —
             // the profile may have been linked to an identity provider between
@@ -532,7 +550,7 @@ final class PasswordResetService
             $lookup = $this->db->prepare(
                 "SELECT pr.profile_id
                  FROM password_resets pr
-                 JOIN memberships m ON m.profile_id = pr.profile_id AND m.tenant_id = :tenant_id AND m.status = 'active'
+                 " . CredentialRecoveryScope::membershipJoin('pr.profile_id') . "
                  WHERE pr.id = :id AND pr.status = '" . self::STATUS_AWAITING_APPROVAL . "'
                  LIMIT 1"
             );
@@ -564,12 +582,7 @@ final class PasswordResetService
                         updated_at = NOW()
                   WHERE id = :id
                     AND status = '" . self::STATUS_AWAITING_APPROVAL . "'
-                    AND EXISTS (
-                        SELECT 1 FROM memberships m
-                        WHERE m.profile_id = password_resets.profile_id
-                          AND m.tenant_id = :tenant_id
-                          AND m.status = 'active'
-                    )"
+                    AND " . CredentialRecoveryScope::governs('password_resets.profile_id')
             );
             $stmt->execute([':id' => $requestId, ':tenant_id' => $tenantId]);
         }

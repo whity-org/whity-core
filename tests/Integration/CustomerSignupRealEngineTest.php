@@ -534,6 +534,32 @@ final class CustomerSignupRealEngineTest extends TestCase
         self::assertSame([self::TENANT_A => 'customer', self::TENANT_B => 'member'], array_map('strval', $kinds));
     }
 
+    /**
+     * #2245: somebody who only CLAIMED an address (an unconfirmed secondary
+     * email on their own account) must not receive the membership when the
+     * real owner confirms a sign-up for it.
+     */
+    public function testAnUnconfirmedClaimOnTheAddressNeverReceivesTheMembership(): void
+    {
+        $this->statement(
+            "INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
+             VALUES ({$this->existingProfileId}, 'victim@example.test', false, false, NOW())"
+        );
+        $this->configure(self::TENANT_A, self::ADMIN_A, 'open', $this->customerRole);
+        $this->request('tenant-a', 'victim@example.test', 'Victim');
+        $token = $this->tokenFromMail(0);
+
+        self::assertTrue($this->decode($this->preview($token))['data']['requires_password']);
+        $res = $this->confirm($token, 'a-long-enough-password');
+        self::assertSame('joined', $this->decode($res)['data']['status']);
+
+        $joined = $this->membership(self::TENANT_A, 'victim@example.test');
+        self::assertNotSame($this->existingProfileId, (int) $joined['profile_id']);
+        self::assertSame(0, (int) $this->scalar(
+            'SELECT COUNT(*) FROM memberships WHERE tenant_id = ' . self::TENANT_A . ' AND profile_id = ' . $this->existingProfileId
+        ));
+    }
+
     public function testStaffWhoSignUpStayStaff(): void
     {
         $this->configure(self::TENANT_A, self::ADMIN_A, 'open', $this->customerRole);
@@ -697,6 +723,27 @@ final class CustomerSignupRealEngineTest extends TestCase
             new Request('GET', '/api/public/signup/workspaces/' . $slug, ['Host' => $host, ClientIp::HEADER => '203.0.113.7'], ''),
             ['workspace' => $slug]
         );
+    }
+
+    /**
+     * #2174: the join page chooses its words from the FIRST key of `details`,
+     * so that key is still `email` or `display_name`; the per-field problems
+     * come after it.
+     */
+    public function testFieldProblemsKeepTheKeyTheJoinPageReadsFirst(): void
+    {
+        $this->saveSettings(self::TENANT_A, self::ADMIN_A, ['mode' => 'open', 'role_id' => $this->customerRole, 'allowed_domains' => ['uni.example']]);
+
+        $bad = json_decode((string) $this->request('tenant-a', 'not-an-email', '')->getBody(), true);
+        self::assertSame('Enter a valid email address', $bad['error']);
+        self::assertSame('email', array_key_first($bad['details']));
+        self::assertSame(['email' => 'invalid_email', 'display_name' => 'required'], $bad['details']['field_codes']);
+
+        $domain = json_decode((string) $this->request('tenant-a', 'outsider@gmail.example', 'Outsider')->getBody(), true);
+        self::assertSame('domain', $domain['details']['email']);
+        self::assertSame('email', array_key_first($domain['details']));
+        self::assertSame(['email' => 'not_allowed'], $domain['details']['field_codes']);
+        self::assertNotSame('', $domain['details']['fields_ar']['email']);
     }
 
     private function request(string $slug, string $email, string $name = 'Someone', string $host = 'app.test'): Response

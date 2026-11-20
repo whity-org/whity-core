@@ -51,6 +51,16 @@ final class RateLimits
         return RateLimitRule::keyed('email_verification.address', 20, self::HOUR);
     }
 
+    /**
+     * Confirming an email address with its link, per client address (#2190).
+     * Each failed try writes an audit row, so the global limit alone let one
+     * address add millions of rows a day.
+     */
+    public static function emailVerificationConfirmPerAddress(): RateLimitRule
+    {
+        return RateLimitRule::keyed('email_verification.confirm_address', 30, self::HOUR);
+    }
+
     /** Sending one of my own email addresses its verification link again. */
     public static function meEmailsResend(): RateLimitRule
     {
@@ -79,6 +89,12 @@ final class RateLimits
     public static function twoFactorRecoveryPerAddress(): RateLimitRule
     {
         return RateLimitRule::keyed('two_factor_recovery.address', 20, self::HOUR);
+    }
+
+    /** Confirming a two-step recovery request with its link, per client address (#2190). */
+    public static function twoFactorRecoveryConfirmPerAddress(): RateLimitRule
+    {
+        return RateLimitRule::keyed('two_factor_recovery.confirm_address', 30, self::HOUR);
     }
 
     /** Opening or accepting an invitation link, per address. */

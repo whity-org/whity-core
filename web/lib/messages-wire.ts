@@ -94,6 +94,8 @@ export interface PublicChatInfo {
   greeting: string | null;
   max_length: number;
   bot_check: { provider: string; site_key: string } | null;
+  /** False while no new chat can start until an admin sets up the bot check (WHIT-1298). */
+  bot_check_ready?: boolean;
   /** The workspace's logo and colour for the chat box (WHIT-1014); null keeps the host's. */
   brand?: WorkspaceBrand | null;
 }

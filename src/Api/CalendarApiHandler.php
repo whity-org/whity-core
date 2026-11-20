@@ -96,7 +96,13 @@ final class CalendarApiHandler
     public function disableFeed(Request $request, array $params): Response
     {
         return $this->run($request, 'feed', function (int $tenantId, int $actor) use ($params): Response {
-            $profileId = $this->staffOr404($tenantId, (int) $params['profileId']);
+            // WHIT-1285 (#2215): someone who manages the calendar can turn off
+            // the feed of a person who has left too; the feed itself already
+            // stops answering once they are not active staff.
+            $profileId = (int) $params['profileId'];
+            if ($profileId <= 0) {
+                throw new CalendarRejectedException('Staff member not found', 404);
+            }
             $this->assertOwnOrManage($tenantId, $actor, $profileId);
             $this->feed?->revoke($tenantId, $profileId);
 
@@ -255,10 +261,13 @@ final class CalendarApiHandler
 
     public function listExceptions(Request $request): Response
     {
-        return $this->run($request, 'exceptions', function (int $tenantId) use ($request): Response {
+        return $this->run($request, 'exceptions', function (int $tenantId, int $actor) use ($request): Response {
             [$from, $to] = $this->range($request);
             $profileId = $this->optionalInt($request, 'profile_id');
             $rows = $this->calendar->exceptions($tenantId, $profileId, $from, $to);
+            // WHIT-1285 (#2237): why someone is away is theirs, and for the
+            // people who manage the calendar; colleagues see only that they are.
+            $manages = $actor > 0 && $this->roleChecker->hasPermissionForProfile($actor, CorePermissions::CALENDAR_MANAGE, $tenantId);
 
             return Response::json(['data' => array_map(static fn (array $r): array => [
                 'id' => $r['id'],
@@ -266,7 +275,7 @@ final class CalendarApiHandler
                 'kind' => $r['kind'],
                 'starts_at' => Interval::toApi($r['interval']->start),
                 'ends_at' => Interval::toApi($r['interval']->end),
-                'note' => $r['note'],
+                'note' => $r['kind'] === 'off' && !$manages && (int) $r['profile_id'] !== $actor ? '' : $r['note'],
             ], $rows)]);
         });
     }
@@ -276,11 +285,11 @@ final class CalendarApiHandler
         return $this->run($request, 'exceptions', function (int $tenantId, int $actor) use ($request): Response {
             $body = JsonBody::parsed($request);
             $profileId = $this->staffOr404($tenantId, is_int($body['profile_id'] ?? null) ? $body['profile_id'] : $actor);
-            $this->assertOwnOrManage($tenantId, $actor, $profileId);
             $kind = $body['kind'] ?? 'off';
             if ($kind !== 'off' && $kind !== 'open') {
                 return Response::error("kind must be 'off' or 'open'", 422);
             }
+            $this->assertMayChangeTimeOff($tenantId, $actor, $profileId, $kind);
             $when = $this->interval($body);
             $note = is_string($body['note'] ?? null) ? mb_substr(trim($body['note']), 0, 500) : '';
             $this->calendar->ensureStaff($tenantId, $profileId);
@@ -298,7 +307,7 @@ final class CalendarApiHandler
     {
         return $this->run($request, 'exceptions', function (int $tenantId, int $actor) use ($params): Response {
             $row = $this->calendar->findException($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Time off');
-            $this->assertOwnOrManage($tenantId, $actor, $row['profile_id']);
+            $this->assertMayChangeTimeOff($tenantId, $actor, $row['profile_id'], $row['kind']);
             $this->calendar->deleteException($tenantId, $row['id']);
 
             return Response::json(['data' => ['id' => $row['id'], 'deleted' => true]]);
@@ -660,14 +669,20 @@ final class CalendarApiHandler
 
     public function listEvents(Request $request): Response
     {
-        return $this->run($request, 'events', function (int $tenantId) use ($request): Response {
+        return $this->run($request, 'events', function (int $tenantId, int $actor) use ($request): Response {
             [$from, $to] = $this->range($request);
             $profileId = $this->optionalInt($request, 'profile_id');
 
             // Time off and extra hours have their own route; meetings arrive with T4.
-            return Response::json(['data' => $this->calendar->listEvents($tenantId, $profileId !== null ? [$profileId] : [], $from, $to, [
+            $events = $this->calendar->listEvents($tenantId, $profileId !== null ? [$profileId] : [], $from, $to, [
                 CalendarRepository::KIND_EVENT, CalendarRepository::KIND_EXTERNAL, CalendarRepository::KIND_MEETING,
-            ])]);
+            ]);
+
+            // WHIT-1285 (#2237): the same privacy as the grid (CalendarItems).
+            return Response::json(['data' => array_map(
+                static fn (array $e): array => CalendarItems::redactedFor($e, $actor),
+                $events,
+            )]);
         });
     }
 
@@ -881,6 +896,25 @@ final class CalendarApiHandler
         $user = $request->user;
 
         return is_object($user) && ($user->principal_kind ?? null) === McpPrincipal::KIND_AGENT;
+    }
+
+    /**
+     * Who may add or remove time off (#2256). The routes take no permission of
+     * their own, so this is the whole check:
+     *  - your OWN time off: any member of staff, with no grant from an admin;
+     *  - your own extra open hours (`open`), which make you bookable: `calendar:write`;
+     *  - anybody else's: `calendar:write` and `calendar:manage`, as before.
+     */
+    private function assertMayChangeTimeOff(int $tenantId, int $actor, int $profileId, string $kind): void
+    {
+        $write = $actor > 0 && $this->roleChecker->hasPermissionForProfile($actor, CorePermissions::CALENDAR_WRITE, $tenantId);
+        if ($actor > 0 && $actor === $profileId && ($write || ($kind === 'off' && $this->roleChecker->isActiveStaff($actor, $tenantId)))) {
+            return;
+        }
+        if (!$write) {
+            throw new CalendarRejectedException('You need permission to change the calendar.', 403, ['required' => CorePermissions::CALENDAR_WRITE]);
+        }
+        $this->assertOwnOrManage($tenantId, $actor, $profileId);
     }
 
     private function assertOwnOrManage(int $tenantId, int $actor, int $profileId): void

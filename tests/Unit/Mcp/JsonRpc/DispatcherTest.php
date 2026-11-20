@@ -340,6 +340,59 @@ final class DispatcherTest extends TestCase
         self::assertNull(TenantContext::getTenantId(), 'TenantContext must be reset after rate-limit exception');
     }
 
+    // ── Batches are capped and charged per item (#2260) ──────────────────────
+
+    /** A batch of $n pings, as a 2025-03-26 client sends it. */
+    private static function pings(int $n): string
+    {
+        return (string) json_encode(array_map(static fn (int $i): array => ['jsonrpc' => '2.0', 'method' => 'ping', 'id' => $i], range(1, $n)));
+    }
+
+    public function testABatchOverTheCapIsRefusedAndRunsNothing(): void
+    {
+        $principal = new McpPrincipal(7, 7, 3, 'user', ['tools:call'], 'jti-batch');
+        $tokenValidator = $this->createMock(TokenValidator::class);
+        $tokenValidator->method('validateBearerForMcp')->willReturn($principal);
+        $ran = 0;
+        $handler = new class ($ran) implements MethodHandler {
+            public function __construct(private int &$ran)
+            {
+            }
+
+            public function __invoke(?array $params, ?string $bearerToken): mixed
+            {
+                $this->ran++;
+                return [];
+            }
+        };
+        $dispatcher = new Dispatcher(['ping' => $handler], $tokenValidator);
+
+        $body = json_decode($dispatcher->handle(self::pings(Dispatcher::MAX_BATCH_SIZE + 1), 'bearer-tok'), true);
+
+        self::assertSame(400, $dispatcher->httpStatus());
+        self::assertSame(ErrorCode::INVALID_REQUEST, $body['error']['code'] ?? null);
+        self::assertSame(0, $ran);
+
+        $answers = json_decode($dispatcher->handle(self::pings(Dispatcher::MAX_BATCH_SIZE), 'bearer-tok'), true);
+        self::assertCount(Dispatcher::MAX_BATCH_SIZE, $answers, 'a batch at the cap still runs');
+    }
+
+    public function testEveryRequestInABatchCountsAgainstTheRateLimit(): void
+    {
+        $principal = new McpPrincipal(7, 7, 3, 'user', ['tools:call'], 'jti-batch-rl');
+        $tokenValidator = $this->createMock(TokenValidator::class);
+        $tokenValidator->method('validateBearerForMcp')->willReturn($principal);
+        $store = new ArraySharedStore();
+        $dispatcher = new Dispatcher(['ping' => new PingHandler()], $tokenValidator, new McpRateLimiter($store, tenantLimit: 1000, principalLimit: 10));
+
+        $dispatcher->handle(self::pings(4), 'bearer-tok');
+        self::assertSame(4, $store->increment('mcp:rate:principal:7', McpRateLimiter::WINDOW_SECONDS) - 1, 'four calls, four hits');
+
+        // 5 used; a batch of 6 would make 11 of 10. Refused whole: none of it runs.
+        $this->expectException(McpRateLimitException::class);
+        $dispatcher->handle(self::pings(6), 'bearer-tok');
+    }
+
     // ── Per-tenant MCP opt-in (WC-149b2fc9) ─────────────────────────────────
 
     public function testHandle_throwsMcpFeatureDisabledException_whenTenantMcpDisabled(): void

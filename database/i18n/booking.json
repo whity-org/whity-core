@@ -89,6 +89,8 @@
         "more.then": "Then",
         "more.total": "In all: {time}",
         "noServices": "Nothing can be booked online here yet. Contact {workspace} to make a booking.",
+        "notReady.description": "They’re still setting up this page. Try again later, or contact them to book.",
+        "notReady.title": "{name} isn’t taking bookings here yet",
         "person.anyone": "Anyone who is free",
         "person.each": "A different person for each service",
         "price.free": "No charge",

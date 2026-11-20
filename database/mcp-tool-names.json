@@ -897,6 +897,10 @@
     "en": "List all plugins",
     "ar": "عرض الإضافات"
   },
+  "get_api_plugins_name_core_grants": {
+    "en": "See the core permissions a plugin asks for its roles",
+    "ar": "عرض صلاحيات Whity التي تطلبها إضافة لأدوارها"
+  },
   "get_api_plugins_store_allowed": {
     "en": "List the trusted plugin stores",
     "ar": "عرض متاجر الإضافات الموثوقة"
@@ -1895,6 +1899,14 @@
   "post_api_plugins_install_from_store": {
     "en": "Download a plugin from the store, left switched off",
     "ar": "تنزيل إضافة من المتجر دون تفعيلها"
+  },
+  "post_api_plugins_name_core_grants_role_approve": {
+    "en": "Approve the core permissions a plugin asks for one role",
+    "ar": "الموافقة على صلاحيات Whity التي تطلبها إضافة لدور"
+  },
+  "post_api_plugins_name_core_grants_role_revoke": {
+    "en": "Take back the core permissions approved for a plugin's role",
+    "ar": "سحب صلاحيات Whity الممنوحة لدور إضافة"
   },
   "post_api_plugins_name_disable": {
     "ar": "تعطيل إضافة"

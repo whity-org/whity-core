@@ -747,6 +747,73 @@ final class DataTypesApiHandlerRealEngineTest extends TestCase
         return $db;
     }
 
+    // ==================== #2253: the MCP credential narrows these too ====================
+
+    public function testAnAgentWhoseReadGrantIsOffDoesNotSeeTheType(): void
+    {
+        $agent = $this->agentRequest(['grant:acme:read=off']);
+
+        self::assertSame([], $this->data($this->handler->list($agent)));
+        $show = $this->handler->show($agent, ['type' => 'acme:record', 'id' => (string) $this->seedRecord(self::TENANT_A, 'active')]);
+        self::assertSame(404, $show->getStatusCode(), 'unknown, as for a person who cannot read it');
+    }
+
+    public function testAnAgentWhoseWriteGrantIsOffCannotTakeTheAction(): void
+    {
+        $recordId = $this->seedRecord(self::TENANT_A, 'active');
+        $agent    = $this->agentRequest(['grant:acme:manage=off']);
+
+        $entry = $this->onlyEntry($this->handler->list($agent));
+        self::assertNotContains('trash', $entry['actions']);
+        self::assertContains('retire', $entry['actions']);
+
+        $response = $this->handler->trash($agent, ['type' => 'acme:record', 'id' => (string) $recordId]);
+        self::assertSame(403, $response->getStatusCode(), $response->getBody());
+        self::assertSame('active', $this->statusOf($recordId), 'nothing moved');
+
+        $bulk = $this->handler->bulk($this->withBody($agent, ['action' => 'trash', 'ids' => [(string) $recordId]]), ['type' => 'acme:record']);
+        self::assertSame(403, $bulk->getStatusCode(), $bulk->getBody());
+        self::assertSame('active', $this->statusOf($recordId));
+    }
+
+    public function testAnApprovedAgentWriteStillRuns(): void
+    {
+        // Ask first is the default: the call reached the handler only after its
+        // person approved it, so the handler lets it run.
+        $recordId = $this->seedRecord(self::TENANT_A, 'active');
+
+        $response = $this->handler->trash($this->agentRequest([]), ['type' => 'acme:record', 'id' => (string) $recordId]);
+
+        self::assertSame(200, $response->getStatusCode(), $response->getBody());
+        self::assertSame('trashed', $this->statusOf($recordId));
+    }
+
+    public function testATokenNarrowedToOtherPermissionsDoesNotSeeTheType(): void
+    {
+        $request = $this->request(self::MANAGER_A, self::TENANT_A);
+        $request->user = (object) ((array) $request->user + ['type' => 'mcp', 'principal_kind' => 'user', 'scope' => ['tools:call', 'users:read']]);
+
+        self::assertSame([], $this->data($this->handler->list($request)));
+    }
+
+    /** @param list<string> $scope */
+    private function agentRequest(array $scope): Request
+    {
+        $request = $this->request(self::MANAGER_A, self::TENANT_A);
+        $request->user = (object) ((array) $request->user + ['type' => 'mcp', 'principal_kind' => 'ai-agent', 'scope' => $scope]);
+
+        return $request;
+    }
+
+    /** @param array<string, mixed> $body */
+    private function withBody(Request $request, array $body): Request
+    {
+        $with = new Request('POST', '/api/data-types/acme:record/bulk', ['content-type' => 'application/json'], (string) json_encode($body));
+        $with->user = $request->user;
+
+        return $with;
+    }
+
     private function request(int $profileId, int $tenantId): Request
     {
         TenantContext::reset();

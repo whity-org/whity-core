@@ -20,6 +20,7 @@ import { NoAccess } from '@/components/no-access';
 import { UserText } from '@/components/ui/user-text';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { Input } from '@/components/ui/input';
+import { NobodyCanApprove } from '@/components/inventory/nobody-can-approve';
 import { OperationStatus } from '@/components/inventory/operation-status';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
@@ -117,10 +118,12 @@ export default function InventoryCountPage({ params }: { params: Promise<{ id: s
     try {
       const done = await inventoryApi.finishCount(count.id);
       toast.addToast(
-        done.status === 'waiting_approval'
-          ? t('inventory.count.waiting', 'The differences are waiting for approval. Stock changes once they are approved.')
-          : t('inventory.count.done', 'Count finished. The stock now matches what you counted.'),
-        'success'
+        done.nobody_can_approve
+          ? t('inventory.approval.nobodyToast', 'Saved, but nobody can approve it yet, so the stock hasn’t changed. Someone who runs the inventory settings has been told.')
+          : done.status === 'waiting_approval'
+            ? t('inventory.count.waiting', 'The differences are waiting for approval. Stock changes once they are approved.')
+            : t('inventory.count.done', 'Count finished. The stock now matches what you counted.'),
+        done.nobody_can_approve ? 'warning' : 'success'
       );
       refetch();
     } catch (e) {
@@ -197,7 +200,25 @@ export default function InventoryCountPage({ params }: { params: Promise<{ id: s
         }
       />
 
-      {count.status === 'waiting_approval' && (
+      {count.nobody_can_approve && (
+        <NobodyCanApprove
+          onSendAgain={async () => {
+            try {
+              const sent = await inventoryApi.finishCount(count.id);
+              toast.addToast(
+                sent.nobody_can_approve
+                  ? t('inventory.approval.stillNobody', 'Still nobody can approve it, so it keeps waiting.')
+                  : t('inventory.count.waiting', 'The differences are waiting for approval. Stock changes once they are approved.'),
+                sent.nobody_can_approve ? 'warning' : 'success'
+              );
+            } catch (e) {
+              setProblem(inventoryErrorText(e));
+            }
+            refetch();
+          }}
+        />
+      )}
+      {count.status === 'waiting_approval' && !count.nobody_can_approve && (
         <Alert>
           <AlertDescription>
             {t('inventory.count.waitingNotice', 'Some differences are worth more than the approval value, so they wait in Approvals. The stock changes once they are approved.')}

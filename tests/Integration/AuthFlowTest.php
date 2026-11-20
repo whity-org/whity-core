@@ -256,13 +256,13 @@ class AuthFlowTest extends TestCase
 
     private function mintRefresh(int $epoch): string
     {
-        return $this->jwtParser->create([
+        return \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $this->jwtParser->create([
             'profile_id' => self::TEST_USER_ID,
             'active_tenant_id' => self::TEST_TENANT_ID,
             'email' => self::TEST_USER_EMAIL,
             'role' => self::TEST_ROLE_NAME,
             'token_epoch' => $epoch,
-        ], 604800, 'refresh');
+        ], 604800, 'refresh'));
     }
 
     private function jtiOf(string $token): string

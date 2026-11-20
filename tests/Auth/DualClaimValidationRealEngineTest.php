@@ -148,10 +148,10 @@ final class DualClaimValidationRealEngineTest extends TestCase
         );
     }
 
-    public function testSystemTenantZeroActiveTenantIsUnscopedByConvention(): void
+    public function testSystemTenantZeroNeedsAnActiveMembershipLikeAnyTenant(): void
     {
-        // No membership rows at all: active_tenant_id = 0 is the system tenant
-        // and carries cross-tenant authority per the platform id-0 convention.
+        // #2229: active_tenant_id = 0 carries cross-tenant authority, so it
+        // needs a live tenant-0 membership. It used to need none.
         $claims = [
             'profile_id'       => $this->profileId,
             'active_tenant_id' => 0,
@@ -159,13 +159,15 @@ final class DualClaimValidationRealEngineTest extends TestCase
             'role'             => 'admin',
             'token_epoch'      => 0,
         ];
-
         $_COOKIE['access_token'] = $this->mint($claims);
 
-        self::assertIsArray(
-            $this->validator->validateAccessToken(),
-            'active_tenant_id = 0 (system tenant) must not require a membership row.'
-        );
+        self::assertNull($this->validator->validateAccessToken(), 'no tenant-0 membership: refused');
+
+        $id = $this->memberships->insert($this->profileId, 0, 1);
+        self::assertIsArray($this->validator->validateAccessToken(), 'an active tenant-0 membership: accepted');
+
+        $this->pdo->prepare("UPDATE memberships SET status = 'suspended' WHERE id = ?")->execute([$id]);
+        self::assertNull($this->validator->validateAccessToken(), 'suspended in tenant 0: refused at once');
     }
 
     public function testNewClaimsRefreshTokenWithoutMembershipIsRejected(): void

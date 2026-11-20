@@ -27,7 +27,7 @@ final class HostKernel
 {
     public const BOOT_FLAG = 'WHITY_HOST_KERNEL_BOOT';
 
-    /** @var array{db: Database, hookManager: HookManager, pluginLoader: PluginLoader}|null */
+    /** @var array{db: Database, hookManager: HookManager, pluginLoader: PluginLoader, resetRequest: \Closure(): void}|null */
     private static ?array $booted = null;
 
     private function __construct()
@@ -37,7 +37,7 @@ final class HostKernel
     /**
      * Run the web kernel's wiring in this process, once.
      *
-     * @return array{db: Database, hookManager: HookManager, pluginLoader: PluginLoader}
+     * @return array{db: Database, hookManager: HookManager, pluginLoader: PluginLoader, resetRequest: \Closure(): void}
      */
     public static function boot(): array
     {
@@ -67,6 +67,10 @@ final class HostKernel
             'db' => $kernel['db'],
             'hookManager' => $kernel['hookManager'],
             'pluginLoader' => $kernel['pluginLoader'],
+            'resetRequest' => ($kernel['resetRequest'] ?? null) instanceof \Closure
+                ? $kernel['resetRequest']
+                : static function (): void {
+                },
         ];
     }
 

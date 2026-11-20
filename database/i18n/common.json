@@ -24,6 +24,8 @@
         "chat.mine.description": "Write to {name}. Replies appear here.",
         "chat.mine.title": "Messages",
         "chat.name": "Your name (optional)",
+        "chat.notReady": "{name} isn’t taking chats here yet",
+        "chat.notReadyNext": "They’re still setting up this page. Come back later, or reach them another way.",
         "chat.placeholder": "Write a message…",
         "chat.retry": "Try again",
         "chat.send": "Send",

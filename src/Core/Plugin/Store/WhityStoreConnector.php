@@ -172,18 +172,22 @@ final class WhityStoreConnector
      */
     public function complete(string $code, string $state, ?int $actor): array
     {
+        // WHIT-1304 (#2222): checked BEFORE the sign-in in progress is used up,
+        // so a stray or forged callback can't cancel someone else's.
         $pending = $this->pending();
-        $this->globals->delete(self::PENDING_KEY);
-
-        if ($pending === null
-            || !hash_equals((string) $pending['state'], hash('sha256', $state))
-            || (int) $pending['expires_at'] < ($this->clock)()
-        ) {
+        if ($pending === null || !hash_equals((string) $pending['state'], hash('sha256', $state))) {
             throw new WhityStoreConnectException('This sign-in has expired or was not started here. Connect again.', 422);
         }
-        if ($pending['actor'] !== null && $actor !== null && (int) $pending['actor'] !== $actor) {
+        if ((int) $pending['expires_at'] < ($this->clock)()) {
+            $this->globals->delete(self::PENDING_KEY);
+            throw new WhityStoreConnectException('This sign-in has expired or was not started here. Connect again.', 422);
+        }
+        // Started by a person: only that person finishes it, never a caller with no person behind it.
+        if ($pending['actor'] !== null && ($actor === null || (int) $pending['actor'] !== $actor)) {
             throw new WhityStoreConnectException('Finish connecting as the person who started it.', 403);
         }
+        // The state matched: it is used once, whatever Taskaat or Whity ID answers next.
+        $this->globals->delete(self::PENDING_KEY);
 
         $response = $this->call($this->postForm, $pending['endpoints']['token_endpoint'], [
             'grant_type' => 'authorization_code',

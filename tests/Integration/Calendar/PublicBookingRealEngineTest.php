@@ -75,6 +75,8 @@ final class PublicBookingRealEngineTest extends TestCase
         }
 
         $globals = new GlobalSettingsRepository($this->pdo);
+        // No bot provider here, so booking needs "allow without a bot check" (WHIT-1298).
+        $globals->set(BotCheck::SETTING_ALLOW_NONE, '1');
         $this->settings = new SettingsService($globals, new TenantSettingsRepository($this->pdo));
         foreach ([1, 2] as $tenant) {
             $this->settings->setTenant($tenant, 'timezone', 'Asia/Amman');
@@ -263,6 +265,26 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertSame(0, (int) $this->scalar('SELECT COUNT(*) FROM calendar_bookings'));
     }
 
+    /**
+     * #2174: the booking page marks the field from `details.field`, which stays;
+     * every field's problem follows it, and nothing is booked.
+     */
+    public function testFieldProblemsKeepTheFieldTheBookingPageReads(): void
+    {
+        $response = $this->handler->book(
+            self::request('POST', '/x', $this->bookingBody(['email' => 'not-an-email', 'phone' => 'call me'])),
+            ['workspace' => 'example-bakery']
+        );
+
+        self::assertSame(422, $response->getStatusCode());
+        $body = json_decode((string) $response->getBody(), true);
+        self::assertSame('Your email address does not look right', $body['error']);
+        self::assertSame('email', $body['details']['field']);
+        self::assertSame('field', array_key_first($body['details']));
+        self::assertSame(['email' => 'invalid_email', 'phone' => 'invalid_phone'], $body['details']['field_codes']);
+        self::assertSame(0, (int) $this->scalar('SELECT COUNT(*) FROM calendar_bookings'));
+    }
+
     public function testOneAddressHoldsAtMostThreeOpenBookingsAndOneIpTenAttempts(): void
     {
         foreach (['10:00', '11:00', '12:00'] as $time) {
@@ -306,6 +328,29 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertStringContainsString('Cancelled: Cake tasting', $this->sent[count($this->sent) - 1]['subject']);
     }
 
+    public function testMovingOneServiceShowsTheCustomersOwnTimeAsFree(): void
+    {
+        // #2207: a single-service booking's own time no longer blocks its own move.
+        $made = self::data($this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']))['data'];
+        $token = (string) $made['manage_token'];
+
+        $_GET = ['service_id' => (string) $this->cake, 'from' => '2026-11-16T10:00:00+03:00', 'to' => '2026-11-16T11:00:00+03:00'];
+        try {
+            $others = self::data($this->handler->slots(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data'];
+        } finally {
+            $_GET = [];
+        }
+        self::assertSame(['2026-11-16T07:30:00Z'], array_column($others, 'starts_at'), 'anyone else still sees 10:00 taken');
+
+        $_GET = ['from' => '2026-11-16T10:00:00+03:00', 'to' => '2026-11-16T11:00:00+03:00'];
+        try {
+            $free = self::data($this->handler->manageSlots(self::request('GET', '/x', [], '198.51.100.1'), ['token' => $token]))['data'];
+        } finally {
+            $_GET = [];
+        }
+        self::assertSame(['2026-11-16T07:00:00Z', '2026-11-16T07:30:00Z'], array_column($free, 'starts_at'), 'the customer sees their own time as free');
+    }
+
     public function testTheFeedListsBookingsAndAReplacedAddressStopsWorking(): void
     {
         $this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']);
@@ -317,6 +362,64 @@ final class PublicBookingRealEngineTest extends TestCase
         $second = $this->feed->issue(1, 11);
         self::assertSame(404, $this->handler->feed(self::request('GET', '/x'), ['token' => $first . '.ics'])->getStatusCode());
         self::assertSame(200, $this->handler->feed(self::request('GET', '/x'), ['token' => $second . '.ics'])->getStatusCode());
+    }
+
+    /**
+     * WHIT-1286 (#2203): a chosen bot check missing its site key or secret is
+     * never offered with an empty key, and booking refuses rather than skips.
+     */
+    public function testAHalfSetUpBotCheckRefusesBookingsAndShowsNoEmptyKey(): void
+    {
+        $globals = new GlobalSettingsRepository($this->pdo);
+        $globals->set(BotCheck::SETTING_PROVIDER, 'turnstile');
+
+        $page = self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data'];
+        self::assertNull($page['bot_check']);
+        $booked = $this->handler->book(self::request('POST', '/x', $this->bookingBody() + ['bot_token' => 'anything']), ['workspace' => 'example-bakery']);
+        self::assertSame(503, $booked->getStatusCode(), $booked->getBody());
+
+        $globals->set(BotCheck::SETTING_SITE_KEY, '0x4AAA-site');
+        self::assertNull(self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data']['bot_check'], 'a site key but no secret');
+        self::assertSame(503, $this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery'])->getStatusCode());
+    }
+
+    /**
+     * WHIT-1298 (#2203, owner 2026-11-19): no provider and "allow without a
+     * bot check" off refuses booking until an admin sets one or the other, and
+     * the page says so up front.
+     */
+    public function testNoBotCheckAndNotAllowedWithoutOneRefusesBookings(): void
+    {
+        $globals = new GlobalSettingsRepository($this->pdo);
+        $page = fn (): array => self::data($this->handler->page(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data'];
+        self::assertTrue($page()['bot_check_ready']);
+
+        $globals->set(BotCheck::SETTING_ALLOW_NONE, '0');
+        self::assertFalse($page()['bot_check_ready']);
+        self::assertNull($page()['bot_check']);
+        $booked = $this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']);
+        self::assertSame(503, $booked->getStatusCode(), $booked->getBody());
+        self::assertSame([], $this->sent, 'nothing booked, nothing sent');
+
+        $globals->set(BotCheck::SETTING_ALLOW_NONE, '1');
+        self::assertSame(201, $this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery'])->getStatusCode());
+    }
+
+    /**
+     * WHIT-1285 (#2215): someone removed or suspended stops getting the feed,
+     * and coming back doesn't bring the old address back.
+     */
+    public function testTheFeedStopsForGoodWhenThePersonIsNoLongerActiveStaff(): void
+    {
+        $this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']);
+        $token = $this->feed->issue(1, 11);
+        self::assertSame(200, $this->handler->feed(self::request('GET', '/x'), ['token' => $token . '.ics'])->getStatusCode());
+
+        $this->pdo->exec("UPDATE memberships SET status = 'suspended' WHERE tenant_id = 1 AND profile_id = 11");
+        self::assertSame(404, $this->handler->feed(self::request('GET', '/x'), ['token' => $token . '.ics'])->getStatusCode());
+
+        $this->pdo->exec("UPDATE memberships SET status = 'active' WHERE tenant_id = 1 AND profile_id = 11");
+        self::assertSame(404, $this->handler->feed(self::request('GET', '/x'), ['token' => $token . '.ics'])->getStatusCode(), 'the old address is forgotten');
     }
 
     public function testTheConfirmationCarriesTheBookingAsAnIcsAttachment(): void

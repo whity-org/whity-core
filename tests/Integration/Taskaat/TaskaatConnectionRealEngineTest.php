@@ -189,6 +189,31 @@ final class TaskaatConnectionRealEngineTest extends TestCase
         }
     }
 
+    /**
+     * WHIT-1304 (#2222): a callback with the wrong state, or from someone
+     * else, doesn't cancel the sign-in in progress; the right one still
+     * finishes it, once.
+     */
+    public function testABadCallbackDoesNotCancelTheSignInInProgress(): void
+    {
+        $connection = $this->connection();
+        $query = $this->start($connection, self::TENANT, 7);
+
+        foreach ([['not-the-state', 7, 422], [$query['state'], 8, 403], [$query['state'], null, 403]] as [$state, $actor, $status]) {
+            try {
+                $connection->complete(self::TENANT, 'the-code', $state, $actor);
+                self::fail('a bad callback must be refused');
+            } catch (TaskaatException $e) {
+                self::assertSame($status, $e->status);
+            }
+        }
+
+        $this->tokenReplies[] = ['access_token' => 'at_1', 'refresh_token' => 'rt_1', 'expires_in' => 30 * 86400];
+        self::assertTrue($connection->complete(self::TENANT, 'the-code', $query['state'], 7)['connected']);
+        $this->expectException(TaskaatException::class);
+        $connection->complete(self::TENANT, 'the-code', $query['state'], 7);
+    }
+
     public function testASignInExpiresAfterTenMinutes(): void
     {
         $connection = $this->connection();

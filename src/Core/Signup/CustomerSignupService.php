@@ -8,6 +8,8 @@ use PDO;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\CustomerSafeRole;
 use Whity\Core\Identity\MembershipRepository;
+use Whity\Core\Identity\ProfileProvisioner;
+use Whity\Core\Identity\UnconfirmedEmailClaimException;
 use Whity\Core\Security\PublicToken;
 
 /**
@@ -235,6 +237,13 @@ final class CustomerSignupService
                 return $this->finish($ownTx, ['result' => self::CONFIRM_PASSWORD_REQUIRED, 'tenant_id' => $tenantId, 'profile_id' => null]);
             }
             if ($profileId === null) {
+                try {
+                    // #2245: the link proved this person holds the address; an
+                    // unconfirmed claim on it by another account is released.
+                    (new ProfileProvisioner($this->db))->releaseUnconfirmedClaim($email);
+                } catch (UnconfirmedEmailClaimException) {
+                    return $this->finish($ownTx, $none);
+                }
                 $profileId = $this->createProfile($email, (string) $row['display_name'], (string) $passwordHash);
             }
 
@@ -682,14 +691,13 @@ final class CustomerSignupService
         return $profileId;
     }
 
+    /**
+     * The profile owning an address through a CONFIRMED row, or null (#2245).
+     * An unconfirmed row is a claim anyone can make, never an owner.
+     */
     private function profileIdForEmail(string $email): ?int
     {
-        // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2); UNIQUE(email)
-        $stmt = $this->db->prepare('SELECT profile_id FROM profile_emails WHERE email = :email LIMIT 1');
-        $stmt->execute([':email' => $email]);
-        $id = $stmt->fetchColumn();
-
-        return $id !== false ? (int) $id : null;
+        return (new ProfileProvisioner($this->db))->verifiedOwner($email);
     }
 
     /** @return array{active: bool, invited: bool, suspended: bool} */

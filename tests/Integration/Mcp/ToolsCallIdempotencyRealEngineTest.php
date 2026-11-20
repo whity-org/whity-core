@@ -15,6 +15,7 @@ use Whity\Core\Request;
 use Whity\Core\Router;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Mcp\Auth\AgentScopeGrant;
+use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Mcp\Auth\McpPrincipal;
 use Whity\Mcp\JsonRpc\ErrorCode;
 use Whity\Mcp\JsonRpc\McpException;
@@ -51,6 +52,12 @@ final class ToolsCallIdempotencyRealEngineTest extends TestCase
 
     /** @var array<string, McpPrincipal> */
     private array $principals;
+
+    /** Whether the person behind every caller holds the route's permission. */
+    private bool $holdsPermission = true;
+
+    /** @var AuditLoggerInterface&object{records: list<array<string, mixed>>} */
+    private AuditLoggerInterface $audit;
 
     protected function setUp(): void
     {
@@ -89,20 +96,31 @@ final class ToolsCallIdempotencyRealEngineTest extends TestCase
         ]], [], $router, static fn (string $m): null => null);
 
         $roles = $this->createStub(RoleChecker::class);
-        $roles->method('hasPermissionForProfile')->willReturn(true);
+        $roles->method('hasPermissionForProfile')->willReturnCallback(fn (): bool => $this->holdsPermission);
 
         $this->principals = [
             'rana'       => new McpPrincipal(self::RANA, self::RANA, self::TENANT, 'oauth', ['tools:call'], 'oauth:rana'),
             'omar'       => new McpPrincipal(self::OMAR, self::OMAR, self::TENANT, 'oauth', ['tools:call'], 'oauth:omar'),
             'agent'      => new McpPrincipal(self::RANA, self::RANA, self::TENANT, AgentScopeGrant::AGENT_KIND, ['tools:call'], 'jti-billing-assistant'),
             'agent-omar' => new McpPrincipal(self::OMAR, self::OMAR, self::TENANT, AgentScopeGrant::AGENT_KIND, ['tools:call'], 'jti-billing-assistant'),
+            // Rana again, through a token narrowed to another permission.
+            'rana-narrow' => new McpPrincipal(self::RANA, self::RANA, self::TENANT, 'oauth', ['tools:call', 'users:read'], 'oauth:rana-narrow'),
         ];
         $tokens = $this->createStub(TokenValidator::class);
         $tokens->method('validateBearerForMcp')->willReturnCallback(fn (string $bearer): ?McpPrincipal => $this->principals[$bearer] ?? null);
 
         $this->keys      = new McpCallKeys($this->pdo);
         $this->proposals = new AgentProposalRepository($this->pdo);
-        $this->toolsCall = new ToolsCallHandler($deriver, $router, $roles, $tokens, proposals: $this->proposals, callKeys: $this->keys);
+        $this->audit     = new class implements AuditLoggerInterface {
+            /** @var list<array<string, mixed>> */
+            public array $records = [];
+
+            public function record(string $action, array $options = []): void
+            {
+                $this->records[] = ['action' => $action] + $options;
+            }
+        };
+        $this->toolsCall = new ToolsCallHandler($deriver, $router, $roles, $tokens, auditLogger: $this->audit, proposals: $this->proposals, callKeys: $this->keys);
     }
 
     protected function tearDown(): void
@@ -338,6 +356,44 @@ final class ToolsCallIdempotencyRealEngineTest extends TestCase
         $this->call('rana', ['name' => 'Leave request'], 'key-1');
 
         self::assertCount(2, $this->created);
+    }
+
+    // ── A replay is authorised again (#2263) ───────────────────────────────
+
+    public function testAReplayAfterThePermissionIsRevokedIsRefused(): void
+    {
+        $this->call('rana', ['name' => 'Leave request'], 'key-revoked');
+        $this->holdsPermission = false;
+
+        self::assertSame(ErrorCode::FORBIDDEN, $this->callError('rana', ['name' => 'Leave request'], 'key-revoked')->errorCode);
+        self::assertCount(1, $this->created);
+    }
+
+    public function testANarrowerTokenOfTheSamePersonCannotReplayTheResult(): void
+    {
+        $this->call('rana', ['name' => 'Leave request'], 'key-shared');
+
+        self::assertSame(ErrorCode::FORBIDDEN, $this->callError('rana-narrow', ['name' => 'Leave request'], 'key-shared')->errorCode);
+    }
+
+    public function testAnAgentWhoseGrantIsNowOffCannotReplay(): void
+    {
+        $this->call('agent', ['name' => 'Leave request'], 'key-agent');
+        $agent = $this->principals['agent'];
+        $this->principals['agent'] = new McpPrincipal($agent->profileId, $agent->userId, $agent->tenantId, $agent->principalKind, ['tools:call', 'grant:forms:manage=off'], $agent->jti);
+
+        self::assertSame(ErrorCode::FORBIDDEN, $this->callError('agent', ['name' => 'Leave request'], 'key-agent')->errorCode);
+    }
+
+    public function testAReplayIsAudited(): void
+    {
+        $this->call('rana', ['name' => 'Leave request'], 'key-audit');
+        $this->call('rana', ['name' => 'Leave request'], 'key-audit');
+
+        $calls = array_values(array_filter($this->audit->records, static fn (array $r): bool => $r['action'] === 'mcp.tools.call'));
+        self::assertCount(2, $calls);
+        self::assertArrayNotHasKey('replayed', $calls[0]['metadata']);
+        self::assertTrue($calls[1]['metadata']['replayed']);
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────

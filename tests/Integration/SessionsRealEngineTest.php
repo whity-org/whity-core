@@ -114,6 +114,31 @@ final class SessionsRealEngineTest extends TestCase
         self::assertNull($this->validator()->validateAccessTokenFromBearer($newAccess));
     }
 
+    /**
+     * #2264: signing out with only the access token (what a token-mode client
+     * or a browser without its refresh cookie sends) ends the whole session:
+     * the paired 7-day refresh token stops rotating and the row leaves the list.
+     */
+    public function testSigningOutWithOnlyTheAccessTokenEndsTheRefreshTokenToo(): void
+    {
+        $this->seedProfile('a@example.com');
+        [$access, $refresh] = $this->login('a@example.com');
+
+        $logout = $this->authHandler()->handleLogout(
+            new Request('POST', '/api/auth/logout', ['Authorization' => 'Bearer ' . $access, 'X-Auth-Mode' => 'token'])
+        );
+        self::assertSame(200, $logout->getStatusCode());
+
+        self::assertNull($this->validator()->validateRefreshTokenFromString($refresh), 'the paired refresh token is revoked');
+        $refreshRes = $this->authHandler()->handleRefresh(
+            new Request('POST', '/api/auth/refresh', ['Authorization' => 'Bearer ' . $refresh, 'X-Auth-Mode' => 'token'])
+        );
+        self::assertSame(401, $refreshRes->getStatusCode());
+        $open = $this->pdo->query('SELECT COUNT(*) FROM sessions WHERE revoked_at IS NULL');
+        self::assertNotFalse($open);
+        self::assertSame(0, (int) $open->fetchColumn(), 'the session is no longer listed');
+    }
+
     public function testRevokingASessionRejectsItsLiveAccessToken(): void
     {
         $this->seedProfile('a@example.com');
@@ -171,6 +196,45 @@ final class SessionsRealEngineTest extends TestCase
             $svc->rotate('REFRESH-2', 'ACCESS-3', 'REFRESH-3', '2099-01-01 00:00:00'),
             'rotate() must also still match by the current refresh jti (the refresh flow).'
         );
+    }
+
+    /**
+     * #2218: switching workspace moves the session row with it. It kept the
+     * sign-in workspace, so in the new one the person's own session was not
+     * listed and could not be revoked.
+     */
+    public function testSwitchingWorkspaceMovesTheSessionRow(): void
+    {
+        $this->pdo->exec("INSERT OR IGNORE INTO tenants (id, name, created_at) VALUES (2, 'Tenant B', datetime('now'))");
+        $pid = $this->seedProfile('switch@example.com');
+        $this->pdo->prepare(
+            "INSERT INTO memberships (profile_id, tenant_id, role_id, status, created_at) VALUES (?, 2, 2, 'active', datetime('now'))"
+        )->execute([$pid]);
+        $svc = new SessionService($this->pdo);
+        $access = $this->jwtParser->create([
+            'profile_id' => $pid, 'active_tenant_id' => 1, 'email' => 'switch@example.com', 'role' => 'user', 'token_epoch' => 0,
+        ], 900, 'access');
+        $claims = $this->jwtParser->parse($access);
+        self::assertIsArray($claims);
+        $svc->start($pid, 1, (string) $claims['jti'], 'REFRESH-SW', '2099-01-01 00:00:00', 'UA', '1.1.1.1');
+
+        $res = $this->authHandler()->handleSwitchTenant(new Request(
+            'POST',
+            '/api/auth/switch-tenant',
+            ['Authorization' => 'Bearer ' . $access, 'X-Auth-Mode' => 'token'],
+            (string) json_encode(['tenant_id' => 2])
+        ));
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        $newAccess = json_decode($res->getBody(), true)['access_token'] ?? null;
+        self::assertIsString($newAccess);
+        $newJti = $this->jwtParser->parse($newAccess)['jti'] ?? null;
+        self::assertIsString($newJti);
+
+        $inB = $svc->listForProfile($pid, 2, $newJti);
+        self::assertCount(1, $inB, 'the session is listed in the workspace it now acts in');
+        self::assertTrue($inB[0]['current']);
+        self::assertSame([], $svc->listForProfile($pid, 1, null));
+        self::assertTrue($svc->revokeById($inB[0]['id'], $pid, 2), 'and can be revoked there');
     }
 
     public function testEmailChangeRotatesTheSessionSoRevokeKillsTheNewToken(): void

@@ -127,6 +127,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             // for them to configure. A deployment that had set them keeps the
             // rows in `app_settings`; nothing reads them, and nothing will.
             'payments.mock_enabled',
+            // #2206: the local billing and dunning runs, off by default.
+            'billing.local_runs_enabled',
             // Whether a refunded payment claws its affiliate commission back.
             // GLOBAL-ONLY: the payer is the platform, not the tenant, so a
             // referred customer's own settings must not decide what their
@@ -141,6 +143,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'plugins.store_allowed_hosts',
             'plugins.store_enabled',
             'plugins.mcp_prompts_require_mark',
+            'plugins.store_allow_unsigned',
             'plugins.billing_email_senders',
             'documents.render_enabled',
             'documents.theme',
@@ -358,6 +361,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             // that is on by default can take money before anybody decided it
             // should.
             'payments.mock_enabled' => 'false',
+            'billing.local_runs_enabled' => 'false',
             // Claws back by default. Absorbing a refund means paying commission
             // out of money nobody collected, which is a decision to make
             // deliberately rather than one to inherit.
@@ -371,6 +375,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'plugins.store_allowed_hosts' => 'app.whity.dev',
             'plugins.store_enabled' => 'true',
             'plugins.mcp_prompts_require_mark' => 'false',
+            'plugins.store_allow_unsigned' => 'false',
             'plugins.billing_email_senders' => '',
             // WHIT-1001: on by default; printing also needs a ready render
             // service, so an install without one still prints nothing.
@@ -723,6 +728,8 @@ final class SettingsRegistryCorePinTest extends TestCase
         self::assertTrue(SettingsRegistry::isGlobalOnly('i18n.enabled'));
         // Code plugins are install-wide, so whose prompts are served is too (WHIT-1014).
         self::assertTrue(SettingsRegistry::isGlobalOnly('plugins.mcp_prompts_require_mark'));
+        // WHIT-1308: only the operator installs code plugins, so only the operator lets unsigned ones in.
+        self::assertTrue(SettingsRegistry::isGlobalOnly('plugins.store_allow_unsigned'));
 
         self::assertTrue(SettingsRegistry::isFeatureFlag('mcp.enabled'));
         self::assertFalse(SettingsRegistry::isFeatureFlag('mail.events.welcome_enabled'));

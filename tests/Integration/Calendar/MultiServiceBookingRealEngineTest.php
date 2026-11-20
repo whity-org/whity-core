@@ -400,6 +400,36 @@ final class MultiServiceBookingRealEngineTest extends TestCase
         self::assertSame('confirmed', $this->service->bookingOrFail(1, (int) $held['id'])['status']);
     }
 
+    /**
+     * #2256: on the HTTP routes too, a member of staff puts time off on their
+     * own calendar with no calendar permission; their own extra hours, or
+     * anybody else's time off, still need the calendar permissions.
+     */
+    public function testAMemberOfStaffAddsAndRemovesTheirOwnTimeOffWithNoGrant(): void
+    {
+        TenantContext::setTenantId(1);
+        $roles = $this->createStub(RoleChecker::class);
+        $roles->method('hasPermissionForProfile')->willReturn(false);
+        $roles->method('isActiveStaff')->willReturnCallback(static fn (int $p, int $t): bool => $t === 1 && in_array($p, [11, 12], true));
+        $handler = new CalendarApiHandler($this->calendar, $this->services, $this->bookings, $this->service, $this->settings, $roles);
+        $as = static function (int $profileId, string $method, string $path, array $body = []): Request {
+            $r = new Request($method, $path, [], $body === [] ? '' : (string) json_encode($body));
+            $r->user = (object) ['profile_id' => $profileId];
+
+            return $r;
+        };
+        $when = ['starts_at' => '2026-11-22T00:00:00+03:00', 'ends_at' => '2026-11-23T00:00:00+03:00'];
+
+        $own = $handler->createException($as(11, 'POST', '/api/calendar/time-off', $when + ['kind' => 'off']));
+        self::assertSame(201, $own->getStatusCode(), $own->getBody());
+        $id = (int) self::json($own)['data']['id'];
+
+        self::assertSame(403, $handler->createException($as(11, 'POST', '/x', $when + ['kind' => 'open']))->getStatusCode(), 'own extra hours need calendar:write');
+        self::assertSame(403, $handler->createException($as(11, 'POST', '/x', $when + ['kind' => 'off', 'profile_id' => 12]))->getStatusCode(), 'somebody else needs the calendar permissions');
+        self::assertSame(403, $handler->deleteException($as(12, 'DELETE', '/x'), ['id' => (string) $id])->getStatusCode());
+        self::assertSame(200, $handler->deleteException($as(11, 'DELETE', '/x'), ['id' => (string) $id])->getStatusCode());
+    }
+
     public function testTheStaffApiTakesTheSettingAndServices(): void
     {
         TenantContext::setTenantId(1);

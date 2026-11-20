@@ -56,6 +56,19 @@ final class ScheduleRunCommand implements CliCommand
     private ?\Closure $syncPluginSchedules;
     private bool $pluginSchedulesSynced = false;
     private ?SchedulerHeartbeat $heartbeat;
+    private ?GlobalSettingsRepository $globals;
+
+    /**
+     * #2205: the scheduler's repositories hold the raw PDO, so `Database`'s
+     * own connection lifetime never rotates it; the scheduler recycles once it
+     * has run that long. Null: never, as when a test injects its own deps.
+     */
+    private ?int $connectionMaxAge = null;
+
+    public function recycleAfterConnectionAge(?int $seconds): void
+    {
+        $this->connectionMaxAge = $seconds;
+    }
 
     /**
      * @param \Closure(int): void|null $sleeper Idle sleeper (seconds); default sleep(), a no-op in tests.
@@ -71,20 +84,25 @@ final class ScheduleRunCommand implements CliCommand
         ?\Closure $sleeper = null,
         private ?\Whity\Core\Plugin\PluginRecords $pluginRecords = null,
         ?\Closure $syncPluginSchedules = null,
-        ?SchedulerHeartbeat $heartbeat = null
+        ?SchedulerHeartbeat $heartbeat = null,
+        ?GlobalSettingsRepository $globals = null
     ) {
         $this->logger = $logger ?? new NullLogger();
         if ($schedules === null || $queue === null || $store === null || $jobs === null) {
-            $pdo = Database::connect()->getPdo();
+            $database = Database::connect();
+            $pdo = $database->getPdo();
+            $this->connectionMaxAge = $database->getMaxLifetimeSeconds() > 0 ? $database->getMaxLifetimeSeconds() : null;
             $this->pluginRecords ??= new \Whity\Core\Plugin\PluginRecords($pdo);
             $schedules ??= new ScheduledJobRepository($pdo);
             $syncPluginSchedules ??= $this->pluginScheduleSync($schedules);
             $queue ??= new QueueService(new JobRepository($pdo));
             $store ??= new DatabaseSharedStore($pdo);
             $jobs ??= new JobRepository($pdo);
-            $heartbeat ??= new SchedulerHeartbeat(new GlobalSettingsRepository($pdo));
+            $globals ??= new GlobalSettingsRepository($pdo);
+            $heartbeat ??= new SchedulerHeartbeat($globals);
         }
         $this->heartbeat = $heartbeat;
+        $this->globals = $globals;
         $this->syncPluginSchedules = $syncPluginSchedules;
         $this->schedules = $schedules;
         $this->queue = $queue;
@@ -109,6 +127,8 @@ final class ScheduleRunCommand implements CliCommand
 
         while (true) {
             $this->tick($opts['lockTtl'], $opts['retention']);
+            // #2205: nothing resolved during one tick is trusted in the next.
+            \Whity\Auth\RoleChecker::clearCache();
 
             if ($opts['once']) {
                 break;
@@ -117,6 +137,10 @@ final class ScheduleRunCommand implements CliCommand
 
             if ($opts['maxRuntime'] > 0 && (time() - $startedAt) >= $opts['maxRuntime']) {
                 $this->logger->info('[schedule:run] recycling (max-runtime reached)', ['seconds' => time() - $startedAt]);
+                break;
+            }
+            if ($this->connectionMaxAge !== null && (time() - $startedAt) >= $this->connectionMaxAge) {
+                $this->logger->info('[schedule:run] recycling (database connection lifetime reached)', ['seconds' => time() - $startedAt]);
                 break;
             }
         }
@@ -214,6 +238,22 @@ final class ScheduleRunCommand implements CliCommand
             ]);
         }
 
+        // #2206: core's own subscription billing (once an hour) and dunning
+        // (once a day), only where the operator turned local billing on. Off by
+        // default: workspace subscriptions belong to Whity Pay, and these runs
+        // issue invoices and lock tenants. Both runs are safe to repeat; the
+        // keys keep it to one job per hour and per day.
+        if ($this->localBillingEnabled()) {
+            $this->queue->dispatch(\Whity\Core\Billing\Jobs\RunSubscriptionBillingJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'billing-run-' . $now->format('YmdH'),
+            ]);
+            $this->queue->dispatch(\Whity\Core\Billing\Jobs\RunDunningJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'billing-dunning-' . $now->format('Ymd'),
+            ]);
+        }
+
         // WHIT-1153: cash payments about to end, once an hour; each payment's
         // reminder goes out once.
         if ((int) $now->format('i') === 0) {
@@ -255,6 +295,21 @@ final class ScheduleRunCommand implements CliCommand
         ]);
 
         return $dispatched;
+    }
+
+    /** #2206: a failed read counts as off, and must not fail the tick. */
+    private function localBillingEnabled(): bool
+    {
+        if ($this->globals === null) {
+            return false;
+        }
+        try {
+            return $this->globals->get(\Whity\Core\Settings\SettingsRegistry::BILLING_LOCAL_RUNS_ENABLED) === 'true';
+        } catch (\Throwable $e) {
+            $this->logger->error('[schedule:run] could not read the local billing setting', ['error' => $e->getMessage()]);
+
+            return false;
+        }
     }
 
     /**

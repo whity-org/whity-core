@@ -25,7 +25,7 @@ import { ChatHeader, ChatThread, TooManyMessages, type ChatTransport } from '@/c
 import type { CustomerMessage, PublicChatInfo } from '@/lib/messages-wire';
 import { api } from '@/lib/api/client';
 
-type Phase = 'loading' | 'closed' | 'ready' | 'error';
+type Phase = 'loading' | 'closed' | 'notReady' | 'ready' | 'error';
 
 function storageKey(workspace: string): string {
   return `whity.chat.${workspace}`;
@@ -74,8 +74,11 @@ export default function PublicChatPage({ params }: { params: Promise<{ workspace
           return;
         }
         if (!response.ok) throw new Error('load');
-        setInfo((body as unknown as { data: PublicChatInfo }).data);
-        setPhase('ready');
+        const loaded = (body as unknown as { data: PublicChatInfo }).data;
+        setInfo(loaded);
+        // WHIT-1298 (#2203): no new chat can start until the bot check is set up.
+        // A chat this browser already has carries on.
+        setPhase(loaded.bot_check_ready === false && readToken(workspace) === null ? 'notReady' : 'ready');
       })
       .catch(() => setPhase('error'));
   }, [workspace]);
@@ -153,6 +156,14 @@ export default function PublicChatPage({ params }: { params: Promise<{ workspace
           icon="comment"
           title={t('chat.closed', 'Chat is closed right now')}
           description={t('chat.closedNext', 'Come back later, or reach the team another way.')}
+        />
+      )}
+      {phase === 'notReady' && (
+        <EmptyFirstTime
+          className="bg-card"
+          icon="comment"
+          title={t('chat.notReady', '{name} isn’t taking chats here yet', { name: info?.brand?.name || info?.workspace_name || '' })}
+          description={t('chat.notReadyNext', 'They’re still setting up this page. Come back later, or reach them another way.')}
         />
       )}
       {phase === 'error' && (

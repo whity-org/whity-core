@@ -82,6 +82,33 @@ final class LoginThrottleService
     }
 
     /**
+     * The per-address counter (#2190). Every failed sign-in counts against the
+     * address typed, registered or not, and the address is checked before the
+     * database is read, so a known address and an unknown one hit the limit
+     * after the same number of tries and get the same answer. Keyed by a hash,
+     * so the store never holds the address itself.
+     */
+    public function isEmailThrottled(string $email): bool
+    {
+        return $this->store->count($this->emailKey($email)) >= $this->userThreshold;
+    }
+
+    public function recordEmailFailure(string $email): void
+    {
+        $this->store->increment($this->emailKey($email), $this->windowSeconds);
+    }
+
+    public function clearEmail(string $email): void
+    {
+        $this->store->delete($this->emailKey($email));
+    }
+
+    private function emailKey(string $email): string
+    {
+        return "{$this->scope}:fail:email:" . hash('sha256', $email);
+    }
+
+    /**
      * Evict the per-user counter on successful login so a legitimate user is
      * not locked out after a password-reset or temporary lockout.
      */

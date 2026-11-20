@@ -44,27 +44,20 @@ use Whity\Core\Document\Routing\RoutingRejectedException;
  * is not a profile and cannot hold a recipient row, so the decision has to be
  * carried by a PERSON the route actually reached.
  *
- * {@see candidates()} builds that list, in this order:
+ * THAT PERSON IS THE RECORDER, AND ONLY THE RECORDER (#2247, owner 2026-11-19).
+ * The decision answers an approval only as the person minuting it: their own
+ * open item on the route, or the item of someone who is away and named them to
+ * decide for them (merge map A2, which the engine applies itself and records
+ * as `on_behalf_of`). If the chair holds the open item, the chair records the
+ * decision or signs it themselves, or their away delegate covers it. That is
+ * register MT.1: the secretary approves the minutes, the chair signs.
  *
- *   1. THE RECORDER — whoever is minuting the decision. If the route reached
- *      them, they are the honest actor: they are the person performing the act,
- *      and the trail should say so.
- *   2. THE CHAIR, then the SECRETARY, then ordinary MEMBERS, by seat
- *      ({@see MemberRole::precedence()}). A chair speaks for the body by
- *      construction; a secretary minutes it; a member is the last resort.
- *
- * Two things this ordering is NOT:
- *
- *   - It is not a privilege. Every candidate must ALREADY hold an open row that
- *     the route opened for them by resolving its own rule. The order decides only
- *     WHICH of several equally-entitled people is named, never whether anybody
- *     unentitled can act. Remove the ordering entirely and the security property
- *     is unchanged.
- *   - It is not a fallback chain over failures. The first candidate holding an
- *     open row is used and the engine's answer is final; if the engine refuses
- *     that person, the refusal is reported rather than retried with the next
- *     name, because "try everyone until somebody is allowed" is precisely the
- *     shape that turns a per-person gate into no gate at all.
+ * This used to fall back to the chair, then the secretary, then any member who
+ * held an open item, and act AS them. Anyone who could seat a person on a body
+ * and record a decision could then put that person's approval on a document
+ * they had never seen. The engine's per-person gate only means something if the
+ * person named is the person acting, so the fallback is gone: the secretary can
+ * no longer apply a decision under the chair's name.
  *
  * A DECISION CAN LEGITIMATELY MOVE NOTHING, AND SAYS SO
  * -----------------------------------------------------
@@ -97,7 +90,7 @@ final class DecisionRouteBridge
     /** The document has never been put into circulation. */
     public const NO_ROUTE = 'no_route';
 
-    /** No current member of the body holds an open item on any of its routes. */
+    /** The recorder holds no open item on the document's routes, nor covers one for someone away. */
     public const NO_OPEN_ITEM = 'no_open_item';
 
     /** The step reached is a circulation step, which takes no verdict. */
@@ -111,7 +104,6 @@ final class DecisionRouteBridge
         private readonly RouteRepository $routes,
         private readonly RouteStepRepository $steps,
         private readonly RouteRecipientRepository $recipients,
-        private readonly ConveningBodyRepository $bodies,
     ) {
     }
 
@@ -125,10 +117,12 @@ final class DecisionRouteBridge
      * the other's boundaries.
      *
      * @param int      $tenantId
-     * @param int      $bodyId       The body that decided.
+     * @param int      $bodyId       The body that decided. Not used to pick who
+     *        acts: a seat on the body gives nobody another person's approval.
      * @param int|null $documentId   The agenda item's document, or null.
      * @param string   $verdict      A {@see DecisionVerdict} value.
-     * @param int|null $recorderId   Who is minuting the decision.
+     * @param int|null $recorderId   Who is minuting the decision, and the only
+     *        person the decision can act as. Null moves nothing.
      * @param string|null $note      The rationale, carried onto the trail so the
      *        document's own history says WHY, not merely that a body answered.
      *
@@ -175,7 +169,9 @@ final class DecisionRouteBridge
             return $none(self::NO_ROUTE);
         }
 
-        $candidates = $this->candidates($tenantId, $bodyId, $recorderId);
+        if ($recorderId === null) {
+            return $none(self::NO_OPEN_ITEM);
+        }
 
         // Newest route first, which is the order listForDocument() returns. A
         // document circulated twice is being asked about by its CURRENT
@@ -185,98 +181,83 @@ final class DecisionRouteBridge
         foreach ($routes as $route) {
             $routeId = (int) $route['id'];
 
-            foreach ($candidates as $profileId) {
-                $recipient = $this->recipients->findOpenForProfile($tenantId, $routeId, $profileId);
-                if ($recipient === null) {
-                    continue;
-                }
-
-                $step = $this->steps->findById((int) $recipient['step_id'], $tenantId);
-                if ($step === null || ($step['decision'] ?? false) !== true) {
-                    // The route reached this body at an ORDINARY circulation
-                    // step. Migration 119 refuses a verdict on one rather than
-                    // ignoring it, and answering WITHOUT a verdict here would
-                    // launder a rejection into a plain acknowledgement that
-                    // advances the document. Recorded and skipped — the NEXT
-                    // candidate is still tried, because two people on one body
-                    // can be standing at two different steps of one route and
-                    // only one of them may be the one holding the gate.
-                    $notAGate = true;
-                    continue;
-                }
-
-                $outcome = $this->router->act(
-                    $tenantId,
-                    $profileId,
-                    $route,
-                    // The only act that carries a verdict. RouteVerdict says so
-                    // itself rather than this class asserting it, so a change to
-                    // the engine's vocabulary reaches here.
-                    RouteAction::ACKNOWLEDGED,
-                    $note,
-                    $routeVerdict,
-                );
-
-                // The engine guarantees an event row (it re-reads the append and
-                // throws if it cannot), so the only uncertainty is the shape of
-                // its `id` — which comes back stringified under some PDO
-                // settings. Cast, do not test.
-                $event = $outcome['event'];
-
-                return [
-                    'reason' => self::APPLIED,
-                    'route_id' => $routeId,
-                    'step_id' => (int) $step['id'],
-                    'actor_profile_id' => $profileId,
-                    'event_id' => isset($event['id']) ? (int) $event['id'] : null,
-                    // What the STEP concluded, which is not the same fact as what
-                    // this body said: under a quorum of `all` the first of three
-                    // approvals decides nothing, and `decided` is null there.
-                    'decided' => $outcome['decided'],
-                    'delivered' => $outcome['delivered'],
-                ];
+            $recipient = $this->openItemFor($tenantId, $routeId, $recorderId);
+            if ($recipient === null) {
+                continue;
             }
+
+            $step = $this->steps->findById((int) $recipient['step_id'], $tenantId);
+            if ($step === null || ($step['decision'] ?? false) !== true) {
+                // The route reached the recorder at an ORDINARY circulation
+                // step. Migration 119 refuses a verdict on one rather than
+                // ignoring it, and answering WITHOUT a verdict here would
+                // launder a rejection into a plain acknowledgement that
+                // advances the document. Recorded and skipped; an older route
+                // may still hold the recorder at a gate.
+                $notAGate = true;
+                continue;
+            }
+
+            // Acts as the recorder. When the item is someone else's that the
+            // recorder covers while they are away, the engine finds it itself
+            // and the trail says whom the recorder acted for.
+            $outcome = $this->router->act(
+                $tenantId,
+                $recorderId,
+                $route,
+                // The only act that carries a verdict. RouteVerdict says so
+                // itself rather than this class asserting it, so a change to
+                // the engine's vocabulary reaches here.
+                RouteAction::ACKNOWLEDGED,
+                $note,
+                $routeVerdict,
+            );
+
+            // The engine guarantees an event row (it re-reads the append and
+            // throws if it cannot), so the only uncertainty is the shape of
+            // its `id` — which comes back stringified under some PDO
+            // settings. Cast, do not test.
+            $event = $outcome['event'];
+
+            return [
+                'reason' => self::APPLIED,
+                'route_id' => $routeId,
+                'step_id' => (int) $step['id'],
+                'actor_profile_id' => $recorderId,
+                'event_id' => isset($event['id']) ? (int) $event['id'] : null,
+                // What the STEP concluded, which is not the same fact as what
+                // this body said: under a quorum of `all` the first of three
+                // approvals decides nothing, and `decided` is null there.
+                'decided' => $outcome['decided'],
+                'delivered' => $outcome['delivered'],
+            ];
         }
 
         return $none($notAGate ? self::NOT_A_DECISION_STEP : self::NO_OPEN_ITEM);
     }
 
     /**
-     * The profiles that may carry this body's decision to a route, best first.
+     * The recorder's own open item on the route, or, with none, the open step
+     * item of someone who is away and named the recorder to decide for them.
+     * The same item {@see DocumentRouter::act()} will find for the same actor;
+     * read here only to know which step it is at.
      *
-     * The recorder leads because the trail should name the person who actually
-     * performed the act when the route reached them. Then the body's current
-     * seats in precedence order, which {@see ConveningBodyRepository::currentMembers()}
-     * already returns.
-     *
-     * PAST MEMBERS ARE EXCLUDED. Somebody who has left the body may still hold an
-     * open recipient row from before they left, and letting them carry today's
-     * decision would put a former member's name on it — which is both wrong and
-     * the sort of wrong that only surfaces when a decision is challenged.
-     *
-     * @return list<int> De-duplicated, order preserved.
+     * @return array<string, mixed>|null
      */
-    private function candidates(int $tenantId, int $bodyId, ?int $recorderId): array
+    private function openItemFor(int $tenantId, int $routeId, int $recorderId): ?array
     {
-        $ordered = [];
-
-        if ($recorderId !== null) {
-            $ordered[] = $recorderId;
+        $own = $this->recipients->findOpenForProfile($tenantId, $routeId, $recorderId);
+        if ($own !== null) {
+            return $own;
         }
-        foreach ($this->bodies->currentMembers($tenantId, $bodyId) as $member) {
-            $ordered[] = (int) $member['profile_id'];
-        }
-
-        $seen = [];
-        $unique = [];
-        foreach ($ordered as $profileId) {
-            if (!isset($seen[$profileId])) {
-                $seen[$profileId] = true;
-                $unique[] = $profileId;
+        foreach ($this->recipients->coveredBy($tenantId, $recorderId) as $awayId) {
+            $item = $this->recipients->findOpenForProfile($tenantId, $routeId, $awayId);
+            if ($item !== null && $item['role'] !== RouteRecipientRepository::ROLE_AUTHOR) {
+                return $item;
             }
         }
 
-        return $unique;
+        return null;
     }
 
     /**
@@ -299,9 +280,9 @@ final class DecisionRouteBridge
                 'The document on this item has never been put into circulation, so there is no '
                 . 'approval step for the decision to answer.',
             self::NO_OPEN_ITEM =>
-                'The document is in circulation but has not reached this body — nobody currently '
-                . 'sitting on it holds an open item on the route — so the decision was recorded and '
-                . 'the document was left where it is.',
+                'The document is in circulation, but the approval it waits for is not yours, so the '
+                . 'decision was recorded and the document was left where it is. Whoever holds the '
+                . 'approval answers it themselves, or the person covering for them while they are away.',
             self::NOT_A_DECISION_STEP =>
                 'The document reached this body as a circulation, not as an approval step, so there '
                 . 'is no verdict for it to take. The decision was recorded.',

@@ -70,12 +70,12 @@ final class SettingsRegistryTest extends TestCase
              // escalation. The dunning policy is per-tenant, because a
              // deployment chases its enterprise customers differently from its
              // self-service ones.
-             'payments.mock_enabled',
+             'payments.mock_enabled', 'billing.local_runs_enabled',
              // Affiliate clawback is global-only for the same reason: the money
              // goes to somebody outside the company, so no tenant decides it.
              'affiliate.clawback_on_refund', 'affiliate.withholding_bp',
              'dunning.retry_schedule_days', 'dunning.lock_after_days',
-             'plugins.store_allowed_hosts', 'plugins.store_enabled', 'plugins.mcp_prompts_require_mark', 'plugins.billing_email_senders',
+             'plugins.store_allowed_hosts', 'plugins.store_enabled', 'plugins.mcp_prompts_require_mark', 'plugins.store_allow_unsigned', 'plugins.billing_email_senders',
              'documents.render_enabled', 'documents.theme', 'documents.theme_by_kind', 'documents.slot_bindings', 'documents.background_issuing', 'documents.render_max_rows',
              'documents.render_max_pages', 'documents.render_max_template_bytes',
              'documents.flow_max_blocks', 'documents.flow_max_table_rows',
@@ -493,7 +493,9 @@ final class SettingsRegistryTest extends TestCase
         // 137 since WHIT-1225: branding_theme and branding_theme_overrides.
         // 142 since WHIT-1233: five inventory.* keys.
         // 144 since WHIT-1234: purchase route and over-receipt.
-        self::assertCount(144, $describe);
+        // 145 since WHIT-1308: plugins.store_allow_unsigned.
+        // 146 since #2206: billing.local_runs_enabled.
+        self::assertCount(146, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
@@ -690,6 +692,9 @@ final class SettingsRegistryTest extends TestCase
         self::assertSame('false', SettingsRegistry::defaultFor('plugins.mcp_prompts_require_mark'));
         self::assertNull(SettingsRegistry::validate('plugins.mcp_prompts_require_mark', 'true'));
         self::assertNotNull(SettingsRegistry::validate('plugins.mcp_prompts_require_mark', 'yes'));
+        // WHIT-1308: unsigned store packages stay refused until the operator says otherwise.
+        self::assertSame('false', SettingsRegistry::defaultFor('plugins.store_allow_unsigned'));
+        self::assertNotNull(SettingsRegistry::validate('plugins.store_allow_unsigned', 'yes'));
     }
 
     public function testPluginsStoreAllowedHostsIsGlobalOnlyFreeformDefaultWhityStore(): void

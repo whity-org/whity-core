@@ -146,6 +146,51 @@ class PluginsApiHandlerTest extends TestCase
         $this->assertSame(array_values(array_unique($ids)), $ids, 'plugin ids must be unique');
     }
 
+    /**
+     * WHIT-1273 (#2251): the router percent-decodes `{name}`, so `..%2Fx`
+     * arrives as `../x`. Enable and disable on disk must refuse it with 400 and
+     * leave files outside the plugin folder alone, with or without a loader.
+     */
+    public function testEnableAndDisableOnDiskRefuseANameThatLeavesThePluginFolder(): void
+    {
+        $plugins = $this->tempDir . '/plugins';
+        mkdir($plugins);
+        file_put_contents($this->tempDir . '/Outside.php.disabled', "<?php\n");
+        file_put_contents($this->tempDir . '/Victim.php', "<?php\n");
+
+        foreach ([null, new PluginLoader($plugins, $this->router)] as $loader) {
+            $apiHandler = new PluginsApiHandler($plugins, $loader);
+            foreach (['../Outside', '..\\Outside', 'sub/../../Outside', "Outside\0", '.', '..'] as $name) {
+                $enabled = $apiHandler->enable(new Request('POST', '/api/plugins/x/enable'), ['name' => $name]);
+                $this->assertContains($enabled->getStatusCode(), [400, 404], "enable {$name}");
+            }
+            foreach (['../Victim', '..\\Victim', 'sub/../../Victim'] as $name) {
+                $disabled = $apiHandler->disable(new Request('POST', '/api/plugins/x/disable'), ['name' => $name]);
+                $this->assertContains($disabled->getStatusCode(), [400, 404], "disable {$name}");
+            }
+        }
+
+        $this->assertSame(400, (new PluginsApiHandler($plugins))->enable(new Request('POST', '/x'), ['name' => '../Outside'])->getStatusCode());
+        $this->assertSame(400, (new PluginsApiHandler($plugins))->disable(new Request('POST', '/x'), ['name' => '../Victim'])->getStatusCode());
+        $this->assertFileExists($this->tempDir . '/Outside.php.disabled', 'nothing outside the plugin folder is renamed');
+        $this->assertFileDoesNotExist($this->tempDir . '/Outside.php');
+        $this->assertFileExists($this->tempDir . '/Victim.php');
+        $this->assertFileDoesNotExist($this->tempDir . '/Victim.php.disabled');
+    }
+
+    public function testEnableAndDisableOnDiskStillRenameABarePlugin(): void
+    {
+        file_put_contents($this->tempDir . '/Bakery.php.disabled', "<?php\n");
+        $apiHandler = new PluginsApiHandler($this->tempDir);
+
+        $this->assertSame(200, $apiHandler->enable(new Request('POST', '/x'), ['name' => 'Bakery'])->getStatusCode());
+        $this->assertFileExists($this->tempDir . '/Bakery.php');
+        $this->assertSame(200, $apiHandler->enable(new Request('POST', '/x'), ['name' => 'Bakery'])->getStatusCode(), 'already enabled');
+        $this->assertSame(200, $apiHandler->disable(new Request('POST', '/x'), ['name' => 'Bakery'])->getStatusCode());
+        $this->assertFileExists($this->tempDir . '/Bakery.php.disabled');
+        $this->assertSame(404, $apiHandler->disable(new Request('POST', '/x'), ['name' => 'Nobody'])->getStatusCode());
+    }
+
     public function testReEnableWithoutLoaderReturnsServiceUnavailable(): void
     {
         $apiHandler = new PluginsApiHandler($this->tempDir);

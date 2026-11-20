@@ -8,6 +8,7 @@ use PDO;
 use Whity\Core\Identity\AssignableRole;
 use Whity\Core\Identity\DomainOwnershipVerifier;
 use Whity\Core\Identity\TenantEmailDomainsRepository;
+use Whity\Core\RBAC\RoleGrantGuard;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
@@ -46,11 +47,36 @@ final class TenantEmailDomainApiHandler
     private AssignableRole $assignableRole;
     private DomainOwnershipVerifier $verifier;
 
-    public function __construct(PDO $db, DomainOwnershipVerifier $verifier)
+    /**
+     * @param RoleGrantGuard|null $grantGuard #2241: the arrival role must be one the caller holds. `public/index.php` always wires it.
+     */
+    public function __construct(PDO $db, DomainOwnershipVerifier $verifier, private readonly ?RoleGrantGuard $grantGuard = null)
     {
         $this->repo = new TenantEmailDomainsRepository($db);
         $this->assignableRole = new AssignableRole($db);
         $this->verifier = $verifier;
+    }
+
+    /**
+     * #2241: the 403 when the caller does not hold every permission of the role
+     * new arrivals would get, or null to go ahead. Called after the role is
+     * known to be visible, so a foreign role still reads as not assignable.
+     */
+    private function refuseRoleGrant(Request $request, int $roleId, int $tenantId): ?Response
+    {
+        if ($this->grantGuard === null) {
+            return null;
+        }
+        $actor = $request->user;
+        $actorId = is_object($actor) && isset($actor->profile_id) && is_int($actor->profile_id)
+            ? $actor->profile_id
+            : null;
+        if ($actorId === null) {
+            return RoleGrantGuard::refusal([], 'You may not choose the role new arrivals get');
+        }
+        $missing = $this->grantGuard->roleNotHeld($actorId, $tenantId, $roleId);
+
+        return $missing === [] ? null : RoleGrantGuard::refusal($missing);
     }
 
     /**
@@ -95,6 +121,9 @@ final class TenantEmailDomainApiHandler
         }
         if (!$this->assignableRole->isAssignable($defaultRoleId, $tenantId)) {
             return Response::error(self::FOREIGN_ROLE_MESSAGE, 422);
+        }
+        if (($refused = $this->refuseRoleGrant($request, $defaultRoleId, $tenantId)) !== null) {
+            return $refused;
         }
 
         $autoProvision = !isset($body['auto_provision']) || (bool) $body['auto_provision'];
@@ -142,7 +171,8 @@ final class TenantEmailDomainApiHandler
         // Read first: a caller who cannot see this row must get the same 404 a
         // non-existent id gets, rather than learning it exists from a different
         // error further down.
-        if ($this->repo->findById($id, $tenantId) === null) {
+        $existing = $this->repo->findById($id, $tenantId);
+        if ($existing === null) {
             return Response::error('Domain not found', 404);
         }
 
@@ -166,6 +196,16 @@ final class TenantEmailDomainApiHandler
 
         if ($defaultRoleId === null && $autoProvision === null) {
             return Response::error('Provide default_role_id, auto_provision, or both', 422);
+        }
+
+        // #2241: a new arrival role, or switching arrivals on, hands that role
+        // to whoever signs up next, so the caller must hold it. Switching
+        // arrivals off is never refused.
+        if ($defaultRoleId !== null || $autoProvision === true) {
+            $roleToGrant = $defaultRoleId ?? (int) ($existing['default_role_id'] ?? 0);
+            if ($roleToGrant > 0 && ($refused = $this->refuseRoleGrant($request, $roleToGrant, $tenantId)) !== null) {
+                return $refused;
+            }
         }
 
         $this->repo->updateSettings($id, $tenantId, $defaultRoleId, $autoProvision);

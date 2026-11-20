@@ -97,6 +97,27 @@ final class EmailVerificationHandlerRealEngineTest extends TestCase
         return $this->emails->insert($profileId, $email, $verified, true);
     }
 
+    /**
+     * #2174 part 2: a token that is not a string is missing (it was read as
+     * "Array" or its digits before); the sentences and statuses are unchanged.
+     */
+    public function testFieldProblemsAreListedAndTheSentencesAreUnchanged(): void
+    {
+        $bad = $this->handler->request(new Request('POST', '/api/email/request-verification', [], (string) json_encode(['email' => 'not-an-email'])));
+        self::assertSame(422, $bad->getStatusCode());
+        $json = json_decode($bad->getBody(), true);
+        self::assertSame('A valid email address is required', $json['error']);
+        self::assertSame(['email' => 'invalid_email'], $json['details']['field_codes']);
+
+        foreach ([['token' => ['x']], ['token' => 123456], ['token' => '  ']] as $body) {
+            $res = $this->handler->confirm(new Request('POST', '/api/email/verify', [], (string) json_encode($body)));
+            self::assertSame(422, $res->getStatusCode());
+            $json = json_decode($res->getBody(), true);
+            self::assertSame('A verification token is required', $json['error']);
+            self::assertSame(['token' => 'required'], $json['details']['field_codes']);
+        }
+    }
+
     private function request(string $email): \Whity\Sdk\Http\Response
     {
         return $this->handler->request(
@@ -226,6 +247,34 @@ final class EmailVerificationHandlerRealEngineTest extends TestCase
         $res = $this->confirm('deadbeef-not-a-real-token');
         self::assertSame(400, $res->getStatusCode());
         self::assertSame(1, $this->auditCount('email.verification.failed'));
+    }
+
+    /**
+     * #2190: every failed try writes an audit row, so one address gets 30
+     * tries an hour; the 31st is refused before the token is read or audited.
+     */
+    public function testFailedConfirmsAreLimitedPerAddress(): void
+    {
+        for ($i = 0; $i < 30; $i++) {
+            self::assertSame(400, $this->confirmFrom('bad-token-' . $i, '203.0.113.9')->getStatusCode(), "try {$i}");
+        }
+
+        $refused = $this->confirmFrom('bad-token-30', '203.0.113.9');
+        self::assertSame(429, $refused->getStatusCode());
+        self::assertSame(30, $this->auditCount('email.verification.failed'));
+
+        // Another address is not affected.
+        self::assertSame(400, $this->confirmFrom('bad-token-31', '203.0.113.10')->getStatusCode());
+    }
+
+    private function confirmFrom(string $token, string $ip): \Whity\Sdk\Http\Response
+    {
+        return $this->handler->confirm(new Request(
+            'POST',
+            '/api/email/verify',
+            [\Whity\Core\RateLimit\ClientIp::HEADER => $ip],
+            (string) json_encode(['token' => $token])
+        ));
     }
 
     public function testConfirmEmptyTokenIs422(): void

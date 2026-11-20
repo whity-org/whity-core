@@ -664,6 +664,7 @@ final class InventoryApiSchemas
                 'value_minor' => self::int(true),
                 'currency' => self::str(true),
                 'route_id' => self::int(true),
+                'nobody_can_approve' => self::bool() + ['description' => 'Waiting for approval, and nobody can approve it yet: nothing posts until someone holds inventory:settings or a route is chosen, then sending it again routes it (WHIT-1301).'],
                 'batch_key' => self::str(true),
                 'sent_batch_key' => self::str(true),
                 'source_plugin' => self::str(true),

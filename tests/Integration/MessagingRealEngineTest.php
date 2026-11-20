@@ -233,6 +233,30 @@ final class MessagingRealEngineTest extends TestCase
         self::assertFalse($this->messaging->cancel(self::B, (int) $c['id']), 'another workspace cannot cancel it');
     }
 
+    /**
+     * #2220. A held message picked up before its hold ends is queued again. The
+     * job doing the picking up still holds the first key, so the new one must
+     * carry a different key, or the queue drops it as a duplicate and the
+     * message stays queued for ever.
+     */
+    public function testAHeldMessagePickedUpEarlyIsQueuedAgainUnderANewKey(): void
+    {
+        $c = $this->messaging->send(self::A, Recipient::address('x@example.test'), 'Hi', new SendOptions());
+        $held = $this->messaging->reply(self::A, (int) $c['conversation_id'], self::STAFF_A, 'Drafted by the agent', true);
+        $first = $this->jobs[count($this->jobs) - 1];
+
+        self::assertSame('skipped', $this->messaging->deliver(self::A, (int) $held['id']));
+
+        $again = $this->jobs[count($this->jobs) - 1];
+        self::assertNotSame($first, $again, 'nothing was queued again');
+        self::assertSame(MessagingService::DELIVER_JOB, $again[0]);
+        self::assertSame((int) $held['id'], $again[1]['message_id']);
+        self::assertSame(1, $again[1]['attempt'], 'deferring is not a failed attempt');
+        self::assertGreaterThan(0, $again[2]['delay']);
+        self::assertNotSame($first[2]['idempotency_key'], $again[2]['idempotency_key']);
+        self::assertStringStartsWith($first[2]['idempotency_key'] . ':', $again[2]['idempotency_key']);
+    }
+
     public function testStaffApiIsBoundToTheCallersWorkspace(): void
     {
         $c = $this->messaging->send(self::A, Recipient::address('x@example.test'), 'Hi', new SendOptions());
@@ -333,7 +357,49 @@ final class MessagingRealEngineTest extends TestCase
         self::assertSame(1, $this->rows('messages'));
     }
 
-    public function testWebChatForVisitorsHidesNotesAndChecksTheToken(): void
+    /**
+     * WHIT-1286 (#2203): a provider chosen with its secret or site key missing
+     * can't check anyone, so no chat starts, rather than skipping the check.
+     */
+    public function testWebChatWithAHalfSetUpBotCheckStartsNoChat(): void
+    {
+        $global = new GlobalSettingsRepository($this->pdo);
+        $global->set(BotCheck::SETTING_PROVIDER, 'turnstile');
+        $global->set(BotCheck::SETTING_ALLOW_NONE, '1'); // only covers having no provider
+        $chat = new PublicChatApiHandler(
+            $this->pdo,
+            $this->messaging,
+            $this->settings,
+            new TenantHostRepository($this->pdo),
+            new HostResolver(new TenantHostRepository($this->pdo), 'whity.test'),
+            new BotCheck($global, new EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'), new HttpFetcher()),
+            new DatabaseSharedStore($this->pdo),
+            'pepper',
+        );
+        $this->settings->save(self::A, true, null, null);
+        $req = fn (string $method, array $body = []): Request => new Request(
+            $method,
+            '/api/public/chat/bakery/conversations',
+            ['Host' => 'app.whity.test', ClientIp::HEADER => '203.0.113.21'],
+            json_encode($body) ?: ''
+        );
+        $params = ['workspace' => 'bakery'];
+
+        self::assertNull(json_decode($chat->info($req('GET'), $params)->getBody(), true)['data']['bot_check'], 'no empty site key');
+        foreach ([[], ['bot_token' => 'anything']] as $extra) {
+            $started = $chat->start($req('POST', ['message' => 'Are you open today?'] + $extra), $params);
+            self::assertSame(503, $started->getStatusCode(), (string) $started->getBody());
+        }
+        $global->set(BotCheck::SETTING_SITE_KEY, '0x4AAA-site');
+        self::assertSame(503, $chat->start($req('POST', ['message' => 'Still there?']), $params)->getStatusCode(), 'a site key but no secret');
+        self::assertSame(0, $this->rows('messages'));
+    }
+
+    /**
+     * WHIT-1298 (#2203, owner 2026-11-19): no provider and "allow without a
+     * bot check" off: the box says chat isn't ready and no chat starts.
+     */
+    public function testWebChatWithNoBotCheckAndNotAllowedWithoutOneStartsNoChat(): void
     {
         $chat = new PublicChatApiHandler(
             $this->pdo,
@@ -342,6 +408,38 @@ final class MessagingRealEngineTest extends TestCase
             new TenantHostRepository($this->pdo),
             new HostResolver(new TenantHostRepository($this->pdo), 'whity.test'),
             new BotCheck(new GlobalSettingsRepository($this->pdo), new EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'), new HttpFetcher()),
+            new DatabaseSharedStore($this->pdo),
+            'pepper',
+        );
+        $this->settings->save(self::A, true, null, null);
+        $req = fn (string $method, array $body = []): Request => new Request(
+            $method,
+            '/api/public/chat/bakery/conversations',
+            ['Host' => 'app.whity.test', ClientIp::HEADER => '203.0.113.22'],
+            json_encode($body) ?: ''
+        );
+        $params = ['workspace' => 'bakery'];
+
+        $info = json_decode($chat->info($req('GET'), $params)->getBody(), true)['data'];
+        self::assertFalse($info['bot_check_ready']);
+        self::assertNull($info['bot_check']);
+        $started = $chat->start($req('POST', ['message' => 'Are you open today?']), $params);
+        self::assertSame(503, $started->getStatusCode(), (string) $started->getBody());
+        self::assertSame(0, $this->rows('messages'));
+    }
+
+    public function testWebChatForVisitorsHidesNotesAndChecksTheToken(): void
+    {
+        $global = new GlobalSettingsRepository($this->pdo);
+        // No provider here, so chat needs "allow without a bot check" (WHIT-1298).
+        $global->set(BotCheck::SETTING_ALLOW_NONE, '1');
+        $chat = new PublicChatApiHandler(
+            $this->pdo,
+            $this->messaging,
+            $this->settings,
+            new TenantHostRepository($this->pdo),
+            new HostResolver(new TenantHostRepository($this->pdo), 'whity.test'),
+            new BotCheck($global, new EncryptedSecretStore(['v1' => str_repeat('k', 32)], 'v1'), new HttpFetcher()),
             new DatabaseSharedStore($this->pdo),
             'pepper',
         );
@@ -361,6 +459,15 @@ final class MessagingRealEngineTest extends TestCase
         $bot = $chat->start($req('POST', ['message' => 'buy now', 'website' => 'spam.example']), $params);
         self::assertSame(201, $bot->getStatusCode());
         self::assertSame(0, $this->rows('messages'), 'the honeypot writes nothing');
+
+        // #2174: a bad email address is refused through the shared field validator,
+        // with the sentence the chat page shows and the field's problem in both languages.
+        $badEmail = $chat->start($req('POST', ['message' => 'Hi', 'email' => 'not-an-email']), $params);
+        self::assertSame(422, $badEmail->getStatusCode());
+        $refused = json_decode($badEmail->getBody(), true);
+        self::assertSame('The email address is not valid.', $refused['error']);
+        self::assertSame(['email' => 'invalid_email'], $refused['details']['field_codes']);
+        self::assertNotSame('', $refused['details']['fields_ar']['email']);
 
         $started = $chat->start($req('POST', ['message' => 'Do you deliver?', 'name' => 'Visitor']), $params);
         self::assertSame(201, $started->getStatusCode());

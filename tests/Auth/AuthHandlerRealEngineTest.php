@@ -263,6 +263,67 @@ final class AuthHandlerRealEngineTest extends TestCase
         $this->assertArrayHasKey('error', json_decode($response->getBody(), true));
     }
 
+    /**
+     * #2174 part 2: only a string is a code, read exactly as sent. A number or a
+     * list reached the TOTP check as a non-string before; now each is "no code",
+     * the same 401 and sentence as a missing one, with the field listed.
+     */
+    public function testHandle2faTreatsACodeThatIsNotTextAsNoCode(): void
+    {
+        $profileId = $this->seedProfile('badcode2fa@whity.local', 1, 2);
+        foreach ([123456, ['123456'], '   ', '0'] as $code) {
+            $_COOKIE['temp_auth_token'] = $this->jwtParser->create([
+                'profile_id'       => $profileId,
+                'active_tenant_id' => 1,
+                'email'            => 'badcode2fa@whity.local',
+            ], 300, 'temp');
+
+            $response = $this->authHandler->handle2fa(new Request('POST', '/api/login/2fa', [], (string) json_encode(['code' => $code])));
+
+            $this->assertSame(401, $response->getStatusCode(), var_export($code, true));
+            $body = json_decode($response->getBody(), true);
+            $this->assertSame('2FA code is required', $body['error']);
+            $this->assertSame(['code' => 'required'], $body['details']['field_codes']);
+        }
+    }
+
+    /**
+     * #2174 part 2: sign-in refuses only a field that was not sent, as before,
+     * now naming it. A badly shaped address or a password that is not text is
+     * not refused early: it fails the credential check like any wrong pair.
+     */
+    public function testLoginNamesTheMissingFieldAndOtherwiseChecksCredentials(): void
+    {
+        $missing = $this->authHandler->handle(new Request('POST', '/api/login', [], (string) json_encode(['email' => 'a@whity.local'])));
+        $this->assertSame(401, $missing->getStatusCode());
+        $body = json_decode($missing->getBody(), true);
+        $this->assertSame('Email and password are required', $body['error']);
+        $this->assertSame(['password' => 'required'], $body['details']['field_codes']);
+
+        $this->seedProfile('shape@whity.local', 1, 2);
+        foreach ([['email' => 'not-an-email', 'password' => 'x'], ['email' => 'shape@whity.local', 'password' => ['x']]] as $sent) {
+            $res = $this->authHandler->handle(new Request('POST', '/api/login', [], (string) json_encode($sent)));
+            $this->assertSame(401, $res->getStatusCode());
+            $this->assertNotSame('Email and password are required', json_decode($res->getBody(), true)['error']);
+        }
+
+        // A mixed-case, padded address still signs in with the password exactly as typed.
+        $this->assertSame(200, $this->login('  Shape@Whity.Local ')->getStatusCode());
+    }
+
+    /** #2174 part 2: a body refresh token that is not text is no token: 401. */
+    public function testHandleRefreshTreatsABodyTokenThatIsNotTextAsNoToken(): void
+    {
+        $response = $this->authHandler->handleRefresh(new Request(
+            'POST',
+            '/api/v1/refresh',
+            ['X-Auth-Mode' => 'token'],
+            (string) json_encode(['refresh_token' => ['x']])
+        ));
+
+        $this->assertSame(401, $response->getStatusCode());
+    }
+
     public function testHandle2faReturns401WithoutTempToken(): void
     {
         unset($_COOKIE['temp_auth_token']);
@@ -317,13 +378,13 @@ final class AuthHandlerRealEngineTest extends TestCase
 
     private function mintRefresh(int $profileId, int $tenantId, string $email, string $role): string
     {
-        return $this->jwtParser->create([
+        return \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $this->jwtParser->create([
             'profile_id'       => $profileId,
             'active_tenant_id' => $tenantId,
             'email'            => $email,
             'role'             => $role,
             'token_epoch'      => 0,
-        ], 604800, 'refresh');
+        ], 604800, 'refresh'));
     }
 
     /**

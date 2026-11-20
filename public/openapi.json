@@ -11786,7 +11786,7 @@
             },
             "post": {
                 "operationId": "post_api_v1_calendar_time_off",
-                "summary": "Add time off (`off`) or extra hours (`open`) for a person",
+                "summary": "Add time off (`off`) or extra hours (`open`) for a person. Your own time off needs only staff membership; your own extra hours need calendar:write; anybody else's needs calendar:write and calendar:manage",
                 "tags": [
                     "calendar"
                 ],
@@ -11840,7 +11840,7 @@
                         }
                     },
                     "403": {
-                        "description": "Another person's calendar without calendar:manage",
+                        "description": "Not staff, extra hours without calendar:write, or another person's calendar without calendar:write and calendar:manage",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11879,12 +11879,7 @@
                             }
                         }
                     }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/api/v1/calendar/time-off/{id}": {
@@ -11985,12 +11980,7 @@
                             }
                         }
                     }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
+                }
             }
         },
         "/api/v1/calendar/today": {
@@ -62705,6 +62695,330 @@
                 ]
             }
         },
+        "/api/v1/plugins/{name}/core-grants": {
+            "get": {
+                "operationId": "get_api_v1_plugins_name_core_grants",
+                "summary": "Core permissions a plugin asks for its roles, and what the operator approved, per workspace (tenant_id narrows to one; 0 is the global roles)",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Requests and approvals",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginCoreGrantsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the platform operator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Plugin not loaded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/{name}/core-grants/{role}/approve": {
+            "post": {
+                "operationId": "post_api_v1_plugins_name_core_grants_role_approve",
+                "summary": "Grant a plugin role the core permissions the plugin asks for it in one workspace, all of them or the listed part",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "role",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PluginCoreGrantChangeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Approved",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginCoreGrantChangeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the platform operator, or a permission the operator does not hold",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Plugin not loaded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The plugin does not ask for this, or the role does not exist there",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/plugins/{name}/core-grants/{role}/revoke": {
+            "post": {
+                "operationId": "post_api_v1_plugins_name_core_grants_role_revoke",
+                "summary": "Take back core permissions approved for a plugin role in one workspace, all of them or the listed part",
+                "tags": [
+                    "platform-ops"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "role",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PluginCoreGrantChangeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Revoked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginCoreGrantChangeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the platform operator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Plugin not loaded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/plugins/{name}/disable": {
             "post": {
                 "operationId": "post_api_v1_plugins_name_disable",
@@ -67885,7 +68199,7 @@
                 "tags": [
                     "rbac"
                 ],
-                "description": "The cleanup an owner runs when it deletes the record itself. `resource_id` carries no foreign key, so core is never told a record disappeared and its grants outlive it \u2014 a later record reusing that id would silently inherit them. Takes the SAME parameters as the list route, so a caller can GET exactly what this removes. Returns the number of grants revoked; 0 is a successful no-op, never a 404, so the call is safe to make unconditionally from a delete path and safe to retry. Unlike the create route this does NOT ask the owning plugin to vouch for the resource: by cleanup time the record is usually already deleted, so a fails-closed check would refuse exactly the calls that matter. The tenant predicate still confines it to the caller's own grants.",
+                "description": "The cleanup an owner runs when it deletes the record itself. `resource_id` carries no foreign key, so core is never told a record disappeared and its grants outlive it \u2014 a later record reusing that id would silently inherit them. Takes the SAME parameters as the list route, so a caller can GET exactly what this removes. Returns the number of grants revoked; 0 is a successful no-op, never a 404, so the call is safe to make unconditionally from a delete path and safe to retry. Unlike the create route this does NOT ask the owning plugin to vouch for the resource: by cleanup time the record is usually already deleted, so a fails-closed check would refuse exactly the calls that matter. The tenant predicate still confines it to the caller's own grants. The caller must hold, at that resource, every permission each grant's role carries; otherwise 403 `exceeds_your_access` and nothing is removed.",
                 "parameters": [
                     {
                         "name": "resource_type",
@@ -67992,7 +68306,7 @@
                 "tags": [
                     "rbac"
                 ],
-                "description": "By id rather than by (resource, role, profile): over HTTP an omitted `profile_id` and an explicit null are indistinguishable, so a tuple-addressed revoke would let a dropped parameter silently revoke the everyone-grant instead of one profile's. The ids come from the list route.",
+                "description": "By id rather than by (resource, role, profile): over HTTP an omitted `profile_id` and an explicit null are indistinguishable, so a tuple-addressed revoke would let a dropped parameter silently revoke the everyone-grant instead of one profile's. The ids come from the list route. The caller must hold, at that resource, every permission the grant's role carries, the same rule as granting it; otherwise 403 `exceeds_your_access` and the grant stays.",
                 "parameters": [
                     {
                         "name": "id",
@@ -103728,6 +104042,10 @@
                         "type": "integer",
                         "nullable": true
                     },
+                    "nobody_can_approve": {
+                        "type": "boolean",
+                        "description": "Waiting for approval, and nobody can approve it yet: nothing posts until someone holds inventory:settings or a route is chosen, then sending it again routes it (WHIT-1301)."
+                    },
                     "batch_key": {
                         "type": "string",
                         "nullable": true
@@ -110874,6 +111192,142 @@
                     "data"
                 ]
             },
+            "PluginCoreGrantChangeRequest": {
+                "type": "object",
+                "properties": {
+                    "tenant_id": {
+                        "type": "integer",
+                        "description": "The workspace whose role this is; 0 or absent for the global roles."
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "nullable": true,
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Only these; absent or null for everything the plugin asks for this role."
+                    }
+                }
+            },
+            "PluginCoreGrantChangeResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "plugin": {
+                                "type": "string"
+                            },
+                            "role": {
+                                "type": "string"
+                            },
+                            "tenant_id": {
+                                "type": "integer"
+                            },
+                            "approved": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "revoked": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "requested": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "granted": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "required": [
+                            "plugin",
+                            "role",
+                            "tenant_id",
+                            "requested",
+                            "granted"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "PluginCoreGrantsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "plugin": {
+                                "type": "string"
+                            },
+                            "requests": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "grants": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "tenant_id": {
+                                            "type": "integer"
+                                        },
+                                        "workspace": {
+                                            "type": "string"
+                                        },
+                                        "role": {
+                                            "type": "string"
+                                        },
+                                        "requested": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "granted": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "tenant_id",
+                                        "workspace",
+                                        "role",
+                                        "requested",
+                                        "granted"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "plugin",
+                            "requests",
+                            "grants"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "PluginEntry": {
                 "type": "object",
                 "properties": {
@@ -111762,6 +112216,10 @@
                             }
                         }
                     },
+                    "bot_check_ready": {
+                        "type": "boolean",
+                        "description": "False when booking is refused until the bot check is set up (WHIT-1298)."
+                    },
                     "brand": {
                         "nullable": true,
                         "allOf": [
@@ -111900,6 +112358,10 @@
                                         "type": "string"
                                     }
                                 }
+                            },
+                            "bot_check_ready": {
+                                "type": "boolean",
+                                "description": "False when no new chat can start until the bot check is set up (WHIT-1298)."
                             },
                             "brand": {
                                 "nullable": true,
@@ -121532,6 +121994,7 @@
                             "lapsed",
                             "installation_unlicensed",
                             "installation_grace",
+                            "withdrawn",
                             null
                         ]
                     },

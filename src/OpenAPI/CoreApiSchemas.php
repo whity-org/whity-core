@@ -3697,6 +3697,36 @@ final class CoreApiSchemas
                     422 => self::errorResponse('The plugin does not grant permissions to this role'),
                 ],
             ]),
+            self::permissionRoute('GET', '/api/plugins/{name}/core-grants', 'plugins:read', [
+                'summary' => 'Core permissions a plugin asks for its roles, and what the operator approved, per workspace (tenant_id narrows to one; 0 is the global roles)',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('Requests and approvals', 'PluginCoreGrantsResponse'),
+                    403 => self::errorResponse('Not the platform operator'),
+                    404 => self::errorResponse('Plugin not loaded'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/{name}/core-grants/{role}/approve', 'plugins:install', [
+                'summary' => 'Grant a plugin role the core permissions the plugin asks for it in one workspace, all of them or the listed part',
+                'tags' => ['platform-ops'],
+                'request' => 'PluginCoreGrantChangeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Approved', 'PluginCoreGrantChangeResponse'),
+                    403 => self::errorResponse('Not the platform operator, or a permission the operator does not hold'),
+                    404 => self::errorResponse('Plugin not loaded'),
+                    422 => self::errorResponse('The plugin does not ask for this, or the role does not exist there'),
+                ],
+            ]),
+            self::permissionRoute('POST', '/api/plugins/{name}/core-grants/{role}/revoke', 'plugins:install', [
+                'summary' => 'Take back core permissions approved for a plugin role in one workspace, all of them or the listed part',
+                'tags' => ['platform-ops'],
+                'request' => 'PluginCoreGrantChangeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Revoked', 'PluginCoreGrantChangeResponse'),
+                    403 => self::errorResponse('Not the platform operator'),
+                    404 => self::errorResponse('Plugin not loaded'),
+                ],
+            ]),
             self::permissionRoute('GET', '/api/plugins/trust-status', 'plugins:read', [
                 'summary' => 'Whether Verified can work here, and how fresh the signed revocation list is',
                 'tags' => ['platform-ops'],
@@ -7618,6 +7648,7 @@ final class CoreApiSchemas
                     'provider' => self::str(),
                     'site_key' => self::str(),
                 ]],
+                'bot_check_ready' => self::bool() + ['description' => 'False when no new chat can start until the bot check is set up (WHIT-1298).'],
                 'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'The brand of the workspace, for the chat box (WHIT-1014).'],
             ], ['workspace_name', 'max_length'])),
             'PublicPlansResponse' => self::object([
@@ -10786,6 +10817,7 @@ final class CoreApiSchemas
                 ], ['id', 'name', 'duration_minutes', 'price_minor', 'currency', 'staff_profile_ids'])],
                 'staff' => ['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'display_name' => self::str()], ['profile_id', 'display_name'])],
                 'bot_check' => ['type' => 'object', 'nullable' => true, 'properties' => ['provider' => self::str(), 'site_key' => self::str()]],
+                'bot_check_ready' => self::bool() + ['description' => 'False when booking is refused until the bot check is set up (WHIT-1298).'],
                 'brand' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')], 'description' => 'The brand of the workspace, for the page (WHIT-1014).'],
             ], ['workspace', 'settings', 'services', 'staff', 'bot_check']),
             // WHIT-1014: what a workspace's public pages show of its brand. Only
@@ -11801,6 +11833,34 @@ final class CoreApiSchemas
                     'tenant_id' => self::int(true),
                     'already_allowed' => self::bool(),
                 ], ['plugin', 'role', 'role_id', 'tenant_id', 'already_allowed']),
+            ], ['data']),
+            'PluginCoreGrantsResponse' => self::object([
+                'data' => self::object([
+                    'plugin' => self::str(),
+                    'requests' => ['type' => 'object', 'additionalProperties' => ['type' => 'array', 'items' => self::str()]],
+                    'grants' => ['type' => 'array', 'items' => self::object([
+                        'tenant_id' => self::int(),
+                        'workspace' => self::str(),
+                        'role' => self::str(),
+                        'requested' => ['type' => 'array', 'items' => self::str()],
+                        'granted' => ['type' => 'array', 'items' => self::str()],
+                    ], ['tenant_id', 'workspace', 'role', 'requested', 'granted'])],
+                ], ['plugin', 'requests', 'grants']),
+            ], ['data']),
+            'PluginCoreGrantChangeRequest' => self::object([
+                'tenant_id' => array_merge(self::int(), ['description' => 'The workspace whose role this is; 0 or absent for the global roles.']),
+                'permissions' => ['type' => 'array', 'nullable' => true, 'items' => self::str(), 'description' => 'Only these; absent or null for everything the plugin asks for this role.'],
+            ], []),
+            'PluginCoreGrantChangeResponse' => self::object([
+                'data' => self::object([
+                    'plugin' => self::str(),
+                    'role' => self::str(),
+                    'tenant_id' => self::int(),
+                    'approved' => ['type' => 'array', 'items' => self::str()],
+                    'revoked' => ['type' => 'array', 'items' => self::str()],
+                    'requested' => ['type' => 'array', 'items' => self::str()],
+                    'granted' => ['type' => 'array', 'items' => self::str()],
+                ], ['plugin', 'role', 'tenant_id', 'requested', 'granted']),
             ], ['data']),
             'PluginUpdatesResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => self::object([
@@ -19119,7 +19179,9 @@ final class CoreApiSchemas
                 'description' => 'By id rather than by (resource, role, profile): over HTTP an omitted '
                     . '`profile_id` and an explicit null are indistinguishable, so a tuple-addressed revoke '
                     . 'would let a dropped parameter silently revoke the everyone-grant instead of one '
-                    . 'profile\'s. The ids come from the list route.',
+                    . 'profile\'s. The ids come from the list route. The caller must hold, at that resource, '
+                    . 'every permission the grant\'s role carries, the same rule as granting it; otherwise 403 '
+                    . '`exceeds_your_access` and the grant stays.',
                 'tags' => ['rbac'],
                 'responses' => [
                     204 => ['description' => 'Grant revoked'],
@@ -19136,7 +19198,9 @@ final class CoreApiSchemas
                     . 'make unconditionally from a delete path and safe to retry. Unlike the create route this '
                     . 'does NOT ask the owning plugin to vouch for the resource: by cleanup time the record is '
                     . 'usually already deleted, so a fails-closed check would refuse exactly the calls that '
-                    . 'matter. The tenant predicate still confines it to the caller\'s own grants.',
+                    . 'matter. The tenant predicate still confines it to the caller\'s own grants. The caller must '
+                    . 'hold, at that resource, every permission each grant\'s role carries; otherwise 403 '
+                    . '`exceeds_your_access` and nothing is removed.',
                 'tags' => ['rbac'],
                 'parameters' => [
                     self::queryParam('resource_type', 'string', 'A registered resource type (e.g. `ou`, `acme:record`)', true),
@@ -19519,16 +19583,16 @@ final class CoreApiSchemas
                 'parameters' => array_merge($range, [$person]),
                 'responses' => [200 => self::jsonResponse('Exceptions', self::listEnvelope('CalendarTimeOff'))] + self::authErrors(),
             ]),
-            self::permissionRoute('POST', '/api/calendar/time-off', 'calendar:write', [
-                'summary' => 'Add time off (`off`) or extra hours (`open`) for a person',
+            self::ungatedRoute('POST', '/api/calendar/time-off', [
+                'summary' => 'Add time off (`off`) or extra hours (`open`) for a person. Your own time off needs only staff membership; your own extra hours need calendar:write; anybody else\'s needs calendar:write and calendar:manage',
                 'tags' => ['calendar'],
                 'request' => 'CalendarTimeOffRequest',
                 'responses' => [
                     201 => self::jsonResponse('The exception', self::dataEnvelope(SchemaBuilder::ref('CalendarTimeOff'))),
-                    403 => self::errorResponse('Another person\'s calendar without calendar:manage'),
+                    403 => self::errorResponse('Not staff, extra hours without calendar:write, or another person\'s calendar without calendar:write and calendar:manage'),
                 ] + self::authErrors(),
             ]),
-            self::permissionRoute('DELETE', '/api/calendar/time-off/{id:\d+}', 'calendar:write', [
+            self::ungatedRoute('DELETE', '/api/calendar/time-off/{id:\d+}', [
                 'summary' => 'Remove time off or extra hours',
                 'tags' => ['calendar'],
                 'responses' => [
@@ -20256,7 +20320,7 @@ final class CoreApiSchemas
                 'changedAt' => ['type' => 'string', 'nullable' => true],
                 'changedBy' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'name' => self::str()]],
                 'state' => ['type' => 'string', 'enum' => ['on', 'read_only', 'off'], 'description' => 'read_only: a paid plugin whose access ended; reads work, writes are refused'],
-                'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['free_for_all', 'entitled', 'cash', 'trial', 'grace', 'lapsed', 'installation_unlicensed', 'installation_grace', null]],
+                'reason' => ['type' => 'string', 'nullable' => true, 'enum' => ['free_for_all', 'entitled', 'cash', 'trial', 'grace', 'lapsed', 'installation_unlicensed', 'installation_grace', 'withdrawn', null]],
                 'graceUntil' => ['type' => 'string', 'nullable' => true],
                 'trialEndsAt' => ['type' => 'string', 'nullable' => true],
                 'paid' => self::bool(),

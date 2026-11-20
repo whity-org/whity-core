@@ -263,10 +263,9 @@ final class ConveningBodyRepository
     /**
      * The body's CURRENT seats, chair first.
      *
-     * Ordered by seat precedence and then by id, which is the order
-     * {@see DecisionRouteBridge} wants and the order a reader expects — a
-     * membership list that puts the chair somewhere in the middle alphabetically
-     * reads as unordered.
+     * Ordered by seat precedence and then by id, which is the order a
+     * reader expects — a membership list that puts the chair somewhere in
+     * the middle alphabetically reads as unordered.
      *
      * @return list<array<string, mixed>>
      */
@@ -352,6 +351,21 @@ final class ConveningBodyRepository
             throw ConveningRejectedException::because(
                 "'{$memberRole}' is not a seat on a convening body; expected one of: "
                 . implode(', ', MemberRole::all()) . '.'
+            );
+        }
+
+        // #2248: profiles are global, so without this a body could seat, invite
+        // and mail somebody from another workspace. Only a person who is an
+        // active member here may hold a seat.
+        $member = $this->db->prepare(
+            "SELECT 1 FROM memberships
+              WHERE tenant_id = :tenant_id AND profile_id = :profile_id AND status = 'active'
+              LIMIT 1"
+        );
+        $member->execute([':tenant_id' => $tenantId, ':profile_id' => $profileId]);
+        if ($member->fetchColumn() === false) {
+            throw ConveningRejectedException::because(
+                'Only an active member of this workspace can hold a seat on one of its bodies.'
             );
         }
 
