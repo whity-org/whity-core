@@ -632,7 +632,7 @@ jobs:
         run: php scripts/ci-email-validation-guard.php
 
       # #2198: a request body field is read as text through the validator, not
-      # cast; (string) of a JSON list stores "Array". Casts may only go down.
+      # cast; (string) of a JSON list stores "Array". The count may not go up.
       - name: Body string-cast guard
         run: php scripts/ci-body-string-cast-guard.php
 
