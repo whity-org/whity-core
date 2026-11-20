@@ -155,4 +155,30 @@ final class FieldValidatorTest extends TestCase
             self::assertStringNotContainsString('{', $en . $ar, $code);
         }
     }
+
+    /**
+     * #2198: a handler reading one field as text never gets "Array".
+     */
+    public function testTextReadsOneFieldAndAListIsEmptyNeverArray(): void
+    {
+        $body = ['key' => '  faculty ', 'list' => ['x'], 'object' => ['a' => 'b'], 'flag' => true, 'n' => 12];
+
+        self::assertSame('faculty', FieldValidator::text($body, 'key'));
+        self::assertSame('', FieldValidator::text($body, 'list'));
+        self::assertSame('', FieldValidator::text($body, 'object'));
+        self::assertSame('', FieldValidator::text($body, 'flag'));
+        self::assertSame('12', FieldValidator::text($body, 'n'), 'a number keeps its digits, as the casts did');
+        self::assertSame('', FieldValidator::text($body, 'absent'));
+    }
+
+    public function testMissingKeepsTheHandlersSentenceAndNamesTheField(): void
+    {
+        $response = FieldValidator::missing('key is required', 'key');
+        $body = json_decode($response->getBody(), true);
+
+        self::assertSame(422, $response->getStatusCode());
+        self::assertSame('key is required', $body['error']);
+        self::assertSame(['key' => Messages::REQUIRED], $body['details']['field_codes']);
+        self::assertArrayHasKey('key', $body['details']['fields_ar']);
+    }
 }

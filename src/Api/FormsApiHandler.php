@@ -22,6 +22,7 @@ use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\InputLimits;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\FieldValidator;
 use Whity\Storage\StorageDriverInterface;
 
 /**
@@ -196,9 +197,9 @@ final class FormsApiHandler
             }
             $body = JsonBody::parsed($request);
 
-            $formKey = trim((string) ($body['form_key'] ?? ''));
+            $formKey = FieldValidator::text($body, 'form_key');
             if ($formKey === '') {
-                return Response::error('form_key is required', 422);
+                return FieldValidator::missing('form_key is required', 'form_key');
             }
             if (strlen($formKey) > FormRepository::KEY_MAX) {
                 return Response::error(
