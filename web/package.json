@@ -26,7 +26,7 @@
     "@whity/api-client": "file:../packages/api-client",
     "@whity/features": "file:../packages/features",
     "@whity/ui": "file:../packages/ui",
-    "@xyflow/react": "^12.12.1",
+    "@xyflow/react": "^13.0.2",
     "bwip-js": "^4.11.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
