@@ -9,7 +9,10 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
 use Whity\Api\InstallFromStoreApiHandler;
 use Whity\Api\PluginsApiHandler;
+use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Plugin\PluginRecords;
+use Whity\Core\Plugin\Trust\PluginTrust;
+use Whity\Core\Plugin\Trust\TrustedKeys;
 use Whity\Core\PluginLoader;
 use Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob;
 use Whity\Core\Request;
@@ -43,6 +46,8 @@ final class PluginStoreLifecycleRealEngineTest extends TestCase
     /** @var array<int, array<string, mixed>> */
     private array $catalogue = [];
     private ?string $package = null;
+    /** What the store answers for a version's /attestation, if anything. */
+    private ?string $attestation = null;
 
     protected function setUp(): void
     {
@@ -183,6 +188,94 @@ final class PluginStoreLifecycleRealEngineTest extends TestCase
         self::assertSame([$this->plugin], $result['failed']);
         self::assertDirectoryExists($this->pluginDir . '/' . $this->plugin);
         self::assertTrue($this->data($this->plugins->removed(new Request('GET', '/x')))[0]['purge_failed']);
+    }
+
+    /**
+     * WHIT-1308 (#2189): a code package with no signature from Whity is refused
+     * before anything in it is unpacked, and the refusal is kept.
+     */
+    public function testAnUnsignedStorePackageIsRefusedBeforeAnythingIsUnpacked(): void
+    {
+        $response = $this->installAs('1.0.0', allowUnsigned: false);
+
+        self::assertSame(422, $response->getStatusCode(), $response->getBody());
+        self::assertStringContainsString("isn't signed by Whity", $response->getBody());
+        self::assertSame([], array_values(array_diff((array) scandir($this->pluginDir), ['.', '..'])));
+        self::assertNull($this->records->install($this->plugin));
+        self::assertSame(['plugin.store_unsigned.refused'], $this->unsignedAudit());
+    }
+
+    /** WHIT-1308: the operator's temporary override lets it in, and says so in the audit log. */
+    public function testTheOperatorsOverrideLetsAnUnsignedPackageInAndItIsAudited(): void
+    {
+        $response = $this->installAs('1.0.0', allowUnsigned: true);
+
+        self::assertSame(201, $response->getStatusCode(), $response->getBody());
+        self::assertSame(['plugin.store_unsigned.installed'], $this->unsignedAudit());
+        $stmt = $this->pdo->prepare("SELECT metadata FROM audit_log WHERE action = 'plugin.store_unsigned.installed'");
+        $stmt->execute();
+        $metadata = json_decode((string) $stmt->fetchColumn(), true);
+        self::assertIsArray($metadata);
+        self::assertSame(hash('sha256', (string) $this->package), $metadata['sha256'] ?? null);
+        self::assertSame('install', $metadata['during'] ?? null);
+    }
+
+    /** WHIT-1308: a package Whity signed installs with the override off. */
+    public function testAPackageWhitySignedInstallsWithoutTheOverride(): void
+    {
+        [$trust, $sign] = $this->trust();
+        $this->package = $this->zip('1.0.0', ['acme:read']);
+        $this->attestation = $sign(PluginTrust::ATTESTATION, [
+            'plugin' => $this->plugin,
+            'version' => '1.0.0',
+            'sha256' => hash('sha256', $this->package),
+            'issued_at' => time(),
+            'expires_at' => time() + 86400,
+        ]);
+
+        $response = $this->installAs('1.0.0', allowUnsigned: false, trust: $trust, keepPackage: true);
+
+        self::assertSame(201, $response->getStatusCode(), $response->getBody());
+        self::assertSame([], $this->unsignedAudit());
+    }
+
+    /**
+     * WHIT-1308: a signature that doesn't hold for these bytes (another package,
+     * a forged key) is refused even with the override on: the override is for
+     * packages Whity hasn't signed yet, not for ones whose signature fails.
+     */
+    public function testASignatureThatDoesNotHoldIsRefusedEvenWithTheOverride(): void
+    {
+        [$trust, $sign] = $this->trust();
+        $this->package = $this->zip('1.0.0', ['acme:read']);
+        $this->attestation = $sign(PluginTrust::ATTESTATION, [
+            'plugin' => $this->plugin,
+            'version' => '1.0.0',
+            'sha256' => hash('sha256', 'some other package'),
+            'issued_at' => time(),
+            'expires_at' => time() + 86400,
+        ]);
+
+        $response = $this->installAs('1.0.0', allowUnsigned: true, trust: $trust, keepPackage: true);
+
+        self::assertSame(422, $response->getStatusCode(), $response->getBody());
+        self::assertStringContainsString("doesn't match this package", $response->getBody());
+        self::assertSame([], array_values(array_diff((array) scandir($this->pluginDir), ['.', '..'])));
+        self::assertSame(['plugin.store_unsigned.refused'], $this->unsignedAudit());
+    }
+
+    /** WHIT-1308: an update is new code too; unsigned, it's refused and the installed version stays. */
+    public function testAnUnsignedUpdateIsRefusedAndTheInstalledVersionStays(): void
+    {
+        $this->installFromStore('1.0.0', ['acme:read']);
+        $this->catalogue = [['slug' => 'acme', 'name' => 'Acme', 'latest_version' => '1.1.0']];
+        $this->package = $this->zip('1.1.0', ['acme:read']);
+
+        $response = $this->store(allowUnsigned: false)->update(new Request('POST', '/x', [], '{}'), ['name' => $this->plugin]);
+
+        self::assertSame(422, $response->getStatusCode(), $response->getBody());
+        self::assertSame('1.0.0', $this->install()['version']);
+        self::assertStringContainsString("'1.0.0'", $this->liveSource());
     }
 
     public function testAnUpdateWithNoNewAccessAppliesAndLandsTurnedOff(): void
@@ -336,20 +429,82 @@ final class PluginStoreLifecycleRealEngineTest extends TestCase
         return $this->data($response);
     }
 
-    private function store(): InstallFromStoreApiHandler
+    /**
+     * The lifecycle tests above are about what happens once a package is in, so
+     * they run with the operator's unsigned-package override on (WHIT-1308).
+     */
+    private function store(bool $allowUnsigned = true, ?PluginTrust $trust = null): InstallFromStoreApiHandler
     {
         $settings = new SettingsService(new GlobalSettingsRepository($this->pdo), new TenantSettingsRepository($this->pdo));
         $settings->setGlobal(SettingsRegistry::PLUGINS_STORE_ALLOWED_HOSTS, 'store.example.com');
+        $settings->setGlobal(SettingsRegistry::PLUGINS_STORE_ALLOW_UNSIGNED, $allowUnsigned ? 'true' : 'false');
 
         return new InstallFromStoreApiHandler(
             $this->pluginDir,
             $settings,
             $this->loader,
-            null,
-            fn (string $url, array $headers): ?string => $this->package,
+            new AuditLogger($this->pdo),
+            fn (string $url, array $headers): ?string => str_ends_with($url, '/attestation') ? $this->attestation : $this->package,
             fn (string $url): array => ['data' => $this->catalogue],
             $this->records,
+            null,
+            null,
+            $trust,
         );
+    }
+
+    private function installAs(string $version, bool $allowUnsigned, ?PluginTrust $trust = null, bool $keepPackage = false): Response
+    {
+        $this->catalogue = [['slug' => 'acme', 'name' => 'Acme', 'latest_version' => $version]];
+        if (!$keepPackage) {
+            $this->package = $this->zip($version, ['acme:read']);
+        }
+
+        return $this->store($allowUnsigned, $trust)->install(new Request('POST', '/x', [], (string) json_encode([
+            'store_url' => self::STORE,
+            'slug' => 'acme',
+            'version' => $version,
+        ])));
+    }
+
+    /**
+     * A key of the test's own, with a fresh revocation list signed by it.
+     *
+     * @return array{0: PluginTrust, 1: \Closure(string, array<string, mixed>): string}
+     */
+    private function trust(): array
+    {
+        $pair = sodium_crypto_sign_keypair();
+        $secret = sodium_crypto_sign_secretkey($pair);
+        $public = base64_encode(sodium_crypto_sign_publickey($pair));
+        $trust = new PluginTrust($this->pdo, new TrustedKeys([$public]));
+        $sign = static function (string $format, array $body) use ($secret, $public): string {
+            $payload = (string) json_encode(['format' => $format] + $body);
+
+            return (string) json_encode([
+                'key' => $public,
+                'payload' => base64_encode($payload),
+                'signature' => base64_encode(sodium_crypto_sign_detached($format . "\n" . $payload, $secret)),
+            ]);
+        };
+        self::assertTrue($trust->applyRevocationList($sign(PluginTrust::REVOCATIONS, [
+            'sequence' => 1,
+            'issued_at' => time(),
+            'expires_at' => time() + 7 * 86400,
+            'revoked' => [],
+        ]))['ok']);
+
+        return [$trust, $sign];
+    }
+
+    /** @return list<string> */
+    private function unsignedAudit(): array
+    {
+        $stmt = $this->pdo->prepare("SELECT action FROM audit_log WHERE action LIKE 'plugin.store_unsigned.%' ORDER BY id");
+        $stmt->execute();
+
+        /** @var list<string> */
+        return $stmt->fetchAll(PDO::FETCH_COLUMN);
     }
 
     /** @return array<string, mixed> */

@@ -2791,6 +2791,8 @@ $settingsHandler = new \Whity\Api\SettingsApiHandler(
     $serverLabels,
     // WHIT-1168: turning password sign-in off must leave a way in.
     $db->getPdo(),
+    // WHIT-1308: turning unsigned store packages on or off is audited.
+    $auditLogger,
 );
 $router->register('GET',   '/api/settings',        [$settingsHandler, 'get'],         null, null, CorePermissions::SETTINGS_READ);
 $router->register('PATCH', '/api/settings',        [$settingsHandler, 'patch'],       null, null, CorePermissions::SETTINGS_WRITE);
