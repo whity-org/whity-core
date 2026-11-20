@@ -74,6 +74,28 @@ final class PluginTrust
     }
 
     /**
+     * Check a code package from a store before anything in it is unpacked
+     * (WHIT-1308, #2189). The plugin's name is only known from inside the
+     * package, so it's taken from the signed statement itself; the hash still
+     * ties that statement to these exact bytes, and the version to the one asked for.
+     *
+     * @return array{ok: bool, reason: string, plugin: ?string}
+     */
+    public function checkStorePackage(string $envelope, string $version, string $packageSha256): array
+    {
+        if ($this->keys->count() === 0) {
+            return ['ok' => false, 'reason' => 'no_keys', 'plugin' => null];
+        }
+        $payload = $this->verified($envelope, self::ATTESTATION);
+        $plugin = is_string($payload['plugin'] ?? null) && $payload['plugin'] !== '' ? $payload['plugin'] : null;
+        if ($plugin === null) {
+            return ['ok' => false, 'reason' => 'bad_signature', 'plugin' => null];
+        }
+
+        return $this->checkAttestation($envelope, $plugin, $version, $packageSha256) + ['plugin' => $plugin];
+    }
+
+    /**
      * Record the mark, checking the attestation again here rather than trusting
      * the caller: this is the only way a mark comes to exist.
      */

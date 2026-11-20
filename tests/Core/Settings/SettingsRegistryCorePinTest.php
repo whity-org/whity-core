@@ -141,6 +141,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'plugins.store_allowed_hosts',
             'plugins.store_enabled',
             'plugins.mcp_prompts_require_mark',
+            'plugins.store_allow_unsigned',
             'plugins.billing_email_senders',
             'documents.render_enabled',
             'documents.theme',
@@ -371,6 +372,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'plugins.store_allowed_hosts' => 'app.whity.dev',
             'plugins.store_enabled' => 'true',
             'plugins.mcp_prompts_require_mark' => 'false',
+            'plugins.store_allow_unsigned' => 'false',
             'plugins.billing_email_senders' => '',
             // WHIT-1001: on by default; printing also needs a ready render
             // service, so an install without one still prints nothing.
@@ -723,6 +725,8 @@ final class SettingsRegistryCorePinTest extends TestCase
         self::assertTrue(SettingsRegistry::isGlobalOnly('i18n.enabled'));
         // Code plugins are install-wide, so whose prompts are served is too (WHIT-1014).
         self::assertTrue(SettingsRegistry::isGlobalOnly('plugins.mcp_prompts_require_mark'));
+        // WHIT-1308: only the operator installs code plugins, so only the operator lets unsigned ones in.
+        self::assertTrue(SettingsRegistry::isGlobalOnly('plugins.store_allow_unsigned'));
 
         self::assertTrue(SettingsRegistry::isFeatureFlag('mcp.enabled'));
         self::assertFalse(SettingsRegistry::isFeatureFlag('mail.events.welcome_enabled'));

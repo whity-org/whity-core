@@ -54,7 +54,7 @@ final class InstallFromStoreApiHandlerTest extends TestCase
      * @param-out list<array{url: string, headers: array<string, string>}> $calls
      *   By-reference sink recording each fetcher invocation.
      */
-    private function handler(string $allowlist, ?string $fetchReturns, array &$calls): InstallFromStoreApiHandler
+    private function handler(string $allowlist, ?string $fetchReturns, array &$calls, bool $allowUnsigned = true): InstallFromStoreApiHandler
     {
         $pdo = SchemaFromMigrations::make(true);
         $settings = new SettingsService(
@@ -62,6 +62,9 @@ final class InstallFromStoreApiHandlerTest extends TestCase
             new TenantSettingsRepository($pdo)
         );
         $settings->setGlobal(SettingsRegistry::PLUGINS_STORE_ALLOWED_HOSTS, $allowlist);
+        // WHIT-1308: no key is pinned here, so these packages are unsigned; the
+        // fetch and SSRF tests run with the operator's override on.
+        $settings->setGlobal(SettingsRegistry::PLUGINS_STORE_ALLOW_UNSIGNED, $allowUnsigned ? 'true' : 'false');
 
         $calls = [];
         $fetch = function (string $url, array $headers) use (&$calls, $fetchReturns): ?string {
@@ -305,6 +308,27 @@ final class InstallFromStoreApiHandlerTest extends TestCase
             $calls[0]['url']
         );
         self::assertSame('Bearer wps_secret', $calls[0]['headers']['Authorization'] ?? null);
+    }
+
+    /**
+     * WHIT-1308 (#2189): with the override off (the default), a package Whity
+     * hasn't signed is refused in plain words and nothing is unpacked.
+     */
+    public function testAnUnsignedPackageIsRefusedAndNothingIsUnpacked(): void
+    {
+        $zip = PluginPackageFixtures::validDirectoryZip($this->workDir, 'StoreUnsigned');
+
+        $calls = [];
+        $handler = $this->handler('store.example.com', (string) file_get_contents($zip), $calls, allowUnsigned: false);
+        $res = $handler->install($this->request([
+            'store_url' => 'https://store.example.com',
+            'slug' => 'acme-widget',
+            'version' => '2.1.0',
+        ]));
+
+        self::assertSame(422, $res->getStatusCode());
+        self::assertStringContainsString("This package isn't signed by Whity", $res->getBody());
+        self::assertSame([], array_values(array_diff((array) scandir($this->pluginDir), ['.', '..'])));
     }
 
     public function testNoAuthorizationHeaderWhenTokenOmitted(): void

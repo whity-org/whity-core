@@ -77,6 +77,8 @@ final class SettingsApiHandler
         ServerLabels $labels,
         // WHIT-1168: checks that turning password sign-in off leaves a way in.
         private readonly ?\PDO $pdo = null,
+        // WHIT-1308: switches whose every change is in the audit log.
+        private readonly ?\Whity\Core\Audit\AuditLoggerInterface $audit = null,
     ) {
         $this->settings = $settings;
         $this->roleChecker = $roleChecker;
@@ -126,6 +128,18 @@ final class SettingsApiHandler
     private const KEY_PERMISSIONS = [
         SettingsRegistry::DOCUMENTS_THEME => CorePermissions::DOCUMENTS_THEMES,
         SettingsRegistry::DOCUMENTS_THEME_BY_KIND => CorePermissions::DOCUMENTS_THEMES,
+    ];
+
+    /**
+     * Global switches whose every change is audited: the action when it goes on,
+     * and when it goes off (anything but 'true' is off).
+     *
+     * @var array<string, array{0: string, 1: string}>
+     */
+    private const AUDITED_SWITCHES = [
+        // WHIT-1308 (#2189): letting unsigned store code onto the server is the operator's
+        // call, and a temporary one; who turned it on or off, and when, is kept.
+        SettingsRegistry::PLUGINS_STORE_ALLOW_UNSIGNED => ['plugin.store_unsigned.turned_on', 'plugin.store_unsigned.turned_off'],
     ];
 
     /**
@@ -425,7 +439,8 @@ final class SettingsApiHandler
             }
         }
 
-        return $this->applyWrites(
+        $before = $this->switchStates();
+        $response = $this->applyWrites(
             $request,
             fn (string $key, ?string $value): null => $this->writeGlobal($key, $value),
             fn (): array => array_intersect_key(
@@ -433,6 +448,31 @@ final class SettingsApiHandler
                 array_flip($this->settings->catalog()->textKeys())
             )
         );
+        if ($response->getStatusCode() === 200) {
+            foreach ($this->switchStates() as $key => $on) {
+                if ($on !== $before[$key]) {
+                    $this->audit?->record(self::AUDITED_SWITCHES[$key][$on ? 0 : 1], [
+                        'tenant_id' => 0,
+                        'target_type' => 'setting',
+                        'metadata' => ['key' => $key, 'enabled' => $on],
+                    ]);
+                }
+            }
+        }
+
+        return $response;
+    }
+
+    /** @return array<string, bool> Each audited switch, on or off right now. */
+    private function switchStates(): array
+    {
+        $globals = $this->settings->getGlobal();
+        $states = [];
+        foreach (array_keys(self::AUDITED_SWITCHES) as $key) {
+            $states[$key] = ($globals[$key] ?? 'false') === 'true';
+        }
+
+        return $states;
     }
 
     /**

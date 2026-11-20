@@ -463,6 +463,13 @@ final class SettingsRegistry
     // gated by this; they keep their own permission checks.
     public const PLUGINS_MCP_PROMPTS_REQUIRE_MARK = 'plugins.mcp_prompts_require_mark';
 
+    // WHIT-1308 (#2189): let a code plugin from a trusted store install without a valid
+    // Whity attestation. OFF by default, so an unsigned package is refused. A temporary
+    // override, owner decision 2026-11-20, until Whity signs store packages; turning it on
+    // or off and every unsigned install it lets through are in the audit log. GLOBAL-ONLY:
+    // code plugins are install-wide, and only the operator installs them.
+    public const PLUGINS_STORE_ALLOW_UNSIGNED = 'plugins.store_allow_unsigned';
+
     // SDK 1.102 (WHIT-985): the code plugins the operator lets send Whity's own billing
     // emails (receipts, failed payments) to a workspace's payers, in the INSTANCE's brand
     // (Mail\BillingEmails). Comma-separated plugin names; EMPTY by default, so nothing can
@@ -1048,6 +1055,7 @@ final class SettingsRegistry
         self::PLUGINS_STORE_ALLOWED_HOSTS,
         self::PLUGINS_STORE_ENABLED,
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK,
+        self::PLUGINS_STORE_ALLOW_UNSIGNED,
         self::PLUGINS_BILLING_EMAIL_SENDERS,
         // Master on/off switch for the render tier: infrastructure-level (is the
         // whole optional subsystem available on this instance), not a per-tenant
@@ -1101,6 +1109,7 @@ final class SettingsRegistry
         self::MAIL_EVENT_PASSWORD_RESET,
         self::PLUGINS_STORE_ENABLED,
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK,
+        self::PLUGINS_STORE_ALLOW_UNSIGNED,
         self::DOCUMENTS_RENDER_ENABLED,
         self::DOCUMENTS_PERSIST_ENABLED,
         self::DOCUMENTS_QR_ENABLED,
@@ -1350,6 +1359,7 @@ final class SettingsRegistry
         // before this flag existed.
         self::PLUGINS_STORE_ENABLED => 'true',
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => 'false',
+        self::PLUGINS_STORE_ALLOW_UNSIGNED => 'false',
         self::PLUGINS_BILLING_EMAIL_SENDERS => '',
         // Heavyweight optional add-on (a whole separate Chromium-bearing
         // container) — opt-in, not opt-out. A sovereign deploy that never runs
@@ -1891,6 +1901,7 @@ final class SettingsRegistry
             self::PLUGINS_STORE_ALLOWED_HOSTS => null, // free-form strings
             self::PLUGINS_STORE_ENABLED => self::validateBoolean($value, self::PLUGINS_STORE_ENABLED),
             self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => self::validateBoolean($value, self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK),
+            self::PLUGINS_STORE_ALLOW_UNSIGNED => self::validateBoolean($value, self::PLUGINS_STORE_ALLOW_UNSIGNED),
             self::PLUGINS_BILLING_EMAIL_SENDERS => self::validatePluginNameList($value, self::PLUGINS_BILLING_EMAIL_SENDERS),
             self::DOCUMENTS_RENDER_ENABLED => self::validateBoolean($value, self::DOCUMENTS_RENDER_ENABLED),
             self::DOCUMENTS_RENDER_MAX_ROWS => self::validateRenderMaxRows($value),

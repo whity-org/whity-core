@@ -516,6 +516,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Offer AI agents the prompts of a server plugin only while the Whity store has marked its installed version Verified. Plugins added by hand or from another store have no mark, so their prompts stop while this is on. Tools are not affected.'
       ),
     },
+    'plugins.store_allow_unsigned': {
+      label: t('settings.meta.plugins.store_allow_unsigned.label', 'Allow unsigned store packages'),
+      help: t(
+        'settings.meta.plugins.store_allow_unsigned.help',
+        "Server plugins from a store are installed only when Whity has signed that exact package. Whity doesn't sign store packages yet, so while this is off they can't be installed from a store. Turning this on lets unsigned ones in until Whity signs them; it's temporary, so turn it off again once it does. Every change to this switch, and every unsigned plugin it lets in, is kept in the audit log. A .zip you upload yourself isn't affected."
+      ),
+    },
     'plugins.billing_email_senders': {
       label: t('settings.meta.plugins.billing_email_senders.label', 'Plugins that send billing emails'),
       help: t(
@@ -616,9 +623,9 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
       title: t('settings.section.pluginStore.title', 'Plugin store'),
       description: t(
         'settings.section.pluginStore.description',
-        'Which stores plugins can be installed from, and whether agents get prompts only from Verified plugins. The plugin marketplace switch is in Feature flags.'
+        'Which stores plugins can be installed from, whether their packages must be signed by Whity, and whether agents get prompts only from Verified plugins. The plugin marketplace switch is in Feature flags.'
       ),
-      keys: ['plugins.store_allowed_hosts', 'plugins.mcp_prompts_require_mark', 'plugins.billing_email_senders'],
+      keys: ['plugins.store_allowed_hosts', 'plugins.store_allow_unsigned', 'plugins.mcp_prompts_require_mark', 'plugins.billing_email_senders'],
     },
     {
       id: 'storage',
