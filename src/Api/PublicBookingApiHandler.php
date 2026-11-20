@@ -322,7 +322,7 @@ final class PublicBookingApiHandler
 
                 return Response::json(['data' => array_map(static fn (array $s): array => ['starts_at' => $s['starts_at'], 'ends_at' => $s['ends_at']], $slots)]);
             }
-            $slots = $this->booking->availability($tenantId, (int) $booking['service_id'], (int) $booking['profile_id'], $from, $to, true);
+            $slots = $this->booking->availability($tenantId, (int) $booking['service_id'], (int) $booking['profile_id'], $from, $to, true, $bookingId);
 
             return Response::json(['data' => array_map(static fn (array $s): array => ['starts_at' => $s['starts_at'], 'ends_at' => $s['ends_at']], $slots)]);
         });
