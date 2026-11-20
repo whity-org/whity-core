@@ -24,6 +24,7 @@ use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\InputLimits;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\FieldValidator;
 
 /**
  * Sittings: their agenda, their invitations, and the decisions taken at them.
@@ -217,9 +218,9 @@ final class MeetingsApiHandler
             }
 
             $body = JsonBody::parsed($request);
-            $scheduledAt = trim((string) ($body['scheduled_at'] ?? ''));
+            $scheduledAt = FieldValidator::text($body, 'scheduled_at');
             if ($scheduledAt === '') {
-                return Response::error('scheduled_at is required', 422);
+                return FieldValidator::missing('scheduled_at is required', 'scheduled_at');
             }
 
             $location = isset($body['location']) && is_string($body['location'])

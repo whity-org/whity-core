@@ -131,6 +131,32 @@ final class OuTypesApiHandlerRealEngineTest extends TestCase
         $this->assertSame(422, $this->handler()->create($this->post(['key' => '']))->getStatusCode());
     }
 
+    /**
+     * #2198. A key or label sent as a list is not text: it is refused with the
+     * shared field error instead of being stored as the text "Array".
+     */
+    public function testAKeyOrLabelThatIsNotTextIsAFieldErrorNotArray(): void
+    {
+        MockRequestFactory::setTestTenant(1);
+        $handler = $this->handler();
+
+        $response = $handler->create($this->post(['key' => ['faculty']]));
+        $this->assertSame(422, $response->getStatusCode());
+        $this->assertSame('key is required', $this->error($response));
+        $body = json_decode($response->getBody(), true);
+        $this->assertSame(['key' => 'required'], $body['details']['field_codes']);
+
+        $id = $this->data($handler->create($this->post(['key' => 'faculty', 'label' => ['x' => 'y']])))['id'];
+        $this->assertSame('faculty', (string) $this->scalar("SELECT label FROM ou_types WHERE id = {$id}"));
+
+        $patched = $handler->update(
+            new Request('PATCH', '/api/ou-types/' . $id, [], (string) json_encode(['label' => ['Kulliyyah']])),
+            ['id' => (string) $id]
+        );
+        $this->assertSame(422, $patched->getStatusCode());
+        $this->assertSame(0, (int) $this->scalar("SELECT COUNT(*) FROM ou_types WHERE label = 'Array' OR type_key = 'array'"));
+    }
+
     // ==================== adopting a plugin's declaration ====================
 
     /**

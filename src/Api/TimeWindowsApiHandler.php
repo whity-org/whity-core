@@ -14,6 +14,7 @@ use Whity\Core\TimeWindow\WindowState;
 use Whity\Core\TimeWindow\WindowTypeRepository;
 use Whity\Http\InputLimits;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\FieldValidator;
 
 /**
  * The periods themselves (#1070): listing, resolving, creating, adjusting,
@@ -161,11 +162,11 @@ final class TimeWindowsApiHandler
                 return Response::error('window_type_id is required and must be an integer', 422);
             }
 
-            $key = trim((string) ($body['key'] ?? ''));
+            $key = FieldValidator::text($body, 'key');
             if ($key === '') {
-                return Response::error('key is required', 422);
+                return FieldValidator::missing('key is required', 'key');
             }
-            $label = array_key_exists('label', $body) ? trim((string) $body['label']) : $key;
+            $label = FieldValidator::text($body, 'label');
             if ($label === '') {
                 $label = $key;
             }
@@ -192,8 +193,8 @@ final class TimeWindowsApiHandler
                 $parentWindowId,
                 $key,
                 $label,
-                (string) ($body['starts_on'] ?? ''),
-                (string) ($body['ends_on'] ?? '')
+                FieldValidator::text($body, 'starts_on'),
+                FieldValidator::text($body, 'ends_on')
             );
 
             return Response::json(['data' => $this->windows->find($tenantId, $id)], 201);
@@ -228,7 +229,7 @@ final class TimeWindowsApiHandler
             $fields = [];
 
             if (array_key_exists('label', $body)) {
-                $label = trim((string) $body['label']);
+                $label = FieldValidator::text($body, 'label');
                 if ($label === '') {
                     return Response::error('label must not be empty', 422);
                 }
@@ -238,10 +239,10 @@ final class TimeWindowsApiHandler
                 $fields['label'] = $label;
             }
             if (array_key_exists('starts_on', $body)) {
-                $fields['starts_on'] = (string) $body['starts_on'];
+                $fields['starts_on'] = FieldValidator::text($body, 'starts_on');
             }
             if (array_key_exists('ends_on', $body)) {
-                $fields['ends_on'] = (string) $body['ends_on'];
+                $fields['ends_on'] = FieldValidator::text($body, 'ends_on');
             }
             if (array_key_exists('parent_window_id', $body)) {
                 $parent = self::intField($body, 'parent_window_id');
@@ -321,7 +322,7 @@ final class TimeWindowsApiHandler
 
             $body = JsonBody::parsed($request);
             $cascade = ($body['cascade'] ?? false) === true;
-            $reason = array_key_exists('reason', $body) ? trim((string) $body['reason']) : null;
+            $reason = array_key_exists('reason', $body) ? FieldValidator::text($body, 'reason') : null;
             if ($reason !== null
                 && ($tooLong = InputLimits::firstViolation(['reason' => [$reason, InputLimits::TEXT_MAX]]))
             ) {
@@ -369,7 +370,7 @@ final class TimeWindowsApiHandler
             }
 
             $body = JsonBody::parsed($request);
-            $reason = trim((string) ($body['reason'] ?? ''));
+            $reason = FieldValidator::text($body, 'reason');
             if ($reason === '') {
                 return Response::error(
                     'reason is required to reopen a closed period, and it is recorded permanently',

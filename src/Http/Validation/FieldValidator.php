@@ -64,6 +64,31 @@ final class FieldValidator
     }
 
     /**
+     * One body field as trimmed text, for a handler not yet declaring its
+     * fields (#2198). Read like {@see Field::text()}: a number is its digits,
+     * and a list, an object, true or false is empty, so `{"key": ["x"]}` is
+     * "missing", never the text "Array" stored with a warning. Use it instead
+     * of `(string) $body[...]`; {@see self::missing()} answers the empty case.
+     *
+     * @param array<string, mixed> $body
+     */
+    public static function text(array $body, string $name): string
+    {
+        return Field::text()->check($name, $body)['value'];
+    }
+
+    /**
+     * The shared 422 for one required field that is empty or not text, keeping
+     * the handler's own sentence (#2198).
+     *
+     * @param array<string, mixed> $details
+     */
+    public static function missing(string $message, string $field, array $details = []): Response
+    {
+        return self::refusal($message, [$field => Messages::problem(Messages::REQUIRED)], $details);
+    }
+
+    /**
      * The shared 422 for problems a handler found itself (a domain not allowed,
      * a workspace name with no letters), so it reads like the validator's own.
      *
