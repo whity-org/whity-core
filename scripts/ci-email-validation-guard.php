@@ -23,8 +23,8 @@ declare(strict_types=1);
  * Usage:  php scripts/ci-email-validation-guard.php
  */
 
-/** Hand-written email checks in src/ outside the validator, as of #2174 part 1. */
-const CEILING = 35;
+/** Hand-written email checks in src/ outside the validator, as of #2174 part 2. */
+const CEILING = 32;
 
 $root = dirname(__DIR__);
 $validatorDir = $root . DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR . 'Http' . DIRECTORY_SEPARATOR . 'Validation';

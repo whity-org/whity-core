@@ -15,6 +15,9 @@ use Whity\Core\Response;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\Field;
+use Whity\Http\Validation\FieldValidator;
+use Whity\Http\Validation\Messages;
 use PDO;
 use Whity\Core\i18n\LocalizedText;
 use Whity\Core\i18n\LocalizedTexts;
@@ -263,9 +266,24 @@ class AuthHandler
         // Parse request body (envelope validated upstream, WC-189).
         $body = JsonBody::parsed($request);
 
-        // Validate request has email and password
-        if (!isset($body['email']) || !isset($body['password'])) {
-            return Response::error('Email and password are required', 401);
+        // #2174: the fields are read through the shared validator. Sign-in only
+        // refuses a field that was not sent, exactly as before: a badly shaped
+        // address or a short password is not refused here, it fails the
+        // credential check below like any wrong pair, so the audit trail and
+        // the throttles still count it. The password is never trimmed and its
+        // length is never checked at sign-in.
+        $checked = FieldValidator::check($body, [
+            'email' => Field::email()->required(),
+            'password' => Field::password()->required(),
+        ]);
+        $missing = array_filter(['email', 'password'], static fn (string $key): bool => !isset($body[$key]));
+        if ($missing !== []) {
+            return FieldValidator::refusal(
+                'Email and password are required',
+                array_intersect_key($checked->problems(), array_flip($missing)),
+                [],
+                401
+            );
         }
 
         // Normalize the submitted email BEFORE the lookup. Migration 035 and the
@@ -276,7 +294,8 @@ class AuthHandler
         // contract is preserved. The original is retained only for audit display.
         $rawEmail = $body['email'];
         $email    = is_string($rawEmail) ? self::normalizeEmail($rawEmail) : '';
-        $password = $body['password'];
+        // A string as sent; a number as its digits; anything else is ''.
+        $password = $checked->value('password');
         $ip       = $this->clientIp($request);
 
         // WC-0abcc29f: check IP throttle before touching the DB — a heavily
@@ -313,7 +332,7 @@ class AuthHandler
             // bcrypt time (~tens of ms), letting an attacker enumerate registered
             // emails by response latency despite the identical 401 body. Burn one
             // bcrypt verify against a fixed dummy hash so both paths cost the same.
-            password_verify(is_string($password) ? $password : '', self::DUMMY_PASSWORD_HASH);
+            password_verify($password, self::DUMMY_PASSWORD_HASH);
 
             $this->audit('auth.login.failure', $request, null, null, [
                 'email'  => $email,
@@ -343,7 +362,7 @@ class AuthHandler
             // Same timing guard as the unknown-email path: this also returns
             // before the real password_verify(), so burn one dummy bcrypt to keep
             // the unverified-email response indistinguishable by latency.
-            password_verify(is_string($password) ? $password : '', self::DUMMY_PASSWORD_HASH);
+            password_verify($password, self::DUMMY_PASSWORD_HASH);
 
             $this->audit('auth.login.failure', $request, null, $profileId, [
                 'email'  => $email,
@@ -388,7 +407,7 @@ class AuthHandler
         // above. Same timing compensation: burn the dummy bcrypt verify BEFORE
         // the real one so this path costs the same as every other failure.
         if ((string) ($profile['status'] ?? 'active') === 'inactive') {
-            password_verify(is_string($password) ? $password : '', self::DUMMY_PASSWORD_HASH);
+            password_verify($password, self::DUMMY_PASSWORD_HASH);
 
             $this->audit('auth.login.failure', $request, null, $profileId, [
                 'email'  => $email,
@@ -398,7 +417,7 @@ class AuthHandler
             return Response::error('Invalid credentials', 401);
         }
 
-        if (!password_verify((string) $password, (string) $profile['password_hash'])) {
+        if (!password_verify($password, (string) $profile['password_hash'])) {
             $this->audit('auth.login.failure', $request, null, $profileId, [
                 'email'  => $email,
                 'reason' => 'invalid_password',
@@ -840,9 +859,7 @@ class AuthHandler
             return $m[1];
         }
 
-        $body = JsonBody::parsed($request);
-        $bodyToken = $body['temp_token'] ?? null;
-        return is_string($bodyToken) && $bodyToken !== '' ? $bodyToken : null;
+        return self::bodyToken($request, 'temp_token');
     }
 
     /**
@@ -2270,9 +2287,7 @@ class AuthHandler
                     $rawToken = $m[1];
                 }
                 if ($rawToken === null) {
-                    $body = JsonBody::parsed($request);
-                    $bodyToken = $body['refresh_token'] ?? null;
-                    $rawToken = is_string($bodyToken) ? $bodyToken : null;
+                    $rawToken = self::bodyToken($request, 'refresh_token');
                 }
                 $claims = $rawToken !== null
                     ? $this->tokenValidator->validateRefreshTokenFromString($rawToken)
@@ -2693,9 +2708,20 @@ class AuthHandler
      */
     private function bodyRefreshToken(Request $request): ?string
     {
-        $body      = JsonBody::parsed($request);
-        $bodyToken = $body['refresh_token'] ?? null;
-        return is_string($bodyToken) ? $bodyToken : null;
+        return self::bodyToken($request, 'refresh_token');
+    }
+
+    /**
+     * A token from the request body, read exactly as sent through the shared
+     * field validator (#2174), or null when it is absent, not a string, or only
+     * spaces. No token is ever trimmed or changed: an unusable value is null,
+     * which every caller already treats as "no token".
+     */
+    private static function bodyToken(Request $request, string $key): ?string
+    {
+        $checked = FieldValidator::check(JsonBody::parsed($request), [$key => Field::secret()->required()]);
+
+        return $checked->ok() ? $checked->value($key) : null;
     }
 
     /**
@@ -2760,13 +2786,21 @@ class AuthHandler
         }
 
         // Parse request body to get 2FA code (envelope validated upstream, WC-189).
-        $body = JsonBody::parsed($request);
-
-        if (!isset($body['code']) || empty($body['code'])) {
-            return Response::error('2FA code is required', 401);
+        // #2174: the code is read exactly as sent and only a string counts, so a
+        // number or a list is "no code" (it reached the TOTP check as a non-string
+        // and failed with a 500 before). "0" stays "no code", as empty() had it.
+        $body    = JsonBody::parsed($request);
+        $checked = FieldValidator::check($body, ['code' => Field::secret()->required()]);
+        if (!$checked->ok() || empty($body['code'])) {
+            return FieldValidator::refusal(
+                '2FA code is required',
+                $checked->problems() !== [] ? $checked->problems() : ['code' => Messages::problem(Messages::REQUIRED)],
+                [],
+                401
+            );
         }
 
-        $code = $body['code'];
+        $code = $checked->value('code');
 
         // ── Resolve 2FA credentials from the profile ──────────────────────────
         // Post-cutover: profile_id is required in the temp token (ADR 0005 §1)
