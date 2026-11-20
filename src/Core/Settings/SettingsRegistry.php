@@ -394,6 +394,13 @@ final class SettingsRegistry
     // invoices for free is the sharpest possible privilege escalation.
     public const PAYMENTS_MOCK_ENABLED = 'payments.mock_enabled';
 
+    // #2206: whether `schedule:run` starts the local billing run (issues
+    // invoices for subscriptions core bills itself) and the dunning sweep
+    // (locks tenants with overdue invoices). OFF and global-only: a
+    // deployment whose subscriptions belong to the billing service (Whity
+    // Pay) must not start invoicing or locking anyone because it upgraded.
+    public const BILLING_LOCAL_RUNS_ENABLED = 'billing.local_runs_enabled';
+
     // DUNNING (#billing). One setting says the whole retry policy: a list of
     // day offsets FROM THE DUE DATE, so "1,3,7" is three attempts on days 1,
     // 3 and 7 rather than 1, 4 and 11. Locking is separate from the last
@@ -1045,6 +1052,7 @@ final class SettingsRegistry
         self::BILLING_INVOICE_NUMBER_SCOPE,
         self::BILLING_INVOICE_NUMBER_RESET,
         self::PAYMENTS_MOCK_ENABLED,
+        self::BILLING_LOCAL_RUNS_ENABLED,
         self::AFFILIATE_CLAWBACK_ON_REFUND,
         self::AFFILIATE_WITHHOLDING_BP,
         self::LICENSING_BILLING_BASIS,
@@ -1121,6 +1129,7 @@ final class SettingsRegistry
         self::CALENDAR_MULTI_SERVICE_BOOKING,
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
+        self::BILLING_LOCAL_RUNS_ENABLED,
         self::AFFILIATE_CLAWBACK_ON_REFUND,
         self::APP_INSTALLABLE,
     ];
@@ -1341,6 +1350,8 @@ final class SettingsRegistry
         // that is on by default is one that can take money before anybody
         // decided it should.
         self::PAYMENTS_MOCK_ENABLED => 'false',
+        // Off until the operator decides core bills its own subscriptions.
+        self::BILLING_LOCAL_RUNS_ENABLED => 'false',
         // Claws back by default. See the constant for why absorbing a refund
         // is a decision rather than a default.
         self::AFFILIATE_CLAWBACK_ON_REFUND => 'true',
@@ -1882,6 +1893,7 @@ final class SettingsRegistry
             self::BILLING_INVOICE_NUMBER_SCOPE => self::validateEnum($key, $value),
             self::BILLING_INVOICE_NUMBER_RESET => self::validateEnum($key, $value),
             self::PAYMENTS_MOCK_ENABLED => self::validateBoolean($value, self::PAYMENTS_MOCK_ENABLED),
+            self::BILLING_LOCAL_RUNS_ENABLED => self::validateBoolean($value, self::BILLING_LOCAL_RUNS_ENABLED),
             self::DUNNING_RETRY_SCHEDULE_DAYS => \Whity\Core\Billing\DunningSchedule::parseProblem($value),
             self::DUNNING_LOCK_AFTER_DAYS => self::validateLockAfterDays($value),
             self::AFFILIATE_CLAWBACK_ON_REFUND => self::validateBoolean($value, self::AFFILIATE_CLAWBACK_ON_REFUND),
