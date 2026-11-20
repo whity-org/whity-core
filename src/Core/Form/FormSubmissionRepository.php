@@ -78,10 +78,20 @@ final class FormSubmissionRepository
      * here could only ever drift from it. `current_step` is the label of the
      * desk still holding it, which is the question somebody who submitted
      * actually has.
+     *
+     * #2204: the document it produced being withdrawn (`POST
+     * /documents/{id}/withdraw`) withdraws the paper too. That closes the open
+     * items with a verdict-less row, so without this the route would read as
+     * finished and the submission as `completed` (and print as Approved).
      */
     private const ROUTE_STATE = ",
                        CASE
                          WHEN s.withdrawn_at IS NOT NULL THEN 'withdrawn'
+                         WHEN s.document_id IS NOT NULL AND EXISTS (
+                           SELECT 1 FROM documents wd
+                            WHERE wd.id = s.document_id AND wd.tenant_id = s.tenant_id
+                              AND wd.withdrawn_at IS NOT NULL
+                         ) THEN 'withdrawn'
                          WHEN NOT EXISTS (
                            SELECT 1 FROM document_routes dr
                             WHERE dr.tenant_id = s.tenant_id
