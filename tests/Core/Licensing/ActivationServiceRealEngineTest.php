@@ -294,6 +294,31 @@ final class ActivationServiceRealEngineTest extends TestCase
     }
 
     /**
+     * #2225. A refusal after the atomic claim is the customer's to fix (a
+     * mistyped serial, a missing device, a retired unit), so it must not spend
+     * the code: they come back and the single-use code still works.
+     */
+    public function testARefusalAfterTheClaimDoesNotSpendTheCode(): void
+    {
+        $issued = $this->service->issue(self::TENANT, null, maxRedemptions: 1);
+
+        $this->assertRedemptionRefusedWith(LicensingException::REASON_DEVICE_REQUIRED, $issued['code']);
+        $this->assertRedemptionRefusedWith(LicensingException::REASON_DEVICE_REQUIRED, $issued['code'], 'SN-TYPO');
+        $retired = $this->device('SN-GONE');
+        $this->pdo->exec("UPDATE licensed_devices SET status = 'retired', retired_at = NOW() WHERE id = {$retired}");
+        $this->assertRedemptionRefusedWith(LicensingException::REASON_DEVICE_UNKNOWN, $issued['code'], $retired);
+        $this->assertRedemptionRefusedWith(LicensingException::REASON_DEVICE_UNKNOWN, $issued['code'], 999999);
+
+        self::assertSame(0, (int) $this->q('SELECT redemption_count FROM device_activation_codes')->fetchColumn());
+
+        $device = $this->device('SN-REAL');
+        $result = $this->service->redeem($issued['code'], 'SN-REAL');
+
+        self::assertSame($device, $result['licensed_device_id']);
+        self::assertSame(1, (int) $this->q('SELECT redemption_count FROM device_activation_codes')->fetchColumn());
+    }
+
+    /**
      * Redemption must fail for a SPECIFIC reason.
      *
      * The reason code is the service's contract; the sentence a person reads

@@ -182,57 +182,70 @@ final class ActivationService
         $codeId = (int) $row['id'];
         $tenantId = (int) $row['tenant_id'];
 
-        // A code bound at issue time wins over anything the caller supplies.
-        // Otherwise a caller could redeem a code minted for one unit against a
-        // different one — which is how a licence ends up on hardware nobody
-        // sold it for.
-        // A SERIAL IS RESOLVED INSIDE THE CODE'S TENANT, never outside it. The
-        // caller may hand us a serial because that is what a person can read off
-        // the unit — but looking one up without a tenant predicate is a
-        // cross-tenant read, and would also mean two customers holding hardware
-        // with the same manufacturer serial could reach each other's row. The
-        // code decided the tenant a moment ago; that is the scope.
-        $deviceId = $row['licensed_device_id'] !== null
-            ? (int) $row['licensed_device_id']
-            : (is_string($device) ? $this->deviceIdForSerial($tenantId, $device) : $device);
+        // EVERY REFUSAL FROM HERE ON RELEASES THE CLAIM. The UPDATE above has
+        // already spent one of this code's redemptions; a mistyped serial, a
+        // retired unit or a full workspace is the customer's to fix, and they
+        // must find the code still alive when they come back (#2225). The
+        // release is an exact inverse of the claim, which is why the claim
+        // only increments a counter.
+        try {
+            // A code bound at issue time wins over anything the caller supplies.
+            // Otherwise a caller could redeem a code minted for one unit against a
+            // different one — which is how a licence ends up on hardware nobody
+            // sold it for.
+            // A SERIAL IS RESOLVED INSIDE THE CODE'S TENANT, never outside it. The
+            // caller may hand us a serial because that is what a person can read off
+            // the unit — but looking one up without a tenant predicate is a
+            // cross-tenant read, and would also mean two customers holding hardware
+            // with the same manufacturer serial could reach each other's row. The
+            // code decided the tenant a moment ago; that is the scope.
+            $deviceId = $row['licensed_device_id'] !== null
+                ? (int) $row['licensed_device_id']
+                : (is_string($device) ? $this->deviceIdForSerial($tenantId, $device) : $device);
 
-        if ($deviceId === null) {
-            throw LicensingException::of(LicensingException::REASON_DEVICE_REQUIRED, 'Unbound code redeemed without a device.');
-        }
+            if ($deviceId === null) {
+                throw LicensingException::of(LicensingException::REASON_DEVICE_REQUIRED, 'Unbound code redeemed without a device.');
+            }
 
-        // THE TIER'S DEVICE CAP, checked only once the tenant is known — which
-        // is not until the code has been claimed, because a code is resolved
-        // from itself and the caller has no session.
-        //
-        // SO THE CLAIM IS RELEASED IF THERE IS NO ROOM. The UPDATE above has
-        // already spent one of this code's redemptions; throwing without undoing
-        // it would burn a customer's activation code because their workspace was
-        // full — they would fix the cap, come back, and find the code dead. The
-        // release is an exact inverse of the claim, which is why the claim only
-        // increments a counter.
-        //
-        // A unit that is ALREADY in service is not re-counted: re-redeeming
-        // against hardware the tenant already holds does not add one, so it is
-        // allowed even at the cap. Otherwise a customer at their limit could
-        // never re-activate a device they already own.
-        if (
-            $this->allowance !== null
-            && !$this->isAlreadyInService($tenantId, $deviceId)
-            && $this->allowance->isExhausted($tenantId, $now)
-        ) {
+            // THE TIER'S DEVICE CAP, checked only once the tenant is known — which
+            // is not until the code has been claimed, because a code is resolved
+            // from itself and the caller has no session.
+            //
+            // SO THE CLAIM IS RELEASED IF THERE IS NO ROOM. The UPDATE above has
+            // already spent one of this code's redemptions; throwing without undoing
+            // it would burn a customer's activation code because their workspace was
+            // full — they would fix the cap, come back, and find the code dead. The
+            // release is an exact inverse of the claim, which is why the claim only
+            // increments a counter.
+            //
+            // A unit that is ALREADY in service is not re-counted: re-redeeming
+            // against hardware the tenant already holds does not add one, so it is
+            // allowed even at the cap. Otherwise a customer at their limit could
+            // never re-activate a device they already own.
+            if (
+                $this->allowance !== null
+                && !$this->isAlreadyInService($tenantId, $deviceId)
+                && $this->allowance->isExhausted($tenantId, $now)
+            ) {
+                throw LicensingException::of(
+                    LicensingException::REASON_LIMIT_REACHED,
+                    sprintf(
+                        'Tenant %d is at its devices.max cap of %d.',
+                        $tenantId,
+                        $this->allowance->capFor($tenantId)
+                    )
+                );
+            }
+
+            $this->activate($tenantId, $deviceId, $now);
+        } catch (\Throwable $e) {
             $this->releaseClaim($codeId, $tenantId);
 
-            throw LicensingException::of(
-                LicensingException::REASON_LIMIT_REACHED,
-                sprintf(
-                    'Tenant %d is at its devices.max cap of %d.',
-                    $tenantId,
-                    $this->allowance->capFor($tenantId)
-                )
-            );
+            throw $e;
         }
 
-        $this->activate($tenantId, $deviceId, $now);
+        // Outside the release: the unit is in service by now, so the redemption
+        // was really spent and the counter must keep saying so.
         $this->recordRedemption($tenantId, $codeId, $deviceId, $redeemedByUserId, $fromIp, $now);
 
         return ['licensed_device_id' => $deviceId, 'tenant_id' => $tenantId];
