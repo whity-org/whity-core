@@ -131,9 +131,12 @@ final class ScheduleRunCommandRealEngineTest extends TestCase
                 $globals
             ))->tick(300, 86400);
         };
-        $billingJobs = fn (): array => $this->pdo->query(
-            "SELECT name, tenant_id FROM jobs WHERE name IN ('core.billing.run', 'core.billing.dunning') ORDER BY name"
-        )->fetchAll(PDO::FETCH_ASSOC);
+        $billingJobs = function (): array {
+            $stmt = $this->pdo->query("SELECT name, tenant_id FROM jobs WHERE name IN ('core.billing.run', 'core.billing.dunning') ORDER BY name");
+            self::assertNotFalse($stmt);
+
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        };
 
         $tick();
         self::assertSame([], $billingJobs(), 'off by default: nobody is invoiced or locked');
