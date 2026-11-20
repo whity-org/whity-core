@@ -42,7 +42,7 @@
     "@tabler/icons-react": "^3.52.0"
   },
   "devDependencies": {
-    "@hookform/resolvers": "^7.0.6",
+    "@hookform/resolvers": "^7.0.7",
     "@types/katex": "^0.16.8",
     "katex": "^0.19.1",
     "radix-ui": "^1.8.1",
