@@ -46,6 +46,7 @@ docker-compose.override.yml
 
 # Storybook build output (regenerated; never committed)
 storybook-static/
+shape-clip-check/
 phpunit_full.log
 .phpunit-sqlite.log
 .phpunit-full.log

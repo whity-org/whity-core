@@ -2153,6 +2153,26 @@ jobs:
           npm run build-storybook -w @whity/ui
           npm run build-storybook -w web
 
+      # Theme shapes (WHIT-1225): render the tricky components from the built
+      # gallery under every shape preset, left-to-right light and right-to-left
+      # dark, desktop and phone, and fail when a rounded corner cuts text or a
+      # painted child pokes past a curve. The presets come from
+      # packages/ui/scripts/shape-presets.json, which ThemeEngineTest keeps
+      # equal to what ThemeCompiler emits.
+      - name: Shape clip check
+        working-directory: .
+        run: |
+          npx playwright install --with-deps chromium
+          node packages/ui/scripts/shape-clip-check.mjs --static packages/ui/storybook-static --out shape-clip-check
+
+      - name: Upload shape clip screenshots
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: shape-clip-check
+          path: shape-clip-check/
+          if-no-files-found: ignore
+
   # ---------------------------------------------------------------------------
   # The single check branch protection requires.
   #

@@ -927,7 +927,7 @@ export function DataTable<TData>({
   if (isLoading) {
     const visibleCount = table.getVisibleLeafColumns().length
     return (
-      <div className={cn("rounded-lg border border-border", className)}>
+      <div className={cn("overflow-hidden rounded-card border border-border bg-card", className)}>
         {/* `aria-busy` marks this as the PLACEHOLDER, not the data.
             It carries the same `aria-label` as the real table — deliberately,
             so assistive technology names the region consistently while it

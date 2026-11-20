@@ -130,9 +130,16 @@ Mono stays Geist Mono (3.4). New fonts join through a PR that adds the files, li
 | `crisp` | ⅛ of the height | 6 | 8 | shadcn 0.3 |
 | `whity` | ¼ of the height (4.2) | 12 | 16 | today |
 | `soft` | ⅓ of the height | 16 | 24 | M3 medium to large |
-| `round` | full (pill) | 20 | 28 | M3 Expressive full |
+| `round` | half the height (pill) | 20 | 28 | M3 Expressive full |
 
 Avatars, the 16px mark and status dots don't follow the preset.
+
+**Rules that keep content clear of the corner** (all presets, added 21 November 2026 after the round preset cut text in textareas and comment cards):
+
+- **A pill is half the control's own height, never `999px`.** The control radius is written in pixels for each control size (16 / 20 / 22 at standard density). A single-line control of that height reads as a pill; anything that uses the control radius and grows (a textarea, a chip field that wraps, a comment card) keeps that corner instead of turning into a stadium. `rounded-full` stays for things whose height never changes: avatars, dots, single-line chips and badges.
+- **Padding grows with the corner.** A field that holds chips or other painted children pads them by `--spacing-inset-control` (`p-inset-control`), which is 30% of the control radius and never under 4px; a radius of r keeps its curve within 0.3r of each edge at 45°.
+- **Nested corners.** A container whose children run edge to edge (a segmented control, a table in a card, a card with a banner or image) clips with `overflow-hidden`, so the children follow its curve. A child inset by padding p uses the outer radius less p (`--radius-control-inner` for the control radius).
+- **Checked in CI.** `packages/ui/scripts/shape-clip-check.mjs` renders the fields, chips, editor and comments, tables, tabs, segmented controls, menus, popovers, cards, dialogs, the sidebar and the phone bar under every preset and density, left to right light and right to left dark, at desktop and phone width, and fails when a corner cuts text or a painted child pokes past a curve.
 
 ### 3.4 Density
 

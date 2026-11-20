@@ -172,7 +172,9 @@ final class ThemeEngineTest extends TestCase
         self::assertStringStartsWith('var(--font-readex-pro),', $vars['font-heading']);
         self::assertSame('1.0625rem', $vars['text-sm']);
         self::assertSame('44px', $vars['control-h']);
-        self::assertSame('999px', $vars['wy-radius-control']);
+        // Round's pill is half the control height (44px comfortable), so a
+        // control that grows keeps that corner (WHIT-1225).
+        self::assertSame('22px', $vars['wy-radius-control']);
         self::assertSame('20px', $vars['wy-radius-card']);
         self::assertMatchesRegularExpression('/^linear\(0(, -?\d+(\.\d+)?)+\)$/', $vars['ease-out']);
         self::assertSame('200ms', $vars['dur-fast']);
@@ -241,5 +243,48 @@ final class ThemeEngineTest extends TestCase
 
         $broken = new ThemeLibrary(null, static fn (): array => throw new \RuntimeException('loader down'));
         self::assertSame(ThemeLibrary::DEFAULT_ID, $broken->available(1)[0]['theme']['id']);
+    }
+
+    /** No preset ever emits a radius larger than half the control it sits on. */
+    public function testNoShapePresetTurnsAGrowingControlIntoAStadium(): void
+    {
+        foreach (ThemeValidator::SHAPES as $shape) {
+            foreach (ThemeValidator::DENSITIES as $density) {
+                $vars = ThemeCompiler::compile(self::theme(['shape' => ['preset' => $shape], 'density' => $density]))['vars'];
+                foreach (['control-sm' => 'control-h-sm', 'control' => 'control-h', 'control-lg' => 'control-h-lg'] as $radius => $height) {
+                    $r = (int) ($vars['wy-radius-' . $radius] ?? 0);
+                    $h = (int) ($vars[$height] ?? ['control-h-sm' => 32, 'control-h' => 40, 'control-h-lg' => 44][$height]);
+                    self::assertLessThanOrEqual(intdiv($h, 2), $r, "{$shape}/{$density} {$radius}");
+                }
+            }
+        }
+    }
+
+    /**
+     * The browser check (packages/ui/scripts/shape-clip-check.mjs) runs every
+     * preset from this file, so it must match what the compiler emits. Run
+     * with UPDATE_SHAPE_PRESETS=1 to rewrite it.
+     */
+    public function testTheShapeCheckPresetsMatchTheCompiler(): void
+    {
+        $file = __DIR__ . '/../../../../packages/ui/scripts/shape-presets.json';
+        $presets = [];
+        foreach (ThemeValidator::SHAPES as $shape) {
+            foreach (['standard', 'compact', 'comfortable'] as $density) {
+                $vars = ThemeCompiler::compile(self::theme(['shape' => ['preset' => $shape], 'density' => $density]))['vars'];
+                $keep = array_filter($vars, static fn (string $k): bool => str_starts_with($k, 'wy-radius-') || str_starts_with($k, 'control-h') || $k === 'row-h', ARRAY_FILTER_USE_KEY);
+                ksort($keep);
+                $presets[$density === 'standard' ? $shape : "{$shape}-{$density}"] = (object) $keep;
+            }
+        }
+        $json = json_encode($presets, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "
+";
+        if (getenv('UPDATE_SHAPE_PRESETS') === '1') {
+            file_put_contents($file, $json);
+        }
+        self::assertFileExists($file);
+        self::assertSame($json, str_replace("
+", "
+", (string) file_get_contents($file)), 'Run UPDATE_SHAPE_PRESETS=1 vendor/bin/phpunit --filter ShapeCheckPresets');
     }
 }
