@@ -328,6 +328,29 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertStringContainsString('Cancelled: Cake tasting', $this->sent[count($this->sent) - 1]['subject']);
     }
 
+    public function testMovingOneServiceShowsTheCustomersOwnTimeAsFree(): void
+    {
+        // #2207: a single-service booking's own time no longer blocks its own move.
+        $made = self::data($this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']))['data'];
+        $token = (string) $made['manage_token'];
+
+        $_GET = ['service_id' => (string) $this->cake, 'from' => '2026-11-16T10:00:00+03:00', 'to' => '2026-11-16T11:00:00+03:00'];
+        try {
+            $others = self::data($this->handler->slots(self::request('GET', '/x'), ['workspace' => 'example-bakery']))['data'];
+        } finally {
+            $_GET = [];
+        }
+        self::assertSame(['2026-11-16T07:30:00Z'], array_column($others, 'starts_at'), 'anyone else still sees 10:00 taken');
+
+        $_GET = ['from' => '2026-11-16T10:00:00+03:00', 'to' => '2026-11-16T11:00:00+03:00'];
+        try {
+            $free = self::data($this->handler->manageSlots(self::request('GET', '/x', [], '198.51.100.1'), ['token' => $token]))['data'];
+        } finally {
+            $_GET = [];
+        }
+        self::assertSame(['2026-11-16T07:00:00Z', '2026-11-16T07:30:00Z'], array_column($free, 'starts_at'), 'the customer sees their own time as free');
+    }
+
     public function testTheFeedListsBookingsAndAReplacedAddressStopsWorking(): void
     {
         $this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']);
