@@ -125,6 +125,27 @@ final class FieldValidatorTest extends TestCase
         self::assertSame(array_keys($body['details']['fields']), array_keys($body['details']['fields_ar']));
     }
 
+    /** #2174 part 2: a token or code is read exactly as sent, and only text counts. */
+    public function testASecretIsReadExactlyAsSentAndOnlyTextCounts(): void
+    {
+        $checked = FieldValidator::check(
+            ['padded' => ' 123456 ', 'number' => 123456, 'list' => ['x'], 'spaces' => '   '],
+            [
+                'padded' => Field::secret()->required(),
+                'number' => Field::secret()->required(),
+                'list' => Field::secret()->required(),
+                'spaces' => Field::secret()->required(),
+            ]
+        );
+
+        self::assertSame(' 123456 ', $checked->value('padded'), 'never trimmed');
+        self::assertFalse($checked->has('padded'));
+        self::assertSame(['number', 'list', 'spaces'], array_keys($checked->problems()));
+        foreach ($checked->problems() as $problem) {
+            self::assertSame(Messages::REQUIRED, $problem['code']);
+        }
+    }
+
     public function testEveryCodeHasWordsInBothLanguages(): void
     {
         foreach (Messages::codes() as $code) {

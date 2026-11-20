@@ -16,6 +16,8 @@ use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\Field;
+use Whity\Http\Validation\FieldValidator;
 
 /**
  * Public email-verification endpoints (WC-235):
@@ -59,13 +61,15 @@ final class EmailVerificationHandler
      */
     public function request(Request $request): Response
     {
-        $body  = JsonBody::parsed($request);
-        $email = strtolower(trim((string) ($body['email'] ?? '')));
-
         // Format validation is not enumeration (it never touches the DB).
-        if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false || strlen($email) > 255) {
-            return Response::error('A valid email address is required', 422);
+        // #2174: the shared field validator; the sentence and status are unchanged.
+        $checked = FieldValidator::check(JsonBody::parsed($request), [
+            'email' => Field::email()->required()->maxBytes(255),
+        ]);
+        if (!$checked->ok()) {
+            return $checked->refusal('A valid email address is required');
         }
+        $email = $checked->value('email');
 
         $ip       = ClientIp::fromRequest($request);
         $emailKey = 'emailverify:req:email:' . hash('sha256', $email);
@@ -128,12 +132,13 @@ final class EmailVerificationHandler
             return $limited;
         }
 
-        $body  = JsonBody::parsed($request);
-        $token = (string) ($body['token'] ?? '');
-
-        if (trim($token) === '') {
-            return Response::error('A verification token is required', 422);
+        // #2174: the token is read exactly as sent; the sentence and status are unchanged.
+        $body    = JsonBody::parsed($request);
+        $checked = FieldValidator::check($body, ['token' => Field::secret()->required()]);
+        if (!$checked->ok()) {
+            return $checked->refusal('A verification token is required');
         }
+        $token = $checked->value('token');
 
         $result = $this->service->confirm($token);
 

@@ -229,6 +229,22 @@ final class TwoFactorRecoveryHandlerRealEngineTest extends TestCase
 
     // ==================== helpers ====================
 
+    /**
+     * #2174 part 2: the shared field validator; the sentences and statuses are
+     * unchanged.
+     */
+    public function testFieldProblemsAreListedAndTheSentencesAreUnchanged(): void
+    {
+        $json = json_decode($this->request('not-an-email')->getBody(), true);
+        self::assertSame('A valid email address is required', $json['error']);
+        self::assertSame(['email' => 'invalid_email'], $json['details']['field_codes']);
+        self::assertNotSame('', $json['details']['fields_ar']['email']);
+
+        $res = $this->handler->confirm(new Request('POST', '/api/auth/2fa-recovery/confirm', [], (string) json_encode(['token' => ['x']])));
+        self::assertSame(422, $res->getStatusCode());
+        self::assertSame('A confirmation token is required', json_decode($res->getBody(), true)['error']);
+    }
+
     private function seedProfileWithTwoFactor(string $email): int
     {
         $this->pdo->exec(

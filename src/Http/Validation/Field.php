@@ -19,6 +19,9 @@ use Whity\Core\PasswordPolicy;
  *  - `phone`: trimmed, then the handler's pattern.
  *  - `emailOrPhone`: trimmed; either an email address or a phone number.
  *  - `password`: never trimmed; {@see PasswordPolicy} decides.
+ *  - `secret`: a token or sign-in code, read exactly as sent (never trimmed,
+ *    and only a string counts: a number is missing, not its digits); one that
+ *    is only spaces is missing.
  *
  * A value that is not a string is read as a string when it is a number and as
  * empty otherwise, so `{"email": ["x"]}` is "missing", never "Array".
@@ -30,6 +33,7 @@ final class Field
     public const KIND_PHONE = 'phone';
     public const KIND_EMAIL_OR_PHONE = 'email_or_phone';
     public const KIND_PASSWORD = 'password';
+    public const KIND_SECRET = 'secret';
 
     /** The phone pattern when a handler doesn't name its own. */
     public const PHONE_PATTERN = '/^\+?[0-9 ()\-]{6,40}$/';
@@ -75,6 +79,15 @@ final class Field
     public static function password(): self
     {
         return new self(self::KIND_PASSWORD);
+    }
+
+    /**
+     * A token or a sign-in code (#2174 part 2). Read exactly as sent, so the
+     * check never changes what is compared: " 123456" stays " 123456".
+     */
+    public static function secret(): self
+    {
+        return new self(self::KIND_SECRET);
     }
 
     public function required(bool $required = true): self
@@ -142,8 +155,10 @@ final class Field
                 break;
             }
         }
-        $value = is_string($raw) ? $raw : (is_int($raw) || is_float($raw) ? (string) $raw : '');
-        if ($this->kind !== self::KIND_PASSWORD) {
+        $value = is_string($raw) ? $raw : (
+            $this->kind !== self::KIND_SECRET && (is_int($raw) || is_float($raw)) ? (string) $raw : ''
+        );
+        if ($this->kind !== self::KIND_PASSWORD && $this->kind !== self::KIND_SECRET) {
             $value = trim($value);
         }
         if ($this->kind === self::KIND_EMAIL && $this->lowercase) {
@@ -167,7 +182,7 @@ final class Field
     /** @return array{code: string, params: array<string, int>}|null */
     private function problem(string $value): ?array
     {
-        if ($value === '') {
+        if ($value === '' || ($this->kind === self::KIND_SECRET && trim($value) === '')) {
             return $this->required ? ['code' => Messages::REQUIRED, 'params' => []] : null;
         }
 

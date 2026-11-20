@@ -97,6 +97,27 @@ final class EmailVerificationHandlerRealEngineTest extends TestCase
         return $this->emails->insert($profileId, $email, $verified, true);
     }
 
+    /**
+     * #2174 part 2: a token that is not a string is missing (it was read as
+     * "Array" or its digits before); the sentences and statuses are unchanged.
+     */
+    public function testFieldProblemsAreListedAndTheSentencesAreUnchanged(): void
+    {
+        $bad = $this->handler->request(new Request('POST', '/api/email/request-verification', [], (string) json_encode(['email' => 'not-an-email'])));
+        self::assertSame(422, $bad->getStatusCode());
+        $json = json_decode($bad->getBody(), true);
+        self::assertSame('A valid email address is required', $json['error']);
+        self::assertSame(['email' => 'invalid_email'], $json['details']['field_codes']);
+
+        foreach ([['token' => ['x']], ['token' => 123456], ['token' => '  ']] as $body) {
+            $res = $this->handler->confirm(new Request('POST', '/api/email/verify', [], (string) json_encode($body)));
+            self::assertSame(422, $res->getStatusCode());
+            $json = json_decode($res->getBody(), true);
+            self::assertSame('A verification token is required', $json['error']);
+            self::assertSame(['token' => 'required'], $json['details']['field_codes']);
+        }
+    }
+
     private function request(string $email): \Whity\Sdk\Http\Response
     {
         return $this->handler->request(
