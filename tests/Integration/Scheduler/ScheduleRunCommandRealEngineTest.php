@@ -110,6 +110,42 @@ final class ScheduleRunCommandRealEngineTest extends TestCase
         self::assertGreaterThanOrEqual($before, $last);
     }
 
+    /**
+     * #2206: core's billing and dunning runs are started by the tick, but only
+     * where the operator turned local billing on; off by default.
+     */
+    public function testTheLocalBillingRunsStartOnlyWhenTheOperatorTurnsThemOn(): void
+    {
+        $globals = new GlobalSettingsRepository($this->pdo);
+        $tick = function () use ($globals): void {
+            (new ScheduleRunCommand(
+                $this->schedules,
+                new QueueService($this->jobs),
+                new ArraySharedStore(),
+                $this->jobs,
+                null,
+                static function (int $seconds): void {},
+                null,
+                null,
+                null,
+                $globals
+            ))->tick(300, 86400);
+        };
+        $billingJobs = fn (): array => $this->pdo->query(
+            "SELECT name, tenant_id FROM jobs WHERE name IN ('core.billing.run', 'core.billing.dunning') ORDER BY name"
+        )->fetchAll(PDO::FETCH_ASSOC);
+
+        $tick();
+        self::assertSame([], $billingJobs(), 'off by default: nobody is invoiced or locked');
+
+        $globals->set(\Whity\Core\Settings\SettingsRegistry::BILLING_LOCAL_RUNS_ENABLED, 'true');
+        $tick();
+        $tick();
+        $jobs = $billingJobs();
+        self::assertSame(['core.billing.dunning', 'core.billing.run'], array_column($jobs, 'name'), 'one of each, however many ticks');
+        self::assertSame([0, 0], array_map('intval', array_column($jobs, 'tenant_id')));
+    }
+
     public function testExactlyOnceLockStopsASecondWorkerFromDoubleFiring(): void
     {
         $id = $this->schedules->register(self::TENANT, 'demo.job', '*/5 * * * *');

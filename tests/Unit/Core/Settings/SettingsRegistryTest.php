@@ -70,7 +70,7 @@ final class SettingsRegistryTest extends TestCase
              // escalation. The dunning policy is per-tenant, because a
              // deployment chases its enterprise customers differently from its
              // self-service ones.
-             'payments.mock_enabled',
+             'payments.mock_enabled', 'billing.local_runs_enabled',
              // Affiliate clawback is global-only for the same reason: the money
              // goes to somebody outside the company, so no tenant decides it.
              'affiliate.clawback_on_refund', 'affiliate.withholding_bp',
@@ -494,7 +494,8 @@ final class SettingsRegistryTest extends TestCase
         // 142 since WHIT-1233: five inventory.* keys.
         // 144 since WHIT-1234: purchase route and over-receipt.
         // 145 since WHIT-1308: plugins.store_allow_unsigned.
-        self::assertCount(145, $describe);
+        // 146 since #2206: billing.local_runs_enabled.
+        self::assertCount(146, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
