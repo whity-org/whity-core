@@ -389,6 +389,8 @@ final class FormPrintout
             'conditional' => 'conditional',
             'rejected' => 'rejected',
             'revisions' => 'revisions',
+            // The render service knows no "withdrawn" mark; it reads as declined.
+            'withdrawn' => 'declined',
             default => 'waiting',
         };
     }
@@ -400,6 +402,7 @@ final class FormPrintout
             'conditional' => 'conditional',
             'rejected' => 'rejected',
             'revisions' => 'revisions',
+            'withdrawn' => 'withdrawn',
             default => 'waiting',
         });
     }

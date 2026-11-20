@@ -189,12 +189,13 @@ final class FormPrintoutService
         foreach ($this->stepInputs($tenantId, $routeId) as $key => $input) {
             $questions[$key] ??= $labels->pick(array_filter(['en' => (string) $input['label'], 'ar' => (string) ($input['label_ar'] ?? '')], static fn (string $l): bool => $l !== ''));
         }
-        $status = $approved ? 'approved' : match ($state) {
+        // #2204: a withdrawn paper prints as withdrawn, whatever its route reached.
+        $status = $state === 'withdrawn' ? 'withdrawn' : ($approved ? 'approved' : match ($state) {
             'completed' => 'approved',
             'not approved' => 'rejected',
             'sent back' => 'revisions',
             default => 'waiting',
-        };
+        });
         $values = (new RouteStepValueRepository($this->db))->valuesForRoute($tenantId, $routeId);
         // What each stage decided, when it picked a decision or a
         // recommendation from a list ("Recommend approval"): the
