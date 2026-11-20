@@ -308,7 +308,10 @@ final class MessagingService implements HostWiredService
         if ($message['send_after'] !== null) {
             $wait = (int) strtotime((string) $message['send_after'] . ' UTC') - time();
             if ($wait > 0) {
-                $this->queueDelivery($tenantId, $messageId, $wait, $attempt);
+                // A NEW key for the deferral: the job running now still holds
+                // this attempt's key, so re-using it would be dropped as a
+                // duplicate and the held message would never go (#2220).
+                $this->queueDelivery($tenantId, $messageId, $wait, $attempt, 'defer:' . sprintf('%.6F', microtime(true)));
 
                 return 'skipped';
             }
@@ -409,7 +412,7 @@ final class MessagingService implements HostWiredService
         return (array) $this->messages->find($tenantId, $id);
     }
 
-    private function queueDelivery(int $tenantId, int $messageId, int $delay, int $attempt): void
+    private function queueDelivery(int $tenantId, int $messageId, int $delay, int $attempt, ?string $keySuffix = null): void
     {
         ($this->enqueue)(
             self::DELIVER_JOB,
@@ -417,7 +420,7 @@ final class MessagingService implements HostWiredService
             [
                 'tenant_id' => $tenantId,
                 'delay' => max(0, $delay),
-                'idempotency_key' => 'message-deliver:' . $messageId . ':' . $attempt,
+                'idempotency_key' => 'message-deliver:' . $messageId . ':' . $attempt . ($keySuffix !== null ? ':' . $keySuffix : ''),
             ]
         );
     }

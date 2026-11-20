@@ -233,6 +233,30 @@ final class MessagingRealEngineTest extends TestCase
         self::assertFalse($this->messaging->cancel(self::B, (int) $c['id']), 'another workspace cannot cancel it');
     }
 
+    /**
+     * #2220. A held message picked up before its hold ends is queued again. The
+     * job doing the picking up still holds the first key, so the new one must
+     * carry a different key, or the queue drops it as a duplicate and the
+     * message stays queued for ever.
+     */
+    public function testAHeldMessagePickedUpEarlyIsQueuedAgainUnderANewKey(): void
+    {
+        $c = $this->messaging->send(self::A, Recipient::address('x@example.test'), 'Hi', new SendOptions());
+        $held = $this->messaging->reply(self::A, (int) $c['conversation_id'], self::STAFF_A, 'Drafted by the agent', true);
+        $first = $this->jobs[count($this->jobs) - 1];
+
+        self::assertSame('skipped', $this->messaging->deliver(self::A, (int) $held['id']));
+
+        $again = $this->jobs[count($this->jobs) - 1];
+        self::assertNotSame($first, $again, 'nothing was queued again');
+        self::assertSame(MessagingService::DELIVER_JOB, $again[0]);
+        self::assertSame((int) $held['id'], $again[1]['message_id']);
+        self::assertSame(1, $again[1]['attempt'], 'deferring is not a failed attempt');
+        self::assertGreaterThan(0, $again[2]['delay']);
+        self::assertNotSame($first[2]['idempotency_key'], $again[2]['idempotency_key']);
+        self::assertStringStartsWith($first[2]['idempotency_key'] . ':', $again[2]['idempotency_key']);
+    }
+
     public function testStaffApiIsBoundToTheCallersWorkspace(): void
     {
         $c = $this->messaging->send(self::A, Recipient::address('x@example.test'), 'Hi', new SendOptions());
