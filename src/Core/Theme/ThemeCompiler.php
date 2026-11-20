@@ -469,7 +469,12 @@ final class ThemeCompiler
         $shape = $theme['shape']['preset'] ?? 'whity';
         if (($shape !== 'whity' || $density !== 'standard') && isset(self::SHAPES[$shape])) {
             [$share, $sm, $md, $lg, $xl, $xxl, $card, $dialog] = self::SHAPES[$shape];
-            $radius = static fn (int $h): string => $share < 0 ? '999px' : ((int) round($h * $share)) . 'px';
+            // Round's pill is half the control's own height, not 999px: a
+            // single-line control still reads as a pill, and anything that
+            // grows (a textarea, a chip field, a card built on the control
+            // radius) keeps that corner instead of turning into a stadium
+            // that cuts its text (WHIT-1225, 30-themes 3.3).
+            $radius = static fn (int $h): string => ($share < 0 ? intdiv($h, 2) : (int) round($h * $share)) . 'px';
             $vars += [
                 'wy-radius-control-sm' => $radius($small),
                 'wy-radius-control' => $radius($control),

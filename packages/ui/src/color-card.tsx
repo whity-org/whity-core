@@ -237,7 +237,7 @@ export function ColorCard({
               {shade.isMain && (
                 <span
                   aria-label={mainShadeLabel}
-                  className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-30 text-xs font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border-2 border-card shadow-2xs whitespace-nowrap leading-none select-none"
+                  data-clip-ignore className="absolute -top-2.5 left-1/2 -translate-x-1/2 z-30 text-xs font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded-full border-2 border-card shadow-2xs whitespace-nowrap leading-none select-none"
                   style={{
                     backgroundColor: shade.hex,
                     color: shade.textColor,

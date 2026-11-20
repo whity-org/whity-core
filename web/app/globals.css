@@ -211,6 +211,8 @@
   --radius-card: var(--wy-radius-card, 12px);
   --radius-dialog: var(--wy-radius-dialog, 16px);
   --radius-full: 999px;
+  --spacing-inset-control: max(0.25rem, calc(var(--radius-control) * 0.3));
+  --radius-control-inner: max(0.125rem, calc(var(--radius-control) - var(--spacing-inset-control)));
   --shadow-plane: var(--plane-rest);
   --shadow-plane-hover: var(--plane-hover);
   --shadow-plane-primary: var(--plane-primary-rest);

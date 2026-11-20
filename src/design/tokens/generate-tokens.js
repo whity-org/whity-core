@@ -521,11 +521,17 @@ function generateThemeInlineBlock(base) {
   // Radii are literal (decision 4.2: ¼ of the control height, cards 12, dialogs
   // 16), not ratios of --radius, so a tenant changing --radius can't bend them.
   // A workspace theme's shape preset (TH.8, WHIT-1225) sets --wy-radius-*;
-  // only the theme engine writes those, and `full` stays a pill.
+  // only the theme engine writes those, and `full` stays a pill. Round's
+  // control radius is half the control height, never 999px.
   for (const [name, value] of Object.entries(base.borderRadius)) {
     if (name === 'base') continue;
     lines.push(name === 'full' ? `  --radius-${name}: ${value};` : `  --radius-${name}: var(--wy-radius-${name}, ${value});`);
   }
+  // Inner padding that grows with the corner (WHIT-1225): a field that
+  // wraps chips keeps them clear of its curve under any shape preset, and
+  // a child's radius inside it is the outer radius less this padding.
+  lines.push('  --spacing-inset-control: max(0.25rem, calc(var(--radius-control) * 0.3));');
+  lines.push('  --radius-control-inner: max(0.125rem, calc(var(--radius-control) - var(--spacing-inset-control)));');
   // The plane (decision 4.3) and the float shadow (4.4).
   lines.push('  --shadow-plane: var(--plane-rest);');
   lines.push('  --shadow-plane-hover: var(--plane-hover);');

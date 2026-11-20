@@ -75,7 +75,7 @@ function ViewToggle<TValue extends string>({
     <div
       role="group"
       aria-label={label}
-      className={cn("flex items-center rounded-md border border-border", className)}
+      className={cn("flex items-center overflow-hidden rounded-md border border-border", className)}
     >
       {options.map((option) => {
         const active = option.value === value
