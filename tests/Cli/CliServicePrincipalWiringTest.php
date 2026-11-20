@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Tests\Cli;
 
 use PHPUnit\Framework\TestCase;
+use Whity\Cli\Commands\BaseCommand;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -59,7 +60,7 @@ final class CliServicePrincipalWiringTest extends TestCase
         $source = $this->baseCommand();
 
         self::assertMatchesRegularExpression(
-            "/'profile_id'\s*=>\s*self::servicePrincipalId\(/",
+            "/cliTokenClaims\(self::servicePrincipalId\(/",
             $source,
             'The id must be looked up, not written down.'
         );
@@ -95,15 +96,37 @@ final class CliServicePrincipalWiringTest extends TestCase
      */
     public function testTheTokenIsScopedToTheSystemTenant(): void
     {
-        self::assertMatchesRegularExpression(
-            "/'tenant_id'\s*=>\s*0\b/",
-            $this->baseCommand(),
-            'Platform-wide commands need the platform-wide scope.'
-        );
-        self::assertDoesNotMatchRegularExpression(
-            "/'tenant_id'\s*=>\s*1\b/",
-            $this->baseCommand()
-        );
+        $claims = BaseCommand::cliTokenClaims(7);
+
+        self::assertSame(0, $claims['active_tenant_id'], 'Platform-wide commands need the platform-wide scope.');
+        self::assertSame(7, $claims['profile_id']);
+    }
+
+    /**
+     * #2200. The token carries the claims every sign-in mints, not the legacy
+     * `tenant_id`, so a handler reading `active_tenant_id` sees the tenant.
+     */
+    public function testTheTokenUsesThePostCutoverTenantClaim(): void
+    {
+        $claims = BaseCommand::cliTokenClaims(7);
+
+        self::assertArrayHasKey('active_tenant_id', $claims);
+        self::assertArrayNotHasKey('tenant_id', $claims);
+        self::assertArrayNotHasKey('user_id', $claims);
+    }
+
+    /**
+     * The claims lock the tenant the way a real token does.
+     */
+    public function testTheClaimsResolveToTheSystemTenant(): void
+    {
+        \Whity\Core\Tenant\TenantContext::reset();
+        try {
+            $method = new \ReflectionMethod(\Whity\Core\Tenant\TenantContext::class, 'lockTenantFromPayload');
+            self::assertSame(0, $method->invoke(null, BaseCommand::cliTokenClaims(7)));
+        } finally {
+            \Whity\Core\Tenant\TenantContext::reset();
+        }
     }
 
     /**

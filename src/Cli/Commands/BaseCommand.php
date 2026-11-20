@@ -832,17 +832,31 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         // `admin` in the system tenant and which nothing can authenticate as.
         //
         // TENANT 0, not 1. `EnforceTenantIsolation` pins every request to the
-        // token's tenant, so the old `tenant_id: 1` would have refused
+        // token's tenant, so the old tenant claim of 1 would have refused
         // `tenant update 5` even once the 401 was fixed. Tenant 0 is the
         // platform-wide scope these commands have always meant to operate at.
         if (!$this->token) {
-            $this->token = $jwtParser->create([
-                'profile_id'  => self::servicePrincipalId($db),
-                'sub'         => 'cli-service-principal',
-                'tenant_id'   => 0,
-                'token_epoch' => 0,
-            ]);
+            $this->token = $jwtParser->create(self::cliTokenClaims(self::servicePrincipalId($db)));
         }
+    }
+
+    /**
+     * The claims of the CLI's synthetic token, in the post-cutover shape every
+     * sign-in mints (#2200): `profile_id` and `active_tenant_id`. The legacy
+     * `tenant_id` claim is only read as a fallback for old tokens
+     * ({@see \Whity\Core\Tenant\TenantContext}), so a token carrying it alone
+     * left `active_tenant_id` null for any handler that reads it.
+     *
+     * @return array{profile_id: int, sub: string, active_tenant_id: int, token_epoch: int}
+     */
+    public static function cliTokenClaims(int $servicePrincipalId): array
+    {
+        return [
+            'profile_id'       => $servicePrincipalId,
+            'sub'              => 'cli-service-principal',
+            'active_tenant_id' => 0,
+            'token_epoch'      => 0,
+        ];
     }
 
     /**
