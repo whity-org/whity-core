@@ -114,6 +114,10 @@ A theme sets **choices**. The engine turns choices into **tokens**. Tokens are w
 | `tajawal` | Tajawal | Tajawal | Light, modern |
 | `almarai` | Almarai | Almarai | Bold, retail |
 | `kufi` | Noto Sans | Noto Kufi Arabic | Formal Arabic headings |
+| `rubik` | Rubik | Rubik | Soft geometric; retail and salons (TH.20) |
+| `alexandria` | Alexandria | Alexandria | Contemporary Kufi; tech and schools (TH.20) |
+| `naskh` | Noto Serif | Noto Naskh Arabic | Classic, for law and print-like brands; product screens only, print keeps E.46 (TH.20) |
+| `ibm-kufi` | IBM Plex Sans | IBM Plex Sans Arabic for text, Noto Kufi Arabic for headings | Formal with a corporate body (TH.20) |
 
 Mono stays Geist Mono (3.4). New fonts join through a PR that adds the files, licence and metrics, never through a theme.
 
