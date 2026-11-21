@@ -160,7 +160,7 @@ final class CommissionCloses
         $stmt = $this->db->prepare('SELECT id FROM calendar_commission_closes WHERE tenant_id = :t ORDER BY period_start DESC, id DESC');
         $stmt->execute([':t' => $tenantId]);
 
-        return array_map(fn (mixed $id): array => $this->one($tenantId, (int) $id, $language), $stmt->fetchAll(PDO::FETCH_COLUMN));
+        return array_values(array_map(fn (mixed $id): array => $this->one($tenantId, (int) $id, $language), $stmt->fetchAll(PDO::FETCH_COLUMN)));
     }
 
     /** @return array<string, mixed> */
