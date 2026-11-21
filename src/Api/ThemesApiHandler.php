@@ -16,6 +16,7 @@ use Whity\Core\Theme\ThemeImporter;
 use Whity\Core\Theme\ThemeImportProblem;
 use Whity\Core\Theme\ThemeLibrary;
 use Whity\Core\Theme\ThemeRepository;
+use Whity\Core\Theme\ThemeTokenExport;
 use Whity\Core\Theme\ThemeTweaks;
 use Whity\Core\Theme\ThemeValidator;
 
@@ -28,6 +29,9 @@ use Whity\Core\Theme\ThemeValidator;
  *
  *   GET    /api/v1/themes            settings:read   the list, each with a preview
  *   GET    /api/v1/themes/export     settings:read   the theme in use as a file (TH.16)
+ *   GET    /api/v1/themes/export/tokens  settings:read  the theme in use as CSS, JSON,
+ *                                                    Tailwind or Flutter (TH.25)
+ *   POST   /api/v1/themes/tokens     settings:write  a draft from the editor, the same way
  *   POST   /api/v1/themes            settings:write  import a theme file (JSON body);
  *                                                    `?check=1` only checks it and says
  *                                                    what a newer version changes
@@ -122,6 +126,54 @@ final class ThemesApiHandler
 
             return Response::json(['data' => ['theme' => $file, 'filename' => $name]], 200);
         }, true);
+    }
+
+    /**
+     * TH.25 (30-themes 11, 14.7): the theme in use, with everything the
+     * workspace set, as resolved tokens for another tool. Free.
+     */
+    public function exportTokens(Request $request): Response
+    {
+        return $this->inWorkspace(function (int $tenantId) use ($request): Response {
+            $format = (string) self::queryParam($request, 'format');
+            if (!in_array($format, ThemeTokenExport::FORMATS, true)) {
+                return Response::error('Choose css, json, tailwind or flutter.', 422);
+            }
+            [$chosen, $seed, $overrides] = $this->adjustments($tenantId);
+            $library = new ThemeLibrary($this->repository, $this->pluginThemes);
+            $theme = ($chosen !== '' ? $library->find($tenantId, $chosen) : null) ?? $library->find($tenantId, ThemeLibrary::DEFAULT_ID)
+                ?? ThemeLibrary::builtIn()[ThemeLibrary::DEFAULT_ID];
+            $values = $tenantId === 0 ? $this->settings->getGlobal() : $this->settings->effective($tenantId);
+            $file = ThemeTweaks::export($theme, $seed, $overrides, (string) ($values[SettingsRegistry::SITE_NAME] ?? ''));
+            if (ThemeValidator::validate($file) !== []) {
+                return Response::error('The theme in use could not be exported.', 500);
+            }
+
+            return Response::json(['data' => ThemeTokenExport::export($file, $format)], 200);
+        }, true);
+    }
+
+    /** TH.25: a draft from the editor as resolved tokens, the same way; nothing is saved. */
+    public function tokens(Request $request): Response
+    {
+        return $this->inWorkspace(function () use ($request): Response {
+            $body = $request->getBody();
+            if (strlen($body) > self::MAX_BYTES + 256) {
+                return Response::error('The theme is too large.', 413);
+            }
+            $decoded = json_decode($body, true);
+            $format = is_array($decoded) && is_string($decoded['format'] ?? null) ? $decoded['format'] : '';
+            $theme = is_array($decoded) ? ($decoded['theme'] ?? null) : null;
+            if (!in_array($format, ThemeTokenExport::FORMATS, true)) {
+                return Response::error('Choose css, json, tailwind or flutter.', 422);
+            }
+            $errors = ThemeValidator::validate($theme);
+            if ($errors !== [] || !is_array($theme)) {
+                return Response::error('This theme can\'t be exported yet.', 422, ['theme' => implode(' ', array_slice($errors, 0, 5))]);
+            }
+
+            return Response::json(['data' => ThemeTokenExport::export($theme, $format)], 200);
+        });
     }
 
     public function import(Request $request): Response

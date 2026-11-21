@@ -550,6 +550,37 @@ final class ThemeCompiler
     }
 
     /**
+     * Every size the theme sets, defaults included, for exports outside Whity
+     * (TH.25): control heights and the table row at its density, the whole
+     * radius set of its preset with the pressed and selected radii and the
+     * corner, and each component family's own set under `<family>-`.
+     *
+     * @param array<string, mixed> $theme A valid theme (ThemeValidator).
+     * @return array<string, string>
+     */
+    public static function resolvedShape(array $theme): array
+    {
+        $density = is_string($theme['density'] ?? null) && isset(self::DENSITY[$theme['density']]) ? $theme['density'] : 'standard';
+        [$small, $control, $large, $row] = self::DENSITY[$density];
+        $shape = is_string($theme['shape']['preset'] ?? null) && isset(self::SHAPES[$theme['shape']['preset']]) ? $theme['shape']['preset'] : 'whity';
+        $morph = static fn (string $preset): bool => ($theme['shape']['morph'] ?? (in_array($preset, self::MORPH_BY_DEFAULT, true) ? 'on' : 'off')) === 'on';
+
+        $out = ['control-h-sm' => "{$small}px", 'control-h' => "{$control}px", 'control-h-lg' => "{$large}px", 'row-h' => "{$row}px"]
+            + self::radii($shape, $small, $control, $large, $morph($shape));
+        $components = is_array($theme['shape']['components'] ?? null) ? $theme['shape']['components'] : [];
+        foreach (ThemeValidator::COMPONENT_FAMILIES as $family) {
+            $preset = $components[$family] ?? null;
+            if (is_string($preset) && isset(self::SHAPES[$preset]) && $preset !== $shape) {
+                foreach (self::radii($preset, $small, $control, $large, $morph($preset)) as $name => $value) {
+                    $out["{$family}-{$name}"] = $value;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * One preset's whole radius set at the given control heights, as the
      * names after `wy-` (or `wy-<family>-`): every radius, the pressed and
      * selected radii (the control's own when it doesn't morph) and the corner.

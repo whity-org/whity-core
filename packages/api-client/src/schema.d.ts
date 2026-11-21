@@ -11571,6 +11571,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/themes/export/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the theme in use as CSS, JSON, Tailwind or Flutter
+         * @description Free (TH.25): the theme this workspace uses, with its main colour, colour overrides and tweaks, as resolved tokens: every colour for light and dark after the guard rails, every radius and size with Whity's defaults, the fonts by family name and the motion timings. css is custom properties, json the Design Tokens Community Group format, tailwind a Tailwind v4 @theme file, flutter a Dart file like whity_tokens' AppTokens with Material 3 colour schemes.
+         */
+        get: operations["get_api_v1_themes_export_tokens"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/themes/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export a draft theme as CSS, JSON, Tailwind or Flutter
+         * @description The theme editor's export (TH.25): a theme file, saved or not, as resolved tokens in the same formats as GET /api/themes/export/tokens. Nothing is saved.
+         */
+        post: operations["post_api_v1_themes_tokens"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/themes/{themeId}": {
         parameters: {
             query?: never;
@@ -23048,6 +23088,30 @@ export interface components {
         ThemeOverridesResponse: {
             data: {
                 [key: string]: string;
+            };
+        };
+        ThemeTokensRequest: {
+            /** @description A theme file (schemas/theme/v1.json). */
+            theme: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description css for CSS variables, json for Design Tokens JSON, tailwind for a Tailwind v4 @theme file, flutter for a Dart file.
+             * @enum {string}
+             */
+            format: "css" | "json" | "tailwind" | "flutter";
+        };
+        ThemeTokensResponse: {
+            data: {
+                /**
+                 * @description The format the file is in.
+                 * @enum {string}
+                 */
+                format: "css" | "json" | "tailwind" | "flutter";
+                filename: string;
+                media_type: string;
+                /** @description The file's text. */
+                content: string;
             };
         };
         TimeWindow: {
@@ -86097,6 +86161,179 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_themes_export_tokens: {
+        parameters: {
+            query: {
+                /** @description css, json, tailwind or flutter */
+                format: "css" | "json" | "tailwind" | "flutter";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file, its name and media type */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeTokensResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown format */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_themes_tokens: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThemeTokensRequest"];
+            };
+        };
+        responses: {
+            /** @description The file, its name and media type */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeTokensResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The theme is larger than 32 KB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Unknown format, or the theme has problems */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

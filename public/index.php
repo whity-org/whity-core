@@ -6458,6 +6458,8 @@ $themesHandler = new \Whity\Api\ThemesApiHandler(
 );
 $router->register('GET',    '/api/themes',            [$themesHandler, 'list'],   null, null, CorePermissions::SETTINGS_READ);
 $router->register('GET',    '/api/themes/export',     [$themesHandler, 'export'], null, null, CorePermissions::SETTINGS_READ);
+$router->register('GET',    '/api/themes/export/tokens', [$themesHandler, 'exportTokens'], null, null, CorePermissions::SETTINGS_READ);
+$router->register('POST',   '/api/themes/tokens',     [$themesHandler, 'tokens'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('POST',   '/api/themes',            [$themesHandler, 'import'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('POST',   '/api/themes/convert',    [$themesHandler, 'convert'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('DELETE', '/api/themes/{themeId}',  [$themesHandler, 'delete'], null, null, CorePermissions::SETTINGS_WRITE);

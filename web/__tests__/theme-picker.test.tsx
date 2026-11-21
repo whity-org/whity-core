@@ -4,6 +4,7 @@
  * guard rails changed.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ThemePicker, adjustmentText, changeText, fontStack, overridesValue } from '@/components/theme-picker';
 
 const GET = jest.fn();
@@ -116,9 +117,35 @@ it('exports the theme in use as a file', async () => {
   const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
   render(<ThemePicker scope="tenant" canWrite={false} />);
   await screen.findByText('Harbour');
-  fireEvent.click(screen.getByRole('button', { name: 'Export theme' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Export theme' }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Theme file, for Whity' }));
   await waitFor(() => expect(click).toHaveBeenCalled());
   expect(GET).toHaveBeenCalledWith('/api/v1/themes/export');
+  click.mockRestore();
+});
+
+// TH.25: the theme in use for another tool.
+it('exports the theme in use as CSS, JSON, Tailwind or Flutter', async () => {
+  GET.mockImplementation((path: string) =>
+    Promise.resolve(
+      path === '/api/v1/themes/export/tokens'
+        ? { data: { data: { format: 'flutter', filename: 'workspace_whity_theme.dart', media_type: 'text/x-dart', content: 'class WorkspaceWhityTheme {}' } } }
+        : { data: { data: list } },
+    ),
+  );
+  const createObjectURL = jest.fn((_blob: Blob) => 'blob:theme');
+  Object.assign(URL, { createObjectURL, revokeObjectURL: jest.fn() });
+  const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  render(<ThemePicker scope="tenant" canWrite={false} />);
+  await screen.findByText('Harbour');
+  await userEvent.click(screen.getByRole('button', { name: 'Export theme' }));
+  for (const name of ['CSS variables', 'Design tokens (JSON)', 'Tailwind CSS']) {
+    expect(await screen.findByRole('menuitem', { name })).toBeInTheDocument();
+  }
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Flutter' }));
+  await waitFor(() => expect(click).toHaveBeenCalled());
+  expect(GET).toHaveBeenCalledWith('/api/v1/themes/export/tokens', { params: { query: { format: 'flutter' } } });
+  expect(createObjectURL.mock.calls[0][0].type).toBe('text/x-dart');
   click.mockRestore();
 });
 

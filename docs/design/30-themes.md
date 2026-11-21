@@ -488,7 +488,7 @@ All free in core (TH.16, TH.25).
 | Import a Whity theme file | the picker |
 | Re-import a newer version of an imported theme | says what changed in words before replacing (built, #2343); the editor adds a side-by-side diff |
 | Import from shadcn CSS variables, a Tailwind v4 `@theme`, or Material Theme Builder JSON | the picker's "Import from another tool" (built, WHIT-1225, see below); the editor will open the result to change it |
-| Export resolved tokens as CSS, JSON, Tailwind or Flutter | the editor (11) |
+| Export resolved tokens as CSS, JSON, Tailwind or Flutter | the picker's Export menu for the theme in use; `POST /themes/tokens` for a draft (built, WHIT-1225, see below) |
 | Share a theme with another workspace you own | export and import now; a "Use in…" button with the editor |
 | Store packages (signed, hashed, through Whity ID, per the store move) | install free; a publisher may sell a theme through Whity Pay (TH.13); publishing from the editor |
 
@@ -500,7 +500,25 @@ All free in core (TH.16, TH.25).
 - **Colours:** the main colour (`primary`) becomes the seed. Each colour whose role Whity has becomes a colour set by hand in its mode. Status colours stay Whity's (TH.7), and the guard rails still apply when the theme is used, so the result says how many colours they will change.
 - **Radius and font:** `--radius` (shadcn's `rounded-lg`) becomes the nearest preset: 0 is Square, up to 6px Crisp, up to 11px Whity, up to 15px Soft, and larger Round. A font becomes its pair only when Whity has it with an Arabic face; otherwise the theme keeps Noto Sans and says so.
 - **Id and name:** the id is `imported.<name>`, and the name is plain text.
-- **Not yet built:** the editor, exporting resolved tokens as CSS, JSON, Tailwind or Flutter, and the side-by-side diff are the rest of section 11.
+- **Not yet built:** the side-by-side diff and publishing, the rest of section 11.
+
+
+**Token export (built, WHIT-1225, TH.25).** `ThemeTokenExport` writes a theme's resolved tokens for another tool. Resolved means what the workspace sees:
+- every colour for light and dark after the guard rails;
+- every radius and size with Whity's defaults (`ThemeCompiler::resolvedShape`), and each family's own corners (14.2);
+- the fonts by family name, never Whity's CSS variables (`ThemeFonts::families`);
+- the motion timings.
+
+The formats:
+- **CSS:** custom properties on `:root`, with dark under `.dark`.
+- **JSON:** the W3C Design Tokens Community Group format. A spring easing has no token type, so it is a described `linear()`.
+- **Tailwind:** a Tailwind v4 file with `@theme` (`--color-*`, `--radius-*` including `--radius-<family>-*`, heights as `--spacing-*`, fonts and easing) and dark under `.dark` in `@layer base`.
+- **Flutter:** a Dart class in the shape of whity_tokens' `AppTokens` (`lightColors`, `darkColors`, `radius`, `size`, fonts), plus Material 3 `lightScheme` and `darkScheme` and a `theme(Brightness)`.
+
+Where it is available:
+- `GET /api/v1/themes/export/tokens?format=` exports the theme in use with everything the workspace set. The picker's Export menu offers it beside the theme file.
+- `POST /api/v1/themes/tokens` exports a draft.
+- The theme name goes into a comment as plain text, and nothing in it can close the comment.
 
 ### 14.8 Free and paid
 

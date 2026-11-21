@@ -1056,6 +1056,10 @@
     "en": "Export the theme in use as a theme file",
     "ar": "تصدير السمة المستخدمة كملف سمة"
   },
+  "get_api_themes_export_tokens": {
+    "en": "Export the theme in use for another tool",
+    "ar": "تصدير المظهر المستخدم لأداة أخرى"
+  },
   "get_api_time_window_types": {
     "en": "List the kinds of period in your workspace",
     "ar": "عرض أنواع الفترات"
@@ -2015,6 +2019,10 @@
   "post_api_themes_convert": {
     "en": "Turn a theme from another tool into a theme file",
     "ar": "تحويل مظهر من أداة أخرى إلى ملف مظهر"
+  },
+  "post_api_themes_tokens": {
+    "en": "Export a draft theme for another tool",
+    "ar": "تصدير مسودة مظهر لأداة أخرى"
   },
   "post_api_time_window_types": {
     "en": "Add a period kind, or adopt a built-in one",
