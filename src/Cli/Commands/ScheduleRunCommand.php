@@ -280,6 +280,14 @@ final class ScheduleRunCommand implements CliCommand
             ]);
         }
 
+        // WHIT-1321: sent quotes past their valid-until date, once an hour.
+        if ((int) $now->format('i') === 0) {
+            $this->queue->dispatch(\Whity\Core\Sales\QuoteExpiryJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'sales-quote-expiry-' . $bucket,
+            ]);
+        }
+
         // WHIT-1013: proof of life, due or not. A failed write must not fail the tick.
         try {
             $this->heartbeat?->beat($now->getTimestamp());

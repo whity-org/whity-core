@@ -2271,5 +2271,61 @@
   "taskaat_update_task": {
     "en": "Change a task in Taskaat",
     "ar": "تعديل مهمة في Taskaat"
+  },
+  "get_api_sales_quotes": {
+    "en": "List quotes",
+    "ar": "عرض عروض الأسعار"
+  },
+  "post_api_sales_quotes": {
+    "en": "Draft a quote",
+    "ar": "إعداد مسودة عرض سعر"
+  },
+  "get_api_sales_quotes_id": {
+    "en": "Show a quote",
+    "ar": "عرض عرض سعر"
+  },
+  "patch_api_sales_quotes_id": {
+    "en": "Change a draft quote",
+    "ar": "تعديل مسودة عرض سعر"
+  },
+  "post_api_sales_quotes_id_submit": {
+    "en": "Send a quote for approval",
+    "ar": "إرسال عرض سعر للموافقة"
+  },
+  "post_api_sales_quotes_id_send": {
+    "en": "Send a quote to the customer",
+    "ar": "إرسال عرض سعر إلى العميل"
+  },
+  "post_api_sales_quotes_id_link": {
+    "en": "Make a new link to a quote",
+    "ar": "إنشاء رابط جديد لعرض سعر"
+  },
+  "post_api_sales_quotes_id_decision": {
+    "en": "Record the customer's answer to a quote",
+    "ar": "تسجيل رد العميل على عرض سعر"
+  },
+  "post_api_sales_quotes_id_revise": {
+    "en": "Make a new revision of a quote",
+    "ar": "إنشاء نسخة معدّلة من عرض سعر"
+  },
+  "post_api_sales_quotes_id_cancel": {
+    "en": "Withdraw a quote",
+    "ar": "سحب عرض سعر"
+  },
+  "get_api_sales_quotes_id_targets": {
+    "en": "What a quote can turn into",
+    "ar": "ما يمكن تحويل عرض السعر إليه"
+  },
+  "post_api_sales_quotes_id_convert": {
+    "en": "Turn a quote into an order or an invoice",
+    "ar": "تحويل عرض سعر إلى أمر بيع أو فاتورة"
+  },
+  "get_api_sales_settings": {
+    "en": "Show the sales settings",
+    "ar": "عرض إعدادات المبيعات"
+  },
+  "patch_api_sales_settings": {
+    "en": "Change the sales settings",
+    "ar": "تعديل إعدادات المبيعات"
   }
 }

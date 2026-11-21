@@ -197,6 +197,16 @@ final class CoreJobs
                 false
             );
             $registry->register(\Whity\Core\Calendar\BookingHoldExpiryJob::NAME, new \Whity\Core\Calendar\BookingHoldExpiryJob($calendarBookings), false);
+            // WHIT-1321: sent quotes past their valid-until date expire. Internal:
+            // the scheduler queues it hourly. Events go through the kernel's
+            // hook manager where one is registered (the worker registers it).
+            $registry->register(\Whity\Core\Sales\QuoteExpiryJob::NAME, new \Whity\Core\Sales\QuoteExpiryJob(
+                static fn (): \Whity\Core\Sales\Quotes => \Whity\Core\Sales\SalesServices::quotes(
+                    $pdo,
+                    $calendarSettings,
+                    isset($GLOBALS['whity_services'][\Whity\Core\Hooks\HookManager::class]) ? \Whity\app(\Whity\Core\Hooks\HookManager::class) : null,
+                )
+            ), false);
             // WHIT-931: MCP idempotency keys older than a day. Internal: the scheduler queues it hourly.
             $registry->register(\Whity\Mcp\Tools\McpCallKeysPruneJob::NAME, new \Whity\Mcp\Tools\McpCallKeysPruneJob(new \Whity\Mcp\Tools\McpCallKeys($pdo)), false);
             // ADR 0018: reminders before events and meetings, through the same

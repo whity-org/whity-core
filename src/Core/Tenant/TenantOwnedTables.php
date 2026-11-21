@@ -662,6 +662,9 @@ final class TenantOwnedTables
         'inv_orders' => '321_create_inventory_orders.php',
         'inv_order_lines' => '321_create_inventory_orders.php',
         'inv_supplier_items' => '321_create_inventory_orders.php',
+        'sales_quotes' => '399_create_sales_quotes.php',
+        'sales_quote_lines' => '399_create_sales_quotes.php',
+        'sales_quote_conversions' => '399_create_sales_quotes.php',
     ];
 
     /**
