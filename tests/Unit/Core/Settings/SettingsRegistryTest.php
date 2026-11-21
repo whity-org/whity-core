@@ -148,6 +148,8 @@ final class SettingsRegistryTest extends TestCase
              'inventory.count_route_template_id', 'inventory.transfers_one_step',
              // WHIT-1234: purchasing.
              'inventory.purchase_route_template_id', 'inventory.over_receipt_percent',
+             // WHIT-1235: batches and expiry.
+             'inventory.fefo', 'inventory.expiry_warning_days',
              // WHIT-1321: quotes.
              'sales.quote_valid_days', 'sales.quote_route_template_id',
              // WHIT-1323: the trading emails' switches.
@@ -501,7 +503,8 @@ final class SettingsRegistryTest extends TestCase
         // 146 since #2206: billing.local_runs_enabled.
         // 148 since WHIT-1321: sales.quote_valid_days and sales.quote_route_template_id.
         // 152 since WHIT-1323: sales.email_quote, _invoice, _receipt and _reminder.
-        self::assertCount(152, $describe);
+        // 154 since WHIT-1235: inventory.fefo and inventory.expiry_warning_days.
+        self::assertCount(154, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

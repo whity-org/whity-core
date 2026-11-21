@@ -107,6 +107,10 @@ final class HostStock implements Stock
             'note' => $line->note,
             'unit_cost_minor' => $line->unitCostMinor,
             'currency' => $line->currency,
+            'lot_id' => $line->lotId,
+            'lot_code' => $line->lotCode,
+            'expires_on' => $line->expiresOn,
+            'made_on' => $line->madeOn,
         ], $request->lines);
 
         $result = HostInventoryGuard::run(fn (): array => $this->ledger->post($tenantId, $request->actingProfileId, $lines, [

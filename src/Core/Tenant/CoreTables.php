@@ -141,6 +141,7 @@ final class CoreTables
         'inv_reasons' => '320_create_inventory_operations.php',
         'inv_reorder_rules' => '320_create_inventory_operations.php',
         'inv_supplier_items' => '321_create_inventory_orders.php',
+        'inv_lots' => '337_create_inventory_lots.php',
         'inv_units' => '317_create_inventory_items.php',
         'inv_variants' => '317_create_inventory_items.php',
         'plugin_secrets' => '187_create_plugin_secrets.php',

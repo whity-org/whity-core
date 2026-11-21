@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.133).
+ * SDK identity (v1.137).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1515,12 +1515,23 @@ namespace Whity\Sdk;
  * a warning only; nothing is ever refused.
  *
  * Purely additive: one new host service, null on older hosts.)
+ *
+ * 1.137 (LOTS, SERIAL NUMBERS AND EXPIRY: {@see Inventory\Lots} reads an item's batches and serial
+ * numbers ({@see Inventory\Lot}) and what is expiring, through `$ctx->inventory()->lots()` or the container.
+ * An item keeps batches when its `tracking` is `lot` (each batch with its expiry) or `serial`. A
+ * {@see Inventory\MoveLine} gains `lotId`, `lotCode`, `expiresOn` and `madeOn`: stock coming in names its
+ * batch (a new code makes it), stock leaving may name one or takes the batches that expire first.
+ * {@see Inventory\Move} gains `lotId`. New events, fired once per batch by a daily job:
+ * `stock.lot.expiring` and `stock.lot.expired`, each with an `.async` twin (WHIT-1235, design 31 §3.5).
+ *
+ * Purely additive: one new method on Context\InventoryScope, which only the host implements, and new
+ * optional constructor arguments, last, on MoveLine and Move.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.133.0';
+    public const VERSION = '1.137.0';
 
     /**
      * Static identity only — never instantiated.

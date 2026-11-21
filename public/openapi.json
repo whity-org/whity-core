@@ -40958,6 +40958,429 @@
                 ]
             }
         },
+        "/api/v1/inventory/lots": {
+            "get": {
+                "operationId": "get_api_v1_inventory_lots",
+                "summary": "An item's batches or serial numbers, with what each holds where",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Soonest expiring first. Batches with no stock left are listed only with `with_empty=true`.",
+                "parameters": [
+                    {
+                        "name": "item_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "The item (or give variant_id).",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "variant_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this variant.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "with_empty",
+                        "in": "query",
+                        "required": false,
+                        "description": "`true` to list batches with no stock left too.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Batches",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventoryLot"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/lots/expiring": {
+            "get": {
+                "operationId": "get_api_v1_inventory_lots_expiring",
+                "summary": "Batches with stock that are expiring soon or have expired",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Within the workspace's warning window (7 days unless changed) or `days`, soonest first.",
+                "parameters": [
+                    {
+                        "name": "days",
+                        "in": "query",
+                        "required": false,
+                        "description": "How many days ahead, 0 to 3650.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Batches",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventoryLot"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/lots/{id}": {
+            "get": {
+                "operationId": "get_api_v1_inventory_lots_id",
+                "summary": "One batch or serial number",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The batch",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryLot"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "patch_api_v1_inventory_lots_id",
+                "summary": "Correct a batch's dates or notes",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "A new expiry date may be told again as expiring or expired.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryLotRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The batch",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryLot"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/inventory/operations": {
             "get": {
                 "operationId": "get_api_v1_inventory_operations",
@@ -106751,6 +107174,24 @@
                                 },
                                 "note": {
                                     "type": "string"
+                                },
+                                "lot_code": {
+                                    "type": "string",
+                                    "description": "For an item that keeps batches: the batch code (a new one makes the batch) or serial number."
+                                },
+                                "lot_id": {
+                                    "type": "integer",
+                                    "description": "Or the batch by id."
+                                },
+                                "expires_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "A new batch's expiry date; needed when the item expires and has no shelf life."
+                                },
+                                "made_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "When a new batch was made."
                                 }
                             },
                             "required": [
@@ -106898,6 +107339,24 @@
                                 },
                                 "note": {
                                     "type": "string"
+                                },
+                                "lot_code": {
+                                    "type": "string",
+                                    "description": "For an item that keeps batches: the batch any extra found belongs to (a new code makes it); a shortfall comes out of the batches that expire first."
+                                },
+                                "lot_id": {
+                                    "type": "integer",
+                                    "description": "Or the batch by id."
+                                },
+                                "expires_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "A new batch's expiry date; needed when the item expires and has no shelf life."
+                                },
+                                "made_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "When a new batch was made."
                                 }
                             },
                             "required": [
@@ -107484,6 +107943,15 @@
                         "nullable": true,
                         "description": "The category it belongs to, or null for none."
                     },
+                    "tracking": {
+                        "type": "string",
+                        "enum": [
+                            "none",
+                            "lot",
+                            "serial"
+                        ],
+                        "description": "`lot` keeps batches (each with its expiry), `serial` a serial number per piece, `none` (the default) neither. Batches can be turned on while the item has stock, which goes into the batch OPENING; serial numbers, and turning batches off, only at 0 stock."
+                    },
                     "expires": {
                         "type": "boolean",
                         "description": "True when the item goes off and its stock has expiry dates."
@@ -107696,6 +108164,130 @@
                     "is_active": {
                         "type": "boolean",
                         "description": "False to stop using the place; its history stays."
+                    }
+                }
+            },
+            "InventoryLot": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "variant_id": {
+                        "type": "integer"
+                    },
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "item_name": {
+                        "type": "string"
+                    },
+                    "item_names": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "The name in each language, such as `{\"en\": \"Flour\", \"ar\": \"\u0637\u062d\u064a\u0646\"}`."
+                    },
+                    "sku": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": "string",
+                        "description": "The batch code or serial number."
+                    },
+                    "is_serial": {
+                        "type": "boolean"
+                    },
+                    "made_on": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "expires_on": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "supplier_contact_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "supplier_name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "on_hand": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "description": "Every place together, in the item's base unit."
+                    },
+                    "on_hand_steps": {
+                        "type": "integer"
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "places": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "location_id": {
+                                    "type": "integer"
+                                },
+                                "on_hand": {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+(\\.\\d+)?$",
+                                    "description": "There."
+                                }
+                            },
+                            "required": [
+                                "location_id",
+                                "on_hand"
+                            ]
+                        }
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "variant_id",
+                    "item_id",
+                    "item_name",
+                    "sku",
+                    "code",
+                    "is_serial",
+                    "made_on",
+                    "expires_on",
+                    "on_hand",
+                    "unit",
+                    "places",
+                    "created_at"
+                ]
+            },
+            "InventoryLotRequest": {
+                "type": "object",
+                "properties": {
+                    "expires_on": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "date",
+                        "description": "The batch's expiry date, such as 2027-03-31; null when it has none."
+                    },
+                    "made_on": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "date",
+                        "description": "When the batch was made; null when not known."
+                    },
+                    "notes": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "description": "A note kept with the batch."
                     }
                 }
             },
@@ -108016,6 +108608,24 @@
                                 "reason_code": {
                                     "type": "string",
                                     "description": "This line's own reason, when it differs."
+                                },
+                                "lot_code": {
+                                    "type": "string",
+                                    "description": "For an item that keeps batches: the batch code (a new one makes the batch) or serial number."
+                                },
+                                "lot_id": {
+                                    "type": "integer",
+                                    "description": "Or the batch by id."
+                                },
+                                "expires_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "A new batch's expiry date; needed when the item expires and has no shelf life."
+                                },
+                                "made_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "When a new batch was made."
                                 }
                             },
                             "required": [
@@ -108137,6 +108747,16 @@
                     "order_line_id": {
                         "type": "integer",
                         "nullable": true
+                    },
+                    "lot_code": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The batch or serial number the line named."
+                    },
+                    "lot_expires_on": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "That batch's expiry date."
                     }
                 },
                 "required": [
@@ -108762,6 +109382,24 @@
                                 },
                                 "note": {
                                     "type": "string"
+                                },
+                                "lot_code": {
+                                    "type": "string",
+                                    "description": "For an item that keeps batches: the batch code (a new one makes the batch) or serial number."
+                                },
+                                "lot_id": {
+                                    "type": "integer",
+                                    "description": "Or the batch by id."
+                                },
+                                "expires_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "A new batch's expiry date; needed when the item expires and has no shelf life."
+                                },
+                                "made_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "When a new batch was made."
                                 }
                             },
                             "required": [
@@ -108977,6 +109615,12 @@
                     },
                     "over_receipt_percent": {
                         "type": "integer"
+                    },
+                    "fefo": {
+                        "type": "boolean"
+                    },
+                    "expiry_warning_days": {
+                        "type": "integer"
                     }
                 },
                 "required": [
@@ -108986,7 +109630,9 @@
                     "count_route_template_id",
                     "transfers_one_step",
                     "purchase_route_template_id",
-                    "over_receipt_percent"
+                    "over_receipt_percent",
+                    "fefo",
+                    "expiry_warning_days"
                 ]
             },
             "InventorySettingsRequest": {
@@ -109024,6 +109670,14 @@
                     "over_receipt_percent": {
                         "type": "integer",
                         "description": "How far past the order a receipt may go before it asks, 0 to 100 (0: anything over asks)."
+                    },
+                    "fefo": {
+                        "type": "boolean",
+                        "description": "True (the default) to take the batch that expires first; false takes the oldest batch."
+                    },
+                    "expiry_warning_days": {
+                        "type": "integer",
+                        "description": "Days before its expiry a batch counts as expiring soon, 1 to 365 (7)."
                     }
                 }
             },
@@ -109184,6 +109838,14 @@
                                 },
                                 "note": {
                                     "type": "string"
+                                },
+                                "lot_code": {
+                                    "type": "string",
+                                    "description": "For an item that keeps batches: the batch to take from. Left out, the batches that expire first are taken."
+                                },
+                                "lot_id": {
+                                    "type": "integer",
+                                    "description": "Or the batch by id."
                                 }
                             },
                             "required": [
