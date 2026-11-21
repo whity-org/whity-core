@@ -2981,6 +2981,11 @@ $workspaceTemplatesHandler = new \Whity\Api\WorkspaceTemplatesApiHandler(
 );
 $workspaceCodePluginsHandler->useTemplateOnboardings(static fn (int $tenantId): array => $workspaceTemplatesHandler->onboardings($tenantId));
 $workspaceTemplatesHandler->useDisplayNames(static fn (): array => $pluginLoader->getDisplayNames());
+// SDK 1.131 (WHIT-1225): a template's theme is offered only when the workspace has it.
+$workspaceTemplatesHandler->useThemes(static fn (int $tenantId, string $id): ?array => (new \Whity\Core\Theme\ThemeLibrary(
+    new \Whity\Core\Theme\ThemeRepository($db->getPdo()),
+    static fn (): array => $pluginLoader->getPluginThemes(),
+))->find($tenantId, $id));
 $workspaceTemplatesHandler->useTrialStarter(static fn (int $tenantId, ?int $profileId, string $plugin, ?int $days): \Whity\Core\Response => $workspaceCodePluginsHandler->startTrialFor($tenantId, $profileId, $plugin, $days));
 $router->register('GET', '/api/workspace/templates', [$workspaceTemplatesHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 $router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', [$workspaceTemplatesHandler, 'apply'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
@@ -3841,6 +3846,10 @@ $documentFieldRegistry->add(new \Whity\Core\Document\Fields\RouteValueFieldProvi
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\RouteApprovalFieldProvider($db->getPdo(), $documentFieldLabels));
 // WHIT-954: contacts as a record type, with the workspace's own fields (`{{contact.<key>}}`).
 $documentFieldRegistry->add(new \Whity\Core\Contacts\ContactFieldProvider($db->getPdo(), $documentFieldLabels));
+// IV.20: purchase orders, goods received notes and item labels print through the document themes.
+foreach (\Whity\Core\Inventory\Print\InventoryPrintFields::all($db->getPdo(), $settingsService, $documentFieldLabels) as $inventoryFieldProvider) {
+    $documentFieldRegistry->add($inventoryFieldProvider);
+}
 // WHIT-742: each workspace plugin's record types, in the workspaces where
 // the plugin is published and on (`CakeOrders.order`), so a template can be
 // written for them and a slot can be issued from them.
@@ -5723,6 +5732,26 @@ $router->register('PUT',    '/api/inventory/reorder-rules',                     
 $router->register('DELETE', '/api/inventory/reorder-rules/{id:\d+}',             [$inventoryHandler, 'deleteReorderRule'], null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/settings',                           [$inventoryHandler, 'showSettings'],     null, null, CorePermissions::INVENTORY_READ);
 $router->register('PATCH',  '/api/inventory/settings',                           [$inventoryHandler, 'updateSettings'],   null, null, CorePermissions::INVENTORY_SETTINGS);
+// IV.20 (WHIT-1234): purchase orders, goods received notes and label sheets print through the document themes.
+$inventoryPrintHandler = new \Whity\Api\InventoryPrintApiHandler(
+    new \Whity\Core\Inventory\Print\InventoryDocuments(
+        $db->getPdo(),
+        $documentSourceRepository,
+        new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
+        static fn (): \Whity\Core\Document\Issuing\TemplateIssuing => \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
+        static function (int $tenantId, int $documentId) use ($documentArtifactRepository, $documentArtifactStore): ?array {
+            $artifact = $documentArtifactRepository->findLatestForDocument($documentId, $tenantId);
+
+            return $artifact !== null
+                ? ['bytes' => $documentArtifactStore->get((string) $artifact['storage_key']), 'content_type' => (string) $artifact['content_type']]
+                : null;
+        },
+    ),
+    $roleChecker,
+);
+$router->register('GET',    '/api/inventory/print-templates',                    [$inventoryPrintHandler, 'templates'],          null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/purchase-orders/{id:\d+}/print',     [$inventoryPrintHandler, 'printPurchaseOrder'], null, null, CorePermissions::PURCHASES_READ);
+$router->register('POST',   '/api/inventory/receipts/{id:\d+}/print',            [$inventoryPrintHandler, 'printReceipt'],       null, null, CorePermissions::PURCHASES_READ);
 $router->register('GET',    '/api/inventory/purchase-orders',                    [$inventoryHandler, 'listPurchaseOrders'],     null, null, CorePermissions::PURCHASES_READ);
 $router->register('POST',   '/api/inventory/purchase-orders',                    [$inventoryHandler, 'createPurchaseOrder'],    null, null, CorePermissions::PURCHASES_WRITE);
 $router->register('GET',    '/api/inventory/purchase-orders/{id:\d+}',           [$inventoryHandler, 'showPurchaseOrder'],      null, null, CorePermissions::PURCHASES_READ);
@@ -6394,6 +6423,7 @@ $themesHandler = new \Whity\Api\ThemesApiHandler(
     static fn (): array => $pluginLoader->getPluginThemes(),
 );
 $router->register('GET',    '/api/themes',            [$themesHandler, 'list'],   null, null, CorePermissions::SETTINGS_READ);
+$router->register('GET',    '/api/themes/export',     [$themesHandler, 'export'], null, null, CorePermissions::SETTINGS_READ);
 $router->register('POST',   '/api/themes',            [$themesHandler, 'import'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('DELETE', '/api/themes/{themeId}',  [$themesHandler, 'delete'], null, null, CorePermissions::SETTINGS_WRITE);
 

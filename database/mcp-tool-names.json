@@ -740,6 +740,10 @@
     "en": "Show a purchase order",
     "ar": "عرض أمر شراء"
   },
+  "get_api_inventory_print_templates": {
+    "en": "List the templates inventory prints from",
+    "ar": "عرض القوالب التي يطبع منها المخزون"
+  },
   "get_api_inventory_reasons": {
     "en": "List reasons for stock changes",
     "ar": "عرض أسباب تغيير المخزون"
@@ -1091,6 +1095,10 @@
   "get_api_themes": {
     "en": "List the themes this workspace can choose",
     "ar": "عرض السمات المتاحة لمساحة العمل"
+  },
+  "get_api_themes_export": {
+    "en": "Export the theme in use as a theme file",
+    "ar": "تصدير السمة المستخدمة كملف سمة"
   },
   "get_api_time_window_types": {
     "en": "List the kinds of period in your workspace",
@@ -1826,6 +1834,10 @@
     "en": "Close a purchase order line that won't come",
     "ar": "إغلاق سطر لن يصل في أمر الشراء"
   },
+  "post_api_inventory_purchase_orders_id_print": {
+    "en": "Print a purchase order",
+    "ar": "طباعة أمر شراء"
+  },
   "post_api_inventory_purchase_orders_id_receive": {
     "en": "Receive goods against a purchase order",
     "ar": "استلام بضاعة على أمر شراء"
@@ -1837,6 +1849,10 @@
   "post_api_inventory_reasons": {
     "en": "Add a reason for stock changes",
     "ar": "إضافة سبب لتغيير المخزون"
+  },
+  "post_api_inventory_receipts_id_print": {
+    "en": "Print a goods received note",
+    "ar": "طباعة سند استلام بضاعة"
   },
   "post_api_inventory_stock_adjustments": {
     "en": "Set opening stock or adjust stock",

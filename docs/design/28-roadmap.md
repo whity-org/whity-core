@@ -36,7 +36,7 @@ Cards: N1 `TplContacts`, `TmOpsMobile`; N2 `TplCustomFields`, `TmFinanceMobile`;
 
 ## Long term
 
-In expected order. Studio comes first because the business modules should be built on it, so customers can extend every module without code.
+In expected order. Studio comes first because the business modules should be built on it, so customers can extend every module without code. Since 21 Nov 2026 (BM.13–BM.15, section 33) every item here is free core; only integrations with outside services are paid plugins, and usage is paid as seats and volume.
 
 | # | What | Status |
 | --- | --- | --- |

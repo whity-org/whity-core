@@ -43,9 +43,10 @@ final class TemplateApplier
 
     /**
      * @param array<string, mixed> $template a validated manifest, with `plugin` when a plugin gave it
+     * @param string|null $theme the template's theme when the person kept "Use its look" on and it is installed (SDK 1.131)
      * @return array{run: int, made: array<string, int>, skipped: list<array{part: string, key: string, reason: string}>}
      */
-    public function apply(int $tenantId, int $profileId, array $template, bool $withExamples): array
+    public function apply(int $tenantId, int $profileId, array $template, bool $withExamples, ?string $theme = null): array
     {
         $this->skipped = [];
         $this->made = [];
@@ -56,6 +57,9 @@ final class TemplateApplier
         $done = $this->runs->items($tenantId, $runId);
 
         $this->settings(is_array($template['settings'] ?? null) ? $template['settings'] : []);
+        if ($theme !== null) {
+            $this->theme($theme);
+        }
         $effective = $this->effectiveSettings();
         $language = ($effective['locale'] ?? 'en') === 'ar' ? 'ar' : 'en';
         $currency = is_string($effective['billing.default_currency'] ?? null) ? $effective['billing.default_currency'] : 'USD';
@@ -125,6 +129,20 @@ final class TemplateApplier
         }
         $result = $this->api->call('PATCH', '/api/settings', ['settings' => $values]);
         $this->outcome($result, 'settings', implode(',', array_keys($values)));
+    }
+
+    /**
+     * The template's theme (WHIT-1225, TH.23), only while the workspace still
+     * has the installation's theme: a theme someone already chose stays. Its
+     * own PATCH, so a refusal never costs the template's other settings.
+     */
+    private function theme(string $theme): void
+    {
+        $overridden = self::data($this->api->call('GET', '/api/settings'))['overridden'] ?? [];
+        if (is_array($overridden) && in_array('branding_theme', $overridden, true)) {
+            return;
+        }
+        $this->outcome($this->api->call('PATCH', '/api/settings', ['settings' => ['branding_theme' => $theme]]), 'theme', $theme);
     }
 
     /** @return array<string, mixed> */

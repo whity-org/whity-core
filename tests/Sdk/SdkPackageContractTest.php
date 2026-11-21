@@ -245,6 +245,7 @@ final class SdkPackageContractTest extends TestCase
             '1.132.0',
             \Whity\Sdk\Sdk::VERSION,
             'SDK 1.132 ADDS Accounting\\Accounts, Ledger, Periods and Reports: the chart of accounts, an append-only double-entry ledger and the trial balance for plugins (WHIT-1318). '
+            . 'SDK 1.131 ADDS the optional workspace template `theme` key: a template names the theme that suits it, offered when it is chosen (WHIT-1225). '
             . 'SDK 1.130 ADDS Contribute\\CorePermissionRequestsInterface and the CorePermissionGrants host service: plugins ask for core permissions for their roles, granted only with an operator\'s approval (#2256). '
             . 'SDK 1.129 ADDS Inventory\\Orders: purchase orders for plugins, sent on the workspace\'s route and received in parts (WHIT-1234). '
             . 'SDK 1.128 ADDS Inventory\\Operations: adjustments, counts and transfers for plugins, with approval above the workspace\'s value (WHIT-1233). '

@@ -74,7 +74,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "preset": { "enum": ["square", "crisp", "whity", "soft", "round"] },
+        "preset": { "enum": ["square", "crisp", "whity", "soft", "round", "pebble", "cut"] },
         "morph": { "enum": ["off", "on"] }
       }
     },
@@ -83,14 +83,14 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "style": { "enum": ["plane", "soft", "flat"] },
+        "style": { "enum": ["plane", "soft", "flat", "outline"] },
         "float": { "enum": ["light", "standard", "strong"] }
       }
     },
     "motion": {
       "type": "object",
       "additionalProperties": false,
-      "properties": { "preset": { "enum": ["calm", "standard", "expressive"] } }
+      "properties": { "preset": { "enum": ["calm", "standard", "expressive", "brisk"] } }
     },
     "documents": {
       "type": "object",

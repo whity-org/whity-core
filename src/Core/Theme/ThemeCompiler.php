@@ -106,7 +106,14 @@ final class ThemeCompiler
         'whity' => [0.25, 4, 7, 10, 12, 16, 12, 16],
         'soft' => [1 / 3, 6, 10, 14, 16, 24, 16, 24],
         'round' => [-1.0, 8, 12, 16, 20, 28, 20, 28],
+        // TH.17: Soft's cards and dialogs with pill controls, and Crisp's
+        // sizes with bevelled corners (corner-shape; rounded where missing).
+        'pebble' => [-1.0, 6, 10, 14, 16, 24, 16, 24],
+        'cut' => [0.125, 2, 4, 5, 6, 8, 6, 8],
     ];
+
+    /** TH.18: shape morph is on by default in the presets with pill controls. */
+    private const MORPH_BY_DEFAULT = ['round', 'pebble'];
 
     /** Body to 4xl in px for each type scale; `standard` is today's (3.5a, A.1). */
     private const SCALES = [
@@ -118,7 +125,12 @@ final class ThemeCompiler
     private const SPRINGS = [
         'standard' => [[0.9, 1400.0], [0.9, 700.0], [0.9, 300.0]],
         'expressive' => [[0.6, 800.0], [0.8, 380.0], [0.8, 200.0]],
+        // TH.19: the standard springs, settled in 0.8 of the time, for busy front desks.
+        'brisk' => [[0.9, 1400.0], [0.9, 700.0], [0.9, 300.0]],
     ];
+
+    /** How long each motion preset takes, against its spring's own settling time. */
+    private const MOTION_PACE = ['brisk' => 0.8];
 
     /** @var array<string, array<string, string>>|null */
     private static ?array $base = null;
@@ -413,7 +425,9 @@ final class ThemeCompiler
                     'plane-primary-rest' => "0 2px 6px 0 {$plane}59",
                     'plane-primary-hover' => "0 6px 16px 0 {$plane}66",
                 ],
-                'flat' => [
+                // TH.19: no shadows at all; the plane is a 2px border, and
+                // floating layers get a 1px border (shadow-float below).
+                'flat', 'outline' => [
                     'plane-rest' => "0 0 0 2px {$plane}",
                     'plane-hover' => "0 0 0 2px {$primary}",
                     'plane-primary-rest' => "0 0 0 2px {$plane}",
@@ -426,9 +440,14 @@ final class ThemeCompiler
                     'plane-primary-hover' => '-5px 5px 0 0 ' . $plane,
                 ],
             };
-        } elseif ($style === 'soft' || $style === 'flat') {
+        } elseif ($style === 'soft' || $style === 'flat' || $style === 'outline') {
             $base = self::base($mode);
             return self::elevation($theme, $base['primary'], $base['plane-deep'], $mode);
+        }
+        if ($style === 'outline') {
+            $out['shadow-float'] = '0 0 0 1px ' . (self::base($mode)['border'] ?? ($mode === 'dark' ? '#333333' : '#e5e5e5'));
+
+            return $out;
         }
         $float = $theme['elevation']['float'] ?? 'standard';
         $strength = ['light' => [[0x1f, 0x0f], [0x66, 0x40]], 'strong' => [[0x42, 0x24], [0xb3, 0x73]]][$float] ?? null;
@@ -474,7 +493,7 @@ final class ThemeCompiler
             // grows (a textarea, a chip field, a card built on the control
             // radius) keeps that corner instead of turning into a stadium
             // that cuts its text (WHIT-1225, 30-themes 3.3).
-            $radius = static fn (int $h): string => ($share < 0 ? intdiv($h, 2) : (int) round($h * $share)) . 'px';
+            $radius = static fn (int $h): string => self::controlRadius($share, $h) . 'px';
             $vars += [
                 'wy-radius-control-sm' => $radius($small),
                 'wy-radius-control' => $radius($control),
@@ -483,19 +502,44 @@ final class ThemeCompiler
                 'wy-radius-xl' => "{$xl}px", 'wy-radius-2xl' => "{$xxl}px",
                 'wy-radius-card' => "{$card}px", 'wy-radius-dialog' => "{$dialog}px",
             ];
+            if ($shape === 'cut') {
+                $vars['wy-corner-shape'] = 'bevel';
+            }
+        }
+        // TH.18: the main button squares off while pressed and a selected chip
+        // goes from its pill to a rounded corner. The person's Calm and Off
+        // show that end state with no movement (--dur-morph).
+        $morph = $theme['shape']['morph'] ?? (in_array($shape, self::MORPH_BY_DEFAULT, true) ? 'on' : 'off');
+        if ($morph === 'on' && isset(self::SHAPES[$shape])) {
+            $share = self::SHAPES[$shape][0];
+            $vars['wy-radius-control-pressed'] = intdiv(self::controlRadius($share, $control), 2) . 'px';
+            $vars['wy-radius-control-selected'] = (int) round($small * 0.25) . 'px';
         }
 
         $motion = $theme['motion']['preset'] ?? 'calm';
         if (isset(self::SPRINGS[$motion])) {
             [$fast, $default, $slow] = self::SPRINGS[$motion];
             // Hover and press stay quick whatever the spring (06-motion).
-            $vars['dur-fast'] = min(200, self::settle(...$fast)) . 'ms';
-            $vars['dur-base'] = min(350, self::settle(...$default)) . 'ms';
-            $vars['dur-slow'] = min(500, self::settle(...$slow)) . 'ms';
+            $pace = self::MOTION_PACE[$motion] ?? 1.0;
+            $vars['dur-fast'] = self::paced(min(200, self::settle(...$fast)), $pace) . 'ms';
+            $vars['dur-base'] = self::paced(min(350, self::settle(...$default)), $pace) . 'ms';
+            $vars['dur-slow'] = self::paced(min(500, self::settle(...$slow)), $pace) . 'ms';
+            // The curve keeps its shape; only the time it takes changes.
             $vars['ease-out'] = self::springCurve(...$default);
         }
 
         return $vars;
+    }
+
+    /** The control radius for a share of its height; a negative share is the pill, half the height (3.3). */
+    private static function controlRadius(float $share, int $height): int
+    {
+        return $share < 0 ? intdiv($height, 2) : (int) round($height * $share);
+    }
+
+    private static function paced(int $ms, float $pace): int
+    {
+        return (int) (round($ms * $pace / 10) * 10);
     }
 
     /** Milliseconds until a spring of mass 1 is within 0.2% of rest. */

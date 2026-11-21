@@ -1490,6 +1490,15 @@ namespace Whity\Sdk;
  *
  * Purely additive: one new optional interface and one new host service.)
  *
+ * 1.131 (A WORKSPACE TEMPLATE NAMES ITS THEME (WHIT-1225, 30-themes §14.6, TH.23):
+ * {@see Manifest\WorkspaceTemplateValidator} accepts an optional `theme`, a theme id such as
+ * `templates.market`, usually one the same plugin ships through {@see Contribute\PluginThemesInterface}.
+ * Choosing the template offers that theme, on by default; core sets it only while the workspace still
+ * has the installation's theme, and skips it when no theme by that id is installed.
+ *
+ * Purely additive: one new optional manifest key. Older hosts refuse a manifest that carries it, so a
+ * plugin that sets `theme` needs `^1.131`.)
+ *
  * 1.132 (ACCOUNTING: host services {@see Accounting\Accounts}, {@see Accounting\Ledger},
  * {@see Accounting\Periods} and {@see Accounting\Reports} read core's chart of accounts, its append-only
  * double-entry ledger, its months and the trial balance without HTTP, and {@see Context\AccountingScope}

@@ -13,7 +13,7 @@ A partner sells its own product; Whity stays underneath. The tenant's brand lead
 
 - **A workspace can apply a theme** from Whity, a plugin or the store, free on every plan. A theme changes colour (one to three seed colours, with overrides), type (a Latin and Arabic pair from the allowed list, for headings and body), shape, density, elevation and motion. See `30-themes.md`.
 - The main colour above is the theme's primary seed, so a workspace that sets only its colour keeps working as before.
-- Making themes, in the live editor, is part of Whity Studio (paid).
+- Making themes, in the live editor, is part of core since 21 Nov 2026 (BM.15, "All into core"); it was planned as paid Whity Studio. Section 30 has the details.
 
 ## What stays
 

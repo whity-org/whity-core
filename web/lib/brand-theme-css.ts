@@ -27,8 +27,12 @@ const VAR_PATTERNS: Record<string, RegExp> = {
   'ease-out': EASE_RE,
   ...Object.fromEntries(['2xs', 'xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl'].map((s) => [`text-${s}`, REM_RE])),
   ...Object.fromEntries(
-    ['control-sm', 'control', 'control-lg', 'sm', 'md', 'lg', 'xl', '2xl', 'card', 'dialog'].map((s) => [`wy-radius-${s}`, PX_RE])
+    ['control-sm', 'control', 'control-lg', 'sm', 'md', 'lg', 'xl', '2xl', 'card', 'dialog', 'control-pressed', 'control-selected'].map(
+      (s) => [`wy-radius-${s}`, PX_RE]
+    )
   ),
+  // TH.17: the Cut preset's bevelled corners.
+  'wy-corner-shape': /^(?:round|bevel)$/,
 };
 
 function isObject(raw: unknown): raw is Record<string, unknown> {

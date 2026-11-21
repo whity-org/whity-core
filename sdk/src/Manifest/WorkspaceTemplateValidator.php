@@ -26,6 +26,7 @@ namespace Whity\Sdk\Manifest;
  *     'examples' => ['contacts' => [['key' => 'c1', 'name' => 'Example Bakery', 'email' => 'hello@example.com']], 'bookings' => [['key' => 'b1', 'service' => 'cake-order', 'contact' => 'c1', 'inDays' => 1, 'time' => '10:00']]],
  *     'setup' => ['steps' => [['id' => 'hours', 'kind' => 'hours', 'title' => [...]]]],
  *     'offer' => ['plugin' => 'Bakeries', 'trialDays' => 30, 'free' => [[...]], 'paid' => [[...]]],
+ *     'theme' => 'templates.market',
  * ]
  * ```
  *
@@ -34,6 +35,10 @@ namespace Whity\Sdk\Manifest;
  * until that plugin is installed and paid, so a template can carry its offer
  * before the plugin exists. `offer.trialDays` is the trial started from the
  * template's setup, used only when the plugin offers a trial at all.
+ * `theme` (SDK 1.131, WHIT-1225) names the theme that suits the template, by
+ * id: one the same plugin ships (PluginThemesInterface, SDK 1.125) or one of
+ * Whity's own. Choosing the template offers it, and only while the workspace
+ * still has the installation's theme; the person can change it any time.
  * Every visible string is `{en, ar}`. This checks what the manifest says about
  * itself; the host also checks what only it knows (that the offered plugin is
  * installed and paid, that each permission exists) and applies only what the
@@ -74,12 +79,14 @@ final class WorkspaceTemplateValidator
 
     public const DOCUMENT_KINDS = ['note', 'letter', 'template', 'label'];
 
-    private const TOP_KEYS = ['key', 'version', 'name', 'summary', 'icon', 'setsUp', 'settings', 'calendar', 'services', 'roles', 'forms', 'documents', 'examples', 'setup', 'offer'];
+    private const TOP_KEYS = ['key', 'version', 'name', 'summary', 'icon', 'setsUp', 'settings', 'calendar', 'services', 'roles', 'forms', 'documents', 'examples', 'setup', 'offer', 'theme'];
     private const KEY_PATTERN = '/^[a-z][a-z0-9-]{0,40}$/';
     private const PERMISSION_PATTERN = '/^[a-z][a-z0-9_]*(:[a-z][a-z0-9_]*)+$/';
     private const ICON_PATTERN = '/^[a-z0-9-]{1,64}$/';
     private const TIME_PATTERN = '/^([01][0-9]|2[0-3]):[0-5][0-9]$/';
     private const PRICE_PATTERN = '/^[0-9]{1,9}(\.[0-9]{1,3})?$/';
+    /** A theme id, vendor.name, as the theme file's own `id` (schemas/theme/v1.json). */
+    private const THEME_PATTERN = '/^[a-z0-9]+(-[a-z0-9]+)*\.[a-z0-9]+(-[a-z0-9]+)*$/';
 
     private function __construct()
     {
@@ -152,6 +159,10 @@ final class WorkspaceTemplateValidator
         }
         if (array_key_exists('offer', $template)) {
             array_push($errors, ...self::offerErrors($template['offer']));
+        }
+        if (array_key_exists('theme', $template)
+            && (!is_string($template['theme']) || strlen($template['theme']) > 100 || preg_match(self::THEME_PATTERN, $template['theme']) !== 1)) {
+            $errors[] = 'template.theme: a theme id like templates.market';
         }
 
         return $errors;

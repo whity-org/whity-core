@@ -1603,6 +1603,10 @@
                     "since": "1.116"
                 },
                 {
+                    "what": "A workspace template names its theme (`theme`), offered when the template is chosen",
+                    "since": "1.131"
+                },
+                {
                     "what": "PluginDisplayNameInterface: the name people read for a plugin, in English and Arabic",
                     "since": "1.117"
                 },

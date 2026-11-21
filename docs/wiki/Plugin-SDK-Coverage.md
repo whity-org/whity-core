@@ -311,6 +311,7 @@ Planned: 0.2.28. Tracked in [#714](https://github.com/whity-org/whity-core/issue
 - calendar.event.created|updated|deleted and booking.created|confirmed|rescheduled|cancelled|expired events with ids only (SDK 1.98)
 - Setup\WorkspaceSetup: set up booking rules, services, staff and hours through core routes, as the acting person (for packs) (SDK 1.108)
 - PluginWorkspaceTemplatesInterface: ready starts for one kind of business, offered after a workspace is created and applied by core as the person choosing them (SDK 1.116)
+- A workspace template names its theme (`theme`), offered when the template is chosen (SDK 1.131)
 - PluginDisplayNameInterface: the name people read for a plugin, in English and Arabic (SDK 1.117)
 - Calendar\TimeOff host service: create, cancel and list a person's time off as the acting person, idempotent by the plugin's own reference (SDK 1.120)
 
