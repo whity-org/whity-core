@@ -2335,5 +2335,33 @@
   "patch_api_sales_settings": {
     "en": "Change the sales settings",
     "ar": "تعديل إعدادات المبيعات"
+  },
+  "get_api_inventory_imports_kind": {
+    "en": "List imports of items or opening stock",
+    "ar": "عرض عمليات استيراد الأصناف أو الرصيد الافتتاحي"
+  },
+  "post_api_inventory_imports_kind": {
+    "en": "Upload a spreadsheet of items or opening stock",
+    "ar": "رفع جدول أصناف أو رصيد افتتاحي"
+  },
+  "get_api_inventory_imports_kind_id": {
+    "en": "Show an import of items or opening stock",
+    "ar": "عرض عملية استيراد أصناف أو رصيد افتتاحي"
+  },
+  "post_api_inventory_imports_kind_id_check": {
+    "en": "Check what an import will do",
+    "ar": "فحص ما ستفعله عملية الاستيراد"
+  },
+  "post_api_inventory_imports_kind_id_run": {
+    "en": "Run an import of items or opening stock",
+    "ar": "تنفيذ استيراد الأصناف أو الرصيد الافتتاحي"
+  },
+  "post_api_inventory_imports_kind_id_undo": {
+    "en": "Undo an import of items or opening stock",
+    "ar": "التراجع عن استيراد الأصناف أو الرصيد الافتتاحي"
+  },
+  "get_api_inventory_imports_kind_id_skipped_csv": {
+    "en": "Download the rows an import skipped",
+    "ar": "تنزيل الصفوف التي تخطاها الاستيراد"
   }
 }

@@ -39,11 +39,12 @@ final class ColumnMatcher
      * @param list<string> $header
      * @param list<list<string>> $rows the data rows under the header
      * @param array<string, list<string>> $extraTargets more targets (the workspace's own fields) and their names
+     * @param bool $contacts false for another kind of import (WHIT-1322): only `$extraTargets` are offered, and no column is guessed to be an email or a mobile from what it holds
      * @return list<array{index: int, header: string, examples: list<string>, empty: bool, suggestion: ?array{target: string, confidence: string}}>
      */
-    public static function suggest(array $header, array $rows, array $extraTargets = []): array
+    public static function suggest(array $header, array $rows, array $extraTargets = [], bool $contacts = true): array
     {
-        $targets = self::NAMES + $extraTargets;
+        $targets = $contacts ? self::NAMES + $extraTargets : $extraTargets;
         $width = count($header);
         foreach ($rows as $row) {
             $width = max($width, count($row));
@@ -86,7 +87,7 @@ final class ColumnMatcher
             if ($column['empty'] || $column['suggestion'] !== null) {
                 continue;
             }
-            $target = self::byContent($column['_values']);
+            $target = $contacts ? self::byContent($column['_values']) : null;
             if ($target !== null && !isset($taken[$target])) {
                 $columns[$i]['suggestion'] = ['target' => $target, 'confidence' => 'doubtful'];
                 $taken[$target] = true;

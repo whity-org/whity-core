@@ -5692,6 +5692,121 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/inventory/imports/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent imports of items or opening stock */
+        get: operations["get_api_v1_inventory_imports_kind"];
+        put?: never;
+        /**
+         * Upload a spreadsheet of items or opening stock
+         * @description CSV or Excel, as a `file` upload or as `text` or `content_base64` with `file_name`. Up to 5,000 rows. Answers the import with each column, its examples and its suggested target. Nothing changes yet.
+         */
+        post: operations["post_api_v1_inventory_imports_kind"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/imports/{kind}/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An import of items or opening stock */
+        get: operations["get_api_v1_inventory_imports_kind_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/imports/{kind}/{id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Work out what an import will do
+         * @description With the columns matched, every row is created, updated (items, matched by SKU) or skipped with a reason. Nothing changes.
+         */
+        post: operations["post_api_v1_inventory_imports_kind_id_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/imports/{kind}/{id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run a checked import
+         * @description Works the plan out again against the data as it is now and applies it in one transaction. It can be undone for 24 hours.
+         */
+        post: operations["post_api_v1_inventory_imports_kind_id_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/imports/{kind}/{id}/skipped.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The skipped rows as a CSV, with their reasons */
+        get: operations["get_api_v1_inventory_imports_kind_id_skipped_csv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/imports/{kind}/{id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo an import, within 24 hours
+         * @description Items it made are archived and items it changed get their values back; opening stock is reversed, unless that stock has moved since (409).
+         */
+        post: operations["post_api_v1_inventory_imports_kind_id_undo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/inventory/items": {
         parameters: {
             query?: never;
@@ -18123,6 +18238,69 @@ export interface components {
             note?: string;
             /** @description Any unique text; sending the same key again starts nothing new. */
             idempotency_key?: string;
+        };
+        InventoryImport: {
+            id: number;
+            /** @enum {string} */
+            kind: "items" | "opening_stock";
+            file_name: string;
+            /** @enum {string} */
+            status: "uploaded" | "checked" | "imported" | "undone";
+            row_count: number;
+            columns: {
+                index: number;
+                header: string;
+                examples?: string[];
+                empty?: boolean;
+                suggestion?: {
+                    target?: string;
+                    confidence?: string;
+                } | null;
+            }[];
+            targets: {
+                key: string;
+                label: string;
+            }[];
+            options?: Record<string, never> | null;
+            /** @description Counts, and up to 200 rows with what each does and why. */
+            summary?: Record<string, never> | null;
+            imported_at?: string | null;
+            undone_at?: string | null;
+            undo_until?: string | null;
+            can_undo: boolean;
+            created_at?: string;
+        };
+        InventoryImportCheckRequest: {
+            /** @description Column index => target key from `targets`, such as `{"0": "sku", "1": "name"}`. Items need `sku`; opening stock needs `sku` and `quantity`. */
+            mapping: {
+                [key: string]: string | null;
+            };
+            /** @description Opening stock: the place for rows that name none. */
+            location_id?: number | null;
+        };
+        InventoryImportListItem: {
+            id: number;
+            kind: string;
+            file_name?: string;
+            status: string;
+            summary?: {
+                create: number;
+                update: number;
+                skip: number;
+            } | null;
+            created_by_profile_id?: number | null;
+            imported_at?: string | null;
+            undo_until?: string | null;
+            can_undo?: boolean;
+            created_at?: string;
+        };
+        InventoryImportUploadRequest: {
+            /** @description The file's name, such as items.csv; .xlsx is read as Excel. */
+            file_name?: string;
+            /** @description The CSV itself. */
+            text?: string;
+            /** @description The file, base64. */
+            content_base64?: string;
         };
         InventoryItem: {
             id: number;
@@ -53787,6 +53965,615 @@ export interface operations {
                 };
             };
             /** @description The count is finished */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_imports_kind: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The last 20, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryImportListItem"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_imports_kind: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryImportUploadRequest"];
+            };
+        };
+        responses: {
+            /** @description The import */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryImport"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the import's state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_imports_kind_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock";
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The import */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryImport"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_imports_kind_id_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock";
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryImportCheckRequest"];
+            };
+        };
+        responses: {
+            /** @description The import with its summary */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryImport"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the import's state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_imports_kind_id_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock";
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The import */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryImport"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the import's state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_imports_kind_id_skipped_csv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock";
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A CSV file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the import's state */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_inventory_imports_kind_id_undo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock";
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The import */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryImport"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the import's state */
             409: {
                 headers: {
                     [name: string]: unknown;
