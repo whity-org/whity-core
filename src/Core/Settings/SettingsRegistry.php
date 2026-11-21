@@ -956,6 +956,12 @@ final class SettingsRegistry
     //     sent; 0 means none, and a person with quotes:write marks it ready.
     public const SALES_QUOTE_VALID_DAYS = 'sales.quote_valid_days';
     public const SALES_QUOTE_ROUTE_TEMPLATE_ID = 'sales.quote_route_template_id';
+    //   - email_*: whether the workspace emails its customers a quote, an
+    //     invoice, a receipt or a payment reminder (WHIT-1323, TR.3); all on.
+    public const SALES_EMAIL_QUOTE = 'sales.email_quote';
+    public const SALES_EMAIL_INVOICE = 'sales.email_invoice';
+    public const SALES_EMAIL_RECEIPT = 'sales.email_receipt';
+    public const SALES_EMAIL_REMINDER = 'sales.email_reminder';
 
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
@@ -984,6 +990,10 @@ final class SettingsRegistry
         self::INVENTORY_OVER_RECEIPT_PERCENT,
         self::SALES_QUOTE_VALID_DAYS,
         self::SALES_QUOTE_ROUTE_TEMPLATE_ID,
+        self::SALES_EMAIL_QUOTE,
+        self::SALES_EMAIL_INVOICE,
+        self::SALES_EMAIL_RECEIPT,
+        self::SALES_EMAIL_REMINDER,
     ];
 
     /**
@@ -1515,6 +1525,10 @@ final class SettingsRegistry
         self::INVENTORY_OVER_RECEIPT_PERCENT => '0',
         self::SALES_QUOTE_VALID_DAYS => '30',
         self::SALES_QUOTE_ROUTE_TEMPLATE_ID => '0',
+        self::SALES_EMAIL_QUOTE => 'true',
+        self::SALES_EMAIL_INVOICE => 'true',
+        self::SALES_EMAIL_RECEIPT => 'true',
+        self::SALES_EMAIL_REMINDER => 'true',
     ];
 
     /**
@@ -2035,6 +2049,7 @@ final class SettingsRegistry
             self::SALES_QUOTE_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
                 ? null
                 : $key . ' must be a route template id, or 0 for none.',
+            self::SALES_EMAIL_QUOTE, self::SALES_EMAIL_INVOICE, self::SALES_EMAIL_RECEIPT, self::SALES_EMAIL_REMINDER => self::validateBoolean($value, $key),
             default => "Unknown setting key: {$key}",
         };
     }

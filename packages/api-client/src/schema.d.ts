@@ -10653,7 +10653,7 @@ export interface paths {
         put?: never;
         /**
          * Send a quote to the customer
-         * @description A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`).
+         * @description A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`). It is emailed to the customer unless `email` is false or the workspace turned the quote email off; `emailed` says whether it was.
          */
         post: operations["post_api_v1_sales_quotes_id_send"];
         delete?: never;
@@ -21801,6 +21801,10 @@ export interface components {
             /** @description Any unique text; sending the same key again makes nothing new and answers the first quote. */
             idempotency_key?: string;
         };
+        SalesQuoteSendRequest: {
+            /** @description False to only make the link, without emailing the customer. True by default. */
+            email?: boolean;
+        };
         SalesQuoteTarget: {
             key: string;
             label: {
@@ -21838,6 +21842,14 @@ export interface components {
             quote_valid_days?: number;
             /** @description The route a quote travels before it goes out; null for none. */
             quote_route_template_id?: number | null;
+            /** @description Email a quote to the customer when it is sent. */
+            email_quote?: boolean;
+            /** @description Email an invoice to the customer when it is issued. */
+            email_invoice?: boolean;
+            /** @description Email a receipt when a payment arrives. */
+            email_receipt?: boolean;
+            /** @description Allow payment reminders by email. */
+            email_reminder?: boolean;
         };
         SavedBlock: {
             id: number;
@@ -80005,7 +80017,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesQuoteSendRequest"];
+            };
+        };
         responses: {
             /** @description The quote and the customer's link */
             200: {
@@ -80016,7 +80032,17 @@ export interface operations {
                     "application/json": {
                         data: components["schemas"]["SalesQuote"];
                         link: string;
+                        emailed: boolean;
                     };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Missing or invalid authentication */
