@@ -133,7 +133,7 @@ final class CreateCompanyStamps
         }
         if ($applied > 0) {
             throw new RuntimeException(
-                'Cannot roll back migration 331: company stamps have been applied, and the records are kept as evidence.'
+                'Cannot roll back migration 336: company stamps have been applied, and the records are kept as evidence.'
             );
         }
 

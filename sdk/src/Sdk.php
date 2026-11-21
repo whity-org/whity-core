@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.137).
+ * SDK identity (v1.142).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1526,12 +1526,18 @@ namespace Whity\Sdk;
  *
  * Purely additive: one new method on Context\InventoryScope, which only the host implements, and new
  * optional constructor arguments, last, on MoveLine and Move.)
+ *
+ * 1.142 (COMPANY STAMPS: {@see Hooks\Events::ROUTE_STAMPED} (`route.stamped`, with its `.async` twin)
+ * fires after a holder applied a company stamp on a route's stamp step, with ids only and the
+ * `stamp_id` (#1729).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.137.0';
+    public const VERSION = '1.142.0';
 
     /**
      * Static identity only — never instantiated.

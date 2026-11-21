@@ -8,7 +8,7 @@ use PDO;
 
 /**
  * Data access for a workspace's company stamps and their holders (#1729,
- * migration 331).
+ * migration 336).
  *
  * A stamp is archived, never deleted: route steps and applied stamps name it.
  * A holder is a named person or a role.

@@ -257,7 +257,7 @@ final class CorePermissions
     // (PermissionRegistry). Migration 172 grants it to every role that held
     // DOCUMENTS_PUBLISH.
     public const DOCUMENTS_THEMES = 'documents:themes';
-    // Company stamps (#1729, migration 331): create, change and archive the
+    // Company stamps (#1729, migration 336): create, change and archive the
     // workspace's stamps and choose who holds them. Applying a stamp needs no
     // permission: being a holder reached by a `stamp` step is the authority.
     public const DOCUMENTS_STAMPS = 'documents:stamps';
