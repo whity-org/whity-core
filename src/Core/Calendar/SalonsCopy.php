@@ -83,10 +83,12 @@ final class SalonsCopy
         $walkins = $copied = $rates = $inCore = [];
         if ($presence->hasTable(self::WALKINS)) {
             $walkins = $by('SELECT tenant_id, COUNT(*) AS n FROM salons_walkins GROUP BY tenant_id');
+            // @tenant-guard-ignore: the copy runs once for the whole installation, reporting every workspace Salons ran in
             $copied = $by('SELECT tenant_id, COUNT(*) AS n FROM calendar_walkins WHERE legacy_id IS NOT NULL GROUP BY tenant_id');
         }
         if ($presence->hasTable(self::RATES)) {
             $rates = $by('SELECT tenant_id, COUNT(*) AS n FROM salons_commission_rates GROUP BY tenant_id');
+            // @tenant-guard-ignore: the copy runs once for the whole installation, reporting every workspace Salons ran in
             $inCore = $by('SELECT tenant_id, COUNT(*) AS n FROM calendar_commission_rates GROUP BY tenant_id');
         }
         $tenants = array_unique([...array_keys($walkins), ...array_keys($copied), ...array_keys($rates), ...array_keys($inCore)]);
@@ -213,6 +215,7 @@ final class SalonsCopy
             $tenants[(int) $t] = true;
         }
         if ((new PdoSchemaPresence($this->db))->hasTable('tenant_code_plugins')) {
+            // @tenant-guard-ignore: finds every workspace that had Salons turned on, across the installation, to turn walk-ins on there
             $on = $this->db->prepare('SELECT tenant_id FROM tenant_code_plugins WHERE plugin_name = :p AND enabled = :on');
             $on->bindValue(':p', 'Salons');
             $on->bindValue(':on', true, PDO::PARAM_BOOL);
