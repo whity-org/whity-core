@@ -5695,6 +5695,8 @@ $salesQuotesHandler = new \Whity\Api\SalesQuotesApiHandler(
     \Whity\Core\Http\FrontendUrls::fromEnv()->base(),
     $brandingService,
     static fn (int $tenantId): string => (new \Whity\Core\Branding\TenantHostRepository($db->getPdo()))->findNameById($tenantId) ?? '',
+    // WHIT-1323: sending a quote emails it to the customer (EM.1 "Money").
+    new \Whity\Core\Sales\TradingEmails($brandedEmailSender, $settingsService),
 );
 $router->register('GET',    '/api/sales/quotes',                     [$salesQuotesHandler, 'list'],     null, null, CorePermissions::QUOTES_READ);
 $router->register('POST',   '/api/sales/quotes',                     [$salesQuotesHandler, 'create'],   null, null, CorePermissions::QUOTES_WRITE);

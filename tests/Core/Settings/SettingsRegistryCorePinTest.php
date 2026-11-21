@@ -235,6 +235,10 @@ final class SettingsRegistryCorePinTest extends TestCase
             'inventory.over_receipt_percent',
             'sales.quote_valid_days',
             'sales.quote_route_template_id',
+            'sales.email_quote',
+            'sales.email_invoice',
+            'sales.email_receipt',
+            'sales.email_reminder',
         ];
     }
 
@@ -486,6 +490,10 @@ final class SettingsRegistryCorePinTest extends TestCase
             'inventory.over_receipt_percent' => '0',
             'sales.quote_valid_days' => '30',
             'sales.quote_route_template_id' => '0',
+            'sales.email_quote' => 'true',
+            'sales.email_invoice' => 'true',
+            'sales.email_receipt' => 'true',
+            'sales.email_reminder' => 'true',
         ];
     }
 

@@ -71411,7 +71411,7 @@
                 "tags": [
                     "sales"
                 ],
-                "description": "A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`).",
+                "description": "A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`). It is emailed to the customer unless `email` is false or the workspace turned the quote email off; `emailed` says whether it was.",
                 "parameters": [
                     {
                         "name": "id",
@@ -71422,6 +71422,16 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SalesQuoteSendRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "The quote and the customer's link",
@@ -71435,12 +71445,26 @@
                                         },
                                         "link": {
                                             "type": "string"
+                                        },
+                                        "emailed": {
+                                            "type": "boolean"
                                         }
                                     },
                                     "required": [
                                         "data",
-                                        "link"
+                                        "link",
+                                        "emailed"
                                     ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
                                 }
                             }
                         }
@@ -118135,6 +118159,15 @@
                     "lines"
                 ]
             },
+            "SalesQuoteSendRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "boolean",
+                        "description": "False to only make the link, without emailing the customer. True by default."
+                    }
+                }
+            },
             "SalesQuoteTarget": {
                 "type": "object",
                 "properties": {
@@ -118230,6 +118263,22 @@
                         "type": "integer",
                         "nullable": true,
                         "description": "The route a quote travels before it goes out; null for none."
+                    },
+                    "email_quote": {
+                        "type": "boolean",
+                        "description": "Email a quote to the customer when it is sent."
+                    },
+                    "email_invoice": {
+                        "type": "boolean",
+                        "description": "Email an invoice to the customer when it is issued."
+                    },
+                    "email_receipt": {
+                        "type": "boolean",
+                        "description": "Email a receipt when a payment arrives."
+                    },
+                    "email_reminder": {
+                        "type": "boolean",
+                        "description": "Allow payment reminders by email."
                     }
                 }
             },
