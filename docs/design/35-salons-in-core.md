@@ -1,6 +1,6 @@
 # 35 · Walk-ins, commission and the price list in core
 
-**Status: proposed (WHIT-1334), owner questions in section 8.** Lane L4 of the business model (section 33 §3.5 and §6, step 9). The owner decided on 21 November 2026 that the Salons plugin's walk-ins, commission, price list and onboarding become core and that a chair is a staff seat (BM.15, Q3), and that paid industry plugins retire (BM.19). The register rows are SL.1–SL.12 (section "Walk-ins, commission and the price list").
+**Status: decided by the owner on 21 November 2026 (WHIT-1334): "Accept all", every question in section 8 as recommended; the live retirement (section 7) "Yes, after deploy".** Lane L4 of the business model (section 33 §3.5 and §6, step 9). The owner decided on 21 November 2026 that the Salons plugin's walk-ins, commission, price list and onboarding become core and that a chair is a staff seat (BM.15, Q3), and that paid industry plugins retire (BM.19). The register rows are SL.1–SL.12 (section "Walk-ins, commission and the price list").
 
 Salons is already free for every workspace on app.whity.dev (`free_for_all`, 21 November 2026). Once this lane is on `develop` and deployed, Salons is unpublished from whity-plugins and its add-on plans and per-chair prices are archived on app.whity.dev (section 7).
 
@@ -124,6 +124,8 @@ After the core PRs deploy, on app.whity.dev, through whity-local-deploy's README
 In whity-plugins: `salons/` is removed from the store catalogue and marked retired in its README (a final 0.8.0 that only says "moved into core" is not published); `workspace-templates`' salon template stops offering Salons "with a 30-day trial" and turns on `calendar.walkins_enabled` instead. In core, the `plugin.salons` mapping and the Salons comments in `PluginSeats` and `PlanPriceRepository` are reworded; `PluginSeats` itself stays for third-party plugins (BM.19).
 
 ## 8. Questions for the owner
+
+**Answered 21 November 2026: "Accept all".** Every recommendation below stands; register rows SL.3, SL.6, SL.8 and SL.11 record them.
 
 1. **Salon setup.** The six-step setup and the ready bilingual menus (men, women, kids): core's own setup for every booking business, or the salon workspace template (free, in `workspace-templates`)? Recommended: **the workspace template**: the steps are mostly core's generic setup already (hours, team, services, booking rules, link), and the menus are salon content, like the template's other examples.
 2. **Service items and the items meter.** Should linked service items count on the inventory items meter (500 free)? Recommended: **no**, only stocked, consumable and made items count; services are not stock.
