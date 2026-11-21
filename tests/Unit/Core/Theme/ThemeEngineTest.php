@@ -273,7 +273,7 @@ final class ThemeEngineTest extends TestCase
         foreach (ThemeValidator::SHAPES as $shape) {
             foreach (['standard', 'compact', 'comfortable'] as $density) {
                 $vars = ThemeCompiler::compile(self::theme(['shape' => ['preset' => $shape], 'density' => $density]))['vars'];
-                $keep = array_filter($vars, static fn (string $k): bool => str_starts_with($k, 'wy-radius-') || str_starts_with($k, 'control-h') || $k === 'row-h', ARRAY_FILTER_USE_KEY);
+                $keep = array_filter($vars, static fn (string $k): bool => str_starts_with($k, 'wy-radius-') || $k === 'wy-corner-shape' || str_starts_with($k, 'control-h') || $k === 'row-h', ARRAY_FILTER_USE_KEY);
                 ksort($keep);
                 $presets[$density === 'standard' ? $shape : "{$shape}-{$density}"] = (object) $keep;
             }
@@ -353,5 +353,51 @@ final class ThemeEngineTest extends TestCase
             ['field' => 'colour.overrides', 'from' => '0', 'to' => '1'],
         ], ThemeTweaks::changes($old, $new));
         self::assertSame([], ThemeTweaks::changes($old, $old));
+    }
+
+    /** TH.17: Pebble is Soft with pill controls; Cut is Crisp with bevelled corners. */
+    public function testPebbleAndCutShapes(): void
+    {
+        $pebble = ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'pebble']]))['vars'];
+        $soft = ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'soft']]))['vars'];
+        self::assertSame('20px', $pebble['wy-radius-control']);
+        self::assertSame($soft['wy-radius-card'], $pebble['wy-radius-card']);
+        self::assertSame($soft['wy-radius-dialog'], $pebble['wy-radius-dialog']);
+
+        $cut = ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'cut']]))['vars'];
+        $crisp = ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'crisp']]))['vars'];
+        self::assertSame('bevel', $cut['wy-corner-shape']);
+        self::assertArrayNotHasKey('wy-corner-shape', $crisp);
+        unset($cut['wy-corner-shape']);
+        self::assertSame($crisp, $cut);
+    }
+
+    /** TH.18: morph is on by default with pill controls, and a theme can turn it on or off. */
+    public function testShapeMorph(): void
+    {
+        $round = ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'round']]))['vars'];
+        self::assertSame('10px', $round['wy-radius-control-pressed']);
+        self::assertSame('8px', $round['wy-radius-control-selected']);
+        self::assertArrayHasKey('wy-radius-control-pressed', ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'pebble']]))['vars']);
+        self::assertArrayNotHasKey('wy-radius-control-pressed', ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'round', 'morph' => 'off']]))['vars']);
+        self::assertArrayNotHasKey('wy-radius-control-pressed', ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'soft']]))['vars']);
+        self::assertSame('5px', ThemeCompiler::compile(self::theme(['shape' => ['morph' => 'on']]))['vars']['wy-radius-control-pressed']);
+    }
+
+    /** TH.19: outline draws borders instead of shadows; brisk is standard at 0.8 of the time. */
+    public function testOutlineElevationAndBriskMotion(): void
+    {
+        $outline = ThemeCompiler::compile(self::theme(['elevation' => ['style' => 'outline', 'float' => 'strong']]));
+        foreach (['light', 'dark'] as $mode) {
+            self::assertMatchesRegularExpression('/^0 0 0 1px #[0-9a-f]{6}$/', $outline[$mode]['shadow-float']);
+            self::assertMatchesRegularExpression('/^0 0 0 2px #/', $outline[$mode]['plane-rest']);
+        }
+
+        $standard = ThemeCompiler::compile(self::theme(['motion' => ['preset' => 'standard']]))['vars'];
+        $brisk = ThemeCompiler::compile(self::theme(['motion' => ['preset' => 'brisk']]))['vars'];
+        foreach (['dur-fast', 'dur-base', 'dur-slow'] as $key) {
+            self::assertEqualsWithDelta((int) $standard[$key] * 0.8, (int) $brisk[$key], 10, $key);
+        }
+        self::assertSame($standard['ease-out'], $brisk['ease-out']);
     }
 }

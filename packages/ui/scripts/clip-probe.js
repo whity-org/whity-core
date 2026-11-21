@@ -33,7 +33,10 @@ function clipProbe(opts) {
     const tl = px(cs.borderTopLeftRadius), tr = px(cs.borderTopRightRadius)
     const br = px(cs.borderBottomRightRadius), bl = px(cs.borderBottomLeftRadius)
     const f = Math.min(1, r.width / (tl + tr || 1), r.width / (bl + br || 1), r.height / (tl + bl || 1), r.height / (tr + br || 1))
-    return { tl: tl * f, tr: tr * f, br: br * f, bl: bl * f, rect: r }
+    // The Cut preset bevels its corners (corner-shape: bevel): the edge is
+    // the straight line between the two tangent points, inside the arc.
+    const bevel = /bevel/.test(cs.getPropertyValue("corner-shape") || "")
+    return { tl: tl * f, tr: tr * f, br: br * f, bl: bl * f, rect: r, bevel }
   }
   // How far point (x, y) lies outside the rounded box; 0 when inside.
   const outside = (R, x, y) => {
@@ -46,7 +49,10 @@ function clipProbe(opts) {
     ]
     for (const [name, cx, cy, rad, inBox] of corners) {
       if (rad > 0 && inBox) {
-        const d = Math.hypot(x - cx, y - cy) - rad
+        // From the box's own corner: |x - edge| + |y - edge| < rad is past the bevel.
+        const d = R.bevel
+          ? (rad - (Math.abs(x - (cx < x ? cx + rad : cx - rad)) + Math.abs(y - (cy < y ? cy + rad : cy - rad)))) / Math.SQRT2
+          : Math.hypot(x - cx, y - cy) - rad
         if (d > 0) return [name, d]
       }
     }

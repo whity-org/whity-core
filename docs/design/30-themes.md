@@ -121,8 +121,8 @@ Mono stays Geist Mono (3.4). New fonts join through a PR that adds the files, li
 
 | Key | Values | Default |
 | --- | --- | --- |
-| `shape.preset` | `square` · `crisp` · `whity` · `soft` · `round` | `whity` |
-| `shape.morph` | `off` · `on` (the main button and chips change corner on press and selection, M3 Expressive) | `off` |
+| `shape.preset` | `square` · `crisp` · `whity` · `soft` · `round` · `pebble` · `cut` (TH.17) | `whity` |
+| `shape.morph` | `off` · `on` (the main button squares off while pressed, a selected chip goes from pill to rounded; M3 Expressive, TH.18) | `on` for `round` and `pebble`, `off` for the rest |
 
 | Preset | Control radius | Card | Dialog | Like |
 | --- | --- | --- | --- | --- |
@@ -131,8 +131,12 @@ Mono stays Geist Mono (3.4). New fonts join through a PR that adds the files, li
 | `whity` | ¼ of the height (4.2) | 12 | 16 | today |
 | `soft` | ⅓ of the height | 16 | 24 | M3 medium to large |
 | `round` | half the height (pill) | 20 | 28 | M3 Expressive full |
+| `pebble` | half the height (pill) | 16 | 24 | Round's buttons with Soft's cards (TH.17) |
+| `cut` | ⅛ of the height, bevelled | 6 | 8 | M3 cut corners, for formal brands; rounded where the browser has no `corner-shape` (TH.17) |
 
-Avatars, the 16px mark and status dots don't follow the preset.
+Avatars, the 16px mark and status dots don't follow the preset, and `rounded-full` pills are never bevelled.
+
+**Morph** (TH.18) uses `--radius-control-pressed` (half the control radius) on the main button at its standard size and `--radius-control-selected` (¼ of the small control height) on a selected toggle chip. It moves over `--dur-morph`, which is 0 for people on Calm or Off and under reduced motion, so they see the end state with no movement.
 
 **Rules that keep content clear of the corner** (all presets, added 21 November 2026 after the round preset cut text in textareas and comment cards):
 
@@ -159,12 +163,13 @@ On phones density is ignored for targets: every target stays at least 48 × 48 (
 
 | Key | Values | Default |
 | --- | --- | --- |
-| `elevation.style` | `plane` · `soft` · `flat` | `plane` |
+| `elevation.style` | `plane` · `soft` · `flat` · `outline` (TH.19) | `plane` |
 | `elevation.float` | `light` · `standard` · `strong` (the floating-layer shadow, 4.4) | `standard` |
 
 - `plane`: the hard offset under the main button, approved agent work and hovered clickable cards (4.3).
 - `soft`: the same places get a soft shadow in the primary's plane tone instead of the offset.
 - `flat`: no offset; those places get a 2px border in `plane-deep`.
+- `outline`: no shadows anywhere. The plane is a 2px border as in `flat`, and floating layers (menus, popovers, dialogs) get a 1px border in the mode's border colour instead of the float shadow, so `elevation.float` has no effect. For high-contrast and print-like brands.
 
 Whatever the style, **approved agent work must look different from a waiting proposal** (solid against dashed, 4.3). That difference is a guard rail, not a token.
 
@@ -172,10 +177,11 @@ Whatever the style, **approved agent work must look different from a waiting pro
 
 | Key | Values | Default |
 | --- | --- | --- |
-| `motion.preset` | `calm` · `standard` · `expressive` | `calm` |
+| `motion.preset` | `calm` · `standard` · `expressive` · `brisk` (TH.19) | `calm` |
 
 - `calm`: today's 06-motion: 120, 180 and 250ms on `cubic-bezier(0.2, 0, 0, 1)`, no bounce.
 - `standard`: M3 standard springs (no visible overshoot). On the web they are emitted as `linear()` easings with matching durations, so CSS needs no runtime library.
+- `brisk`: the standard springs' curve over 0.8 of their durations, for busy front desks.
 - `expressive`: M3 expressive spatial springs (a small overshoot on things entering and on the main button's press). Colour and opacity always use the effects spring, which never overshoots.
 
 The person's **Animations** setting (Full, Calm, Off) and the device's reduce-motion setting always win (06-motion, LT.4): Calm and reduce motion mean the `calm` preset with no movement, whatever the theme.
