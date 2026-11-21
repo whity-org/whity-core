@@ -9,7 +9,7 @@ use Whity\Core\Accounting\Periods as CorePeriods;
 use Whity\Sdk\Accounting\Period;
 use Whity\Sdk\Accounting\Periods;
 
-/** The months of the books for plugins, read-only (SDK 1.131, WHIT-1318). */
+/** The months of the books for plugins, read-only (SDK 1.132, WHIT-1318). */
 final class HostPeriods implements Periods
 {
     public function __construct(

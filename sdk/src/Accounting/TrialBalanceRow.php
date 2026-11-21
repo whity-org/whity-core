@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Sdk\Accounting;
 
-/** One account on the trial balance (SDK 1.131, WHIT-1318), in minor units. */
+/** One account on the trial balance (SDK 1.132, WHIT-1318), in minor units. */
 final class TrialBalanceRow
 {
     public function __construct(

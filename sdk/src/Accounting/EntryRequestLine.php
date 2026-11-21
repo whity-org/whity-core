@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Accounting;
 
 /**
- * One line of an entry to post (SDK 1.131, WHIT-1318): an account by id, and
+ * One line of an entry to post (SDK 1.132, WHIT-1318): an account by id, and
  * a debit or a credit in the base currency's minor units (one of them above
  * 0, the other 0). `contactId` ties it to a customer or supplier, `ouId` to a
  * branch.

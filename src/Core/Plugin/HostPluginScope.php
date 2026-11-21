@@ -126,7 +126,7 @@ final class HostPluginScope implements PluginScope
         return $scope;
     }
 
-    /** Core's books for this plugin; its ledger and accounts are bound to this plugin (SDK 1.131, WHIT-1318). */
+    /** Core's books for this plugin; its ledger and accounts are bound to this plugin (SDK 1.132, WHIT-1318). */
     public function accounting(): AccountingScope
     {
         if (!isset($this->stores[AccountingScope::class])) {

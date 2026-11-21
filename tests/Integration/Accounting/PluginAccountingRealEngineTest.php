@@ -27,7 +27,7 @@ use Whity\Sdk\Accounting\EntryRequestLine;
 use Whity\Sdk\PluginInterface;
 
 /**
- * A payroll plugin posts its run through the SDK (1.131, WHIT-1318): it adds
+ * A payroll plugin posts its run through the SDK (1.132, WHIT-1318): it adds
  * an account it owns, posts the month's salaries under its OWN name, retries
  * safely with an idempotency key, reverses it, reads the trial balance, and is
  * refused for a person without the permission, through the container's copy,

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Accounting;
 
 /**
- * Reports read from the ledger, for a plugin (SDK 1.131, WHIT-1318, register
+ * Reports read from the ledger, for a plugin (SDK 1.132, WHIT-1318, register
  * AC.23). The trial balance arrives first; profit and loss, the balance sheet
  * and the aged reports arrive with phase A5.
  */

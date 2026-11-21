@@ -11,7 +11,7 @@ use Whity\Sdk\Accounting\Accounts;
 use Whity\Sdk\PluginInterface;
 
 /**
- * The chart of accounts for plugins (SDK 1.131, WHIT-1318), in the workspace
+ * The chart of accounts for plugins (SDK 1.132, WHIT-1318), in the workspace
  * the call runs in. The container's copy reads; {@see self::for()} gives a
  * copy bound to a loaded plugin, whose new accounts belong to that plugin.
  */

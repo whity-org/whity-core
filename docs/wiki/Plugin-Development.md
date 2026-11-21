@@ -2046,9 +2046,9 @@ What to know:
 - **Order from suppliers** (SDK 1.129). `$inventory->orders()->createPurchase($supplierContactId, $placeId, [['variant_id' => $v, 'quantity' => '24', 'unit' => 'bag']], $profileId)` drafts a purchase order (the supplier's price fills a line without one); `submit()` sends it and `receive()` takes in what arrived, at the order's cost. They need `purchases:write`. `inventory.order.submitting` lets you refuse an order (a budget, a blocked supplier).
 - **Listen or refuse.** `stock.moved` (and `stock.moved.async` after commit) tells you what posted. `stock.moving` runs before, inside the transaction; throw `HookVetoException` to refuse the whole post (the caller gets 409 with your reason). `inventory.item.created`, `updated` and `archived` follow the items; `inventory.operation.done`, `inventory.count.differences`, `stock.level.below_reorder` and `stock.level.restored` follow operations and reorder levels (SDK 1.128).
 
-## Step 12k — Post to core's books (SDK 1.131)
+## Step 12k — Post to core's books (SDK 1.132)
 
-Accounting is core (WHIT-1318, design section 32). A payroll, point-of-sale or rental plugin posts its money to the workspace's own books instead of keeping a ledger of its own, through `$ctx->accounting()` (SDK 1.131). On an older host it throws `Context\ServiceUnavailable`.
+Accounting is core (WHIT-1318, design section 32). A payroll, point-of-sale or rental plugin posts its money to the workspace's own books instead of keeping a ledger of its own, through `$ctx->accounting()` (SDK 1.132). On an older host it throws `Context\ServiceUnavailable`.
 
 ```php
 use Whity\Sdk\Accounting\{EntryRequest, EntryRequestLine};

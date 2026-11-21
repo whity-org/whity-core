@@ -100,7 +100,7 @@ $inventory->stock()->move(new MoveRequest(
 
 `Context\InventoryScope` (`$ctx->inventory()`) holds the six (`operations()` since 1.128, `orders()` since 1.129). Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
 
-### Accounting (1.131)
+### Accounting (1.132)
 
 Core's books (WHIT-1318, design section 32). Through the context, in the workspace the call runs in:
 
@@ -122,10 +122,10 @@ $entry = $books->ledger()->post(new EntryRequest(
 
 | Service | What for | Workspace | Since |
 |---|---|---|---|
-| `Accounting\Accounts` | The chart in tree order, by code and by role (`receivable`, `sales_tax_output`...); `create()` adds an account your plugin owns, only through `$ctx->accounting()->accounts()`, acting as a person with `accounting:settings`. | current | 1.131 |
-| `Accounting\Ledger` | Post balanced entries (minor units of the base currency) and `reverse()` them as your plugin, idempotent by key, only through `$ctx->accounting()->ledger()`; read entries and balances. The container copy reads and refuses writes (`use_plugin_context`). | current | 1.131 |
-| `Accounting\Periods` | The month a date is in, whether it is open, the lock date. | current | 1.131 |
-| `Accounting\Reports` | The trial balance for a range, optionally one branch. | current | 1.131 |
+| `Accounting\Accounts` | The chart in tree order, by code and by role (`receivable`, `sales_tax_output`...); `create()` adds an account your plugin owns, only through `$ctx->accounting()->accounts()`, acting as a person with `accounting:settings`. | current | 1.132 |
+| `Accounting\Ledger` | Post balanced entries (minor units of the base currency) and `reverse()` them as your plugin, idempotent by key, only through `$ctx->accounting()->ledger()`; read entries and balances. The container copy reads and refuses writes (`use_plugin_context`). | current | 1.132 |
+| `Accounting\Periods` | The month a date is in, whether it is open, the lock date. | current | 1.132 |
+| `Accounting\Reports` | The trial balance for a range, optionally one branch. | current | 1.132 |
 
 `Context\AccountingScope` (`$ctx->accounting()`) holds the four. Refusals throw `Accounting\AccountingRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `unbalanced`, `period_closed`, `conflict`, `vetoed`, `use_plugin_context`.
 

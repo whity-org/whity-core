@@ -10,7 +10,7 @@ use Whity\Sdk\Accounting\Periods;
 use Whity\Sdk\Accounting\Reports;
 
 /**
- * Core's books for one plugin, in the workspace the call runs in (SDK 1.131,
+ * Core's books for one plugin, in the workspace the call runs in (SDK 1.132,
  * WHIT-1318): `$ctx->accounting()`.
  *
  * `ledger()` and `accounts()` are bound to the plugin the loader loaded: the

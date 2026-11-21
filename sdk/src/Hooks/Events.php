@@ -536,7 +536,7 @@ final class Events
     public const INVENTORY_ORDER_CANCELLED = 'inventory.order.cancelled';
     public const INVENTORY_ORDER_CANCELLED_ASYNC = 'inventory.order.cancelled.async';
 
-    // ---- accounting: the ledger and periods (SDK 1.131, WHIT-1318, design section 32) ----
+    // ---- accounting: the ledger and periods (SDK 1.132, WHIT-1318, design section 32) ----
     /**
      * FILTER hook, before a journal entry posts, inside its transaction.
      * Payload: `tenant_id`, `journal` (its code), `date`, `memo`,

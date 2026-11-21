@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.131.0",
+    "sdk_version": "1.132.0",
     "core_version": "0.2.30",
     "updated": "2026-11-19",
     "ratings": {
@@ -115,23 +115,23 @@
             "has": [
                 {
                     "what": "Accounting\\Accounts host service: the chart of accounts in tree order, by code and by role (receivable, sales tax, stock...), and accounts a plugin owns added through $ctx->accounting()->accounts(); the container copy only reads",
-                    "since": "1.131"
+                    "since": "1.132"
                 },
                 {
                     "what": "Accounting\\Ledger: the append-only double-entry ledger, hash-chained per workspace; plugins post balanced entries in an open month and reverse them through $ctx->accounting()->ledger(), bound to the loaded plugin (idempotent by key), acting as a person with accounting:post; reads entries and balances",
-                    "since": "1.131"
+                    "since": "1.132"
                 },
                 {
                     "what": "Accounting\\Periods and Accounting\\Reports: whether a date is open, the lock date, and the trial balance",
-                    "since": "1.131"
+                    "since": "1.132"
                 },
                 {
                     "what": "Events accounting.entry.posting (filter, can veto), accounting.entry.posted, accounting.entry.reversed, accounting.period.closed and accounting.period.reopened",
-                    "since": "1.131"
+                    "since": "1.132"
                 },
                 {
                     "what": "PluginContext: $ctx->accounting() (Context\\AccountingScope) with accounts(), ledger(), periods() and reports()",
-                    "since": "1.131"
+                    "since": "1.132"
                 }
             ],
             "missing": [

@@ -14,7 +14,7 @@ use Whity\Sdk\Accounting\Ledger;
 use Whity\Sdk\PluginInterface;
 
 /**
- * Core's ledger for plugins (SDK 1.131, WHIT-1318), in the workspace the call
+ * Core's ledger for plugins (SDK 1.132, WHIT-1318), in the workspace the call
  * runs in.
  *
  * WHO POSTS. The instance in the container is unbound: it reads, and refuses

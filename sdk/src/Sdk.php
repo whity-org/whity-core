@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.131).
+ * SDK identity (v1.132).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1490,7 +1490,7 @@ namespace Whity\Sdk;
  *
  * Purely additive: one new optional interface and one new host service.)
  *
- * 1.131 (ACCOUNTING: host services {@see Accounting\Accounts}, {@see Accounting\Ledger},
+ * 1.132 (ACCOUNTING: host services {@see Accounting\Accounts}, {@see Accounting\Ledger},
  * {@see Accounting\Periods} and {@see Accounting\Reports} read core's chart of accounts, its append-only
  * double-entry ledger, its months and the trial balance without HTTP, and {@see Context\AccountingScope}
  * puts them on the plugin context as `$ctx->accounting()`. An {@see Accounting\EntryRequest} posts balanced
@@ -1508,7 +1508,7 @@ namespace Whity\Sdk;
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.131.0';
+    public const VERSION = '1.132.0';
 
     /**
      * Static identity only — never instantiated.

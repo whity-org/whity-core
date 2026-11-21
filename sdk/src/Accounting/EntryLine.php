@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Accounting;
 
 /**
- * One line of a posted entry (SDK 1.131, WHIT-1318): an account and a debit
+ * One line of a posted entry (SDK 1.132, WHIT-1318): an account and a debit
  * or a credit in minor units, never both.
  */
 final class EntryLine
