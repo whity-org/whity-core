@@ -11032,6 +11032,31 @@ final class CoreApiSchemas
                 'walkin_id' => self::int() + ['description' => 'The walk-in to serve, from GET /api/calendar/walkins.'],
                 'profile_id' => self::int() + ['description' => 'Who serves them, from GET /api/calendar/walkins/staff.'],
             ], ['walkin_id', 'profile_id']),
+            'CalendarCommissionRate' => self::object([
+                'id' => self::int(),
+                'profile_id' => self::int(),
+                'person' => self::str(),
+                'service_id' => self::int(true) + ['description' => 'Null: the rate for every service without one of its own.'],
+                'service' => self::str(),
+                'percent' => self::str() + ['description' => 'As read, such as 12.5%.'],
+                'percent_bp' => self::int() + ['description' => 'Basis points: 1250 is 12.5%.'],
+            ], ['id', 'profile_id', 'percent_bp']),
+            'CalendarCommissionRateRequest' => self::object([
+                'profile_id' => self::int() + ['description' => 'The member of staff, from GET /api/calendar/commission/staff.'],
+                'service_id' => self::int() + ['description' => 'Empty for every service.'],
+                'percent' => self::str() + ['description' => 'A number from 0 to 100, such as 30 or 12.5.'],
+            ], ['profile_id', 'percent']),
+            'CalendarCommissionReportRow' => self::object([
+                'profile_id' => self::int(),
+                'person' => self::str(),
+                'currency' => self::str(),
+                'bookings' => self::int(),
+                'sales_minor' => self::int(),
+                'commission_minor' => self::int(),
+                'rated' => self::bool() + ['description' => 'False when the person has no rate.'],
+                'sales' => self::str(),
+                'commission' => self::str(),
+            ], ['profile_id', 'currency', 'bookings', 'sales_minor', 'commission_minor']),
             'CalendarStaff' => self::object([
                 'profile_id' => self::int(),
                 'display_name' => self::str(),
@@ -19927,6 +19952,61 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
                     404 => self::errorResponse('Not found'),
                     422 => self::errorResponse('Not a confirmed booking'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/rates', 'calendar:commission', [
+                'summary' => 'Every commission rate, by member of staff',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Rates', self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CalendarCommissionRate')])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/commission/rates', 'calendar:commission', [
+                'summary' => 'Set a commission rate, for every service or one',
+                'tags' => ['calendar'],
+                'request' => 'CalendarCommissionRateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The rate', self::dataEnvelope(SchemaBuilder::ref('CalendarCommissionRate'))),
+                    422 => self::errorResponse('Not valid'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/calendar/commission/rates/{id:\d+}', 'calendar:commission', [
+                'summary' => 'Remove a commission rate',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Removed', self::dataEnvelope(self::object(['removed' => self::bool()], ['removed']))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/periods', 'calendar:commission', [
+                'summary' => 'The periods the commission report covers',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Periods', self::dataEnvelope(['type' => 'array', 'items' => self::object(['id' => self::str(), 'label' => self::str(), 'from' => self::str(), 'to' => self::str()], ['id', 'label', 'from', 'to'])])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/report', 'calendar:commission', [
+                'summary' => 'What each member of staff earned in a period',
+                'description' => 'From done bookings (confirmed and already over), each service line at its own price, in the workspace time zone.',
+                'tags' => ['calendar'],
+                'parameters' => [self::queryParam('period', 'string', 'this_month (default), last_month, this_week, last_7_days or last_30_days.')],
+                'responses' => [
+                    200 => self::jsonResponse('One row per person and currency', self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CalendarCommissionReportRow')])),
+                    422 => self::errorResponse('Unknown period'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/staff', 'calendar:commission', [
+                'summary' => 'The staff a commission rate can be set for',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Staff', self::dataEnvelope(['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name'])])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/services', 'calendar:commission', [
+                'summary' => 'The services a commission rate can be set for',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Services', self::dataEnvelope(['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name'])])),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/calendar/walkins', 'calendar:front_desk', [

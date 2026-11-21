@@ -2423,5 +2423,33 @@
   "post_api_calendar_walkins_id_left": {
     "en": "Mark that a walk-in left",
     "ar": "تسجيل مغادرة زبون بدون حجز"
+  },
+  "get_api_calendar_commission_rates": {
+    "en": "List staff commission rates",
+    "ar": "عرض نسب عمولة الفريق"
+  },
+  "post_api_calendar_commission_rates": {
+    "en": "Set a commission rate",
+    "ar": "تحديد نسبة عمولة"
+  },
+  "delete_api_calendar_commission_rates_id": {
+    "en": "Remove a commission rate",
+    "ar": "إزالة نسبة عمولة"
+  },
+  "get_api_calendar_commission_periods": {
+    "en": "List the commission report periods",
+    "ar": "عرض فترات تقرير العمولة"
+  },
+  "get_api_calendar_commission_report": {
+    "en": "See what each member of staff earned",
+    "ar": "عرض ما حصل عليه كل موظف من عمولة"
+  },
+  "get_api_calendar_commission_staff": {
+    "en": "List the staff a rate can be set for",
+    "ar": "عرض الموظفين الذين يمكن تحديد نسبة لهم"
+  },
+  "get_api_calendar_commission_services": {
+    "en": "List the services a rate can be set for",
+    "ar": "عرض الخدمات التي يمكن تحديد نسبة لها"
   }
 }

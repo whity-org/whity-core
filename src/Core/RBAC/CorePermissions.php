@@ -490,6 +490,10 @@ final class CorePermissions
     // desk. Granted by capability to roles holding calendar:write and
     // contacts:write, since the booking and the contact are made as that person.
     public const CALENDAR_FRONT_DESK = 'calendar:front_desk';
+    // WHIT-1334 (design section 35 §4, SL.7): set staff commission rates and
+    // see what each earned. Granted by capability to roles holding
+    // calendar:manage.
+    public const CALENDAR_COMMISSION = 'calendar:commission';
 
     // CONTACTS (migrations 261 and 262, design 3.3 A8). Customers and
     // suppliers as one record, with tags and spreadsheet import. Read and
@@ -636,6 +640,7 @@ final class CorePermissions
             self::CALENDAR_WRITE,
             self::CALENDAR_MANAGE,
             self::CALENDAR_FRONT_DESK,
+            self::CALENDAR_COMMISSION,
             self::CONTACTS_READ,
             self::CONTACTS_WRITE,
             self::CONTACTS_IMPORT,
