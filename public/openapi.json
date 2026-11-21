@@ -78817,6 +78817,123 @@
                 ]
             }
         },
+        "/api/v1/themes/convert": {
+            "post": {
+                "operationId": "post_api_v1_themes_convert",
+                "summary": "Turn a theme from shadcn, Tailwind or Material Theme Builder into a theme file",
+                "tags": [
+                    "theme"
+                ],
+                "description": "Free (TH.25): shadcn CSS variables (:root and .dark), a Tailwind v4 @theme block, or Material Theme Builder JSON become a Whity theme file. Colours become the main colour and colours set by hand for the roles Whity has, the radius the nearest shape preset, the font its pair; status colours stay Whity's. Nothing is saved: import the result with POST /api/themes.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ConvertThemeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The theme file, what was kept in words, and a preview",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConvertThemeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "The source is larger than 64 KB",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Nothing usable was found; the error says what to paste",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/themes/export": {
             "get": {
                 "operationId": "get_api_v1_themes_export",
@@ -94986,6 +95103,78 @@
                 },
                 "minProperties": 1
             },
+            "ConvertThemeRequest": {
+                "type": "object",
+                "properties": {
+                    "format": {
+                        "type": "string",
+                        "enum": [
+                            "shadcn",
+                            "tailwind",
+                            "material"
+                        ],
+                        "description": "shadcn CSS variables, a Tailwind v4 @theme block, or Material Theme Builder JSON."
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "The CSS or JSON as pasted or read from the file, at most 64 KB."
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "The theme's name; \"Imported from \u2026\" when empty."
+                    }
+                },
+                "required": [
+                    "format",
+                    "source"
+                ]
+            },
+            "ConvertThemeResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "theme": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "A theme file (schemas/theme/v1.json), not saved yet."
+                            },
+                            "notes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "What was kept and what was not, in plain words."
+                            },
+                            "preview": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "Colours for light and dark, and the corner radii."
+                            },
+                            "adjustments": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                },
+                                "description": "What the guard rails change: mode, role and change."
+                            }
+                        },
+                        "required": [
+                            "theme",
+                            "notes",
+                            "preview",
+                            "adjustments"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "CustomField": {
                 "type": "object",
                 "properties": {
@@ -104974,7 +105163,7 @@
                     },
                     "shape": {
                         "type": "object",
-                        "description": "preset (square, crisp, whity, soft, round) and morph."
+                        "description": "preset (square, crisp, whity, soft, round, pebble, cut), morph, and components: a preset for buttons, fields, chips, cards, dialogs, tables or navigation."
                     },
                     "density": {
                         "type": "string",

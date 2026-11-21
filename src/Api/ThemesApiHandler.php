@@ -12,6 +12,8 @@ use Whity\Core\Settings\SettingsService;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Core\Theme\ThemeCompiler;
 use Whity\Core\Theme\ThemeFonts;
+use Whity\Core\Theme\ThemeImporter;
+use Whity\Core\Theme\ThemeImportProblem;
 use Whity\Core\Theme\ThemeLibrary;
 use Whity\Core\Theme\ThemeRepository;
 use Whity\Core\Theme\ThemeTweaks;
@@ -21,14 +23,17 @@ use Whity\Core\Theme\ThemeValidator;
  * The themes a workspace can choose, and importing a theme file (WHIT-1225,
  * TH.13, TH.14). Applying a theme is free: choosing one is the
  * `branding_theme` setting through `PATCH /api/settings`, like the main
- * colour. Making themes is Whity Studio's (paid); core only takes a finished
- * file.
+ * colour. Making themes is free in core too (TH.25): converting from other
+ * tools here, and the editor.
  *
  *   GET    /api/v1/themes            settings:read   the list, each with a preview
  *   GET    /api/v1/themes/export     settings:read   the theme in use as a file (TH.16)
  *   POST   /api/v1/themes            settings:write  import a theme file (JSON body);
  *                                                    `?check=1` only checks it and says
  *                                                    what a newer version changes
+ *   POST   /api/v1/themes/convert    settings:write  turn shadcn CSS, a Tailwind @theme block
+ *                                                    or Material Theme Builder JSON into a
+ *                                                    theme file; nothing is saved (TH.25)
  *   DELETE /api/v1/themes/{themeId}  settings:write  remove an imported theme
  *
  * The free tweaks (TH.15: shape, density, font pair) are part of the
@@ -148,6 +153,47 @@ final class ThemesApiHandler
             $this->repository->save($tenantId, $theme, 'import', false, self::profileId($request));
 
             return Response::json(['data' => ['id' => $theme['id'], 'version' => $theme['version']]], 201);
+        });
+    }
+
+    /**
+     * TH.25 (30-themes 11, 14.7): a theme made with shadcn, Tailwind or
+     * Material Theme Builder, as a Whity theme file with what was kept in
+     * words and a preview. Nothing is saved; importing it is `POST /themes`.
+     */
+    public function convert(Request $request): Response
+    {
+        return $this->inWorkspace(function () use ($request): Response {
+            if (strlen($request->getBody()) > ThemeImporter::MAX_BYTES + 1024) {
+                return Response::error('This is too long to be a theme. Paste only the colour variables.', 413);
+            }
+            $body = json_decode($request->getBody(), true);
+            $format = is_array($body) && is_string($body['format'] ?? null) ? $body['format'] : '';
+            $source = is_array($body) && is_string($body['source'] ?? null) ? $body['source'] : '';
+            $name = is_array($body) && is_string($body['name'] ?? null) ? $body['name'] : '';
+            try {
+                $result = ThemeImporter::convert($format, $source, $name);
+            } catch (ThemeImportProblem $problem) {
+                return Response::error('This could not be turned into a theme.', 422, ['source' => $problem->reason()]);
+            }
+            $compiled = ThemeCompiler::compile($result['theme']);
+            if ($compiled['adjustments'] !== []) {
+                $result['notes'][] = count($compiled['adjustments']) === 1
+                    ? 'One colour is changed when the theme is used, so text on it stays readable.'
+                    : count($compiled['adjustments']) . ' colours are changed when the theme is used, so text on them stays readable.';
+            }
+
+            return Response::json(['data' => [
+                'theme' => $result['theme'],
+                'notes' => $result['notes'],
+                'preview' => [
+                    'light' => self::swatch($compiled['light'], 'light'),
+                    'dark' => self::swatch($compiled['dark'], 'dark'),
+                    'radius' => $compiled['vars']['wy-radius-control'] ?? '10px',
+                    'card_radius' => $compiled['vars']['wy-radius-card'] ?? '12px',
+                ],
+                'adjustments' => $compiled['adjustments'],
+            ]], 200);
         });
     }
 

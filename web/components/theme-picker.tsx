@@ -14,10 +14,14 @@
  * the theme (saved in `branding_theme_overrides` next to the colour
  * overrides), export the theme in use as a file, and see in words what a
  * newer version of an imported theme changes before it replaces the old one.
+ *
+ * Free since TH.25: turn a theme made with shadcn, Tailwind or Material Theme
+ * Builder into a theme file (POST /themes/convert), see it and what was kept
+ * in words, then add it through the same checked import.
  */
 
 import { useRef, useState } from 'react';
-import { IconCheck, IconDownload, IconTrash, IconUpload } from '@tabler/icons-react';
+import { IconCheck, IconDownload, IconFileImport, IconTrash, IconUpload } from '@tabler/icons-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +35,9 @@ import {
 import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
+import { Input } from '@whity/ui/input';
+import { Textarea } from '@whity/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { api } from '@/lib/api/client';
@@ -223,10 +230,10 @@ export function adjustmentText(change: string, rawRole: string, t: TranslateFn):
   }
 }
 
-function ThemePreview({ item, dark }: { item: ThemeListItem; dark: boolean }) {
-  const s = (dark ? item.preview.dark : item.preview.light) ?? {};
-  const radius = safe(item.preview.radius, PX, '10px');
-  const cardRadius = safe(item.preview.card_radius, PX, '12px');
+function ThemePreview({ preview, dark }: { preview: ThemeListItem['preview']; dark: boolean }) {
+  const s = (dark ? preview.dark : preview.light) ?? {};
+  const radius = safe(preview.radius, PX, '10px');
+  const cardRadius = safe(preview.card_radius, PX, '12px');
   return (
     <div
       aria-hidden="true"
@@ -254,6 +261,212 @@ function ThemePreview({ item, dark }: { item: ThemeListItem; dark: boolean }) {
         </div>
       </div>
     </div>
+  );
+}
+
+type ConvertFormat = 'shadcn' | 'tailwind' | 'material';
+
+interface Converted {
+  theme: unknown;
+  notes: string[];
+  preview: ThemeListItem['preview'];
+}
+
+/**
+ * TH.25: paste or choose what another tool made, see it as a Whity theme and
+ * what was kept, then add it. Nothing is saved until "Add this theme".
+ */
+function ConvertThemeDialog({
+  open,
+  onOpenChange,
+  onAdd,
+  dark,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAdd: (theme: unknown) => Promise<boolean>;
+  dark: boolean;
+}) {
+  const t = useTranslation('admin');
+  const [format, setFormat] = useState<ConvertFormat>('shadcn');
+  const [name, setName] = useState('');
+  const [source, setSource] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const [result, setResult] = useState<Converted | null>(null);
+  const [working, setWorking] = useState(false);
+  const file = useRef<HTMLInputElement>(null);
+
+  const formats: Record<ConvertFormat, { label: string; hint: string; accept: string }> = {
+    shadcn: {
+      label: t('theme.convert.shadcn', 'shadcn'),
+      hint: t('theme.convert.shadcnHint', 'Paste the :root and .dark blocks from your globals.css.'),
+      accept: '.css,text/css,text/plain',
+    },
+    tailwind: {
+      label: t('theme.convert.tailwind', 'Tailwind CSS'),
+      hint: t('theme.convert.tailwindHint', 'Paste the @theme block with your --color-* variables.'),
+      accept: '.css,text/css,text/plain',
+    },
+    material: {
+      label: t('theme.convert.material', 'Material Theme Builder'),
+      hint: t('theme.convert.materialHint', 'Export as JSON from Material Theme Builder and paste or choose the file.'),
+      accept: '.json,application/json',
+    },
+  };
+
+  const reset = () => {
+    setResult(null);
+    setProblem(null);
+  };
+
+  const convert = async () => {
+    setWorking(true);
+    setProblem(null);
+    try {
+      const { data: body, error: convertError } = await api.POST('/api/v1/themes/convert', {
+        body: { format, source, name },
+      });
+      if (convertError || !body) {
+        const reason = (convertError as { errors?: { source?: string } } | undefined)?.errors?.source;
+        setProblem(reason ?? t('theme.convert.failed', 'This could not be turned into a theme. Check what you pasted and try again.'));
+        return;
+      }
+      setResult({ theme: body.data.theme, notes: body.data.notes, preview: body.data.preview as ThemeListItem['preview'] });
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const add = async () => {
+    if (!result) return;
+    setWorking(true);
+    try {
+      if (await onAdd(result.theme)) {
+        onOpenChange(false);
+        setSource('');
+        setName('');
+        reset();
+      }
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) reset();
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent data-testid="theme-convert" className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{t('theme.convert.title', 'Import from another tool')}</DialogTitle>
+          <DialogDescription>
+            {t('theme.convert.description', 'Bring the colours, corners and font of a theme made with shadcn, Tailwind or Material Theme Builder.')}
+          </DialogDescription>
+        </DialogHeader>
+        {result === null ? (
+          <div className="grid gap-4">
+            <div className="grid gap-1.5">
+              <span className="text-sm font-medium" id="theme-convert-format">
+                {t('theme.convert.format', 'Made with')}
+              </span>
+              <Select value={format} onValueChange={(value) => setFormat(value as ConvertFormat)}>
+                <SelectTrigger aria-labelledby="theme-convert-format" data-testid="theme-convert-format">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(formats) as ConvertFormat[]).map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {formats[key].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Input
+              label={t('theme.convert.name', 'Name')}
+              value={name}
+              maxLength={80}
+              placeholder={t('theme.convert.namePlaceholder', 'Imported from {tool}', { tool: formats[format].label })}
+              onChange={(event) => setName(event.target.value)}
+            />
+            <div className="grid gap-1.5">
+              <label className="text-sm font-medium" htmlFor="theme-convert-source">
+                {format === 'material' ? t('theme.convert.json', 'JSON') : t('theme.convert.css', 'CSS')}
+              </label>
+              <Textarea
+                id="theme-convert-source"
+                value={source}
+                rows={8}
+                dir="ltr"
+                spellCheck={false}
+                className="font-mono"
+                aria-describedby="theme-convert-hint"
+                aria-invalid={problem !== null || undefined}
+                onChange={(event) => {
+                  setSource(event.target.value);
+                  setProblem(null);
+                }}
+              />
+              <p id="theme-convert-hint" className="text-xs text-muted-foreground">
+                {formats[format].hint}
+              </p>
+              {problem && (
+                <p role="alert" className="text-xs text-destructive">
+                  {problem}
+                </p>
+              )}
+            </div>
+            <input
+              ref={file}
+              type="file"
+              accept={formats[format].accept}
+              className="sr-only"
+              aria-label={t('theme.convert.file', 'Choose a file')}
+              onChange={(event) => {
+                const chosen = event.target.files?.[0];
+                if (chosen) void chosen.text().then((text) => setSource(text));
+                event.target.value = '';
+              }}
+            />
+          </div>
+        ) : (
+          <div className="grid gap-3" data-testid="theme-convert-result">
+            <ThemePreview preview={result.preview} dark={dark} />
+            <ul className="grid list-disc gap-1 ps-5 text-sm">
+              {result.notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <DialogFooter>
+          {result === null ? (
+            <>
+              <Button variant="outline" disabled={working} onClick={() => file.current?.click()}>
+                <IconUpload aria-hidden="true" />
+                {t('theme.convert.file', 'Choose a file')}
+              </Button>
+              <Button disabled={working || source.trim() === ''} onClick={() => void convert()}>
+                {t('theme.convert.go', 'Make the theme')}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" disabled={working} onClick={reset}>
+                {t('theme.convert.back', 'Back')}
+              </Button>
+              <Button disabled={working} onClick={() => void add()}>
+                {t('theme.convert.add', 'Add this theme')}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -315,17 +528,46 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
     }
   };
 
-  const saveImport = async (theme: unknown) => {
+  const saveImport = async (theme: unknown): Promise<boolean> => {
     const { error: importError } = await api.POST('/api/v1/themes', { body: theme as never });
     if (importError) {
       const reason = (importError as { errors?: { theme?: string } }).errors?.theme;
       addToast(reason ?? t('theme.import.failed', 'This theme file can’t be used.'), 'error');
-      return;
+      return false;
     }
     refetch();
     void refreshAppBranding();
     addToast(t('theme.import.done', 'Theme added. Choose it below to use it.'), 'success');
+    return true;
   };
+
+  /** Checks first, and says what a newer version changes before it replaces the old one (TH.16). */
+  const importTheme = async (theme: unknown): Promise<boolean> => {
+    const { data: checked, error: checkError } = await api.POST('/api/v1/themes', {
+      params: { query: { check: '1' } },
+      body: theme as never,
+    });
+    if (checkError || !checked) {
+      const reason = (checkError as { errors?: { theme?: string } } | undefined)?.errors?.theme;
+      addToast(reason ?? t('theme.import.failed', 'This theme file can’t be used.'), 'error');
+      return false;
+    }
+    const info = checked.data;
+    const changes = info.changes ?? [];
+    if (info.installed_version && changes.length > 0) {
+      const existing = (data?.themes ?? []).find((item) => item.id === info.id);
+      setPending({
+        theme,
+        name: (existing && pick(existing.name, lang)) || info.id,
+        from: info.installed_version,
+        to: info.version,
+        changes,
+      });
+      return true;
+    }
+    return saveImport(theme);
+  };
+  const [converting, setConverting] = useState(false);
 
   const apply = async (id: string) => {
     setBusy(id);
@@ -357,30 +599,7 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
         addToast(t('theme.import.notJson', 'This file isn’t a theme file.'), 'error');
         return;
       }
-      // TH.16: check first, and say what a newer version changes before it replaces the old one.
-      const { data: checked, error: checkError } = await api.POST('/api/v1/themes', {
-        params: { query: { check: '1' } },
-        body: theme as never,
-      });
-      if (checkError || !checked) {
-        const reason = (checkError as { errors?: { theme?: string } } | undefined)?.errors?.theme;
-        addToast(reason ?? t('theme.import.failed', 'This theme file can’t be used.'), 'error');
-        return;
-      }
-      const info = checked.data;
-      const changes = info.changes ?? [];
-      if (info.installed_version && changes.length > 0) {
-        const existing = (data?.themes ?? []).find((item) => item.id === info.id);
-        setPending({
-          theme,
-          name: (existing && pick(existing.name, lang)) || info.id,
-          from: info.installed_version,
-          to: info.version,
-          changes,
-        });
-        return;
-      }
-      await saveImport(theme);
+      await importTheme(theme);
     } finally {
       setBusy(null);
       if (fileInput.current) fileInput.current.value = '';
@@ -445,6 +664,11 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
               <IconUpload aria-hidden="true" />
               {t('theme.import', 'Add a theme file')}
             </Button>
+            <Button variant="outline" disabled={busy !== null} onClick={() => setConverting(true)}>
+              <IconFileImport aria-hidden="true" />
+              {t('theme.convert.open', 'Import from another tool')}
+            </Button>
+            <ConvertThemeDialog open={converting} onOpenChange={setConverting} onAdd={importTheme} dark={resolved === 'dark'} />
           </>
         )}
         </div>
@@ -459,7 +683,7 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
             const name = pick(item.name, lang) || item.id;
             return (
               <li key={item.id} className="grid gap-3 rounded-card border bg-card p-3" data-theme-id={item.id}>
-                <ThemePreview item={item} dark={resolved === 'dark'} />
+                <ThemePreview preview={item.preview} dark={resolved === 'dark'} />
                 <div className="grid gap-1">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold">{name}</span>
