@@ -6472,6 +6472,8 @@ $router->register('GET',    '/api/themes/export/tokens', [$themesHandler, 'expor
 $router->register('POST',   '/api/themes/tokens',     [$themesHandler, 'tokens'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('POST',   '/api/themes',            [$themesHandler, 'import'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('POST',   '/api/themes/convert',    [$themesHandler, 'convert'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('POST',   '/api/themes/preview',    [$themesHandler, 'preview'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('GET',    '/api/themes/{themeId}',  [$themesHandler, 'show'],   null, null, CorePermissions::SETTINGS_READ);
 $router->register('DELETE', '/api/themes/{themeId}',  [$themesHandler, 'delete'], null, null, CorePermissions::SETTINGS_WRITE);
 
 // 13c-bis. Register the pending-registration review API (WC-235). Gated on

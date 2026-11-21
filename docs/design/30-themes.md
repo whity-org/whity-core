@@ -326,6 +326,14 @@ This section first described Whity Studio, a paid tool for making themes. On 21 
 - **Versions.** History, compare and restore, and publishing a new version to the workspaces using it.
 - **Publish to the store** as the theme's publisher.
 
+**The live editor (built, WHIT-1225).**
+- **Where:** Settings › Branding › Theme, from "Make a theme" or a theme's Edit / Make a copy (`/admin/settings/branding/theme?from=<id>`), for people with `settings:write` in a workspace.
+- **What it edits:** every choice in section 3 is a closed control: the main, second and accent colours, colour style, greys and contrast; colours set by hand per role and mode; text and heading fonts, text size, title weight and emphasis; corners, morph and each family's corners (14.2); spacing; shadows, shadow strength and animations. "Default" removes the choice, so the theme follows Whity's.
+- **The preview:** every change goes to `POST /api/v1/themes/preview`, the same compiler and guard rails a theme gets in use. The answer carries every colour for both modes, so light and dark sit side by side whatever mode the person is in. It also says what the guard rails change and lists every problem at once.
+- **How the preview is drawn:** the draft's values go only onto two `[data-theme-preview]` elements (`previewThemeCss`), which recompute the shape values as `:root` does. They hold the real components: tabs, a card with a field, check box, switch and buttons, a table, badges and the chart colours. The page around them keeps the workspace's theme.
+- **Saving:** saving goes through the theme import with `source: "editor"`. The workspace's own theme (imported or made here) gets its next patch version; any other is saved as a copy under `workspace.<name>` with no author. "Save and use" also sets `branding_theme`.
+- **Not in this step:** generating seeds from the logo or a colour wheel, presets to start from, the wider preview across key screens, the contrast report, versions, export of resolved tokens, the side-by-side diff and publishing. The last three are the next steps of TH.24.
+
 The editor is built last in the order of TH.24, after the per-component overrides. Whether the wider Studio product (records and pages, R.2) moves the same way is for the business-model register, not this spec.
 
 ## 12. Build plan (phase 2, after approval)
