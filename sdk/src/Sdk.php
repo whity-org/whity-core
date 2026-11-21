@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.140).
+ * SDK identity (v1.147).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1527,10 +1527,19 @@ namespace Whity\Sdk;
  * Purely additive: one new method on Context\InventoryScope, which only the host implements, and new
  * optional constructor arguments, last, on MoveLine and Move.)
  *
- * 1.140 (WALK-INS (WHIT-1334, design section 35 §3): a workspace template may set the calendar's
+ * 1.141 (NOTICES BY EMAIL: a type in {@see Notification\PluginNotificationsInterface::getNotificationTypes()}
+ * may carry `emailDefault` (bool, optional, false when left out). Every notice still lands in the inbox;
+ * with `emailDefault` it also goes by email to a person who never chose for the type. The person's own
+ * choice always wins, and the workspace's email switch applies as for core notices. The email carries
+ * the Notice's subject and body only, never `data` (WHIT-1250, #2209).
+ *
+ * Purely additive: one optional key. Older hosts ignore it and keep notices in-app, so a plugin that
+ * needs the email needs `^1.141`.)
+ *
+ * 1.147 (WALK-INS (WHIT-1334, design section 35 §3): a workspace template may set the calendar's
  * `walkins_enabled`, which turns on the walk-in queue at the front desk, and give a role
  * `calendar:front_desk`. Older hosts refuse a template that sets it, so a template plugin that
- * does needs `^1.140`.
+ * does needs `^1.147`.
  *
  * Purely additive.)
  * Breaking changes require a new major version.
@@ -1538,7 +1547,7 @@ namespace Whity\Sdk;
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.140.0';
+    public const VERSION = '1.147.0';
 
     /**
      * Static identity only — never instantiated.

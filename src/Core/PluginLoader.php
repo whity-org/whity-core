@@ -2438,7 +2438,10 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
      * (WHIT-1030). A declaration that throws or is malformed costs that plugin
      * its entries here and nothing else.
      *
-     * @return list<array{type: string, label: array{en: string, ar: string}, plugin: string}>
+     * `email_default`: whether email starts on for a person who never chose
+     * for the type (#2209).
+     *
+     * @return list<array{type: string, label: array{en: string, ar: string}, plugin: string, email_default: bool}>
      */
     public function declaredNotificationTypes(): array
     {
@@ -2456,8 +2459,8 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             }
             try {
                 $slug = \Whity\Core\Plugin\PluginIdentity::slugOf($plugin);
-                foreach (\Whity\Core\Notification\PluginNotificationTypes::of($plugin, $slug) as $type => $label) {
-                    $declared[] = ['type' => $type, 'label' => $label, 'plugin' => $slug];
+                foreach (\Whity\Core\Notification\PluginNotificationTypes::declared($plugin, $slug) as $type => $declaration) {
+                    $declared[] = ['type' => $type, 'label' => $declaration['label'], 'plugin' => $slug, 'email_default' => $declaration['emailDefault']];
                 }
             } catch (Throwable $e) {
                 $this->logWarning("Plugin {$pluginKey} declares invalid notification types: " . $e->getMessage());

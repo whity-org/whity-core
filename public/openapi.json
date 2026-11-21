@@ -81990,6 +81990,113 @@
                 ]
             }
         },
+        "/api/v1/themes/preview": {
+            "post": {
+                "operationId": "post_api_v1_themes_preview",
+                "summary": "Preview a draft theme in the live editor",
+                "tags": [
+                    "theme"
+                ],
+                "description": "Free (TH.25): compiles a draft theme file as it would be used, with every colour for light and dark, the type, shape, density and motion values, what the guard rails change, and the roles a colour may be set by hand for. A draft with problems answers valid=false and lists them all. Nothing is saved; saving is POST /api/themes with {theme, source: \"editor\"}.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportThemeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The compiled draft, or its problems",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemePreviewResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "The theme is larger than 32 KB",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/themes/tokens": {
             "post": {
                 "operationId": "post_api_v1_themes_tokens",
@@ -82187,6 +82294,100 @@
                     },
                     "422": {
                         "description": "Not an imported theme",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "get": {
+                "operationId": "get_api_v1_themes_themeid",
+                "summary": "Get one theme's file, for the editor",
+                "tags": [
+                    "theme"
+                ],
+                "description": "The theme file as installed. editable is true for the workspace's own themes (imported or made in the editor); any other is changed as a copy.",
+                "parameters": [
+                    {
+                        "name": "themeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "themeId",
+                        "in": "path",
+                        "required": true,
+                        "description": "The theme's id, like acme.harbour",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The theme file",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemeFileResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This workspace has no theme with that id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -95569,10 +95770,12 @@
                 "type": "object",
                 "properties": {
                     "walkin_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "The walk-in to serve, from GET /api/calendar/walkins."
                     },
                     "profile_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "Who serves them, from GET /api/calendar/walkins/staff."
                     }
                 },
                 "required": [
@@ -95585,14 +95788,16 @@
                 "properties": {
                     "name": {
                         "type": "string",
-                        "maxLength": 200
+                        "maxLength": 200,
+                        "description": "Their name, as they gave it."
                     },
                     "phone": {
                         "type": "string",
                         "description": "Optional; used to find or add the customer in Contacts when served."
                     },
                     "service_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "The service they want, from GET /api/calendar/walkins/services."
                     },
                     "profile_id": {
                         "type": "integer",
@@ -95600,7 +95805,8 @@
                     },
                     "note": {
                         "type": "string",
-                        "maxLength": 500
+                        "maxLength": 500,
+                        "description": "Anything the desk should know."
                     }
                 },
                 "required": [
@@ -108525,14 +108731,8 @@
             },
             "ImportThemeRequest": {
                 "type": "object",
-                "description": "A theme file (schemas/theme/v1.json).",
+                "description": "A theme file (schemas/theme/v1.json): schemaVersion, id, version and name are required. Or {theme, source} with the file under theme.",
                 "additionalProperties": false,
-                "required": [
-                    "schemaVersion",
-                    "id",
-                    "version",
-                    "name"
-                ],
                 "properties": {
                     "$schema": {
                         "type": "string",
@@ -108589,6 +108789,17 @@
                     "documents": {
                         "type": "object",
                         "description": "Defaults for the workspace's document theme: accentUse, titleFace, largePrint."
+                    },
+                    "theme": {
+                        "type": "object",
+                        "description": "Instead of the fields above: the theme file, with source."
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": [
+                            "editor"
+                        ],
+                        "description": "With theme: editor when it was made or changed in the theme editor (TH.25)."
                     }
                 }
             },
@@ -115183,12 +115394,16 @@
                                 },
                                 "plugin": {
                                     "type": "string"
+                                },
+                                "email_default": {
+                                    "type": "boolean"
                                 }
                             },
                             "required": [
                                 "type",
                                 "label",
-                                "plugin"
+                                "plugin",
+                                "email_default"
                             ]
                         }
                     }
@@ -126448,6 +126663,37 @@
                     "data"
                 ]
             },
+            "ThemeFileResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "theme": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "The theme file (schemas/theme/v1.json)."
+                            },
+                            "source": {
+                                "type": "string",
+                                "description": "whity, plugin, import, editor or store."
+                            },
+                            "editable": {
+                                "type": "boolean",
+                                "description": "True for the workspace's own themes; any other is changed as a copy."
+                            }
+                        },
+                        "required": [
+                            "theme",
+                            "source",
+                            "editable"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "ThemeListResponse": {
                 "type": "object",
                 "properties": {
@@ -126630,6 +126876,77 @@
                         "additionalProperties": {
                             "type": "string"
                         }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "ThemePreviewResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "valid": {
+                                "type": "boolean"
+                            },
+                            "problems": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Every problem with the draft, in words; empty when valid."
+                            },
+                            "light": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "description": "Every colour role for light, as #rrggbb."
+                            },
+                            "dark": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "description": "Every colour role for dark, as #rrggbb."
+                            },
+                            "vars": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "description": "Type, shape, density and motion values."
+                            },
+                            "fonts": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            },
+                            "adjustments": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                },
+                                "description": "What the guard rails change: mode, role and change."
+                            },
+                            "roles": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "The colour roles a theme may set by hand."
+                            }
+                        },
+                        "required": [
+                            "valid",
+                            "problems"
+                        ]
                     }
                 },
                 "required": [

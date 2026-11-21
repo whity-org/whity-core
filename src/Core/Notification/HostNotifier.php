@@ -17,8 +17,14 @@ use Whity\Sdk\PluginNamespace;
  * ACTIVE memberships, whatever the plugin named, and every send goes through
  * {@see NotificationDispatcher}, which applies each person's preferences.
  *
- * Only the in-app channel for now: a plugin holds no address, and core ships no
- * mail transport for notifications yet.
+ * Every notice lands in the inbox. It also goes by email (#2209) when the
+ * person chose email for the type, or never chose and the plugin declared
+ * `emailDefault: true`; the dispatcher then applies the channel-wide choice and
+ * {@see \Whity\Core\Mail\EmailGate}, exactly as for core's own notices. The
+ * plugin names people by profile id only: the email transport finds the
+ * address, and the email carries the subject and body, never `data`.
+ *
+ * The text is the person's language, else the workspace's.
  */
 final class HostNotifier implements Notifier
 {
@@ -29,8 +35,10 @@ final class HostNotifier implements Notifier
     private const MAX_DATA_BYTES = 16384;
 
     /**
-     * @param array<string, array{en: string, ar: string}> $types namespaced type => label
+     * @param array<string, array{en: string, ar: string}> $types         namespaced type => label
      * @param \Closure(): ?int                             $tenant
+     * @param array<string, bool>                          $emailDefaults namespaced type => email starts on
+     * @param (\Closure(int): string)|null                 $workspaceLanguage the workspace's language, 'en' or 'ar'
      */
     public function __construct(
         private readonly PDO $db,
@@ -42,6 +50,8 @@ final class HostNotifier implements Notifier
         // WHIT-1123: true when the plugin is off for the workspace; then
         // nothing is sent. Null: always sends, as before.
         private readonly ?\Closure $offFor = null,
+        private readonly array $emailDefaults = [],
+        private readonly ?\Closure $workspaceLanguage = null,
     ) {
     }
 
@@ -97,12 +107,27 @@ final class HostNotifier implements Notifier
             throw new \InvalidArgumentException('Too many recipients for one send (at most ' . self::MAX_RECIPIENTS . ').');
         }
 
+        $emailChoices = $recipients === [] ? [] : $this->emailChoices($tenantId, $canonical);
+        $emailDefault = ($this->emailDefaults[$canonical] ?? false) === true;
+        $workspaceLanguage = null;
+
         $sent = 0;
         foreach ($recipients as $profileId => $language) {
-            $language = $language === 'ar' ? 'ar' : 'en';
+            $code = strtolower(trim((string) $language));
+            if (str_starts_with($code, 'ar')) {
+                $language = 'ar';
+            } elseif (str_starts_with($code, 'en')) {
+                $language = 'en';
+            } else {
+                $workspaceLanguage ??= $this->workspaceLanguage($tenantId);
+                $language = $workspaceLanguage;
+            }
+            // The person's own choice for this type wins; else the plugin's default.
+            $email = $emailChoices !== null && ($emailChoices[$profileId] ?? $emailDefault);
+            $channels = $email ? ['in_app', 'email'] : ['in_app'];
             try {
                 $this->dispatcher->dispatch($tenantId, $profileId, $canonical, [
-                    'channels' => ['in_app'],
+                    'channels' => $channels,
                     'subject' => $notice->subject[$language],
                     'body' => $notice->body[$language],
                     'data' => $data,
@@ -121,6 +146,36 @@ final class HostNotifier implements Notifier
         }
 
         return $sent;
+    }
+
+    /**
+     * Who chose email for this type exactly, on or off. Null when they could
+     * not be read: then nobody gets email, so a default never overrides a
+     * refusal we could not see, and the inbox still gets the notice.
+     *
+     * @return array<int, bool>|null
+     */
+    private function emailChoices(int $tenantId, string $type): ?array
+    {
+        try {
+            return (new NotificationPreferenceRepository($this->db))->choicesFor($tenantId, $type, 'email');
+        } catch (\Throwable $e) {
+            $this->logger?->warning('[notifications] email choices could not be read', ['plugin' => $this->slug, 'tenant_id' => $tenantId, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    private function workspaceLanguage(int $tenantId): string
+    {
+        if ($this->workspaceLanguage === null) {
+            return 'en';
+        }
+        try {
+            return ($this->workspaceLanguage)($tenantId) === 'ar' ? 'ar' : 'en';
+        } catch (\Throwable) {
+            return 'en';
+        }
     }
 
     /**
