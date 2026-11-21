@@ -30,8 +30,13 @@ $ctx->jobs()->enqueue('catalog.sync');
 $ctx->audit()->record('order.refunded', 'order', $orderId);
 $ctx->http(AddressPolicy::publicOnly())->send('GET', $urlSomeoneTyped, []);
 $ctx->themes()->current()['light']['primary'] ?? null;   // 1.125: Theme\WorkspaceTheme, read-only
+$ctx->database()->select('keyhub_orders', ['status' => 'open']);   // 1.138: Database\WorkspaceTables, held to the workspace
+$ctx->log()->warning('Provider answered late', ['ms' => 4200]);    // 1.139: Log\PluginLog, scrubbed
+$ctx->errors()->report($caught);                                    // 1.139: Log\ErrorReporter, scrubbed
 $ctx->workspaceId();                          // null outside a workspace
 ```
+
+- **Declare what you use (1.138).** With `Contribute\PluginCapabilitiesInterface` the context gives only the services you list (`Context\Service`) and `database()` reaches only your listed tables; anything else throws `Context\ServiceNotDeclared` or `Database\TableRefused`. `log()` and `errors()` need no declaration.
 
 - **The workspace comes from the context (D2).** Every store acts in the workspace the request or job runs in, and none takes a workspace, so none can name another.
 - **A missing service fails when you use it.** A service this host doesn't provide throws `Context\ServiceUnavailable` (an `SdkException`) when you ask for it, not when you load.
@@ -118,6 +123,8 @@ Implement the interface next to `PluginInterface`. Each one is optional, and the
 | `PluginOnboardingInterface` | A guided setup | sdk/README |
 | `PluginWorkspaceTemplatesInterface` | Workspace templates | [Plugin-Workspace-Templates](Plugin-Workspace-Templates.md) |
 | `PluginWorkspaceLifecycleInterface` | Called when the plugin is turned on or off in a workspace | Workspace-Plugins |
+| `PluginInstallLifecycleInterface` | Called once when the plugin is installed and once per upgrade, after its migrations (1.139) | [Plugin-Development](Plugin-Development.md) |
+| `Contribute\PluginCapabilitiesInterface` | The context services and own tables the plugin uses (1.138) | [Plugin-Development](Plugin-Development.md) |
 | `Settings\PluginSettingsInterface`, `Secrets\PluginSecretFieldsInterface` | Settings, and the secret fields an admin fills | Plugin-Development |
 | `Tenant\PluginTablesInterface` | The tables you own, for tenant-isolation checks | sdk/README |
 | `DataType\PluginDataTypesInterface` | Records with a lifecycle and delete guards | [Plugin-Data-Types](Plugin-Data-Types.md) |
