@@ -136,6 +136,11 @@ final class ThemeTweaks
             'type.titleWeight' => ['type', 'titleWeight'],
             'shape.preset' => ['shape', 'preset'],
             'shape.morph' => ['shape', 'morph'],
+            // TH.21: each family's own corners.
+            ...array_combine(
+                array_map(static fn (string $f): string => "shape.components.{$f}", ThemeValidator::COMPONENT_FAMILIES),
+                array_map(static fn (string $f): array => ['shape', 'components', $f], ThemeValidator::COMPONENT_FAMILIES)
+            ),
             'density' => ['density'],
             'elevation.style' => ['elevation', 'style'],
             'elevation.float' => ['elevation', 'float'],

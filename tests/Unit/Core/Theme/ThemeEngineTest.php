@@ -42,7 +42,9 @@ final class ThemeEngineTest extends TestCase
         self::assertSame(ThemeValidator::SCALES, $p['type']['properties']['scale']['enum']);
         self::assertSame(ThemeValidator::TITLE_WEIGHTS, $p['type']['properties']['titleWeight']['enum']);
         self::assertSame(ThemeValidator::EMPHASES, $p['type']['properties']['emphasis']['enum']);
-        self::assertSame(ThemeValidator::SHAPES, $p['shape']['properties']['preset']['enum']);
+        self::assertSame(ThemeValidator::SHAPES, $schema['$defs']['shapePreset']['enum']);
+        self::assertSame(['$ref' => '#/$defs/shapePreset'], $p['shape']['properties']['preset']);
+        self::assertSame(ThemeValidator::COMPONENT_FAMILIES, array_keys($p['shape']['properties']['components']['properties']));
         self::assertSame(ThemeValidator::MORPHS, $p['shape']['properties']['morph']['enum']);
         self::assertSame(ThemeValidator::DENSITIES, $p['density']['enum']);
         self::assertSame(ThemeValidator::ELEVATIONS, $p['elevation']['properties']['style']['enum']);
@@ -273,9 +275,16 @@ final class ThemeEngineTest extends TestCase
         foreach (ThemeValidator::SHAPES as $shape) {
             foreach (['standard', 'compact', 'comfortable'] as $density) {
                 $vars = ThemeCompiler::compile(self::theme(['shape' => ['preset' => $shape], 'density' => $density]))['vars'];
-                $keep = array_filter($vars, static fn (string $k): bool => str_starts_with($k, 'wy-radius-') || $k === 'wy-corner-shape' || str_starts_with($k, 'control-h') || $k === 'row-h', ARRAY_FILTER_USE_KEY);
-                ksort($keep);
-                $presets[$density === 'standard' ? $shape : "{$shape}-{$density}"] = (object) $keep;
+                $presets[$density === 'standard' ? $shape : "{$shape}-{$density}"] = self::shapeVars($vars);
+            }
+        }
+        // TH.21: every family on a preset other than the theme's, both ways
+        // round, so the check sees mixed corners meet (a table in a card, a
+        // field in a dialog) as well as each preset on its own.
+        foreach (self::MIXED_SHAPES as $name => $shape) {
+            foreach (['standard', 'compact'] as $density) {
+                $vars = ThemeCompiler::compile(self::theme(['shape' => $shape, 'density' => $density]))['vars'];
+                $presets[$density === 'standard' ? $name : "{$name}-{$density}"] = self::shapeVars($vars);
             }
         }
         $json = json_encode($presets, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
@@ -284,6 +293,67 @@ final class ThemeEngineTest extends TestCase
         }
         self::assertFileExists($file);
         self::assertSame($json, str_replace("\r\n", "\n", (string) file_get_contents($file)), 'Run UPDATE_SHAPE_PRESETS=1 vendor/bin/phpunit --filter ShapeCheckPresets');
+    }
+
+    /** Two mixes for the shape check: every family away from the theme's preset. */
+    private const MIXED_SHAPES = [
+        'mixed-round' => ['preset' => 'round', 'components' => ['buttons' => 'square', 'fields' => 'cut', 'chips' => 'crisp', 'cards' => 'whity', 'dialogs' => 'soft', 'tables' => 'square', 'navigation' => 'pebble']],
+        'mixed-square' => ['preset' => 'square', 'components' => ['buttons' => 'round', 'fields' => 'round', 'chips' => 'pebble', 'cards' => 'round', 'dialogs' => 'cut', 'tables' => 'round', 'navigation' => 'soft']],
+    ];
+
+    /**
+     * @param array<string, string> $vars
+     */
+    private static function shapeVars(array $vars): object
+    {
+        $keep = array_filter(
+            $vars,
+            static fn (string $k): bool => (str_starts_with($k, 'wy-') && (str_contains($k, 'radius-') || str_ends_with($k, 'corner-shape'))) || str_starts_with($k, 'control-h') || $k === 'row-h',
+            ARRAY_FILTER_USE_KEY
+        );
+        ksort($keep);
+
+        return (object) $keep;
+    }
+
+    /** TH.21: a family takes its own preset, by name only, with its own morph and corner. */
+    public function testAComponentFamilyHasItsOwnShape(): void
+    {
+        self::assertSame([], ThemeValidator::validate(self::theme(['shape' => ['preset' => 'soft', 'components' => ['buttons' => 'round', 'cards' => 'crisp']]])));
+        self::assertSame([], ThemeValidator::validate(self::theme(['shape' => ['components' => []]])));
+        self::assertSame(['shape.components has an unknown key "avatars".'], ThemeValidator::validate(self::theme(['shape' => ['components' => ['avatars' => 'square']]])));
+        self::assertSame(['shape.components.cards must be one of: ' . implode(', ', ThemeValidator::SHAPES) . '.'], ThemeValidator::validate(self::theme(['shape' => ['components' => ['cards' => '12px']]])));
+        self::assertSame(['shape.components must be an object.'], ThemeValidator::validate(self::theme(['shape' => ['components' => ['round']]])));
+        self::assertSame(['shape has an unknown key "radius".'], ThemeValidator::validate(self::theme(['shape' => ['radius' => 4]])));
+
+        $vars = ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'soft', 'components' => ['buttons' => 'round', 'cards' => 'crisp', 'fields' => 'cut', 'dialogs' => 'soft']]]))['vars'];
+        // Buttons: Round's pill at each control height, morphing by default.
+        self::assertSame('16px', $vars['wy-buttons-radius-control-sm']);
+        self::assertSame('20px', $vars['wy-buttons-radius-control']);
+        self::assertSame('10px', $vars['wy-buttons-radius-control-pressed']);
+        self::assertSame('8px', $vars['wy-buttons-radius-control-selected']);
+        self::assertSame('round', $vars['wy-buttons-corner-shape']);
+        // Cards: Crisp's, not morphing, so pressed is the control's own radius.
+        self::assertSame('6px', $vars['wy-cards-radius-card']);
+        self::assertSame($vars['wy-cards-radius-control'], $vars['wy-cards-radius-control-pressed']);
+        self::assertSame('bevel', $vars['wy-fields-corner-shape']);
+        // The theme's own preset needs nothing more, and other families follow it.
+        self::assertArrayNotHasKey('wy-dialogs-radius-dialog', $vars);
+        self::assertArrayNotHasKey('wy-tables-radius-card', $vars);
+        self::assertSame('16px', $vars['wy-radius-card']);
+
+        // Density moves a family's control radius with its height.
+        $compact = ThemeCompiler::compile(self::theme(['density' => 'compact', 'shape' => ['components' => ['buttons' => 'round']]]))['vars'];
+        self::assertSame('18px', $compact['wy-buttons-radius-control']);
+        // The theme's morph setting holds for its families too.
+        $off = ThemeCompiler::compile(self::theme(['shape' => ['morph' => 'off', 'components' => ['buttons' => 'round']]]))['vars'];
+        self::assertSame('20px', $off['wy-buttons-radius-control-pressed']);
+
+        // Each family's own corners are a change a newer version says in words.
+        self::assertSame(
+            [['field' => 'shape.components.cards', 'from' => null, 'to' => 'crisp']],
+            ThemeTweaks::changes(self::theme(['shape' => ['preset' => 'soft']]), self::theme(['shape' => ['preset' => 'soft', 'components' => ['cards' => 'crisp']]]))
+        );
     }
 
     /** TH.15: shape, density and the font pair on top of the theme, saved with the colour overrides. */
