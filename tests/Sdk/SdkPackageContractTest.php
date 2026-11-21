@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.137.0',
+            '1.141.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.137 ADDS Inventory\\Lots and Inventory\\Lot, lot fields on MoveLine and Move, and the stock.lot.expiring|expired events: batches, serial numbers and expiry (WHIT-1235). '
+            'SDK 1.141 ADDS the optional notification type `emailDefault` key: a plugin notice can also go by email, per each person\'s preferences (WHIT-1250, #2209). '
+            . 'SDK 1.137 ADDS Inventory\\Lots and Inventory\\Lot, lot fields on MoveLine and Move, and the stock.lot.expiring|expired events: batches, serial numbers and expiry (WHIT-1235). '
             . 'SDK 1.133 ADDS Usage\\Usage: a workspace\'s usage meters for a month, read-only, with each base and warning state (section 33 §5). '
             . 'SDK 1.132 ADDS Contribute\\WorkspaceQuoteConversion and the sales.quote.* events: what an accepted quote turns into (WHIT-1321). '
             . 'SDK 1.131 ADDS the optional workspace template `theme` key: a template names the theme that suits it, offered when it is chosen (WHIT-1225). '

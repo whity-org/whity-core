@@ -20160,6 +20160,7 @@ export interface components {
                     ar: string;
                 };
                 plugin: string;
+                email_default: boolean;
             }[];
         };
         NotificationPreferencesUpdateRequest: {

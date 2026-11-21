@@ -113679,12 +113679,16 @@
                                 },
                                 "plugin": {
                                     "type": "string"
+                                },
+                                "email_default": {
+                                    "type": "boolean"
                                 }
                             },
                             "required": [
                                 "type",
                                 "label",
-                                "plugin"
+                                "plugin",
+                                "email_default"
                             ]
                         }
                     }
