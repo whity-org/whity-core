@@ -29,6 +29,19 @@ final class PluginNotificationTypes
      */
     public static function of(PluginNotificationsInterface $plugin, string $slug): array
     {
+        return array_map(static fn (array $type): array => $type['label'], self::declared($plugin, $slug));
+    }
+
+    /**
+     * Namespaced type => its label and whether email starts on for a person
+     * who never chose for it (#2209). `emailDefault` is optional and false
+     * when left out, so a plugin that never opted in sends no email.
+     *
+     * @return array<string, array{label: array{en: string, ar: string}, emailDefault: bool}>
+     * @throws \InvalidArgumentException on a malformed declaration
+     */
+    public static function declared(PluginNotificationsInterface $plugin, string $slug): array
+    {
         $types = [];
         foreach ($plugin->getNotificationTypes() as $key => $declaration) {
             $key = (string) $key;
@@ -45,7 +58,11 @@ final class PluginNotificationTypes
             if (!self::isText($english) || !self::isText($arabic)) {
                 throw new \InvalidArgumentException("Notification type {$key} needs a label in English and Arabic.");
             }
-            $types[$type] = ['en' => $english, 'ar' => $arabic];
+            $emailDefault = is_array($raw) ? ($raw['emailDefault'] ?? false) : false;
+            if (!is_bool($emailDefault)) {
+                throw new \InvalidArgumentException("Notification type {$key}: emailDefault must be true or false.");
+            }
+            $types[$type] = ['label' => ['en' => $english, 'ar' => $arabic], 'emailDefault' => $emailDefault];
         }
 
         return $types;

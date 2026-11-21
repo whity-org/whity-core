@@ -4598,6 +4598,27 @@ final class CoreApiSchemas
                     422 => self::errorResponse('Nothing usable was found; the error says what to paste'),
                 ] + self::authErrors(),
             ]),
+            // TH.25: the live editor.
+            self::permissionRoute('GET', '/api/themes/{themeId}', 'settings:read', [
+                'summary' => 'Get one theme\'s file, for the editor',
+                'description' => 'The theme file as installed. editable is true for the workspace\'s own themes (imported or made in the editor); any other is changed as a copy.',
+                'tags' => ['theme'],
+                'parameters' => [['name' => 'themeId', 'in' => 'path', 'required' => true, 'description' => 'The theme\'s id, like acme.harbour', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('The theme file', 'ThemeFileResponse'),
+                    404 => self::errorResponse('This workspace has no theme with that id'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes/preview', 'settings:write', [
+                'summary' => 'Preview a draft theme in the live editor',
+                'description' => 'Free (TH.25): compiles a draft theme file as it would be used, with every colour for light and dark, the type, shape, density and motion values, what the guard rails change, and the roles a colour may be set by hand for. A draft with problems answers valid=false and lists them all. Nothing is saved; saving is POST /api/themes with {theme, source: "editor"}.',
+                'tags' => ['theme'],
+                'request' => 'ImportThemeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The compiled draft, or its problems', 'ThemePreviewResponse'),
+                    413 => self::errorResponse('The theme is larger than 32 KB'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('DELETE', '/api/themes/{themeId}', 'settings:write', [
                 'summary' => 'Remove a theme this workspace imported',
                 'description' => 'If the workspace was using it, it goes back to the installation\'s theme. Whity\'s own themes cannot be removed.',
@@ -11667,7 +11688,8 @@ final class CoreApiSchemas
                     'type' => self::str(),
                     'label' => self::object(['en' => self::str(), 'ar' => self::str()], ['en', 'ar']),
                     'plugin' => self::str(),
-                ], ['type', 'label', 'plugin'])],
+                    'email_default' => self::bool(),
+                ], ['type', 'label', 'plugin', 'email_default'])],
             ], ['data', 'transactional_prefixes', 'plugin_types']),
             'PushDevice' => self::object([
                 'id' => self::int(),
@@ -12315,9 +12337,8 @@ final class CoreApiSchemas
             ], ['format', 'filename', 'media_type', 'content'])),
             'ImportThemeRequest' => [
                 'type' => 'object',
-                'description' => 'A theme file (schemas/theme/v1.json).',
+                'description' => 'A theme file (schemas/theme/v1.json): schemaVersion, id, version and name are required. Or {theme, source} with the file under theme.',
                 'additionalProperties' => false,
-                'required' => ['schemaVersion', 'id', 'version', 'name'],
                 'properties' => [
                     '$schema' => ['type' => 'string', 'description' => 'The schema address, https://whity.dev/schema/theme/v1.json.'],
                     'schemaVersion' => ['type' => 'integer', 'description' => 'The format version, 1.'],
@@ -12333,6 +12354,8 @@ final class CoreApiSchemas
                     'elevation' => ['type' => 'object', 'description' => 'style (plane, soft, flat) and float.'],
                     'motion' => ['type' => 'object', 'description' => 'preset: calm, standard or expressive.'],
                     'documents' => ['type' => 'object', 'description' => 'Defaults for the workspace\'s document theme: accentUse, titleFace, largePrint.'],
+                    'theme' => ['type' => 'object', 'description' => 'Instead of the fields above: the theme file, with source.'],
+                    'source' => ['type' => 'string', 'enum' => ['editor'], 'description' => 'With theme: editor when it was made or changed in the theme editor (TH.25).'],
                 ],
             ],
             'ImportThemeResponse' => self::dataEnvelope(self::object([
@@ -12357,6 +12380,21 @@ final class CoreApiSchemas
                 'preview' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Colours for light and dark, and the corner radii.'],
                 'adjustments' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']], 'description' => 'What the guard rails change: mode, role and change.'],
             ], ['theme', 'notes', 'preview', 'adjustments'])),
+            'ThemeFileResponse' => self::dataEnvelope(self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The theme file (schemas/theme/v1.json).'],
+                'source' => self::str() + ['description' => 'whity, plugin, import, editor or store.'],
+                'editable' => self::bool() + ['description' => 'True for the workspace\'s own themes; any other is changed as a copy.'],
+            ], ['theme', 'source', 'editable'])),
+            'ThemePreviewResponse' => self::dataEnvelope(self::object([
+                'valid' => self::bool(),
+                'problems' => ['type' => 'array', 'items' => self::str(), 'description' => 'Every problem with the draft, in words; empty when valid.'],
+                'light' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Every colour role for light, as #rrggbb.'],
+                'dark' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Every colour role for dark, as #rrggbb.'],
+                'vars' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Type, shape, density and motion values.'],
+                'fonts' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                'adjustments' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']], 'description' => 'What the guard rails change: mode, role and change.'],
+                'roles' => ['type' => 'array', 'items' => self::str(), 'description' => 'The colour roles a theme may set by hand.'],
+            ], ['valid', 'problems'])),
             'DeleteThemeResponse' => self::dataEnvelope(self::object(['deleted' => self::bool()], ['deleted'])),
 
             // ── Forgotten-password + 2FA-recovery (WC-password-reset-2fa-recovery) ──
