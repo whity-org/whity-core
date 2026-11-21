@@ -124,6 +124,7 @@ final class CoreTables
         'plugin_revocation_state' => '213_create_plugin_revocation_state.php',
         'plugin_role_approvals' => '221_track_plugin_role_grants.php',
         'plugin_core_grants' => '325_create_plugin_core_grants.php',
+        'plugin_versions_seen' => '339_create_plugin_versions_seen.php',
         'plugin_agent_context_grants' => '227_create_plugin_agent_context_grants.php',
         'agent_proposals' => '176_create_agent_proposals.php',
         // MCP idempotency keys (WHIT-931).
