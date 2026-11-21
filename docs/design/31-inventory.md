@@ -19,7 +19,7 @@ This spec turns the inventory designs that already exist (IN.1, section 27; N4 a
 - One-level recipes, to be confirmed by the owner (D3): make a batch, and consumables used by a service.
 - Approvals through the existing routing, printing through the existing document themes, an audit trail, Arabic, and MCP tools for the Stock assistant.
 
-**Not in core** (plugins, or later):
+**Not in core** (plugins, or later). Since 21 Nov 2026 (BM.13–BM.15, section 33) everything below that does not talk to an outside service comes to core later rather than as a paid plugin; plugins may still replace parts through the extension points:
 - Stock valuation methods beyond one simple cost (average or FIFO): a costing plugin.
 - Journal entries and accounting export: an accounting plugin, Money (MO.1), or a later release.
 - Multi-level production, work orders, MRP and planning: a production plugin.
