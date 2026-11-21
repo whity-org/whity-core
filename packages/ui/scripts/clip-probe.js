@@ -35,7 +35,7 @@ function clipProbe(opts) {
     const f = Math.min(1, r.width / (tl + tr || 1), r.width / (bl + br || 1), r.height / (tl + bl || 1), r.height / (tr + br || 1))
     // The Cut preset bevels its corners (corner-shape: bevel): the edge is
     // the straight line between the two tangent points, inside the arc.
-    const bevel = /bevel/.test(cs.getPropertyValue("corner-shape") || "")
+    const bevel = /bevel|superellipse\(0\)/.test(cs.getPropertyValue("corner-shape") || "")
     return { tl: tl * f, tr: tr * f, br: br * f, bl: bl * f, rect: r, bevel }
   }
   // How far point (x, y) lies outside the rounded box; 0 when inside.
