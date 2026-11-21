@@ -292,6 +292,7 @@ export function CommandPalette({
         role="dialog"
         aria-modal="true"
         aria-label={label}
+        data-slot="command-palette"
         className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-float"
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={onKeyDown}

@@ -226,6 +226,7 @@ const DatePicker = React.forwardRef<HTMLDivElement, DatePickerProps>(
           <button
             type="button"
             id={id}
+            data-slot="date-picker-trigger"
             disabled={disabled}
             className={cn(
               "relative flex h-10 w-full items-center justify-start rounded-control border border-input bg-card ps-8 pe-8 py-0.5 text-sm text-foreground transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20",

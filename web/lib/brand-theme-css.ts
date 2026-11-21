@@ -8,6 +8,9 @@ const REM_RE = /^\d+(?:\.\d+)?rem$/;
 const MS_RE = /^\d+ms$/;
 const NUMBER = String.raw`-?\d+(?:\.\d+)?`;
 const EASE_RE = new RegExp(`^(?:linear\\(${NUMBER}(?:, ${NUMBER})*\\)|cubic-bezier\\(${NUMBER}, ${NUMBER}, ${NUMBER}, ${NUMBER}\\))$`);
+const RADII = ['control-sm', 'control', 'control-lg', 'sm', 'md', 'lg', 'xl', '2xl', 'card', 'dialog', 'control-pressed', 'control-selected'];
+/** TH.21 (30-themes 14.2): ThemeValidator::COMPONENT_FAMILIES. */
+const SHAPE_FAMILIES = ['buttons', 'fields', 'chips', 'cards', 'dialogs', 'tables', 'navigation'];
 const FONT_STACK_RE = /^var\(--font-[a-z0-9-]+\)(?:, var\(--font-[a-z0-9-]+\))*, ui-sans-serif, system-ui, sans-serif$/;
 
 /**
@@ -27,12 +30,17 @@ const VAR_PATTERNS: Record<string, RegExp> = {
   'ease-out': EASE_RE,
   ...Object.fromEntries(['2xs', 'xs', 'sm', 'base', 'lg', 'xl', '2xl', '3xl', '4xl'].map((s) => [`text-${s}`, REM_RE])),
   ...Object.fromEntries(
-    ['control-sm', 'control', 'control-lg', 'sm', 'md', 'lg', 'xl', '2xl', 'card', 'dialog', 'control-pressed', 'control-selected'].map(
-      (s) => [`wy-radius-${s}`, PX_RE]
-    )
+    RADII.map((s) => [`wy-radius-${s}`, PX_RE])
   ),
   // TH.17: the Cut preset's bevelled corners.
   'wy-corner-shape': /^(?:round|bevel)$/,
+  // TH.21: a component family's own preset, the same set under its name.
+  ...Object.fromEntries(
+    SHAPE_FAMILIES.flatMap((family) => [
+      ...RADII.map((s) => [`wy-${family}-radius-${s}`, PX_RE] as const),
+      [`wy-${family}-corner-shape`, /^(?:round|bevel)$/] as const,
+    ])
+  ),
 };
 
 function isObject(raw: unknown): raw is Record<string, unknown> {
