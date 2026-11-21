@@ -210,6 +210,9 @@ final class InventoryPrintRealEngineTest extends TestCase
         $po = $templates[InventoryStarters::PURCHASE_ORDER]['ar'];
 
         $row = $this->one('SELECT record_type, lang, published_version, scope FROM document_sources WHERE id = ' . $po);
+        self::assertIsArray($row);
+        // PostgreSQL answers the version as an int, SQLite as a string.
+        $row['published_version'] = (string) $row['published_version'];
         self::assertSame(['record_type' => 'inventory.purchase_order', 'lang' => 'ar', 'published_version' => '1', 'scope' => 'system'], $row);
 
         $this->pdo->exec("UPDATE document_sources SET title = 'Our purchase order' WHERE id = " . $po);
