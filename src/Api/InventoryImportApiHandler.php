@@ -15,10 +15,12 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Http\JsonBody;
 
 /**
- * Importing items and opening stock from a spreadsheet (WHIT-1322, design
- * section 34 §6), under `/api/inventory/imports/{kind}` where kind is `items`
- * or `opening_stock`. The router gates every route on `inventory:write`;
- * opening stock also needs `stock:adjust`, as typing it by hand does.
+ * Importing items, opening stock and supplier prices from a spreadsheet
+ * (WHIT-1322, WHIT-1234 P3d, design section 34 §6), under
+ * `/api/inventory/imports/{kind}` where kind is `items`, `opening_stock` or
+ * `supplier_prices`. The router gates every route on `inventory:write`, as
+ * setting a supplier price by hand does (IM.7); opening stock also needs
+ * `stock:adjust`, as typing it by hand does.
  */
 final class InventoryImportApiHandler
 {
@@ -104,12 +106,11 @@ final class InventoryImportApiHandler
             $actor = is_object($user) && isset($user->profile_id) && is_int($user->profile_id) ? $user->profile_id : null;
             $kind = (string) ($params['kind'] ?? '');
             if (!isset(InventoryImports::KINDS[$kind])) {
-                return Response::error('Import items or opening_stock', 404);
+                return Response::error('Import items, opening_stock or supplier_prices', 404);
             }
             if ($kind === 'opening_stock' && !$this->may($tenantId, $actor, CorePermissions::STOCK_ADJUST)) {
                 return Response::error('Importing opening stock needs the permission to adjust stock', 403);
             }
-
             return $work($tenantId, $kind, $actor);
         } catch (InventoryRejectedException $e) {
             return Response::error($e->clientMessage, $e->status, $e->extra);

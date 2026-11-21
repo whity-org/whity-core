@@ -14,6 +14,7 @@ use Whity\Core\Inventory\InventoryRejectedException;
 use Whity\Core\Inventory\InventoryWorkspace;
 use Whity\Core\Inventory\ItemService;
 use Whity\Core\Inventory\StockLedger;
+use Whity\Core\Inventory\SupplierItems;
 use Whity\Core\Money\Currency;
 use Whity\Core\Money\MoneyException;
 
@@ -39,8 +40,16 @@ use Whity\Core\Money\MoneyException;
  * blank cell means "nothing to say". Prices are typed in normal units of the
  * workspace's currency (CU.1-CU.4).
  *
+ * Items with variants take a row per variant (WHIT-1234 P3d, IM.3): up to
+ * three option columns, each named by its own heading (Size, Colour), and the
+ * rows of one item share its group column or its name. A new item is made
+ * with all of them; an item that exists gains the new SKUs as variants.
+ *
  * Opening stock posts one batch `opening → place` at the given unit cost, to
  * the place named in the row or the one chosen for the whole file.
+ *
+ * Supplier prices (`SupplierPriceRows`) set what a supplier sells, matched by
+ * supplier and SKU.
  *
  * Importing never refuses because of a plan limit (IM.8): items past the
  * base only warn, on Billing and the plan banner.
@@ -51,7 +60,10 @@ final class InventoryImports
     public const MAX_LISTED = 200;
 
     /** Kind in the API => kind on the job. */
-    public const KINDS = ['items' => 'inventory.items', 'opening_stock' => 'inventory.opening_stock'];
+    public const KINDS = ['items' => 'inventory.items', 'opening_stock' => 'inventory.opening_stock', 'supplier_prices' => 'inventory.supplier_prices'];
+
+    /** Option columns: a row per variant, the column's own heading names the option (Size, Colour). */
+    private const OPTION_TARGETS = ['option1', 'option2', 'option3'];
 
     /** Targets, with their English label and the headings that mean them (lower case; Arabic forms read alike). */
     private const TARGETS = [
@@ -66,6 +78,10 @@ final class InventoryImports
             'tax_category' => ['Tax category', ['tax category', 'tax', 'vat', 'tax class', 'فئة الضريبة', 'الضريبة']],
             'barcode' => ['Barcode', ['barcode', 'ean', 'upc', 'gtin', 'الباركود', 'باركود']],
             'description' => ['Description', ['details', 'notes', 'long description', 'الوصف', 'التفاصيل']],
+            'group' => ['Item group', ['item group', 'group', 'parent sku', 'parent code', 'parent', 'model', 'المجموعة', 'الصنف الرئيسي']],
+            'option1' => ['Option 1', ['option 1', 'option1', 'size', 'المقاس', 'الحجم']],
+            'option2' => ['Option 2', ['option 2', 'option2', 'colour', 'color', 'اللون']],
+            'option3' => ['Option 3', ['option 3', 'option3', 'material', 'flavour', 'flavor', 'المادة', 'النكهة']],
         ],
         'opening_stock' => [
             'sku' => ['SKU', ['sku', 'code', 'item code', 'item no', 'الرمز', 'رمز', 'رمز الصنف', 'كود']],
@@ -74,6 +90,7 @@ final class InventoryImports
             'place' => ['Place', ['place', 'location', 'warehouse', 'store', 'branch', 'المكان', 'المستودع', 'الموقع', 'الفرع']],
             'unit_cost' => ['Unit cost', ['unit cost', 'cost', 'cost price', 'التكلفة', 'كلفة الوحدة', 'سعر الكلفة']],
         ],
+        'supplier_prices' => SupplierPriceRows::TARGETS,
     ];
 
     private const KIND_WORDS = [
@@ -85,6 +102,8 @@ final class InventoryImports
     /** @var array<string, ImportJobRepository> */
     private array $jobs = [];
 
+    private readonly ?SupplierPriceRows $supplierPrices;
+
     /** @param \Closure(int): string $currency the workspace's currency */
     public function __construct(
         private readonly InventoryDb $db,
@@ -92,7 +111,9 @@ final class InventoryImports
         private readonly ItemService $items,
         private readonly StockLedger $ledger,
         private readonly \Closure $currency,
+        private readonly ?SupplierItems $supplierItems = null,
     ) {
+        $this->supplierPrices = $supplierItems === null ? null : new SupplierPriceRows($db, $items, $supplierItems, $currency);
         foreach (self::KINDS as $api => $kind) {
             $this->jobs[$api] = new ImportJobRepository($db->pdo, $kind);
         }
@@ -160,6 +181,8 @@ final class InventoryImports
             $plan = $this->plan($tenantId, $kind, $job['rows'], $job['options']);
             if ($kind === 'items') {
                 $this->applyItems($tenantId, $id, $plan, $actor, $jobs);
+            } elseif ($kind === 'supplier_prices') {
+                $this->applySupplierPrices($tenantId, $id, $plan, $jobs);
             } else {
                 $this->applyStock($tenantId, $id, $plan, $actor, $jobs, (string) ($job['file_name']));
             }
@@ -186,7 +209,9 @@ final class InventoryImports
                 throw new InventoryRejectedException('An import can be undone for 24 hours after it runs; this one ran longer ago', 409);
             }
             foreach ($jobs->changes($tenantId, $id) as $change) {
-                if ($change['entity_type'] === 'inventory.stock') {
+                if ($change['entity_type'] === 'inventory.supplier_item') {
+                    $this->supplierPrices()->undo($tenantId, $change);
+                } elseif ($change['entity_type'] === 'inventory.stock') {
                     $this->undoStock($tenantId, (string) ($change['extra']['batch_key'] ?? ''), $actor);
                 } elseif ($change['action'] === 'created') {
                     $this->items->archive($tenantId, $change['entity_id'], true, $actor);
@@ -291,7 +316,11 @@ final class InventoryImports
             $used[$target] = true;
             $clean[(string) (int) $index] = $target;
         }
-        $required = $kind === 'items' ? ['sku' => 'SKU'] : ['sku' => 'SKU', 'quantity' => 'quantity'];
+        $required = match ($kind) {
+            'items' => ['sku' => 'SKU'],
+            'supplier_prices' => ['sku' => 'SKU', 'price' => 'price'],
+            default => ['sku' => 'SKU', 'quantity' => 'quantity'],
+        };
         foreach ($required as $target => $label) {
             if (!isset($used[$target])) {
                 throw InventoryRejectedException::field('mapping', 'Choose the column with the ' . $label);
@@ -309,6 +338,37 @@ final class InventoryImports
             }
             $options['location_id'] = $place;
         }
+        if ($kind === 'supplier_prices') {
+            $supplier = $input['contact_id'] ?? null;
+            if ($supplier !== null) {
+                if (!is_int($supplier)) {
+                    throw InventoryRejectedException::field('contact_id', 'contact_id is a supplier here');
+                }
+                $this->supplierItemsFor()->supplier($tenantId, $supplier, 'contact_id');
+            } elseif (!isset($used['supplier'])) {
+                throw InventoryRejectedException::field('contact_id', 'Choose the supplier, or the column that names them');
+            }
+            $options['contact_id'] = $supplier;
+        }
+        if ($kind === 'items') {
+            // The option's name is the column's own heading (Size, Colour).
+            $axes = [];
+            foreach ($clean as $index => $target) {
+                if (in_array($target, self::OPTION_TARGETS, true)) {
+                    $axis = trim((string) ($job['header'][(int) $index] ?? ''));
+                    if ($axis === '' || mb_strlen($axis) > 40) {
+                        throw InventoryRejectedException::field('mapping', 'Column ' . $index . ' needs a heading of up to 40 characters: it names the option (Size, Colour)');
+                    }
+                    if (in_array(mb_strtolower($axis), array_map('mb_strtolower', $axes), true)) {
+                        throw InventoryRejectedException::field('mapping', 'Two option columns are called "' . $axis . '"; rename one');
+                    }
+                    $axes[$target] = $axis;
+                }
+            }
+            if ($axes !== []) {
+                $options['axes'] = $axes;
+            }
+        }
 
         return $options;
     }
@@ -324,9 +384,12 @@ final class InventoryImports
     {
         /** @var array<string, string> $mapping */
         $mapping = $options['mapping'] ?? [];
+        /** @var array<string, string> $axes */
+        $axes = is_array($options['axes'] ?? null) ? $options['axes'] : [];
         $currency = ($this->currency)($tenantId);
         $plan = [];
         $seen = [];
+        $groups = [];
         foreach ($rows as $i => $cells) {
             $rowNumber = $i + 2;
             $values = [];
@@ -336,25 +399,295 @@ final class InventoryImports
             $sku = $values['sku'] ?? '';
             $base = ['row' => $rowNumber, 'name' => $sku, 'changes' => [], 'before' => null];
             if ($sku === '') {
-                $plan[] = ['action' => 'skip', 'reason' => 'No SKU'] + $base;
+                $plan[$i] = ['action' => 'skip', 'reason' => 'No SKU'] + $base;
                 continue;
             }
             if (mb_strlen($sku) > 64) {
-                $plan[] = ['action' => 'skip', 'reason' => 'The SKU is longer than 64 characters'] + $base;
+                $plan[$i] = ['action' => 'skip', 'reason' => 'The SKU is longer than 64 characters'] + $base;
                 continue;
             }
-            $key = mb_strtolower($sku) . '|' . ($kind === 'opening_stock' ? mb_strtolower($values['place'] ?? '') : '');
+            $key = mb_strtolower($sku) . '|' . match ($kind) {
+                'opening_stock' => mb_strtolower($values['place'] ?? ''),
+                'supplier_prices' => mb_strtolower($values['supplier'] ?? ''),
+                default => '',
+            };
             if (isset($seen[$key])) {
-                $plan[] = ['action' => 'skip', 'reason' => 'Same ' . ($kind === 'items' ? 'item' : 'item and place') . ' as row ' . $seen[$key]] + $base;
+                $plan[$i] = ['action' => 'skip', 'reason' => 'Same ' . match ($kind) {
+                    'items' => 'item',
+                    'supplier_prices' => 'item and supplier',
+                    default => 'item and place',
+                } . ' as row ' . $seen[$key]] + $base;
                 continue;
             }
             $seen[$key] = $rowNumber;
-            $plan[] = $kind === 'items'
-                ? $this->planItem($tenantId, $values, $currency, $base)
-                : $this->planStock($tenantId, $values, $options, $currency, $base);
+            if ($kind === 'items' && $axes !== [] && self::hasOptions($values, $axes)) {
+                // A row per variant: rows of one item share its group, or its name.
+                $group = mb_strtolower(($values['group'] ?? '') !== '' ? $values['group'] : ($values['name'] ?? ''));
+                if ($group === '') {
+                    $plan[$i] = ['action' => 'skip', 'reason' => 'A variant needs its item\'s name or group, to know which item it belongs to'] + $base;
+                    continue;
+                }
+                $groups[$group][$i] = ['values' => $values, 'base' => $base];
+                continue;
+            }
+            $plan[$i] = match ($kind) {
+                'items' => $this->planItem($tenantId, $values, $currency, $base),
+                'supplier_prices' => $this->supplierPrices()->plan($tenantId, $values, $options, $base),
+                default => $this->planStock($tenantId, $values, $options, $currency, $base),
+            };
+        }
+        foreach ($groups as $members) {
+            $plan = $this->planVariants($tenantId, $members, $axes, $currency) + $plan;
+        }
+        ksort($plan);
+
+        return array_values($plan);
+    }
+
+    /**
+     * @param array<string, string> $values
+     * @param array<string, string> $axes
+     */
+    private static function hasOptions(array $values, array $axes): bool
+    {
+        foreach (array_keys($axes) as $target) {
+            if (($values[$target] ?? '') !== '') {
+                return true;
+            }
         }
 
-        return $plan;
+        return false;
+    }
+
+    /**
+     * The rows that are variants of one item (IM.3: one row per variant, the
+     * option columns name the axes). A new item is made with all of them; an
+     * existing one, found by any row's SKU, gains the new SKUs as variants
+     * and keeps the ones it has.
+     *
+     * @param array<int, array{values: array<string, string>, base: array<string, mixed>}> $members by row index
+     * @param array<string, string> $axes option target => its name
+     * @return array<int, array<string, mixed>> by row index
+     */
+    private function planVariants(int $tenantId, array $members, array $axes, string $currency): array
+    {
+        $out = [];
+        $valid = [];
+        $combos = [];
+        foreach ($members as $i => ['values' => $v, 'base' => $base]) {
+            $options = [];
+            foreach ($axes as $target => $axis) {
+                if (($v[$target] ?? '') === '') {
+                    $out[$i] = ['action' => 'skip', 'reason' => 'Every variant needs its ' . $axis] + $base;
+                    continue 2;
+                }
+                if (mb_strlen($v[$target]) > 60) {
+                    $out[$i] = ['action' => 'skip', 'reason' => $axis . ' is longer than 60 characters'] + $base;
+                    continue 2;
+                }
+                $options[$axis] = $v[$target];
+            }
+            $combo = mb_strtolower(implode('|', $options));
+            if (isset($combos[$combo])) {
+                $out[$i] = ['action' => 'skip', 'reason' => 'Same ' . implode(' and ', array_keys($options)) . ' as row ' . $combos[$combo]] + $base;
+                continue;
+            }
+            $parsed = $this->itemFields($v, $currency, $base);
+            if (isset($parsed['action'])) {
+                $out[$i] = $parsed;
+                continue;
+            }
+            $combos[$combo] = $base['row'];
+            $valid[$i] = ['values' => $v, 'base' => $base, 'options' => $options] + $parsed;
+        }
+        if ($valid === []) {
+            return $out;
+        }
+        $skipAll = static function (string $reason) use ($valid, $out): array {
+            foreach ($valid as $i => $m) {
+                $out[$i] = ['action' => 'skip', 'reason' => $reason] + $m['base'];
+            }
+
+            return $out;
+        };
+
+        $itemIds = [];
+        foreach ($valid as $m) {
+            $id = $this->items->itemIdBySku($tenantId, $m['values']['sku']);
+            if ($id !== null) {
+                $itemIds[$id] = true;
+            }
+        }
+        if (count($itemIds) > 1) {
+            return $skipAll('These rows have the same item name or group, but their SKUs belong to different items');
+        }
+        $leaderIndex = array_key_first($valid);
+        $leader = $valid[$leaderIndex];
+
+        if ($itemIds === []) {
+            if (count($valid) > ItemService::MAX_VARIANTS) {
+                return $skipAll('An item can have at most ' . ItemService::MAX_VARIANTS . ' variants');
+            }
+            $names = [];
+            foreach ($valid as $m) {
+                if ($m['names'] !== []) {
+                    $names = $m['names'];
+                    break;
+                }
+            }
+            if ($names === []) {
+                return $skipAll('No name for a new item');
+            }
+            $unit = ($leader['values']['unit'] ?? '') !== '' ? $leader['values']['unit'] : 'pc';
+            if ($this->unitId($tenantId, $unit) === null) {
+                return $skipAll('There is no unit "' . $unit . '"; add it under Units first');
+            }
+            $variants = [];
+            foreach ($valid as $i => $m) {
+                $barcode = $m['values']['barcode'] ?? '';
+                if ($barcode !== '' && $this->barcodeTaken($tenantId, $barcode)) {
+                    $out[$i] = ['action' => 'skip', 'reason' => 'The barcode belongs to another item'] + $m['base'];
+                    continue;
+                }
+                $variants[] = self::variantInput(null, $m, $leader['fields']);
+                $out[$i] = ['action' => 'create', 'group' => true] + $m['base'];
+            }
+            if ($variants === []) {
+                return $out;
+            }
+            // The item is made once, from the first row that isn't skipped.
+            foreach ($out as $i => $row) {
+                if (($row['group'] ?? false) === true) {
+                    $out[$i]['op'] = ['create', $leader['fields'] + ['name' => $names, 'unit' => $unit, 'variants' => $variants]];
+                    break;
+                }
+            }
+
+            return $out;
+        }
+
+        $itemId = (int) array_key_first($itemIds);
+        $item = $this->items->show($tenantId, $itemId);
+        if ($item['archived']) {
+            return $skipAll('The item with this SKU is archived');
+        }
+        $live = array_values(array_filter($item['variants'], static fn (array $x): bool => !$x['archived']));
+        $wanted = array_values($axes);
+        sort($wanted);
+        $bySku = [];
+        foreach ($live as $x) {
+            $bySku[mb_strtolower((string) $x['sku'])] = $x;
+            $has = array_keys($x['options']);
+            sort($has);
+            if (($has !== [] || count($live) > 1) && $has !== $wanted) {
+                return $skipAll($item['name'] . '\'s variants are by ' . ($has === [] ? 'nothing yet' : implode(' and ', $has)) . '; this file has ' . implode(' and ', $wanted));
+            }
+        }
+        $list = array_map(static fn (array $x): array => self::variantFromShown($x), $live);
+        $before = $list;
+        $variantsChanged = false;
+        $rowsSeen = [];
+        foreach ($valid as $i => $m) {
+            $existing = $bySku[mb_strtolower($m['values']['sku'])] ?? null;
+            if ($existing !== null) {
+                $rowsSeen[mb_strtolower((string) $existing['sku'])] = true;
+                if ($existing['options'] != $m['options']) {
+                    foreach ($list as $k => $entry) {
+                        if ($entry['id'] === $existing['id']) {
+                            $list[$k]['options'] = $m['options'];
+                        }
+                    }
+                    $variantsChanged = true;
+                    $out[$i] = ['action' => 'update', 'group' => true, 'changes' => ['options']] + $m['base'];
+                } else {
+                    $out[$i] = ['action' => 'skip', 'reason' => 'Already up to date', 'group' => true, 'item_id' => $itemId] + $m['base'];
+                }
+                continue;
+            }
+            $barcode = $m['values']['barcode'] ?? '';
+            if ($barcode !== '' && $this->barcodeTaken($tenantId, $barcode)) {
+                $out[$i] = ['action' => 'skip', 'reason' => 'The barcode belongs to another item'] + $m['base'];
+                continue;
+            }
+            $list[] = self::variantInput(null, $m, $leader['fields'] + array_filter([
+                'sale_price_minor' => $item['sale_price_minor'], 'purchase_price_minor' => $item['purchase_price_minor'],
+            ], static fn ($p): bool => $p !== null));
+            $variantsChanged = true;
+            $out[$i] = ['action' => 'create', 'group' => true, 'item_id' => $itemId] + $m['base'];
+        }
+        // The single variant without options gets them from its row, or the item can't have more.
+        if ($variantsChanged && count($live) === 1 && $live[0]['options'] === [] && !isset($rowsSeen[mb_strtolower((string) $live[0]['sku'])])) {
+            return $skipAll($item['name'] . ' has one variant (' . $live[0]['sku'] . ') with no ' . implode(' or ', $wanted) . '; add a row for it too');
+        }
+        if (count($list) > ItemService::MAX_VARIANTS) {
+            return $skipAll('An item can have at most ' . ItemService::MAX_VARIANTS . ' variants');
+        }
+
+        // The item's own fields come from the first row, as for an item without variants.
+        $itemPlan = $this->itemChanges($tenantId, $itemId, $leader['fields'], $leader['names']);
+        $fields = $itemPlan['fields'];
+        $beforeFields = $itemPlan['before'];
+        if ($variantsChanged) {
+            $fields['variants'] = $list;
+            $beforeFields['variants'] = $before;
+        }
+        if ($fields === []) {
+            return $out;
+        }
+        if ($itemPlan['fields'] !== [] && ($out[$leaderIndex]['action'] ?? '') === 'skip' && ($out[$leaderIndex]['group'] ?? false) === true) {
+            $out[$leaderIndex] = ['action' => 'update', 'group' => true, 'item_id' => $itemId, 'changes' => array_keys($itemPlan['fields'])] + $leader['base'];
+        }
+        // The change is made once, from the first row that isn't skipped (or the first row).
+        $carrier = $leaderIndex;
+        foreach ($out as $i => $row) {
+            if ($row['action'] !== 'skip' && ($row['group'] ?? false) === true) {
+                $carrier = $i;
+                break;
+            }
+        }
+        $out[$carrier]['op'] = ['update', $itemId, $fields, $beforeFields];
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $m a planned row: `values`, `options` and `fields`
+     * @param array<string, mixed> $itemFields the item's prices, which a variant with the same one doesn't repeat
+     * @return array<string, mixed> a variant as `ItemService` takes it
+     */
+    private static function variantInput(?int $id, array $m, array $itemFields): array
+    {
+        /** @var array<string, string> $values */
+        $values = $m['values'];
+        /** @var array<string, mixed> $fields */
+        $fields = $m['fields'];
+        $variant = ['id' => $id, 'sku' => $values['sku'], 'options' => $m['options']];
+        if (($values['barcode'] ?? '') !== '') {
+            $variant['barcodes'] = [['code' => $values['barcode']]];
+        }
+        foreach (['sale_price_minor', 'purchase_price_minor'] as $price) {
+            if (isset($fields[$price]) && $fields[$price] !== ($itemFields[$price] ?? null)) {
+                $variant[$price] = $fields[$price];
+            }
+        }
+
+        return $variant;
+    }
+
+    /**
+     * @param array<string, mixed> $shown a variant as `ItemService::show` gives it
+     * @return array<string, mixed> the same variant as `ItemService::update` takes it
+     */
+    private static function variantFromShown(array $shown): array
+    {
+        return [
+            'id' => (int) $shown['id'],
+            'sku' => (string) $shown['sku'],
+            'options' => $shown['options'],
+            'barcodes' => array_map(static fn (array $b): array => ['code' => (string) $b['code'], 'unit' => $b['unit'] ?? null], $shown['barcodes']),
+            'sale_price_minor' => $shown['sale_price_minor'],
+            'purchase_price_minor' => $shown['purchase_price_minor'],
+        ];
     }
 
     /**
@@ -363,6 +696,53 @@ final class InventoryImports
      * @return array<string, mixed>
      */
     private function planItem(int $tenantId, array $v, string $currency, array $base): array
+    {
+        $parsed = $this->itemFields($v, $currency, $base);
+        if (isset($parsed['action'])) {
+            return $parsed;
+        }
+        ['fields' => $fields, 'names' => $names] = $parsed;
+
+        $itemId = $this->items->itemIdBySku($tenantId, $v['sku']);
+        if ($itemId === null) {
+            if ($names === []) {
+                return ['action' => 'skip', 'reason' => 'No name for a new item'] + $base;
+            }
+            $unit = ($v['unit'] ?? '') !== '' ? $v['unit'] : 'pc';
+            if ($this->unitId($tenantId, $unit) === null) {
+                return ['action' => 'skip', 'reason' => 'There is no unit "' . $unit . '"; add it under Units first'] + $base;
+            }
+            if (($v['barcode'] ?? '') !== '' && $this->barcodeTaken($tenantId, $v['barcode'])) {
+                return ['action' => 'skip', 'reason' => 'The barcode belongs to another item'] + $base;
+            }
+            $create = $fields + ['name' => $names, 'unit' => $unit, 'sku' => $v['sku']];
+            if (($v['barcode'] ?? '') !== '') {
+                $create['barcodes'] = [['code' => $v['barcode']]];
+            }
+
+            return ['action' => 'create', 'fields' => $create] + $base;
+        }
+
+        $row = $this->items->row($tenantId, $itemId) ?? [];
+        if (($row['archived_at'] ?? null) !== null) {
+            return ['action' => 'skip', 'reason' => 'The item with this SKU is archived'] + $base;
+        }
+        ['fields' => $changed, 'before' => $before] = $this->itemChanges($tenantId, $itemId, $fields, $names);
+        if ($changed === []) {
+            return ['action' => 'skip', 'reason' => 'Already up to date', 'item_id' => $itemId] + $base;
+        }
+
+        return ['action' => 'update', 'item_id' => $itemId, 'fields' => $changed, 'before' => $before, 'changes' => array_keys($changed)] + $base;
+    }
+
+    /**
+     * What an item row says about the item, or why it is skipped.
+     *
+     * @param array<string, string> $v
+     * @param array<string, mixed> $base
+     * @return array{fields: array<string, mixed>, names: array<string, string>}|array<string, mixed>
+     */
+    private function itemFields(array $v, string $currency, array $base): array
     {
         $fields = [];
         foreach (['sale_price' => 'sale_price_minor', 'purchase_price' => 'purchase_price_minor'] as $target => $field) {
@@ -407,30 +787,19 @@ final class InventoryImports
             }
         }
 
-        $itemId = $this->items->itemIdBySku($tenantId, $v['sku']);
-        if ($itemId === null) {
-            if ($names === []) {
-                return ['action' => 'skip', 'reason' => 'No name for a new item'] + $base;
-            }
-            $unit = ($v['unit'] ?? '') !== '' ? $v['unit'] : 'pc';
-            if ($this->unitId($tenantId, $unit) === null) {
-                return ['action' => 'skip', 'reason' => 'There is no unit "' . $unit . '"; add it under Units first'] + $base;
-            }
-            if (($v['barcode'] ?? '') !== '' && $this->barcodeTaken($tenantId, $v['barcode'])) {
-                return ['action' => 'skip', 'reason' => 'The barcode belongs to another item'] + $base;
-            }
-            $create = $fields + ['name' => $names, 'unit' => $unit, 'sku' => $v['sku']];
-            if (($v['barcode'] ?? '') !== '') {
-                $create['barcodes'] = [['code' => $v['barcode']]];
-            }
+        return ['fields' => $fields, 'names' => $names];
+    }
 
-            return ['action' => 'create', 'fields' => $create] + $base;
-        }
-
+    /**
+     * The item's fields a row changes, with their values before.
+     *
+     * @param array<string, mixed> $fields
+     * @param array<string, string> $names
+     * @return array{fields: array<string, mixed>, before: array<string, mixed>}
+     */
+    private function itemChanges(int $tenantId, int $itemId, array $fields, array $names): array
+    {
         $row = $this->items->row($tenantId, $itemId) ?? [];
-        if (($row['archived_at'] ?? null) !== null) {
-            return ['action' => 'skip', 'reason' => 'The item with this SKU is archived'] + $base;
-        }
         $changed = [];
         $before = [];
         $current = InventoryNames::decode($row['names'] ?? null, (string) ($row['name'] ?? ''));
@@ -448,11 +817,8 @@ final class InventoryImports
                 $before[$field] = $was;
             }
         }
-        if ($changed === []) {
-            return ['action' => 'skip', 'reason' => 'Already up to date', 'item_id' => $itemId] + $base;
-        }
 
-        return ['action' => 'update', 'item_id' => $itemId, 'fields' => $changed, 'before' => $before, 'changes' => array_keys($changed)] + $base;
+        return ['fields' => $changed, 'before' => $before];
     }
 
     /**
@@ -508,12 +874,38 @@ final class InventoryImports
     private function applyItems(int $tenantId, int $jobId, array $plan, ?int $actor, ImportJobRepository $jobs): void
     {
         foreach ($plan as $row) {
+            if (($row['group'] ?? false) === true) {
+                // Variants of one item: the row carrying the item's change makes it.
+                $op = $row['op'] ?? null;
+                if (is_array($op) && $op[0] === 'create') {
+                    $item = $this->items->create($tenantId, $op[1], $actor);
+                    $jobs->recordChange($tenantId, $jobId, 'inventory.item', (int) $item['id'], 'created', null);
+                } elseif (is_array($op) && $op[0] === 'update') {
+                    $this->items->update($tenantId, (int) $op[1], $op[2], $actor);
+                    $jobs->recordChange($tenantId, $jobId, 'inventory.item', (int) $op[1], 'updated', $op[3]);
+                }
+                continue;
+            }
             if ($row['action'] === 'create') {
                 $item = $this->items->create($tenantId, $row['fields'], $actor);
                 $jobs->recordChange($tenantId, $jobId, 'inventory.item', (int) $item['id'], 'created', null);
             } elseif ($row['action'] === 'update') {
                 $this->items->update($tenantId, (int) $row['item_id'], $row['fields'], $actor);
                 $jobs->recordChange($tenantId, $jobId, 'inventory.item', (int) $row['item_id'], 'updated', $row['before']);
+            }
+        }
+    }
+
+    /** @param list<array<string, mixed>> $plan */
+    private function applySupplierPrices(int $tenantId, int $jobId, array $plan, ImportJobRepository $jobs): void
+    {
+        foreach ($plan as $row) {
+            if ($row['action'] === 'create' || $row['action'] === 'update') {
+                $saved = $this->supplierPrices()->apply($tenantId, $row);
+                $jobs->recordChange(
+                    $tenantId, $jobId, 'inventory.supplier_item', $saved['id'], $row['action'] === 'create' ? 'created' : 'updated',
+                    $row['action'] === 'update' ? $row['before'] : null, ['unpreferred' => $saved['unpreferred']]
+                );
             }
         }
     }
@@ -567,7 +959,17 @@ final class InventoryImports
 
     private function jobs(string $kind): ImportJobRepository
     {
-        return $this->jobs[$kind] ?? throw InventoryRejectedException::field('kind', 'kind is items or opening_stock');
+        return $this->jobs[$kind] ?? throw InventoryRejectedException::field('kind', 'kind is items, opening_stock or supplier_prices');
+    }
+
+    private function supplierPrices(): SupplierPriceRows
+    {
+        return $this->supplierPrices ?? throw new \LogicException('Supplier prices need SupplierItems');
+    }
+
+    private function supplierItemsFor(): SupplierItems
+    {
+        return $this->supplierItems ?? throw new \LogicException('Supplier prices need SupplierItems');
     }
 
     /**
