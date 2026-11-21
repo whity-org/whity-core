@@ -211,6 +211,10 @@ final class MigrationSchemaTest extends TestCase
             314 => 'reserved for the 0.2.31 migrations lane, which shipped a baseline instead',
             315 => 'reserved for the 0.2.31 migrations lane, which shipped a baseline instead',
             316 => 'reserved for the 0.2.31 migrations lane, which shipped a baseline instead',
+            // Confirmed by the orchestrator (2026-11-21).
+            327 => 'held by accounting A1 draft (#2349), withdrawn 2026-11-21; A1 takes new numbers at merge',
+            328 => 'held by accounting A1 draft (#2349), withdrawn 2026-11-21; A1 takes new numbers at merge',
+            329 => 'held by accounting A1 draft (#2349), withdrawn 2026-11-21; A1 takes new numbers at merge',
         ];
 
         $deleted = array_values(array_filter(
