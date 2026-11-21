@@ -340,7 +340,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'licensing.billing_basis' => 'activated',
             'seats.enforcement' => 'warn',
             'seats.count_invited' => 'true',
-            'meters.enforcement' => 'block',
+            'meters.enforcement' => 'warn',
             // Tax defaults to ZERO, not to any country's rate: charging tax
             // an operator is not registered to collect is a worse failure than
             // not charging it, and a default correct for one jurisdiction and

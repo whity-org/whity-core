@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
 import { useFetch } from '@/hooks/useFetch';
@@ -256,6 +257,15 @@ export default function BillingPage() {
 
       {/* WHIT-932: a limit passed is told here, never enforced by a lock. */}
       {!forbidden && <PlanLimits />}
+
+      {/* Section 33 §5: every meter, its base and the warning state. */}
+      {!forbidden && (
+        <div>
+          <Button asChild variant="outline" data-testid="billing-usage-link">
+            <Link href="/billing/usage">{t('billing.usage.open', 'See usage')}</Link>
+          </Button>
+        </div>
+      )}
 
       {/* A LOAD FAILURE IS SAID OUT LOUD. An empty table and a failed request
           look identical, and "no invoices" is a far more comforting thing to

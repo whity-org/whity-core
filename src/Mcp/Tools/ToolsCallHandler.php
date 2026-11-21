@@ -80,6 +80,9 @@ final class ToolsCallHandler implements MethodHandler
         // WHIT-931: idempotency keys, so a retried call runs once. Null: keys
         // are ignored and every call runs, as before.
         private readonly ?McpCallKeys $callKeys = null,
+        // The usage ledger (business model, BM.17): an agent's call is agent
+        // work, a person's call is an API call. Null: nothing is recorded.
+        private readonly ?\Whity\Core\Usage\McpUsage $usage = null,
     ) {}
 
     /**
@@ -589,7 +592,14 @@ final class ToolsCallHandler implements MethodHandler
      */
     private function countAgentWork(McpPrincipal $principal): void
     {
+        $startedRun = $this->recordUsage($principal);
+
         if ($this->agentWork === null || !$principal->isAgent()) {
+            return;
+        }
+        // With the usage ledger, the allowance is on runs (BM.3: 300 agent
+        // runs a month), so the meter that warns is spent once per run.
+        if ($this->usage !== null && !$startedRun) {
             return;
         }
 
@@ -598,6 +608,27 @@ final class ToolsCallHandler implements MethodHandler
         } catch (\Throwable $e) {
             $this->warn('Could not count agent work: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Into the usage ledger; a failure there never stops the call. Returns
+     * whether an agent's call started a run.
+     */
+    private function recordUsage(McpPrincipal $principal): bool
+    {
+        if ($this->usage === null) {
+            return false;
+        }
+        try {
+            if ($principal->isAgent()) {
+                return $this->usage->agentCalled($principal->tenantId, $principal->agentPrincipalId());
+            }
+            $this->usage->personCalled($principal->tenantId);
+        } catch (Throwable $e) {
+            $this->warn('Could not record usage: ' . $e->getMessage());
+        }
+
+        return false;
     }
 
     /**

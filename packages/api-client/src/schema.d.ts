@@ -11619,6 +11619,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every usage meter for this workspace and month
+         * @description Seats, customers, items, invoices, storage, messages (by channel), agents (runs and tool calls) and API calls, each with what was used, the base (null when there is no limit) and whether it is near or past it. Past a base is a warning only: nothing is refused (BM.4). The current month is read live; an earlier one as it was kept.
+         */
+        get: operations["get_api_v1_usage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user-groups": {
         parameters: {
             query?: never;
@@ -22695,6 +22715,40 @@ export interface components {
         };
         UnreadCountResponse: {
             unread_count: number;
+        };
+        UsageMeter: {
+            /** @enum {string} */
+            meter: "seats" | "customers" | "inventory.items" | "invoices" | "storage.bytes" | "messages.outbound" | "agents" | "api.calls";
+            /** @description The entitlement its base is set on. */
+            key: string;
+            /** @enum {string} */
+            kind: "counted" | "snapshot";
+            /** @enum {string} */
+            unit: "count" | "bytes";
+            used: number;
+            /** @description The month's highest reading; for a counted meter, the same as used. */
+            peak: number;
+            /** @description Null when there is no limit. */
+            base: number | null;
+            /** @enum {string} */
+            state: "unlimited" | "ok" | "near" | "over";
+            /** @description The meter split: messages by channel, API calls by `api` or `mcp`, agents by `runs`, `tool_calls`, `tokens_in`, `tokens_out`. */
+            dimensions: {
+                [key: string]: number;
+            };
+            resets_at: string | null;
+        };
+        UsageReport: {
+            /** @description YYYY-MM, in the workspace's time zone. */
+            period: string;
+            current: boolean;
+            resets_at: string | null;
+            meters: components["schemas"]["UsageMeter"][];
+            /** @description Months with usage, newest first. */
+            periods: string[];
+        };
+        UsageReportResponse: {
+            data: components["schemas"]["UsageReport"];
         };
         User: {
             id: number;
@@ -85427,6 +85481,83 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_usage: {
+        parameters: {
+            query?: {
+                /** @description A month, YYYY-MM; the current month when left out. */
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description This workspace's usage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageReportResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The month is not written YYYY-MM */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

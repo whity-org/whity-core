@@ -102,7 +102,7 @@ final class PlanLimitMailer
             return true;
         }
         try {
-            return ($this->settings->effective($tenantId)[SettingsRegistry::METERS_ENFORCEMENT] ?? 'block') === 'warn';
+            return ($this->settings->effective($tenantId)[SettingsRegistry::METERS_ENFORCEMENT] ?? 'warn') === 'warn';
         } catch (\Throwable) {
             return false;
         }
