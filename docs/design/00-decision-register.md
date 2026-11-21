@@ -917,7 +917,7 @@ Owner's answer: use US dollars everywhere. Every card, sample, document, email, 
 
 ## Themes (version 3.6, decided 19 November 2026)
 
-Owner's direction (19 Nov 2026): themes are tokens only, in the spirit of Material 3 Expressive and the shadcn/ui customizer; applying a theme is free, the visual editor is paid and part of Whity Studio. The spec is `30-themes.md` (WHIT-1225). Proposed and answered by the owner on 19 Nov 2026; 3.1 and 09 "What stays" are updated to match.
+Owner's direction (19 Nov 2026): themes are tokens only, in the spirit of Material 3 Expressive and the shadcn/ui customizer; applying a theme is free, the visual editor is paid and part of Whity Studio. Changed 21 Nov 2026 (TH.25): the editor and every other part of the theme system are free in core. The spec is `30-themes.md` (WHIT-1225). Proposed and answered by the owner on 19 Nov 2026; 3.1 and 09 "What stays" are updated to match.
 
 | # | Decision | Decided |
 | --- | --- | --- |
@@ -934,7 +934,7 @@ Owner's direction (19 Nov 2026): themes are tokens only, in the spirit of Materi
 | TH.11 | Documents | Print stays under E.44–E.47; a theme sets only the document theme's defaults and the accent comes from its primary; theme fonts don't reach print. **Owner:** accepted as recommended. |
 | TH.12 | Inheritance and the person | Whity default, installation theme, chosen theme, workspace adjustments (primary seed and overrides), then the person: light or dark, text size, animations, and a new Higher contrast (7:1). Guard rails last: 4.5:1 text and 3:1 non-text with automatic fallback, A.1 and M.5 minimums, Arabic and RTL. **Owner:** accepted as recommended, with Higher contrast. |
 | TH.13 | Plugins and the store | Plugins ship theme files through a new SDK interface (the route-based `PluginThemeInterface` is deprecated); store themes are signed packages; publishers may sell themes through Whity Pay; applying is free. **Owner:** yes, through Whity Pay, as recommended. |
-| TH.14 | Free and paid | Free in core: apply any installed theme, set the primary seed and overrides, import a theme file. Whity Studio (paid): live editor, seeds from the logo, presets, import from shadcn and Material Theme Builder, export, preview across key screens, documents and the phone, versions, publishing to the store. **Owner:** accepted as recommended. |
+| TH.14 | Free and paid | Free in core: apply any installed theme, set the primary seed and overrides, import a theme file. Whity Studio (paid): live editor, seeds from the logo, presets, import from shadcn and Material Theme Builder, export, preview across key screens, documents and the phone, versions, publishing to the store. **Owner:** accepted as recommended. **Superseded 21 Nov 2026 by TH.25:** all of it is free in core. |
 
 ### Theme expansion (decided 21 November 2026)
 
@@ -948,10 +948,11 @@ Proposed in `30-themes.md` §14 (WHIT-1225) and answered by the owner on 21 Nov 
 | TH.18 | Shape morph | On by default in Round and Pebble: the main button squares while pressed, a selected chip goes pill to rounded. Calm and Off show the end state. **Owner:** "Morph, outline, brisk" |
 | TH.19 | Outline elevation and brisk motion | Elevation `outline` (no shadows; 1px borders on floating layers, the plane a 2px border); motion `brisk` (standard springs at 0.8× durations). The person's Animations setting wins. **Owner:** "Morph, outline, brisk" |
 | TH.20 | Font pairs | Add `rubik`, `alexandria`, `naskh` (Noto Naskh Arabic with Noto Serif) and `ibm-kufi` (IBM Plex body, Noto Kufi Arabic headings), each with 400/500/600, OFL and its own Arabic metrics. Print keeps E.46. **Owner:** "Four Arabic font pairs" |
-| TH.21 | Per-component shape | A theme may give seven families (buttons, fields, chips, cards, dialogs, tables, navigation) their own preset, by name only, never pixels; fields and cards never past Round's cap. Studio authors them; core applies them. **Owner:** "Per-component and density" |
+| TH.21 | Per-component shape | A theme may give seven families (buttons, fields, chips, cards, dialogs, tables, navigation) their own preset, by name only, never pixels; fields and cards never past Round's cap. Core applies them, and since TH.25 core's editor makes them. **Owner:** "Per-component and density" |
 | TH.22 | Density per area and per person | `density.tables` and `density.forms` in the theme; a per-person Compact / Standard / Comfortable choice in Language and display, desktop only, never below A.1. **Owner:** "Per-component and density" |
 | TH.23 | Template themes | One theme per workspace template, shipped in the `workspace-templates` package through the plugin theme interface and offered when the workspace is created; a manifest names it with a new optional `theme` key (SDK minor). **Owner:** "Yes" |
-| TH.24 | Order of work | Free tweaks and export; presets and morph (with outline and brisk); fonts; template themes; per-component overrides and density; Studio's importers. One PR per step. **Owner:** "As recommended" |
+| TH.24 | Order of work | Free tweaks and export; presets and morph (with outline and brisk); fonts; template themes; per-component overrides and density; the editor and importers (free since TH.25). One PR per step. **Owner:** "As recommended" |
+| TH.25 | The theme system is all core | Owner, 21 Nov 2026, a new approach: "I want to start a new approach... everything is in whity... and core supports almost everything that it makes sense to support... extra usage and users is what is paid, and outside integration plugins are paid like payment gateways, jofotara, etc..." On Whity Studio for themes: "All into core". The theme editor, seed generator, logo colours, presets, importers (shadcn, Tailwind `@theme`, Material Theme Builder), token export, previews, contrast report, versions and publishing are free core features for every workspace, with `settings:write`. Supersedes the paid parts of TH.14 and the free-versus-Studio split in 30-themes §11 and §14.7–14.8. A publisher may still sell a theme through Whity Pay (TH.13). The open-core and Studio product rows outside TH are a separate business-model change |
 
 ## Inventory in core (decided 19 November 2026)
 

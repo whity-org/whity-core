@@ -1,8 +1,10 @@
 # Themes: the Whity UI theme standard
 
-Status: **decided by the owner on 19 Nov 2026** (WHIT-1225), expansion (section 14) on 21 Nov 2026. Register: "Themes (version 3.6)", TH.1–TH.24. Every recommendation in section 13 was accepted except TH.6, where the owner chose **headings and body**: a theme may set the whole font pair on product screens.
+Status: **decided by the owner on 19 Nov 2026** (WHIT-1225), expansion (section 14) on 21 Nov 2026, and every part of the theme system made free in core the same day (TH.25). Register: "Themes (version 3.6)", TH.1–TH.25. Every recommendation in section 13 was accepted except TH.6, where the owner chose **headings and body**: a theme may set the whole font pair on product screens.
 
-Owner's direction, 19 Nov 2026: themes are **tokens only**, in the spirit of Material 3 Expressive and the shadcn/ui theme customizer. **Applying a theme is free** in core, whether it comes from Whity, a plugin or the store. **The visual theme editor is paid** and is part of **Whity Studio**.
+Owner's direction, 19 Nov 2026: themes are **tokens only**, in the spirit of Material 3 Expressive and the shadcn/ui theme customizer. **Applying a theme is free** in core, whether it comes from Whity, a plugin or the store.
+
+**Changed 21 Nov 2026 (TH.25):** the owner moved to "everything is in whity": "I want to start a new approach... everything is in whity... and core supports almost everything that it makes sense to support... extra usage and users is what is paid, and outside integration plugins are paid like payment gateways, jofotara, etc..." On Whity Studio: "All into core". The theme editor, the importers and every other part of the theme system are **free core features**; there is no paid theme tool. What is paid is extra usage and users, and plugins that integrate outside services. Selling a theme in the store (TH.13) is unchanged.
 
 ## Summary
 
@@ -13,7 +15,7 @@ Owner's direction, 19 Nov 2026: themes are **tokens only**, in the spirit of Mat
 - **Guard rails run last, and they always win:** 4.5:1 text contrast with automatic fallback, 3:1 for borders and focus, the 17px and 48px minimums on phones, Arabic and RTL rules, status colours, agent marks, and print staying under E.44.
 - **One resolved token set, many consumers.** The web app, `packages/ui`, the mobile app (M.15), document themes (E.44), emails and websites all read the same resolved output, `GET /api/v1/theme`.
 - **Plugins ship themes as files** through a new SDK interface. Store themes are signed packages. The old route-based `PluginThemeInterface` is folded into this.
-- **Whity Studio (paid)** adds the live editor, generating a theme from a logo, presets to start from, import and export (including shadcn CSS and Material Theme Builder JSON), a preview across key screens, documents and the phone, and publishing to the store.
+- **The theme editor is free in core** (TH.25): the live editor, generating a theme from a logo, presets to start from, import and export (including shadcn CSS and Material Theme Builder JSON), a preview across key screens, documents and the phone, and publishing to the store.
 
 ## 1. What exists today
 
@@ -283,7 +285,7 @@ Guard rails run after every layer and can't be turned off. When one changes a va
 >
 > **What stays:** status colours, layout, components and icons, and the rules that protect people: contrast, the minimum sizes, Arabic and RTL, the plane rules, approvals, scopes and attribution for agents. A partner can't remove them: they protect the partner's own customers.
 
-BM.5 still holds: the logo and colour are free on every plan, and now so is applying any theme. Studio, the editor, is what's paid.
+BM.5 still holds: the logo and colour are free on every plan, and so is applying any theme. Since TH.25 so is making one: the editor is part of core.
 
 ## 8. Document themes (E.44) consume the same tokens
 
@@ -308,32 +310,32 @@ BM.5 still holds: the logo and colour are free on every plan, and now so is appl
 - **The store** lists themes as their own kind of item, with a preview of key screens (section 11), "Used by n workspaces" and the publisher's trust mark (S.4). Installing and applying is free; a publisher can sell a theme through Whity Pay like any paid plugin.
 - The SDK minor for this comes from the sdk lane (sdk-0231); it is not numbered here.
 
-## 11. Whity Studio (paid) adds on top
+## 11. The theme editor (free in core since 21 Nov 2026)
 
-Core alone can apply, list and switch themes, set the primary seed and overrides (layer 4), and import a theme file that someone hands it. Studio is the paid tool for **making** themes:
+This section first described Whity Studio, a paid tool for making themes. On 21 Nov 2026 the owner put it "All into core" (TH.25): everything below is a free core feature, for every workspace, on top of applying, listing and switching themes, the primary seed and overrides (layer 4), the tweaks (TH.15), export (TH.16) and importing a theme file. Making a theme needs `settings:write`, like choosing one:
 
 - **Live editor.** Every choice in section 3 with the app re-theming as you go, light and dark side by side.
-- **Seed generator.** Pick seeds by hand, from a colour wheel with harmony rules (complementary, analogous, triadic), or **from the logo**: Studio extracts the dominant colours of the uploaded logo and proposes seeds, like M3 dynamic colour from an image.
+- **Seed generator.** Pick seeds by hand, from a colour wheel with harmony rules (complementary, analogous, triadic), or **from the logo**: the editor extracts the dominant colours of the uploaded logo and proposes seeds, like M3 dynamic colour from an image.
 - **Presets to start from.** Ten or so Whity-made themes (for clinics, salons, law firms, schools, retail…) to copy and change.
 - **Import and export.** The Whity theme file both ways; import from shadcn CSS variables, a Tailwind v4 `@theme` block or Material Theme Builder JSON (mapped to seeds and overrides, then checked); export resolved tokens as CSS, JSON, Tailwind or Flutter.
 - **Preview across key screens:** Home, a list, a record, a form, the approval card, a dialog, a chart, the sign-in page, an email, a printed document and the phone, in English and Arabic, light and dark, with a contrast report for every pair.
 - **Versions.** History, compare and restore, and publishing a new version to the workspaces using it.
 - **Publish to the store** as the theme's publisher.
 
-Studio later grows into records and pages (R.2). Themes are its first part.
+The editor is built last in the order of TH.24, after the per-component overrides. Whether the wider Studio product (records and pages, R.2) moves the same way is for the business-model register, not this spec.
 
 ## 12. Build plan (phase 2, after approval)
 
 Free engine in core, one PR per step where it helps review:
 
-1. **Schema and validator.** `schemas/theme/v1.json`; validator in PHP (server, authoritative) and TypeScript (Studio and the preview), sharing one fixture suite; the error messages in words.
+1. **Schema and validator.** `schemas/theme/v1.json`; validator in PHP (server, authoritative) and TypeScript (the editor and the preview), sharing one fixture suite; the error messages in words.
 2. **Generator.** Extend `TenantTheme` into `ThemeCompiler` (PHP) and `compileTheme` (TS): palettes, schemes, roles, type, shape, density, elevation, motion, guard rails, `adjustments`. The `calm` scheme must reproduce today's `TenantTheme` fixture exactly.
 3. **Storage and API.** Migration 323: `themes` (installed theme files, by id and version, source, signature status) and `workspace_theme` (chosen id and version, adjustments). Migration 324: move `branding_main_color` into each workspace's adjustments as the primary seed (idempotent, no customer data lost). `GET /api/v1/theme` (resolved, public like branding, `ETag`), `GET/PUT /api/v1/workspace/theme`, `POST /api/v1/themes/import`. Permission `settings:branding`. OpenAPI and MCP tools follow the usual rules.
 4. **Runtime in `web/` and `packages/ui`.** The branding provider becomes a theme provider: one `<style data-theme>` with the resolved variables for `:root` and `.dark`, still re-checked by pattern before it's written (as `brand-theme-css.ts` does). `packages/ui` reads radius, sizes, elevation and motion from variables instead of fixed values where it doesn't already. Fonts for the chosen family load from `@whity/tokens`.
 5. **`@whity/tokens` 1.2.0.** The new roles in `base.json` (`surface-*`, containers, tertiary), the allowed fonts, the schema, and a `compile` export for others to use.
 6. **The Theme picker.** In workspace settings: installed themes as cards with a small preview, "Use this theme", the main colour and overrides (what Branding has today), and what the guard rails changed, in words. No editor.
 
-Studio, store theme listings and the SDK interface follow as their own pieces of work.
+The editor, store theme listings and the SDK interface follow as their own pieces of work.
 
 ### 12.1 What phase 2 built (WHIT-1225), and where it differs from the plan
 
@@ -365,7 +367,7 @@ Studio, store theme listings and the SDK interface follow as their own pieces of
 | TH.11 | Theme fonts in print | No, as recommended (E.46 stays) |
 | TH.12 | Higher contrast per person | Yes, as recommended |
 | TH.13 | Selling themes | Yes, through Whity Pay, as recommended |
-| TH.14 | What the free picker does | Choose a theme, set the primary seed and overrides; the rest is Studio. As recommended |
+| TH.14 | What the free picker does | Choose a theme, set the primary seed and overrides; the rest is Studio. As recommended. **Superseded 21 Nov 2026 by TH.25:** the rest is core too |
 
 TH.1–TH.3, TH.5 and TH.8 were decided as written in this spec.
 
@@ -374,7 +376,7 @@ TH.1–TH.3, TH.5 and TH.8 were decided as written in this spec.
 **Status: decided by the owner on 21 Nov 2026** (register TH.15–TH.24): every question in 14.9 was answered as recommended. Building follows 14.9 question 10, one PR per step. The decisions in section 13 stand:
 - tokens only;
 - applying any theme is free;
-- the editor is part of paid Whity Studio;
+- the editor was part of paid Whity Studio; since TH.25 (same day) it is free in core;
 - plugins can ship themes.
 
 Every addition below stays a value in the theme file (section 4), checked by the guard rails (section 6), so a theme still can't add CSS, URLs or code. The questions and the owner's answers are in 14.9.
@@ -465,30 +467,36 @@ Whity's own five (Whity, Harbour, Ink, Bloom, Desert) stay in core for every wor
 
 ### 14.7 Theme import and export
 
-| | Free (core) | Whity Studio (paid) |
-| --- | --- | --- |
-| Export the theme in use as a Whity theme file (JSON v1) | yes, from the picker | yes |
-| Import a Whity theme file | yes (today) | yes |
-| Re-import a newer version of an imported theme | yes, shows what changed in words before applying | yes, plus a side-by-side diff |
-| Import from shadcn CSS variables, a Tailwind v4 `@theme`, or Material Theme Builder JSON | no | yes (11) |
-| Export resolved tokens as CSS, JSON, Tailwind or Flutter | no | yes (11) |
-| Share a theme with another workspace you own | yes, by export and import | yes, a "Use in…" button |
-| Store packages (signed, hashed, through Whity ID, per the store move) | install free; paid themes through Whity Pay | publish |
+All free in core (TH.16, TH.25).
 
-### 14.8 Free versus Whity Studio
+| What | Where |
+| --- | --- |
+| Export the theme in use as a Whity theme file (JSON v1) | the picker (built, #2343) |
+| Import a Whity theme file | the picker |
+| Re-import a newer version of an imported theme | says what changed in words before replacing (built, #2343); the editor adds a side-by-side diff |
+| Import from shadcn CSS variables, a Tailwind v4 `@theme`, or Material Theme Builder JSON | the editor (11), the last step of TH.24 |
+| Export resolved tokens as CSS, JSON, Tailwind or Flutter | the editor (11) |
+| Share a theme with another workspace you own | export and import now; a "Use in…" button with the editor |
+| Store packages (signed, hashed, through Whity ID, per the store move) | install free; a publisher may sell a theme through Whity Pay (TH.13); publishing from the editor |
 
-| | Free (core) | Whity Studio (paid) |
-| --- | --- | --- |
-| Apply any theme: Whity's, a plugin's, imported, from the store | yes | yes |
-| Main colour, colour overrides, Higher contrast, per-person density | yes | yes |
-| Pick the theme's shape preset, density and font pair from the lists, on top of the chosen theme (a "tweak", like the main colour) | **question 1** | yes |
-| Per-component shape overrides (14.2) | read when a theme has them | author them |
-| Live editor, seed generator, logo colours, presets to start from, preview across key screens, contrast report, versions, publishing (11) | no | yes |
-| Export and import as in 14.7 | the free rows | all |
+### 14.8 Free and paid
+
+This table first split the theme system between free core and paid Whity Studio. Since TH.25 there is no split: **every row is free in core**, for every workspace.
+
+| Feature | Core |
+| --- | --- |
+| Apply any theme: Whity's, a plugin's, imported, from the store | free |
+| Main colour, colour overrides, Higher contrast, per-person density | free |
+| Shape preset, density and font pair on top of the chosen theme (TH.15) | free |
+| Per-component shape overrides (14.2): applying and making them | free |
+| Live editor, seed generator, logo colours, presets to start from, preview across key screens, contrast report, versions, publishing (11) | free |
+| Export and import as in 14.7 | free |
+
+Paid stays where TH.25 puts it: extra usage and users, and plugins that integrate outside services. A theme a publisher sells in the store is the publisher's price, not a Whity tier.
 
 ### 14.9 Questions for the owner (answered 21 Nov 2026: all as recommended, TH.15–TH.24)
 
-1. **Free tweaks.** Can a free workspace change the shape preset, density and font pair on top of a theme, as it changes the main colour today? Recommended: **yes**. They're single choices from closed lists, cheap to support, and they answer most "make it ours" requests. Studio keeps everything that needs an editor.
+1. **Free tweaks.** Can a free workspace change the shape preset, density and font pair on top of a theme, as it changes the main colour today? Recommended: **yes**. They're single choices from closed lists, cheap to support, and they answer most "make it ours" requests. Studio keeps everything that needs an editor. *(Since TH.25 the editor is free in core too.)*
 2. **New shape presets.** Add Pebble and Cut (14.1)? Recommended: **both**, with Cut falling back to rounded corners where `corner-shape` isn't supported.
 3. **Morph on by default** in the Round and Pebble presets? Recommended: **yes**, with Calm and Off showing no movement.
 4. **Per-component overrides** (14.2): the seven families and presets only, no pixels? Recommended: **yes**.
@@ -503,4 +511,4 @@ Whity's own five (Whity, Harbour, Ink, Bloom, Desert) stay in core for every wor
     - fonts;
     - template themes;
     - per-component overrides;
-    - Studio's importers.
+    - Studio's importers. *(Since TH.25: the editor and importers, free in core.)*

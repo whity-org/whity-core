@@ -2,7 +2,7 @@
 
 /**
  * Settings › Branding › Theme (WHIT-1225, TH.13, TH.14): pick one of the
- * installed themes. Applying a theme is free; making one is Whity Studio's.
+ * installed themes. Applying a theme is free, and since TH.25 so is making one (the editor is core).
  * Each card previews the theme in the workspace's main colour, which replaces
  * the theme's own colour (30-themes.md section 5), and says in words what the
  * guard rails changed for the theme in use.
@@ -539,7 +539,7 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
           </div>
         )}
         <p className="text-xs text-muted-foreground">
-          {t('theme.studio', 'To make your own theme, use Whity Studio. Everyone can still choose Larger text, Higher contrast and Calm animations for themselves.')}
+          {t('theme.personal', 'Everyone can still choose Larger text, Higher contrast and Calm animations for themselves.')}
         </p>
       </CardContent>
       <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
