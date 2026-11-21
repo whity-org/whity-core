@@ -34,8 +34,8 @@ Tables are prefixed `sales_`, because quotes belong to selling, not to stock (`i
 
 | Table | Holds | Key columns |
 | --- | --- | --- |
-| `sales_quotes` | One row per quote revision | `number` (`QUO-0318`, from the sequence allocator with the key `sales:quote`, as purchase orders use `inventory:purchase_order`), `revision` (1, 2, …), `replaces_id` (the revision before), `contact_id` (a contact with `is_customer`), `status`, `issue_date`, `valid_until`, `currency`, `prices_include_tax`, `subtotal_minor`, `discount_minor`, `tax_minor`, `total_minor`, `notes`, `terms`, `route_id`, `document_id` (the printed copy), `public_token_hash`, `sent_at`, `decided_at`, `decided_by_name`, `decline_reason`, `created_by`, `agent_id`, `on_behalf_of` |
-| `sales_quote_lines` | Lines | `quote_id`, `position`, `variant_id` (nullable: a line may be free text or a service with no item), `unit_id`, `description` (bilingual through `LocalizedText`), `quantity` (base-unit steps, IV.3; free lines use thousandths), `price_minor`, `discount_bp`, `tax_category`, `tax_bp`, `line_total_minor` |
+| `sales_quotes` | One row per quote revision | `number` (`QUO-0318`, from the sequence allocator with the key `sales:quote`, as purchase orders use `inventory:purchase_order`), `revision` (1, 2, …), `replaces_id` (the revision before), `contact_id` (a contact with `is_customer`), `status`, `issue_date`, `valid_until`, `currency`, `prices_include_tax`, `subtotal_minor`, `tax_minor`, `total_minor`, `notes`, `terms`, `route_id`, `document_id` (the printed copy), `public_token_hash`, `sent_at`, `decided_at`, `decided_by_name`, `decline_reason`, `created_by`, `agent_id`, `on_behalf_of` |
+| `sales_quote_lines` | Lines | `quote_id`, `position`, `variant_id` (nullable: a line may be free text or a service with no item), `unit_id`, `description` (bilingual through `LocalizedText`), `quantity` and `quantity_decimals` (whole steps in the line's own unit, IV.3; free lines keep up to three decimals), `base_quantity` (an item line's quantity in its base unit, ready for a sales order), `price_minor`, `discount_bp`, `tax_category`, `tax_bp`, `line_total_minor` |
 | `sales_quote_conversions` | What a quote turned into | `quote_id`, `target` (`sales_order`, `invoice`, or a plugin's target key), `target_id`, `converted_by`, `converted_at`; `UNIQUE (tenant_id, quote_id, target)` so a quote turns into each kind once |
 
 Amounts are minor units of the row's currency (CU.1–CU.4). Tax on a line is the rate in basis points until accounting's tax engine ships (A2); then `tax_category` maps to a tax code through `Taxes::codeFor()` and `tax_bp` is filled from it, so quotes need no migration when A2 lands. With `prices_include_tax`, tax is split per rate on the total, as Front Office did, so the printed tax equals the tax on the sum.
@@ -57,7 +57,7 @@ draft ─► waiting_approval ─► ready ─► sent ─► accepted ─► co
 6. **Expire.** A daily job marks sent quotes past their date as `expired` and fires `sales.quote.expired`. An expired quote can be revised (a new date) or copied.
 7. **Turn into** a sales order or an invoice (3.3).
 
-The public link is a random token; only its hash is stored. The link opens one quote revision, read-only apart from Accept and Decline, and is rate-limited like the other public pages.
+The public link is a random token; only its hash is stored, so the link is shown once, when the quote is sent (and printed in its QR). **Make a new link** gives a fresh one and stops the old one working. The link opens one quote revision, read-only apart from Accept and Decline, and is rate-limited like the other public pages.
 
 ### 3.3 Turning a quote into an order or an invoice: the hook
 
@@ -84,9 +84,11 @@ interface WorkspaceQuoteConversion
 - **Inventory P5** registers `sales_order`: a draft sales order with the quote's lines (variant lines only; free lines are listed back as "not stock" and kept on the order's notes).
 - **Accounting A2** registers `invoice`: a draft customer invoice in its `acc_` tables (not platform billing's `invoices`) with every line (AC.11's "from items, sales orders and deliveries, or free lines" gains "or a quote"). This is the hook A2 fills; nothing in quotes changes when it does.
 - Converting runs in one transaction: the target is made, a `sales_quote_conversions` row is written, the quote becomes `converted` (it stays `converted` if a second target is added later), and `sales.quote.converted` fires with the target key and id. The unique key makes a retried click harmless.
-- A plugin (a rental or project plugin) may register its own target through the same interface.
+- Later, a plugin (a rental or project plugin) may register its own target through the same interface.
 
-Accepting a quote reserves no stock (question Q2). Stock is reserved when the sales order it turns into is confirmed (IV.13).
+Accepting a quote reserves no stock (question Q2).
+
+Plugins offering their own targets come in a later SDK minor, together with the per-workspace plugin switch that decides where each one shows; the first targets are core's own. Stock is reserved when the sales order it turns into is confirmed (IV.13).
 
 ### 3.4 Permissions
 
@@ -252,7 +254,7 @@ Each step is one pull request to `develop`, merged on green CI, with migration n
 | Step | What | Migrations | Ticket |
 | --- | --- | --- | --- |
 | Spec | This section and the register rows | — | WHIT-1320 |
-| Quotes | Tables, service, numbering, route subject, permissions, quote starters, public page, the quote email, expiry job, conversion registry and `WorkspaceQuoteConversion`, SDK `Quotes`, MCP tools, screens | 2 (tables; permissions and settings) | WHIT-1321 |
+| Quotes | Tables, service, numbering, route subject, permissions, quote starters, public page, the quote email, expiry job, conversion registry and `WorkspaceQuoteConversion`, SDK `Quotes`, MCP tools, screens | 1 (tables and permissions; settings are registry defaults) | WHIT-1321 |
 | Import | `import_jobs` engine, contacts moved onto it, `inventory.items`, `inventory.opening_stock`, `inventory.supplier_prices`, background runs, `WorkspaceImportKind` | 2 (new tables and copy; drop old) | WHIT-1322 |
 | Receipt and emails | The 80 mm receipt starter and field provider, `TradingEmails` (invoice, receipt, reminder ready for A2), Settings › Emails switches | 0–1 | WHIT-1323 |
 | Retire Front Office | whity-plugins unpublish, core mapping and comments, docs | 0 | WHIT-1324 |
