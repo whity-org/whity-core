@@ -536,6 +536,33 @@ final class Events
     public const INVENTORY_ORDER_CANCELLED = 'inventory.order.cancelled';
     public const INVENTORY_ORDER_CANCELLED_ASYNC = 'inventory.order.cancelled.async';
 
+    // ---- accounting: the ledger and periods (SDK 1.131, WHIT-1318, design section 32) ----
+    /**
+     * FILTER hook, before a journal entry posts, inside its transaction.
+     * Payload: `tenant_id`, `journal` (its code), `date`, `memo`,
+     * `source_type`, `source_id`, `acting_profile_id`, `reverses_entry_id`, and
+     * `lines` (each `account_id`, `debit_minor`, `credit_minor`, `contact_id`,
+     * `ou_id`). Return the payload unchanged; refuse the entry with
+     * {@see HookVetoException} (the caller gets 409 and your reason).
+     */
+    public const ACCOUNTING_ENTRY_POSTING = 'accounting.entry.posting';
+    /**
+     * A journal entry posted. Payload: `tenant_id`, `entry_id`, `number`,
+     * `journal`, `date`, `source_type`, `source_id`, `reverses_entry_id`,
+     * `total_minor`, `currency`, `acting_profile_id`.
+     */
+    public const ACCOUNTING_ENTRY_POSTED = 'accounting.entry.posted';
+    public const ACCOUNTING_ENTRY_POSTED_ASYNC = 'accounting.entry.posted.async';
+    /** An entry was reversed. Payload: `tenant_id`, `entry_id` (the original), `reversal_entry_id`, `acting_profile_id`. */
+    public const ACCOUNTING_ENTRY_REVERSED = 'accounting.entry.reversed';
+    public const ACCOUNTING_ENTRY_REVERSED_ASYNC = 'accounting.entry.reversed.async';
+    /** A month was closed. Payload: `tenant_id`, `period_id`, `starts_on`, `ends_on`, `acting_profile_id`. */
+    public const ACCOUNTING_PERIOD_CLOSED = 'accounting.period.closed';
+    public const ACCOUNTING_PERIOD_CLOSED_ASYNC = 'accounting.period.closed.async';
+    /** A closed month was reopened. Payload as closed, plus `reason`. */
+    public const ACCOUNTING_PERIOD_REOPENED = 'accounting.period.reopened';
+    public const ACCOUNTING_PERIOD_REOPENED_ASYNC = 'accounting.period.reopened.async';
+
     /**
      * The event name to dispatch for one of THIS plugin's own events (SDK 1.29).
      *

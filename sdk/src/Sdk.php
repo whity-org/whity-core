@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.130).
+ * SDK identity (v1.131).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1489,12 +1489,26 @@ namespace Whity\Sdk;
  * puts time off on their own calendar through {@see Calendar\TimeOff} with no `calendar:write`.
  *
  * Purely additive: one new optional interface and one new host service.)
+ *
+ * 1.131 (ACCOUNTING: host services {@see Accounting\Accounts}, {@see Accounting\Ledger},
+ * {@see Accounting\Periods} and {@see Accounting\Reports} read core's chart of accounts, its append-only
+ * double-entry ledger, its months and the trial balance without HTTP, and {@see Context\AccountingScope}
+ * puts them on the plugin context as `$ctx->accounting()`. An {@see Accounting\EntryRequest} posts balanced
+ * lines in the base currency's minor units, in an open month, under the plugin's own name, acting as a
+ * person holding `accounting:post`, idempotent by key, undone by `reverse()` (the mirror entry). Entries are
+ * hash-chained per workspace. A plugin adds accounts it owns through the context's `accounts()`; the
+ * container's copies only read (`use_plugin_context`). Refusals throw {@see Accounting\AccountingRejected}
+ * with a stable reason (`unbalanced`, `period_closed`...). New events `accounting.entry.posting` (a filter that
+ * can veto), `accounting.entry.posted`, `accounting.entry.reversed`, `accounting.period.closed` and
+ * `accounting.period.reopened`, each notification with an `.async` twin (WHIT-1318, design section 32).
+ *
+ * Purely additive: one new method on Context\PluginScope, which only the host implements.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.130.0';
+    public const VERSION = '1.131.0';
 
     /**
      * Static identity only — never instantiated.

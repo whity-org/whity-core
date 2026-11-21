@@ -662,6 +662,18 @@ final class TenantOwnedTables
         'inv_orders' => '321_create_inventory_orders.php',
         'inv_order_lines' => '321_create_inventory_orders.php',
         'inv_supplier_items' => '321_create_inventory_orders.php',
+        // Accounting (WHIT-1318, design section 32). Every query binds tenant_id;
+        // acc_entries and acc_lines are append-only (a trigger refuses UPDATE and DELETE).
+        'acc_books' => '327_create_accounting_chart.php',
+        'acc_accounts' => '327_create_accounting_chart.php',
+        'acc_journals' => '327_create_accounting_chart.php',
+        'acc_fiscal_years' => '327_create_accounting_chart.php',
+        'acc_periods' => '327_create_accounting_chart.php',
+        'acc_entries' => '328_create_accounting_ledger.php',
+        'acc_lines' => '328_create_accounting_ledger.php',
+        'acc_balances' => '328_create_accounting_ledger.php',
+        'acc_manual_entries' => '328_create_accounting_ledger.php',
+        'acc_manual_entry_lines' => '328_create_accounting_ledger.php',
     ];
 
     /**

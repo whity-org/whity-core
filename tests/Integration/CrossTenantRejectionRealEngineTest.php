@@ -2887,6 +2887,70 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         self::assertCount(1, $ledger->history(self::TENANT_A));
     }
 
+    // ==================== accounting (WHIT-1318, migrations 327-328) ====================
+
+    public function testAccountingIsTenantScopedAndForeignAccountsEntriesAndMonthsCannotBeTouched(): void
+    {
+        $db = new \Whity\Core\Accounting\AccountingDb($this->pdo);
+        $books = new \Whity\Core\Accounting\AccountingWorkspace($db, static fn (int $t): string => 'USD');
+        $periods = new \Whity\Core\Accounting\Periods($db, $books);
+        $ledger = new \Whity\Core\Accounting\Ledger($db, $books, $periods, new \Whity\Database\SequenceCounters($this->pdo));
+        $chart = new \Whity\Core\Accounting\ChartOfAccounts($db, $books);
+        $manual = new \Whity\Core\Accounting\ManualEntries($db, $books, $ledger);
+        $reports = new \Whity\Core\Accounting\AccountingReports($db, $books, $periods);
+        $today = gmdate('Y-m-d');
+
+        $rent = (int) ($chart->byCode(self::TENANT_A, '6200')['id'] ?? 0);
+        $bank = (int) ($chart->byCode(self::TENANT_A, '1110')['id'] ?? 0);
+        $entry = $ledger->post(self::TENANT_A, null, [
+            'journal' => 'GEN', 'date' => $today, 'source_type' => 'manual',
+            'lines' => [['account_id' => $rent, 'debit_minor' => 1000], ['account_id' => $bank, 'credit_minor' => 1000]],
+        ])['entry'];
+        $draft = $manual->create(self::TENANT_A, null, ['date' => $today, 'lines' => [
+            ['account_id' => $rent, 'debit' => '1.00'], ['account_id' => $bank, 'credit' => '1.00'],
+        ]]);
+        $month = $periods->periodFor(self::TENANT_A, $today);
+
+        self::assertSame([], $ledger->entries(self::TENANT_B, []));
+        self::assertSame([], $manual->list(self::TENANT_B));
+        self::assertSame([], $reports->trialBalance(self::TENANT_B, substr($today, 0, 8) . '01', $today)['rows']);
+        self::assertNotContains($rent, array_column($chart->list(self::TENANT_B), 'id'));
+        self::assertNotContains($month['id'], array_column($periods->list(self::TENANT_B), 'id'));
+
+        foreach ([
+            'read an account' => fn () => $chart->get(self::TENANT_B, $rent),
+            'rename an account' => fn () => $chart->update(self::TENANT_B, $rent, ['name' => 'Taken']),
+            'archive an account' => fn () => $chart->archive(self::TENANT_B, $rent),
+            'read an entry' => fn () => $ledger->entry(self::TENANT_B, $entry['id']),
+            'reverse an entry' => fn () => $ledger->reverse(self::TENANT_B, $entry['id'], null),
+            'read a draft' => fn () => $manual->get(self::TENANT_B, $draft['id']),
+            'post a draft' => fn () => $manual->post(self::TENANT_B, $draft['id'], null),
+            'close a month' => fn () => $periods->close(self::TENANT_B, $month['id'], null),
+            'read a statement' => fn () => $reports->accountStatement(self::TENANT_B, $rent, $today, $today),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} of Tenant A");
+            } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+                self::assertSame(404, $e->status, "a foreign record answers 404 to {$what}");
+            }
+        }
+        try {
+            $ledger->post(self::TENANT_B, null, [
+                'journal' => 'GEN', 'date' => $today, 'source_type' => 'manual',
+                'lines' => [['account_id' => $rent, 'debit_minor' => 1], ['account_id' => $bank, 'credit_minor' => 1]],
+            ]);
+            self::fail('Tenant B posted to Tenant A\'s accounts');
+        } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+            self::assertSame(422, $e->status);
+        }
+
+        self::assertSame('open', $periods->get(self::TENANT_A, $month['id'])['status']);
+        self::assertSame('draft', $manual->get(self::TENANT_A, $draft['id'])['status']);
+        self::assertNull($ledger->entry(self::TENANT_A, $entry['id'])['reversed_by_entry_id']);
+        self::assertSame(1000, $ledger->balance(self::TENANT_A, $rent, $today));
+    }
+
     private function contactService(): \Whity\Core\Contacts\ContactService
     {
         return new \Whity\Core\Contacts\ContactService(

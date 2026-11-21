@@ -510,6 +510,14 @@ final class CorePermissions
     // roles that run the workspace.
     public const PURCHASES_READ = 'purchases:read';
     public const PURCHASES_WRITE = 'purchases:write';
+    // ACCOUNTING (migrations 327-329, WHIT-1318, design section 32). Read goes
+    // to the roles that run the workspace; posting, closing and the settings
+    // to the roles holding settings:write, and to each workspace's Accountant
+    // role. Approving is never a permission (AC.24).
+    public const ACCOUNTING_READ = 'accounting:read';
+    public const ACCOUNTING_POST = 'accounting:post';
+    public const ACCOUNTING_CLOSE = 'accounting:close';
+    public const ACCOUNTING_SETTINGS = 'accounting:settings';
     // TASKS on Taskaat (A10, T.3). Tasks and boards live in the workspace's
     // Taskaat; these gate Whity's way into them. Read and write go to every
     // staff role (anchor documents:read); manage (connecting the workspace to
@@ -637,6 +645,10 @@ final class CorePermissions
             self::STOCK_TRANSFER,
             self::PURCHASES_READ,
             self::PURCHASES_WRITE,
+            self::ACCOUNTING_READ,
+            self::ACCOUNTING_POST,
+            self::ACCOUNTING_CLOSE,
+            self::ACCOUNTING_SETTINGS,
             self::FIELDS_MANAGE,
             self::TASKS_READ,
             self::TASKS_WRITE,

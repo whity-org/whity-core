@@ -179,6 +179,7 @@ final class CoreApiSchemas
             self::externalBillingRoutes(),
             ContactsApiSchemas::routes(),
             InventoryApiSchemas::routes(),
+            AccountingApiSchemas::routes(),
             ContactsApiSchemas::customFieldRoutes()
         ));
     }
@@ -12779,7 +12780,7 @@ final class CoreApiSchemas
                 'counts' => SchemaBuilder::ref('DataTypeBulkCounts'),
                 'results' => ['type' => 'array', 'items' => SchemaBuilder::ref('DataTypeBulkResult')],
             ], ['key', 'action', 'counts', 'results'])),
-        ] + self::workspacePluginComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components();
+        ] + self::workspacePluginComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components() + AccountingApiSchemas::components();
     }
 
     /**

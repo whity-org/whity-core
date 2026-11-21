@@ -378,6 +378,20 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `inventory.order.cancelled` | `INVENTORY_ORDER_CANCELLED` | observe | Cancelled before anything arrived. |
 | `inventory.order.cancelled.async` | `INVENTORY_ORDER_CANCELLED_ASYNC` | queued |  |
 
+### Accounting
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `accounting.entry.posting` | `ACCOUNTING_ENTRY_POSTING` | veto | Before a journal entry posts, inside its transaction (SDK 1.131). Payload: `tenant_id`, `journal`, `date`, `memo`, `source_type`, `source_id`, `acting_profile_id`, `reverses_entry_id`, `lines` (`account_id`, `debit_minor`, `credit_minor`, `contact_id`, `ou_id`). Throw `HookVetoException` to refuse the entry. |
+| `accounting.entry.posted` | `ACCOUNTING_ENTRY_POSTED` | observe | Inside the transaction, after the entry, its lines and the balances are written. Payload: `tenant_id`, `entry_id`, `number`, `journal`, `date`, `source_type`, `source_id`, `reverses_entry_id`, `total_minor`, `currency`, `acting_profile_id`. |
+| `accounting.entry.posted.async` | `ACCOUNTING_ENTRY_POSTED_ASYNC` | queued |  |
+| `accounting.entry.reversed` | `ACCOUNTING_ENTRY_REVERSED` | observe | Payload: `tenant_id`, `entry_id` (the original), `reversal_entry_id`, `acting_profile_id`. |
+| `accounting.entry.reversed.async` | `ACCOUNTING_ENTRY_REVERSED_ASYNC` | queued |  |
+| `accounting.period.closed` | `ACCOUNTING_PERIOD_CLOSED` | observe | A month was closed. Payload: `tenant_id`, `period_id`, `starts_on`, `ends_on`, `acting_profile_id`. |
+| `accounting.period.closed.async` | `ACCOUNTING_PERIOD_CLOSED_ASYNC` | queued |  |
+| `accounting.period.reopened` | `ACCOUNTING_PERIOD_REOPENED` | observe | A closed month was reopened. Payload as closed, plus `reason`. |
+| `accounting.period.reopened.async` | `ACCOUNTING_PERIOD_REOPENED_ASYNC` | queued |  |
+
 ### Deletion is transactional (WC-713)
 
 For `tenant.*`, `ou.*` and `role.*`, `TenantsApiHandler::delete()`, `OusApiHandler::delete()` and `RolesApiHandler::delete()` run
