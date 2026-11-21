@@ -53,6 +53,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { api } from '@/lib/api/client';
+import { ThemeDiff } from '@/components/theme-diff';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 import { useRefreshBranding } from '@/lib/branding-context';
@@ -112,6 +113,8 @@ export interface ThemeChange {
 
 interface PendingImport {
   theme: unknown;
+  /** The installed version's file, for the side-by-side diff (TH.25); null when it can't be read. */
+  installed: unknown;
   name: string;
   from: string;
   to: string;
@@ -152,6 +155,16 @@ export function saveFile(content: string, filename: string, type: string): void 
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * The reason the server gave in words, from an error's `details` (Response::error),
+ * so the person reads what to fix rather than a general message.
+ */
+export function errorReason(error: unknown, key: string): string | undefined {
+  const details = (error as { details?: Record<string, unknown> } | undefined)?.details;
+  const reason = details?.[key];
+  return typeof reason === 'string' && reason.trim() !== '' ? reason : undefined;
 }
 
 /** A tweak's option in plain words. */
@@ -365,7 +378,7 @@ function ConvertThemeDialog({
         body: { format, source, name },
       });
       if (convertError || !body) {
-        const reason = (convertError as { errors?: { source?: string } } | undefined)?.errors?.source;
+        const reason = errorReason(convertError, 'source');
         setProblem(reason ?? t('theme.convert.failed', 'This could not be turned into a theme. Check what you pasted and try again.'));
         return;
       }
@@ -578,7 +591,7 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
   const saveImport = async (theme: unknown): Promise<boolean> => {
     const { error: importError } = await api.POST('/api/v1/themes', { body: theme as never });
     if (importError) {
-      const reason = (importError as { errors?: { theme?: string } }).errors?.theme;
+      const reason = errorReason(importError, 'theme');
       addToast(reason ?? t('theme.import.failed', 'This theme file can’t be used.'), 'error');
       return false;
     }
@@ -595,7 +608,7 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
       body: theme as never,
     });
     if (checkError || !checked) {
-      const reason = (checkError as { errors?: { theme?: string } } | undefined)?.errors?.theme;
+      const reason = errorReason(checkError, 'theme');
       addToast(reason ?? t('theme.import.failed', 'This theme file can’t be used.'), 'error');
       return false;
     }
@@ -603,8 +616,10 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
     const changes = info.changes ?? [];
     if (info.installed_version && changes.length > 0) {
       const existing = (data?.themes ?? []).find((item) => item.id === info.id);
+      const { data: installed } = await api.GET('/api/v1/themes/{themeId}', { params: { path: { themeId: info.id } } });
       setPending({
         theme,
+        installed: installed?.data.theme ?? null,
         name: (existing && pick(existing.name, lang)) || info.id,
         from: info.installed_version,
         to: info.version,
@@ -894,7 +909,7 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
         </p>
       </CardContent>
       <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
-        <AlertDialogContent data-testid="theme-import-changes">
+        <AlertDialogContent data-testid="theme-import-changes" className={pending?.installed ? 'sm:max-w-3xl' : undefined}>
           <AlertDialogHeader>
             <AlertDialogTitle>
               {t('theme.update.title', 'Update {name} from {from} to {to}?', {
@@ -905,11 +920,22 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
             </AlertDialogTitle>
             <AlertDialogDescription>{t('theme.update.description', 'The new version changes:')}</AlertDialogDescription>
           </AlertDialogHeader>
-          <ul className="grid gap-1 text-sm">
-            {(pending?.changes ?? []).map((change) => (
-              <li key={change.field}>{changeText(change, t)}</li>
-            ))}
-          </ul>
+          {pending?.installed ? (
+            // TH.25: the two versions side by side, with what changes in words.
+            <ThemeDiff
+              before={pending.installed}
+              after={pending.theme}
+              beforeLabel={t('theme.diff.installed', 'Now ({version})', { version: pending.from })}
+              afterLabel={t('theme.diff.newer', 'New ({version})', { version: pending.to })}
+              describe={changeText}
+            />
+          ) : (
+            <ul className="grid gap-1 text-sm">
+              {(pending?.changes ?? []).map((change) => (
+                <li key={change.field}>{changeText(change, t)}</li>
+              ))}
+            </ul>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>{t('theme.update.keep', 'Keep the old version')}</AlertDialogCancel>
             <AlertDialogAction

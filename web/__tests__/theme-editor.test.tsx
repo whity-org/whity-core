@@ -105,3 +105,22 @@ it('saves a copy from the editor and puts it in use', async () => {
   expect(PATCH).toHaveBeenCalledWith('/api/v1/settings', { body: { settings: { branding_theme: 'workspace.harbour-copy' } } });
   expect(refresh).toHaveBeenCalled();
 });
+
+it('compares the draft with where it started, side by side', async () => {
+  POST.mockImplementation((path: string) =>
+    Promise.resolve(
+      path === '/api/v1/themes/compare'
+        ? { data: { data: { changes: [{ field: 'name', from: 'Harbour', to: 'Harbour (copy)' }], before: valid, after: valid } } }
+        : { data: { data: valid } },
+    ),
+  );
+  render(<ThemeEditor start={harbour} editable={false} fonts={[]} />);
+  await settle();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Compare' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Compare' }));
+  expect(await screen.findByTestId('theme-editor-compare')).toHaveTextContent('Compare with where you started');
+  await waitFor(() => expect(screen.getByTestId('theme-diff-changes')).toHaveTextContent('Name: Harbour → Harbour (copy)'));
+  expect(POST).toHaveBeenCalledWith('/api/v1/themes/compare', {
+    body: { before: harbour, after: expect.objectContaining({ name: { en: 'Harbour (copy)' } }) },
+  });
+});

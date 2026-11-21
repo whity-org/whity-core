@@ -332,7 +332,7 @@ This section first described Whity Studio, a paid tool for making themes. On 21 
 - **The preview:** every change goes to `POST /api/v1/themes/preview`, the same compiler and guard rails a theme gets in use. The answer carries every colour for both modes, so light and dark sit side by side whatever mode the person is in. It also says what the guard rails change and lists every problem at once.
 - **How the preview is drawn:** the draft's values go only onto two `[data-theme-preview]` elements (`previewThemeCss`), which recompute the shape values as `:root` does. They hold the real components: tabs, a card with a field, check box, switch and buttons, a table, badges and the chart colours. The page around them keeps the workspace's theme.
 - **Saving:** saving goes through the theme import with `source: "editor"`. The workspace's own theme (imported or made here) gets its next patch version; any other is saved as a copy under `workspace.<name>` with no author. "Save and use" also sets `branding_theme`.
-- **Not in this step:** generating seeds from the logo or a colour wheel, presets to start from, the wider preview across key screens, the contrast report, versions, export of resolved tokens, the side-by-side diff and publishing. The last three are the next steps of TH.24.
+- **Not in this step:** generating seeds from the logo or a colour wheel, presets to start from, the wider preview across key screens, the contrast report, versions, export of resolved tokens, and publishing. Export and the side-by-side diff came next (below, 14.7); publishing waits on the store.
 
 The editor is built last in the order of TH.24, after the per-component overrides. Whether the wider Studio product (records and pages, R.2) moves the same way is for the business-model register, not this spec.
 
@@ -494,7 +494,7 @@ All free in core (TH.16, TH.25).
 | --- | --- |
 | Export the theme in use as a Whity theme file (JSON v1) | the picker (built, #2343) |
 | Import a Whity theme file | the picker |
-| Re-import a newer version of an imported theme | says what changed in words before replacing (built, #2343); the editor adds a side-by-side diff |
+| Re-import a newer version of an imported theme | says what changed in words before replacing (built, #2343), with the two versions side by side (built, WHIT-1225, see below) |
 | Import from shadcn CSS variables, a Tailwind v4 `@theme`, or Material Theme Builder JSON | the picker's "Import from another tool" (built, WHIT-1225, see below); the editor will open the result to change it |
 | Export resolved tokens as CSS, JSON, Tailwind or Flutter | the picker's Export menu for the theme in use; `POST /themes/tokens` for a draft (built, WHIT-1225, see below) |
 | Share a theme with another workspace you own | export and import now; a "Use in…" button with the editor |
@@ -527,6 +527,14 @@ Where it is available:
 - `GET /api/v1/themes/export/tokens?format=` exports the theme in use with everything the workspace set. The picker's Export menu offers it beside the theme file.
 - `POST /api/v1/themes/tokens` exports a draft.
 - The theme name goes into a comment as plain text, and nothing in it can close the comment.
+
+**The side-by-side diff (built, WHIT-1225, TH.25).** `POST /api/v1/themes/compare` (`settings:read`) takes two theme files. It returns what the newer one changes, field by field as a re-import says it (TH.16, including each family's corners), and both compiled with every colour in both modes. Nothing is saved.
+
+`ThemeDiff` shows the changes in words and the two drawn with the same components as the editor's preview, light or dark. Each sits on its own `[data-theme-preview="before-…"]` or `"after-…"` element, so the page's own theme is untouched. It appears in two places:
+- when a newer version of an imported theme is added: "Now (1.0.0)" next to "New (1.1.0)";
+- in the editor's Compare, which shows the draft next to where it started.
+
+The picker and the editor now show the server's reason when a theme is refused, read from the error's `details`.
 
 ### 14.8 Free and paid
 

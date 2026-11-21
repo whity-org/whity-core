@@ -82114,6 +82114,123 @@
                 ]
             }
         },
+        "/api/v1/themes/compare": {
+            "post": {
+                "operationId": "post_api_v1_themes_compare",
+                "summary": "Compare two themes side by side",
+                "tags": [
+                    "theme"
+                ],
+                "description": "The side-by-side diff (TH.25): what the newer theme changes, field by field as a re-import says it (TH.16), and both themes compiled for a preview, every colour in both modes. Nothing is saved.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CompareThemesRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "What changes and both previews",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CompareThemesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "The themes are larger than 64 KB together",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "One of the themes has problems; the error says which",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/themes/convert": {
             "post": {
                 "operationId": "post_api_v1_themes_convert",
@@ -98448,6 +98565,78 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/CodePluginAccess"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "CompareThemesRequest": {
+                "type": "object",
+                "properties": {
+                    "before": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The older theme file, such as the installed version."
+                    },
+                    "after": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The newer theme file, such as a file to import or the editor's draft."
+                    }
+                },
+                "required": [
+                    "before",
+                    "after"
+                ]
+            },
+            "CompareThemesResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "changes": {
+                                "type": "array",
+                                "description": "What the newer theme changes, field by field.",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field": {
+                                            "type": "string"
+                                        },
+                                        "from": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "to": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "required": [
+                                        "field",
+                                        "from",
+                                        "to"
+                                    ]
+                                }
+                            },
+                            "before": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "The older theme compiled: light, dark, vars, fonts, adjustments."
+                            },
+                            "after": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "The newer theme compiled, the same way."
+                            }
+                        },
+                        "required": [
+                            "changes",
+                            "before",
+                            "after"
+                        ]
                     }
                 },
                 "required": [

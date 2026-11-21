@@ -11868,6 +11868,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/themes/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compare two themes side by side
+         * @description The side-by-side diff (TH.25): what the newer theme changes, field by field as a re-import says it (TH.16), and both themes compiled for a preview, every colour in both modes. Nothing is saved.
+         */
+        post: operations["post_api_v1_themes_compare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/themes/convert": {
         parameters: {
             query?: never;
@@ -15304,6 +15324,34 @@ export interface components {
         };
         CodePluginAccessResponse: {
             data: components["schemas"]["CodePluginAccess"];
+        };
+        CompareThemesRequest: {
+            /** @description The older theme file, such as the installed version. */
+            before: {
+                [key: string]: unknown;
+            };
+            /** @description The newer theme file, such as a file to import or the editor's draft. */
+            after: {
+                [key: string]: unknown;
+            };
+        };
+        CompareThemesResponse: {
+            data: {
+                /** @description What the newer theme changes, field by field. */
+                changes: {
+                    field: string;
+                    from: string | null;
+                    to: string | null;
+                }[];
+                /** @description The older theme compiled: light, dark, vars, fonts, adjustments. */
+                before: {
+                    [key: string]: unknown;
+                };
+                /** @description The newer theme compiled, the same way. */
+                after: {
+                    [key: string]: unknown;
+                };
+            };
         };
         Contact: {
             id: number;
@@ -88343,6 +88391,102 @@ export interface operations {
                 };
             };
             /** @description The file is not a valid theme, or uses a whity. id */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_themes_compare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompareThemesRequest"];
+            };
+        };
+        responses: {
+            /** @description What changes and both previews */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompareThemesResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The themes are larger than 64 KB together */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description One of the themes has problems; the error says which */
             422: {
                 headers: {
                     [name: string]: unknown;

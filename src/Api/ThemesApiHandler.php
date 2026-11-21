@@ -41,6 +41,8 @@ use Whity\Core\Theme\ThemeValidator;
  *   GET    /api/v1/themes/{themeId}  settings:read   one theme's file, for the editor
  *   POST   /api/v1/themes/preview    settings:write  compile a draft for the live editor;
  *                                                    nothing is saved (TH.25)
+ *   POST   /api/v1/themes/compare    settings:read   two themes side by side: what changes
+ *                                                    and both previews (TH.25)
  *   DELETE /api/v1/themes/{themeId}  settings:write  remove an imported theme
  *
  * The free tweaks (TH.15: shape, density, font pair) are part of the
@@ -302,19 +304,62 @@ final class ThemesApiHandler
             if ($errors !== []) {
                 return Response::json(['data' => ['valid' => false, 'problems' => array_slice($errors, 0, 20)]], 200);
             }
-            $compiled = ThemeCompiler::compile($theme);
+
+            return Response::json(['data' => ['valid' => true, 'problems' => []] + self::previewOf($theme) + ['roles' => ThemeCompiler::overridableRoles()]], 200);
+        });
+    }
+
+    /**
+     * The side-by-side diff (TH.25, 30-themes 11 and 14.7): two theme files,
+     * what the newer one changes in words (as a re-import says it, TH.16)
+     * and both compiled for a preview. Nothing is saved.
+     */
+    public function compare(Request $request): Response
+    {
+        return $this->inWorkspace(function () use ($request): Response {
+            $body = $request->getBody();
+            if (strlen($body) > 2 * self::MAX_BYTES + 256) {
+                return Response::error('The themes are too large.', 413);
+            }
+            $decoded = json_decode($body, true);
+            $before = is_array($decoded) ? ($decoded['before'] ?? null) : null;
+            $after = is_array($decoded) ? ($decoded['after'] ?? null) : null;
+            foreach (['before' => $before, 'after' => $after] as $which => $theme) {
+                $errors = ThemeValidator::validate($theme);
+                if ($errors !== [] || !is_array($theme)) {
+                    return Response::error('These themes can\'t be compared.', 422, [$which => implode(' ', array_slice($errors, 0, 5))]);
+                }
+            }
+            if (!is_array($before) || !is_array($after)) {
+                return Response::error('These themes can\'t be compared.', 422);
+            }
 
             return Response::json(['data' => [
-                'valid' => true,
-                'problems' => [],
-                'light' => array_merge(ThemeCompiler::base('light'), $compiled['light']),
-                'dark' => array_merge(ThemeCompiler::base('dark'), $compiled['dark']),
-                'vars' => $compiled['vars'] === [] ? new \stdClass() : $compiled['vars'],
-                'fonts' => ['body' => ThemeFonts::name($compiled['fonts']['body']), 'heading' => ThemeFonts::name($compiled['fonts']['heading'])],
-                'adjustments' => $compiled['adjustments'],
-                'roles' => ThemeCompiler::overridableRoles(),
+                'changes' => ThemeTweaks::changes($before, $after),
+                'before' => self::previewOf($before),
+                'after' => self::previewOf($after),
             ]], 200);
-        });
+        }, true);
+    }
+
+    /**
+     * A valid theme compiled for a preview: every colour in both modes, the
+     * values, the fonts by name and what the guard rails change.
+     *
+     * @param array<string, mixed> $theme
+     * @return array<string, mixed>
+     */
+    private static function previewOf(array $theme): array
+    {
+        $compiled = ThemeCompiler::compile($theme);
+
+        return [
+            'light' => array_merge(ThemeCompiler::base('light'), $compiled['light']),
+            'dark' => array_merge(ThemeCompiler::base('dark'), $compiled['dark']),
+            'vars' => $compiled['vars'] === [] ? new \stdClass() : $compiled['vars'],
+            'fonts' => ['body' => ThemeFonts::name($compiled['fonts']['body']), 'heading' => ThemeFonts::name($compiled['fonts']['heading'])],
+            'adjustments' => $compiled['adjustments'],
+        ];
     }
 
     /** @param array<string, mixed> $params */

@@ -2036,6 +2036,10 @@
     "en": "Import a theme into this workspace",
     "ar": "استيراد سمة إلى مساحة العمل"
   },
+  "post_api_themes_compare": {
+    "en": "Compare two themes side by side",
+    "ar": "مقارنة مظهرين جنباً إلى جنب"
+  },
   "post_api_themes_convert": {
     "en": "Turn a theme from another tool into a theme file",
     "ar": "تحويل مظهر من أداة أخرى إلى ملف مظهر"
