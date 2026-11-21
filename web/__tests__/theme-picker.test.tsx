@@ -4,7 +4,7 @@
  * guard rails changed.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ThemePicker, adjustmentText } from '@/components/theme-picker';
+import { ThemePicker, adjustmentText, changeText, overridesValue } from '@/components/theme-picker';
 
 const GET = jest.fn();
 const PATCH = jest.fn();
@@ -80,4 +80,69 @@ it('words every guard-rail change', () => {
     fallback.replace(/\{(\w+)\}/g, (_m, k: string) => vars?.[k] ?? '')) as never;
   expect(adjustmentText('override-dropped', 'background', t)).toContain('The page');
   expect(adjustmentText('theme-missing', 'theme', t)).toContain('removed');
+});
+
+// TH.15 and TH.16: free tweaks, export, and what a newer version changes.
+const t = ((_k: string, fallback: string, vars?: Record<string, string>) =>
+  fallback.replace(/\{(\w+)\}/g, (_m, k: string) => vars?.[k] ?? '')) as never;
+
+it('keeps the colour overrides when the tweaks are saved, and clears an empty value', () => {
+  expect(overridesValue({ light: { background: '#f4f1ea' }, dark: {} }, { shape: 'round', density: null, font: 'cairo' })).toBe(
+    '{"light":{"background":"#f4f1ea"},"shape":"round","font":"cairo"}',
+  );
+  expect(overridesValue({ light: {}, dark: {} }, { shape: null, density: null, font: null })).toBe('');
+});
+
+it('shows the tweaks only to people who can change them', async () => {
+  GET.mockResolvedValue({
+    data: { data: { ...list, tweaks: { shape: 'round', density: null, font: null }, options: { shape: ['whity', 'round'], density: ['standard'], font: [{ id: 'noto', name: 'Noto Sans' }] } } },
+  });
+  const { unmount } = render(<ThemePicker scope="tenant" canWrite />);
+  expect(await screen.findByTestId('theme-tweaks')).toHaveTextContent('Corners');
+  expect(screen.getByTestId('theme-tweak-shape')).toHaveTextContent('Round');
+  expect(screen.getByTestId('theme-tweak-density')).toHaveTextContent('As the theme sets it');
+  unmount();
+  render(<ThemePicker scope="tenant" canWrite={false} />);
+  await screen.findByText('Harbour');
+  expect(screen.queryByTestId('theme-tweaks')).not.toBeInTheDocument();
+});
+
+it('exports the theme in use as a file', async () => {
+  GET.mockImplementation((path: string) =>
+    Promise.resolve(path === '/api/v1/themes/export' ? { data: { data: { theme: { id: 'workspace.whity' }, filename: 'workspace.whity-1.0.0.json' } } } : { data: { data: list } }),
+  );
+  const createObjectURL = jest.fn(() => 'blob:theme');
+  Object.assign(URL, { createObjectURL, revokeObjectURL: jest.fn() });
+  const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  render(<ThemePicker scope="tenant" canWrite={false} />);
+  await screen.findByText('Harbour');
+  fireEvent.click(screen.getByRole('button', { name: 'Export theme' }));
+  await waitFor(() => expect(click).toHaveBeenCalled());
+  expect(GET).toHaveBeenCalledWith('/api/v1/themes/export');
+  click.mockRestore();
+});
+
+it('says what a newer version changes before replacing it', async () => {
+  POST.mockImplementation((_path: string, init: { params?: { query?: { check?: string } } }) =>
+    Promise.resolve(
+      init.params?.query?.check === '1'
+        ? { data: { data: { id: 'acme.sea', version: '1.1.0', installed_version: '1.0.0', changes: [{ field: 'shape.preset', from: 'soft', to: 'round' }] } } }
+        : { data: { data: { id: 'acme.sea', version: '1.1.0' } }, error: undefined },
+    ),
+  );
+  render(<ThemePicker scope="tenant" canWrite />);
+  await screen.findByText('Sea');
+  const file = new File(['{"id":"acme.sea"}'], 'sea.json', { type: 'application/json' });
+  Object.defineProperty(file, 'text', { value: () => Promise.resolve('{"id":"acme.sea"}') });
+  fireEvent.change(screen.getByLabelText('Add a theme file', { selector: 'input' }), { target: { files: [file] } });
+  const dialog = await screen.findByTestId('theme-import-changes');
+  expect(dialog).toHaveTextContent('Update Sea from 1.0.0 to 1.1.0?');
+  expect(dialog).toHaveTextContent('Corners: soft → round');
+  expect(POST).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole('button', { name: 'Update' }));
+  await waitFor(() => expect(POST).toHaveBeenCalledTimes(2));
+});
+
+it('words a change field by field', () => {
+  expect(changeText({ field: 'density', from: null, to: 'compact' }, t)).toBe('Spacing: none → compact');
 });

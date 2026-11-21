@@ -76279,7 +76279,21 @@
                 "tags": [
                     "theme"
                 ],
-                "description": "A theme file in the format of schemas/theme/v1.json: choices, never CSS. Importing the same id again replaces it. It is not applied until branding_theme is set to its id.",
+                "description": "A theme file in the format of schemas/theme/v1.json: choices, never CSS. Importing the same id again replaces it. It is not applied until branding_theme is set to its id. With check=1 nothing is saved: the answer says which version is installed and what the file changes (TH.16).",
+                "parameters": [
+                    {
+                        "name": "check",
+                        "in": "query",
+                        "required": false,
+                        "description": "1 to only check the file and list what it changes",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "1"
+                            ]
+                        }
+                    }
+                ],
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -76291,6 +76305,16 @@
                     }
                 },
                 "responses": {
+                    "200": {
+                        "description": "With check=1: the file can be used, and what it changes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ImportThemeResponse"
+                                }
+                            }
+                        }
+                    },
                     "201": {
                         "description": "The theme was imported",
                         "content": {
@@ -76363,6 +76387,83 @@
                     },
                     "422": {
                         "description": "The file is not a valid theme, or uses a whity. id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/themes/export": {
+            "get": {
+                "operationId": "get_api_v1_themes_export",
+                "summary": "Export the theme in use as a theme file",
+                "tags": [
+                    "theme"
+                ],
+                "description": "Free (TH.16): the theme this workspace uses, with its main colour, colour overrides, shape, density and font pair folded in, so importing it elsewhere gives the same look. A copy of one of Whity's own themes gets a workspace. id.",
+                "responses": {
+                    "200": {
+                        "description": "The theme file",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemeExportResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -102496,6 +102597,36 @@
                             },
                             "version": {
                                 "type": "string"
+                            },
+                            "installed_version": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "With ?check=1: the version already installed under this id, if any."
+                            },
+                            "changes": {
+                                "type": "array",
+                                "description": "With ?check=1: what this file changes in the installed version, field by field.",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field": {
+                                            "type": "string"
+                                        },
+                                        "from": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "to": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "required": [
+                                        "field",
+                                        "from",
+                                        "to"
+                                    ]
+                                }
                             }
                         },
                         "required": [
@@ -119133,6 +119264,31 @@
                     }
                 }
             },
+            "ThemeExportResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "theme": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "A theme file (schemas/theme/v1.json) with the main colour, colour overrides and tweaks folded in."
+                            },
+                            "filename": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "theme",
+                            "filename"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "ThemeListResponse": {
                 "type": "object",
                 "properties": {
@@ -119222,6 +119378,73 @@
                                         "preview"
                                     ]
                                 }
+                            },
+                            "tweaks": {
+                                "type": "object",
+                                "properties": {
+                                    "shape": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "density": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "font": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                },
+                                "required": [
+                                    "shape",
+                                    "density",
+                                    "font"
+                                ]
+                            },
+                            "options": {
+                                "type": "object",
+                                "properties": {
+                                    "shape": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "density": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "font": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string"
+                                                },
+                                                "name": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "id",
+                                                "name"
+                                            ]
+                                        }
+                                    }
+                                },
+                                "required": [
+                                    "shape",
+                                    "density",
+                                    "font"
+                                ]
+                            },
+                            "colour_overrides": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "The workspace's colour overrides, light and dark, kept when the tweaks are saved."
                             }
                         },
                         "required": [

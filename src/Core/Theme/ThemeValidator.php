@@ -123,15 +123,26 @@ final class ThemeValidator
     }
 
     /**
-     * Checks a workspace's colour overrides on their own (the
-     * `branding_theme_overrides` setting): `{light: {role: #hex}, dark: {...}}`.
+     * Checks a workspace's adjustments on their own (the
+     * `branding_theme_overrides` setting): colour overrides
+     * `{light: {role: #hex}, dark: {...}}`, and since TH.15 the free tweaks
+     * `shape`, `density` and `font`, each from its closed list (ThemeTweaks).
      *
      * @return list<string>
      */
     public static function validateOverrides(mixed $overrides): array
     {
         $errors = [];
-        self::overrides($overrides, 'overrides', $errors);
+        if (!self::isObject($overrides)) {
+            self::overrides($overrides, 'overrides', $errors);
+
+            return $errors;
+        }
+        self::onlyKeys($overrides, ['light', 'dark', ...ThemeTweaks::KEYS], 'overrides', $errors);
+        self::oneOf($overrides, 'shape', self::SHAPES, 'overrides.shape', $errors);
+        self::oneOf($overrides, 'density', self::DENSITIES, 'overrides.density', $errors);
+        self::oneOf($overrides, 'font', ThemeFonts::ids(), 'overrides.font', $errors);
+        self::overrides(array_intersect_key($overrides, ['light' => true, 'dark' => true]), 'overrides', $errors);
 
         return $errors;
     }

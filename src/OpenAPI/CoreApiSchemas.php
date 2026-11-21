@@ -4544,12 +4544,20 @@ final class CoreApiSchemas
                 'tags' => ['theme'],
                 'responses' => [200 => self::jsonResponse('The themes and which one is in use', 'ThemeListResponse')] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/themes/export', 'settings:read', [
+                'summary' => 'Export the theme in use as a theme file',
+                'description' => 'Free (TH.16): the theme this workspace uses, with its main colour, colour overrides, shape, density and font pair folded in, so importing it elsewhere gives the same look. A copy of one of Whity\'s own themes gets a workspace. id.',
+                'tags' => ['theme'],
+                'responses' => [200 => self::jsonResponse('The theme file', 'ThemeExportResponse')] + self::authErrors(),
+            ]),
             self::permissionRoute('POST', '/api/themes', 'settings:write', [
                 'summary' => 'Import a theme file into this workspace',
-                'description' => 'A theme file in the format of schemas/theme/v1.json: choices, never CSS. Importing the same id again replaces it. It is not applied until branding_theme is set to its id.',
+                'description' => 'A theme file in the format of schemas/theme/v1.json: choices, never CSS. Importing the same id again replaces it. It is not applied until branding_theme is set to its id. With check=1 nothing is saved: the answer says which version is installed and what the file changes (TH.16).',
                 'tags' => ['theme'],
+                'parameters' => [['name' => 'check', 'in' => 'query', 'required' => false, 'description' => '1 to only check the file and list what it changes', 'schema' => ['type' => 'string', 'enum' => ['1']]]],
                 'request' => 'ImportThemeRequest',
                 'responses' => [
+                    200 => self::jsonResponse('With check=1: the file can be used, and what it changes', 'ImportThemeResponse'),
                     201 => self::jsonResponse('The theme was imported', 'ImportThemeResponse'),
                     413 => self::errorResponse('The file is larger than 32 KB'),
                     422 => self::errorResponse('The file is not a valid theme, or uses a whity. id'),
@@ -12144,7 +12152,24 @@ final class CoreApiSchemas
                     'preview' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Colours for light and dark, and the corner radii.'],
                     'adjustments' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']], 'description' => 'What the guard rails changed: mode, role and change.'],
                 ], ['id', 'version', 'name', 'source', 'current', 'preview'])],
+                // TH.15: the free tweaks on top of the theme, null where the workspace follows it.
+                'tweaks' => self::object([
+                    'shape' => self::str(true),
+                    'density' => self::str(true),
+                    'font' => self::str(true),
+                ], ['shape', 'density', 'font']),
+                'options' => self::object([
+                    'shape' => ['type' => 'array', 'items' => self::str()],
+                    'density' => ['type' => 'array', 'items' => self::str()],
+                    'font' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'name' => self::str()], ['id', 'name'])],
+                ], ['shape', 'density', 'font']),
+                'colour_overrides' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The workspace\'s colour overrides, light and dark, kept when the tweaks are saved.'],
             ], ['current', 'themes'])),
+            // TH.16: the theme in use as a theme file.
+            'ThemeExportResponse' => self::dataEnvelope(self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'A theme file (schemas/theme/v1.json) with the main colour, colour overrides and tweaks folded in.'],
+                'filename' => self::str(),
+            ], ['theme', 'filename'])),
             'ImportThemeRequest' => [
                 'type' => 'object',
                 'description' => 'A theme file (schemas/theme/v1.json).',
@@ -12167,7 +12192,16 @@ final class CoreApiSchemas
                     'documents' => ['type' => 'object', 'description' => 'Defaults for the workspace\'s document theme: accentUse, titleFace, largePrint.'],
                 ],
             ],
-            'ImportThemeResponse' => self::dataEnvelope(self::object(['id' => self::str(), 'version' => self::str()], ['id', 'version'])),
+            'ImportThemeResponse' => self::dataEnvelope(self::object([
+                'id' => self::str(),
+                'version' => self::str(),
+                'installed_version' => self::str(true) + ['description' => 'With ?check=1: the version already installed under this id, if any.'],
+                'changes' => ['type' => 'array', 'description' => 'With ?check=1: what this file changes in the installed version, field by field.', 'items' => self::object([
+                    'field' => self::str(),
+                    'from' => self::str(true),
+                    'to' => self::str(true),
+                ], ['field', 'from', 'to'])],
+            ], ['id', 'version'])),
             'DeleteThemeResponse' => self::dataEnvelope(self::object(['deleted' => self::bool()], ['deleted'])),
 
             // ── Forgotten-password + 2FA-recovery (WC-password-reset-2fa-recovery) ──

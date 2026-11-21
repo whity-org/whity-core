@@ -6349,6 +6349,7 @@ $themesHandler = new \Whity\Api\ThemesApiHandler(
     static fn (): array => $pluginLoader->getPluginThemes(),
 );
 $router->register('GET',    '/api/themes',            [$themesHandler, 'list'],   null, null, CorePermissions::SETTINGS_READ);
+$router->register('GET',    '/api/themes/export',     [$themesHandler, 'export'], null, null, CorePermissions::SETTINGS_READ);
 $router->register('POST',   '/api/themes',            [$themesHandler, 'import'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('DELETE', '/api/themes/{themeId}',  [$themesHandler, 'delete'], null, null, CorePermissions::SETTINGS_WRITE);
 

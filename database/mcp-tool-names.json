@@ -1048,6 +1048,10 @@
     "en": "List the themes this workspace can choose",
     "ar": "عرض السمات المتاحة لمساحة العمل"
   },
+  "get_api_themes_export": {
+    "en": "Export the theme in use as a theme file",
+    "ar": "تصدير السمة المستخدمة كملف سمة"
+  },
   "get_api_time_window_types": {
     "en": "List the kinds of period in your workspace",
     "ar": "عرض أنواع الفترات"
