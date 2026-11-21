@@ -11161,6 +11161,7 @@ final class CoreApiSchemas
                 'staff_profile_ids' => ['type' => 'array', 'items' => self::int()],
                 'room_id' => self::int(true) + ['description' => 'The room it needs; booked with the person.'],
                 'needs_approval' => self::bool() + ['description' => 'A customer\'s booking is a request staff accept first.'],
+                'item_id' => self::int(true) + ['description' => 'The inventory service item that holds its name and price (WHIT-1334).'],
             ], ['id', 'name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_minor', 'currency', 'bookable_online', 'active', 'sort_order', 'staff_profile_ids']),
             'CalendarServiceRequest' => self::object([
                 'name' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Text, or a `{ar, en}` map.'],
@@ -20084,6 +20085,14 @@ final class CoreApiSchemas
                 'tags' => ['calendar'],
                 'responses' => [
                     200 => self::jsonResponse('Services', self::dataEnvelope(['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name'])])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/price-list', 'calendar:read', [
+                'summary' => 'The price list as a page to print',
+                'description' => 'A whole HTML page: every active service in English and Arabic, how long it takes and its price, from its inventory service item (WHIT-1334).',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => ['description' => 'The page', 'content' => ['text/html' => ['schema' => self::str()]]],
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/calendar/walkins', 'calendar:front_desk', [

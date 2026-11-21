@@ -11259,6 +11259,83 @@
                 ]
             }
         },
+        "/api/v1/calendar/price-list": {
+            "get": {
+                "operationId": "get_api_v1_calendar_price_list",
+                "summary": "The price list as a page to print",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "A whole HTML page: every active service in English and Arabic, how long it takes and its price, from its inventory service item (WHIT-1334).",
+                "responses": {
+                    "200": {
+                        "description": "The page",
+                        "content": {
+                            "text/html": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/rooms": {
             "get": {
                 "operationId": "get_api_v1_calendar_rooms",
@@ -95802,6 +95879,11 @@
                     "needs_approval": {
                         "type": "boolean",
                         "description": "A customer's booking is a request staff accept first."
+                    },
+                    "item_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The inventory service item that holds its name and price (WHIT-1334)."
                     }
                 },
                 "required": [
