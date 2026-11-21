@@ -1,6 +1,6 @@
 # Themes: the Whity UI theme standard
 
-Status: **decided by the owner on 19 Nov 2026** (WHIT-1225). Register: "Themes (version 3.6)", TH.1–TH.14. Every recommendation in section 13 was accepted except TH.6, where the owner chose **headings and body**: a theme may set the whole font pair on product screens.
+Status: **decided by the owner on 19 Nov 2026** (WHIT-1225), expansion (section 14) on 21 Nov 2026. Register: "Themes (version 3.6)", TH.1–TH.24. Every recommendation in section 13 was accepted except TH.6, where the owner chose **headings and body**: a theme may set the whole font pair on product screens.
 
 Owner's direction, 19 Nov 2026: themes are **tokens only**, in the spirit of Material 3 Expressive and the shadcn/ui theme customizer. **Applying a theme is free** in core, whether it comes from Whity, a plugin or the store. **The visual theme editor is paid** and is part of **Whity Studio**.
 
@@ -357,15 +357,15 @@ Studio, store theme listings and the SDK interface follow as their own pieces of
 
 TH.1–TH.3, TH.5 and TH.8 were decided as written in this spec.
 
-## 14. Expansion (proposed, 21 November 2026)
+## 14. Expansion (decided 21 November 2026)
 
-**Status: proposed, not approved.** Nothing here is built. The decisions in section 13 stand:
+**Status: decided by the owner on 21 Nov 2026** (register TH.15–TH.24): every question in 14.9 was answered as recommended. Building follows 14.9 question 10, one PR per step. The decisions in section 13 stand:
 - tokens only;
 - applying any theme is free;
 - the editor is part of paid Whity Studio;
 - plugins can ship themes.
 
-Every addition below stays a value in the theme file (section 4), checked by the guard rails (section 6), so a theme still can't add CSS, URLs or code. The questions for the owner are in 14.9; the rows will be TH.15 onward.
+Every addition below stays a value in the theme file (section 4), checked by the guard rails (section 6), so a theme still can't add CSS, URLs or code. The questions and the owner's answers are in 14.9.
 
 ### 14.1 More shape and the corner rules (builds on the §3.3 corner rules in #2340)
 
@@ -474,7 +474,7 @@ Whity's own five (Whity, Harbour, Ink, Bloom, Desert) stay in core for every wor
 | Live editor, seed generator, logo colours, presets to start from, preview across key screens, contrast report, versions, publishing (11) | no | yes |
 | Export and import as in 14.7 | the free rows | all |
 
-### 14.9 Questions for the owner
+### 14.9 Questions for the owner (answered 21 Nov 2026: all as recommended, TH.15–TH.24)
 
 1. **Free tweaks.** Can a free workspace change the shape preset, density and font pair on top of a theme, as it changes the main colour today? Recommended: **yes**. They're single choices from closed lists, cheap to support, and they answer most "make it ours" requests. Studio keeps everything that needs an editor.
 2. **New shape presets.** Add Pebble and Cut (14.1)? Recommended: **both**, with Cut falling back to rounded corners where `corner-shape` isn't supported.
