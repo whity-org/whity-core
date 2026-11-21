@@ -39,7 +39,7 @@ final class LinkCalendarServicesToItems
         $items = new ItemService($inventory, $workspace, new UnitCatalog($inventory, $workspace), static fn (int $tenantId): string => 'USD');
         $links = new ServiceItems($pdo, new ServiceRepository($pdo), $items);
 
-        // @tenant-guard-ignore: the migration links the services of every workspace once
+        // Every workspace, once: a migration runs for the whole installation.
         $tenants = $pdo->query('SELECT DISTINCT tenant_id FROM calendar_services WHERE item_id IS NULL ORDER BY tenant_id');
         foreach ($tenants === false ? [] : $tenants->fetchAll(\PDO::FETCH_COLUMN) as $tenantId) {
             $links->linkAll((int) $tenantId);
