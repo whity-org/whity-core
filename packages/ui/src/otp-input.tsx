@@ -110,7 +110,7 @@ function OtpInput({
       <span id={`${baseId}-label`} className="block text-sm font-medium text-foreground">
         {label}
       </span>
-      <div dir="ltr" role="group" aria-labelledby={`${baseId}-label`} aria-describedby={describedBy} className="flex items-center justify-center gap-2">
+      <div dir="ltr" role="group" data-slot="otp-input" aria-labelledby={`${baseId}-label`} aria-describedby={describedBy} className="flex items-center justify-center gap-2">
         {Array.from({ length }, (_, index) => (
           <React.Fragment key={index}>
             {index === half && (
