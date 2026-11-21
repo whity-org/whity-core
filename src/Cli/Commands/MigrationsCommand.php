@@ -354,6 +354,10 @@ class MigrationsCommand implements CommandHelp, CliCommand
             }
             $current = null;
 
+            // SDK 1.152 (#1686): each plugin's installed or upgraded callback,
+            // once per version, now that its migrations have run.
+            $this->runInstallCallbacks();
+
             echo "\n";
             if ($count === 0 && $baselined === 0) {
                 echo "\033[0;32m✓ All migrations already executed\033[0m\n";
@@ -381,6 +385,24 @@ class MigrationsCommand implements CommandHelp, CliCommand
             }
             $this->reportFailure($e, $current, $currentStart, $count, $runStart);
             return 1;
+        }
+    }
+
+    /** Tell each loaded plugin it was installed or upgraded; a failure is printed, not fatal. */
+    private function runInstallCallbacks(): void
+    {
+        $callbacks = new \Whity\Core\Plugin\PluginInstallCallbacks($this->db->getPdo());
+        foreach ($this->pluginLoader()->getPlugins() as $plugin) {
+            try {
+                $outcome = $callbacks->run($plugin);
+            } catch (\Throwable) {
+                $outcome = \Whity\Core\Plugin\PluginInstallCallbacks::FAILED;
+            }
+            if ($outcome === \Whity\Core\Plugin\PluginInstallCallbacks::FAILED) {
+                echo "  \033[0;33m! {$plugin->getName()}: its install or upgrade callback failed; it runs again next time\033[0m\n";
+            } elseif ($outcome !== \Whity\Core\Plugin\PluginInstallCallbacks::UNCHANGED) {
+                echo "  {$plugin->getName()} {$plugin->getVersion()}: {$outcome}\n";
+            }
         }
     }
 

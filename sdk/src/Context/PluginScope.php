@@ -10,6 +10,8 @@ use Whity\Sdk\Documents\PluginDocumentStore;
 use Whity\Sdk\Http\Outbound\AddressPolicy;
 use Whity\Sdk\Http\Outbound\HttpClient;
 use Whity\Sdk\Jobs\JobQueue;
+use Whity\Sdk\Log\ErrorReporter;
+use Whity\Sdk\Log\PluginLog;
 use Whity\Sdk\Notification\Notifier;
 use Whity\Sdk\Secrets\WorkspaceSecrets;
 use Whity\Sdk\Settings\PluginSettingsStore;
@@ -88,4 +90,16 @@ interface PluginScope
      * {@see \Whity\Sdk\Contribute\PluginCapabilitiesInterface}.
      */
     public function database(): WorkspaceTables;
+
+    /**
+     * This plugin's log, scrubbed like core's error tracker and tagged with the
+     * plugin and workspace (SDK 1.152, #1686). Needs no declaration.
+     */
+    public function log(): PluginLog;
+
+    /**
+     * Report a caught error to the deployment's error tracker, scrubbed and
+     * tagged (SDK 1.152, #1686). Needs no declaration.
+     */
+    public function errors(): ErrorReporter;
 }
