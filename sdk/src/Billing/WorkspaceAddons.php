@@ -12,7 +12,7 @@ namespace Whity\Sdk\Billing;
  * A billing plugin (Whity Pay) calls it when a workspace's subscription to an
  * add-on starts, renews or ends. An add-on's entitlements stack on the tier's,
  * so a paid plugin's `<plugin>.access` comes from its add-on plan, e.g.
- * `plugin.front-office.monthly`.
+ * `plugin.jofotara.monthly`.
  *
  * Only plans marked as add-ons can be granted: a tier can never be replaced
  * through here. Revoking starts the plugin's 7 days of grace in that
@@ -21,7 +21,7 @@ namespace Whity\Sdk\Billing;
 interface WorkspaceAddons
 {
     /**
-     * @param string $planKey An add-on plan's key, e.g. `plugin.front-office.monthly`.
+     * @param string $planKey An add-on plan's key, e.g. `plugin.jofotara.monthly`.
      * @return bool false when no add-on plan has that key
      */
     public function grant(int $tenantId, string $planKey, int $quantity = 1): bool;

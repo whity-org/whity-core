@@ -13,8 +13,8 @@ use Whity\Core\Settings\SettingsService;
 /**
  * Sends one email as a workspace (EM.1): in its brand, in its language, through
  * the {@see EmailLayout}. The one place that knows how a workspace's email looks,
- * so every core sender and every plugin that sends through core (Front Office's
- * invoices, Whity Pay's receipts) gets the same card, the same white-label rule
+ * so every core sender (the trading emails, TR.2) and every plugin that sends
+ * through core (Whity Pay's receipts) gets the same card, the same white-label rule
  * and the same Arabic layout without drawing HTML of its own.
  *
  * The language is the workspace's `locale` setting: Arabic when it starts with

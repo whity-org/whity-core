@@ -25,7 +25,8 @@ use Whity\Core\Money\Currency;
  * words and the running balance are typed in, and there is no JoFotara stamp or
  * reference. Nothing here makes a document compliant with JoFotara; section 16's
  * "Before shipping" review is still open. The invoice here is an Invoice: the
- * Tax invoice is what Front Office adds (owner, 2 Nov 2026).
+ * Tax invoice's stamp, reference and QR come from the JoFotara integration
+ * plugin through core's e-invoicing point (AC.22).
  *
  * Amounts are written in the workspace's currency when the starter is seeded
  * (CU.1–CU.3): the figures, the "Total USD" labels and the amount in words. The
