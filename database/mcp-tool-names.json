@@ -2423,5 +2423,9 @@
   "post_api_calendar_walkins_id_left": {
     "en": "Mark that a walk-in left",
     "ar": "تسجيل مغادرة زبون بدون حجز"
+  },
+  "get_api_calendar_price_list": {
+    "en": "Open the price list to print",
+    "ar": "فتح قائمة الأسعار للطباعة"
   }
 }

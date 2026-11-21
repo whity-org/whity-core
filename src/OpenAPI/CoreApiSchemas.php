@@ -19929,6 +19929,14 @@ final class CoreApiSchemas
                     422 => self::errorResponse('Not a confirmed booking'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/calendar/price-list', 'calendar:read', [
+                'summary' => 'The price list as a page to print',
+                'description' => 'A whole HTML page: every active service in English and Arabic, how long it takes and its price, from its inventory service item (WHIT-1334).',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => ['description' => 'The page', 'content' => ['text/html' => ['schema' => self::str()]]],
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/calendar/walkins', 'calendar:front_desk', [
                 'summary' => 'Who is waiting at the front desk, first come first served',
                 'description' => 'Needs the walk-ins switch of the workspace (WHIT-1334); off answers 409 with reason walkins_off.',
