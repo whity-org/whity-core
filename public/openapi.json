@@ -119426,6 +119426,12 @@
                                                 },
                                                 "name": {
                                                     "type": "string"
+                                                },
+                                                "stack": {
+                                                    "type": "string"
+                                                },
+                                                "heading_stack": {
+                                                    "type": "string"
                                                 }
                                             },
                                             "required": [

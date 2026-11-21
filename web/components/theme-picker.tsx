@@ -57,13 +57,28 @@ export interface ThemeListItem {
 }
 
 export type TweakKey = 'shape' | 'density' | 'font';
+
+export interface FontOption {
+  id: string;
+  name: string;
+  /** The pair's CSS stacks (TH.20), checked before they reach a style attribute. */
+  stack?: string;
+  heading_stack?: string;
+}
+
+const FONT_STACK = /^var\(--font-[a-z0-9-]+\)(?:, var\(--font-[a-z0-9-]+\))*, ui-sans-serif, system-ui, sans-serif$/;
+
+/** A font stack for a style attribute, only when it has the one shape the engine writes. */
+export function fontStack(value: string | undefined): string | undefined {
+  return value !== undefined && FONT_STACK.test(value) ? value : undefined;
+}
 export type Tweaks = Record<TweakKey, string | null>;
 
 interface ThemeList {
   current: string;
   themes: ThemeListItem[];
   tweaks?: Tweaks;
-  options?: { shape: string[]; density: string[]; font: { id: string; name: string }[] };
+  options?: { shape: string[]; density: string[]; font: FontOption[] };
   colour_overrides?: { light?: Record<string, string>; dark?: Record<string, string> };
 }
 
@@ -95,7 +110,7 @@ export function overridesValue(colour: ThemeList['colour_overrides'], tweaks: Tw
 }
 
 /** A tweak's option in plain words. */
-function optionName(key: TweakKey, value: string, t: TranslateFn, fonts: { id: string; name: string }[]): string {
+function optionName(key: TweakKey, value: string, t: TranslateFn, fonts: FontOption[]): string {
   if (key === 'font') return fonts.find((f) => f.id === value)?.name ?? value;
   if (key === 'shape') {
     const names: Record<string, string> = {
@@ -517,7 +532,9 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
                         <SelectItem value="theme">{t('theme.tweak.fromTheme', 'As the theme sets it')}</SelectItem>
                         {values.map((value) => (
                           <SelectItem key={value} value={value}>
-                            {optionName(key, value, t, options.font)}
+                            <span style={key === 'font' ? { fontFamily: fontStack(options.font.find((f) => f.id === value)?.stack) } : undefined}>
+                              {optionName(key, value, t, options.font)}
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -526,6 +543,29 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
                 );
               })}
             </div>
+            {(() => {
+              // TH.20: the chosen pair, one English and one Arabic sentence at title and body size.
+              const font = options.font.find((f) => f.id === tweaks.font);
+              const body = fontStack(font?.stack);
+              if (!font || !body) return null;
+              const heading = fontStack(font.heading_stack) ?? body;
+              return (
+                <div className="grid gap-2 rounded-control bg-muted p-3" data-testid="theme-font-preview">
+                  <p className="text-lg font-semibold" style={{ fontFamily: heading }} lang="en" dir="ltr">
+                    Example Bakery opens at 8:00 on Sunday.
+                  </p>
+                  <p className="text-sm" style={{ fontFamily: body }} lang="en" dir="ltr">
+                    Book a table, order a cake, or ask Ahmad Khalil at the front desk.
+                  </p>
+                  <p className="text-lg font-semibold" style={{ fontFamily: heading }} lang="ar" dir="rtl">
+                    يفتح مخبز المثال الساعة 8:00 يوم الأحد.
+                  </p>
+                  <p className="text-sm" style={{ fontFamily: body }} lang="ar" dir="rtl">
+                    احجز طاولة، أو اطلب كعكة، أو اسأل أحمد خليل في مكتب الاستقبال.
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         )}
         {current && (current.adjustments ?? []).length > 0 && (
