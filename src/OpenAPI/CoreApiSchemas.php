@@ -4599,6 +4599,27 @@ final class CoreApiSchemas
                     422 => self::errorResponse('Nothing usable was found; the error says what to paste'),
                 ] + self::authErrors(),
             ]),
+            // TH.25: the live editor.
+            self::permissionRoute('GET', '/api/themes/{themeId}', 'settings:read', [
+                'summary' => 'Get one theme\'s file, for the editor',
+                'description' => 'The theme file as installed. editable is true for the workspace\'s own themes (imported or made in the editor); any other is changed as a copy.',
+                'tags' => ['theme'],
+                'parameters' => [['name' => 'themeId', 'in' => 'path', 'required' => true, 'description' => 'The theme\'s id, like acme.harbour', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('The theme file', 'ThemeFileResponse'),
+                    404 => self::errorResponse('This workspace has no theme with that id'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes/preview', 'settings:write', [
+                'summary' => 'Preview a draft theme in the live editor',
+                'description' => 'Free (TH.25): compiles a draft theme file as it would be used, with every colour for light and dark, the type, shape, density and motion values, what the guard rails change, and the roles a colour may be set by hand for. A draft with problems answers valid=false and lists them all. Nothing is saved; saving is POST /api/themes with {theme, source: "editor"}.',
+                'tags' => ['theme'],
+                'request' => 'ImportThemeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The compiled draft, or its problems', 'ThemePreviewResponse'),
+                    413 => self::errorResponse('The theme is larger than 32 KB'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('DELETE', '/api/themes/{themeId}', 'settings:write', [
                 'summary' => 'Remove a theme this workspace imported',
                 'description' => 'If the workspace was using it, it goes back to the installation\'s theme. Whity\'s own themes cannot be removed.',
@@ -11064,6 +11085,7 @@ final class CoreApiSchemas
                 'currency' => self::str(),
                 'instant_booking' => self::bool() + ['description' => 'Off: every booking from the booking page is a request.'],
                 'multi_service_booking' => self::bool() + ['description' => 'On: one booking may hold several services back to back (WHIT-1173). Default off.'],
+                'walkins_enabled' => self::bool() + ['description' => 'On: the walk-in queue at the front desk (WHIT-1334). Default off.'],
             ], ['time_zone', 'booking_page_enabled', 'min_notice_minutes', 'max_advance_days', 'slot_step_minutes', 'reminder_hours_before', 'payment_hold_minutes', 'week_start', 'weekend_days', 'currency']),
             'CalendarSettingsRequest' => self::object([
                 'booking_page_enabled' => self::bool() + ['description' => 'Turn the public booking page on or off.'],
@@ -11076,7 +11098,79 @@ final class CoreApiSchemas
                 'weekend_days' => ['type' => 'array', 'items' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']], 'description' => 'Days shown as the weekend.'],
                 'instant_booking' => self::bool() + ['description' => 'Off turns every booking from the booking page into a request staff accept.'],
                 'multi_service_booking' => self::bool() + ['description' => 'On lets one booking hold several services back to back, on the booking page and at the desk (WHIT-1173). Default off.'],
+                'walkins_enabled' => self::bool() + ['description' => 'Turn the walk-in queue at the front desk on or off (WHIT-1334). Default off.'],
             ], []),
+            'CalendarWalkin' => self::object([
+                'id' => self::int(),
+                'position' => self::int() + ['description' => 'Place in the queue, 1 is next (waiting list only).'],
+                'name' => self::str(),
+                'phone' => self::str(),
+                'service_id' => self::int(),
+                'service' => self::str() + ['description' => 'The service name in the caller language (waiting list only).'],
+                'preferred_profile_id' => self::int(true),
+                'preferred' => self::str() + ['description' => 'Who they asked for, by name (waiting list only).'],
+                'note' => self::str(),
+                'status' => self::str() + ['enum' => ['waiting', 'assigning', 'served', 'left']],
+                'added_at' => self::str(),
+                'waited_minutes' => self::int(),
+                'assigned_profile_id' => self::int(true),
+                'booking_id' => self::int(true),
+                'contact_id' => self::int(true),
+            ], ['id', 'name', 'service_id']),
+            'CalendarWalkinRequest' => self::object([
+                'name' => self::str() + ['maxLength' => 200, 'description' => 'Their name, as they gave it.'],
+                'phone' => self::str() + ['description' => 'Optional; used to find or add the customer in Contacts when served.'],
+                'service_id' => self::int() + ['description' => 'The service they want, from GET /api/calendar/walkins/services.'],
+                'profile_id' => self::int() + ['description' => 'Who they asked for; empty for whoever is free.'],
+                'note' => self::str() + ['maxLength' => 500, 'description' => 'Anything the desk should know.'],
+            ], ['name', 'service_id']),
+            'CalendarWalkinAssignRequest' => self::object([
+                'walkin_id' => self::int() + ['description' => 'The walk-in to serve, from GET /api/calendar/walkins.'],
+                'profile_id' => self::int() + ['description' => 'Who serves them, from GET /api/calendar/walkins/staff.'],
+            ], ['walkin_id', 'profile_id']),
+            'CalendarCommissionRate' => self::object([
+                'id' => self::int(),
+                'profile_id' => self::int(),
+                'person' => self::str(),
+                'service_id' => self::int(true) + ['description' => 'Null: the rate for every service without one of its own.'],
+                'service' => self::str(),
+                'percent' => self::str() + ['description' => 'As read, such as 12.5%.'],
+                'percent_bp' => self::int() + ['description' => 'Basis points: 1250 is 12.5%.'],
+            ], ['id', 'profile_id', 'percent_bp']),
+            'CalendarCommissionRateRequest' => self::object([
+                'profile_id' => self::int() + ['description' => 'The member of staff, from GET /api/calendar/commission/staff.'],
+                'service_id' => self::int() + ['description' => 'Empty for every service.'],
+                'percent' => self::str() + ['description' => 'A number from 0 to 100, such as 30 or 12.5.'],
+            ], ['profile_id', 'percent']),
+            'CalendarCommissionCloseRequest' => self::object([
+                'period' => self::str() + ['description' => 'A period that has ended, such as last_month.'],
+            ], ['period']),
+            'CalendarCommissionReportRow' => self::object([
+                'profile_id' => self::int(),
+                'person' => self::str(),
+                'currency' => self::str(),
+                'bookings' => self::int(),
+                'sales_minor' => self::int(),
+                'commission_minor' => self::int(),
+                'rated' => self::bool() + ['description' => 'False when the person has no rate.'],
+                'sales' => self::str(),
+                'commission' => self::str(),
+            ], ['profile_id', 'currency', 'bookings', 'sales_minor', 'commission_minor']),
+            'CalendarCommissionClose' => self::object([
+                'id' => self::int(),
+                'from' => self::str() + ['description' => 'First day, in the workspace time zone.'],
+                'to' => self::str() + ['description' => 'Last day, included.'],
+                'period' => self::str(),
+                'closed_at' => self::str(),
+                'closed_by_profile_id' => self::int(true),
+                'expense_ref' => self::str(true) + ['description' => 'What the books called it; null until booked.'],
+                'books' => self::str(),
+                'total' => self::str(),
+                'lines' => ['type' => 'array', 'items' => self::object([
+                    'profile_id' => self::int(), 'person' => self::str(), 'currency' => self::str(), 'bookings' => self::int(),
+                    'sales_minor' => self::int(), 'commission_minor' => self::int(),
+                ], ['profile_id', 'currency', 'commission_minor'])],
+            ], ['id', 'from', 'to', 'lines']),
             'CalendarStaff' => self::object([
                 'profile_id' => self::int(),
                 'display_name' => self::str(),
@@ -11216,7 +11310,7 @@ final class CoreApiSchemas
                 'blocks_until' => self::str() + ['description' => 'End including the buffer after.'],
                 'status' => self::str() + ['enum' => ['pending_payment', 'requested', 'confirmed', 'cancelled', 'expired'], 'description' => '`requested`: the customer asked for this time and staff accept it first.'],
                 'hold_expires_at' => self::str(true),
-                'source' => self::str() + ['enum' => ['staff', 'public', 'agent']],
+                'source' => self::str() + ['enum' => ['staff', 'public', 'agent', 'walkin']],
                 'price_minor' => self::int(true),
                 'currency' => self::str(),
                 'cancelled_by' => self::str(true),
@@ -11690,7 +11784,8 @@ final class CoreApiSchemas
                     'type' => self::str(),
                     'label' => self::object(['en' => self::str(), 'ar' => self::str()], ['en', 'ar']),
                     'plugin' => self::str(),
-                ], ['type', 'label', 'plugin'])],
+                    'email_default' => self::bool(),
+                ], ['type', 'label', 'plugin', 'email_default'])],
             ], ['data', 'transactional_prefixes', 'plugin_types']),
             'PushDevice' => self::object([
                 'id' => self::int(),
@@ -12338,9 +12433,8 @@ final class CoreApiSchemas
             ], ['format', 'filename', 'media_type', 'content'])),
             'ImportThemeRequest' => [
                 'type' => 'object',
-                'description' => 'A theme file (schemas/theme/v1.json).',
+                'description' => 'A theme file (schemas/theme/v1.json): schemaVersion, id, version and name are required. Or {theme, source} with the file under theme.',
                 'additionalProperties' => false,
-                'required' => ['schemaVersion', 'id', 'version', 'name'],
                 'properties' => [
                     '$schema' => ['type' => 'string', 'description' => 'The schema address, https://whity.dev/schema/theme/v1.json.'],
                     'schemaVersion' => ['type' => 'integer', 'description' => 'The format version, 1.'],
@@ -12356,6 +12450,8 @@ final class CoreApiSchemas
                     'elevation' => ['type' => 'object', 'description' => 'style (plane, soft, flat) and float.'],
                     'motion' => ['type' => 'object', 'description' => 'preset: calm, standard or expressive.'],
                     'documents' => ['type' => 'object', 'description' => 'Defaults for the workspace\'s document theme: accentUse, titleFace, largePrint.'],
+                    'theme' => ['type' => 'object', 'description' => 'Instead of the fields above: the theme file, with source.'],
+                    'source' => ['type' => 'string', 'enum' => ['editor'], 'description' => 'With theme: editor when it was made or changed in the theme editor (TH.25).'],
                 ],
             ],
             'ImportThemeResponse' => self::dataEnvelope(self::object([
@@ -12380,6 +12476,21 @@ final class CoreApiSchemas
                 'preview' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Colours for light and dark, and the corner radii.'],
                 'adjustments' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']], 'description' => 'What the guard rails change: mode, role and change.'],
             ], ['theme', 'notes', 'preview', 'adjustments'])),
+            'ThemeFileResponse' => self::dataEnvelope(self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The theme file (schemas/theme/v1.json).'],
+                'source' => self::str() + ['description' => 'whity, plugin, import, editor or store.'],
+                'editable' => self::bool() + ['description' => 'True for the workspace\'s own themes; any other is changed as a copy.'],
+            ], ['theme', 'source', 'editable'])),
+            'ThemePreviewResponse' => self::dataEnvelope(self::object([
+                'valid' => self::bool(),
+                'problems' => ['type' => 'array', 'items' => self::str(), 'description' => 'Every problem with the draft, in words; empty when valid.'],
+                'light' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Every colour role for light, as #rrggbb.'],
+                'dark' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Every colour role for dark, as #rrggbb.'],
+                'vars' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Type, shape, density and motion values.'],
+                'fonts' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                'adjustments' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']], 'description' => 'What the guard rails change: mode, role and change.'],
+                'roles' => ['type' => 'array', 'items' => self::str(), 'description' => 'The colour roles a theme may set by hand.'],
+            ], ['valid', 'problems'])),
             'DeleteThemeResponse' => self::dataEnvelope(self::object(['deleted' => self::bool()], ['deleted'])),
 
             // ── Forgotten-password + 2FA-recovery (WC-password-reset-2fa-recovery) ──
@@ -20110,6 +20221,162 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
                     404 => self::errorResponse('Not found'),
                     422 => self::errorResponse('Not a confirmed booking'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/closes', 'calendar:commission', [
+                'summary' => 'Every closed commission period, newest first',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Closes', self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CalendarCommissionClose')])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/closes/periods', 'calendar:commission', [
+                'summary' => 'The commission periods that may be closed now',
+                'description' => 'Ended, and touching no closed day.',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Periods', self::dataEnvelope(['type' => 'array', 'items' => self::object(['id' => self::str(), 'label' => self::str(), 'from' => self::str(), 'to' => self::str()], ['id', 'label', 'from', 'to'])])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/commission/closes', 'calendar:commission', [
+                'summary' => 'Close a commission period',
+                'description' => 'Freezes each person\'s totals, fires calendar.commission.closed, and sends it to the books when something books commission (WHIT-1334).',
+                'tags' => ['calendar'],
+                'request' => 'CalendarCommissionCloseRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The close', self::dataEnvelope(SchemaBuilder::ref('CalendarCommissionClose'))),
+                    409 => self::errorResponse('Not ended, already closed, or nothing to close'),
+                    422 => self::errorResponse('Unknown period'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/commission/closes/{id:\d+}/book', 'calendar:commission', [
+                'summary' => 'Send a closed commission period to the books again',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The close', self::dataEnvelope(SchemaBuilder::ref('CalendarCommissionClose'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('Already booked, or the books cannot take it'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/rates', 'calendar:commission', [
+                'summary' => 'Every commission rate, by member of staff',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Rates', self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CalendarCommissionRate')])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/commission/rates', 'calendar:commission', [
+                'summary' => 'Set a commission rate, for every service or one',
+                'tags' => ['calendar'],
+                'request' => 'CalendarCommissionRateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The rate', self::dataEnvelope(SchemaBuilder::ref('CalendarCommissionRate'))),
+                    422 => self::errorResponse('Not valid'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/calendar/commission/rates/{id:\d+}', 'calendar:commission', [
+                'summary' => 'Remove a commission rate',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Removed', self::dataEnvelope(self::object(['removed' => self::bool()], ['removed']))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/periods', 'calendar:commission', [
+                'summary' => 'The periods the commission report covers',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Periods', self::dataEnvelope(['type' => 'array', 'items' => self::object(['id' => self::str(), 'label' => self::str(), 'from' => self::str(), 'to' => self::str()], ['id', 'label', 'from', 'to'])])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/report', 'calendar:commission', [
+                'summary' => 'What each member of staff earned in a period',
+                'description' => 'From done bookings (confirmed and already over), each service line at its own price, in the workspace time zone.',
+                'tags' => ['calendar'],
+                'parameters' => [self::queryParam('period', 'string', 'this_month (default), last_month, this_week, last_7_days or last_30_days.')],
+                'responses' => [
+                    200 => self::jsonResponse('One row per person and currency', self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CalendarCommissionReportRow')])),
+                    422 => self::errorResponse('Unknown period'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/staff', 'calendar:commission', [
+                'summary' => 'The staff a commission rate can be set for',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Staff', self::dataEnvelope(['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name'])])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/services', 'calendar:commission', [
+                'summary' => 'The services a commission rate can be set for',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Services', self::dataEnvelope(['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name'])])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/walkins', 'calendar:front_desk', [
+                'summary' => 'Who is waiting at the front desk, first come first served',
+                'description' => 'Needs the walk-ins switch of the workspace (WHIT-1334); off answers 409 with reason walkins_off.',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The queue', self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CalendarWalkin')])),
+                    409 => self::errorResponse('Walk-ins are off, or no longer waiting'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/walkins', 'calendar:front_desk', [
+                'summary' => 'Add someone who came in without a booking',
+                'tags' => ['calendar'],
+                'request' => 'CalendarWalkinRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The walk-in', self::dataEnvelope(SchemaBuilder::ref('CalendarWalkin'))),
+                    409 => self::errorResponse('Walk-ins are off, or no longer waiting'),
+                    422 => self::errorResponse('Not valid'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/walkins/services', 'calendar:front_desk', [
+                'summary' => 'The services a walk-in can choose',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Services', self::dataEnvelope(['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name'])])),
+                    409 => self::errorResponse('Walk-ins are off, or no longer waiting'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/walkins/staff', 'calendar:front_desk', [
+                'summary' => 'The bookable staff, free ones first',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Staff', self::dataEnvelope(['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'name' => self::str(), 'free' => self::bool(), 'label' => self::str()], ['profile_id', 'name', 'free', 'label'])])),
+                    409 => self::errorResponse('Walk-ins are off, or no longer waiting'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/walkins/assign', 'calendar:front_desk', [
+                'summary' => 'Hand a walk-in to the person chosen',
+                'description' => 'Books the service now for that person, checked in, without emailing anyone; the booking finds or adds the customer in Contacts.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarWalkinAssignRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The walk-in', self::dataEnvelope(SchemaBuilder::ref('CalendarWalkin'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('Walk-ins are off, or no longer waiting'),
+                    422 => self::errorResponse('Not valid'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/walkins/{id:\d+}/assign', 'calendar:front_desk', [
+                'summary' => 'Hand a walk-in to the next free person',
+                'description' => 'The one they asked for if free, else the first with no booking now.',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The walk-in', self::dataEnvelope(SchemaBuilder::ref('CalendarWalkin'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('Nobody is free, no longer waiting, or walk-ins are off'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/walkins/{id:\d+}/left', 'calendar:front_desk', [
+                'summary' => 'They left without being served',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The walk-in', self::dataEnvelope(SchemaBuilder::ref('CalendarWalkin'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('Walk-ins are off, or no longer waiting'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('DELETE', '/api/calendar/bookings/{id:\d+}/check-in', 'calendar:write', [

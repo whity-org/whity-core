@@ -45,7 +45,7 @@ final class NotificationPreferencesApiHandlerRealEngineTest extends TestCase
     {
         $tv = $this->createMock(TokenValidator::class);
         $tv->method('validateAccessToken')->willReturn(['profile_id' => self::CALLER, 'active_tenant_id' => self::TENANT_A]);
-        $types = [['type' => 'acme:order.shipped', 'label' => ['en' => 'Order shipped', 'ar' => 'تم شحن الطلب'], 'plugin' => 'acme']];
+        $types = [['type' => 'acme:order.shipped', 'label' => ['en' => 'Order shipped', 'ar' => 'تم شحن الطلب'], 'plugin' => 'acme', 'email_default' => true]];
         $handler = new NotificationPreferencesApiHandler($tv, $this->repo, $this->resolver, static fn (): array => $types);
 
         $body = json_decode($handler->list(new Request('GET', '/api/me/notification-preferences'))->getBody(), true);

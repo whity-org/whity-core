@@ -27,6 +27,7 @@ class CliRunner
         // Section 33 §5: the usage ledger's stored bytes and snapshots.
         'usage:storage-rebuild' => 'Whity\Cli\Commands\UsageCommand',
         'usage:snapshot' => 'Whity\Cli\Commands\UsageCommand',
+        'calendar:copy-salons' => 'Whity\Cli\Commands\CalendarCopySalonsCommand',
         // WHIT-1168: the break-glass for a server that signs in only with its identity provider.
         'auth'       => 'Whity\Cli\Commands\AuthCommand',
         // WHIT-1047: every stored secret onto the current key after a rotation.

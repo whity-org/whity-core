@@ -1069,5 +1069,24 @@ Front Office's parts that no core lane covered (BM.15, BM.19), specified in sect
 | IM.8 | Meters | Importing never refuses because of a meter; the check says when the import takes the workspace past its base |
 | IM.9 | Front Office | Front Office is retired once quotes, import, the receipt and the trading emails are on `develop`: unpublished from the store, the `plugin.front-office.*` mapping removed from core, no core migration (app.whity.dev holds no `fo_*` data, 21 Nov 2026) |
 
+## Walk-ins, commission and the price list (decided 21 November 2026)
+
+The Salons plugin's features in core (BM.15, Q3; BM.19), specified in section 35 (WHIT-1334). Decided by the owner on 21 November 2026: **"Accept all"**, so section 35 §8's four recommendations stand (the salon setup in the workspace template, service items not counted, commission closed by hand, walk-ins behind a switch). Salons retires on app.whity.dev after the core work deploys ("Yes, after deploy").
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| SL.1 | Scope | The walk-in queue, commission rates and the price list are core, free, for any business that takes bookings, in general words (staff member, not stylist). The chair price retires: a chair is a staff seat on the seat meter (BM.3, BM.17), read from the daily seat snapshot; core reads no chair count |
+| SL.2 | Walk-ins data | `calendar_walkins` holds only the wait (name, phone, service, who they asked for, status `waiting`, `assigning`, `served`, `left`, the booking and contact once served, `legacy_id` for copied rows). Never deleted |
+| SL.3 | Walk-ins behaviour | Next free staff member (the one asked for if free, else the first with no booking now) or a chosen one; handing over claims the row, finds or adds the contact by phone, books the service now through `BookingService` without notifying, checks it in, in one transaction. On a workspace switch `calendar.walkins_enabled`, off by default, on in the salon template (owner, Q4, "Accept all") |
+| SL.4 | Walk-ins permission | `calendar:front_desk`, granted by capability to roles with `calendar:write` and `contacts:write` |
+| SL.5 | Commission data | `calendar_commission_rates`: a staff member's percentage in basis points, `service_id` 0 for every service, one per staff member and service. The report reads done bookings (confirmed and over) each time, per currency, per service line, in the workspace's time zone |
+| SL.6 | Commission to the books | Closing an ended period by hand freezes its totals in `calendar_commission_closes` and `calendar_commission_close_lines` (never overlapping, never reopened), fires `calendar.commission.closed` and calls `Contribute\WorkspaceCommissionExpenses` if bound; accounting A3 binds it and posts the expense and payable (owner, Q3, "Accept all") |
+| SL.7 | Commission permission | `calendar:commission`, granted by capability to roles with `calendar:manage` |
+| SL.8 | Price list | Every calendar service is linked (`item_id`) to an inventory service item (`kind = 'service'`), whose price is the price; the calendar keeps a copy written in the same transaction. Service items don't count on the items meter (owner, Q2, "Accept all"). The printed list is a page of its own until a document starter replaces it |
+| SL.9 | Moving the data | One idempotent migration, and `whity-cli calendar:copy-salons`, copy `salons_walkins` and `salons_commission_rates` and the `salons:*` grants to core for every workspace that has them; nothing when the tables are absent. Salons' tables go only when the plugin is uninstalled |
+| SL.10 | Retiring Salons | After the core work deploys: on app.whity.dev the `plugin.salons.*` add-on plans 2–4 are retired and their six per-chair prices deactivated (rows kept), and the plugin is turned off and removed, through whity-local-deploy's procedure; in whity-plugins Salons leaves the store and the salon template stops offering it. `PluginSeats` stays for third-party plugins |
+| SL.11 | Salon setup | The six-step setup and the ready menus go to the salon workspace template, not core (owner, Q1, "Accept all") |
+| SL.12 | Screens | Core block screens in the Calendar group (Walk-ins, Commission, Price list), with Salons' English and Arabic, until the brand team's cards arrive |
+
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.

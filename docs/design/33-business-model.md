@@ -98,7 +98,7 @@ Multi-currency, fixed assets, budgets and consolidation move from the planned pa
 
 ### 3.5 Salons and the industry packs
 
-`salons` in whity-plugins is paid today (`salons.access`, product `plugin.salons`, 14-day trial, priced per chair as seats; `src/SalonsPlugin.php:39-44`). Its walk-in queue, commission rates, price list and onboarding pass the test as core features (or stay a free pack like `appointments`). Its per-chair price is a seat price, which BM.17 keeps as the seat meter. Question 3.
+`salons` in whity-plugins is paid today (`salons.access`, product `plugin.salons`, 14-day trial, priced per chair as seats; `src/SalonsPlugin.php:39-44`). Its walk-in queue, commission rates, price list and onboarding pass the test as core features (or stay a free pack like `appointments`). Its per-chair price is a seat price, which BM.17 keeps as the seat meter. Question 3. Specified in section 35 (WHIT-1334, SL.1–SL.12).
 
 `appointments` and `workspace-templates` are free already and stay as they are; `workspace-templates` stops offering a vertical plugin "with a 30-day trial" once the vertical is free.
 

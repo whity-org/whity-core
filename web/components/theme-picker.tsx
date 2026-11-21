@@ -24,7 +24,8 @@
  */
 
 import { useRef, useState } from 'react';
-import { IconCheck, IconChevronDown, IconDownload, IconFileImport, IconTrash, IconUpload } from '@tabler/icons-react';
+import Link from 'next/link';
+import { IconCheck, IconChevronDown, IconDownload, IconFileImport, IconPalette, IconTrash, IconUpload } from '@tabler/icons-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,6 +59,9 @@ import { useRefreshBranding } from '@/lib/branding-context';
 import { useThemeMode } from '@/lib/theme-mode-context';
 
 type Swatch = Record<string, string>;
+
+/** The workspace's own themes: imported from a file or made in the editor (TH.25). */
+const OWN = ['import', 'editor'];
 
 export interface ThemeListItem {
   id: string;
@@ -229,7 +233,7 @@ function pick(text: Record<string, string> | null | undefined, lang: string | nu
 }
 
 /** A colour role in plain words: token names are not for people (A.3). */
-function roleName(role: string, t: TranslateFn): string {
+export function roleName(role: string, t: TranslateFn): string {
   if (role === 'primary' || role === 'brand') return t('theme.role.primary', 'The main colour');
   if (role.endsWith('-foreground') && (role.startsWith('primary') || role.startsWith('brand'))) return t('theme.role.buttonText', 'Button text');
   if (role === 'ring') return t('theme.role.ring', 'The focus outline');
@@ -727,6 +731,12 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
               {t('theme.convert.open', 'Import from another tool')}
             </Button>
             <ConvertThemeDialog open={converting} onOpenChange={setConverting} onAdd={importTheme} dark={resolved === 'dark'} />
+            <Button variant="outline" asChild>
+              <Link href="/admin/settings/branding/theme">
+                <IconPalette aria-hidden="true" />
+                {t('theme.make', 'Make a theme')}
+              </Link>
+            </Button>
           </>
         )}
         </div>
@@ -771,6 +781,9 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
                   {item.source === 'import' && (
                     <p className="text-xs text-muted-foreground">{t('theme.imported', 'Added by this workspace')}</p>
                   )}
+                  {item.source === 'editor' && (
+                    <p className="text-xs text-muted-foreground">{t('theme.made', 'Made in this workspace')}</p>
+                  )}
                 </div>
                 {canWrite && (
                   <div className="flex flex-wrap gap-2">
@@ -779,7 +792,16 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
                         {t('theme.use', 'Use this theme')}
                       </Button>
                     )}
-                    {item.source === 'import' && scope === 'tenant' && (
+                    {scope === 'tenant' && (
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={`/admin/settings/branding/theme?from=${encodeURIComponent(item.id)}`}>
+                          {OWN.includes(item.source)
+                            ? t('theme.edit', 'Edit')
+                            : t('theme.copy', 'Make a copy')}
+                        </Link>
+                      </Button>
+                    )}
+                    {OWN.includes(item.source) && scope === 'tenant' && (
                       <Button
                         size="sm"
                         variant="ghost"

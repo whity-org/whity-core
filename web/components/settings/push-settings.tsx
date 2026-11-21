@@ -74,7 +74,13 @@ export function PushSettings() {
       if (!alive || !data) return;
       setPrefs(data.data as Preference[]);
       setPluginKinds(
-        data.plugin_types.map((p) => ({ id: p.type, types: [p.type], label: language === 'ar' ? p.label.ar : p.label.en }))
+        // #2209: a plugin's kind starts off on email unless the plugin said otherwise.
+        data.plugin_types.map((p) => ({
+          id: p.type,
+          types: [p.type],
+          label: language === 'ar' ? p.label.ar : p.label.en,
+          emailOff: !p.email_default,
+        }))
       );
     });
     return () => {

@@ -138,6 +138,7 @@ final class SettingsRegistryTest extends TestCase
              'calendar.weekend_days',
              'calendar.instant_booking',
              'calendar.multi_service_booking',
+             'calendar.walkins_enabled',
              'app.installable',
              'website.plans',
              'website.contact_workspace',
@@ -326,8 +327,9 @@ final class SettingsRegistryTest extends TestCase
         // 55 since WHIT-1173: calendar.multi_service_booking.
         // 57 since WHIT-1225: branding_theme and branding_theme_overrides,
         // each workspace's own theme (TH.1).
-        // 58 since #1730: documents.qr_public_signer_names.
-        self::assertCount(58, SettingsRegistry::tenantTextKeys());
+        // 58 since WHIT-1334: calendar.walkins_enabled.
+        // 59 since #1730: documents.qr_public_signer_names.
+        self::assertCount(59, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -507,8 +509,9 @@ final class SettingsRegistryTest extends TestCase
         // 148 since WHIT-1321: sales.quote_valid_days and sales.quote_route_template_id.
         // 152 since WHIT-1323: sales.email_quote, _invoice, _receipt and _reminder.
         // 154 since WHIT-1235: inventory.fefo and inventory.expiry_warning_days.
-        // 155 since #1730: documents.qr_public_signer_names.
-        self::assertCount(155, $describe);
+        // 155 since WHIT-1334: calendar.walkins_enabled.
+        // 156 since #1730: documents.qr_public_signer_names.
+        self::assertCount(156, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

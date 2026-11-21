@@ -33,6 +33,9 @@ final class HostPluginNotifier implements PluginNotifier
         ?\Closure $tenant = null,
         // WHIT-1123: (plugin name, workspace) => is the plugin off there?
         private readonly ?\Closure $pluginOff = null,
+        // #2209: the workspace's language ('en' or 'ar'), for a person who
+        // has none of their own. Null: English, as before.
+        private readonly ?\Closure $workspaceLanguage = null,
     ) {
         $this->tenant = $tenant ?? static fn (): ?int => TenantContext::getTenantId();
     }
@@ -40,8 +43,8 @@ final class HostPluginNotifier implements PluginNotifier
     public function for(PluginInterface $plugin): Notifier
     {
         $slug = PluginIdentity::slugOf($plugin);
-        $types = $plugin instanceof PluginNotificationsInterface
-            ? PluginNotificationTypes::of($plugin, $slug)
+        $declared = $plugin instanceof PluginNotificationsInterface
+            ? PluginNotificationTypes::declared($plugin, $slug)
             : [];
 
         $name = $plugin->getName();
@@ -51,10 +54,12 @@ final class HostPluginNotifier implements PluginNotifier
             $this->db,
             $this->dispatcher,
             $slug,
-            $types,
+            array_map(static fn (array $type): array => $type['label'], $declared),
             $this->tenant,
             $this->logger,
             $off !== null ? static fn (int $tenantId): bool => $off($name, $tenantId) === true : null,
+            array_map(static fn (array $type): bool => $type['emailDefault'], $declared),
+            $this->workspaceLanguage,
         );
     }
 }
