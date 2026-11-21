@@ -88,6 +88,9 @@ final class InventoryApiHandlerRealEngineTest extends TestCase
             // change has its own permission (WHIT-1233).
             $expected = match (true) {
                 str_starts_with($route, 'GET ') && (str_contains($route, '/purchase-orders') || str_contains($route, '/supplier-items')) => 'purchases:read',
+                // Printing an order or a goods received note only issues a
+                // copy of what the person can already read (WHIT-1234).
+                str_ends_with($route, '/print') => 'purchases:read',
                 str_contains($route, '/purchase-orders') => 'purchases:write',
                 str_starts_with($route, 'GET ') => 'inventory:read',
                 str_contains($route, '/stock/'), str_contains($route, '/adjustments') => 'stock:adjust',
@@ -103,7 +106,7 @@ final class InventoryApiHandlerRealEngineTest extends TestCase
         foreach (array_keys($byRoute) as $route) {
             [$method, $path] = explode(' ', $route, 2);
             self::assertMatchesRegularExpression(
-                '#\$router->register\(\'' . $method . '\',\s+\'' . preg_quote($path, '#') . '\',\s+\[\$inventoryHandler, \'\w+\'\],\s+null, null, CorePermissions::(INVENTORY_READ|INVENTORY_WRITE|STOCK_ADJUST|STOCK_COUNT|STOCK_TRANSFER|INVENTORY_SETTINGS|PURCHASES_READ|PURCHASES_WRITE)\);#',
+                '#\$router->register\(\'' . $method . '\',\s+\'' . preg_quote($path, '#') . '\',\s+\[\$inventory(Print)?Handler, \'\w+\'\],\s+null, null, CorePermissions::(INVENTORY_READ|INVENTORY_WRITE|STOCK_ADJUST|STOCK_COUNT|STOCK_TRANSFER|INVENTORY_SETTINGS|PURCHASES_READ|PURCHASES_WRITE)\);#',
                 $index,
                 $route . ' is registered with its permission'
             );

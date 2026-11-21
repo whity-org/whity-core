@@ -696,6 +696,10 @@
     "en": "Show a purchase order",
     "ar": "عرض أمر شراء"
   },
+  "get_api_inventory_print_templates": {
+    "en": "List the templates inventory prints from",
+    "ar": "عرض القوالب التي يطبع منها المخزون"
+  },
   "get_api_inventory_reasons": {
     "en": "List reasons for stock changes",
     "ar": "عرض أسباب تغيير المخزون"
@@ -1738,6 +1742,10 @@
     "en": "Close a purchase order line that won't come",
     "ar": "إغلاق سطر لن يصل في أمر الشراء"
   },
+  "post_api_inventory_purchase_orders_id_print": {
+    "en": "Print a purchase order",
+    "ar": "طباعة أمر شراء"
+  },
   "post_api_inventory_purchase_orders_id_receive": {
     "en": "Receive goods against a purchase order",
     "ar": "استلام بضاعة على أمر شراء"
@@ -1749,6 +1757,10 @@
   "post_api_inventory_reasons": {
     "en": "Add a reason for stock changes",
     "ar": "إضافة سبب لتغيير المخزون"
+  },
+  "post_api_inventory_receipts_id_print": {
+    "en": "Print a goods received note",
+    "ar": "طباعة سند استلام بضاعة"
   },
   "post_api_inventory_stock_adjustments": {
     "en": "Set opening stock or adjust stock",

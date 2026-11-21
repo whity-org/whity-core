@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
+import { PrintMenu } from '@/components/inventory/print-menu';
 import { UserText } from '@/components/ui/user-text';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { AdjustStockDialog } from '@/components/inventory/adjust-stock-dialog';
@@ -59,6 +60,8 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
   const { has, loading: accessLoading } = useCapabilities();
   const canWrite = has(INVENTORY_WRITE);
   const canAdjust = has(STOCK_ADJUST);
+  // Label sheets print through the document templates (IV.20).
+  const canPrintLabels = has('documents:render');
   const [editing, setEditing] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -160,7 +163,15 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
         title={nameIn(item.names, item.name, language)}
         description={`${kindLabel(t, item.kind)} · ${t('inventory.countedIn', 'counted in {unit}', { unit })}`}
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {canPrintLabels && item.kind !== 'service' && !item.archived && (
+              <PrintMenu
+                print={(lang) => inventoryApi.printLabels(item.variants.map((v) => v.id), lang)}
+                fileName={`labels-${item.variants[0]?.sku ?? item.id}`}
+                label={t('inventory.print.labels', 'Print labels')}
+                testId="item-print-labels"
+              />
+            )}
             {canAdjust && item.kind !== 'service' && !item.archived && places.length > 0 && (
               <Button variant="outline" onClick={() => setAdjusting(true)} data-testid="item-adjust">
                 <Icon name="transfer" />
