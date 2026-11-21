@@ -221,7 +221,7 @@ it('turns pasted shadcn CSS into a theme, shows what was kept, then adds it thro
 });
 
 it('says in words why something could not be turned into a theme', async () => {
-  POST.mockResolvedValue({ error: { errors: { source: 'No CSS variables were found. Paste the :root and .dark blocks, or the @theme block.' } } });
+  POST.mockResolvedValue({ error: { error: 'This could not be turned into a theme.', details: { source: 'No CSS variables were found. Paste the :root and .dark blocks, or the @theme block.' } } });
   render(<ThemePicker scope="tenant" canWrite />);
   await screen.findByText('Sea');
   fireEvent.click(screen.getByRole('button', { name: 'Import from another tool' }));
@@ -230,4 +230,49 @@ it('says in words why something could not be turned into a theme', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Make the theme' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('No CSS variables were found');
   expect(screen.queryByTestId('theme-convert-result')).not.toBeInTheDocument();
+});
+
+// TH.25: a newer version shows side by side with the installed one.
+it('shows a newer version side by side with the one installed, and the reason when a file is refused', async () => {
+  const installed = { schemaVersion: 1, id: 'acme.sea', version: '1.0.0', name: { en: 'Sea' }, shape: { preset: 'soft' } };
+  const newer = { ...installed, version: '1.1.0', shape: { preset: 'round' } };
+  GET.mockImplementation((path: string) =>
+    Promise.resolve(path === '/api/v1/themes/{themeId}' ? { data: { data: { theme: installed, source: 'import', editable: true } } } : { data: { data: list } }),
+  );
+  POST.mockImplementation((path: string, init: { params?: { query?: { check?: string } } }) => {
+    if (path === '/api/v1/themes/compare') {
+      return Promise.resolve({
+        data: { data: { changes: [{ field: 'shape.preset', from: 'soft', to: 'round' }], before: { light: swatch, dark: swatch, vars: { 'wy-radius-control': '13px' } }, after: { light: swatch, dark: swatch, vars: { 'wy-radius-control': '20px' } } } },
+      });
+    }
+    return Promise.resolve(
+      init.params?.query?.check === '1'
+        ? { data: { data: { id: 'acme.sea', version: '1.1.0', installed_version: '1.0.0', changes: [{ field: 'shape.preset', from: 'soft', to: 'round' }] } } }
+        : { data: { data: { id: 'acme.sea', version: '1.1.0' } }, error: undefined },
+    );
+  });
+  const { container } = render(<ThemePicker scope="tenant" canWrite />);
+  await screen.findByText('Sea');
+  const file = new File([JSON.stringify(newer)], 'sea.json', { type: 'application/json' });
+  Object.defineProperty(file, 'text', { value: () => Promise.resolve(JSON.stringify(newer)) });
+  fireEvent.change(screen.getByLabelText('Add a theme file', { selector: 'input' }), { target: { files: [file] } });
+  const diff = await screen.findByTestId('theme-diff');
+  expect(POST).toHaveBeenCalledWith('/api/v1/themes/compare', { body: { before: installed, after: newer } });
+  expect(diff).toHaveTextContent('Corners: soft → round');
+  expect(diff).toHaveTextContent('Now (1.0.0)');
+  expect(diff).toHaveTextContent('New (1.1.0)');
+  expect(screen.getByTestId('theme-editor-preview-before-light')).toBeInTheDocument();
+  expect(screen.getByTestId('theme-editor-preview-after-light')).toBeInTheDocument();
+  expect(document.body.innerHTML).toContain('[data-theme-preview="after-light"]{');
+  expect(container).toBeTruthy();
+});
+
+it('says the server’s reason when a theme file is refused', async () => {
+  POST.mockResolvedValue({ error: { error: 'This theme file can’t be used.', details: { theme: 'density must be one of: compact, standard, comfortable.' } } });
+  render(<ThemePicker scope="tenant" canWrite />);
+  await screen.findByText('Sea');
+  const file = new File(['{"id":"acme.sea"}'], 'sea.json', { type: 'application/json' });
+  Object.defineProperty(file, 'text', { value: () => Promise.resolve('{"id":"acme.sea"}') });
+  fireEvent.change(screen.getByLabelText('Add a theme file', { selector: 'input' }), { target: { files: [file] } });
+  await waitFor(() => expect(addToast).toHaveBeenCalledWith('density must be one of: compact, standard, comfortable.', 'error'));
 });

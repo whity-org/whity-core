@@ -4619,6 +4619,17 @@ final class CoreApiSchemas
                     413 => self::errorResponse('The theme is larger than 32 KB'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('POST', '/api/themes/compare', 'settings:read', [
+                'summary' => 'Compare two themes side by side',
+                'description' => 'The side-by-side diff (TH.25): what the newer theme changes, field by field as a re-import says it (TH.16), and both themes compiled for a preview, every colour in both modes. Nothing is saved.',
+                'tags' => ['theme'],
+                'request' => 'CompareThemesRequest',
+                'responses' => [
+                    200 => self::jsonResponse('What changes and both previews', 'CompareThemesResponse'),
+                    413 => self::errorResponse('The themes are larger than 64 KB together'),
+                    422 => self::errorResponse('One of the themes has problems; the error says which'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('DELETE', '/api/themes/{themeId}', 'settings:write', [
                 'summary' => 'Remove a theme this workspace imported',
                 'description' => 'If the workspace was using it, it goes back to the installation\'s theme. Whity\'s own themes cannot be removed.',
@@ -12321,6 +12332,19 @@ final class CoreApiSchemas
                 'adjustments' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']], 'description' => 'What the guard rails change: mode, role and change.'],
                 'roles' => ['type' => 'array', 'items' => self::str(), 'description' => 'The colour roles a theme may set by hand.'],
             ], ['valid', 'problems'])),
+            'CompareThemesRequest' => self::object([
+                'before' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The older theme file, such as the installed version.'],
+                'after' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The newer theme file, such as a file to import or the editor\'s draft.'],
+            ], ['before', 'after']),
+            'CompareThemesResponse' => self::dataEnvelope(self::object([
+                'changes' => ['type' => 'array', 'description' => 'What the newer theme changes, field by field.', 'items' => self::object([
+                    'field' => self::str(),
+                    'from' => self::str(true),
+                    'to' => self::str(true),
+                ], ['field', 'from', 'to'])],
+                'before' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The older theme compiled: light, dark, vars, fonts, adjustments.'],
+                'after' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The newer theme compiled, the same way.'],
+            ], ['changes', 'before', 'after'])),
             'DeleteThemeResponse' => self::dataEnvelope(self::object(['deleted' => self::bool()], ['deleted'])),
 
             // ── Forgotten-password + 2FA-recovery (WC-password-reset-2fa-recovery) ──
