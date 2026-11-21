@@ -11022,15 +11022,15 @@ final class CoreApiSchemas
                 'contact_id' => self::int(true),
             ], ['id', 'name', 'service_id']),
             'CalendarWalkinRequest' => self::object([
-                'name' => self::str() + ['maxLength' => 200],
+                'name' => self::str() + ['maxLength' => 200, 'description' => 'Their name, as they gave it.'],
                 'phone' => self::str() + ['description' => 'Optional; used to find or add the customer in Contacts when served.'],
-                'service_id' => self::int(),
+                'service_id' => self::int() + ['description' => 'The service they want, from GET /api/calendar/walkins/services.'],
                 'profile_id' => self::int() + ['description' => 'Who they asked for; empty for whoever is free.'],
-                'note' => self::str() + ['maxLength' => 500],
+                'note' => self::str() + ['maxLength' => 500, 'description' => 'Anything the desk should know.'],
             ], ['name', 'service_id']),
             'CalendarWalkinAssignRequest' => self::object([
-                'walkin_id' => self::int(),
-                'profile_id' => self::int(),
+                'walkin_id' => self::int() + ['description' => 'The walk-in to serve, from GET /api/calendar/walkins.'],
+                'profile_id' => self::int() + ['description' => 'Who serves them, from GET /api/calendar/walkins/staff.'],
             ], ['walkin_id', 'profile_id']),
             'CalendarCommissionRate' => self::object([
                 'id' => self::int(),
@@ -11042,7 +11042,7 @@ final class CoreApiSchemas
                 'percent_bp' => self::int() + ['description' => 'Basis points: 1250 is 12.5%.'],
             ], ['id', 'profile_id', 'percent_bp']),
             'CalendarCommissionRateRequest' => self::object([
-                'profile_id' => self::int(),
+                'profile_id' => self::int() + ['description' => 'The member of staff, from GET /api/calendar/commission/staff.'],
                 'service_id' => self::int() + ['description' => 'Empty for every service.'],
                 'percent' => self::str() + ['description' => 'A number from 0 to 100, such as 30 or 12.5.'],
             ], ['profile_id', 'percent']),

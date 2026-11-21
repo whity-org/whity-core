@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.142).
+ * SDK identity (v1.148).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1527,13 +1527,6 @@ namespace Whity\Sdk;
  * Purely additive: one new method on Context\InventoryScope, which only the host implements, and new
  * optional constructor arguments, last, on MoveLine and Move.)
  *
- * 1.140 (WALK-INS (WHIT-1334, design section 35 §3): a workspace template may set the calendar's
- * `walkins_enabled`, which turns on the walk-in queue at the front desk, and give a role
- * `calendar:front_desk`. Older hosts refuse a template that sets it, so a template plugin that
- * does needs `^1.140`.
- *
- * Purely additive.)
- *
  * 1.141 (NOTICES BY EMAIL: a type in {@see Notification\PluginNotificationsInterface::getNotificationTypes()}
  * may carry `emailDefault` (bool, optional, false when left out). Every notice still lands in the inbox;
  * with `emailDefault` it also goes by email to a person who never chose for the type. The person's own
@@ -1543,7 +1536,14 @@ namespace Whity\Sdk;
  * Purely additive: one optional key. Older hosts ignore it and keep notices in-app, so a plugin that
  * needs the email needs `^1.141`.)
  *
- * 1.142 (COMMISSION TO THE BOOKS (WHIT-1334, design section 35 §4.3): when an owner closes a
+ * 1.147 (WALK-INS (WHIT-1334, design section 35 §3): a workspace template may set the calendar's
+ * `walkins_enabled`, which turns on the walk-in queue at the front desk, and give a role
+ * `calendar:front_desk`. Older hosts refuse a template that sets it, so a template plugin that
+ * does needs `^1.147`.
+ *
+ * Purely additive.)
+ *
+ * 1.148 (COMMISSION TO THE BOOKS (WHIT-1334, design section 35 §4.3): when an owner closes a
  * commission period, core freezes each member of staff's totals and hands the close
  * ({@see Calendar\CommissionClose}, its {@see Calendar\CommissionCloseLine}s) to the one
  * {@see Contribute\WorkspaceCommissionExpenses} bound in the container, which answers the
@@ -1555,7 +1555,7 @@ namespace Whity\Sdk;
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.142.0';
+    public const VERSION = '1.148.0';
 
     /**
      * Static identity only — never instantiated.
