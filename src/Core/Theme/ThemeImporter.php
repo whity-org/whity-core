@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Whity\Core\Theme;
 
-use InvalidArgumentException;
 use Whity\Core\Branding\TenantTheme;
 
 /**
@@ -62,15 +61,15 @@ final class ThemeImporter
 
     /**
      * @return array{theme: array<string, mixed>, notes: list<string>}
-     * @throws InvalidArgumentException in plain words when nothing usable is found
+     * @throws ThemeImportProblem in plain words when nothing usable is found
      */
     public static function convert(string $format, string $source, string $name = ''): array
     {
         if (!in_array($format, self::FORMATS, true)) {
-            throw new InvalidArgumentException('Choose shadcn, Tailwind or Material Theme Builder.');
+            throw new ThemeImportProblem('Choose shadcn, Tailwind or Material Theme Builder.');
         }
         if (strlen($source) > self::MAX_BYTES) {
-            throw new InvalidArgumentException('This is too long to be a theme. Paste only the colour variables.');
+            throw new ThemeImportProblem('This is too long to be a theme. Paste only the colour variables.');
         }
         $label = ['shadcn' => 'shadcn', 'tailwind' => 'Tailwind', 'material' => 'Material Theme Builder'][$format];
         $name = trim(preg_replace('/[<>{}\x00-\x1f]/u', '', $name) ?? '');
@@ -90,7 +89,7 @@ final class ThemeImporter
 
         $errors = ThemeValidator::validate($theme);
         if ($errors !== []) {
-            throw new InvalidArgumentException('The colours found could not make a theme: ' . implode(' ', array_slice($errors, 0, 3)));
+            throw new ThemeImportProblem('The colours found could not make a theme: ' . implode(' ', array_slice($errors, 0, 3)));
         }
 
         return ['theme' => $theme, 'notes' => $notes];
@@ -123,7 +122,7 @@ final class ThemeImporter
             }
         }
         if ($modes['light'] === [] && $modes['dark'] === []) {
-            throw new InvalidArgumentException('No CSS variables were found. Paste the :root and .dark blocks, or the @theme block.');
+            throw new ThemeImportProblem('No CSS variables were found. Paste the :root and .dark blocks, or the @theme block.');
         }
 
         $colours = ['light' => [], 'dark' => []];
@@ -150,7 +149,7 @@ final class ThemeImporter
         // `.dark` alone is enough to read; light falls back to it only for the seed.
         $primary = $colours['light']['primary'] ?? $colours['dark']['primary'] ?? null;
         if ($primary === null && $colours['light'] === [] && $colours['dark'] === []) {
-            throw new InvalidArgumentException('No colours Whity can use were found, such as --primary or --background.');
+            throw new ThemeImportProblem('No colours Whity can use were found, such as --primary or --background.');
         }
 
         $theme = ['colour' => self::colourBlock($primary, null, null, $colours, 'calm')];
@@ -197,7 +196,7 @@ final class ThemeImporter
     {
         $data = json_decode($json, true);
         if (!is_array($data)) {
-            throw new InvalidArgumentException('This is not JSON. Export the theme from Material Theme Builder as JSON and paste the whole file.');
+            throw new ThemeImportProblem('This is not JSON. Export the theme from Material Theme Builder as JSON and paste the whole file.');
         }
         $core = is_array($data['coreColors'] ?? null) ? $data['coreColors'] : [];
         $schemes = is_array($data['schemes'] ?? null) ? $data['schemes'] : [];
@@ -207,7 +206,7 @@ final class ThemeImporter
         $hex = static fn (mixed $v): ?string => is_string($v) ? self::colour($v) : null;
         $primary = $hex($core['primary'] ?? null) ?? $hex($data['seed'] ?? null) ?? $hex($light['primary'] ?? null);
         if ($primary === null) {
-            throw new InvalidArgumentException('No primary colour was found. Material Theme Builder files have coreColors.primary or schemes.light.primary.');
+            throw new ThemeImportProblem('No primary colour was found. Material Theme Builder files have coreColors.primary or schemes.light.primary.');
         }
 
         $colours = ['light' => [], 'dark' => []];

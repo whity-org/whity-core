@@ -13,6 +13,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Core\Theme\ThemeCompiler;
 use Whity\Core\Theme\ThemeFonts;
 use Whity\Core\Theme\ThemeImporter;
+use Whity\Core\Theme\ThemeImportProblem;
 use Whity\Core\Theme\ThemeLibrary;
 use Whity\Core\Theme\ThemeRepository;
 use Whity\Core\Theme\ThemeTweaks;
@@ -172,8 +173,8 @@ final class ThemesApiHandler
             $name = is_array($body) && is_string($body['name'] ?? null) ? $body['name'] : '';
             try {
                 $result = ThemeImporter::convert($format, $source, $name);
-            } catch (\InvalidArgumentException $e) {
-                return Response::error('This could not be turned into a theme.', 422, ['source' => $e->getMessage()]);
+            } catch (ThemeImportProblem $problem) {
+                return Response::error('This could not be turned into a theme.', 422, ['source' => $problem->reason()]);
             }
             $compiled = ThemeCompiler::compile($result['theme']);
             if ($compiled['adjustments'] !== []) {

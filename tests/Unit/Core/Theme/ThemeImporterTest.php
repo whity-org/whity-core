@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Whity\Tests\Unit\Core\Theme;
 
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 use Whity\Core\Theme\ThemeCompiler;
 use Whity\Core\Theme\ThemeImporter;
+use Whity\Core\Theme\ThemeImportProblem;
 use Whity\Core\Theme\ThemeValidator;
 
 /** TH.25 (30-themes 11, 14.7): themes from shadcn, Tailwind and Material Theme Builder. */
@@ -133,7 +133,7 @@ final class ThemeImporterTest extends TestCase
             try {
                 ThemeImporter::convert($format, $source);
                 self::fail("{$format} should not convert");
-            } catch (InvalidArgumentException $e) {
+            } catch (ThemeImportProblem $e) {
                 self::assertStringContainsString($says, $e->getMessage());
             }
         }
