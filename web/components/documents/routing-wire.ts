@@ -42,7 +42,9 @@
  */
 // WHIT-919 adds `sent_back` (to the author for changes) and `resubmitted` (by the
 // author). `signed`, `stamped` and `declined` are in the server's vocabulary for
-// the signing steps and join this list when those steps are built.
+// the signing and stamp steps (WHIT-922, #1729). They are written by the sign
+// and stamp endpoints (and `declined` by the decline form on those panels), not
+// by the recipient act menu, so they stay out of this list.
 export const ROUTE_ACTIONS = [
   'issued',
   'forwarded',
@@ -196,6 +198,11 @@ export interface RouteStep {
   /** On a `sign` step: the capacity the signer signs in, and whom they sign for. */
   sign_capacity?: string | null;
   sign_on_behalf_of?: string | null;
+  /**
+   * On a `stamp` step (#1729): the company stamp only a holder of it can apply.
+   * Absent on an older server.
+   */
+  stamp_id?: number | null;
   /**
    * WHIT-1016: values the person letting it through here fills in (a committee
    * meeting number, say). Sent with an approval, an acknowledgement or a

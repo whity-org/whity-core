@@ -27,7 +27,7 @@ import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useNavigation } from '@/lib/navigation-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
-import { LICENSING_VIEW } from '@/lib/capabilities';
+import { DOCUMENTS_STAMPS, LICENSING_VIEW } from '@/lib/capabilities';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import type { components } from '@whity/api-client';
 import { MY_SETTINGS_PAGES, SETTINGS_HOME_HREF, WORKSPACE_SETTINGS_ANCHOR } from '@/lib/settings/my-settings';
@@ -58,6 +58,7 @@ const GROUP_OF: Readonly<Record<string, GroupId>> = {
   branding: 'workspace',
   owners: 'workspace',
   'document-themes': 'workspace',
+  'document-stamps': 'workspace',
   billing: 'workspace',
   plugins: 'workspace',
   security: 'security',
@@ -101,6 +102,9 @@ export const WORKSPACE_PAGE_NAV_IDS: Readonly<Record<string, string>> = {
 const DOCUMENT_THEMES_HREF = '/admin/document-themes';
 const DOCUMENT_THEMES_PERMISSION = 'documents:themes';
 
+/** Company stamps (#1729) sit beside document themes: who holds each stamp is a workspace setting. */
+const DOCUMENT_STAMPS_HREF = '/admin/document-stamps';
+
 /** Booking rules stay in the calendar's own pages; Settings links there. */
 const BOOKINGS_HREF = '/calendar/settings';
 
@@ -134,6 +138,7 @@ export const SETTINGS_AREA_PREFIXES = [
   '/admin/translations',
   DEVICES_HREF,
   DOCUMENT_THEMES_HREF,
+  DOCUMENT_STAMPS_HREF,
 ] as const;
 
 /**
@@ -178,6 +183,7 @@ const ROW_ICON: Readonly<Record<string, IconName>> = {
   'error-tracking': 'error',
   devices: 'desktop',
   'document-themes': 'branding',
+  'document-stamps': 'approval',
   billing: 'billing',
   plugins: 'plugin',
   'audit-logs': 'audit',
@@ -257,6 +263,7 @@ export function useSettingsGroups({ enabled = true }: { enabled?: boolean } = {}
   // WHIT-955: the workspace's own fields on its records (A9).
   const canManageFields = has('fields:manage');
   const canEditThemes = has(DOCUMENT_THEMES_PERMISSION);
+  const canManageStamps = has(DOCUMENTS_STAMPS);
   const canManageBookings = has(CALENDAR_MANAGE);
   const language = useLanguageCode();
 
@@ -328,6 +335,9 @@ export function useSettingsGroups({ enabled = true }: { enabled?: boolean } = {}
     if (canEditThemes) {
       links.push({ id: 'document-themes', href: DOCUMENT_THEMES_HREF, label: t('settingsArea.documentThemes', 'Document themes'), group: 'workspace' });
     }
+    if (canManageStamps) {
+      links.push({ id: 'document-stamps', href: DOCUMENT_STAMPS_HREF, label: t('settingsArea.documentStamps', 'Company stamps'), group: 'workspace' });
+    }
     if (canManageBookings) {
       links.push({ id: 'bookings', href: BOOKINGS_HREF, label: t('settingsArea.bookings', 'Bookings'), group: 'data' });
     }
@@ -350,7 +360,7 @@ export function useSettingsGroups({ enabled = true }: { enabled?: boolean } = {}
       label: groupLabels[group],
       links: links.filter((link) => link.group === group).sort((a, b) => rank(a.id) - rank(b.id)),
     })).filter((group) => group.links.length > 0);
-  }, [tabs, navItems, navLabels, canSeeDevices, canManageFields, canEditThemes, canManageBookings, isSystemTenant, t, tc, ta, workspaceName]);
+  }, [tabs, navItems, navLabels, canSeeDevices, canManageFields, canEditThemes, canManageStamps, canManageBookings, isSystemTenant, t, tc, ta, workspaceName]);
 
   return groups;
 }

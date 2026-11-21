@@ -132,6 +132,7 @@ import {
   type RouteVerdictName,
 } from './routing-wire';
 import { SignPanel } from './sign-panel';
+import { StampPanel } from './stamp-panel';
 import { RoutePersonValue } from './route-person-value';
 import { Lottie } from '@whity/ui/lottie';
 
@@ -232,6 +233,8 @@ export function RouteActPanel({
   const [outcome, setOutcome] = useState<DecisionOutcome | null>(null);
   /** The viewer has just signed: the panel says so, with the signing moment (LT.4). */
   const [justSigned, setJustSigned] = useState(false);
+  /** The viewer has just applied a company stamp (#1729): the panel says so. */
+  const [justStamped, setJustStamped] = useState(false);
 
   /** The viewer's own OPEN item on this route, if they have one. */
   const myOpenItem = useMemo<RouteRecipient | null>(() => {
@@ -566,6 +569,13 @@ export function RouteActPanel({
   if (myStep?.kind === 'sign') {
     return <SignPanel documentId={documentId} route={route} onActed={onActed} onSigned={() => setJustSigned(true)} />;
   }
+  // #1729: a stamp step is answered by a holder applying the company stamp, or
+  // by declining, with its own panel.
+  if (myStep?.kind === 'stamp') {
+    return (
+      <StampPanel documentId={documentId} route={route} onActed={onActed} onStamped={() => setJustStamped(true)} />
+    );
+  }
 
   return (
     <div
@@ -648,6 +658,11 @@ export function RouteActPanel({
             {t('signing.done', 'Signed. Your electronic signature is recorded with the audit trail.')}
           </p>
         </div>
+      )}
+      {justStamped && (
+        <p className="text-sm text-foreground" role="status" data-slot="route-act-stamped">
+          {t('stamping.done', 'Stamp applied. It is recorded with the audit trail.')}
+        </p>
       )}
       {outcome !== null && (
         <Alert

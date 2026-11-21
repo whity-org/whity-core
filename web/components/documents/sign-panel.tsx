@@ -64,7 +64,7 @@ export interface SignPanelProps {
   onSigned?: () => void;
 }
 
-function errorOf(body: unknown, fallback: string): string {
+export function errorOf(body: unknown, fallback: string): string {
   const error = typeof body === 'object' && body !== null ? (body as { error?: unknown }).error : undefined;
   return typeof error === 'string' && error !== '' ? error : fallback;
 }
