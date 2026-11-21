@@ -18,10 +18,13 @@
  * Free since TH.25: turn a theme made with shadcn, Tailwind or Material Theme
  * Builder into a theme file (POST /themes/convert), see it and what was kept
  * in words, then add it through the same checked import.
+ *
+ * Free since TH.25: export the theme in use for another tool, as CSS
+ * variables, design tokens JSON, Tailwind CSS or a Flutter file.
  */
 
 import { useRef, useState } from 'react';
-import { IconCheck, IconDownload, IconFileImport, IconTrash, IconUpload } from '@tabler/icons-react';
+import { IconCheck, IconChevronDown, IconDownload, IconFileImport, IconTrash, IconUpload } from '@tabler/icons-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +41,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
 import { Input } from '@whity/ui/input';
 import { Textarea } from '@whity/ui/textarea';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@whity/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { api } from '@/lib/api/client';
@@ -114,6 +125,29 @@ export function overridesValue(colour: ThemeList['colour_overrides'], tweaks: Tw
     if (tweaks[key]) out[key] = tweaks[key];
   }
   return Object.keys(out).length === 0 ? '' : JSON.stringify(out);
+}
+
+export const TOKEN_FORMATS = ['css', 'json', 'tailwind', 'flutter'] as const;
+export type TokenFormat = (typeof TOKEN_FORMATS)[number];
+
+/** An export format in plain words (TH.25). */
+export function tokenFormatName(format: TokenFormat, t: TranslateFn): string {
+  return {
+    css: t('theme.export.css', 'CSS variables'),
+    json: t('theme.export.json', 'Design tokens (JSON)'),
+    tailwind: t('theme.export.tailwind', 'Tailwind CSS'),
+    flutter: t('theme.export.flutter', 'Flutter'),
+  }[format];
+}
+
+/** Hands the person a file to keep, made here from text. */
+export function saveFile(content: string, filename: string, type: string): void {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 /** A tweak's option in plain words. */
@@ -509,18 +543,27 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
     }
   };
 
+  /** TH.25: the theme in use as resolved tokens for another tool. */
+  const exportTokens = async (format: TokenFormat) => {
+    setBusy('export');
+    try {
+      const { data: body, error: exportError } = await api.GET('/api/v1/themes/export/tokens', { params: { query: { format } } });
+      if (exportError || !body) throw new Error('export');
+      saveFile(body.data.content, body.data.filename, body.data.media_type);
+    } catch {
+      addToast(t('theme.export.failed', 'The theme could not be exported. Try again.'), 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const exportTheme = async () => {
     setBusy('export');
     try {
       const { data: body, error: exportError } = await api.GET('/api/v1/themes/export');
       if (exportError || !body) throw new Error('export');
       const { theme, filename } = body.data;
-      const url = URL.createObjectURL(new Blob([`${JSON.stringify(theme, null, 2)}\n`], { type: 'application/json' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveFile(`${JSON.stringify(theme, null, 2)}\n`, filename, 'application/json');
     } catch {
       addToast(t('theme.export.failed', 'The theme could not be exported. Try again.'), 'error');
     } finally {
@@ -643,10 +686,25 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
           </CardDescription>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled={busy !== null || !data} onClick={() => void exportTheme()}>
-            <IconDownload aria-hidden="true" />
-            {t('theme.export', 'Export theme')}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={busy !== null || !data}>
+                <IconDownload aria-hidden="true" />
+                {t('theme.export', 'Export theme')}
+                <IconChevronDown aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => void exportTheme()}>{t('theme.export.file', 'Theme file, for Whity')}</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>{t('theme.export.forOther', 'For another tool')}</DropdownMenuLabel>
+              {TOKEN_FORMATS.map((format) => (
+                <DropdownMenuItem key={format} onSelect={() => void exportTokens(format)}>
+                  {tokenFormatName(format, t)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         {canWrite && scope === 'tenant' && (
           <>
             <input

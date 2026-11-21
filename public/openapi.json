@@ -79011,6 +79011,227 @@
                 ]
             }
         },
+        "/api/v1/themes/export/tokens": {
+            "get": {
+                "operationId": "get_api_v1_themes_export_tokens",
+                "summary": "Export the theme in use as CSS, JSON, Tailwind or Flutter",
+                "tags": [
+                    "theme"
+                ],
+                "description": "Free (TH.25): the theme this workspace uses, with its main colour, colour overrides and tweaks, as resolved tokens: every colour for light and dark after the guard rails, every radius and size with Whity's defaults, the fonts by family name and the motion timings. css is custom properties, json the Design Tokens Community Group format, tailwind a Tailwind v4 @theme file, flutter a Dart file like whity_tokens' AppTokens with Material 3 colour schemes.",
+                "parameters": [
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "required": true,
+                        "description": "css, json, tailwind or flutter",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "css",
+                                "json",
+                                "tailwind",
+                                "flutter"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The file, its name and media type",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemeTokensResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown format",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/themes/tokens": {
+            "post": {
+                "operationId": "post_api_v1_themes_tokens",
+                "summary": "Export a draft theme as CSS, JSON, Tailwind or Flutter",
+                "tags": [
+                    "theme"
+                ],
+                "description": "The theme editor's export (TH.25): a theme file, saved or not, as resolved tokens in the same formats as GET /api/themes/export/tokens. Nothing is saved.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ThemeTokensRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The file, its name and media type",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemeTokensResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "The theme is larger than 32 KB",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown format, or the theme has problems",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/themes/{themeId}": {
             "delete": {
                 "operationId": "delete_api_v1_themes_themeid",
@@ -122827,6 +123048,67 @@
                         "additionalProperties": {
                             "type": "string"
                         }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "ThemeTokensRequest": {
+                "type": "object",
+                "properties": {
+                    "theme": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "A theme file (schemas/theme/v1.json)."
+                    },
+                    "format": {
+                        "type": "string",
+                        "enum": [
+                            "css",
+                            "json",
+                            "tailwind",
+                            "flutter"
+                        ]
+                    }
+                },
+                "required": [
+                    "theme",
+                    "format"
+                ]
+            },
+            "ThemeTokensResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "format": {
+                                "type": "string",
+                                "enum": [
+                                    "css",
+                                    "json",
+                                    "tailwind",
+                                    "flutter"
+                                ]
+                            },
+                            "filename": {
+                                "type": "string"
+                            },
+                            "media_type": {
+                                "type": "string"
+                            },
+                            "content": {
+                                "type": "string",
+                                "description": "The file's text."
+                            }
+                        },
+                        "required": [
+                            "format",
+                            "filename",
+                            "media_type",
+                            "content"
+                        ]
                     }
                 },
                 "required": [

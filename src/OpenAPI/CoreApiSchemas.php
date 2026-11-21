@@ -4551,6 +4551,28 @@ final class CoreApiSchemas
                 'tags' => ['theme'],
                 'responses' => [200 => self::jsonResponse('The theme file', 'ThemeExportResponse')] + self::authErrors(),
             ]),
+            // TH.25: resolved tokens for other tools.
+            self::permissionRoute('GET', '/api/themes/export/tokens', 'settings:read', [
+                'summary' => 'Export the theme in use as CSS, JSON, Tailwind or Flutter',
+                'description' => 'Free (TH.25): the theme this workspace uses, with its main colour, colour overrides and tweaks, as resolved tokens: every colour for light and dark after the guard rails, every radius and size with Whity\'s defaults, the fonts by family name and the motion timings. css is custom properties, json the Design Tokens Community Group format, tailwind a Tailwind v4 @theme file, flutter a Dart file like whity_tokens\' AppTokens with Material 3 colour schemes.',
+                'tags' => ['theme'],
+                'parameters' => [['name' => 'format', 'in' => 'query', 'required' => true, 'description' => 'css, json, tailwind or flutter', 'schema' => ['type' => 'string', 'enum' => ['css', 'json', 'tailwind', 'flutter']]]],
+                'responses' => [
+                    200 => self::jsonResponse('The file, its name and media type', 'ThemeTokensResponse'),
+                    422 => self::errorResponse('Unknown format'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes/tokens', 'settings:write', [
+                'summary' => 'Export a draft theme as CSS, JSON, Tailwind or Flutter',
+                'description' => 'The theme editor\'s export (TH.25): a theme file, saved or not, as resolved tokens in the same formats as GET /api/themes/export/tokens. Nothing is saved.',
+                'tags' => ['theme'],
+                'request' => 'ThemeTokensRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The file, its name and media type', 'ThemeTokensResponse'),
+                    413 => self::errorResponse('The theme is larger than 32 KB'),
+                    422 => self::errorResponse('Unknown format, or the theme has problems'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('POST', '/api/themes', 'settings:write', [
                 'summary' => 'Import a theme file into this workspace',
                 'description' => 'A theme file in the format of schemas/theme/v1.json: choices, never CSS. Importing the same id again replaces it. It is not applied until branding_theme is set to its id. With check=1 nothing is saved: the answer says which version is installed and what the file changes (TH.16).',
@@ -12207,6 +12229,16 @@ final class CoreApiSchemas
                 'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'A theme file (schemas/theme/v1.json) with the main colour, colour overrides and tweaks folded in.'],
                 'filename' => self::str(),
             ], ['theme', 'filename'])),
+            'ThemeTokensRequest' => self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'A theme file (schemas/theme/v1.json).'],
+                'format' => ['type' => 'string', 'enum' => ['css', 'json', 'tailwind', 'flutter']],
+            ], ['theme', 'format']),
+            'ThemeTokensResponse' => self::dataEnvelope(self::object([
+                'format' => ['type' => 'string', 'enum' => ['css', 'json', 'tailwind', 'flutter']],
+                'filename' => self::str(),
+                'media_type' => self::str(),
+                'content' => self::str() + ['description' => 'The file\'s text.'],
+            ], ['format', 'filename', 'media_type', 'content'])),
             'ImportThemeRequest' => [
                 'type' => 'object',
                 'description' => 'A theme file (schemas/theme/v1.json).',
