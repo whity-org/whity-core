@@ -21,7 +21,7 @@
     "tokens:check": "node ../src/design/tokens/generate-tokens.js check"
   },
   "dependencies": {
-    "@hookform/resolvers": "^7.0.6",
+    "@hookform/resolvers": "^7.0.7",
     "@tabler/icons-react": "^3.52.0",
     "@whity/api-client": "file:../packages/api-client",
     "@whity/features": "file:../packages/features",
@@ -52,7 +52,7 @@
     "@tailwindcss/vite": "^4.3.4",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
-    "@testing-library/user-event": "^14.6.10",
+    "@testing-library/user-event": "^14.6.12",
     "@types/jest": "^30",
     "@types/katex": "^0.16.8",
     "@types/node": "^26.6.6",

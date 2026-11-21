@@ -192,7 +192,7 @@
     "bwip-js": "^4.11.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "recharts": "^3.10.1",
+    "recharts": "^3.11.0",
     "tailwind-merge": "^3.7.0"
   },
   "devDependencies": {
