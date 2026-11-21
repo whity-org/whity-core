@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.131).
+ * SDK identity (v1.133).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1498,12 +1498,29 @@ namespace Whity\Sdk;
  *
  * Purely additive: one new optional manifest key. Older hosts refuse a manifest that carries it, so a
  * plugin that sets `theme` needs `^1.131`.)
+ *
+ * 1.132 (QUOTES: {@see Contribute\WorkspaceQuoteConversion} turns an accepted quote into something
+ * else, read as a {@see Sales\QuoteSnapshot} with its {@see Sales\QuoteSnapshotLine}s; it answers a
+ * {@see Sales\ConversionCheck} and a {@see Sales\ConversionResult}. Core's inventory (sales orders) and
+ * accounting (invoices) are its first implementations. New events: the filter `sales.quote.sending`
+ * (can veto) and `sales.quote.created|sent|accepted|declined|expired|converted|cancelled`, each with an
+ * `.async` twin (WHIT-1321, design section 34 §3).
+ *
+ * Purely additive.)
+ *
+ * 1.133 (USAGE METERS, READ-ONLY (section 33 §5, BM.17): the host service {@see Usage\Usage} gives a
+ * plugin its workspace's usage meters for a month, as Billing > Usage shows them: seats, customers,
+ * items, invoices, storage, messages by channel, agent runs and tool calls, and API calls, each with
+ * what was used, its base and whether it is near or past it ({@see Usage\UsageMeter}). Past a base is
+ * a warning only; nothing is ever refused.
+ *
+ * Purely additive: one new host service, null on older hosts.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.131.0';
+    public const VERSION = '1.133.0';
 
     /**
      * Static identity only — never instantiated.

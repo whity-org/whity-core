@@ -510,6 +510,11 @@ final class CorePermissions
     // roles that run the workspace.
     public const PURCHASES_READ = 'purchases:read';
     public const PURCHASES_WRITE = 'purchases:write';
+    // Quotes to customers (WHIT-1321, design section 34, QT.8): the roles that
+    // run the workspace. Turning one into an order or an invoice also needs
+    // the target's own permission; approving is the route, never a permission.
+    public const QUOTES_READ = 'quotes:read';
+    public const QUOTES_WRITE = 'quotes:write';
     // TASKS on Taskaat (A10, T.3). Tasks and boards live in the workspace's
     // Taskaat; these gate Whity's way into them. Read and write go to every
     // staff role (anchor documents:read); manage (connecting the workspace to
@@ -637,6 +642,8 @@ final class CorePermissions
             self::STOCK_TRANSFER,
             self::PURCHASES_READ,
             self::PURCHASES_WRITE,
+            self::QUOTES_READ,
+            self::QUOTES_WRITE,
             self::FIELDS_MANAGE,
             self::TASKS_READ,
             self::TASKS_WRITE,

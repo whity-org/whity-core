@@ -157,6 +157,18 @@ final class RateLimits
         return RateLimitRule::keyed('public_booking.slots', 240, self::HOUR);
     }
 
+    /** Opening a customer's quote link, per address (WHIT-1321). */
+    public static function publicQuoteViewPerAddress(): RateLimitRule
+    {
+        return RateLimitRule::keyed('public_quote.view', 120, self::HOUR);
+    }
+
+    /** Accepting or declining a quote online, per address (WHIT-1321). */
+    public static function publicQuoteAnswerPerAddress(): RateLimitRule
+    {
+        return RateLimitRule::keyed('public_quote.answer', 20, self::HOUR);
+    }
+
     /** Making a public booking, per address. */
     public static function publicBookingBookPerAddress(): RateLimitRule
     {

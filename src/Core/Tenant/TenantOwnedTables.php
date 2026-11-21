@@ -162,6 +162,9 @@ final class TenantOwnedTables
         // Files, photos and voice sent in Chat (UC.10).
         'chat_attachments' => '279_create_chat_attachments.php',
         'stored_files' => '298_create_stored_files.php',
+        // The usage ledger and stored bytes (section 33 §5, WHIT-1325).
+        'usage_ledger' => '332_create_usage_ledger.php',
+        'tenant_storage_usage' => '333_create_tenant_storage_usage.php',
         // Who owns each workspace (WHIT-1169).
         'workspace_owners' => '300_create_workspace_owners.php',
         // Offers to hand a workspace over or co-own it (WHIT-1170).
@@ -662,6 +665,9 @@ final class TenantOwnedTables
         'inv_orders' => '321_create_inventory_orders.php',
         'inv_order_lines' => '321_create_inventory_orders.php',
         'inv_supplier_items' => '321_create_inventory_orders.php',
+        'sales_quotes' => '330_create_sales_quotes.php',
+        'sales_quote_lines' => '330_create_sales_quotes.php',
+        'sales_quote_conversions' => '330_create_sales_quotes.php',
     ];
 
     /**

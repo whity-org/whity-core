@@ -10055,6 +10055,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/quotes/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The customer's quote, by the link the business sent (public)
+         * @description No account needed. When a newer revision has gone out, the newest one with `replaced: true`. Sent `Cache-Control: no-store`.
+         */
+        get: operations["get_api_v1_public_quotes_token"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/quotes/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept a quote (public) */
+        post: operations["post_api_v1_public_quotes_token_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/quotes/{token}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline a quote (public) */
+        post: operations["post_api_v1_public_quotes_token_decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/signup/confirm": {
         parameters: {
             query?: never;
@@ -10444,6 +10498,226 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/quotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List quotes, newest first
+         * @description One row per quote: its latest revision that has gone out, or the draft when it never has.
+         */
+        get: operations["get_api_v1_sales_quotes"];
+        put?: never;
+        /**
+         * Draft a quote
+         * @description A customer (a contact marked as one) and lines: an item (its price, name and tax category fill in when left out) or a free line with a description. Valid for the workspace's number of days (30 by default) unless `valid_until` says otherwise.
+         */
+        post: operations["post_api_v1_sales_quotes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/quotes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A quote with its lines, revisions and what it turned into */
+        get: operations["get_api_v1_sales_quotes_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a draft quote
+         * @description Any field; `lines` replaces every line. Only a draft can change; a sent quote changes through a new revision.
+         */
+        patch: operations["patch_api_v1_sales_quotes_id"];
+        trace?: never;
+    };
+    "/api/v1/sales/quotes/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Withdraw a quote before the customer answers */
+        post: operations["post_api_v1_sales_quotes_id_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/quotes/{id}/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn an accepted quote into an order or an invoice
+         * @description Once per target: asked again, it answers what was made the first time (200).
+         */
+        post: operations["post_api_v1_sales_quotes_id_convert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/quotes/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record the customer's answer
+         * @description What the customer said by phone or in person: accepted, with the name of who accepted, or declined, with a reason if they gave one.
+         */
+        post: operations["post_api_v1_sales_quotes_id_decision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/quotes/{id}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a new link to a quote
+         * @description The link before it stops working.
+         */
+        post: operations["post_api_v1_sales_quotes_id_link"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/quotes/{id}/revise": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make a new revision of a quote
+         * @description A draft copy with the same number and the next revision. Asked again while that draft exists, it answers the same draft.
+         */
+        post: operations["post_api_v1_sales_quotes_id_revise"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/quotes/{id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a quote to the customer
+         * @description A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`). It is emailed to the customer unless `email` is false or the workspace turned the quote email off; `emailed` says whether it was.
+         */
+        post: operations["post_api_v1_sales_quotes_id_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/quotes/{id}/submit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send a quote for approval
+         * @description It travels the workspace's quote route when one is chosen (`status: waiting_approval`); with none it is ready at once.
+         */
+        post: operations["post_api_v1_sales_quotes_id_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/quotes/{id}/targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What a quote can turn into
+         * @description One entry per target the workspace has (a sales order, an invoice), with whether it is possible now and why not.
+         */
+        get: operations["get_api_v1_sales_quotes_id_targets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The sales settings */
+        get: operations["get_api_v1_sales_settings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change the sales settings */
+        patch: operations["patch_api_v1_sales_settings"];
         trace?: never;
     };
     "/api/v1/saved-blocks": {
@@ -11257,6 +11531,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/themes/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn a theme from shadcn, Tailwind or Material Theme Builder into a theme file
+         * @description Free (TH.25): shadcn CSS variables (:root and .dark), a Tailwind v4 @theme block, or Material Theme Builder JSON become a Whity theme file. Colours become the main colour and colours set by hand for the roles Whity has, the radius the nearest shape preset, the font its pair; status colours stay Whity's. Nothing is saved: import the result with POST /api/themes.
+         */
+        post: operations["post_api_v1_themes_convert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/themes/export": {
         parameters: {
             query?: never;
@@ -11728,6 +12022,26 @@ export interface paths {
         put?: never;
         /** Demo reject action for the inbox block example */
         post: operations["post_api_v1_uikit_demo_tasks_id_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every usage meter for this workspace and month
+         * @description Seats, customers, items, invoices, storage, messages (by channel), agents (runs and tool calls) and API calls, each with what was used, the base (null when there is no limit) and whether it is near or past it. Past a base is a warning only: nothing is refused (BM.4). The current month is read live; an earlier one as it was kept.
+         */
+        get: operations["get_api_v1_usage"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -14712,6 +15026,35 @@ export interface components {
             description?: string;
             /** @description false retires the body: it keeps its history but convenes no new meetings. */
             is_active?: boolean;
+        };
+        ConvertThemeRequest: {
+            /**
+             * @description shadcn CSS variables, a Tailwind v4 @theme block, or Material Theme Builder JSON.
+             * @enum {string}
+             */
+            format: "shadcn" | "tailwind" | "material";
+            /** @description The CSS or JSON as pasted or read from the file, at most 64 KB. */
+            source: string;
+            /** @description The theme's name; "Imported from …" when empty. */
+            name?: string;
+        };
+        ConvertThemeResponse: {
+            data: {
+                /** @description A theme file (schemas/theme/v1.json), not saved yet. */
+                theme: {
+                    [key: string]: unknown;
+                };
+                /** @description What was kept and what was not, in plain words. */
+                notes: string[];
+                /** @description Colours for light and dark, and the corner radii. */
+                preview: {
+                    [key: string]: unknown;
+                };
+                /** @description What the guard rails change: mode, role and change. */
+                adjustments: {
+                    [key: string]: string;
+                }[];
+            };
         };
         CustomField: {
             id: number;
@@ -17734,7 +18077,7 @@ export interface components {
             colour?: Record<string, never>;
             /** @description family and headingFamily from the allowed fonts, scale, titleWeight and emphasis. */
             type?: Record<string, never>;
-            /** @description preset (square, crisp, whity, soft, round) and morph. */
+            /** @description preset (square, crisp, whity, soft, round, pebble, cut), morph, and components: a preset for buttons, fields, chips, cards, dialogs, tables or navigation. */
             shape?: Record<string, never>;
             /** @description compact, standard or comfortable. */
             density?: string;
@@ -20647,6 +20990,43 @@ export interface components {
                 fromMonthly: string | null;
             };
         };
+        PublicSalesQuote: {
+            number: string | null;
+            revision?: number;
+            /** @enum {string} */
+            status: "draft" | "waiting_approval" | "ready" | "sent" | "accepted" | "declined" | "expired" | "converted" | "cancelled" | "replaced";
+            customer: string;
+            issue_date?: string | null;
+            valid_until: string;
+            currency: string;
+            prices_include_tax?: boolean;
+            subtotal_minor?: number;
+            tax_minor?: number;
+            total_minor: number;
+            terms?: string;
+            decided_by_name?: string | null;
+            decided_at?: string | null;
+            replaced?: boolean;
+            lines: {
+                description: string;
+                quantity: string;
+                unit?: string | null;
+                price_minor: number;
+                discount_bp?: number;
+                tax_bp?: number;
+                line_total_minor: number;
+            }[];
+            workspace?: {
+                name: string;
+                brand?: Record<string, never> | null;
+            };
+        };
+        PublicSalesQuoteAnswer: {
+            /** @description Your name. Required to accept. */
+            name?: string;
+            /** @description Why, if declining. Optional. */
+            reason?: string;
+        };
         PublicSignupAcceptedResponse: {
             data: {
                 /** @enum {string} */
@@ -21303,6 +21683,175 @@ export interface components {
         };
         RoutingRuleListResponse: {
             data: components["schemas"]["RoutingRule"][];
+        };
+        SalesQuote: {
+            id: number;
+            /** @description Taken on first send (`QUO-0318`); null before. */
+            number?: string | null;
+            revision: number;
+            replaces_id?: number | null;
+            /** @enum {string} */
+            status: "draft" | "waiting_approval" | "ready" | "sent" | "accepted" | "declined" | "expired" | "converted" | "cancelled" | "replaced";
+            contact_id: number;
+            contact_name: string;
+            contact_email?: string;
+            issue_date?: string | null;
+            valid_until: string;
+            currency: string;
+            prices_include_tax?: boolean;
+            subtotal_minor: number;
+            tax_minor: number;
+            total_minor: number;
+            notes?: string;
+            terms?: string;
+            route_id?: number | null;
+            document_id?: number | null;
+            source_plugin?: string | null;
+            created_by_profile_id?: number | null;
+            created_by_name?: string | null;
+            agent_id?: number | null;
+            on_behalf_of_profile_id?: number | null;
+            approved_by_name?: string | null;
+            decided_by_name?: string;
+            decided_by_profile_name?: string | null;
+            decided_online?: boolean;
+            decline_reason?: string;
+            submitted_at?: string | null;
+            approved_at?: string | null;
+            sent_at?: string | null;
+            decided_at?: string | null;
+            converted_at?: string | null;
+            cancelled_at?: string | null;
+            created_at: string;
+            updated_at: string;
+            lines?: components["schemas"]["SalesQuoteLine"][];
+            conversions?: {
+                target: string;
+                id: number;
+                label?: string;
+            }[];
+            revisions?: {
+                id: number;
+                revision: number;
+                status: string;
+                sent_at?: string | null;
+            }[];
+        };
+        SalesQuoteConvertRequest: {
+            /** @description A target key from GET …/targets, such as `sales_order` or `invoice`. */
+            target: string;
+        };
+        SalesQuoteDecisionRequest: {
+            /** @description True when the customer said yes, false when they declined. */
+            accepted: boolean;
+            /** @description Who accepted. Required when accepting. */
+            name?: string;
+            /** @description Why they declined, if they said. */
+            reason?: string;
+        };
+        SalesQuoteLine: {
+            id: number;
+            variant_id?: number | null;
+            item_id?: number | null;
+            sku?: string | null;
+            unit?: string | null;
+            description: string;
+            quantity: string;
+            price_minor: number;
+            discount_bp?: number;
+            tax_category?: string;
+            tax_bp?: number;
+            /** @description Quantity times price, less the discount. */
+            line_total_minor: number;
+        };
+        SalesQuoteLineRequest: {
+            /** @description The item variant; leave out for a free line. */
+            variant_id?: number | null;
+            /** @description What it is. Required for a free line; an item line takes the item's name when left out. */
+            description?: string;
+            /** @description A decimal such as "2.5", in `unit` for an item, up to 3 decimals for a free line. */
+            quantity: string;
+            /** @description A unit code for an item line; the item's base unit when left out. */
+            unit?: string;
+            /** @description The price of one, in minor units of the quote's currency. */
+            price_minor?: number;
+            /** @description Discount in basis points, 0 to 10000. */
+            discount_bp?: number;
+            /** @description Tax rate in basis points, 0 to 10000 (1600 is 16%). */
+            tax_bp?: number;
+            /** @description The item's tax category, kept for the tax engine. */
+            tax_category?: string;
+        };
+        SalesQuoteRequest: {
+            /** @description The customer: a contact marked as a customer. */
+            contact_id: number;
+            /**
+             * Format: date
+             * @description The last day the customer can accept, such as 2026-12-21. Today plus the workspace's number of days when left out.
+             */
+            valid_until?: string;
+            /** @description Three letters; the workspace's currency when left out. */
+            currency?: string;
+            /** @description True when the prices typed already include tax. False by default. */
+            prices_include_tax?: boolean;
+            /** @description For the team; never shown to the customer. */
+            notes?: string;
+            /** @description Printed on the quote and shown to the customer. */
+            terms?: string;
+            /** @description The lines, 1 to 300, in order. On a change it replaces every line. */
+            lines: components["schemas"]["SalesQuoteLineRequest"][];
+            /** @description Any unique text; sending the same key again makes nothing new and answers the first quote. */
+            idempotency_key?: string;
+        };
+        SalesQuoteSendRequest: {
+            /** @description False to only make the link, without emailing the customer. True by default. */
+            email?: boolean;
+        };
+        SalesQuoteTarget: {
+            key: string;
+            label: {
+                en: string;
+                ar: string;
+            };
+            possible: boolean;
+            reason: string;
+            done?: {
+                id?: number;
+                label?: string;
+            } | null;
+        };
+        SalesQuoteUpdateRequest: {
+            /** @description The customer: a contact marked as a customer. */
+            contact_id?: number;
+            /**
+             * Format: date
+             * @description The last day the customer can accept, such as 2026-12-21. Today plus the workspace's number of days when left out.
+             */
+            valid_until?: string;
+            /** @description Three letters; the workspace's currency when left out. */
+            currency?: string;
+            /** @description True when the prices typed already include tax. False by default. */
+            prices_include_tax?: boolean;
+            /** @description For the team; never shown to the customer. */
+            notes?: string;
+            /** @description Printed on the quote and shown to the customer. */
+            terms?: string;
+            /** @description The lines, 1 to 300, in order. On a change it replaces every line. */
+            lines?: components["schemas"]["SalesQuoteLineRequest"][];
+        };
+        SalesSettings: {
+            /** @description How long a new quote is valid, 1 to 365 days. */
+            quote_valid_days?: number;
+            /** @description The route a quote travels before it goes out; null for none. */
+            quote_route_template_id?: number | null;
+            /** @description Email a quote to the customer when it is sent. */
+            email_quote?: boolean;
+            /** @description Email an invoice to the customer when it is issued. */
+            email_invoice?: boolean;
+            /** @description Email a receipt when a payment arrives. */
+            email_receipt?: boolean;
+            /** @description Allow payment reminders by email. */
+            email_reminder?: boolean;
         };
         SavedBlock: {
             id: number;
@@ -22877,6 +23426,40 @@ export interface components {
         };
         UnreadCountResponse: {
             unread_count: number;
+        };
+        UsageMeter: {
+            /** @enum {string} */
+            meter: "seats" | "customers" | "inventory.items" | "invoices" | "storage.bytes" | "messages.outbound" | "agents" | "api.calls";
+            /** @description The entitlement its base is set on. */
+            key: string;
+            /** @enum {string} */
+            kind: "counted" | "snapshot";
+            /** @enum {string} */
+            unit: "count" | "bytes";
+            used: number;
+            /** @description The month's highest reading; for a counted meter, the same as used. */
+            peak: number;
+            /** @description Null when there is no limit. */
+            base: number | null;
+            /** @enum {string} */
+            state: "unlimited" | "ok" | "near" | "over";
+            /** @description The meter split: messages by channel, API calls by `api` or `mcp`, agents by `runs`, `tool_calls`, `tokens_in`, `tokens_out`. */
+            dimensions: {
+                [key: string]: number;
+            };
+            resets_at: string | null;
+        };
+        UsageReport: {
+            /** @description YYYY-MM, in the workspace's time zone. */
+            period: string;
+            current: boolean;
+            resets_at: string | null;
+            meters: components["schemas"]["UsageMeter"][];
+            /** @description Months with usage, newest first. */
+            periods: string[];
+        };
+        UsageReportResponse: {
+            data: components["schemas"]["UsageReport"];
         };
         User: {
             id: number;
@@ -76078,6 +76661,242 @@ export interface operations {
             };
         };
     };
+    get_api_v1_public_quotes_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The 64-character token from the customer's link. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicSalesQuote"];
+                    };
+                };
+            };
+            /** @description This link is not valid any more */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_public_quotes_token_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The 64-character token from the customer's link. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicSalesQuoteAnswer"];
+            };
+        };
+        responses: {
+            /** @description The quote, accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicSalesQuote"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This link is not valid any more */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already answered, expired, withdrawn or replaced */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The name is missing */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_public_quotes_token_decline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The 64-character token from the customer's link. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicSalesQuoteAnswer"];
+            };
+        };
+        responses: {
+            /** @description The quote, declined */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicSalesQuote"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This link is not valid any more */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already answered, expired, withdrawn or replaced */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_public_signup_confirm: {
         parameters: {
             query?: {
@@ -78341,6 +79160,1252 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_sales_quotes: {
+        parameters: {
+            query?: {
+                /** @description `draft`, `waiting_approval`, `ready`, `sent`, `accepted`, `declined`, `expired`, `converted` or `cancelled`. */
+                status?: string;
+                /** @description Only this customer. */
+                contact_id?: number;
+                /** @description At most 200. Default 50. */
+                limit?: number;
+                /** @description How many to skip. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Quotes, without their lines */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesQuote"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_sales_quotes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesQuoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The same key was sent before */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesQuote"];
+                    };
+                };
+            };
+            /** @description The quote */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesQuote"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the quote's state, or a rule refused it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_sales_quotes_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesQuote"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_sales_quotes_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesQuoteUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesQuote"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the quote's state, or a rule refused it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_sales_quotes_id_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesQuote"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the quote's state, or a rule refused it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_sales_quotes_id_convert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesQuoteConvertRequest"];
+            };
+        };
+        responses: {
+            /** @description It was turned into that before */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesQuote"];
+                    };
+                };
+            };
+            /** @description The quote and what it became */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesQuote"];
+                        target: {
+                            key: string;
+                            id: number;
+                            label: string;
+                            link?: string;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the quote's state, or a rule refused it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_sales_quotes_id_decision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesQuoteDecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description The quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesQuote"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the quote's state, or a rule refused it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_sales_quotes_id_link: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new link */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        link: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the quote's state, or a rule refused it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_sales_quotes_id_revise: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new revision */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesQuote"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the quote's state, or a rule refused it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_sales_quotes_id_send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesQuoteSendRequest"];
+            };
+        };
+        responses: {
+            /** @description The quote and the customer's link */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesQuote"];
+                        link: string;
+                        emailed: boolean;
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the quote's state, or a rule refused it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_sales_quotes_id_submit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The quote */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesQuote"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the quote's state, or a rule refused it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_sales_quotes_id_targets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The targets */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesQuoteTarget"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_sales_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesSettings"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_sales_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesSettings"];
+            };
+        };
+        responses: {
+            /** @description The settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["SalesSettings"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -83889,6 +85954,102 @@ export interface operations {
             };
         };
     };
+    post_api_v1_themes_convert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConvertThemeRequest"];
+            };
+        };
+        responses: {
+            /** @description The theme file, what was kept in words, and a preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConvertThemeResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The source is larger than 64 KB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Nothing usable was found; the error says what to paste */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_themes_export: {
         parameters: {
             query?: never;
@@ -86218,6 +88379,83 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_usage: {
+        parameters: {
+            query?: {
+                /** @description A month, YYYY-MM; the current month when left out. */
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description This workspace's usage */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageReportResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The month is not written YYYY-MM */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

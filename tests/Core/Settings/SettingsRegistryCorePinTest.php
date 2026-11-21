@@ -233,6 +233,12 @@ final class SettingsRegistryCorePinTest extends TestCase
             // WHIT-1234: purchasing.
             'inventory.purchase_route_template_id',
             'inventory.over_receipt_percent',
+            'sales.quote_valid_days',
+            'sales.quote_route_template_id',
+            'sales.email_quote',
+            'sales.email_invoice',
+            'sales.email_receipt',
+            'sales.email_reminder',
         ];
     }
 
@@ -340,7 +346,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'licensing.billing_basis' => 'activated',
             'seats.enforcement' => 'warn',
             'seats.count_invited' => 'true',
-            'meters.enforcement' => 'block',
+            'meters.enforcement' => 'warn',
             // Tax defaults to ZERO, not to any country's rate: charging tax
             // an operator is not registered to collect is a worse failure than
             // not charging it, and a default correct for one jurisdiction and
@@ -482,6 +488,12 @@ final class SettingsRegistryCorePinTest extends TestCase
             'inventory.transfers_one_step' => 'false',
             'inventory.purchase_route_template_id' => '0',
             'inventory.over_receipt_percent' => '0',
+            'sales.quote_valid_days' => '30',
+            'sales.quote_route_template_id' => '0',
+            'sales.email_quote' => 'true',
+            'sales.email_invoice' => 'true',
+            'sales.email_receipt' => 'true',
+            'sales.email_reminder' => 'true',
         ];
     }
 

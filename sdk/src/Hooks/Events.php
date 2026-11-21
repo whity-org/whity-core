@@ -536,6 +536,44 @@ final class Events
     public const INVENTORY_ORDER_CANCELLED = 'inventory.order.cancelled';
     public const INVENTORY_ORDER_CANCELLED_ASYNC = 'inventory.order.cancelled.async';
 
+    // ---- quotes to customers (SDK 1.132, WHIT-1321, design section 34 §3.6) ----
+    /**
+     * FILTER hook, before a quote is sent to the customer (its first send or a
+     * revision). Payload: `tenant_id`, `quote_id`, `number`, `revision`,
+     * `contact_id`, `currency`, `total_minor`, `valid_until`,
+     * `acting_profile_id`, and `lines` (each `variant_id` or null,
+     * `description`, `quantity`, `price_minor`, `line_total_minor`). Return the
+     * payload unchanged; refuse with {@see HookVetoException} (a credit limit, a
+     * blocked customer): the caller gets 409 and your reason.
+     */
+    public const SALES_QUOTE_SENDING = 'sales.quote.sending';
+    /**
+     * A quote was drafted. This and every `sales.quote.*` notification below
+     * carry `tenant_id`, `quote_id`, `number` (null until first sent),
+     * `revision`, `contact_id`, `status`, `total_minor`, `currency` and
+     * `acting_profile_id` (null when the customer decided online).
+     */
+    public const SALES_QUOTE_CREATED = 'sales.quote.created';
+    public const SALES_QUOTE_CREATED_ASYNC = 'sales.quote.created.async';
+    /** Sent to the customer, with its number. */
+    public const SALES_QUOTE_SENT = 'sales.quote.sent';
+    public const SALES_QUOTE_SENT_ASYNC = 'sales.quote.sent.async';
+    /** The customer accepted, online or as a person recorded. Also carries `decided_by_name` and `online`. */
+    public const SALES_QUOTE_ACCEPTED = 'sales.quote.accepted';
+    public const SALES_QUOTE_ACCEPTED_ASYNC = 'sales.quote.accepted.async';
+    /** The customer declined. Also carries `decided_by_name`, `online` and `reason`. */
+    public const SALES_QUOTE_DECLINED = 'sales.quote.declined';
+    public const SALES_QUOTE_DECLINED_ASYNC = 'sales.quote.declined.async';
+    /** Past its valid-until date without a decision. */
+    public const SALES_QUOTE_EXPIRED = 'sales.quote.expired';
+    public const SALES_QUOTE_EXPIRED_ASYNC = 'sales.quote.expired.async';
+    /** Turned into a target. Also carries `target` (`sales_order`, `invoice`, a plugin's key) and `target_id`. */
+    public const SALES_QUOTE_CONVERTED = 'sales.quote.converted';
+    public const SALES_QUOTE_CONVERTED_ASYNC = 'sales.quote.converted.async';
+    /** Cancelled before a decision. */
+    public const SALES_QUOTE_CANCELLED = 'sales.quote.cancelled';
+    public const SALES_QUOTE_CANCELLED_ASYNC = 'sales.quote.cancelled.async';
+
     /**
      * The event name to dispatch for one of THIS plugin's own events (SDK 1.29).
      *

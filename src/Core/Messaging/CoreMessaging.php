@@ -36,6 +36,8 @@ final class CoreMessaging
         ?string $appUrl = null,
         // E2: emails go out as the workspace's HTML card through the one sender.
         ?\Whity\Core\Mail\BrandedEmailSender $sender = null,
+        // The usage ledger: each message counted on its channel (BM.17).
+        ?\Whity\Core\Usage\UsageLedger $usage = null,
     ): MessagingService {
         $settings = new MessagingSettings($pdo, $secrets);
 
@@ -76,6 +78,9 @@ final class CoreMessaging
             $enqueue,
             $meters,
         );
+        if ($usage !== null) {
+            $service->useUsageLedger($usage);
+        }
         // One chat (design 3.5, WHIT-1097): blocked senders and the workspace's bots.
         $blocking = new \Whity\Core\Chat\ChatBlocking($pdo);
         $bots = new \Whity\Core\Chat\ChatBots($pdo);

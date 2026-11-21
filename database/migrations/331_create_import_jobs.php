@@ -84,7 +84,7 @@ final class CreateImportJobs
         if (!self::tableExists($db->getPdo(), 'contact_imports')) {
             return;
         }
-        // @tenant-guard-ignore: a one-off copy of every workspace's rows between two tenant-owned tables; each row keeps its own tenant_id
+        // A one-off copy of every workspace's rows between two tenant-owned tables; each row keeps its own tenant_id
         $imports = $db->query(
             'SELECT id, tenant_id, created_by_profile_id, file_name, status, header_json, rows_json, options_json, summary_json,
                     imported_at, undone_at, created_at, updated_at

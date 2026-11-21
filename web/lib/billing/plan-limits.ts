@@ -26,6 +26,9 @@ export const KNOWN_LIMITS = [
   'documents.render.per_day',
   'documents.render.per_month',
   'inventory.items.max',
+  'invoices.per_month',
+  'api.calls.per_month',
+  'storage.quota_bytes',
   'brand.custom_domain',
 ] as const;
 

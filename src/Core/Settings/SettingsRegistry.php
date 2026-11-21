@@ -285,9 +285,10 @@ final class SettingsRegistry
     public const SEATS_ENFORCEMENT = 'seats.enforcement';
     public const SEATS_COUNT_INVITED = 'seats.count_invited';
 
-    // METERED LIMITS (documents rendered per day or month). 'block' refuses past
-    // the limit, as metering always has; 'warn' counts and lets the action go
-    // ahead. Global-only for the same reason as seats.enforcement.
+    // METERED LIMITS (documents rendered per day or month). 'warn', the
+    // default since the business model (BM.17), counts and lets the action go
+    // ahead; 'block' refuses past the limit, for an operator who opts in.
+    // Global-only for the same reason as seats.enforcement.
     public const METERS_ENFORCEMENT = 'meters.enforcement';
 
     // INVOICING (#billing). Every one of these differs per deployment, which
@@ -949,6 +950,19 @@ final class SettingsRegistry
     public const INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID = 'inventory.purchase_route_template_id';
     public const INVENTORY_OVER_RECEIPT_PERCENT = 'inventory.over_receipt_percent';
 
+    // ---- Quotes to customers (WHIT-1321, design section 34 §3, QT.4) ----
+    //   - quote_valid_days: how long a new quote is valid, 1 to 365 days (30).
+    //   - quote_route_template_id: the route a quote travels before it can be
+    //     sent; 0 means none, and a person with quotes:write marks it ready.
+    public const SALES_QUOTE_VALID_DAYS = 'sales.quote_valid_days';
+    public const SALES_QUOTE_ROUTE_TEMPLATE_ID = 'sales.quote_route_template_id';
+    //   - email_*: whether the workspace emails its customers a quote, an
+    //     invoice, a receipt or a payment reminder (WHIT-1323, TR.3); all on.
+    public const SALES_EMAIL_QUOTE = 'sales.email_quote';
+    public const SALES_EMAIL_INVOICE = 'sales.email_invoice';
+    public const SALES_EMAIL_RECEIPT = 'sales.email_receipt';
+    public const SALES_EMAIL_REMINDER = 'sales.email_reminder';
+
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
      * settings API cannot make (a customer-safe role, a permission other than
@@ -974,6 +988,12 @@ final class SettingsRegistry
         self::INVENTORY_TRANSFERS_ONE_STEP,
         self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID,
         self::INVENTORY_OVER_RECEIPT_PERCENT,
+        self::SALES_QUOTE_VALID_DAYS,
+        self::SALES_QUOTE_ROUTE_TEMPLATE_ID,
+        self::SALES_EMAIL_QUOTE,
+        self::SALES_EMAIL_INVOICE,
+        self::SALES_EMAIL_RECEIPT,
+        self::SALES_EMAIL_REMINDER,
     ];
 
     /**
@@ -1327,7 +1347,10 @@ final class SettingsRegistry
         self::LICENSING_BILLING_BASIS => 'activated',
         self::SEATS_ENFORCEMENT => 'warn',
         self::SEATS_COUNT_INVITED => 'true',
-        self::METERS_ENFORCEMENT => 'block',
+        // Warn by default (BM.4, BM.17): a limit counts and tells the people
+        // who can change the plan, and nobody is ever locked out. 'block' is
+        // still there for an operator who chooses it.
+        self::METERS_ENFORCEMENT => 'warn',
         // Zero tax until an operator says otherwise — see the constant.
         self::BILLING_DEFAULT_CURRENCY => 'USD',
         self::BILLING_DEFAULT_PLAN => '',
@@ -1500,6 +1523,12 @@ final class SettingsRegistry
         self::INVENTORY_TRANSFERS_ONE_STEP => 'false',
         self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID => '0',
         self::INVENTORY_OVER_RECEIPT_PERCENT => '0',
+        self::SALES_QUOTE_VALID_DAYS => '30',
+        self::SALES_QUOTE_ROUTE_TEMPLATE_ID => '0',
+        self::SALES_EMAIL_QUOTE => 'true',
+        self::SALES_EMAIL_INVOICE => 'true',
+        self::SALES_EMAIL_RECEIPT => 'true',
+        self::SALES_EMAIL_REMINDER => 'true',
     ];
 
     /**
@@ -2016,6 +2045,11 @@ final class SettingsRegistry
                 : $key . ' must be a route template id, or 0 for the default.',
             self::INVENTORY_TRANSFERS_ONE_STEP => self::validateBoolean($value, self::INVENTORY_TRANSFERS_ONE_STEP),
             self::INVENTORY_OVER_RECEIPT_PERCENT => self::validateWholeNumberBetween($value, self::INVENTORY_OVER_RECEIPT_PERCENT, 0, 100),
+            self::SALES_QUOTE_VALID_DAYS => self::validateWholeNumberBetween($value, self::SALES_QUOTE_VALID_DAYS, 1, 365),
+            self::SALES_QUOTE_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
+                ? null
+                : $key . ' must be a route template id, or 0 for none.',
+            self::SALES_EMAIL_QUOTE, self::SALES_EMAIL_INVOICE, self::SALES_EMAIL_RECEIPT, self::SALES_EMAIL_REMINDER => self::validateBoolean($value, $key),
             default => "Unknown setting key: {$key}",
         };
     }

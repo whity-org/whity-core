@@ -54,6 +54,14 @@ final class MessagingService implements HostWiredService
     /** C5: who a customer is, whatever channel they write on. */
     private ConversationContacts $contacts;
 
+    /** The usage ledger (BM.17): every outbound message, on its channel. Null: not recorded. */
+    private ?\Whity\Core\Usage\UsageLedger $usage = null;
+
+    public function useUsageLedger(\Whity\Core\Usage\UsageLedger $usage): void
+    {
+        $this->usage = $usage;
+    }
+
     /** UC.12: says whether a sender is blocked; what they send is then dropped. */
     private ?Closure $blocked = null;
 
@@ -399,7 +407,7 @@ final class MessagingService implements HostWiredService
             'channel_address' => $address,
         ]);
         $this->conversations->touch($tenantId, $conversationId, false);
-        $this->count($tenantId);
+        $this->count($tenantId, $channel->key());
 
         // Web chat has no provider to wait for: the visitor sees it once it is
         // marked sent, so it is marked now unless it is being held.
@@ -426,8 +434,11 @@ final class MessagingService implements HostWiredService
     }
 
     /** Counted when queued, on every channel; warns past the plan's allowance, never refuses. */
-    private function count(int $tenantId): void
+    private function count(int $tenantId, string $channelKey): void
     {
+        // The durable count, per channel (section 33 §5). Never throws.
+        $this->usage?->add($tenantId, \Whity\Core\Usage\UsageMeters::MESSAGES, 1, $channelKey);
+
         if ($this->meters === null) {
             return;
         }

@@ -3352,6 +3352,9 @@ $router->register('GET',  '/api/billing/trial',    [$externalBillingHandler, 'tr
 // its allowance, and the workspace's admins read the result on Billing.
 $customerUsage = new \Whity\Core\Usage\CustomerUsage($db->getPdo(), $entitlementService, $settingsService);
 $customerUsage->subscribe($hookManager);
+// Section 33 §5 (BM.17): the durable usage ledger every meter writes to, per
+// workspace and month, that a bill is made from.
+$usageLedger = new \Whity\Core\Usage\UsageLedger($db->getPdo(), $settingsService);
 $planLimitMeters = new \Whity\Core\Entitlement\MeterService(
     new DatabaseSharedStore($db->getPdo()),
     $entitlementService,
@@ -3382,11 +3385,26 @@ $planLimitsHandler = new \Whity\Api\PlanLimitsApiHandler(
         $entitlementService,
         new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService),
         $customerUsage,
-        $planLimitMeters
+        $planLimitMeters,
+        $usageLedger,
     ),
     $roleChecker
 );
 $router->register('GET',  '/api/billing/limits',   [$planLimitsHandler, 'show'],      null, null, CorePermissions::BILLING_VIEW);
+// Section 33 §5: every usage meter, its base and whether it is near or past it.
+$usageReport = new \Whity\Core\Usage\UsageReport(
+    $usageLedger,
+    new \Whity\Core\Usage\UsageSnapshots(
+        $db->getPdo(),
+        $usageLedger,
+        new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService),
+        $customerUsage,
+    ),
+    $entitlementService,
+);
+$router->register('GET',  '/api/usage',            [new \Whity\Api\UsageApiHandler($usageReport, $roleChecker), 'show'], null, null, CorePermissions::BILLING_VIEW);
+// SDK 1.133: a plugin reads its workspace's meters, read-only.
+\Whity\register_service(\Whity\Sdk\Usage\Usage::class, new \Whity\Core\Usage\HostUsage($usageReport));
 // More seats, or fewer. The only change the billing service supports in place:
 // a PLAN swap would mean cancelling and buying again, which either double-charges
 // or leaves a gap, so it is refused rather than faked.
@@ -5669,6 +5687,52 @@ $inventoryPurchases = new \Whity\Core\Inventory\PurchaseOrders(
 );
 $routeSubjectRegistry->register(new \Whity\Core\Inventory\OrderRouteSubject($inventoryDb, $inventoryPurchases));
 $inventoryPurchases->useApprovals(new \Whity\Core\Inventory\OperationRoutes($inventoryDb, $documentRouter, $routeTemplateRepository, $roleChecker, $inventorySettings));
+// WHIT-1321: quotes to customers (design section 34, QT.1-QT.12). A quote
+// travels the workspace's quote route when one is chosen (sales.quote); the
+// customer answers on a public page reached by a 256-bit link. What a quote
+// turns into is a registry the inventory and accounting lanes fill.
+$salesQuoteConversions = new \Whity\Core\Sales\QuoteConversions();
+\Whity\register_service(\Whity\Core\Sales\QuoteConversions::class, $salesQuoteConversions); // @phpstan-ignore-line
+$salesQuotes = new \Whity\Core\Sales\Quotes(
+    $inventoryDb,
+    $inventoryWorkspace,
+    $inventoryItems,
+    $inventoryUnits,
+    new \Whity\Database\SequenceCounters($db->getPdo()),
+    $salesQuoteConversions,
+    $inventorySettings,
+    $inventoryItems->currencyFor(...),
+    $hookManager,
+);
+$routeSubjectRegistry->register(new \Whity\Core\Sales\QuoteRouteSubject($inventoryDb, $salesQuotes));
+$salesQuotes->useApprovals(new \Whity\Core\Sales\QuoteRoutes($documentRouter, $routeTemplateRepository, $inventorySettings));
+$salesQuotesHandler = new \Whity\Api\SalesQuotesApiHandler(
+    $salesQuotes,
+    $settingsService,
+    new DatabaseSharedStore($db->getPdo()),
+    \Whity\Core\Http\FrontendUrls::fromEnv()->base(),
+    $brandingService,
+    static fn (int $tenantId): string => (new \Whity\Core\Branding\TenantHostRepository($db->getPdo()))->findNameById($tenantId) ?? '',
+    // WHIT-1323: sending a quote emails it to the customer (EM.1 "Money").
+    new \Whity\Core\Sales\TradingEmails($brandedEmailSender, $settingsService),
+);
+$router->register('GET',    '/api/sales/quotes',                     [$salesQuotesHandler, 'list'],     null, null, CorePermissions::QUOTES_READ);
+$router->register('POST',   '/api/sales/quotes',                     [$salesQuotesHandler, 'create'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('GET',    '/api/sales/quotes/{id:\d+}',            [$salesQuotesHandler, 'show'],     null, null, CorePermissions::QUOTES_READ);
+$router->register('PATCH',  '/api/sales/quotes/{id:\d+}',            [$salesQuotesHandler, 'update'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/submit',     [$salesQuotesHandler, 'submit'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/send',       [$salesQuotesHandler, 'send'],     null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/link',       [$salesQuotesHandler, 'newLink'],  null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/decision',   [$salesQuotesHandler, 'decide'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/revise',     [$salesQuotesHandler, 'revise'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/cancel',     [$salesQuotesHandler, 'cancel'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('GET',    '/api/sales/quotes/{id:\d+}/targets',    [$salesQuotesHandler, 'targets'],  null, null, CorePermissions::QUOTES_READ);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/convert',    [$salesQuotesHandler, 'convert'],  null, null, CorePermissions::QUOTES_WRITE);
+$router->register('GET',    '/api/sales/settings',                   [$salesQuotesHandler, 'showSettings'],   null, null, CorePermissions::QUOTES_READ);
+$router->register('PATCH',  '/api/sales/settings',                   [$salesQuotesHandler, 'updateSettings'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('GET',    '/api/public/quotes/{token:[a-f0-9]{64}}',         [$salesQuotesHandler, 'publicShow'],    null);
+$router->register('POST',   '/api/public/quotes/{token:[a-f0-9]{64}}/accept',  [$salesQuotesHandler, 'publicAccept'],  null);
+$router->register('POST',   '/api/public/quotes/{token:[a-f0-9]{64}}/decline', [$salesQuotesHandler, 'publicDecline'], null);
 $inventoryGuard = new \Whity\Core\Inventory\Host\HostInventoryGuard(
     $inventoryDb,
     static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
@@ -6154,6 +6218,7 @@ $messagingService = \Whity\Core\Messaging\CoreMessaging::build(
     $planLimitMeters,
     (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
     $brandedEmailSender,
+    $usageLedger,
 );
 \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messagingService);
 // WHIT-967 (SDK 1.99): a plugin messages a workspace's customer through Messages.
@@ -6394,6 +6459,7 @@ $themesHandler = new \Whity\Api\ThemesApiHandler(
 $router->register('GET',    '/api/themes',            [$themesHandler, 'list'],   null, null, CorePermissions::SETTINGS_READ);
 $router->register('GET',    '/api/themes/export',     [$themesHandler, 'export'], null, null, CorePermissions::SETTINGS_READ);
 $router->register('POST',   '/api/themes',            [$themesHandler, 'import'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('POST',   '/api/themes/convert',    [$themesHandler, 'convert'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('DELETE', '/api/themes/{themeId}',  [$themesHandler, 'delete'], null, null, CorePermissions::SETTINGS_WRITE);
 
 // 13c-bis. Register the pending-registration review API (WC-235). Gated on
@@ -6821,7 +6887,7 @@ $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnl
 ))->registerOn($proposalDiffs);
 // WHIT-812: what an agent did that its person can still undo.
 $agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters, callKeys: new \Whity\Mcp\Tools\McpCallKeys($db->getPdo()));
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters, callKeys: new \Whity\Mcp\Tools\McpCallKeys($db->getPdo()), usage: new \Whity\Core\Usage\McpUsage($usageLedger, new DatabaseSharedStore($db->getPdo())));
 $mcpToolsCallHandler->setWorkspaceGate($pluginLoader);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
