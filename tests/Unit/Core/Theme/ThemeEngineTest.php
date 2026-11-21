@@ -11,6 +11,7 @@ use Whity\Core\Theme\ThemeCompiler;
 use Whity\Core\Theme\ThemeFonts;
 use Whity\Core\Theme\ThemeLibrary;
 use Whity\Core\Theme\ThemeResolver;
+use Whity\Core\Theme\ThemeTweaks;
 use Whity\Core\Theme\ThemeValidator;
 
 /**
@@ -272,19 +273,130 @@ final class ThemeEngineTest extends TestCase
         foreach (ThemeValidator::SHAPES as $shape) {
             foreach (['standard', 'compact', 'comfortable'] as $density) {
                 $vars = ThemeCompiler::compile(self::theme(['shape' => ['preset' => $shape], 'density' => $density]))['vars'];
-                $keep = array_filter($vars, static fn (string $k): bool => str_starts_with($k, 'wy-radius-') || str_starts_with($k, 'control-h') || $k === 'row-h', ARRAY_FILTER_USE_KEY);
+                $keep = array_filter($vars, static fn (string $k): bool => str_starts_with($k, 'wy-radius-') || $k === 'wy-corner-shape' || str_starts_with($k, 'control-h') || $k === 'row-h', ARRAY_FILTER_USE_KEY);
                 ksort($keep);
                 $presets[$density === 'standard' ? $shape : "{$shape}-{$density}"] = (object) $keep;
             }
         }
-        $json = json_encode($presets, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "
-";
+        $json = json_encode($presets, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
         if (getenv('UPDATE_SHAPE_PRESETS') === '1') {
             file_put_contents($file, $json);
         }
         self::assertFileExists($file);
-        self::assertSame($json, str_replace("
-", "
-", (string) file_get_contents($file)), 'Run UPDATE_SHAPE_PRESETS=1 vendor/bin/phpunit --filter ShapeCheckPresets');
+        self::assertSame($json, str_replace("\r\n", "\n", (string) file_get_contents($file)), 'Run UPDATE_SHAPE_PRESETS=1 vendor/bin/phpunit --filter ShapeCheckPresets');
+    }
+
+    /** TH.15: shape, density and the font pair on top of the theme, saved with the colour overrides. */
+    public function testTheFreeTweaksApplyOnTopOfTheChosenTheme(): void
+    {
+        self::assertSame([], ThemeValidator::validateOverrides(['shape' => 'round', 'density' => 'compact', 'font' => 'cairo', 'light' => ['background' => '#f4f1ea']]));
+        self::assertNotSame([], ThemeValidator::validateOverrides(['shape' => 'blob']));
+        self::assertNotSame([], ThemeValidator::validateOverrides(['font' => 'comic-sans']));
+        self::assertNotSame([], ThemeValidator::validateOverrides(['radius' => '999px']));
+
+        $library = new ThemeLibrary();
+        $settings = [
+            SettingsRegistry::BRANDING_THEME => 'whity.harbour',
+            SettingsRegistry::BRANDING_THEME_OVERRIDES => '{"shape":"round","density":"comfortable","font":"cairo"}',
+        ];
+        $tweaked = ThemeResolver::resolve($settings, $library, 1)['theme'];
+        $plain = ThemeResolver::resolve([SettingsRegistry::BRANDING_THEME => 'whity.harbour'], $library, 1)['theme'];
+        self::assertNotNull($tweaked);
+        self::assertNotNull($plain);
+        self::assertSame('cairo', $tweaked['fonts']['body']);
+        self::assertSame('cairo', $tweaked['fonts']['heading']);
+        self::assertNotSame($plain['vars']['wy-radius-control'] ?? null, $tweaked['vars']['wy-radius-control'] ?? null);
+        self::assertSame($plain['light']['primary'], $tweaked['light']['primary']);
+
+        // A tweak replaces a heading face the theme set, as one pair.
+        $kufi = ThemeTweaks::apply(self::theme(['type' => ['family' => 'noto', 'headingFamily' => 'kufi', 'scale' => 'roomy']]), ['font' => 'plex']);
+        self::assertEquals(['scale' => 'roomy', 'family' => 'plex'], $kufi['type']);
+        self::assertSame(['shape' => null, 'density' => 'compact', 'font' => null], ThemeTweaks::chosen(['density' => 'compact', 'shape' => 'blob']));
+    }
+
+    /** TH.16: the export is a valid theme file that gives the same look when imported. */
+    public function testTheExportFoldsInEverythingTheWorkspaceSet(): void
+    {
+        $harbour = ThemeLibrary::builtIn()['whity.harbour'];
+        $overrides = ['shape' => 'round', 'font' => 'readex', 'light' => ['background' => '#f4f1ea']];
+        $file = ThemeTweaks::export($harbour, '#B74C05', $overrides, 'Example Bakery');
+
+        self::assertSame([], ThemeValidator::validate($file));
+        self::assertSame('workspace.harbour', $file['id']);
+        self::assertSame('#b74c05', $file['colour']['seeds']['primary']);
+        self::assertSame('#f4f1ea', $file['colour']['overrides']['light']['background']);
+        self::assertSame('round', $file['shape']['preset']);
+        self::assertSame('readex', $file['type']['family']);
+        self::assertSame(['name' => 'Example Bakery'], $file['author']);
+        self::assertSame('workspace.whity', ThemeTweaks::export(ThemeLibrary::builtIn()[ThemeLibrary::DEFAULT_ID], null, [])['id']);
+
+        // Imported as-is, the file compiles to the workspace's look with no adjustments left to apply.
+        $direct = ThemeCompiler::compile(ThemeTweaks::apply($harbour, $overrides), '#b74c05', $overrides);
+        $again = ThemeCompiler::compile($file);
+        self::assertSame($direct['light'], $again['light']);
+        self::assertSame($direct['dark'], $again['dark']);
+        self::assertSame($direct['vars'], $again['vars']);
+
+        // An imported theme keeps its own id.
+        self::assertSame('acme.test', ThemeTweaks::export(self::theme(), null, [])['id']);
+    }
+
+    /** TH.16: a newer version says what it changes before it replaces the old one. */
+    public function testANewerVersionListsWhatItChanges(): void
+    {
+        $old = self::theme(['shape' => ['preset' => 'soft'], 'colour' => ['seeds' => ['primary' => '#0b6e74']]]);
+        $new = self::theme(['version' => '1.1.0', 'shape' => ['preset' => 'round'], 'density' => 'compact', 'colour' => ['seeds' => ['primary' => '#0b6e74'], 'overrides' => ['light' => ['background' => '#f4f1ea']]]]);
+        self::assertSame([
+            ['field' => 'shape.preset', 'from' => 'soft', 'to' => 'round'],
+            ['field' => 'density', 'from' => null, 'to' => 'compact'],
+            ['field' => 'colour.overrides', 'from' => '0', 'to' => '1'],
+        ], ThemeTweaks::changes($old, $new));
+        self::assertSame([], ThemeTweaks::changes($old, $old));
+    }
+
+    /** TH.17: Pebble is Soft with pill controls; Cut is Crisp with bevelled corners. */
+    public function testPebbleAndCutShapes(): void
+    {
+        $pebble = ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'pebble']]))['vars'];
+        $soft = ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'soft']]))['vars'];
+        self::assertSame('20px', $pebble['wy-radius-control']);
+        self::assertSame($soft['wy-radius-card'], $pebble['wy-radius-card']);
+        self::assertSame($soft['wy-radius-dialog'], $pebble['wy-radius-dialog']);
+
+        $cut = ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'cut']]))['vars'];
+        $crisp = ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'crisp']]))['vars'];
+        self::assertSame('bevel', $cut['wy-corner-shape']);
+        self::assertArrayNotHasKey('wy-corner-shape', $crisp);
+        unset($cut['wy-corner-shape']);
+        self::assertSame($crisp, $cut);
+    }
+
+    /** TH.18: morph is on by default with pill controls, and a theme can turn it on or off. */
+    public function testShapeMorph(): void
+    {
+        $round = ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'round']]))['vars'];
+        self::assertSame('10px', $round['wy-radius-control-pressed']);
+        self::assertSame('8px', $round['wy-radius-control-selected']);
+        self::assertArrayHasKey('wy-radius-control-pressed', ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'pebble']]))['vars']);
+        self::assertArrayNotHasKey('wy-radius-control-pressed', ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'round', 'morph' => 'off']]))['vars']);
+        self::assertArrayNotHasKey('wy-radius-control-pressed', ThemeCompiler::compile(self::theme(['shape' => ['preset' => 'soft']]))['vars']);
+        self::assertSame('5px', ThemeCompiler::compile(self::theme(['shape' => ['morph' => 'on']]))['vars']['wy-radius-control-pressed']);
+    }
+
+    /** TH.19: outline draws borders instead of shadows; brisk is standard at 0.8 of the time. */
+    public function testOutlineElevationAndBriskMotion(): void
+    {
+        $outline = ThemeCompiler::compile(self::theme(['elevation' => ['style' => 'outline', 'float' => 'strong']]));
+        foreach (['light', 'dark'] as $mode) {
+            self::assertMatchesRegularExpression('/^0 0 0 1px #[0-9a-f]{6}$/', $outline[$mode]['shadow-float']);
+            self::assertMatchesRegularExpression('/^0 0 0 2px #/', $outline[$mode]['plane-rest']);
+        }
+
+        $standard = ThemeCompiler::compile(self::theme(['motion' => ['preset' => 'standard']]))['vars'];
+        $brisk = ThemeCompiler::compile(self::theme(['motion' => ['preset' => 'brisk']]))['vars'];
+        foreach (['dur-fast', 'dur-base', 'dur-slow'] as $key) {
+            self::assertEqualsWithDelta((int) $standard[$key] * 0.8, (int) $brisk[$key], 10, $key);
+        }
+        self::assertSame($standard['ease-out'], $brisk['ease-out']);
     }
 }

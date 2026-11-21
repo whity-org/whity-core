@@ -24,7 +24,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "mb-(--plane-offset) ml-(--plane-offset) bg-primary text-primary-foreground shadow-plane-primary transition-[box-shadow,translate] duration-(--dur-fast) ease-out-whity hover:translate-x-px hover:-translate-y-px hover:shadow-plane-primary-hover active:-translate-x-[3px] active:translate-y-[3px] active:shadow-none",
+          // Shape morph (TH.18): pressed, the main button squares off when the
+          // theme morphs. The small and large sizes keep their own corner.
+          "mb-(--plane-offset) ml-(--plane-offset) bg-primary text-primary-foreground shadow-plane-primary [transition:box-shadow_var(--dur-fast)_var(--ease-out-whity),translate_var(--dur-fast)_var(--ease-out-whity),border-radius_var(--dur-morph)_var(--ease-out-whity)] hover:translate-x-px hover:-translate-y-px hover:shadow-plane-primary-hover active:-translate-x-[3px] active:translate-y-[3px] active:rounded-control-pressed active:shadow-none",
         outline:
           "border-input bg-card text-foreground hover:bg-muted aria-expanded:bg-muted",
         secondary:
@@ -35,13 +37,13 @@ const buttonVariants = cva(
       },
       size: {
         default: "h-10 px-3.5 [&_svg:not([class*='size-'])]:size-4",
-        xs: "h-8 gap-1 rounded-control-sm px-2.5 text-xs [&_svg:not([class*='size-'])]:size-4",
-        sm: "h-8 gap-1 rounded-control-sm px-2.5 text-xs [&_svg:not([class*='size-'])]:size-4",
-        lg: "h-11 rounded-control-lg px-4 [&_svg:not([class*='size-'])]:size-4",
+        xs: "h-8 gap-1 rounded-control-sm active:rounded-control-sm px-2.5 text-xs [&_svg:not([class*='size-'])]:size-4",
+        sm: "h-8 gap-1 rounded-control-sm active:rounded-control-sm px-2.5 text-xs [&_svg:not([class*='size-'])]:size-4",
+        lg: "h-11 rounded-control-lg active:rounded-control-lg px-4 [&_svg:not([class*='size-'])]:size-4",
         icon: "size-10 px-0 [&_svg:not([class*='size-'])]:size-4",
-        "icon-xs": "size-8 rounded-control-sm px-0 [&_svg:not([class*='size-'])]:size-4",
-        "icon-sm": "size-8 rounded-control-sm px-0 [&_svg:not([class*='size-'])]:size-4",
-        "icon-lg": "size-11 rounded-control-lg px-0 [&_svg:not([class*='size-'])]:size-4",
+        "icon-xs": "size-8 rounded-control-sm active:rounded-control-sm px-0 [&_svg:not([class*='size-'])]:size-4",
+        "icon-sm": "size-8 rounded-control-sm active:rounded-control-sm px-0 [&_svg:not([class*='size-'])]:size-4",
+        "icon-lg": "size-11 rounded-control-lg active:rounded-control-lg px-0 [&_svg:not([class*='size-'])]:size-4",
       },
     },
     compoundVariants: [

@@ -532,6 +532,10 @@ function generateThemeInlineBlock(base) {
   // a child's radius inside it is the outer radius less this padding.
   lines.push('  --spacing-inset-control: max(0.25rem, calc(var(--radius-control) * 0.3));');
   lines.push('  --radius-control-inner: max(0.125rem, calc(var(--radius-control) - var(--spacing-inset-control)));');
+  // Shape morph (TH.18): the main button while pressed and a selected chip.
+  // Without a theme that morphs, both stay the control's own radius.
+  lines.push('  --radius-control-pressed: var(--wy-radius-control-pressed, var(--radius-control));');
+  lines.push('  --radius-control-selected: var(--wy-radius-control-selected, var(--radius-control-sm));');
   // The plane (decision 4.3) and the float shadow (4.4).
   lines.push('  --shadow-plane: var(--plane-rest);');
   lines.push('  --shadow-plane-hover: var(--plane-hover);');
@@ -546,6 +550,15 @@ function generateThemeInlineBlock(base) {
     `@utility plane-lift { transition: box-shadow ${base.motion['dur-fast']} ${base.motion['ease-out']}, ` +
       `translate ${base.motion['dur-fast']} ${base.motion['ease-out']}; &:hover { translate: 1px -1px; } }`
   );
+  // The Cut preset (TH.17) bevels every themed corner; pills (`rounded-full`)
+  // stay round. Browsers without corner-shape draw the rounded corner.
+  lines.push(
+    '@layer base { [class*="rounded-control"], [class*="rounded-card"], [class*="rounded-dialog"], [class*="rounded-sm"], ' +
+      '[class*="rounded-md"], [class*="rounded-lg"], [class*="rounded-xl"], [class*="rounded-2xl"] { corner-shape: var(--wy-corner-shape, round); } }'
+  );
+  // Morph moves only for people on Full animations (06-motion, LT.4).
+  lines.push(':root { --dur-morph: var(--dur-fast); }');
+  lines.push(':root[data-motion="calm"], :root[data-motion="off"] { --dur-morph: 0ms; }');
   lines.push(
     '@utility bg-blueprint-grid { background-color: var(--blueprint); background-image: ' +
       'linear-gradient(var(--blueprint-line) 1px, transparent 1px), linear-gradient(90deg, var(--blueprint-line) 1px, transparent 1px), ' +

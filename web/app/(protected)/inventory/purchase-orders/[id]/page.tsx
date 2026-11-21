@@ -23,6 +23,7 @@ import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
 import { UserText } from '@/components/ui/user-text';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
+import { PrintMenu } from '@/components/inventory/print-menu';
 import { PurchaseOrderStatus } from '@/components/inventory/purchase-orders-tab';
 import { ReceiveOrderDialog } from '@/components/inventory/receive-order-dialog';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -206,7 +207,14 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
         }
         title={order.contact_name ?? order.number}
         description={subtitle}
-        action={action}
+        action={
+          <div className="flex flex-wrap gap-2">
+            {order.status !== 'cancelled' && (
+              <PrintMenu print={(lang) => inventoryApi.printPurchaseOrder(order.id, lang)} fileName={order.number} testId="po-print" />
+            )}
+            {action}
+          </div>
+        }
       />
 
       {order.status === 'waiting_approval' && (
@@ -374,12 +382,20 @@ export default function PurchaseOrderPage({ params }: { params: Promise<{ id: st
           ) : (
             receipts.map((receipt) => (
               <section key={receipt.id} className="rounded-lg border border-border p-5">
-                <h2 className="font-semibold">
-                  {t('inventory.po.receivedAt', 'Received {when}, {place}', {
-                    when: dates.dateTime(receipt.done_at ?? receipt.created_at) ?? '',
-                    place: placeName,
-                  })}
-                </h2>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <h2 className="font-semibold">
+                    {t('inventory.po.receivedAt', 'Received {when}, {place}', {
+                      when: dates.dateTime(receipt.done_at ?? receipt.created_at) ?? '',
+                      place: placeName,
+                    })}
+                  </h2>
+                  <PrintMenu
+                    print={(lang) => inventoryApi.printReceipt(receipt.id, lang)}
+                    fileName={receipt.number}
+                    size="sm"
+                    testId="po-receipt-print"
+                  />
+                </div>
                 <p className="text-sm text-muted-foreground">
                   <bdi dir="ltr" className="font-mono">
                     {receipt.number}

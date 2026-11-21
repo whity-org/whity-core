@@ -9,7 +9,7 @@ use Whity\Core\Settings\SettingsRegistry;
 /**
  * A workspace's resolved theme (30-themes.md section 5): the chosen theme (or
  * the installation's, or Whity's), with the workspace's main colour as the
- * primary seed and its colour overrides on top, compiled with the guard
+ * primary seed, its colour overrides and its free tweaks (TH.15) on top, compiled with the guard
  * rails. A person's own light or dark, text size and animations are applied
  * by the app; their Higher contrast (TH.12) is the `high` set, written under
  * `[data-contrast="high"]`.
@@ -43,6 +43,8 @@ final class ThemeResolver
             }
         }
 
+        // TH.15: the workspace's shape, density and font pair on top of the theme.
+        $theme = ThemeTweaks::apply($theme, $overrides);
         $compiled = ThemeCompiler::compile($theme, $seed, $overrides);
         $high = ThemeCompiler::compile($theme, $seed, $overrides, 'high');
         if ($missing) {

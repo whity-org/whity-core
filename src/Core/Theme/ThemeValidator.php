@@ -22,12 +22,12 @@ final class ThemeValidator
     public const SCALES = ['standard', 'roomy', 'large'];
     public const TITLE_WEIGHTS = [500, 600];
     public const EMPHASES = ['quiet', 'expressive'];
-    public const SHAPES = ['square', 'crisp', 'whity', 'soft', 'round'];
+    public const SHAPES = ['square', 'crisp', 'whity', 'soft', 'round', 'pebble', 'cut'];
     public const MORPHS = ['off', 'on'];
     public const DENSITIES = ['compact', 'standard', 'comfortable'];
-    public const ELEVATIONS = ['plane', 'soft', 'flat'];
+    public const ELEVATIONS = ['plane', 'soft', 'flat', 'outline'];
     public const FLOATS = ['light', 'standard', 'strong'];
-    public const MOTIONS = ['calm', 'standard', 'expressive'];
+    public const MOTIONS = ['calm', 'standard', 'expressive', 'brisk'];
     public const ACCENT_USES = ['title', 'title-and-headings'];
     public const TITLE_FACES = ['readex', 'noto'];
 
@@ -123,15 +123,26 @@ final class ThemeValidator
     }
 
     /**
-     * Checks a workspace's colour overrides on their own (the
-     * `branding_theme_overrides` setting): `{light: {role: #hex}, dark: {...}}`.
+     * Checks a workspace's adjustments on their own (the
+     * `branding_theme_overrides` setting): colour overrides
+     * `{light: {role: #hex}, dark: {...}}`, and since TH.15 the free tweaks
+     * `shape`, `density` and `font`, each from its closed list (ThemeTweaks).
      *
      * @return list<string>
      */
     public static function validateOverrides(mixed $overrides): array
     {
         $errors = [];
-        self::overrides($overrides, 'overrides', $errors);
+        if (!self::isObject($overrides)) {
+            self::overrides($overrides, 'overrides', $errors);
+
+            return $errors;
+        }
+        self::onlyKeys($overrides, ['light', 'dark', ...ThemeTweaks::KEYS], 'overrides', $errors);
+        self::oneOf($overrides, 'shape', self::SHAPES, 'overrides.shape', $errors);
+        self::oneOf($overrides, 'density', self::DENSITIES, 'overrides.density', $errors);
+        self::oneOf($overrides, 'font', ThemeFonts::ids(), 'overrides.font', $errors);
+        self::overrides(array_intersect_key($overrides, ['light' => true, 'dark' => true]), 'overrides', $errors);
 
         return $errors;
     }

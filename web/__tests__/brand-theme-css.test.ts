@@ -78,4 +78,14 @@ describe('brandThemeCss with a theme (WHIT-1225)', () => {
     });
     expect(css).toBe(':root{--control-h:44px;}');
   });
+
+  it('writes the Cut and morph values only in their own shape (TH.17, TH.18)', () => {
+    const css = brandThemeCss({
+      light: {},
+      dark: {},
+      vars: { 'wy-corner-shape': 'bevel', 'wy-radius-control-pressed': '10px', 'wy-radius-control-selected': 'squircle' },
+    });
+    expect(css).toBe(':root{--wy-corner-shape:bevel;--wy-radius-control-pressed:10px;}');
+    expect(brandThemeCss({ light: {}, dark: {}, vars: { 'wy-corner-shape': 'bevel;}body{x:y' } })).not.toContain('bevel');
+  });
 });
