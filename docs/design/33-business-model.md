@@ -57,10 +57,10 @@ Worked examples:
 | Ledger, periods, reports | Core accounting (AC.3, AC.7, AC.23) | Accounting lane |
 | Bank accounts, statement import, reconciliation, match suggestions | Core accounting bank (AC.16) and the Bookkeeping assistant | Accounting lane |
 | Invoices, payments | Core accounting (AC.11, AC.14) | Accounting lane |
-| **Quotes** | Core sales documents, beside sales orders (IV.13) and invoices (AC.11) | **Not covered.** Needs a row and an owner (section 6, step 5) |
-| **80 mm receipt** | A document starter through the document themes (6.8 lists it as "later") | **Not covered** |
-| **Trading emails** (invoice, quote, reminder) | Core email templates (EM.1 already lists them) | Partly: the emails exist as designs |
-| **CSV import** of items, contacts, opening balances | Core spreadsheet import (R.1, A8) | Partly |
+| **Quotes** | Core sales documents, beside sales orders (IV.13) and invoices (AC.11) | Section 34, QT.1–QT.12 (WHIT-1320) |
+| **80 mm receipt** | A document starter through the document themes (6.8 lists it as "later") | Section 34, TR.1 (WHIT-1320) |
+| **Trading emails** (invoice, quote, reminder) | Core email templates (EM.1 already lists them) | Section 34, TR.2–TR.4 (WHIT-1320) |
+| **CSV import** of items, contacts, opening balances | Core spreadsheet import (R.1, A8) | Section 34, IM.1–IM.9 (WHIT-1320) |
 | JoFotara UUID and QR | Core e-invoicing point (AC.22); the JoFotara plugin fills it | Accounting lane |
 
 **Data.** There are no real customers on app.whity.dev (owner, 16 November 2026), so no compatibility layer is needed. What must carry over is the demo data the owner named: the AAU IRB demo and the salon demo (tenant 5). Step 1 of the move is to check which workspaces have Front Office on and hold `fo_*` rows. If any do, core ships a one-off, idempotent import command that reads `fo_*` tables when they exist and writes core inventory and accounting records, then marks the import done per workspace; it runs once the A2 (invoices) and inventory P2 phases are on develop. If none do, the plugin is simply uninstalled (its data is kept 30 days, S.7) and no import is written.

@@ -377,6 +377,21 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `inventory.order.done.async` | `INVENTORY_ORDER_DONE_ASYNC` | queued |  |
 | `inventory.order.cancelled` | `INVENTORY_ORDER_CANCELLED` | observe | Cancelled before anything arrived. |
 | `inventory.order.cancelled.async` | `INVENTORY_ORDER_CANCELLED_ASYNC` | queued |  |
+| `sales.quote.sending` | `SALES_QUOTE_SENDING` | veto | Before a quote goes to the customer, its first send or a revision (SDK 1.132). Payload: `tenant_id`, `quote_id`, `number`, `revision`, `contact_id`, `currency`, `total_minor`, `valid_until`, `acting_profile_id`, `lines` (`variant_id` or null, `description`, `quantity`, `price_minor`, `line_total_minor`). Throw `HookVetoException` to refuse it (409 with your reason). |
+| `sales.quote.created` | `SALES_QUOTE_CREATED` | observe | A quote or a revision was drafted. Every `sales.quote.*` notification carries `tenant_id`, `quote_id`, `number` (null until sent), `revision`, `contact_id`, `status`, `total_minor`, `currency`, `acting_profile_id` (null when the customer answered online). |
+| `sales.quote.created.async` | `SALES_QUOTE_CREATED_ASYNC` | queued |  |
+| `sales.quote.sent` | `SALES_QUOTE_SENT` | observe | Sent to the customer, with its number. |
+| `sales.quote.sent.async` | `SALES_QUOTE_SENT_ASYNC` | queued |  |
+| `sales.quote.accepted` | `SALES_QUOTE_ACCEPTED` | observe | The customer accepted, online or as a person recorded. Also `decided_by_name`, `online`. |
+| `sales.quote.accepted.async` | `SALES_QUOTE_ACCEPTED_ASYNC` | queued |  |
+| `sales.quote.declined` | `SALES_QUOTE_DECLINED` | observe | The customer declined. Also `decided_by_name`, `online`, `reason`. |
+| `sales.quote.declined.async` | `SALES_QUOTE_DECLINED_ASYNC` | queued |  |
+| `sales.quote.expired` | `SALES_QUOTE_EXPIRED` | observe | Past its valid-until date without an answer. |
+| `sales.quote.expired.async` | `SALES_QUOTE_EXPIRED_ASYNC` | queued |  |
+| `sales.quote.converted` | `SALES_QUOTE_CONVERTED` | observe | Turned into a target. Also `target` (`sales_order`, `invoice`) and `target_id`. |
+| `sales.quote.converted.async` | `SALES_QUOTE_CONVERTED_ASYNC` | queued |  |
+| `sales.quote.cancelled` | `SALES_QUOTE_CANCELLED` | observe | Withdrawn before the customer answered. |
+| `sales.quote.cancelled.async` | `SALES_QUOTE_CANCELLED_ASYNC` | queued |  |
 
 ### Deletion is transactional (WC-713)
 

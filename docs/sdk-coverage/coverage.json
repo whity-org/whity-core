@@ -156,6 +156,14 @@
                 {
                     "what": "Events inventory.order.submitting (filter, can veto) and inventory.order.created, approved, rejected, partly_done, done and cancelled",
                     "since": "1.129"
+                },
+                {
+                    "what": "Contribute\\WorkspaceQuoteConversion: what an accepted quote turns into (a sales order, an invoice), read as a Sales\\QuoteSnapshot; core's inventory and accounting implement it",
+                    "since": "1.132"
+                },
+                {
+                    "what": "Events sales.quote.sending (filter, can veto) and sales.quote.created, sent, accepted, declined, expired, converted and cancelled",
+                    "since": "1.132"
                 }
             ],
             "missing": [

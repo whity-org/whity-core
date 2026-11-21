@@ -4,7 +4,7 @@
  * guard rails changed.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ThemePicker, adjustmentText, changeText, overridesValue } from '@/components/theme-picker';
+import { ThemePicker, adjustmentText, changeText, fontStack, overridesValue } from '@/components/theme-picker';
 
 const GET = jest.fn();
 const PATCH = jest.fn();
@@ -145,4 +145,22 @@ it('says what a newer version changes before replacing it', async () => {
 
 it('words a change field by field', () => {
   expect(changeText({ field: 'density', from: null, to: 'compact' }, t)).toBe('Spacing: none → compact');
+});
+
+it('previews the chosen font pair in English and Arabic, with only a well-formed stack (TH.20)', async () => {
+  const stack = 'var(--font-rubik), ui-sans-serif, system-ui, sans-serif';
+  GET.mockResolvedValue({
+    data: {
+      data: {
+        ...list,
+        tweaks: { shape: null, density: null, font: 'rubik' },
+        options: { shape: ['whity'], density: ['standard'], font: [{ id: 'rubik', name: 'Rubik', stack, heading_stack: stack }] },
+      },
+    },
+  });
+  render(<ThemePicker scope="tenant" canWrite />);
+  const preview = await screen.findByTestId('theme-font-preview');
+  expect(preview.querySelector('[lang="ar"]')).toHaveStyle({ fontFamily: stack });
+  expect(fontStack('Comic Sans; } body {')).toBeUndefined();
+  expect(fontStack(stack)).toBe(stack);
 });

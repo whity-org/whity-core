@@ -179,6 +179,7 @@ final class CoreApiSchemas
             self::externalBillingRoutes(),
             ContactsApiSchemas::routes(),
             InventoryApiSchemas::routes(),
+            SalesApiSchemas::routes(),
             ContactsApiSchemas::customFieldRoutes()
         ));
     }
@@ -12186,7 +12187,7 @@ final class CoreApiSchemas
                 'options' => self::object([
                     'shape' => ['type' => 'array', 'items' => self::str()],
                     'density' => ['type' => 'array', 'items' => self::str()],
-                    'font' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'name' => self::str()], ['id', 'name'])],
+                    'font' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'name' => self::str(), 'stack' => self::str(), 'heading_stack' => self::str()], ['id', 'name'])],
                 ], ['shape', 'density', 'font']),
                 'colour_overrides' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The workspace\'s colour overrides, light and dark, kept when the tweaks are saved.'],
             ], ['current', 'themes'])),
@@ -12838,7 +12839,7 @@ final class CoreApiSchemas
                 'counts' => SchemaBuilder::ref('DataTypeBulkCounts'),
                 'results' => ['type' => 'array', 'items' => SchemaBuilder::ref('DataTypeBulkResult')],
             ], ['key', 'action', 'counts', 'results'])),
-        ] + self::workspacePluginComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components();
+        ] + self::workspacePluginComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components() + SalesApiSchemas::components();
     }
 
     /**

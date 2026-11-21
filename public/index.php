@@ -5687,6 +5687,50 @@ $inventoryPurchases = new \Whity\Core\Inventory\PurchaseOrders(
 );
 $routeSubjectRegistry->register(new \Whity\Core\Inventory\OrderRouteSubject($inventoryDb, $inventoryPurchases));
 $inventoryPurchases->useApprovals(new \Whity\Core\Inventory\OperationRoutes($inventoryDb, $documentRouter, $routeTemplateRepository, $roleChecker, $inventorySettings));
+// WHIT-1321: quotes to customers (design section 34, QT.1-QT.12). A quote
+// travels the workspace's quote route when one is chosen (sales.quote); the
+// customer answers on a public page reached by a 256-bit link. What a quote
+// turns into is a registry the inventory and accounting lanes fill.
+$salesQuoteConversions = new \Whity\Core\Sales\QuoteConversions();
+\Whity\register_service(\Whity\Core\Sales\QuoteConversions::class, $salesQuoteConversions); // @phpstan-ignore-line
+$salesQuotes = new \Whity\Core\Sales\Quotes(
+    $inventoryDb,
+    $inventoryWorkspace,
+    $inventoryItems,
+    $inventoryUnits,
+    new \Whity\Database\SequenceCounters($db->getPdo()),
+    $salesQuoteConversions,
+    $inventorySettings,
+    $inventoryItems->currencyFor(...),
+    $hookManager,
+);
+$routeSubjectRegistry->register(new \Whity\Core\Sales\QuoteRouteSubject($inventoryDb, $salesQuotes));
+$salesQuotes->useApprovals(new \Whity\Core\Sales\QuoteRoutes($documentRouter, $routeTemplateRepository, $inventorySettings));
+$salesQuotesHandler = new \Whity\Api\SalesQuotesApiHandler(
+    $salesQuotes,
+    $settingsService,
+    new DatabaseSharedStore($db->getPdo()),
+    \Whity\Core\Http\FrontendUrls::fromEnv()->base(),
+    $brandingService,
+    static fn (int $tenantId): string => (new \Whity\Core\Branding\TenantHostRepository($db->getPdo()))->findNameById($tenantId) ?? '',
+);
+$router->register('GET',    '/api/sales/quotes',                     [$salesQuotesHandler, 'list'],     null, null, CorePermissions::QUOTES_READ);
+$router->register('POST',   '/api/sales/quotes',                     [$salesQuotesHandler, 'create'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('GET',    '/api/sales/quotes/{id:\d+}',            [$salesQuotesHandler, 'show'],     null, null, CorePermissions::QUOTES_READ);
+$router->register('PATCH',  '/api/sales/quotes/{id:\d+}',            [$salesQuotesHandler, 'update'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/submit',     [$salesQuotesHandler, 'submit'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/send',       [$salesQuotesHandler, 'send'],     null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/link',       [$salesQuotesHandler, 'newLink'],  null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/decision',   [$salesQuotesHandler, 'decide'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/revise',     [$salesQuotesHandler, 'revise'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/cancel',     [$salesQuotesHandler, 'cancel'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('GET',    '/api/sales/quotes/{id:\d+}/targets',    [$salesQuotesHandler, 'targets'],  null, null, CorePermissions::QUOTES_READ);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/convert',    [$salesQuotesHandler, 'convert'],  null, null, CorePermissions::QUOTES_WRITE);
+$router->register('GET',    '/api/sales/settings',                   [$salesQuotesHandler, 'showSettings'],   null, null, CorePermissions::QUOTES_READ);
+$router->register('PATCH',  '/api/sales/settings',                   [$salesQuotesHandler, 'updateSettings'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('GET',    '/api/public/quotes/{token:[a-f0-9]{64}}',         [$salesQuotesHandler, 'publicShow'],    null);
+$router->register('POST',   '/api/public/quotes/{token:[a-f0-9]{64}}/accept',  [$salesQuotesHandler, 'publicAccept'],  null);
+$router->register('POST',   '/api/public/quotes/{token:[a-f0-9]{64}}/decline', [$salesQuotesHandler, 'publicDecline'], null);
 $inventoryGuard = new \Whity\Core\Inventory\Host\HostInventoryGuard(
     $inventoryDb,
     static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),

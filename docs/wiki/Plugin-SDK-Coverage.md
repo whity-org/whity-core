@@ -436,6 +436,8 @@ Planned: later.
 - Events inventory.operation.done, inventory.count.differences, stock.level.below_reorder and stock.level.restored (SDK 1.128)
 - Inventory\Orders: purchase orders for a supplier contact, sent on the workspace's purchase route (or approved at once) and received in parts at the order's cost, through $ctx->inventory()->orders(), bound to the loaded plugin; the container copy only reads (SDK 1.129)
 - Events inventory.order.submitting (filter, can veto) and inventory.order.created, approved, rejected, partly_done, done and cancelled (SDK 1.129)
+- Contribute\WorkspaceQuoteConversion: what an accepted quote turns into (a sales order, an invoice), read as a Sales\QuoteSnapshot; core's inventory and accounting implement it (SDK 1.132)
+- Events sales.quote.sending (filter, can veto) and sales.quote.created, sent, accepted, declined, expired, converted and cancelled (SDK 1.132)
 
 **Missing**
 
