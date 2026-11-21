@@ -11535,7 +11535,8 @@ final class CoreApiSchemas
                     'type' => self::str(),
                     'label' => self::object(['en' => self::str(), 'ar' => self::str()], ['en', 'ar']),
                     'plugin' => self::str(),
-                ], ['type', 'label', 'plugin'])],
+                    'email_default' => self::bool(),
+                ], ['type', 'label', 'plugin', 'email_default'])],
             ], ['data', 'transactional_prefixes', 'plugin_types']),
             'PushDevice' => self::object([
                 'id' => self::int(),

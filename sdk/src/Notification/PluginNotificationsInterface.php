@@ -19,17 +19,30 @@ namespace Whity\Sdk\Notification;
  *     {
  *         return [
  *             'order.shipped' => ['label' => ['en' => 'Order shipped', 'ar' => 'تم شحن الطلب']],
+ *             'task.assigned' => [
+ *                 'label' => ['en' => 'A task was given to you', 'ar' => 'أُسندت إليك مهمة'],
+ *                 'emailDefault' => true,
+ *             ],
  *         ];
  *     }
+ *
+ * Every notice lands in the person's inbox. `emailDefault` (optional, SDK
+ * 1.135) also sends it by email to a person who never chose for the type;
+ * left out, it is false, so email comes only when the person turns it on in
+ * Preferences › Notifications. The person's choice always wins, and the
+ * workspace's email switch applies as for core's notices. The email carries the
+ * Notice's subject and body in the person's language, never its `data`, and
+ * the plugin never sees an address.
  */
 interface PluginNotificationsInterface
 {
     /**
-     * Bare key => ['label' => ['en' => string, 'ar' => string]]. A key is
-     * lowercase, starts with a letter and continues with letters, digits,
-     * underscores or dots. A malformed declaration is refused whole.
+     * Bare key => ['label' => ['en' => string, 'ar' => string],
+     * 'emailDefault' => bool (optional)]. A key is lowercase, starts with a
+     * letter and continues with letters, digits, underscores or dots. A
+     * malformed declaration is refused whole.
      *
-     * @return array<string, array{label: array{en: string, ar: string}}>
+     * @return array<string, array{label: array{en: string, ar: string}, emailDefault?: bool}>
      */
     public function getNotificationTypes(): array;
 }

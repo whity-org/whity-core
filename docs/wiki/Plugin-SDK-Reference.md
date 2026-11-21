@@ -47,7 +47,7 @@ These are the factories `PluginContext` uses. They keep working through SDK 2.0.
 | `Secrets\PluginSecrets` → `Secrets\SecretStore` | API keys and signing secrets: encrypted, never read back on screens or in the API. | argument | 1.60 |
 | `Storage\PluginFiles` → `Storage\PluginFileStore` | Uploads and exports under plain relative paths (`put`, `get`, `exists`, `list`, `delete`). `Storage\PluginFileController` serves them. | current | 1.63 |
 | `Documents\PluginDocuments` → `Documents\PluginDocumentStore` | Issue documents recorded as yours, then QR verification URLs and tracking for those documents only. | current | 1.63 |
-| `Notification\PluginNotifier` → `Notification\Notifier` | Notify a person, a role or a unit with a notice type you declared. Preferences apply. | current | WHIT-1030 |
+| `Notification\PluginNotifier` → `Notification\Notifier` | Notify a person, a role or a unit with a notice type you declared. Preferences apply; a type with `emailDefault` also goes by email (SDK 1.135). | current | WHIT-1030, WHIT-1250 |
 | `Jobs\PluginJobQueue` → `Jobs\JobQueue` | Enqueue your own jobs (idempotency key, delay) and read their `JobStatus`. | current | WHIT-1031 |
 | `Audit\PluginAudit` → `Audit\AuditTrail` | Record and read your audit entries. The host attributes actor, IP and workspace. | current | WHIT-1032 |
 

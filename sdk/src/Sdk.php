@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.132).
+ * SDK identity (v1.135).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1507,12 +1507,21 @@ namespace Whity\Sdk;
  * `.async` twin (WHIT-1321, design section 34 §3).
  *
  * Purely additive.)
+ *
+ * 1.135 (NOTICES BY EMAIL: a type in {@see Notification\PluginNotificationsInterface::getNotificationTypes()}
+ * may carry `emailDefault` (bool, optional, false when left out). Every notice still lands in the inbox;
+ * with `emailDefault` it also goes by email to a person who never chose for the type. The person's own
+ * choice always wins, and the workspace's email switch applies as for core notices. The email carries
+ * the Notice's subject and body only, never `data` (WHIT-1250, #2209).
+ *
+ * Purely additive: one optional key. Older hosts ignore it and keep notices in-app, so a plugin that
+ * needs the email needs `^1.135`.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.132.0';
+    public const VERSION = '1.135.0';
 
     /**
      * Static identity only — never instantiated.
