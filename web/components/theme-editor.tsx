@@ -48,7 +48,6 @@ export interface ThemePreviewData {
 
 const HEX = /^#[0-9a-f]{6}$/i;
 const FAMILIES = ['buttons', 'fields', 'chips', 'cards', 'dialogs', 'tables', 'navigation'] as const;
-const SHAPES = ['square', 'crisp', 'whity', 'soft', 'round', 'pebble', 'cut'];
 
 /** The value at a path, or undefined. */
 export function valueAt(theme: ThemeFile, path: string[]): unknown {
@@ -171,7 +170,13 @@ function ColourField({
 }) {
   const hex = typeof value === 'string' && HEX.test(value) ? value.toLowerCase() : '';
   const [text, setText] = useState(hex);
-  useEffect(() => setText(hex), [hex]);
+  // When the colour changes from outside (the picker, Clear), the text follows;
+  // adjusting state while rendering, as React recommends, not in an effect.
+  const [shown, setShown] = useState(hex);
+  if (hex !== shown) {
+    setShown(hex);
+    setText(hex);
+  }
   return (
     <div className="grid gap-1.5">
       <label className="text-sm font-medium" htmlFor={`${id}-hex`}>
@@ -343,14 +348,22 @@ export function ThemeEditor({ start, editable, fonts }: ThemeEditorProps) {
       { value: 'large', label: t('theme.editor.scale.large', 'Large') },
     ],
     titleWeight: [
-      { value: '500', label: t('theme.editor.titleWeight.500', 'Medium') },
-      { value: '600', label: t('theme.editor.titleWeight.600', 'Semibold') },
+      { value: '500', label: t('theme.editor.titleWeight.medium', 'Medium') },
+      { value: '600', label: t('theme.editor.titleWeight.semibold', 'Semibold') },
     ],
     emphasis: [
       { value: 'quiet', label: t('theme.editor.emphasis.quiet', 'Quiet') },
       { value: 'expressive', label: t('theme.editor.emphasis.expressive', 'Expressive') },
     ],
-    shape: SHAPES.map((s) => ({ value: s, label: t(`theme.tweak.shape.${s}`, s.charAt(0).toUpperCase() + s.slice(1)) })),
+    shape: [
+      { value: 'square', label: t('theme.tweak.shape.square', 'Square') },
+      { value: 'crisp', label: t('theme.tweak.shape.crisp', 'Crisp') },
+      { value: 'whity', label: t('theme.tweak.shape.whity', 'Whity') },
+      { value: 'soft', label: t('theme.tweak.shape.soft', 'Soft') },
+      { value: 'round', label: t('theme.tweak.shape.round', 'Round') },
+      { value: 'pebble', label: t('theme.tweak.shape.pebble', 'Pebble') },
+      { value: 'cut', label: t('theme.tweak.shape.cut', 'Cut') },
+    ],
     morph: [
       { value: 'on', label: t('theme.editor.morph.on', 'On') },
       { value: 'off', label: t('theme.editor.morph.off', 'Off') },
