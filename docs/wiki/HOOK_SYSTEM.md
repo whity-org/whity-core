@@ -396,6 +396,8 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `sales.quote.converted.async` | `SALES_QUOTE_CONVERTED_ASYNC` | queued |  |
 | `sales.quote.cancelled` | `SALES_QUOTE_CANCELLED` | observe | Withdrawn before the customer answered. |
 | `sales.quote.cancelled.async` | `SALES_QUOTE_CANCELLED_ASYNC` | queued |  |
+| `calendar.commission.closed` | `CALENDAR_COMMISSION_CLOSED` | observe | An owner closed a commission period (WHIT-1334). Carries `tenant_id`, `close_id`, `from`, `to`, `acting_profile_id` and `lines` (`profile_id`, `currency`, `bookings`, `sales_minor`, `commission_minor`). |
+| `calendar.commission.closed.async` | `CALENDAR_COMMISSION_CLOSED_ASYNC` | queued |  |
 
 ### Deletion is transactional (WC-713)
 

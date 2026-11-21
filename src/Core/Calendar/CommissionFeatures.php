@@ -125,6 +125,43 @@ final class CommissionFeatures
                         'confirm' => ['en' => "Remove this rate? Reports will use the person's other rate, or none.", 'ar' => 'إزالة هذه النسبة؟ ستستخدم التقارير النسبة الأخرى للموظف، أو لا شيء.'],
                     ]],
                 ],
+                [
+                    'type' => 'modal',
+                    'id' => 'close-period',
+                    'title' => ['en' => 'Close a period', 'ar' => 'إقفال فترة'],
+                    'trigger' => ['en' => 'Close a period', 'ar' => 'إقفال فترة'],
+                    'variant' => 'outline',
+                    'children' => [[
+                        'type' => 'form',
+                        'requiredPermission' => CorePermissions::CALENDAR_COMMISSION,
+                        'submit' => ['method' => 'POST', 'endpoint' => $api . '/closes'],
+                        'children' => [
+                            ['type' => 'alert', 'variant' => 'info', 'body' => [
+                                'en' => 'Closing freezes what each person earned in a period that has ended, so later changes to prices or rates never move it, and sends it to the books when they take commission. A closed period cannot be closed again.',
+                                'ar' => 'الإقفال يثبّت ما حصل عليه كل شخص في فترة انتهت، فلا تغيّره تعديلات الأسعار أو النسب لاحقاً، ويرسله إلى الدفاتر حين تستقبل العمولات. لا يمكن إقفال فترة مقفلة مرة أخرى.',
+                            ]],
+                            [
+                                'type' => 'referenceSelect', 'name' => 'period', 'required' => true,
+                                'label' => ['en' => 'Period', 'ar' => 'الفترة'],
+                                'source' => $api . '/closes/periods', 'valueField' => 'id', 'labelField' => 'label',
+                            ],
+                            ['type' => 'submitButton', 'label' => ['en' => 'Close this period', 'ar' => 'إقفال هذه الفترة'], 'variant' => 'primary', 'requiredPermission' => CorePermissions::CALENDAR_COMMISSION],
+                        ],
+                    ]],
+                ],
+                [
+                    'type' => 'dataTable',
+                    'source' => $api . '/closes',
+                    'emptyText' => ['en' => 'No closed periods yet.', 'ar' => 'لا فترات مقفلة بعد.'],
+                    'columns' => [
+                        ['key' => 'period', 'label' => ['en' => 'Closed period', 'ar' => 'الفترة المقفلة']],
+                        ['key' => 'total', 'label' => ['en' => 'Commission', 'ar' => 'العمولة']],
+                        ['key' => 'books', 'label' => ['en' => 'In the books', 'ar' => 'في الدفاتر']],
+                    ],
+                    'rowActions' => [[
+                        'label' => ['en' => 'Send to the books', 'ar' => 'إرسال إلى الدفاتر'], 'method' => 'POST', 'endpoint' => $api . '/closes/{id}/book',
+                    ]],
+                ],
             ],
         ];
     }

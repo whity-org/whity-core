@@ -2451,5 +2451,21 @@
   "get_api_calendar_commission_services": {
     "en": "List the services a rate can be set for",
     "ar": "عرض الخدمات التي يمكن تحديد نسبة لها"
+  },
+  "get_api_calendar_commission_closes": {
+    "en": "List closed commission periods",
+    "ar": "عرض فترات العمولة المقفلة"
+  },
+  "get_api_calendar_commission_closes_periods": {
+    "en": "List the commission periods that can be closed",
+    "ar": "عرض فترات العمولة التي يمكن إقفالها"
+  },
+  "post_api_calendar_commission_closes": {
+    "en": "Close a commission period",
+    "ar": "إقفال فترة عمولة"
+  },
+  "post_api_calendar_commission_closes_id_book": {
+    "en": "Send a closed commission period to the books",
+    "ar": "إرسال فترة عمولة مقفلة إلى الدفاتر"
   }
 }

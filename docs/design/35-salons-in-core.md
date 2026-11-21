@@ -75,8 +75,8 @@ From the calendar each time, nothing stored: for a period (this month, last mont
 
 Accounting's bills and expenses (A3) are not built yet. Core defines the hook now so A3 only has to implement it:
 
-- **Close a period** (a button on the report, permission `calendar:commission`): freezes that period's totals in `calendar_commission_closes` (`period_start`, `period_end`, `profile_id`, `currency`, `bookings`, `sales_minor`, `commission_minor`, `closed_by`, `closed_at`, `expense_ref`), so a later price change doesn't move a paid month. A closed period can't be closed twice; reopening is refused once `expense_ref` is set.
-- On close, core fires `calendar.commission.closed` (notification, with `.async` twin, in the webhook catalogue) and calls `Contribute\WorkspaceCommissionExpenses::record(close)` if one is bound. Accounting A3 binds it and posts an expense to "Commission" with a payable to each staff member, writing back `expense_ref`. With nothing bound, the close stands and the report says the totals are ready for the books.
+- **Close a period** (on the Commission screen, permission `calendar:commission`): only a period that has ended, and never one touching a closed day. It freezes the totals of everyone with a rate: `calendar_commission_closes` (`period_start`, `period_end`, `closed_by_profile_id`, `closed_at`, `expense_ref`, `booked_at`) and `calendar_commission_close_lines` (one per person and currency: `bookings`, `sales_minor`, `commission_minor`), so a later price or rate change never moves a paid month. A close is never reopened.
+- On close, core fires `calendar.commission.closed` (notification, with `.async` twin, in the webhook catalogue) and calls `Contribute\WorkspaceCommissionExpenses::record(close)` if one is bound. Accounting A3 binds it and posts an expense to "Commission" with a payable to each staff member, answering the reference core keeps as `expense_ref`. With nothing bound, or the books refusing for now, the close stands, shows "Ready for the books", and can be sent again.
 
 ### 4.4 Permission
 
