@@ -2387,5 +2387,33 @@
   "get_api_inventory_imports_kind_id_skipped_csv": {
     "en": "Download the rows an import skipped",
     "ar": "تنزيل الصفوف التي تخطاها الاستيراد"
+  },
+  "get_api_calendar_walkins": {
+    "en": "See who is waiting at the front desk",
+    "ar": "عرض من ينتظر في الاستقبال"
+  },
+  "post_api_calendar_walkins": {
+    "en": "Add a walk-in to the queue",
+    "ar": "إضافة زبون بدون حجز إلى الدور"
+  },
+  "get_api_calendar_walkins_services": {
+    "en": "List the services a walk-in can choose",
+    "ar": "عرض الخدمات المتاحة لزبون بدون حجز"
+  },
+  "get_api_calendar_walkins_staff": {
+    "en": "List the staff for walk-ins, free ones first",
+    "ar": "عرض الفريق للزبائن بدون حجز، المتاحون أولاً"
+  },
+  "post_api_calendar_walkins_assign": {
+    "en": "Hand a walk-in to the person chosen",
+    "ar": "تسليم زبون بدون حجز للشخص المختار"
+  },
+  "post_api_calendar_walkins_id_assign": {
+    "en": "Hand a walk-in to the next free person",
+    "ar": "تسليم زبون بدون حجز لأول شخص متاح"
+  },
+  "post_api_calendar_walkins_id_left": {
+    "en": "Mark that a walk-in left",
+    "ar": "تسجيل مغادرة زبون بدون حجز"
   }
 }
