@@ -149,6 +149,7 @@ final class CoreApiSchemas
             self::documentAgentRoutes(),
             self::savedBlockRoutes(),
             self::documentThemeRoutes(),
+            self::companyStampRoutes(),
             self::documentTemplateSlotRoutes(),
             self::workspacePluginRoutes(),
             self::documentRecordRoutes(),
@@ -6778,6 +6779,8 @@ final class CoreApiSchemas
                 // WHIT-921: the template a `finalise` step renders the final
                 // document with. Null on every other step.
                 'final_template_id' => self::int(true),
+                // #1729: the company stamp a `stamp` step asks for. Null elsewhere.
+                'stamp_id' => self::int(true),
                 // WHIT-1016: the values a person letting it through here fills in.
                 'inputs' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepInput')],
                 // WHIT-1018: the subject's people questions whose answers this step leaves out.
@@ -6936,7 +6939,10 @@ final class CoreApiSchemas
                         // WHIT-921: `finalise` makes the final document. It
                         // must be the last step, at most one, and needs a render
                         // service; it names no rule and nobody acts on it.
-                        'kind' => ['type' => 'string', 'enum' => ['sign', 'finalise'], 'nullable' => true],
+                        // #1729: `stamp` asks a holder of the company stamp
+                        // `stamp_id` to apply it, answered like a signing step.
+                        'kind' => ['type' => 'string', 'enum' => ['sign', 'stamp', 'finalise'], 'nullable' => true],
+                        'stamp_id' => self::int(true) + ['description' => "On a stamp step: one of the company stamps of the workspace (GET /api/document-stamps)."],
                         'sign_capacity' => self::str(true) + ['description' => 'On a signing step: the capacity the signer signs in, such as "Director". At most 200 characters.'],
                         'sign_on_behalf_of' => self::str(true) + ['description' => 'On a signing step: whom the signer signs for, such as the workspace. At most 200 characters.'],
                         'final_template_id' => self::int(true) + ['description' => 'On a `finalise` step: the document template to render with. Absent uses the template the subject names: the final document template of a form, or the template of a document.'],
@@ -7096,7 +7102,93 @@ final class CoreApiSchemas
                 'by' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name']),
                 'at' => self::str() + ['description' => 'Server time, UTC, to the second.'],
                 'subject_version' => self::int(),
+                // #1729: a signature, or a company stamp a holder applied.
+                'kind' => ['type' => 'string', 'enum' => ['signature', 'stamp']],
+                'stamp' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('AppliedStamp')]],
             ], ['id', 'by', 'at', 'subject_version']),
+            'AppliedStamp' => self::object([
+                'id' => self::int(true),
+                'name' => self::str(),
+                'legal_name' => self::str(),
+                'image' => self::str() + ['description' => 'On the audit: the PNG or JPEG data URL that was applied.'],
+            ], ['name', 'legal_name']),
+            'CompanyStampHolders' => self::object([
+                'people' => ['type' => 'array', 'items' => self::int(), 'description' => 'Profile ids of members of this workspace.'],
+                'roles' => ['type' => 'array', 'items' => self::int(), 'description' => 'Role ids; everyone holding one holds the stamp.'],
+            ], []),
+            'CompanyStamp' => self::object([
+                'id' => self::int(),
+                'name' => self::str(),
+                'legal_name' => self::str(),
+                'image' => self::str() + ['description' => 'A PNG or JPEG data URL, at most 512 KB.'],
+                'image_hash' => self::str(),
+                'holders' => self::object([
+                    'people' => ['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name'])],
+                    'roles' => ['type' => 'array', 'items' => self::object(['role_id' => self::int(), 'name' => self::str()], ['role_id', 'name'])],
+                ], ['people', 'roles']),
+                'created_at' => self::str(),
+                'updated_at' => self::str(),
+                'archived_at' => self::str(true),
+            ], ['id', 'name', 'legal_name', 'image', 'holders', 'archived_at']),
+            'CompanyStampResponse' => self::dataEnvelope(SchemaBuilder::ref('CompanyStamp')),
+            'CompanyStampListResponse' => self::listEnvelope('CompanyStamp'),
+            'CompanyStampRequest' => self::object([
+                'name' => self::str() + ['description' => 'At most 200 characters.'],
+                'legal_name' => self::str() + ['description' => 'The legal name the stamp stands for. At most 300 characters.'],
+                'image' => self::str() + ['description' => 'A PNG or JPEG data URL, at most 512 KB, 32 to 4000 pixels a side.'],
+                'holders' => SchemaBuilder::ref('CompanyStampHolders'),
+            ], ['name', 'legal_name', 'image']),
+            'CompanyStampUpdateRequest' => self::object([
+                'name' => self::str(),
+                'legal_name' => self::str(),
+                'image' => self::str(),
+            ], []),
+            'StampingContext' => self::object([
+                'route_id' => self::int(),
+                'can_stamp' => self::bool(),
+                'is_holder' => self::bool(),
+                'step' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'id' => self::int(),
+                        'position' => self::int(),
+                        'label' => self::str(true),
+                        'quorum' => ['type' => 'string', 'enum' => ['all', 'any']],
+                    ],
+                    'required' => ['id', 'position', 'quorum'],
+                ],
+                'stamp' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('AppliedStamp')]],
+                'subject' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'type' => self::str(),
+                        'id' => self::int(),
+                        'title' => self::str(true),
+                        'version' => self::int(),
+                        'content_hash' => self::str(),
+                    ],
+                    'required' => ['type', 'id', 'version', 'content_hash'],
+                ],
+                'consent_version' => self::str(),
+                'second_factor' => self::object([
+                    'method' => ['type' => 'string', 'enum' => ['totp', 'email_code', 'fresh_sign_in']],
+                    'provider_key' => self::str(true),
+                    'email_hint' => self::str(true),
+                    'signed_in_again' => self::bool(),
+                ], ['method', 'signed_in_again']),
+            ], ['route_id', 'can_stamp', 'is_holder', 'consent_version', 'second_factor']),
+            'StampingContextResponse' => self::dataEnvelope(SchemaBuilder::ref('StampingContext')),
+            'StampRequest' => self::object([
+                'content_hash' => self::str(),
+                'consent' => self::bool(),
+                'consent_version' => self::str() + ['description' => 'The stamp consent version from the stamping context.'],
+                'second_factor' => self::object([
+                    'method' => ['type' => 'string', 'enum' => ['totp', 'email_code', 'fresh_sign_in']],
+                    'code' => self::str(true),
+                ], ['method']),
+            ], ['content_hash', 'consent', 'consent_version', 'second_factor']),
             'SigningContext' => self::object([
                 'route_id' => self::int(),
                 'can_sign' => self::bool(),
@@ -7151,6 +7243,10 @@ final class CoreApiSchemas
             // A signature record, as the audit page shows it.
             'SignatureRecord' => self::object([
                 'id' => self::int(),
+                // #1729: a signature, or a company stamp a holder applied. A stamp
+                // has no drawn `appearance`; `stamp` has its names and image.
+                'kind' => ['type' => 'string', 'enum' => ['signature', 'stamp']],
+                'stamp' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('AppliedStamp')]],
                 'route_id' => self::int(),
                 'event_id' => self::int(),
                 'step_id' => self::int(),
@@ -16557,6 +16653,45 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+            // #1729: applying a company stamp on a `stamp` step. Session-gated
+            // like signing; the handler checks the caller holds the stamp.
+            [
+                'method' => 'GET',
+                'path' => '/api/documents/{id:\\d+}/routes/{routeId:\\d+}/stamping',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'What you see before applying a company stamp: the step, the stamp, whether you hold it, the content hash, the consent version and how you will confirm',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        200 => self::jsonResponse('The stamping context', 'StampingContextResponse'),
+                        404 => self::errorResponse('Document or route not found, or not visible to the caller'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/documents/{id:\\d+}/routes/{routeId:\\d+}/stamp',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Apply the company stamp your open stamp step asks for',
+                    'description' => 'Only a holder of the stamp (named, or through a role) can apply it. Needs the stamp consent line '
+                        . 'in its current wording, the content hash you were shown and the second check your account uses, as '
+                        . 'for a signature. The act and a sealed stamp record (with the names and image of the stamp copied in) '
+                        . 'are written together. An authorised person applying the image, not a certified electronic seal.',
+                    'tags' => ['documents'],
+                    'request' => 'StampRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The stamp record and the trail entry', 'SignResponse'),
+                        403 => self::errorResponse('You do not hold this company stamp'),
+                        404 => self::errorResponse('Document or route not found, or not visible to the caller'),
+                        409 => self::errorResponse('The content changed since you opened it'),
+                        422 => self::errorResponse('Consent or second check missing or not correct, or nothing here waits for your stamp'),
+                        429 => self::errorResponse('Too many tries'),
+                    ] + self::authErrors(),
+                ],
+            ],
             [
                 'method' => 'GET',
                 'path' => '/api/documents/{id:\\d+}/audit',
@@ -18971,6 +19106,70 @@ final class CoreApiSchemas
      *
      * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
      */
+    /**
+     * Company stamps (#1729): a name, the legal name it stands for, an image and
+     * its holders. Anyone who reads documents lists them, so a route's author can
+     * choose one; `documents:stamps` changes them. Archived, never deleted.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function companyStampRoutes(): array
+    {
+        $notFound = [404 => self::errorResponse('Stamp not found')];
+
+        return [
+            self::permissionRoute('GET', '/api/document-stamps', 'documents:read', [
+                'summary' => "The workspace's company stamps, with their holders",
+                'description' => 'Archived stamps are left out unless `?archived=true`.',
+                'tags' => ['documents'],
+                'responses' => [200 => self::jsonResponse('The stamps', 'CompanyStampListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-stamps', 'documents:stamps', [
+                'summary' => 'Add a company stamp',
+                'description' => 'Applying it is an authorised person applying the image, not a certified electronic seal.',
+                'tags' => ['documents'],
+                'request' => 'CompanyStampRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The stamp', 'CompanyStampResponse'),
+                    422 => self::errorResponse('A name, legal name, image or holder could not be used'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/document-stamps/{id:\d+}', 'documents:read', [
+                'summary' => 'One company stamp, with its holders',
+                'tags' => ['documents'],
+                'responses' => [200 => self::jsonResponse('The stamp', 'CompanyStampResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/document-stamps/{id:\d+}', 'documents:stamps', [
+                'summary' => "Change a stamp's name, legal name or image. Stamps already applied keep their own copy.",
+                'tags' => ['documents'],
+                'request' => 'CompanyStampUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The stamp', 'CompanyStampResponse'),
+                    422 => self::errorResponse('A name, legal name or image could not be used'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/document-stamps/{id:\d+}/holders', 'documents:stamps', [
+                'summary' => "Replace a stamp's holders: named people and roles",
+                'tags' => ['documents'],
+                'request' => 'CompanyStampHolders',
+                'responses' => [
+                    200 => self::jsonResponse('The stamp', 'CompanyStampResponse'),
+                    422 => self::errorResponse('A holder is not in this workspace, or a role is not one it has'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-stamps/{id:\d+}/archive', 'documents:stamps', [
+                'summary' => 'Archive a stamp. New stamp steps cannot ask for it; records already made keep it.',
+                'tags' => ['documents'],
+                'responses' => [200 => self::jsonResponse('The stamp', 'CompanyStampResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-stamps/{id:\d+}/restore', 'documents:stamps', [
+                'summary' => 'Bring an archived stamp back',
+                'tags' => ['documents'],
+                'responses' => [200 => self::jsonResponse('The stamp', 'CompanyStampResponse')] + $notFound + self::authErrors(),
+            ]),
+        ];
+    }
+
     private static function documentThemeRoutes(): array
     {
         $mcp = ['toolset' => 'core.documents.themes'];

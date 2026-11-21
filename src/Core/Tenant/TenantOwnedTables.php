@@ -345,6 +345,9 @@ final class TenantOwnedTables
         'route_signatures'           => '232_add_route_signatures.php',
         'saved_signatures'           => '232_add_route_signatures.php',
         'signing_challenges'         => '232_add_route_signatures.php',
+        // #1729: company stamps and who holds them.
+        'company_stamps'             => '331_create_company_stamps.php',
+        'company_stamp_holders'      => '331_create_company_stamps.php',
         // WHIT-921: what the engine did when a route reached its finalise step.
         'route_finalisations'        => '234_add_route_finalise.php',
 

@@ -137,6 +137,9 @@ final class CoreTables
         'sales_quotes' => '330_create_sales_quotes.php',
         'sales_quote_lines' => '330_create_sales_quotes.php',
         'sales_quote_conversions' => '330_create_sales_quotes.php',
+        // Company stamps (#1729).
+        'company_stamps' => '331_create_company_stamps.php',
+        'company_stamp_holders' => '331_create_company_stamps.php',
         'inv_operations' => '320_create_inventory_operations.php',
         'inv_reasons' => '320_create_inventory_operations.php',
         'inv_reorder_rules' => '320_create_inventory_operations.php',

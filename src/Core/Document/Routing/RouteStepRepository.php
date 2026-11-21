@@ -109,16 +109,19 @@ final class RouteStepRepository
         ?int $finalTemplateId = null,
         array $inputs = [],
         array $excludeNamedIn = [],
+        ?int $stampId = null,
     ): int {
         $isFinalise = $kind === RouteStepKind::FINALISE;
+        // #1729: a `stamp` step names its kind and the stamp it asks for.
+        $isStamp = $kind === RouteStepKind::STAMP;
         $stmt = $this->db->prepare(
             'INSERT INTO document_route_steps
                  (tenant_id, route_id, position, rule_kind, rule_config, label,
                   decision, decision_quorum, satisfied_by, kind, allow_send_back,
-                  sign_capacity, sign_on_behalf_of, final_template_id, inputs, exclude_named_in, created_at)
+                  sign_capacity, sign_on_behalf_of, final_template_id, inputs, exclude_named_in, stamp_id, created_at)
              VALUES (:tenant_id, :route_id, :position, :rule_kind, :rule_config, :label,
                      :decision, :decision_quorum, :satisfied_by, :kind, :allow_send_back,
-                     :sign_capacity, :sign_on_behalf_of, :final_template_id, :inputs, :exclude_named_in, NOW())'
+                     :sign_capacity, :sign_on_behalf_of, :final_template_id, :inputs, :exclude_named_in, :stamp_id, NOW())'
         );
         $stmt->execute([
             ':tenant_id' => $tenantId,
@@ -146,7 +149,7 @@ final class RouteStepRepository
             // WHIT-918: derived from the two columns above on every write, so the
             // three cannot disagree while the engine still reads the old pair.
             // WHIT-922, WHIT-921: a `sign` or finalise step names its kind; the old two columns cannot.
-            ':kind' => $kind === RouteStepKind::SIGN
+            ':kind' => $kind === RouteStepKind::SIGN || $isStamp
                 ? $kind
                 : ($isFinalise ? RouteStepKind::FINALISE : RouteStepKind::derive($decision, $satisfiedBy)),
             // WHIT-919. 1/0 for the reason `decision` gives above.
@@ -160,6 +163,7 @@ final class RouteStepRepository
             ':inputs' => RouteStepInputs::encode($inputs),
             // WHIT-1018: the subject's people questions whose answers this step leaves out.
             ':exclude_named_in' => RouteStepExclusions::encode($excludeNamedIn),
+            ':stamp_id' => $isStamp ? $stampId : null,
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -175,7 +179,7 @@ final class RouteStepRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
                     decision, decision_quorum, satisfied_by, kind, allow_send_back,
-                    sign_capacity, sign_on_behalf_of, final_template_id, inputs, exclude_named_in, created_at
+                    sign_capacity, sign_on_behalf_of, final_template_id, inputs, exclude_named_in, stamp_id, created_at
                FROM document_route_steps
               WHERE id = :id AND tenant_id = :tenant_id'
         );
@@ -195,7 +199,7 @@ final class RouteStepRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
                     decision, decision_quorum, satisfied_by, kind, allow_send_back,
-                    sign_capacity, sign_on_behalf_of, final_template_id, inputs, exclude_named_in, created_at
+                    sign_capacity, sign_on_behalf_of, final_template_id, inputs, exclude_named_in, stamp_id, created_at
                FROM document_route_steps
               WHERE tenant_id = :tenant_id AND route_id = :route_id
               ORDER BY position ASC'
@@ -238,7 +242,7 @@ final class RouteStepRepository
         $stmt = $this->db->prepare(
             'SELECT id, tenant_id, route_id, position, rule_kind, rule_config, label,
                     decision, decision_quorum, satisfied_by, kind, allow_send_back,
-                    sign_capacity, sign_on_behalf_of, final_template_id, inputs, exclude_named_in, created_at
+                    sign_capacity, sign_on_behalf_of, final_template_id, inputs, exclude_named_in, stamp_id, created_at
                FROM document_route_steps
               WHERE tenant_id = :tenant_id AND route_id = :route_id AND position > :position
               ORDER BY position ASC
@@ -306,6 +310,8 @@ final class RouteStepRepository
             'sign_on_behalf_of' => isset($row['sign_on_behalf_of']) ? (string) $row['sign_on_behalf_of'] : null,
             // WHIT-921: the template a finalise step renders with, or null.
             'final_template_id' => isset($row['final_template_id']) ? (int) $row['final_template_id'] : null,
+            // #1729: the company stamp a `stamp` step asks for, or null.
+            'stamp_id' => isset($row['stamp_id']) ? (int) $row['stamp_id'] : null,
             // WHIT-1016: the values a person acting here fills in; [] for none.
             'inputs' => RouteStepInputs::decode($row['inputs'] ?? null),
             // WHIT-1018: people named in these questions are left out here.

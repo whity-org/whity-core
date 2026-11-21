@@ -307,9 +307,11 @@ final class DocumentRouter
             // A signature is made on a document (WHIT-922), and nobody could
             // answer this step, so the route would never finish.
             foreach ($declared as $step) {
-                if ($step['kind'] === RouteStepKind::SIGN) {
+                if ($step['kind'] === RouteStepKind::SIGN || $step['kind'] === RouteStepKind::STAMP) {
                     throw RoutingRejectedException::because(
-                        'A signing step needs a document to sign, and this route travels on a form submission.'
+                        $step['kind'] === RouteStepKind::STAMP
+                            ? 'A stamp step needs a document to stamp, and this route travels on a form submission.'
+                            : 'A signing step needs a document to sign, and this route travels on a form submission.'
                     );
                 }
             }
@@ -364,6 +366,7 @@ final class DocumentRouter
                     $step['final_template_id'],
                     inputs: $step['inputs'],
                     excludeNamedIn: $step['exclude_named_in'],
+                    stampId: $step['stamp_id'] ?? null,
                 );
             }
 
@@ -593,14 +596,21 @@ final class DocumentRouter
         // derived, never given: a signature counts as an approval under the
         // step's quorum and a decline as a rejection, so the quorum, the route's
         // ending and final numbering work exactly as on a decision step.
-        $signAct = $action === RouteAction::SIGNED || $action === RouteAction::DECLINED;
+        // #1729: applying a company stamp answers a `stamp` step the same way.
+        $sealed = $action === RouteAction::SIGNED || $action === RouteAction::STAMPED;
+        $signAct = $sealed || $action === RouteAction::DECLINED;
         if ($signAct) {
             if ($verdict !== null) {
-                throw RoutingRejectedException::because('Signing and declining carry no verdict of their own.');
+                throw RoutingRejectedException::because('Signing, stamping and declining carry no verdict of their own.');
             }
             if ($action === RouteAction::SIGNED && $this->signatureWriter === null) {
                 throw RoutingRejectedException::because(
                     'A signature is made through signing, with your consent, your drawn signature and a second check.'
+                );
+            }
+            if ($action === RouteAction::STAMPED && $this->signatureWriter === null) {
+                throw RoutingRejectedException::because(
+                    'A stamp is applied through stamping, by a holder of the stamp, with your consent and a second check.'
                 );
             }
             if ($action === RouteAction::DECLINED && ($note === null || trim($note) === '')) {
@@ -686,7 +696,7 @@ final class DocumentRouter
         }
 
         if ($signAct) {
-            $verdict = $action === RouteAction::SIGNED ? RouteVerdict::APPROVED : RouteVerdict::REJECTED;
+            $verdict = $sealed ? RouteVerdict::APPROVED : RouteVerdict::REJECTED;
         }
 
         // WHIT-920: on a route with NO document (a form submission routed on
@@ -707,7 +717,7 @@ final class DocumentRouter
         // WHIT-919: the version this act is made on. Read, never recorded here:
         // only a submit or a resubmit makes a version.
         $version = $this->subjectVersion($tenantId, $subjectType, $subjectId, $actorId, false);
-        if ($action === RouteAction::SIGNED && ($version['version'] === null || $version['content_hash'] === null)) {
+        if ($sealed && ($version['version'] === null || $version['content_hash'] === null)) {
             // A signature binds to the hash of one version; with none recorded
             // there is nothing to bind it to.
             throw RoutingRejectedException::because('This cannot be signed yet: its content has no recorded version.');
@@ -808,7 +818,7 @@ final class DocumentRouter
         try {
             $this->assertOpen($tenantId, $documentId, $subjectType, $subjectId);
 
-            if ($action === RouteAction::SIGNED) {
+            if ($sealed) {
                 // WHIT-922: read the version again inside the transaction, and
                 // refuse unless it is the one the signer was shown. The event
                 // and the signature record both carry what is read here.
@@ -933,7 +943,7 @@ final class DocumentRouter
 
             // WHIT-922: the signature record, in the same transaction as the act
             // that signs, so neither can exist without the other.
-            if ($action === RouteAction::SIGNED && $this->signatureWriter !== null && $event !== null) {
+            if ($sealed && $this->signatureWriter !== null && $event !== null) {
                 ($this->signatureWriter)($event, $step);
             }
 
@@ -997,6 +1007,13 @@ final class DocumentRouter
                 'step_id' => (int) $step['id'],
             ]);
         }
+        if ($action === RouteAction::STAMPED) {
+            // #1729. Ids only, like `route.signed`; `stamp_id` is the stamp the step asked for.
+            $this->broadcastRoute(Events::ROUTE_STAMPED, $tenantId, $documentId, $subjectType, $subjectId, $routeId, $actorId, $eventId, [
+                'step_id' => (int) $step['id'],
+                'stamp_id' => isset($step['stamp_id']) ? (int) $step['stamp_id'] : null,
+            ]);
+        }
         // WHIT-1243: since WHIT-1140 the office records its answers on a form
         // submission at a route step, so this is where `submission.reviewed`
         // (SDK 1.94) fires: after the act committed, and only when it entered
@@ -1049,6 +1066,40 @@ final class DocumentRouter
         $this->expectedSignVersion = ['version' => $expectedVersion, 'content_hash' => $expectedContentHash];
         try {
             return $this->act($tenantId, $actorId, $route, RouteAction::SIGNED, null);
+        } finally {
+            $this->signatureWriter = null;
+            $this->expectedSignVersion = null;
+        }
+    }
+
+    /**
+     * Apply the company stamp on the caller's open item on a `stamp` step (#1729).
+     *
+     * The only way a `stamped` act is made, and the twin of {@see sign()}:
+     * `$writeStamp` writes the sealed stamp record inside the act's transaction.
+     * That the caller holds the stamp, consented and passed the second check is
+     * the caller's to check: {@see \Whity\Core\Document\Signing\SigningService::stamp()}.
+     *
+     * @param array<string, mixed> $route
+     * @param \Closure(array<string, mixed>, array<string, mixed>): void $writeStamp
+     *
+     * @return array{event: array<string, mixed>, resolved: int, delivered: int, decided: ?string}
+     *
+     * @throws RoutingRejectedException
+     * @throws RouteVersionChangedException
+     */
+    public function stamp(
+        int $tenantId,
+        int $actorId,
+        array $route,
+        \Closure $writeStamp,
+        int $expectedVersion,
+        string $expectedContentHash,
+    ): array {
+        $this->signatureWriter = $writeStamp;
+        $this->expectedSignVersion = ['version' => $expectedVersion, 'content_hash' => $expectedContentHash];
+        try {
+            return $this->act($tenantId, $actorId, $route, RouteAction::STAMPED, null);
         } finally {
             $this->signatureWriter = null;
             $this->expectedSignVersion = null;
@@ -1714,6 +1765,21 @@ final class DocumentRouter
         // WHIT-922: a sign step is answered by signing or declining (or a
         // send-back, handled before this), and nothing else answers it.
         $isSign = ($step['kind'] ?? null) === RouteStepKind::SIGN;
+        // #1729: a stamp step is answered by applying the stamp or declining.
+        if (($step['kind'] ?? null) === RouteStepKind::STAMP) {
+            if ($action !== RouteAction::STAMPED && $action !== RouteAction::DECLINED) {
+                throw RoutingRejectedException::because(
+                    sprintf('Step %d is a stamp step: apply the stamp, decline, or send it back.', $position)
+                );
+            }
+
+            return;
+        }
+        if ($action === RouteAction::STAMPED) {
+            throw RoutingRejectedException::because(
+                sprintf('Step %d is not a stamp step, so there is no stamp to apply here.', $position)
+            );
+        }
         $signAct = $action === RouteAction::SIGNED || $action === RouteAction::DECLINED;
         if ($isSign !== $signAct) {
             throw RoutingRejectedException::because($isSign
@@ -1960,7 +2026,7 @@ final class DocumentRouter
 
         // WHIT-922: a sign step is `all` or `any`, and never inherits the
         // tenant's approval setting: who must sign is the route's to say.
-        if (($step['kind'] ?? null) === RouteStepKind::SIGN) {
+        if (in_array($step['kind'] ?? null, [RouteStepKind::SIGN, RouteStepKind::STAMP], true)) {
             return $onStep === RouteQuorum::ANY ? RouteQuorum::ANY : RouteQuorum::ALL;
         }
 
@@ -2557,7 +2623,7 @@ final class DocumentRouter
      *                    allow_send_back: bool, edges: array<string, int>, kind: ?string,
      *                    sign_capacity: ?string, sign_on_behalf_of: ?string,
      *                    final_template_id: ?int, inputs: list<array<string, mixed>>,
-     *                    exclude_named_in: list<string>}>
+     *                    exclude_named_in: list<string>, stamp_id?: ?int}>
      */
     private function validateSteps(int $tenantId, array $steps): array
     {
@@ -2659,12 +2725,50 @@ final class DocumentRouter
                     implode(', ', RouteStepKind::all()),
                 ));
             }
-            if ($stepKind === RouteStepKind::STAMP) {
-                throw RoutingRejectedException::because(sprintf(
-                    "Step %d: '%s' steps are not available yet.",
-                    $position,
-                    $stepKind,
-                ));
+            // #1729: a stamp step names the company stamp it asks for. Only a
+            // holder of that stamp can answer it, and they answer it as a
+            // signing step is answered: apply it, decline, or send it back.
+            $isStamp = $stepKind === RouteStepKind::STAMP;
+            $stampId = null;
+            if ($isStamp) {
+                $stampId = $step['stamp_id'] ?? null;
+                if (!is_int($stampId) || !$this->isActiveStamp($tenantId, $stampId)) {
+                    throw RoutingRejectedException::because(sprintf(
+                        "Step %d is a stamp step: 'stamp_id' must name one of this workspace's company stamps.",
+                        $position,
+                    ));
+                }
+                if (($step['sign_capacity'] ?? null) !== null || ($step['sign_on_behalf_of'] ?? null) !== null) {
+                    throw RoutingRejectedException::because(
+                        "Step {$position}: a stamp stands for its own legal name, so it takes no "
+                        . "'sign_capacity' or 'sign_on_behalf_of'."
+                    );
+                }
+                if ($decision || ($step['satisfied_by'] ?? RouteSatisfaction::ACT) !== RouteSatisfaction::ACT) {
+                    throw RoutingRejectedException::because(sprintf(
+                        'Step %d is a stamp step, so it is neither a decision step nor satisfied by delivery: '
+                        . 'a holder answers it by applying the stamp.',
+                        $position,
+                    ));
+                }
+                foreach (['on_approved', 'on_rejected'] as $edgeKey) {
+                    if (($step[$edgeKey] ?? null) !== null) {
+                        throw RoutingRejectedException::because(
+                            "Step {$position}: a stamp step continues to the next step when stamped and ends the "
+                            . "route when declined, so it takes no '{$edgeKey}'."
+                        );
+                    }
+                }
+                $stampQuorum = $step['decision_quorum'] ?? null;
+                if ($stampQuorum !== null && $stampQuorum !== RouteQuorum::ALL && $stampQuorum !== RouteQuorum::ANY) {
+                    throw RoutingRejectedException::because(
+                        "Step {$position}: a stamp step needs every holder it reaches ('all') or any one of them ('any')."
+                    );
+                }
+            } elseif (($step['stamp_id'] ?? null) !== null) {
+                throw RoutingRejectedException::because(
+                    "Step {$position}: 'stamp_id' only means something on a stamp step."
+                );
             }
             $isSign = $stepKind === RouteStepKind::SIGN;
             $signCapacity = null;
@@ -2739,7 +2843,7 @@ final class DocumentRouter
                         implode(', ', RouteQuorum::all()),
                     ));
                 }
-                if (!$decision && !$isSign) {
+                if (!$decision && !$isSign && !$isStamp) {
                     // Refused, not ignored. A quorum on a step that demands no
                     // verdict is a number nothing ever reads, and the author
                     // believes they have configured an approval.
@@ -2812,7 +2916,11 @@ final class DocumentRouter
             // WHIT-1016: values the person acting here fills in before approving.
             try {
                 $inputs = RouteStepInputs::parse($step['inputs'] ?? null);
-                RouteStepInputs::assertAllowed($inputs, $satisfiedBy, $isSign ? RouteStepKind::SIGN : null);
+                RouteStepInputs::assertAllowed(
+                    $inputs,
+                    $satisfiedBy,
+                    $isSign ? RouteStepKind::SIGN : ($isStamp ? RouteStepKind::STAMP : null),
+                );
                 // WHIT-1018: people named in these questions are left out here.
                 $excludeNamedIn = RouteStepExclusions::parse($step['exclude_named_in'] ?? null);
             } catch (InvalidArgumentException $e) {
@@ -2829,16 +2937,30 @@ final class DocumentRouter
                 'satisfied_by' => $satisfiedBy,
                 'allow_send_back' => $allowSendBack,
                 'edges' => $edges,
-                'kind' => $isSign ? RouteStepKind::SIGN : null,
+                'kind' => $isSign ? RouteStepKind::SIGN : ($isStamp ? RouteStepKind::STAMP : null),
                 'sign_capacity' => $signCapacity,
                 'sign_on_behalf_of' => $signOnBehalfOf,
                 'final_template_id' => null,
                 'inputs' => $inputs,
                 'exclude_named_in' => $excludeNamedIn,
+                'stamp_id' => $stampId,
             ];
         }
 
         return $out;
+    }
+
+    /** Whether a company stamp is this workspace's and not archived (#1729). */
+    private function isActiveStamp(int $tenantId, int $stampId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT 1 FROM company_stamps WHERE tenant_id = :tenant_id AND id = :id AND archived_at IS NULL'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':id' => $stampId]);
+        $found = $stmt->fetchColumn() !== false;
+        $stmt->closeCursor();
+
+        return $found;
     }
 
     /** A sign step's capacity or on-behalf-of: optional, trimmed, at most 200 characters. */

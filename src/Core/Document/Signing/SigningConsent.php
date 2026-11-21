@@ -18,15 +18,21 @@ final class SigningConsent
 {
     public const CURRENT = '2026-11-1';
 
+    /** The consent line a stamp holder ticks before applying a company stamp (#1729). */
+    public const STAMP_CURRENT = '2026-11-stamp-1';
+
     /** @var array<string, string> */
     private const WORDING = [
         '2026-11-1' => 'I have read this document and I sign it electronically, in the capacity shown. '
             . 'I agree that my electronic signature, with this audit trail, records that I signed this version.',
+        '2026-11-stamp-1' => 'I hold this company stamp and I am authorised to apply it to this document. '
+            . 'I agree that this audit trail records that I applied it to this version. '
+            . 'This is an authorised person applying the image of the stamp, not a certified electronic seal.',
     ];
 
-    public static function isCurrent(string $version): bool
+    public static function isCurrent(string $version, bool $stamp = false): bool
     {
-        return $version === self::CURRENT;
+        return $version === ($stamp ? self::STAMP_CURRENT : self::CURRENT);
     }
 
     public static function wording(string $version): ?string
