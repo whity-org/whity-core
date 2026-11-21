@@ -29003,6 +29003,676 @@
                 ]
             }
         },
+        "/api/v1/document-stamps": {
+            "get": {
+                "operationId": "get_api_v1_document_stamps",
+                "summary": "The workspace's company stamps, with their holders",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Archived stamps are left out unless `?archived=true`.",
+                "responses": {
+                    "200": {
+                        "description": "The stamps",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CompanyStampListResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_document_stamps",
+                "summary": "Add a company stamp",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Applying it is an authorised person applying the image, not a certified electronic seal.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CompanyStampRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The stamp",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CompanyStampResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A name, legal name, image or holder could not be used",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-stamps/{id}": {
+            "get": {
+                "operationId": "get_api_v1_document_stamps_id",
+                "summary": "One company stamp, with its holders",
+                "tags": [
+                    "documents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The stamp",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CompanyStampResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Stamp not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "patch_api_v1_document_stamps_id",
+                "summary": "Change a stamp's name, legal name or image. Stamps already applied keep their own copy.",
+                "tags": [
+                    "documents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CompanyStampUpdateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The stamp",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CompanyStampResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Stamp not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A name, legal name or image could not be used",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-stamps/{id}/archive": {
+            "post": {
+                "operationId": "post_api_v1_document_stamps_id_archive",
+                "summary": "Archive a stamp. New stamp steps cannot ask for it; records already made keep it.",
+                "tags": [
+                    "documents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The stamp",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CompanyStampResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Stamp not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-stamps/{id}/holders": {
+            "put": {
+                "operationId": "put_api_v1_document_stamps_id_holders",
+                "summary": "Replace a stamp's holders: named people and roles",
+                "tags": [
+                    "documents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CompanyStampHolders"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The stamp",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CompanyStampResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Stamp not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A holder is not in this workspace, or a role is not one it has",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/document-stamps/{id}/restore": {
+            "post": {
+                "operationId": "post_api_v1_document_stamps_id_restore",
+                "summary": "Bring an archived stamp back",
+                "tags": [
+                    "documents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The stamp",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CompanyStampResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Stamp not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/document-template-slots": {
             "get": {
                 "operationId": "get_api_v1_document_template_slots",
@@ -30513,13 +31183,18 @@
                                                 },
                                                 "stage": {
                                                     "type": "string",
-                                                    "description": "Only at the `stage` and `described` disclosure levels",
+                                                    "description": "Only at the `stage`, `described` and `signed` disclosure levels",
                                                     "enum": [
                                                         "issued",
                                                         "forwarded",
                                                         "acknowledged",
                                                         "returned",
-                                                        "noted"
+                                                        "noted",
+                                                        "sent_back",
+                                                        "resubmitted",
+                                                        "signed",
+                                                        "stamped",
+                                                        "declined"
                                                     ]
                                                 },
                                                 "stage_on": {
@@ -30556,6 +31231,53 @@
                                                         "issued_on"
                                                     ]
                                                 },
+                                                "signatures": {
+                                                    "type": "array",
+                                                    "description": "Only at `signed` (#1730): the signatures and company stamps on the document, as capacities with dates. `name` only when the workspace turned on documents.qr_public_signer_names.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "kind": {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "signature",
+                                                                    "stamp"
+                                                                ]
+                                                            },
+                                                            "capacity": {
+                                                                "type": "string",
+                                                                "nullable": true,
+                                                                "description": "The capacity signed in, or the legal name a stamp stands for"
+                                                            },
+                                                            "on_behalf_of": {
+                                                                "type": "string",
+                                                                "nullable": true
+                                                            },
+                                                            "version": {
+                                                                "type": "integer"
+                                                            },
+                                                            "signed_on": {
+                                                                "type": "string",
+                                                                "nullable": true,
+                                                                "description": "Date only"
+                                                            },
+                                                            "name": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "kind",
+                                                            "capacity",
+                                                            "on_behalf_of",
+                                                            "version",
+                                                            "signed_on"
+                                                        ]
+                                                    }
+                                                },
+                                                "trail_intact": {
+                                                    "type": "boolean",
+                                                    "description": "Only at `signed` (#1730): false when the hash chain of the document trail is broken, so the record behind the paper was changed."
+                                                },
                                                 "brand": {
                                                     "nullable": true,
                                                     "allOf": [
@@ -30587,6 +31309,124 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification attempts from this address",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Verification is temporarily unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/document-verifications/{token}/files/{sha256}": {
+            "get": {
+                "operationId": "get_api_v1_document_verifications_token_files_sha256",
+                "summary": "Check a file: is this PDF the one the issuer stored? (public, rate-limited)",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The browser hashes the PDF and sends only its SHA-256; the file never leaves the visitor's device (#1730). `current` is the newest PDF of the document, `earlier` an older one. Every code that does not verify answers `none` with the same 200, so this cannot be asked whether a code exists.",
+                "parameters": [
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "sha256",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Whether the file matches",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "match": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "current",
+                                                        "earlier",
+                                                        "none"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "match"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a SHA-256",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -33299,6 +34139,235 @@
                     },
                     "429": {
                         "description": "Too many codes were sent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/documents/{id}/routes/{routeId}/stamp": {
+            "post": {
+                "operationId": "post_api_v1_documents_id_routes_routeid_stamp",
+                "summary": "Apply the company stamp your open stamp step asks for",
+                "tags": [
+                    "documents"
+                ],
+                "description": "Only a holder of the stamp (named, or through a role) can apply it. Needs the stamp consent line in its current wording, the content hash you were shown and the second check your account uses, as for a signature. The act and a sealed stamp record (with the names and image of the stamp copied in) are written together. An authorised person applying the image, not a certified electronic seal.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/StampRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The stamp record and the trail entry",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/SignResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "You do not hold this company stamp",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document or route not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The content changed since you opened it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Consent or second check missing or not correct, or nothing here waits for your stamp",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many tries",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/documents/{id}/routes/{routeId}/stamping": {
+            "get": {
+                "operationId": "get_api_v1_documents_id_routes_routeid_stamping",
+                "summary": "What you see before applying a company stamp: the step, the stamp, whether you hold it, the content hash, the consent version and how you will confirm",
+                "tags": [
+                    "documents"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "routeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The stamping context",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/StampingContextResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Document or route not found, or not visible to the caller",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -93551,6 +94620,29 @@
                     "data"
                 ]
             },
+            "AppliedStamp": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "legal_name": {
+                        "type": "string"
+                    },
+                    "image": {
+                        "type": "string",
+                        "description": "On the audit: the PNG or JPEG data URL that was applied."
+                    }
+                },
+                "required": [
+                    "name",
+                    "legal_name"
+                ]
+            },
             "ApplyWorkspaceTemplateRequest": {
                 "type": "object",
                 "properties": {
@@ -98454,6 +99546,177 @@
                     "data"
                 ]
             },
+            "CompanyStamp": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "legal_name": {
+                        "type": "string"
+                    },
+                    "image": {
+                        "type": "string",
+                        "description": "A PNG or JPEG data URL, at most 512 KB."
+                    },
+                    "image_hash": {
+                        "type": "string"
+                    },
+                    "holders": {
+                        "type": "object",
+                        "properties": {
+                            "people": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "profile_id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "profile_id",
+                                        "name"
+                                    ]
+                                }
+                            },
+                            "roles": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "role_id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "role_id",
+                                        "name"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "people",
+                            "roles"
+                        ]
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "updated_at": {
+                        "type": "string"
+                    },
+                    "archived_at": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "legal_name",
+                    "image",
+                    "holders",
+                    "archived_at"
+                ]
+            },
+            "CompanyStampHolders": {
+                "type": "object",
+                "properties": {
+                    "people": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Profile ids of members of this workspace."
+                    },
+                    "roles": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Role ids; everyone holding one holds the stamp."
+                    }
+                }
+            },
+            "CompanyStampListResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CompanyStamp"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "CompanyStampRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "At most 200 characters."
+                    },
+                    "legal_name": {
+                        "type": "string",
+                        "description": "The legal name the stamp stands for. At most 300 characters."
+                    },
+                    "image": {
+                        "type": "string",
+                        "description": "A PNG or JPEG data URL, at most 512 KB, 32 to 4000 pixels a side."
+                    },
+                    "holders": {
+                        "$ref": "#/components/schemas/CompanyStampHolders",
+                        "description": "Who may apply the stamp: profile ids in `people`, role ids in `roles`."
+                    }
+                },
+                "required": [
+                    "name",
+                    "legal_name",
+                    "image"
+                ]
+            },
+            "CompanyStampResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/CompanyStamp"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "CompanyStampUpdateRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The new name of the stamp. At most 200 characters."
+                    },
+                    "legal_name": {
+                        "type": "string",
+                        "description": "The new legal name the stamp stands for. At most 300 characters."
+                    },
+                    "image": {
+                        "type": "string",
+                        "description": "A new image: a PNG or JPEG data URL, at most 512 KB. Stamps already applied keep their own copy."
+                    }
+                }
+            },
             "Contact": {
                 "type": "object",
                 "properties": {
@@ -103213,9 +104476,15 @@
                                     "type": "string",
                                     "enum": [
                                         "sign",
+                                        "stamp",
                                         "finalise"
                                     ],
                                     "nullable": true
+                                },
+                                "stamp_id": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "On a stamp step: one of the company stamps of the workspace (GET /api/document-stamps)."
                                 },
                                 "sign_capacity": {
                                     "type": "string",
@@ -103468,6 +104737,10 @@
                         "type": "integer",
                         "nullable": true
                     },
+                    "stamp_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
                     "inputs": {
                         "type": "array",
                         "items": {
@@ -103529,6 +104802,21 @@
                     },
                     "subject_version": {
                         "type": "integer"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "signature",
+                            "stamp"
+                        ]
+                    },
+                    "stamp": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AppliedStamp"
+                            }
+                        ]
                     }
                 },
                 "required": [
@@ -124010,6 +125298,21 @@
                     "id": {
                         "type": "integer"
                     },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "signature",
+                            "stamp"
+                        ]
+                    },
+                    "stamp": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AppliedStamp"
+                            }
+                        ]
+                    },
                     "route_id": {
                         "type": "integer"
                     },
@@ -124692,6 +125995,174 @@
                             "state",
                             "email"
                         ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "StampRequest": {
+                "type": "object",
+                "properties": {
+                    "content_hash": {
+                        "type": "string"
+                    },
+                    "consent": {
+                        "type": "boolean"
+                    },
+                    "consent_version": {
+                        "type": "string",
+                        "description": "The stamp consent version from the stamping context."
+                    },
+                    "second_factor": {
+                        "type": "object",
+                        "properties": {
+                            "method": {
+                                "type": "string",
+                                "enum": [
+                                    "totp",
+                                    "email_code",
+                                    "fresh_sign_in"
+                                ]
+                            },
+                            "code": {
+                                "type": "string",
+                                "nullable": true
+                            }
+                        },
+                        "required": [
+                            "method"
+                        ]
+                    }
+                },
+                "required": [
+                    "content_hash",
+                    "consent",
+                    "consent_version",
+                    "second_factor"
+                ]
+            },
+            "StampingContext": {
+                "type": "object",
+                "properties": {
+                    "route_id": {
+                        "type": "integer"
+                    },
+                    "can_stamp": {
+                        "type": "boolean"
+                    },
+                    "is_holder": {
+                        "type": "boolean"
+                    },
+                    "step": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "position": {
+                                "type": "integer"
+                            },
+                            "label": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "quorum": {
+                                "type": "string",
+                                "enum": [
+                                    "all",
+                                    "any"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "position",
+                            "quorum"
+                        ]
+                    },
+                    "stamp": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AppliedStamp"
+                            }
+                        ]
+                    },
+                    "subject": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "type": {
+                                "type": "string"
+                            },
+                            "id": {
+                                "type": "integer"
+                            },
+                            "title": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "version": {
+                                "type": "integer"
+                            },
+                            "content_hash": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "type",
+                            "id",
+                            "version",
+                            "content_hash"
+                        ]
+                    },
+                    "consent_version": {
+                        "type": "string"
+                    },
+                    "second_factor": {
+                        "type": "object",
+                        "properties": {
+                            "method": {
+                                "type": "string",
+                                "enum": [
+                                    "totp",
+                                    "email_code",
+                                    "fresh_sign_in"
+                                ]
+                            },
+                            "provider_key": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "email_hint": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "signed_in_again": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "method",
+                            "signed_in_again"
+                        ]
+                    }
+                },
+                "required": [
+                    "route_id",
+                    "can_stamp",
+                    "is_holder",
+                    "consent_version",
+                    "second_factor"
+                ]
+            },
+            "StampingContextResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/StampingContext"
                     }
                 },
                 "required": [

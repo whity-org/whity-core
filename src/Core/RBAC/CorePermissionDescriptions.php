@@ -118,6 +118,7 @@ final class CorePermissionDescriptions
         CorePermissions::DOCUMENTS_ISSUE              => 'Issue a document from a template: the record, its QR code and its PDF, and correct it',
         CorePermissions::DOCUMENTS_WITHDRAW           => 'Withdraw an issued document: its codes stop being honoured and open items on it close. The record is kept.',
         CorePermissions::DOCUMENTS_THEMES             => "Create, edit and archive the workspace's document themes, and choose its default theme",
+        CorePermissions::DOCUMENTS_STAMPS             => "Create, change and archive the workspace's company stamps and choose who holds them",
         CorePermissions::DOCUMENTS_SUGGEST            => 'Suggest changes to a document, which someone who can edit it accepts or rejects',
         CorePermissions::DOCUMENTS_COMMENT            => 'Comment on a document: start threads, reply, resolve and reopen them',
         CorePermissions::DOCUMENTS_READ_ALL           => 'See every issued document in the tenant, not only the ones you raised',

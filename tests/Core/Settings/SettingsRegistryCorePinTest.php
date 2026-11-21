@@ -174,6 +174,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'documents.qr_public_detail',
             // WHIT-920: whether an applicant sees who reviewed their form. Off.
             'forms.show_reviewer_names',
+            // #1730: whether the public check names who signed. Off.
+            'documents.qr_public_signer_names',
             // #999 — how many people a USER GROUP preview SHOWS. Not a ceiling
             // on resolution: the count a preview reports is exact and unbounded,
             // this is the size of the sample beside it.
@@ -437,6 +439,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'documents.qr_public_detail' => 'minimal',
             // WHIT-920: OFF. Applicants see stages and outcomes, not reviewers.
             'forms.show_reviewer_names' => 'false',
+            // #1730: OFF. The public check shows capacities, not names.
+            'documents.qr_public_signer_names' => 'false',
             // Ten faces: enough to recognise a group at a glance, small enough
             // that nobody mistakes the sample for the list.
             'groups.preview_sample_size' => '10',

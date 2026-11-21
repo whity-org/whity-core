@@ -50,6 +50,7 @@ final class SigningService
         private readonly SigningChallengeRepository $challenges,
         private readonly InstanceSealKeys $keys,
         private readonly ?SigningCodeMailer $mailer = null,
+        private readonly ?CompanyStampRepository $stamps = null,
     ) {
     }
 
@@ -105,10 +106,12 @@ final class SigningService
      */
     public function sendCode(int $tenantId, int $actorId, array $route): array
     {
-        if ($this->openSignItem($tenantId, $actorId, $route) === null) {
+        if ($this->openSignItem($tenantId, $actorId, $route) === null
+            && $this->openStampItem($tenantId, $actorId, $route) === null
+        ) {
             throw new SigningRefusedException(
                 SigningRefusedException::NOT_SIGNER,
-                'Nothing on this route is waiting for your signature.',
+                'Nothing on this route is waiting for your signature or stamp.',
             );
         }
         if ($this->secondFactor->methodFor($actorId)['method'] !== SigningSecondFactor::EMAIL_CODE) {
@@ -292,6 +295,207 @@ final class SigningService
     }
 
     /**
+     * What a stamp holder sees before applying a company stamp (#1729): the
+     * step, the stamp (name, legal name, image), whether they hold it, the
+     * content's current hash, the consent wording's version and their check.
+     *
+     * @param array<string, mixed> $route
+     * @return array<string, mixed>
+     */
+    public function stampContext(int $tenantId, int $actorId, array $route): array
+    {
+        $item = $this->openStampItem($tenantId, $actorId, $route);
+        $stamp = $item === null ? null : $this->stampOf($tenantId, $item['step']);
+        $holder = $stamp !== null && $this->stamps !== null
+            && $this->stamps->isHolder($tenantId, (int) $stamp['id'], $actorId);
+        $subject = $this->currentContent($tenantId, $route);
+        $factor = $this->secondFactor->methodFor($actorId);
+
+        return [
+            'route_id' => (int) $route['id'],
+            'can_stamp' => $item !== null && $stamp !== null && $holder && $subject !== null,
+            'is_holder' => $holder,
+            'step' => $item === null ? null : [
+                'id' => (int) $item['step']['id'],
+                'position' => (int) $item['step']['position'],
+                'label' => $item['step']['label'],
+                'quorum' => ($item['step']['decision_quorum'] ?? null) === RouteQuorum::ANY
+                    ? RouteQuorum::ANY
+                    : RouteQuorum::ALL,
+            ],
+            'stamp' => $stamp === null ? null : [
+                'id' => (int) $stamp['id'],
+                'name' => (string) $stamp['name'],
+                'legal_name' => (string) $stamp['legal_name'],
+                'image' => (string) $stamp['image'],
+            ],
+            'subject' => $subject,
+            'consent_version' => SigningConsent::STAMP_CURRENT,
+            'second_factor' => [
+                'method' => $factor['method'],
+                'provider_key' => $factor['provider_key'],
+                'email_hint' => $factor['method'] === SigningSecondFactor::EMAIL_CODE
+                    ? self::maskEmail($this->signer($actorId)['email'])
+                    : null,
+                'signed_in_again' => $factor['method'] === SigningSecondFactor::FRESH_SIGN_IN
+                    && $this->challenges->hasFreshSignIn($tenantId, $actorId, (int) $route['id']),
+            ],
+        ];
+    }
+
+    /**
+     * Apply the company stamp a `stamp` step asks for (#1729).
+     *
+     * Made only when, at that moment, the caller holds an open item on the
+     * step, holds the stamp (named, or through a role), ticked the stamp consent
+     * line, was shown the content as it is now, and passed the same second
+     * check as a signature. The record is sealed like a signature, with the
+     * stamp's names and image copied in.
+     *
+     * @param array<string, mixed> $route
+     * @param array{content_hash: mixed, consent: mixed, consent_version: mixed, second_factor?: mixed} $input
+     *
+     * @return array{event: array<string, mixed>, signature: array<string, mixed>, decided: ?string,
+     *               resolved: int, delivered: int}
+     *
+     * @throws SigningRefusedException
+     * @throws RoutingRejectedException
+     */
+    public function stamp(int $tenantId, int $actorId, array $route, array $input, ?string $ip, ?string $userAgent): array
+    {
+        $item = $this->openStampItem($tenantId, $actorId, $route);
+        if ($item === null) {
+            throw new SigningRefusedException(
+                SigningRefusedException::NOT_SIGNER,
+                'Nothing on this route is waiting for your stamp.',
+            );
+        }
+        $stamp = $this->stampOf($tenantId, $item['step']);
+        if ($stamp === null || $stamp['archived_at'] !== null) {
+            throw RoutingRejectedException::because('The company stamp this step asks for is no longer available.');
+        }
+        if ($this->stamps === null || !$this->stamps->isHolder($tenantId, (int) $stamp['id'], $actorId)) {
+            throw new SigningRefusedException(
+                SigningRefusedException::NOT_HOLDER,
+                'Only a holder of this company stamp can apply it. Ask whoever manages the workspace\'s stamps.',
+                403,
+            );
+        }
+
+        if (($input['consent'] ?? false) !== true) {
+            throw new SigningRefusedException(
+                SigningRefusedException::CONSENT_REQUIRED,
+                'Tick the consent line to apply the stamp.',
+            );
+        }
+        $consentVersion = $input['consent_version'] ?? null;
+        if (!is_string($consentVersion) || !SigningConsent::isCurrent($consentVersion, true)) {
+            throw new SigningRefusedException(
+                SigningRefusedException::CONSENT_REQUIRED,
+                'The consent wording has changed. Read it again and tick it to apply the stamp.',
+            );
+        }
+
+        $subjectType = self::subjectType($route);
+        $subjectId = self::subjectId($route);
+        $snapshot = $this->subjects->get($subjectType)?->snapshot($tenantId, $subjectId);
+        if ($snapshot === null) {
+            throw RoutingRejectedException::because('This cannot be stamped: its content could not be read.');
+        }
+        $expected = $input['content_hash'] ?? null;
+        if (!is_string($expected) || !hash_equals(RouteSubjectVersionRepository::hash($snapshot), $expected)) {
+            throw new SigningRefusedException(
+                SigningRefusedException::CONTENT_CHANGED,
+                'The content changed since you opened it. Read it again before applying the stamp.',
+                409,
+            );
+        }
+
+        $factor = is_array($input['second_factor'] ?? null) ? $input['second_factor'] : [];
+        $method = is_string($factor['method'] ?? null) ? $factor['method'] : '';
+        $code = is_string($factor['code'] ?? null) ? $factor['code'] : null;
+        $confirmedBy = $this->secondFactor->confirm($tenantId, $actorId, $method, $code, $ip, (int) $route['id'], $expected);
+
+        $seen = $this->versions->record($tenantId, $subjectType, $subjectId, $snapshot, $actorId);
+
+        $holder = $this->signer($actorId);
+        $documentId = (int) $route['document_id'];
+        $image = (string) $stamp['image'];
+        $written = null;
+
+        try {
+            $outcome = $this->router->stamp(
+                $tenantId,
+                $actorId,
+                $route,
+                function (array $event, array $actStep) use (
+                    $tenantId, $documentId, $route, $subjectType, $subjectId, $holder, $actorId,
+                    $confirmedBy, $ip, $userAgent, $image, $stamp, $expected, &$written
+                ): void {
+                    if (!hash_equals($expected, (string) ($event['content_hash'] ?? ''))) {
+                        throw new RouteVersionChangedException('The content changed since you opened it.');
+                    }
+                    $record = [
+                        'kind' => SignatureRepository::KIND_STAMP,
+                        'tenant_id' => $tenantId,
+                        'document_id' => $documentId,
+                        'route_id' => (int) $route['id'],
+                        'event_id' => (int) $event['id'],
+                        'step_id' => (int) $actStep['id'],
+                        'subject_type' => $subjectType,
+                        'subject_id' => $subjectId,
+                        'subject_version' => (int) $event['subject_version'],
+                        'content_hash' => (string) $event['content_hash'],
+                        // The holder who applied it.
+                        'signer_profile_id' => $actorId,
+                        'signer_name' => $holder['name'],
+                        'signer_email' => $holder['email'],
+                        'capacity' => null,
+                        'on_behalf_of' => (string) $stamp['legal_name'],
+                        'confirmed_by' => $confirmedBy,
+                        'signed_at' => RouteTrailChain::second((string) $event['occurred_at']),
+                        'ip_address' => $ip === null ? null : mb_substr($ip, 0, 64),
+                        'user_agent' => $userAgent === null ? null : mb_substr($userAgent, 0, 512),
+                        'consent_version' => SigningConsent::STAMP_CURRENT,
+                        'appearance_hash' => hash('sha256', $image),
+                        'appearance' => $image,
+                        'stamp_id' => (int) $stamp['id'],
+                        'stamp_name' => (string) $stamp['name'],
+                        'stamp_legal_name' => (string) $stamp['legal_name'],
+                    ];
+                    $message = SignatureRepository::sealedMessage($record, $event['entry_hash'] ?? null);
+                    $seal = $this->keys->seal($message);
+                    $record['record_hash'] = hash('sha256', $message);
+                    $record['seal'] = $seal['seal'];
+                    $record['seal_key_id'] = $seal['key_id'];
+                    $record['id'] = $this->signatures->append($record);
+                    $written = $record;
+                },
+                $seen['version'],
+                $seen['content_hash'],
+            );
+        } catch (RouteVersionChangedException) {
+            throw new SigningRefusedException(
+                SigningRefusedException::CONTENT_CHANGED,
+                'The content changed since you opened it. Read it again before applying the stamp.',
+                409,
+            );
+        }
+
+        if ($written === null) {
+            throw new \RuntimeException('The stamp was not recorded.');
+        }
+
+        return [
+            'event' => $outcome['event'],
+            'signature' => $written,
+            'decided' => $outcome['decided'],
+            'resolved' => $outcome['resolved'],
+            'delivered' => $outcome['delivered'],
+        ];
+    }
+
+    /**
      * The audit of a document: every act, every signature with whether its seal
      * checks, and whether the trail's chain is intact.
      *
@@ -329,12 +533,12 @@ final class SigningService
         return ['chain' => $chain, 'signatures' => $out];
     }
 
-    /** @return list<int> The document's `signed` trail entries, oldest first. */
+    /** @return list<int> The document's `signed` and `stamped` trail entries, oldest first. */
     private function signedEventIds(int $tenantId, int $documentId): array
     {
         $stmt = $this->db->prepare(
             "SELECT id FROM document_route_events
-              WHERE tenant_id = :tenant_id AND document_id = :document_id AND action = 'signed'
+              WHERE tenant_id = :tenant_id AND document_id = :document_id AND action IN ('signed', 'stamped')
               ORDER BY id ASC"
         );
         $stmt->execute([':tenant_id' => $tenantId, ':document_id' => $documentId]);
@@ -384,7 +588,8 @@ final class SigningService
      *
      * @param array<string, mixed> $row From {@see SignatureRepository}.
      * @return array{id: int, capacity: ?string, on_behalf_of: ?string,
-     *               by: array{profile_id: int, name: string}, at: string, subject_version: int}
+     *               by: array{profile_id: int, name: string}, at: string, subject_version: int,
+     *               kind: string, stamp: ?array{id: ?int, name: string, legal_name: string}}
      */
     public static function presentCurrent(array $row): array
     {
@@ -395,6 +600,9 @@ final class SigningService
             'by' => ['profile_id' => (int) $row['signer_profile_id'], 'name' => (string) $row['signer_name']],
             'at' => (string) $row['signed_at'],
             'subject_version' => (int) $row['subject_version'],
+            // #1729: a signature, or a company stamp a holder applied.
+            'kind' => self::kindOf($row),
+            'stamp' => self::stampOfRow($row),
         ];
     }
 
@@ -406,10 +614,18 @@ final class SigningService
      */
     public static function present(array $row, bool $withDetails = true): array
     {
-        $appearance = json_decode((string) ($row['appearance'] ?? ''), true);
+        $kind = self::kindOf($row);
+        $appearance = $kind === SignatureRepository::KIND_STAMP
+            ? null
+            : json_decode((string) ($row['appearance'] ?? ''), true);
 
         return [
             'id' => (int) $row['id'],
+            'kind' => $kind,
+            // #1729: on a stamp, its names as they were and the image applied.
+            'stamp' => self::stampOfRow($row) === null ? null : self::stampOfRow($row) + [
+                'image' => (string) ($row['appearance'] ?? ''),
+            ],
             'route_id' => (int) $row['route_id'],
             'event_id' => (int) $row['event_id'],
             'step_id' => (int) $row['step_id'],
@@ -437,6 +653,65 @@ final class SigningService
             'seal' => (string) $row['seal'],
             'seal_key_id' => (string) $row['seal_key_id'],
         ];
+    }
+
+    /** @param array<string, mixed> $row */
+    private static function kindOf(array $row): string
+    {
+        return ($row['kind'] ?? null) === SignatureRepository::KIND_STAMP
+            ? SignatureRepository::KIND_STAMP
+            : SignatureRepository::KIND_SIGNATURE;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array{id: ?int, name: string, legal_name: string}|null
+     */
+    private static function stampOfRow(array $row): ?array
+    {
+        if (self::kindOf($row) !== SignatureRepository::KIND_STAMP) {
+            return null;
+        }
+
+        return [
+            'id' => isset($row['stamp_id']) ? (int) $row['stamp_id'] : null,
+            'name' => (string) ($row['stamp_name'] ?? ''),
+            'legal_name' => (string) ($row['stamp_legal_name'] ?? ''),
+        ];
+    }
+
+    /**
+     * The holder's open item and its step, when the step is a `stamp` step (#1729).
+     *
+     * @param array<string, mixed> $route
+     * @return array{recipient: array<string, mixed>, step: array<string, mixed>}|null
+     */
+    private function openStampItem(int $tenantId, int $actorId, array $route): ?array
+    {
+        $recipient = $this->recipients->findOpenForProfile($tenantId, (int) $route['id'], $actorId);
+        if ($recipient === null || $recipient['role'] === RouteRecipientRepository::ROLE_AUTHOR) {
+            return null;
+        }
+        $step = $this->steps->findById((int) $recipient['step_id'], $tenantId);
+        if ($step === null || $step['kind'] !== RouteStepKind::STAMP) {
+            return null;
+        }
+
+        return ['recipient' => $recipient, 'step' => $step];
+    }
+
+    /**
+     * @param array<string, mixed> $step
+     * @return array<string, mixed>|null
+     */
+    private function stampOf(int $tenantId, array $step): ?array
+    {
+        $stampId = $step['stamp_id'] ?? null;
+        if (!is_int($stampId) || $this->stamps === null) {
+            return null;
+        }
+
+        return $this->stamps->find($tenantId, $stampId);
     }
 
     /**

@@ -7,7 +7,8 @@
  * Every act on the document's routes and every signature, whether each
  * signature's seal checks against the instance's published key, and whether
  * the trail's hash chain is intact. Electronic signatures with an audit trail;
- * the page never calls them anything more.
+ * the page never calls them anything more. A company stamp (#1729) is shown as
+ * what it is: its image, applied by a named holder, not a certified seal.
  *
  * Anyone who may see the document may read its audit; the server answers a
  * document they may not see as missing.
@@ -56,6 +57,9 @@ interface AuditSignature {
   consent_version: string;
   consent_wording: string | null;
   appearance: SignatureAppearance | null;
+  /** #1729: a company stamp applied by a holder, or a signature. Absent on an older server: a signature. */
+  kind?: 'signature' | 'stamp';
+  stamp?: { id: number; name: string; legal_name: string; image: string } | null;
   record_hash: string;
   seal_key_id: string;
   seal_valid: boolean;
@@ -252,22 +256,65 @@ export default function Page() {
       </Alert>
 
       <section className="space-y-3">
-        <h2 className="text-base font-semibold text-foreground">{t('audit.signatures.heading', 'Signatures')}</h2>
+        <h2 className="text-base font-semibold text-foreground">
+          {t('audit.signatures.headingWithStamps', 'Signatures and stamps')}
+        </h2>
         {data.signatures.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('audit.signatures.none', 'Nobody has signed this document.')}</p>
         ) : (
           <ul className="space-y-3">
-            {data.signatures.map((s) => (
-              <li key={s.id} className="space-y-3 rounded-md border border-border p-4" data-testid="audit-signature">
+            {data.signatures.map((s) => {
+              const isStamp = s.kind === 'stamp';
+              const stamp = isStamp ? (s.stamp ?? null) : null;
+              return (
+              <li
+                key={s.id}
+                className="space-y-3 rounded-md border border-border p-4"
+                data-testid="audit-signature"
+                data-kind={isStamp ? 'stamp' : 'signature'}
+              >
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold text-foreground">{s.by.name}</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {isStamp
+                      ? t('audit.stamp.appliedBy', 'Applied by {name}', { name: s.by.name })
+                      : s.by.name}
+                  </span>
                   <Badge variant={s.seal_valid ? 'success' : 'destructive'} data-seal={s.seal_valid ? 'valid' : 'invalid'}>
                     {s.seal_valid
                       ? t('audit.seal.valid', 'Seal checks')
                       : t('audit.seal.invalid', 'Seal does not check')}
                   </Badge>
                 </div>
-                {s.appearance !== null && (
+                {isStamp && (
+                  <div className="flex flex-wrap items-center gap-4" data-testid="audit-stamp">
+                    {stamp !== null && (
+                      // A data URL the server stored with the record; next/image adds nothing here.
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={stamp.image}
+                        alt={t('stamping.imageAlt', 'The image of the stamp {name}', { name: stamp.name })}
+                        className="size-24 shrink-0 rounded-md border border-border object-contain p-1"
+                      />
+                    )}
+                    <div className="min-w-0 space-y-1 text-sm">
+                      <p className="font-medium text-foreground">
+                        {stamp !== null ? stamp.name : t('audit.stamp.unknown', 'A company stamp')}
+                      </p>
+                      {stamp !== null && (
+                        <p className="text-muted-foreground">
+                          {t('stamping.legalName', 'Stands for {legalName}', { legalName: stamp.legal_name })}
+                        </p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {t(
+                          'audit.stamp.note',
+                          'An authorised person applied the image of this stamp. It is not a certified electronic seal.'
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {!isStamp && s.appearance !== null && (
                   <SignatureDrawing
                     appearance={s.appearance}
                     label={t('audit.drawing', 'Drawn signature of {name}', { name: s.by.name })}
@@ -275,17 +322,23 @@ export default function Page() {
                   />
                 )}
                 <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
-                  <div>
-                    <dt className="text-xs text-muted-foreground">{t('signing.capacity', 'Signing as')}</dt>
-                    <dd>{s.capacity ?? t('signing.capacity.self', 'Yourself')}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">{t('signing.onBehalfOf', 'On behalf of')}</dt>
-                    <dd>{s.on_behalf_of ?? t('signing.onBehalfOf.self', 'Yourself')}</dd>
-                  </div>
+                  {!isStamp && (
+                    <>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">{t('signing.capacity', 'Signing as')}</dt>
+                        <dd>{s.capacity ?? t('signing.capacity.self', 'Yourself')}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">{t('signing.onBehalfOf', 'On behalf of')}</dt>
+                        <dd>{s.on_behalf_of ?? t('signing.onBehalfOf.self', 'Yourself')}</dd>
+                      </div>
+                    </>
+                  )}
                   {!hidden && (
                     <div>
-                      <dt className="text-xs text-muted-foreground">{t('audit.signedAt', 'Signed at')}</dt>
+                      <dt className="text-xs text-muted-foreground">
+                        {isStamp ? t('audit.stampedAt', 'Applied at') : t('audit.signedAt', 'Signed at')}
+                      </dt>
                       <dd dir="ltr">{dateTime(s.at) ?? '—'}</dd>
                     </div>
                   )}
@@ -321,7 +374,12 @@ export default function Page() {
                             'signing.consent.v20261101',
                             'I have read this document and I sign it electronically, in the capacity shown. I agree that my electronic signature, with this audit trail, records that I signed this version.'
                           )
-                        : (s.consent_wording ?? '')}
+                        : s.consent_version === '2026-11-stamp-1'
+                          ? t(
+                              'stamping.consent.v2026stamp1',
+                              'I hold this company stamp and I am authorised to apply it to this document. I agree that this audit trail records that I applied it to this version. This is an authorised person applying the image of the stamp, not a certified electronic seal.'
+                            )
+                          : (s.consent_wording ?? '')}
                     </dd>
                   </div>
                   <div className="sm:col-span-2">
@@ -332,7 +390,8 @@ export default function Page() {
                   </div>
                 </dl>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </section>

@@ -204,6 +204,13 @@ export const DOCUMENTS_ISSUE = 'documents:issue';
 export const DOCUMENTS_WITHDRAW = 'documents:withdraw';
 
 /**
+ * Managing the workspace's company stamps (#1729): adding, editing, choosing
+ * who holds each, archiving and restoring. Reading the list needs only
+ * `documents:read`; applying a stamp needs only to be one of its holders.
+ */
+export const DOCUMENTS_STAMPS = 'documents:stamps';
+
+/**
  * Document ROUTE TEMPLATES (#1027) — the reusable, branching flow designs the
  * node-based editor edits.
  *

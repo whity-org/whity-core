@@ -259,6 +259,9 @@ class EnforceTenantIsolation
         // POST to this path is a 404 from the router rather than an
         // unauthenticated write that got this far.
         '#^/api/v1/document-verifications/[^/]+$#',
+        // #1730: "Check a file" on the same page, anchored the same way: the
+        // token, `files`, and exactly 64 hexadecimal characters. GET only.
+        '#^/api/v1/document-verifications/[^/]+/files/[0-9a-fA-F]{64}$#',
         // #billing: a payment provider's settlement callback. A BANK CANNOT HOLD
         // A SESSION — there is nothing here for this middleware to resolve, and
         // no amount of configuration would give a provider one. Without this

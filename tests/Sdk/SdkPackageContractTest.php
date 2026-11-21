@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.148.0',
+            '1.149.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.148 ADDS Contribute\\WorkspaceCommissionExpenses, Calendar\\CommissionClose and the calendar.commission.closed event: a closed commission period goes to the books (WHIT-1334). '
+            'SDK 1.149 ADDS the route.stamped event: a holder applied a company stamp on a stamp step (#1729). '
+            . 'SDK 1.148 ADDS Contribute\\WorkspaceCommissionExpenses, Calendar\\CommissionClose and the calendar.commission.closed event: a closed commission period goes to the books (WHIT-1334). '
             . 'SDK 1.147 ADDS the workspace template calendar setting `walkins_enabled`: a template turns on the walk-in queue (WHIT-1334). '
             . 'SDK 1.141 ADDS the optional notification type `emailDefault` key: a plugin notice can also go by email, per each person\'s preferences (WHIT-1250, #2209). '
             . 'SDK 1.137 ADDS Inventory\\Lots and Inventory\\Lot, lot fields on MoveLine and Move, and the stock.lot.expiring|expired events: batches, serial numbers and expiry (WHIT-1235). '
