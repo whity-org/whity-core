@@ -14,6 +14,8 @@ use Whity\Sdk\Context\Service;
 use Whity\Sdk\Context\ServiceNotDeclared;
 use Whity\Sdk\Context\ServiceUnavailable;
 use Whity\Sdk\Database\WorkspaceTables;
+use Whity\Sdk\Log\ErrorReporter;
+use Whity\Sdk\Log\PluginLog;
 use Whity\Sdk\Documents\PluginDocuments;
 use Whity\Sdk\Documents\PluginDocumentStore;
 use Whity\Sdk\Http\Outbound\AddressPolicy;
@@ -166,6 +168,36 @@ final class HostPluginScope implements PluginScope
         assert($tables instanceof WorkspaceTables);
 
         return $tables;
+    }
+
+    /** This plugin's scrubbed log (SDK 1.152, #1686); needs no declaration. */
+    public function log(): PluginLog
+    {
+        return $this->pluginLog();
+    }
+
+    /** Report a caught error, scrubbed and tagged (SDK 1.152, #1686); needs no declaration. */
+    public function errors(): ErrorReporter
+    {
+        return $this->pluginLog();
+    }
+
+    private function pluginLog(): HostPluginLog
+    {
+        if (!isset($this->stores[HostPluginLog::class])) {
+            $logger = $GLOBALS['whity_services'][\Psr\Log\LoggerInterface::class] ?? null;
+            $tracker = $GLOBALS['whity_services'][\Whity\Core\Observability\ErrorTracker::class] ?? null;
+            $this->stores[HostPluginLog::class] = new HostPluginLog(
+                $this->plugin->getName(),
+                $logger instanceof \Psr\Log\LoggerInterface ? $logger : new \Whity\Core\Log\ErrorLogLogger(),
+                $tracker instanceof \Whity\Core\Observability\ErrorTracker ? $tracker : null,
+                $this->workspaceId(...),
+            );
+        }
+        $log = $this->stores[HostPluginLog::class];
+        assert($log instanceof HostPluginLog);
+
+        return $log;
     }
 
     /** Refuse a service a declaring plugin left out. */

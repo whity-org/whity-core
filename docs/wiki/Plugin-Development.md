@@ -479,6 +479,36 @@ which makes the declaration required. It is least privilege inside the host,
 not a sandbox: plugin PHP runs in the host's process, and store review is what
 checks a plugin keeps to its declaration.
 
+### Logs, errors, route limits and install callbacks (SDK 1.152)
+
+From the plugin context (#1686):
+
+```php
+$ctx = \Whitypp(PluginContext::class)->for($this);
+$ctx->log()->warning('Provider answered late', ['provider' => 'polar', 'ms' => 4200]);
+
+try {
+    $this->sync();
+} catch (ProviderDown $e) {
+    $ctx->errors()->report($e, ['provider' => 'polar']);   // a caught error someone should see
+}
+```
+
+Both pass everything through core's error scrubber (secrets, tokens, emails
+and keys whose names suggest a secret are replaced) and the host tags each
+record with your plugin and the workspace; you can't set those. Neither throws.
+An exception your route or job lets escape is captured by the host already.
+
+Limit a route with `'rateLimit' => 30` in its `getRoutes()` entry: 30 calls a
+minute per person (per address when signed out), then 429 with `Retry-After`,
+before your handler runs. It adds to the deployment's own limits.
+
+Implement `Whity\Sdk\PluginInstallLifecycleInterface` to hear once per version
+that the plugin was installed (`onInstalled($version)`) or upgraded
+(`onUpgraded($from, $to)`), after your migrations ran, with no workspace. A
+throw is logged and the call is made again next time, so make both idempotent.
+Per-workspace set-up belongs in `PluginWorkspaceLifecycleInterface`.
+
 ## Step 3 — Discovery and auto-loading
 
 You do not register the plugin anywhere. When the application boots,
