@@ -22,11 +22,11 @@ jest.mock('@/components/sso-login-buttons', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { useEffect } = require('react');
   return {
-    SsoLoginButtons: ({ onLoaded }: { onLoaded?: (info: { providers: unknown[]; passwordSignIn: boolean }) => void }) => {
+    SsoLoginButtons: ({ onLoaded, form }: { onLoaded?: (info: { providers: unknown[]; passwordSignIn: boolean }) => void; form?: string }) => {
       useEffect(() => {
         onLoaded?.({ providers: [{ provider_key: 'whity_id', display_name: 'Whity ID' }], passwordSignIn });
       }, [onLoaded]);
-      return <span>Continue with Whity ID</span>;
+      return <span data-testid="sso-buttons" data-form={form ?? ''}>Continue with Whity ID</span>;
     },
   };
 });
@@ -69,6 +69,28 @@ describe('LoginPage when password sign-in is off', () => {
     expect(screen.queryByPlaceholderText('Enter your password')).not.toBeInTheDocument();
     expect(screen.queryByText('Forgot your password?')).not.toBeInTheDocument();
     expect(screen.queryByText('Create a workspace')).not.toBeInTheDocument();
+  });
+
+  // #2355: signing in from a form's public link hands the form to the provider
+  // buttons, so a new person joins the form's workspace and returns to it.
+  test('passes a form from its public link on to the provider buttons', async () => {
+    passwordSignIn = false;
+    const slug = 'ab12'.repeat(16);
+    window.history.replaceState(null, '', `/login?form=${slug}&next=/forms/5`);
+    renderLogin();
+
+    await waitFor(() => expect(screen.getByTestId('sso-buttons')).toHaveAttribute('data-form', slug));
+    window.history.replaceState(null, '', '/login');
+  });
+
+  test('ignores a form that is not a public form slug', async () => {
+    passwordSignIn = false;
+    window.history.replaceState(null, '', '/login?form=https://evil.test');
+    renderLogin();
+
+    await waitFor(() => expect(screen.getByTestId('provider-only-note')).toBeInTheDocument());
+    expect(screen.getByTestId('sso-buttons')).toHaveAttribute('data-form', '');
+    window.history.replaceState(null, '', '/login');
   });
 
   test('keeps email and password when it is on', async () => {
