@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans, Noto_Sans_Arabic, Geist_Mono, Readex_Pro, IBM_Plex_Sans, IBM_Plex_Sans_Arabic, Cairo, Noto_Kufi_Arabic } from "next/font/google";
+import { Noto_Sans, Noto_Sans_Arabic, Geist_Mono, Readex_Pro, IBM_Plex_Sans, IBM_Plex_Sans_Arabic, Cairo, Noto_Kufi_Arabic, Rubik, Alexandria, Noto_Naskh_Arabic, Noto_Serif } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { AuthProvider } from "@/lib/auth-context";
@@ -83,6 +83,32 @@ const notoKufiArabic = Noto_Kufi_Arabic({
   variable: "--font-noto-kufi-arabic",
   weight: ["400", "500", "600"],
   subsets: ["arabic"],
+  preload: false,
+});
+
+// TH.20 (21 Nov 2026): four more pairs, chosen by their Arabic face.
+const rubik = Rubik({
+  variable: "--font-rubik",
+  weight: ["400", "500", "600"],
+  subsets: ["latin", "arabic"],
+  preload: false,
+});
+const alexandria = Alexandria({
+  variable: "--font-alexandria",
+  weight: ["400", "500", "600"],
+  subsets: ["latin", "arabic"],
+  preload: false,
+});
+const notoNaskhArabic = Noto_Naskh_Arabic({
+  variable: "--font-noto-naskh-arabic",
+  weight: ["400", "500", "600"],
+  subsets: ["arabic"],
+  preload: false,
+});
+const notoSerif = Noto_Serif({
+  variable: "--font-noto-serif",
+  weight: ["400", "500", "600"],
+  subsets: ["latin"],
   preload: false,
 });
 
@@ -175,6 +201,10 @@ export default async function RootLayout({
         ibmPlexSansArabic.variable,
         cairo.variable,
         notoKufiArabic.variable,
+        rubik.variable,
+        alexandria.variable,
+        notoNaskhArabic.variable,
+        notoSerif.variable,
         "font-sans"
       )}
       // The blocking init scripts (see <head> below) set the `dark` class and
