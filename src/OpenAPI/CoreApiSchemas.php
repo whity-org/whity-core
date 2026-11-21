@@ -11132,6 +11132,7 @@ final class CoreApiSchemas
                 'staff_profile_ids' => ['type' => 'array', 'items' => self::int()],
                 'room_id' => self::int(true) + ['description' => 'The room it needs; booked with the person.'],
                 'needs_approval' => self::bool() + ['description' => 'A customer\'s booking is a request staff accept first.'],
+                'item_id' => self::int(true) + ['description' => 'The inventory service item that holds its name and price (WHIT-1334).'],
             ], ['id', 'name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_minor', 'currency', 'bookable_online', 'active', 'sort_order', 'staff_profile_ids']),
             'CalendarServiceRequest' => self::object([
                 'name' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Text, or a `{ar, en}` map.'],

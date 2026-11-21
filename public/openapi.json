@@ -95254,6 +95254,11 @@
                     "needs_approval": {
                         "type": "boolean",
                         "description": "A customer's booking is a request staff accept first."
+                    },
+                    "item_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The inventory service item that holds its name and price (WHIT-1334)."
                     }
                 },
                 "required": [

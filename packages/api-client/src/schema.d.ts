@@ -14435,6 +14435,8 @@ export interface components {
             room_id?: number | null;
             /** @description A customer's booking is a request staff accept first. */
             needs_approval?: boolean;
+            /** @description The inventory service item that holds its name and price (WHIT-1334). */
+            item_id?: number | null;
         };
         CalendarServiceRequest: {
             /** @description Text, or a `{ar, en}` map. */
