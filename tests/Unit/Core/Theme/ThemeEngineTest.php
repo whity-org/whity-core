@@ -11,6 +11,7 @@ use Whity\Core\Theme\ThemeCompiler;
 use Whity\Core\Theme\ThemeFonts;
 use Whity\Core\Theme\ThemeLibrary;
 use Whity\Core\Theme\ThemeResolver;
+use Whity\Core\Theme\ThemeTweaks;
 use Whity\Core\Theme\ThemeValidator;
 
 /**
@@ -283,8 +284,74 @@ final class ThemeEngineTest extends TestCase
             file_put_contents($file, $json);
         }
         self::assertFileExists($file);
-        self::assertSame($json, str_replace("
-", "
-", (string) file_get_contents($file)), 'Run UPDATE_SHAPE_PRESETS=1 vendor/bin/phpunit --filter ShapeCheckPresets');
+        self::assertSame($json, str_replace("\r\n", "\n", (string) file_get_contents($file)), 'Run UPDATE_SHAPE_PRESETS=1 vendor/bin/phpunit --filter ShapeCheckPresets');
+    }
+
+    /** TH.15: shape, density and the font pair on top of the theme, saved with the colour overrides. */
+    public function testTheFreeTweaksApplyOnTopOfTheChosenTheme(): void
+    {
+        self::assertSame([], ThemeValidator::validateOverrides(['shape' => 'round', 'density' => 'compact', 'font' => 'cairo', 'light' => ['background' => '#f4f1ea']]));
+        self::assertNotSame([], ThemeValidator::validateOverrides(['shape' => 'blob']));
+        self::assertNotSame([], ThemeValidator::validateOverrides(['font' => 'comic-sans']));
+        self::assertNotSame([], ThemeValidator::validateOverrides(['radius' => '999px']));
+
+        $library = new ThemeLibrary();
+        $settings = [
+            SettingsRegistry::BRANDING_THEME => 'whity.harbour',
+            SettingsRegistry::BRANDING_THEME_OVERRIDES => '{"shape":"round","density":"comfortable","font":"cairo"}',
+        ];
+        $tweaked = ThemeResolver::resolve($settings, $library, 1)['theme'];
+        $plain = ThemeResolver::resolve([SettingsRegistry::BRANDING_THEME => 'whity.harbour'], $library, 1)['theme'];
+        self::assertNotNull($tweaked);
+        self::assertNotNull($plain);
+        self::assertSame('cairo', $tweaked['fonts']['body']);
+        self::assertSame('cairo', $tweaked['fonts']['heading']);
+        self::assertNotSame($plain['vars']['wy-radius-control'] ?? null, $tweaked['vars']['wy-radius-control'] ?? null);
+        self::assertSame($plain['light']['primary'], $tweaked['light']['primary']);
+
+        // A tweak replaces a heading face the theme set, as one pair.
+        $kufi = ThemeTweaks::apply(self::theme(['type' => ['family' => 'noto', 'headingFamily' => 'kufi', 'scale' => 'roomy']]), ['font' => 'plex']);
+        self::assertEquals(['scale' => 'roomy', 'family' => 'plex'], $kufi['type']);
+        self::assertSame(['shape' => null, 'density' => 'compact', 'font' => null], ThemeTweaks::chosen(['density' => 'compact', 'shape' => 'blob']));
+    }
+
+    /** TH.16: the export is a valid theme file that gives the same look when imported. */
+    public function testTheExportFoldsInEverythingTheWorkspaceSet(): void
+    {
+        $harbour = ThemeLibrary::builtIn()['whity.harbour'];
+        $overrides = ['shape' => 'round', 'font' => 'readex', 'light' => ['background' => '#f4f1ea']];
+        $file = ThemeTweaks::export($harbour, '#B74C05', $overrides, 'Example Bakery');
+
+        self::assertSame([], ThemeValidator::validate($file));
+        self::assertSame('workspace.harbour', $file['id']);
+        self::assertSame('#b74c05', $file['colour']['seeds']['primary']);
+        self::assertSame('#f4f1ea', $file['colour']['overrides']['light']['background']);
+        self::assertSame('round', $file['shape']['preset']);
+        self::assertSame('readex', $file['type']['family']);
+        self::assertSame(['name' => 'Example Bakery'], $file['author']);
+        self::assertSame('workspace.whity', ThemeTweaks::export(ThemeLibrary::builtIn()[ThemeLibrary::DEFAULT_ID], null, [])['id']);
+
+        // Imported as-is, the file compiles to the workspace's look with no adjustments left to apply.
+        $direct = ThemeCompiler::compile(ThemeTweaks::apply($harbour, $overrides), '#b74c05', $overrides);
+        $again = ThemeCompiler::compile($file);
+        self::assertSame($direct['light'], $again['light']);
+        self::assertSame($direct['dark'], $again['dark']);
+        self::assertSame($direct['vars'], $again['vars']);
+
+        // An imported theme keeps its own id.
+        self::assertSame('acme.test', ThemeTweaks::export(self::theme(), null, [])['id']);
+    }
+
+    /** TH.16: a newer version says what it changes before it replaces the old one. */
+    public function testANewerVersionListsWhatItChanges(): void
+    {
+        $old = self::theme(['shape' => ['preset' => 'soft'], 'colour' => ['seeds' => ['primary' => '#0b6e74']]]);
+        $new = self::theme(['version' => '1.1.0', 'shape' => ['preset' => 'round'], 'density' => 'compact', 'colour' => ['seeds' => ['primary' => '#0b6e74'], 'overrides' => ['light' => ['background' => '#f4f1ea']]]]);
+        self::assertSame([
+            ['field' => 'shape.preset', 'from' => 'soft', 'to' => 'round'],
+            ['field' => 'density', 'from' => null, 'to' => 'compact'],
+            ['field' => 'colour.overrides', 'from' => '0', 'to' => '1'],
+        ], ThemeTweaks::changes($old, $new));
+        self::assertSame([], ThemeTweaks::changes($old, $old));
     }
 }

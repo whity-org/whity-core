@@ -11133,9 +11133,29 @@ export interface paths {
         put?: never;
         /**
          * Import a theme file into this workspace
-         * @description A theme file in the format of schemas/theme/v1.json: choices, never CSS. Importing the same id again replaces it. It is not applied until branding_theme is set to its id.
+         * @description A theme file in the format of schemas/theme/v1.json: choices, never CSS. Importing the same id again replaces it. It is not applied until branding_theme is set to its id. With check=1 nothing is saved: the answer says which version is installed and what the file changes (TH.16).
          */
         post: operations["post_api_v1_themes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/themes/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the theme in use as a theme file
+         * @description Free (TH.16): the theme this workspace uses, with its main colour, colour overrides, shape, density and font pair folded in, so importing it elsewhere gives the same look. A copy of one of Whity's own themes gets a workspace. id.
+         */
+        get: operations["get_api_v1_themes_export"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -17612,6 +17632,14 @@ export interface components {
             data: {
                 id: string;
                 version: string;
+                /** @description With ?check=1: the version already installed under this id, if any. */
+                installed_version?: string | null;
+                /** @description With ?check=1: what this file changes in the installed version, field by field. */
+                changes?: {
+                    field: string;
+                    from: string | null;
+                    to: string | null;
+                }[];
             };
         };
         InboundAcceptedResponse: {
@@ -22221,6 +22249,15 @@ export interface components {
             /** @description New URL-safe identifier (lower-case letters, digits, dashes); must be unique. */
             slug?: string;
         };
+        ThemeExportResponse: {
+            data: {
+                /** @description A theme file (schemas/theme/v1.json) with the main colour, colour overrides and tweaks folded in. */
+                theme: {
+                    [key: string]: unknown;
+                };
+                filename: string;
+            };
+        };
         ThemeListResponse: {
             data: {
                 /** @description The id of the theme in use (whity.default when none was chosen). */
@@ -22256,6 +22293,23 @@ export interface components {
                         [key: string]: string;
                     }[];
                 }[];
+                tweaks?: {
+                    shape: string | null;
+                    density: string | null;
+                    font: string | null;
+                };
+                options?: {
+                    shape: string[];
+                    density: string[];
+                    font: {
+                        id: string;
+                        name: string;
+                    }[];
+                };
+                /** @description The workspace's colour overrides, light and dark, kept when the tweaks are saved. */
+                colour_overrides?: {
+                    [key: string]: unknown;
+                };
             };
         };
         ThemeOverridesResponse: {
@@ -82928,7 +82982,10 @@ export interface operations {
     };
     post_api_v1_themes: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description 1 to only check the file and list what it changes */
+                check?: "1";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -82939,6 +82996,15 @@ export interface operations {
             };
         };
         responses: {
+            /** @description With check=1: the file can be used, and what it changes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImportThemeResponse"];
+                };
+            };
             /** @description The theme was imported */
             201: {
                 headers: {
@@ -83004,6 +83070,71 @@ export interface operations {
             };
             /** @description The file is not a valid theme, or uses a whity. id */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_themes_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The theme file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeExportResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

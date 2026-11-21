@@ -341,6 +341,12 @@ Studio, store theme listings and the SDK interface follow as their own pieces of
 - **Not applied yet:** `shape.morph`, `type.titleWeight` and `type.emphasis` are stored and validated but no component reads them; they land with the components that morph and the title styles. The `documents` block is stored but does not yet set the document theme's defaults.
 - **Plugin themes (SDK 1.125):** `Whity\Sdk\Contribute\PluginThemesInterface::getThemes()` returns theme files, checked on load (ids under `whity.` refused, the first plugin keeps a shared id) and listed as "From <plugin>" in workspaces where the plugin is on. Plugins read the result through their context, `$ctx->themes()` (`Theme\WorkspaceTheme`: `current()` and `installed()`), with no workspace argument (D2) and no way to apply a theme. `PluginThemeInterface` is deprecated, working through 2.0.x. The CLI and the queue worker list Whity's own and imported themes only, since they pass no plugin loader yet.
 
+### 12.2 Free tweaks and export (TH.15, TH.16)
+
+- **Tweaks:** `shape`, `density` and `font` sit in `branding_theme_overrides` next to the colour overrides (`{light, dark, shape, density, font}`), so there is no new setting and no migration. `ThemeTweaks::apply` puts them on the chosen theme before it compiles, in the resolver and in the picker's previews; a font pair sets body and headings together. They stay when the workspace chooses another theme.
+- **Export:** `GET /api/v1/themes/export` (settings:read) returns the theme in use as a file, with the main colour as the primary seed, the colour overrides and the tweaks folded in. A copy of one of Whity's own themes is named `workspace.<name>`, since `whity.` can't be imported.
+- **Newer versions:** `POST /api/v1/themes?check=1` saves nothing and lists what the file changes in the installed version, field by field; the picker says it in words and asks before replacing.
+
 ## 13. Owner's decisions (19 Nov 2026)
 
 | # | Question | Answer |

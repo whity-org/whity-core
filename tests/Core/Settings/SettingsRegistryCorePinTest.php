@@ -525,6 +525,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             ['branding_theme_overrides', '{"light":{"background":"#f4f1ea"}}', true],
             ['branding_theme_overrides', '{"light":{"success":"#00ff00"}}', false],
             ['branding_theme_overrides', 'not json', false],
+            ['branding_theme_overrides', '{"shape":"round","density":"compact","font":"cairo"}', true],
+            ['branding_theme_overrides', '{"shape":"blob"}', false],
             ['mcp.enabled', 'true', true],
             ['mcp.enabled', '1', false],
             ['mcp.always_on_plugin_tools', '', true],
