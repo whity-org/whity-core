@@ -5561,9 +5561,12 @@ $router->register('POST',   '/api/calendar/walkins/{id:\d+}/left',          [$wa
 
 // WHIT-1334 (design section 35 §4, SL.5-SL.7): staff commission rates and the
 // report from done bookings, moved from the Salons plugin.
+$calendarCommission = new \Whity\Core\Calendar\Commission($db->getPdo(), $calendarBookingService, $calendarRepository, $calendarServiceRepository);
 $commissionHandler = new \Whity\Api\CommissionApiHandler(
-    new \Whity\Core\Calendar\Commission($db->getPdo(), $calendarBookingService, $calendarRepository, $calendarServiceRepository),
+    $calendarCommission,
     $languageRegistry,
+    // SL.6: closing a period by hand; the books bind WorkspaceCommissionExpenses.
+    new \Whity\Core\Calendar\CommissionCloses($db->getPdo(), $calendarCommission, $calendarRepository, $hookManager),
 );
 $router->register('GET',    '/api/calendar/commission/rates',               [$commissionHandler, 'rates'],         null, null, CorePermissions::CALENDAR_COMMISSION);
 $router->register('POST',   '/api/calendar/commission/rates',               [$commissionHandler, 'setRate'],       null, null, CorePermissions::CALENDAR_COMMISSION);
@@ -5572,6 +5575,10 @@ $router->register('GET',    '/api/calendar/commission/periods',             [$co
 $router->register('GET',    '/api/calendar/commission/report',              [$commissionHandler, 'report'],        null, null, CorePermissions::CALENDAR_COMMISSION);
 $router->register('GET',    '/api/calendar/commission/staff',               [$commissionHandler, 'staff'],         null, null, CorePermissions::CALENDAR_COMMISSION);
 $router->register('GET',    '/api/calendar/commission/services',            [$commissionHandler, 'services'],      null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('GET',    '/api/calendar/commission/closes',              [$commissionHandler, 'closes'],        null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('GET',    '/api/calendar/commission/closes/periods',      [$commissionHandler, 'closablePeriods'], null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('POST',   '/api/calendar/commission/closes',              [$commissionHandler, 'close'],         null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('POST',   '/api/calendar/commission/closes/{id:\d+}/book', [$commissionHandler, 'book'],          null, null, CorePermissions::CALENDAR_COMMISSION);
 $hookManager->listen('navigation.register', function ($data, $context) use ($languageRegistry) {
     $items = $data['items'] ?? [];
     $items[] = \Whity\Core\Calendar\CommissionFeatures::navigationItem($languageRegistry->getCurrentLanguageCode());

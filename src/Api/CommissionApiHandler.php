@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use Whity\Core\Calendar\CalendarRejectedException;
 use Whity\Core\Calendar\Commission;
+use Whity\Core\Calendar\CommissionCloses;
 use Whity\Core\i18n\LanguageRegistry;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -22,7 +23,46 @@ final class CommissionApiHandler
     public function __construct(
         private readonly Commission $commission,
         private readonly LanguageRegistry $languages,
+        private readonly ?CommissionCloses $closes = null,
     ) {
+    }
+
+    /** Every closed period, newest first (SL.6). */
+    public function closes(Request $request): Response
+    {
+        return $this->run($request, fn (int $t): array => $this->closesOrFail()->list($t, $this->language()));
+    }
+
+    /** The periods that may be closed now. */
+    public function closablePeriods(Request $request): Response
+    {
+        return $this->run($request, fn (int $t): array => $this->closesOrFail()->closable($t, $this->language()));
+    }
+
+    /** Close a period: `period`, one that has ended. */
+    public function close(Request $request): Response
+    {
+        return $this->run($request, function (int $t, ?int $actor) use ($request): array {
+            $body = JsonBody::parsed($request);
+            $period = is_string($body['period'] ?? null) ? $body['period'] : '';
+
+            return $this->closesOrFail()->close($t, $period, $actor, $this->language());
+        });
+    }
+
+    /**
+     * Send a close to the books again.
+     *
+     * @param array<string, string> $params
+     */
+    public function book(Request $request, array $params): Response
+    {
+        return $this->run($request, fn (int $t): array => $this->closesOrFail()->book($t, (int) ($params['id'] ?? 0), $this->language()));
+    }
+
+    private function closesOrFail(): CommissionCloses
+    {
+        return $this->closes ?? throw new CalendarRejectedException('Closing periods is not available here.', 404);
     }
 
     public function rates(Request $request): Response
