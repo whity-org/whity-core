@@ -50,6 +50,30 @@ final class NotificationPreferenceRepository
     }
 
     /**
+     * Who in a workspace chose for one (type, channel) exactly: profile id =>
+     * on or off (#2209). A person with no row for it is absent; a channel-wide
+     * (`*`) row is not read here.
+     *
+     * @return array<int, bool>
+     */
+    public function choicesFor(int $tenantId, string $type, string $channel): array
+    {
+        $stmt = $this->pdo->prepare(
+            'SELECT profile_id, enabled FROM user_notification_preferences
+              WHERE tenant_id = :tenant_id AND type = :type AND channel = :channel'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':type' => $type, ':channel' => $channel]);
+
+        $choices = [];
+        /** @var array{profile_id: int|string, enabled: mixed} $row */
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $choices[(int) $row['profile_id']] = self::toBool($row['enabled']);
+        }
+
+        return $choices;
+    }
+
+    /**
      * Upsert one (type, channel) toggle for a profile in a tenant. Idempotent via
      * the UNIQUE(tenant_id, profile_id, type, channel) index.
      */

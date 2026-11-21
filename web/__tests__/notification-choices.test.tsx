@@ -35,17 +35,23 @@ function jsonResponse(status: number, body: unknown) {
 
 let saved: unknown[] = [];
 
+// #2209: a plugin chooses whether its kind starts on by email.
+const pluginTypes = [
+  { type: 'keyhub:task.assigned', label: { en: 'A task was given to you', ar: 'أُسندت إليك مهمة' }, plugin: 'keyhub', email_default: true },
+  { type: 'keyhub:stage.begun', label: { en: 'A stage you own has begun', ar: 'بدأت مرحلة تملكها' }, plugin: 'keyhub', email_default: false },
+];
+
 beforeEach(() => {
   saved = [];
   mockApiClient.mockReset();
   mockApiClient.mockImplementation((url: string, init?: RequestInit) => {
     if (url === '/api/v1/me/notification-preferences' && (init?.method ?? 'GET') === 'GET') {
-      return jsonResponse(200, { data: [{ type: 'chat.message', channel: 'push', enabled: false }], plugin_types: [] });
+      return jsonResponse(200, { data: [{ type: 'chat.message', channel: 'push', enabled: false }], plugin_types: pluginTypes });
     }
     if (url === '/api/v1/me/notification-preferences' && init?.method === 'PUT') {
       const body = JSON.parse(String(init.body)) as { preferences: unknown[] };
       saved.push(...body.preferences);
-      return jsonResponse(200, { data: body.preferences, plugin_types: [] });
+      return jsonResponse(200, { data: body.preferences, plugin_types: pluginTypes });
     }
     return jsonResponse(404, {});
   });
@@ -78,5 +84,17 @@ describe('Notification choices', () => {
     await userEvent.click(email);
 
     await waitFor(() => expect(saved).toEqual([{ type: 'calendar.event.reminder', channel: 'email', enabled: true }]));
+  });
+
+  it('a plugin kind starts on by email only when the plugin said so (#2209)', async () => {
+    render(<PushSettings />);
+    await waitFor(() => expect(within(row('A task was given to you')).getAllByRole('switch')).toHaveLength(2));
+
+    expect(within(row('A task was given to you')).getAllByRole('switch')[1]).toBeChecked();
+    expect(within(row('A stage you own has begun')).getAllByRole('switch')[1]).not.toBeChecked();
+
+    await userEvent.click(within(row('A stage you own has begun')).getAllByRole('switch')[1]);
+
+    await waitFor(() => expect(saved).toEqual([{ type: 'keyhub:stage.begun', channel: 'email', enabled: true }]));
   });
 });
