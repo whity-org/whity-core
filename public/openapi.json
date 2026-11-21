@@ -94960,10 +94960,12 @@
                 "type": "object",
                 "properties": {
                     "walkin_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "The walk-in to serve, from GET /api/calendar/walkins."
                     },
                     "profile_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "Who serves them, from GET /api/calendar/walkins/staff."
                     }
                 },
                 "required": [
@@ -94976,14 +94978,16 @@
                 "properties": {
                     "name": {
                         "type": "string",
-                        "maxLength": 200
+                        "maxLength": 200,
+                        "description": "Their name, as they gave it."
                     },
                     "phone": {
                         "type": "string",
                         "description": "Optional; used to find or add the customer in Contacts when served."
                     },
                     "service_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "The service they want, from GET /api/calendar/walkins/services."
                     },
                     "profile_id": {
                         "type": "integer",
@@ -94991,7 +94995,8 @@
                     },
                     "note": {
                         "type": "string",
-                        "maxLength": 500
+                        "maxLength": 500,
+                        "description": "Anything the desk should know."
                     }
                 },
                 "required": [

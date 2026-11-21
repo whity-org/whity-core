@@ -14468,16 +14468,21 @@ export interface components {
             contact_id?: number | null;
         };
         CalendarWalkinAssignRequest: {
+            /** @description The walk-in to serve, from GET /api/calendar/walkins. */
             walkin_id: number;
+            /** @description Who serves them, from GET /api/calendar/walkins/staff. */
             profile_id: number;
         };
         CalendarWalkinRequest: {
+            /** @description Their name, as they gave it. */
             name: string;
             /** @description Optional; used to find or add the customer in Contacts when served. */
             phone?: string;
+            /** @description The service they want, from GET /api/calendar/walkins/services. */
             service_id: number;
             /** @description Who they asked for; empty for whoever is free. */
             profile_id?: number;
+            /** @description Anything the desk should know. */
             note?: string;
         };
         CapabilityDenial: {

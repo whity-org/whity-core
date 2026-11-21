@@ -11022,7 +11022,7 @@ final class CoreApiSchemas
                 'contact_id' => self::int(true),
             ], ['id', 'name', 'service_id']),
             'CalendarWalkinRequest' => self::object([
-                'name' => self::str() + ['maxLength' => 200, 'description' => 'The customer's name, as they gave it.'],
+                'name' => self::str() + ['maxLength' => 200, 'description' => 'Their name, as they gave it.'],
                 'phone' => self::str() + ['description' => 'Optional; used to find or add the customer in Contacts when served.'],
                 'service_id' => self::int() + ['description' => 'The service they want, from GET /api/calendar/walkins/services.'],
                 'profile_id' => self::int() + ['description' => 'Who they asked for; empty for whoever is free.'],
