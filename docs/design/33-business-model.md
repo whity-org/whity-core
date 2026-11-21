@@ -1,6 +1,6 @@
 # The business model: everything in core, pay for seats, volume and outside services
 
-Status: **direction decided by the owner on 21 November 2026; the plan below is proposed, with owner questions in section 7.** Register rows BM.13–BM.20 record the decisions (WHIT-1319). Nothing is built by this document.
+Status: **decided by the owner on 21 November 2026.** The direction, then the answers to section 7 the same day: Q1 "Into core", Q2 and Q12 "Yes, now", Q5 "Accept, all warn", and Q3, Q4, Q6–Q11, Q13 and Q14 "Accept all" (every recommendation as written). Register rows BM.13–BM.20 record the decisions (WHIT-1319). Nothing is built by this document.
 
 ## 1. What the owner decided
 
@@ -166,6 +166,8 @@ Each step is its own lane and PR, with its own WHIT id, after this register PR m
 Steps 3 and 4 are already running. Steps 5, 7 and 8 can run in parallel; 6 waits for 5; 9 and 10 wait for the owner's answers.
 
 ## 7. Questions for the owner
+
+**Answered 21 November 2026.** Q1: "Into core". Q2 and Q12: "Yes, now" (done on app.whity.dev the same day). Q5: "Accept, all warn", with the suggested numbers. Every other question: "Accept all", the recommendation as written. The register rows BM.3–BM.5, BM.15–BM.19, M.16, S.2, FP.2 and FP.4 carry the answers.
 
 1. **Whity Builder.** Does it move into core as Studio's editor, with its AI authoring as core agent tools counted by the agent and API meters, and builder.whity.dev and the connector retired? Or does it stay a hosted, paid service? Recommended: **into core**, after Front Office.
 2. **Front Office on app.whity.dev now.** May the operator set Front Office (and Salons) to "Free for every workspace" and archive the `plugin.front-office.*` price rows ($29 a month, 14-day trial) now, before core covers every part? Any workspace that bought or started a trial keeps everything; no refunds are due because there are no real customers. Recommended: **yes, now**.

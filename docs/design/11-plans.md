@@ -12,7 +12,7 @@ Whity is a branded house: one name and one plain noun that says what each thing 
 | Whity ID | Single sign-on and identity provider (OIDC) | Closed, paid service, hosted by Whity | Planned |
 | Whity Pay | Payments and subscriptions through the installer's own Stripe, Polar or Paddle | Paid integration plugin (BM.16) | Built |
 | Integration plugins | JoFotara, live bank feeds, WhatsApp, SMS, calendar sync | Paid plugins, one per outside service (BM.16) | Planned |
-| Whity Builder | No-code plugin builder at builder.whity.dev | Closed, paid service today; moving into core is open (section 33 Q1) | Built |
+| Whity Builder | No-code plugin builder at builder.whity.dev | Closed, paid service today; moves into core as Studio's editor after Front Office, then builder.whity.dev retires (owner, section 33 Q1) | Built |
 | Whity Marketplace | Partners and developers sell plugins | Revenue share | Later |
 
 Whity Front Office, until 21 Nov 2026 a closed, paid app, moves into core (BM.15, BM.19); Whity Studio is not a paid product (BM.15). Section 33 has the plan.
