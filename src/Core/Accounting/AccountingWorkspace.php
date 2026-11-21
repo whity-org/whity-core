@@ -227,7 +227,7 @@ final class AccountingWorkspace
                 'INSERT INTO roles (name, description, tenant_id, created_at) VALUES (:name, :description, :tenant_id, CURRENT_TIMESTAMP)',
                 [
                     ':name' => self::ACCOUNTANT_ROLE,
-                    ':description' => 'For your accountant: sees the books and reports, posts entries and closes months. Can\'t change the accounting settings.',
+                    ':description' => "For your accountant: sees the books and reports, posts entries and closes months. Can't change the accounting settings.",
                     ':tenant_id' => $tenantId,
                 ]
             );
