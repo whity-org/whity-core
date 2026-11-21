@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.150.0",
+    "sdk_version": "1.151.0",
     "core_version": "0.2.30",
     "updated": "2026-11-21",
     "ratings": {
@@ -1221,13 +1221,20 @@
                 {
                     "what": "Offline-host conformance kit",
                     "since": "1.27"
+                },
+                {
+                    "what": "$ctx->database(): the plugin's declared tables, every call held to the workspace by the host (WorkspaceTables)",
+                    "since": "1.151"
+                },
+                {
+                    "what": "PluginCapabilitiesInterface: a plugin declares the context services and tables it uses and gets only those",
+                    "since": "1.151"
                 }
             ],
             "missing": [
-                "A runtime connection handle from the SDK",
                 "Read-only views of core tables"
             ],
-            "security": "Workspace isolation is checked by lint and tests, not enforced. A connection bound to the workspace is a design question.",
+            "security": "Since SDK 1.151 a plugin's own tables can be reached through a handle the host binds to the workspace, and a plugin that declares its services gets only those from its context. Plugin SQL written by hand is still checked by lint and tests, and plugin PHP runs in the host's process, so the declaration is least privilege, not a sandbox.",
             "plan": "later"
         },
         {
