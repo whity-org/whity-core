@@ -233,6 +233,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             // WHIT-1234: purchasing.
             'inventory.purchase_route_template_id',
             'inventory.over_receipt_percent',
+            'sales.quote_valid_days',
+            'sales.quote_route_template_id',
         ];
     }
 
@@ -482,6 +484,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'inventory.transfers_one_step' => 'false',
             'inventory.purchase_route_template_id' => '0',
             'inventory.over_receipt_percent' => '0',
+            'sales.quote_valid_days' => '30',
+            'sales.quote_route_template_id' => '0',
         ];
     }
 

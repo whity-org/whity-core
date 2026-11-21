@@ -166,6 +166,8 @@ final class CorePermissionDescriptions
         CorePermissions::STOCK_TRANSFER               => 'Send and receive stock between places',
         CorePermissions::PURCHASES_READ               => 'See purchase orders and what suppliers sell',
         CorePermissions::PURCHASES_WRITE              => 'Draft, send and receive purchase orders',
+        CorePermissions::QUOTES_READ                  => 'See quotes to customers',
+        CorePermissions::QUOTES_WRITE                 => 'Draft, send and turn quotes into orders or invoices',
         CorePermissions::FIELDS_MANAGE                => 'Add, change and archive the workspace\'s own fields on its records',
         CorePermissions::TASKS_READ                   => 'See tasks and boards in the workspace\'s Taskaat',
         CorePermissions::TASKS_WRITE                  => 'Create and change tasks in the workspace\'s Taskaat: checks, evidence and reviews',
