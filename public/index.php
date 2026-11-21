@@ -3352,6 +3352,9 @@ $router->register('GET',  '/api/billing/trial',    [$externalBillingHandler, 'tr
 // its allowance, and the workspace's admins read the result on Billing.
 $customerUsage = new \Whity\Core\Usage\CustomerUsage($db->getPdo(), $entitlementService, $settingsService);
 $customerUsage->subscribe($hookManager);
+// Section 33 §5 (BM.17): the durable usage ledger every meter writes to, per
+// workspace and month, that a bill is made from.
+$usageLedger = new \Whity\Core\Usage\UsageLedger($db->getPdo(), $settingsService);
 $planLimitMeters = new \Whity\Core\Entitlement\MeterService(
     new DatabaseSharedStore($db->getPdo()),
     $entitlementService,
@@ -3382,11 +3385,26 @@ $planLimitsHandler = new \Whity\Api\PlanLimitsApiHandler(
         $entitlementService,
         new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService),
         $customerUsage,
-        $planLimitMeters
+        $planLimitMeters,
+        $usageLedger,
     ),
     $roleChecker
 );
 $router->register('GET',  '/api/billing/limits',   [$planLimitsHandler, 'show'],      null, null, CorePermissions::BILLING_VIEW);
+// Section 33 §5: every usage meter, its base and whether it is near or past it.
+$usageReport = new \Whity\Core\Usage\UsageReport(
+    $usageLedger,
+    new \Whity\Core\Usage\UsageSnapshots(
+        $db->getPdo(),
+        $usageLedger,
+        new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService),
+        $customerUsage,
+    ),
+    $entitlementService,
+);
+$router->register('GET',  '/api/usage',            [new \Whity\Api\UsageApiHandler($usageReport, $roleChecker), 'show'], null, null, CorePermissions::BILLING_VIEW);
+// SDK 1.133: a plugin reads its workspace's meters, read-only.
+\Whity\register_service(\Whity\Sdk\Usage\Usage::class, new \Whity\Core\Usage\HostUsage($usageReport));
 // More seats, or fewer. The only change the billing service supports in place:
 // a PLAN swap would mean cancelling and buying again, which either double-charges
 // or leaves a gap, so it is refused rather than faked.
@@ -6184,6 +6202,7 @@ $messagingService = \Whity\Core\Messaging\CoreMessaging::build(
     $planLimitMeters,
     (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
     $brandedEmailSender,
+    $usageLedger,
 );
 \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messagingService);
 // WHIT-967 (SDK 1.99): a plugin messages a workspace's customer through Messages.
@@ -6852,7 +6871,7 @@ $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnl
 ))->registerOn($proposalDiffs);
 // WHIT-812: what an agent did that its person can still undo.
 $agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters, callKeys: new \Whity\Mcp\Tools\McpCallKeys($db->getPdo()));
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters, callKeys: new \Whity\Mcp\Tools\McpCallKeys($db->getPdo()), usage: new \Whity\Core\Usage\McpUsage($usageLedger, new DatabaseSharedStore($db->getPdo())));
 $mcpToolsCallHandler->setWorkspaceGate($pluginLoader);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:

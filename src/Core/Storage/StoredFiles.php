@@ -110,15 +110,23 @@ final class StoredFiles
             ':filename' => $filename,
             ':by' => $createdBy,
         ]);
+        $newId = (int) $stmt->fetchColumn();
+        $stmt->closeCursor();
 
-        return (int) $stmt->fetchColumn();
+        // The workspace's stored bytes (section 33 §5); never throws.
+        \Whity\Core\Usage\StorageUsage::added($db, $tenantId, (int) $file['byte_size']);
+
+        return $newId;
     }
 
     /** Forget a stored object's row once the owner has deleted the bytes. */
     public static function forget(PDO $db, int $tenantId, string $storageKey): void
     {
-        $db->prepare('DELETE FROM stored_files WHERE tenant_id = :tenant_id AND storage_key = :key')
-            ->execute([':tenant_id' => $tenantId, ':key' => $storageKey]);
+        $delete = $db->prepare('DELETE FROM stored_files WHERE tenant_id = :tenant_id AND storage_key = :key RETURNING byte_size');
+        $delete->execute([':tenant_id' => $tenantId, ':key' => $storageKey]);
+        foreach ($delete->fetchAll(PDO::FETCH_COLUMN) as $bytes) {
+            \Whity\Core\Usage\StorageUsage::removed($db, $tenantId, (int) $bytes);
+        }
     }
 
     /**

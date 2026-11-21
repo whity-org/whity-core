@@ -6405,6 +6405,31 @@ final class CoreApiSchemas
                 'resets_at' => self::str(true),
             ], ['key', 'kind', 'used', 'limit', 'over', 'resets_at']),
             'PlanLimitListResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('PlanLimit')]),
+            // Section 33 §5: one usage meter for one month, from the usage ledger.
+            'UsageMeter' => self::object([
+                'meter' => ['type' => 'string', 'enum' => ['seats', 'customers', 'inventory.items', 'invoices', 'storage.bytes', 'messages.outbound', 'agents', 'api.calls']],
+                'key' => self::str() + ['description' => 'The entitlement its base is set on.'],
+                'kind' => ['type' => 'string', 'enum' => ['counted', 'snapshot']],
+                'unit' => ['type' => 'string', 'enum' => ['count', 'bytes']],
+                'used' => self::int(),
+                'peak' => self::int() + ['description' => 'The month\'s highest reading; for a counted meter, the same as used.'],
+                'base' => self::int(true) + ['description' => 'Null when there is no limit.'],
+                'state' => ['type' => 'string', 'enum' => ['unlimited', 'ok', 'near', 'over']],
+                'dimensions' => [
+                    'type' => 'object',
+                    'description' => 'The meter split: messages by channel, API calls by `api` or `mcp`, agents by `runs`, `tool_calls`, `tokens_in`, `tokens_out`.',
+                    'additionalProperties' => ['type' => 'integer'],
+                ],
+                'resets_at' => self::str(true),
+            ], ['meter', 'key', 'kind', 'unit', 'used', 'peak', 'base', 'state', 'dimensions', 'resets_at']),
+            'UsageReport' => self::object([
+                'period' => self::str() + ['description' => 'YYYY-MM, in the workspace\'s time zone.'],
+                'current' => self::bool(),
+                'resets_at' => self::str(true),
+                'meters' => ['type' => 'array', 'items' => SchemaBuilder::ref('UsageMeter')],
+                'periods' => ['type' => 'array', 'items' => self::str(), 'description' => 'Months with usage, newest first.'],
+            ], ['period', 'current', 'resets_at', 'meters', 'periods']),
+            'UsageReportResponse' => self::dataEnvelope(SchemaBuilder::ref('UsageReport')),
 
             // ── Subscription / billing state (WC-billing) ─────────────────────
             'PlanRef' => self::object([
@@ -15226,6 +15251,20 @@ final class CoreApiSchemas
                 'tags' => ['billing'],
                 'responses' => [
                     200 => self::jsonResponse('This workspace\'s limits', 'PlanLimitListResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/usage', 'billing:view', [
+                'summary' => 'Every usage meter for this workspace and month',
+                'description' =>
+                    'Seats, customers, items, invoices, storage, messages (by channel), agents (runs and '
+                    . 'tool calls) and API calls, each with what was used, the base (null when there is no '
+                    . 'limit) and whether it is near or past it. Past a base is a warning only: nothing '
+                    . 'is refused (BM.4). The current month is read live; an earlier one as it was kept.',
+                'tags' => ['billing'],
+                'parameters' => [self::queryParam('period', 'string', 'A month, YYYY-MM; the current month when left out.')],
+                'responses' => [
+                    200 => self::jsonResponse('This workspace\'s usage', 'UsageReportResponse'),
+                    422 => self::errorResponse('The month is not written YYYY-MM'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/billing/receipts', 'billing:view', [

@@ -2276,6 +2276,10 @@
     "en": "Change a task in Taskaat",
     "ar": "تعديل مهمة في Taskaat"
   },
+  "get_api_usage": {
+    "en": "See what your workspace used against what its plan includes",
+    "ar": "عرض ما استخدمته مساحة العمل مقارنة بما تشمله باقتها"
+  },
   "get_api_sales_quotes": {
     "en": "List quotes",
     "ar": "عرض عروض الأسعار"

@@ -63,6 +63,8 @@ final class PlanLimitMailerTest extends TestCase
     public function testCloseToTheLimitOnABlockingInstanceSaysNewOnesWait(): void
     {
         $m = $this->mailer(['amro@example.test']);
+        // Blocking is an operator's choice now; warn is the default (BM.17).
+        $this->settings->setGlobal(SettingsRegistry::METERS_ENFORCEMENT, 'block');
 
         // Customers never block (WARN_ONLY); document renders do, on a blocking instance.
         $m->crossed(5, EntitlementRegistry::DOCUMENTS_RENDER_PER_MONTH, 450, 500, 'near', '2026-12-01T00:00:00+00:00');

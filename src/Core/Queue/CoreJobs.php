@@ -209,6 +209,8 @@ final class CoreJobs
             ), false);
             // WHIT-931: MCP idempotency keys older than a day. Internal: the scheduler queues it hourly.
             $registry->register(\Whity\Mcp\Tools\McpCallKeysPruneJob::NAME, new \Whity\Mcp\Tools\McpCallKeysPruneJob(new \Whity\Mcp\Tools\McpCallKeys($pdo)), false);
+            // Section 33 §5: every workspace's snapshot meters into the usage ledger. Internal: the scheduler queues it daily.
+            $registry->register(\Whity\Core\Usage\UsageSnapshotJob::NAME, new \Whity\Core\Usage\UsageSnapshotJob($pdo, \Whity\Core\Usage\UsageSnapshots::forDatabase($pdo)), false);
             // ADR 0018: reminders before events and meetings, through the same
             // notices, preferences and push as every other notice.
             $registry->register(

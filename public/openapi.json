@@ -81847,6 +81847,104 @@
                 ]
             }
         },
+        "/api/v1/usage": {
+            "get": {
+                "operationId": "get_api_v1_usage",
+                "summary": "Every usage meter for this workspace and month",
+                "tags": [
+                    "billing"
+                ],
+                "description": "Seats, customers, items, invoices, storage, messages (by channel), agents (runs and tool calls) and API calls, each with what was used, the base (null when there is no limit) and whether it is near or past it. Past a base is a warning only: nothing is refused (BM.4). The current month is read live; an earlier one as it was kept.",
+                "parameters": [
+                    {
+                        "name": "period",
+                        "in": "query",
+                        "required": false,
+                        "description": "A month, YYYY-MM; the current month when left out.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "This workspace's usage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsageReportResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The month is not written YYYY-MM",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/user-groups": {
             "get": {
                 "operationId": "get_api_v1_user_groups",
@@ -124240,6 +124338,133 @@
                 },
                 "required": [
                     "unread_count"
+                ]
+            },
+            "UsageMeter": {
+                "type": "object",
+                "properties": {
+                    "meter": {
+                        "type": "string",
+                        "enum": [
+                            "seats",
+                            "customers",
+                            "inventory.items",
+                            "invoices",
+                            "storage.bytes",
+                            "messages.outbound",
+                            "agents",
+                            "api.calls"
+                        ]
+                    },
+                    "key": {
+                        "type": "string",
+                        "description": "The entitlement its base is set on."
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "counted",
+                            "snapshot"
+                        ]
+                    },
+                    "unit": {
+                        "type": "string",
+                        "enum": [
+                            "count",
+                            "bytes"
+                        ]
+                    },
+                    "used": {
+                        "type": "integer"
+                    },
+                    "peak": {
+                        "type": "integer",
+                        "description": "The month's highest reading; for a counted meter, the same as used."
+                    },
+                    "base": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Null when there is no limit."
+                    },
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "unlimited",
+                            "ok",
+                            "near",
+                            "over"
+                        ]
+                    },
+                    "dimensions": {
+                        "type": "object",
+                        "description": "The meter split: messages by channel, API calls by `api` or `mcp`, agents by `runs`, `tool_calls`, `tokens_in`, `tokens_out`.",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
+                    },
+                    "resets_at": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "meter",
+                    "key",
+                    "kind",
+                    "unit",
+                    "used",
+                    "peak",
+                    "base",
+                    "state",
+                    "dimensions",
+                    "resets_at"
+                ]
+            },
+            "UsageReport": {
+                "type": "object",
+                "properties": {
+                    "period": {
+                        "type": "string",
+                        "description": "YYYY-MM, in the workspace's time zone."
+                    },
+                    "current": {
+                        "type": "boolean"
+                    },
+                    "resets_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "meters": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/UsageMeter"
+                        }
+                    },
+                    "periods": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Months with usage, newest first."
+                    }
+                },
+                "required": [
+                    "period",
+                    "current",
+                    "resets_at",
+                    "meters",
+                    "periods"
+                ]
+            },
+            "UsageReportResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/UsageReport"
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "User": {
