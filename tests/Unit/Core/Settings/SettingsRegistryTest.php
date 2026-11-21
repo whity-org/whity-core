@@ -147,7 +147,9 @@ final class SettingsRegistryTest extends TestCase
              'inventory.approve_adjustments_above', 'inventory.approve_counts_above', 'inventory.adjustment_route_template_id',
              'inventory.count_route_template_id', 'inventory.transfers_one_step',
              // WHIT-1234: purchasing.
-             'inventory.purchase_route_template_id', 'inventory.over_receipt_percent'],
+             'inventory.purchase_route_template_id', 'inventory.over_receipt_percent',
+             // WHIT-1321: quotes.
+             'sales.quote_valid_days', 'sales.quote_route_template_id'],
             SettingsRegistry::keys()
         );
     }
@@ -495,7 +497,8 @@ final class SettingsRegistryTest extends TestCase
         // 144 since WHIT-1234: purchase route and over-receipt.
         // 145 since WHIT-1308: plugins.store_allow_unsigned.
         // 146 since #2206: billing.local_runs_enabled.
-        self::assertCount(146, $describe);
+        // 148 since WHIT-1321: sales.quote_valid_days and sales.quote_route_template_id.
+        self::assertCount(148, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
