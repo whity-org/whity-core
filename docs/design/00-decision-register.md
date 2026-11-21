@@ -1037,5 +1037,37 @@ Decided by the owner on 21 November 2026 (WHIT-1318, section 32), and changed th
 | AC.29 | Plans | Everything in core accounting works on every plan. What is paid is "Seats and volume" (owner, 21 Nov 2026); accounting's volume meter is invoices issued a month, counted and charged as the business-model decision sets. The JoFotara and bank feeds plugins are priced with the other integrations |
 | AC.30 | Sidebar | Operations › Money with tabs Overview, Invoices, Bills, Payments, Accounts, Sales tax, Reports; Purchases and Sales stay inside Inventory, revisited after A3 lands (Q13) |
 
+## Quotes, receipts, trading emails and import (proposed 21 November 2026)
+
+Front Office's parts that no core lane covered (BM.15, BM.19), specified in section 34 (WHIT-1320). **Proposed**: the owner's questions are section 34 §9; the recommendations are written in until answered.
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| QT.1 | Scope | Quotes are core, free, on every plan and with or without inventory: a priced offer to a customer contact with a valid-until date, sent, accepted or declined, then turned into a sales order (IV.13) or an invoice (AC.11). Not a promise of stock, not a debt |
+| QT.2 | Data | `sales_quotes` (one row per revision), `sales_quote_lines` (an item variant or a free line; quantity in base-unit steps, IV.3), `sales_quote_conversions`. Amounts in the row's currency (CU.1–CU.4); tax in basis points until accounting's tax engine, then from the tax code by `tax_category` with no migration. Code in `src/Core/Sales`, never beside platform billing's `invoices` or `QuoteService` |
+| QT.3 | Numbers | `QUO-0318` from the sequence allocator (`sales:quote`), taken on first send. A changed sent quote keeps its number as a new revision ("rev 2"); earlier revisions never change |
+| QT.4 | Life | Draft → approval by route if set (route subject `sales.quote`) → ready → sent → accepted or declined, or expired after the valid-until date (default 30 days, `sales.quote_valid_days`; a daily job) → converted. Cancel any time before accepted |
+| QT.5 | Accepting | The quote's link and QR open a public page in the workspace's brand with no sign-in (SU.1, SU.10, section 16): Accept with a typed name, or Decline with an optional reason. A person can record a decision made by phone. Only the link's hash is stored; the page is rate-limited |
+| QT.6 | Turning into | Through the conversion hook `Contribute\WorkspaceQuoteConversion` (`key`, `label`, `canConvert`, `convert`): inventory P5 registers `sales_order`, accounting A2 registers `invoice`, plugins may add their own. One button per available target; with none, the quote stays accepted and says what will be possible. Each target once per quote, in one transaction |
+| QT.7 | Stock | Accepting a quote reserves nothing; the sales order it turns into reserves when confirmed |
+| QT.8 | Permissions | `quotes:read`, `quotes:write`; converting also needs the target's permission. Granted by capability, never by role name. Approving is the route, never a permission |
+| QT.9 | Printing | The `editor.quote` starter becomes record-driven (`TplDocQuote`, English and Arabic, document themes, `QuoteFieldProvider` with the QR to the public page); each revision issues its own copy, never changed |
+| QT.10 | SDK and events | Service `Sales\Quotes` (list, get, createDraft, addLines, send, recordDecision, convert, cancel; workspace from the call). Filter `sales.quote.sending`; notifications `sales.quote.created`, `.sent`, `.accepted`, `.declined`, `.expired`, `.converted`, `.cancelled`, with `.async` twins, in the webhook catalogue |
+| QT.11 | Agents | Read tools `quotes_list`, `quotes_get`; an agent drafts a quote and proposes sending it; a person accepts (Check first, tier 2) |
+| QT.12 | Place | Operations › Sales with tabs Quotes and Sales orders, shown to every workspace; Sales orders appear when inventory is on (amends AC.30 for quotes). Screens follow section 21 until the brand team's cards arrive |
+| TR.1 | 80 mm receipt | A seeded starter from `TplReceipt80` on core's 80 mm roll (`PageSizes`), English and Arabic, black only, numbered `RCT-` (`sales:receipt`); the e-invoicing QR slot is filled by the JoFotara plugin (AC.22). It prints a paid sales order (inventory P5) and a payment received (accounting A2); until then it previews with sample data. The A5 receipt stays |
+| TR.2 | Trading emails | Quote, invoice, receipt and payment reminder from `handoff/emails/` (EM.1) through `BrandedEmailSender`, in one `TradingEmails` service: the quote email ships with quotes; accounting A2 calls the other three. The quote, invoice and receipt PDFs are attached; one main button (Review and accept, Pay now or View); replies go to the workspace |
+| TR.3 | Switches | Each trading email is on by default and the workspace can turn each off (Settings › Emails) |
+| TR.4 | Meter | Trading emails count on the messages meter, warn only (BM.17); quotes are not a counted record (Q4) |
+| IM.1 | One engine | Core's contact import (WHIT-953) becomes the import engine for every kind: upload (CSV or Excel), match columns (English or Arabic headings, by content), check (nothing changes), import (one transaction, every change recorded), undo for 24 hours (`TplImport`, N3) |
+| IM.2 | Data | `import_jobs` and `import_job_changes` replace `contact_imports` and `contact_import_changes`: copied by an idempotent migration, then the old tables dropped (no real customers, owner 16 Nov 2026) |
+| IM.3 | Kinds | `contacts` (built), `inventory.items` (items and variants by SKU, then barcode), `inventory.opening_stock` (one opening operation), `inventory.supplier_prices`; `accounting.opening_balances`, the chart, open invoices and bills and bank statements come with the accounting lane on the same engine |
+| IM.4 | Extension | A kind implements `Contribute\WorkspaceImportKind` (key, label, permission, targets, plan, apply, undo); core's kinds, the accounting lane and plugins all use it. Custom fields join any kind whose record type has them |
+| IM.5 | Size | Up to 5,000 rows and 5 MB while the person waits; up to 100,000 rows and 20 MB as a background job with progress and a notification when done, applied in batches of 1,000. Uploaded rows are cleared after 7 days; the summary stays |
+| IM.6 | Undo | For 24 hours: made records go, changed ones get their values back, stock and entries are reversed; refused with a plain reason when what it brought in has been used since (stock moved, a period closed) |
+| IM.7 | Permissions | The kind's own write permission (`contacts:import`, `inventory:write`, `accounting:post` for opening balances), checked at upload and again at import |
+| IM.8 | Meters | Importing never refuses because of a meter; the check says when the import takes the workspace past its base |
+| IM.9 | Front Office | Front Office is retired once quotes, import, the receipt and the trading emails are on `develop`: unpublished from the store, the `plugin.front-office.*` mapping removed from core, no core migration (app.whity.dev holds no `fo_*` data, 21 Nov 2026) |
+
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.
