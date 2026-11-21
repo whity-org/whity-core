@@ -19093,20 +19093,6 @@ final class CoreApiSchemas
     }
 
     /**
-     * Document themes (editor M4d; E.44, DOCUMENT-THEMES.md 5).
-     *
-     * Reads use documents:read, writes the workspace's own themes with
-     * documents:themes. A theme is addressed by its ref: `whity.standard`
-     * (Whity's own, read-only) or `tenant.<key>`. Every operation sits in the
-     * `core.documents.themes` MCP toolset (discoverable, reached through
-     * search and call). Workspace theme writes are `allow` for agents
-     * (DOCUMENT-THEMES.md 6): they can be undone and a published template
-     * keeps its frozen theme, so nothing more is declared. A document's own
-     * theme is set through PUT /api/document-sources/{id}/draft.
-     *
-     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
-     */
-    /**
      * Company stamps (#1729): a name, the legal name it stands for, an image and
      * its holders. Anyone who reads documents lists them, so a route's author can
      * choose one; `documents:stamps` changes them. Archived, never deleted.
@@ -19170,6 +19156,20 @@ final class CoreApiSchemas
         ];
     }
 
+    /**
+     * Document themes (editor M4d; E.44, DOCUMENT-THEMES.md 5).
+     *
+     * Reads use documents:read, writes the workspace's own themes with
+     * documents:themes. A theme is addressed by its ref: `whity.standard`
+     * (Whity's own, read-only) or `tenant.<key>`. Every operation sits in the
+     * `core.documents.themes` MCP toolset (discoverable, reached through
+     * search and call). Workspace theme writes are `allow` for agents
+     * (DOCUMENT-THEMES.md 6): they can be undone and a published template
+     * keeps its frozen theme, so nothing more is declared. A document's own
+     * theme is set through PUT /api/document-sources/{id}/draft.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
     private static function documentThemeRoutes(): array
     {
         $mcp = ['toolset' => 'core.documents.themes'];
