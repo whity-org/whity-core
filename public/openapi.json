@@ -97084,7 +97084,8 @@
                         "description": "A PNG or JPEG data URL, at most 512 KB, 32 to 4000 pixels a side."
                     },
                     "holders": {
-                        "$ref": "#/components/schemas/CompanyStampHolders"
+                        "$ref": "#/components/schemas/CompanyStampHolders",
+                        "description": "Who may apply the stamp: profile ids in `people`, role ids in `roles`."
                     }
                 },
                 "required": [
@@ -97108,13 +97109,16 @@
                 "type": "object",
                 "properties": {
                     "name": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "The new name of the stamp. At most 200 characters."
                     },
                     "legal_name": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "The new legal name the stamp stands for. At most 300 characters."
                     },
                     "image": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "A new image: a PNG or JPEG data URL, at most 512 KB. Stamps already applied keep their own copy."
                     }
                 }
             },

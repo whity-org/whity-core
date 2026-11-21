@@ -7136,12 +7136,12 @@ final class CoreApiSchemas
                 'name' => self::str() + ['description' => 'At most 200 characters.'],
                 'legal_name' => self::str() + ['description' => 'The legal name the stamp stands for. At most 300 characters.'],
                 'image' => self::str() + ['description' => 'A PNG or JPEG data URL, at most 512 KB, 32 to 4000 pixels a side.'],
-                'holders' => SchemaBuilder::ref('CompanyStampHolders'),
+                'holders' => SchemaBuilder::ref('CompanyStampHolders') + ['description' => 'Who may apply the stamp: profile ids in `people`, role ids in `roles`.'],
             ], ['name', 'legal_name', 'image']),
             'CompanyStampUpdateRequest' => self::object([
-                'name' => self::str(),
-                'legal_name' => self::str(),
-                'image' => self::str(),
+                'name' => self::str() + ['description' => 'The new name of the stamp. At most 200 characters.'],
+                'legal_name' => self::str() + ['description' => 'The new legal name the stamp stands for. At most 300 characters.'],
+                'image' => self::str() + ['description' => 'A new image: a PNG or JPEG data URL, at most 512 KB. Stamps already applied keep their own copy.'],
             ], []),
             'StampingContext' => self::object([
                 'route_id' => self::int(),

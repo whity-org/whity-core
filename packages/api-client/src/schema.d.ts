@@ -15078,14 +15078,18 @@ export interface components {
             legal_name: string;
             /** @description A PNG or JPEG data URL, at most 512 KB, 32 to 4000 pixels a side. */
             image: string;
+            /** @description Who may apply the stamp: profile ids in `people`, role ids in `roles`. */
             holders?: components["schemas"]["CompanyStampHolders"];
         };
         CompanyStampResponse: {
             data: components["schemas"]["CompanyStamp"];
         };
         CompanyStampUpdateRequest: {
+            /** @description The new name of the stamp. At most 200 characters. */
             name?: string;
+            /** @description The new legal name the stamp stands for. At most 300 characters. */
             legal_name?: string;
+            /** @description A new image: a PNG or JPEG data URL, at most 512 KB. Stamps already applied keep their own copy. */
             image?: string;
         };
         Contact: {
