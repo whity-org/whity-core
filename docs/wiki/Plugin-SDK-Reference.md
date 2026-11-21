@@ -100,6 +100,35 @@ $inventory->stock()->move(new MoveRequest(
 
 `Context\InventoryScope` (`$ctx->inventory()`) holds the six (`operations()` since 1.128, `orders()` since 1.129). Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
 
+### Accounting (1.132)
+
+Core's books (WHIT-1318, design section 32). Through the context, in the workspace the call runs in:
+
+```php
+use Whity\Sdk\Accounting\{EntryRequest, EntryRequestLine};
+
+$books = $ctx->accounting();                                     // Context\AccountingScope
+$salaries = $books->accounts()->byCode('6100');
+$owed = $books->accounts()->byCode('2300');
+$entry = $books->ledger()->post(new EntryRequest(
+    actingProfileId: $payrollOfficerId,                          // must hold accounting:post
+    journal: 'GEN',
+    date: '2026-11-30',                                          // in an open month
+    lines: [EntryRequestLine::debit($salaries->id, 2400000), EntryRequestLine::credit($owed->id, 2400000)],
+    sourceType: 'payroll_run',                                   // stored as "<your plugin>.payroll_run"
+    idempotencyKey: 'run-' . $runId,
+));
+```
+
+| Service | What for | Workspace | Since |
+|---|---|---|---|
+| `Accounting\Accounts` | The chart in tree order, by code and by role (`receivable`, `sales_tax_output`...); `create()` adds an account your plugin owns, only through `$ctx->accounting()->accounts()`, acting as a person with `accounting:settings`. | current | 1.132 |
+| `Accounting\Ledger` | Post balanced entries (minor units of the base currency) and `reverse()` them as your plugin, idempotent by key, only through `$ctx->accounting()->ledger()`; read entries and balances. The container copy reads and refuses writes (`use_plugin_context`). | current | 1.132 |
+| `Accounting\Periods` | The month a date is in, whether it is open, the lock date. | current | 1.132 |
+| `Accounting\Reports` | The trial balance for a range, optionally one branch. | current | 1.132 |
+
+`Context\AccountingScope` (`$ctx->accounting()`) holds the four. Refusals throw `Accounting\AccountingRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `unbalanced`, `period_closed`, `conflict`, `vetoed`, `use_plugin_context`.
+
 ## Contribution points: what a plugin declares
 
 Implement the interface next to `PluginInterface`. Each one is optional, and the host skips plugins that don't implement it. A declaration the host refuses is dropped with a logged reason, and the plugin keeps loading unless the page says otherwise. `Manifest\ManifestPlugin` answers some of them from `plugin.json`.
@@ -157,6 +186,6 @@ A plugin hands the host an object that does the work. The host decides when to c
 
 Every exception the SDK defines implements `Whity\Sdk\SdkException` (1.123), so `catch (SdkException $e)` catches "the host or the SDK refused this":
 
-`ContactRejected`, `TimeOffRejected`, `InventoryRejected`, `DocumentNotIssuedException`, `RenderRejectedException`, `RenderUnavailableException`, `BillingPortalException`, `HookVetoException`, `MultipartException`, `InvalidManifestException`, `ExpressionError`, `HttpFailure`.
+`ContactRejected`, `TimeOffRejected`, `InventoryRejected`, `AccountingRejected`, `DocumentNotIssuedException`, `RenderRejectedException`, `RenderUnavailableException`, `BillingPortalException`, `HookVetoException`, `MultipartException`, `InvalidManifestException`, `ExpressionError`, `HttpFailure`.
 
 Each still extends `\RuntimeException`, so existing catches don't change. The SDK also throws plain SPL exceptions that don't implement it: `\InvalidArgumentException` for a bad key or value, and `\RuntimeException` or `\LogicException` when there is no workspace in scope. The [streamline proposal](Plugin-SDK-Streamline-Proposal.md) suggests making these consistent in 2.0.

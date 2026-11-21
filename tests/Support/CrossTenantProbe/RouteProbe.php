@@ -757,11 +757,16 @@ final class RouteProbe
     /**
      * A global-table row tied to a person who belongs to the attacker alone is
      * the attacker's own (its administrator's profile, emails, reset links).
+     * So is a permission granted to a role the attacker's workspace owns, such
+     * as the Accountant role accounting makes on first use (WHIT-1318).
      *
      * @param array<string, mixed> $row
      */
     private function belongsToAttacker(string $table, array $row): bool
     {
+        if ($table === 'role_permissions' && isset($row['role_id'])) {
+            return (int) $this->scalar('SELECT tenant_id FROM roles WHERE id = ' . (int) $row['role_id']) === $this->attacker;
+        }
         $profile = match (true) {
             $table === 'profiles' => $row['id'] ?? null,
             array_key_exists('profile_id', $row) => $row['profile_id'],

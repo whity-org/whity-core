@@ -7,7 +7,9 @@ namespace Whity\Core\Plugin;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Audit\AuditTrail;
 use Whity\Sdk\Audit\PluginAudit;
+use Whity\Core\Accounting\Host\HostAccountingScope;
 use Whity\Core\Inventory\Host\HostInventoryScope;
+use Whity\Sdk\Context\AccountingScope;
 use Whity\Sdk\Context\InventoryScope;
 use Whity\Sdk\Context\PluginScope;
 use Whity\Sdk\Context\ServiceUnavailable;
@@ -120,6 +122,18 @@ final class HostPluginScope implements PluginScope
         }
         $scope = $this->stores[InventoryScope::class];
         assert($scope instanceof InventoryScope);
+
+        return $scope;
+    }
+
+    /** Core's books for this plugin; its ledger and accounts are bound to this plugin (SDK 1.132, WHIT-1318). */
+    public function accounting(): AccountingScope
+    {
+        if (!isset($this->stores[AccountingScope::class])) {
+            $this->stores[AccountingScope::class] = new HostAccountingScope($this->plugin);
+        }
+        $scope = $this->stores[AccountingScope::class];
+        assert($scope instanceof AccountingScope);
 
         return $scope;
     }

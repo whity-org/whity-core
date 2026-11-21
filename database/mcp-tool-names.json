@@ -250,6 +250,50 @@
     "en": "List two-step sign-in recovery requests waiting for approval",
     "ar": "عرض طلبات استعادة التحقق بخطوتين المعلقة"
   },
+  "get_api_accounting_accounts": {
+    "en": "List the chart of accounts",
+    "ar": "عرض دليل الحسابات"
+  },
+  "get_api_accounting_accounts_id": {
+    "en": "Show an account",
+    "ar": "عرض حساب"
+  },
+  "get_api_accounting_accounts_id_statement": {
+    "en": "Show an account's statement",
+    "ar": "عرض كشف حساب"
+  },
+  "get_api_accounting_books": {
+    "en": "Show the workspace's books",
+    "ar": "عرض دفاتر مساحة العمل"
+  },
+  "get_api_accounting_entries": {
+    "en": "List journal entries",
+    "ar": "عرض القيود"
+  },
+  "get_api_accounting_entries_id": {
+    "en": "Show a journal entry",
+    "ar": "عرض قيد"
+  },
+  "get_api_accounting_journals": {
+    "en": "List the journals",
+    "ar": "عرض دفاتر اليومية"
+  },
+  "get_api_accounting_manual_entries": {
+    "en": "List journal entries people wrote",
+    "ar": "عرض القيود اليدوية"
+  },
+  "get_api_accounting_manual_entries_id": {
+    "en": "Show a draft journal entry",
+    "ar": "عرض قيد يدوي"
+  },
+  "get_api_accounting_periods": {
+    "en": "List the months of the books",
+    "ar": "عرض الفترات المحاسبية"
+  },
+  "get_api_accounting_reports_trial_balance": {
+    "en": "Show the trial balance",
+    "ar": "عرض ميزان المراجعة"
+  },
   "get_api_admin_languages": {
     "en": "List every language, including switched-off ones",
     "ar": "عرض كل اللغات"
@@ -1155,6 +1199,14 @@
     "en": "Change how long people have to set up two-step sign-in",
     "ar": "تغيير مهلة تفعيل التحقق بخطوتين"
   },
+  "patch_api_accounting_accounts_id": {
+    "en": "Change an account",
+    "ar": "تعديل حساب"
+  },
+  "patch_api_accounting_manual_entries_id": {
+    "en": "Change a draft journal entry",
+    "ar": "تعديل مسودة قيد"
+  },
   "patch_api_affiliate_payouts_id": {
     "en": "Record that a payout was transferred",
     "ar": "تسجيل تحويل دفعة مسوّق"
@@ -1334,6 +1386,42 @@
   "post_api_2fa_recovery_identity_check": {
     "en": "Start an admin's check that it's them before approving a two-step reset",
     "ar": "بدء تحقق المسؤول من هويته قبل الموافقة على إعادة تعيين التحقق بخطوتين"
+  },
+  "post_api_accounting_accounts": {
+    "en": "Add an account to the chart",
+    "ar": "إضافة حساب إلى الدليل"
+  },
+  "post_api_accounting_accounts_id_archive": {
+    "en": "Archive an account",
+    "ar": "أرشفة حساب"
+  },
+  "post_api_accounting_accounts_id_restore": {
+    "en": "Bring an account back",
+    "ar": "استعادة حساب"
+  },
+  "post_api_accounting_entries_id_reverse": {
+    "en": "Reverse a journal entry",
+    "ar": "عكس قيد"
+  },
+  "post_api_accounting_manual_entries": {
+    "en": "Draft a journal entry",
+    "ar": "إنشاء مسودة قيد"
+  },
+  "post_api_accounting_manual_entries_id_cancel": {
+    "en": "Cancel a draft journal entry",
+    "ar": "إلغاء مسودة قيد"
+  },
+  "post_api_accounting_manual_entries_id_post": {
+    "en": "Post a journal entry to the books",
+    "ar": "ترحيل قيد إلى الدفاتر"
+  },
+  "post_api_accounting_periods_id_close": {
+    "en": "Close a month",
+    "ar": "إقفال شهر"
+  },
+  "post_api_accounting_periods_id_reopen": {
+    "en": "Reopen a month",
+    "ar": "إعادة فتح شهر"
   },
   "post_api_affiliates": {
     "en": "Create an affiliate",

@@ -75,4 +75,11 @@ interface PluginScope
      * Its `stock()` is bound to this plugin, the only way a plugin writes stock.
      */
     public function inventory(): InventoryScope;
+
+    /**
+     * Core's books in this workspace: the chart, the ledger, the months and the
+     * reports (SDK 1.132, WHIT-1318). Its `ledger()` and `accounts()` are bound
+     * to this plugin, the only way a plugin writes the books.
+     */
+    public function accounting(): AccountingScope;
 }

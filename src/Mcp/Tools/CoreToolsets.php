@@ -104,6 +104,11 @@ final class CoreToolsets
             'titleAr'     => 'المخزون',
             'description' => 'Items, units, places and stock: levels, history, opening stock and adjustments.',
         ],
+        'core.accounting' => [
+            'title'       => 'Accounting',
+            'titleAr'     => 'المحاسبة',
+            'description' => 'The chart of accounts, journal entries, periods and the trial balance.',
+        ],
         'core.convening' => [
             'title'       => 'Meetings',
             'titleAr'     => 'الاجتماعات',
@@ -177,6 +182,7 @@ final class CoreToolsets
         'contacts'                 => 'core.contacts',
         'custom-fields'            => 'core.contacts',
         'inventory'                => 'core.inventory',
+        'accounting'               => 'core.accounting',
         'chat'                     => 'core.chat',
         'taxonomy'                 => 'core.taxonomy',
         'data-types'               => 'core.taxonomy',

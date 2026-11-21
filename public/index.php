@@ -5764,6 +5764,51 @@ $router->register('GET',    '/api/inventory/supplier-items',                    
 $router->register('PUT',    '/api/inventory/supplier-items',                     [$inventoryHandler, 'setSupplierItem'],        null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('DELETE', '/api/inventory/supplier-items/{id:\d+}',            [$inventoryHandler, 'deleteSupplierItem'],     null, null, CorePermissions::INVENTORY_WRITE);
 
+// WHIT-1318: accounting, phase A1. The books, the chart of accounts, the
+// append-only double-entry ledger with its hash chain, months, manual entries
+// and the trial balance (design section 32). The books are set up on first use.
+$accountingDb = new \Whity\Core\Accounting\AccountingDb($db->getPdo());
+$accountingWorkspace = new \Whity\Core\Accounting\AccountingWorkspace(
+    $accountingDb,
+    static fn (int $tenantId): string => (string) ($settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? 'USD'),
+);
+$accountingPeriods = new \Whity\Core\Accounting\Periods($accountingDb, $accountingWorkspace, $hookManager);
+$accountingLedger = new \Whity\Core\Accounting\Ledger($accountingDb, $accountingWorkspace, $accountingPeriods, new \Whity\Database\SequenceCounters($db->getPdo()), $hookManager);
+$accountingChart = new \Whity\Core\Accounting\ChartOfAccounts($accountingDb, $accountingWorkspace);
+$accountingManual = new \Whity\Core\Accounting\ManualEntries($accountingDb, $accountingWorkspace, $accountingLedger);
+$accountingReports = new \Whity\Core\Accounting\AccountingReports($accountingDb, $accountingWorkspace, $accountingPeriods);
+$accountingGuard = new \Whity\Core\Accounting\Host\HostAccountingGuard(
+    $accountingDb,
+    static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+);
+\Whity\register_service(\Whity\Sdk\Accounting\Accounts::class, new \Whity\Core\Accounting\Host\HostAccounts($accountingChart, $accountingGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Accounting\Ledger::class, new \Whity\Core\Accounting\Host\HostLedger($accountingLedger, $accountingGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Accounting\Periods::class, new \Whity\Core\Accounting\Host\HostPeriods($accountingPeriods, $accountingWorkspace, $accountingGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Accounting\Reports::class, new \Whity\Core\Accounting\Host\HostReports($accountingReports, $accountingGuard)); // @phpstan-ignore-line
+$accountingHandler = new \Whity\Api\AccountingApiHandler($accountingWorkspace, $accountingChart, $accountingLedger, $accountingManual, $accountingPeriods, $accountingReports);
+$router->register('GET',    '/api/accounting/books',                              [$accountingHandler, 'showBooks'],         null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('GET',    '/api/accounting/accounts',                           [$accountingHandler, 'listAccounts'],      null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('POST',   '/api/accounting/accounts',                           [$accountingHandler, 'createAccount'],     null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('GET',    '/api/accounting/accounts/{id:\d+}',                  [$accountingHandler, 'showAccount'],       null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('PATCH',  '/api/accounting/accounts/{id:\d+}',                  [$accountingHandler, 'updateAccount'],     null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('POST',   '/api/accounting/accounts/{id:\d+}/archive',          [$accountingHandler, 'archiveAccount'],    null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('POST',   '/api/accounting/accounts/{id:\d+}/restore',          [$accountingHandler, 'restoreAccount'],    null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('GET',    '/api/accounting/accounts/{id:\d+}/statement',        [$accountingHandler, 'accountStatement'],  null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('GET',    '/api/accounting/journals',                           [$accountingHandler, 'listJournals'],      null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('GET',    '/api/accounting/entries',                            [$accountingHandler, 'listEntries'],       null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('GET',    '/api/accounting/entries/{id:\d+}',                   [$accountingHandler, 'showEntry'],         null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('POST',   '/api/accounting/entries/{id:\d+}/reverse',           [$accountingHandler, 'reverseEntry'],      null, null, CorePermissions::ACCOUNTING_POST);
+$router->register('GET',    '/api/accounting/manual-entries',                     [$accountingHandler, 'listManualEntries'], null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('POST',   '/api/accounting/manual-entries',                     [$accountingHandler, 'createManualEntry'], null, null, CorePermissions::ACCOUNTING_POST);
+$router->register('GET',    '/api/accounting/manual-entries/{id:\d+}',            [$accountingHandler, 'showManualEntry'],   null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('PATCH',  '/api/accounting/manual-entries/{id:\d+}',            [$accountingHandler, 'updateManualEntry'], null, null, CorePermissions::ACCOUNTING_POST);
+$router->register('POST',   '/api/accounting/manual-entries/{id:\d+}/post',       [$accountingHandler, 'postManualEntry'],   null, null, CorePermissions::ACCOUNTING_POST);
+$router->register('POST',   '/api/accounting/manual-entries/{id:\d+}/cancel',     [$accountingHandler, 'cancelManualEntry'], null, null, CorePermissions::ACCOUNTING_POST);
+$router->register('GET',    '/api/accounting/periods',                            [$accountingHandler, 'listPeriods'],       null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('POST',   '/api/accounting/periods/{id:\d+}/close',             [$accountingHandler, 'closePeriod'],       null, null, CorePermissions::ACCOUNTING_CLOSE);
+$router->register('POST',   '/api/accounting/periods/{id:\d+}/reopen',            [$accountingHandler, 'reopenPeriod'],      null, null, CorePermissions::ACCOUNTING_CLOSE);
+$router->register('GET',    '/api/accounting/reports/trial-balance',              [$accountingHandler, 'trialBalance'],      null, null, CorePermissions::ACCOUNTING_READ);
+
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,
     $meetingRepository,
