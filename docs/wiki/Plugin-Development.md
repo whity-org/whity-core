@@ -435,6 +435,50 @@ that honour it.
 
 ---
 
+### Declare what you use, and reach your tables through the context (SDK 1.151)
+
+Implement `Whity\Sdk\Contribute\PluginCapabilitiesInterface` to say which
+context services your plugin uses and which of your own tables it reaches
+(#1693). Your `PluginContext` scope then gives you only those; anything else
+throws `ServiceNotDeclared`. The operator sees the list under your plugin
+(`capabilities` in `GET /api/plugins`).
+
+```php
+use Whity\Sdk\Context\Service;
+use Whity\Sdk\Contribute\PluginCapabilitiesInterface;
+
+final class KeyHubPlugin implements PluginInterface, PluginCapabilitiesInterface
+{
+    public function getServices(): array
+    {
+        return [Service::SETTINGS, Service::JOBS, Service::DATABASE];
+    }
+
+    public function getTables(): array
+    {
+        return ['keyhub_orders'];   // created by your migrations, with a tenant_id column
+    }
+}
+
+$db = \Whitypp(PluginContext::class)->for($this)->database();
+$db->insert('keyhub_orders', ['ref' => 'A-1', 'status' => 'open']);
+$open = $db->select('keyhub_orders', ['status' => ['open', 'held']], ['ref' => 'asc'], 50);
+$db->update('keyhub_orders', ['status' => 'paid'], ['ref' => 'A-1']);
+```
+
+The host adds `tenant_id = <this workspace>` to every condition and sets it on
+every insert; you never write `tenant_id`, and a call that names it, names a
+table you didn't declare, uses a column name that isn't plain, or runs with no
+workspace in scope is refused with `TableRefused`. A core table, or one another
+plugin declared first, is dropped from your declaration with a logged warning.
+Conditions are equals, `null` (IS NULL) or a list (IN). For joins, ranges and
+aggregates write your own SQL as before, with its own `tenant_id` predicate.
+
+A plugin that doesn't implement the interface keeps every service until 2.0,
+which makes the declaration required. It is least privilege inside the host,
+not a sandbox: plugin PHP runs in the host's process, and store review is what
+checks a plugin keeps to its declaration.
+
 ## Step 3 — Discovery and auto-loading
 
 You do not register the plugin anywhere. When the application boots,
