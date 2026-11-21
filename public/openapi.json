@@ -9090,6 +9090,1143 @@
                 ]
             }
         },
+        "/api/v1/calendar/commission/closes": {
+            "get": {
+                "operationId": "get_api_v1_calendar_commission_closes",
+                "summary": "Every closed commission period, newest first",
+                "tags": [
+                    "calendar"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Closes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarCommissionClose"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_calendar_commission_closes",
+                "summary": "Close a commission period",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "Freezes each person's totals, fires calendar.commission.closed, and sends it to the books when something books commission (WHIT-1334).",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarCommissionCloseRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The close",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarCommissionClose"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not ended, already closed, or nothing to close",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown period",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/commission/closes/periods": {
+            "get": {
+                "operationId": "get_api_v1_calendar_commission_closes_periods",
+                "summary": "The commission periods that may be closed now",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "Ended, and touching no closed day.",
+                "responses": {
+                    "200": {
+                        "description": "Periods",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string"
+                                                    },
+                                                    "label": {
+                                                        "type": "string"
+                                                    },
+                                                    "from": {
+                                                        "type": "string"
+                                                    },
+                                                    "to": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "label",
+                                                    "from",
+                                                    "to"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/commission/closes/{id}/book": {
+            "post": {
+                "operationId": "post_api_v1_calendar_commission_closes_id_book",
+                "summary": "Send a closed commission period to the books again",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The close",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarCommissionClose"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Already booked, or the books cannot take it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/commission/periods": {
+            "get": {
+                "operationId": "get_api_v1_calendar_commission_periods",
+                "summary": "The periods the commission report covers",
+                "tags": [
+                    "calendar"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Periods",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string"
+                                                    },
+                                                    "label": {
+                                                        "type": "string"
+                                                    },
+                                                    "from": {
+                                                        "type": "string"
+                                                    },
+                                                    "to": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "label",
+                                                    "from",
+                                                    "to"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/commission/rates": {
+            "get": {
+                "operationId": "get_api_v1_calendar_commission_rates",
+                "summary": "Every commission rate, by member of staff",
+                "tags": [
+                    "calendar"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Rates",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarCommissionRate"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_calendar_commission_rates",
+                "summary": "Set a commission rate, for every service or one",
+                "tags": [
+                    "calendar"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarCommissionRateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The rate",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarCommissionRate"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/commission/rates/{id}": {
+            "delete": {
+                "operationId": "delete_api_v1_calendar_commission_rates_id",
+                "summary": "Remove a commission rate",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Removed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "removed": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "removed"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/commission/report": {
+            "get": {
+                "operationId": "get_api_v1_calendar_commission_report",
+                "summary": "What each member of staff earned in a period",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "From done bookings (confirmed and already over), each service line at its own price, in the workspace time zone.",
+                "parameters": [
+                    {
+                        "name": "period",
+                        "in": "query",
+                        "required": false,
+                        "description": "this_month (default), last_month, this_week, last_7_days or last_30_days.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "One row per person and currency",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarCommissionReportRow"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown period",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/commission/services": {
+            "get": {
+                "operationId": "get_api_v1_calendar_commission_services",
+                "summary": "The services a commission rate can be set for",
+                "tags": [
+                    "calendar"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Services",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "name"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/commission/staff": {
+            "get": {
+                "operationId": "get_api_v1_calendar_commission_staff",
+                "summary": "The staff a commission rate can be set for",
+                "tags": [
+                    "calendar"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Staff",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "profile_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "profile_id",
+                                                    "name"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/day-counts": {
             "get": {
                 "operationId": "get_api_v1_calendar_day_counts",
@@ -12061,6 +13198,786 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/walkins": {
+            "get": {
+                "operationId": "get_api_v1_calendar_walkins",
+                "summary": "Who is waiting at the front desk, first come first served",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "Needs the walk-ins switch of the workspace (WHIT-1334); off answers 409 with reason walkins_off.",
+                "responses": {
+                    "200": {
+                        "description": "The queue",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarWalkin"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Walk-ins are off, or no longer waiting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_calendar_walkins",
+                "summary": "Add someone who came in without a booking",
+                "tags": [
+                    "calendar"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarWalkinRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The walk-in",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarWalkin"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Walk-ins are off, or no longer waiting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/walkins/assign": {
+            "post": {
+                "operationId": "post_api_v1_calendar_walkins_assign",
+                "summary": "Hand a walk-in to the person chosen",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "Books the service now for that person, checked in, without emailing anyone; the booking finds or adds the customer in Contacts.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarWalkinAssignRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The walk-in",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarWalkin"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Walk-ins are off, or no longer waiting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/walkins/services": {
+            "get": {
+                "operationId": "get_api_v1_calendar_walkins_services",
+                "summary": "The services a walk-in can choose",
+                "tags": [
+                    "calendar"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Services",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "id",
+                                                    "name"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Walk-ins are off, or no longer waiting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/walkins/staff": {
+            "get": {
+                "operationId": "get_api_v1_calendar_walkins_staff",
+                "summary": "The bookable staff, free ones first",
+                "tags": [
+                    "calendar"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Staff",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "profile_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "name": {
+                                                        "type": "string"
+                                                    },
+                                                    "free": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "label": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "profile_id",
+                                                    "name",
+                                                    "free",
+                                                    "label"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Walk-ins are off, or no longer waiting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/walkins/{id}/assign": {
+            "post": {
+                "operationId": "post_api_v1_calendar_walkins_id_assign",
+                "summary": "Hand a walk-in to the next free person",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "The one they asked for if free, else the first with no booking now.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The walk-in",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarWalkin"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Nobody is free, no longer waiting, or walk-ins are off",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/walkins/{id}/left": {
+            "post": {
+                "operationId": "post_api_v1_calendar_walkins_id_left",
+                "summary": "They left without being served",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The walk-in",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarWalkin"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Walk-ins are off, or no longer waiting",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -81394,6 +83311,113 @@
                 ]
             }
         },
+        "/api/v1/themes/preview": {
+            "post": {
+                "operationId": "post_api_v1_themes_preview",
+                "summary": "Preview a draft theme in the live editor",
+                "tags": [
+                    "theme"
+                ],
+                "description": "Free (TH.25): compiles a draft theme file as it would be used, with every colour for light and dark, the type, shape, density and motion values, what the guard rails change, and the roles a colour may be set by hand for. A draft with problems answers valid=false and lists them all. Nothing is saved; saving is POST /api/themes with {theme, source: \"editor\"}.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ImportThemeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The compiled draft, or its problems",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemePreviewResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "The theme is larger than 32 KB",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/themes/tokens": {
             "post": {
                 "operationId": "post_api_v1_themes_tokens",
@@ -81591,6 +83615,100 @@
                     },
                     "422": {
                         "description": "Not an imported theme",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "get": {
+                "operationId": "get_api_v1_themes_themeid",
+                "summary": "Get one theme's file, for the editor",
+                "tags": [
+                    "theme"
+                ],
+                "description": "The theme file as installed. editable is true for the workspace's own themes (imported or made in the editor); any other is changed as a copy.",
+                "parameters": [
+                    {
+                        "name": "themeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "themeId",
+                        "in": "path",
+                        "required": true,
+                        "description": "The theme's id, like acme.harbour",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The theme file",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemeFileResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This workspace has no theme with that id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -93481,7 +95599,8 @@
                         "enum": [
                             "staff",
                             "public",
-                            "agent"
+                            "agent",
+                            "walkin"
                         ]
                     },
                     "price_minor": {
@@ -93767,6 +95886,188 @@
                 },
                 "required": [
                     "starts_at"
+                ]
+            },
+            "CalendarCommissionClose": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "from": {
+                        "type": "string",
+                        "description": "First day, in the workspace time zone."
+                    },
+                    "to": {
+                        "type": "string",
+                        "description": "Last day, included."
+                    },
+                    "period": {
+                        "type": "string"
+                    },
+                    "closed_at": {
+                        "type": "string"
+                    },
+                    "closed_by_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "expense_ref": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "What the books called it; null until booked."
+                    },
+                    "books": {
+                        "type": "string"
+                    },
+                    "total": {
+                        "type": "string"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "profile_id": {
+                                    "type": "integer"
+                                },
+                                "person": {
+                                    "type": "string"
+                                },
+                                "currency": {
+                                    "type": "string"
+                                },
+                                "bookings": {
+                                    "type": "integer"
+                                },
+                                "sales_minor": {
+                                    "type": "integer"
+                                },
+                                "commission_minor": {
+                                    "type": "integer"
+                                }
+                            },
+                            "required": [
+                                "profile_id",
+                                "currency",
+                                "commission_minor"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "from",
+                    "to",
+                    "lines"
+                ]
+            },
+            "CalendarCommissionCloseRequest": {
+                "type": "object",
+                "properties": {
+                    "period": {
+                        "type": "string",
+                        "description": "A period that has ended, such as last_month."
+                    }
+                },
+                "required": [
+                    "period"
+                ]
+            },
+            "CalendarCommissionRate": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "profile_id": {
+                        "type": "integer"
+                    },
+                    "person": {
+                        "type": "string"
+                    },
+                    "service_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Null: the rate for every service without one of its own."
+                    },
+                    "service": {
+                        "type": "string"
+                    },
+                    "percent": {
+                        "type": "string",
+                        "description": "As read, such as 12.5%."
+                    },
+                    "percent_bp": {
+                        "type": "integer",
+                        "description": "Basis points: 1250 is 12.5%."
+                    }
+                },
+                "required": [
+                    "id",
+                    "profile_id",
+                    "percent_bp"
+                ]
+            },
+            "CalendarCommissionRateRequest": {
+                "type": "object",
+                "properties": {
+                    "profile_id": {
+                        "type": "integer",
+                        "description": "The member of staff, from GET /api/calendar/commission/staff."
+                    },
+                    "service_id": {
+                        "type": "integer",
+                        "description": "Empty for every service."
+                    },
+                    "percent": {
+                        "type": "string",
+                        "description": "A number from 0 to 100, such as 30 or 12.5."
+                    }
+                },
+                "required": [
+                    "profile_id",
+                    "percent"
+                ]
+            },
+            "CalendarCommissionReportRow": {
+                "type": "object",
+                "properties": {
+                    "profile_id": {
+                        "type": "integer"
+                    },
+                    "person": {
+                        "type": "string"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "bookings": {
+                        "type": "integer"
+                    },
+                    "sales_minor": {
+                        "type": "integer"
+                    },
+                    "commission_minor": {
+                        "type": "integer"
+                    },
+                    "rated": {
+                        "type": "boolean",
+                        "description": "False when the person has no rate."
+                    },
+                    "sales": {
+                        "type": "string"
+                    },
+                    "commission": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "profile_id",
+                    "currency",
+                    "bookings",
+                    "sales_minor",
+                    "commission_minor"
                 ]
             },
             "CalendarDayCount": {
@@ -94458,6 +96759,10 @@
                     "multi_service_booking": {
                         "type": "boolean",
                         "description": "On: one booking may hold several services back to back (WHIT-1173). Default off."
+                    },
+                    "walkins_enabled": {
+                        "type": "boolean",
+                        "description": "On: the walk-in queue at the front desk (WHIT-1334). Default off."
                     }
                 },
                 "required": [
@@ -94546,6 +96851,10 @@
                     "multi_service_booking": {
                         "type": "boolean",
                         "description": "On lets one booking hold several services back to back, on the booking page and at the desk (WHIT-1173). Default off."
+                    },
+                    "walkins_enabled": {
+                        "type": "boolean",
+                        "description": "Turn the walk-in queue at the front desk on or off (WHIT-1334). Default off."
                     }
                 }
             },
@@ -94819,6 +97128,122 @@
                         "description": "The person opened the app's sidebar on the calendar, so it stays open there."
                     }
                 }
+            },
+            "CalendarWalkin": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "position": {
+                        "type": "integer",
+                        "description": "Place in the queue, 1 is next (waiting list only)."
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "phone": {
+                        "type": "string"
+                    },
+                    "service_id": {
+                        "type": "integer"
+                    },
+                    "service": {
+                        "type": "string",
+                        "description": "The service name in the caller language (waiting list only)."
+                    },
+                    "preferred_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "preferred": {
+                        "type": "string",
+                        "description": "Who they asked for, by name (waiting list only)."
+                    },
+                    "note": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "waiting",
+                            "assigning",
+                            "served",
+                            "left"
+                        ]
+                    },
+                    "added_at": {
+                        "type": "string"
+                    },
+                    "waited_minutes": {
+                        "type": "integer"
+                    },
+                    "assigned_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "booking_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "contact_id": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "service_id"
+                ]
+            },
+            "CalendarWalkinAssignRequest": {
+                "type": "object",
+                "properties": {
+                    "walkin_id": {
+                        "type": "integer",
+                        "description": "The walk-in to serve, from GET /api/calendar/walkins."
+                    },
+                    "profile_id": {
+                        "type": "integer",
+                        "description": "Who serves them, from GET /api/calendar/walkins/staff."
+                    }
+                },
+                "required": [
+                    "walkin_id",
+                    "profile_id"
+                ]
+            },
+            "CalendarWalkinRequest": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "Their name, as they gave it."
+                    },
+                    "phone": {
+                        "type": "string",
+                        "description": "Optional; used to find or add the customer in Contacts when served."
+                    },
+                    "service_id": {
+                        "type": "integer",
+                        "description": "The service they want, from GET /api/calendar/walkins/services."
+                    },
+                    "profile_id": {
+                        "type": "integer",
+                        "description": "Who they asked for; empty for whoever is free."
+                    },
+                    "note": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "description": "Anything the desk should know."
+                    }
+                },
+                "required": [
+                    "name",
+                    "service_id"
+                ]
             },
             "CapabilityDenial": {
                 "type": "object",
@@ -107933,14 +110358,8 @@
             },
             "ImportThemeRequest": {
                 "type": "object",
-                "description": "A theme file (schemas/theme/v1.json).",
+                "description": "A theme file (schemas/theme/v1.json): schemaVersion, id, version and name are required. Or {theme, source} with the file under theme.",
                 "additionalProperties": false,
-                "required": [
-                    "schemaVersion",
-                    "id",
-                    "version",
-                    "name"
-                ],
                 "properties": {
                     "$schema": {
                         "type": "string",
@@ -107997,6 +110416,17 @@
                     "documents": {
                         "type": "object",
                         "description": "Defaults for the workspace's document theme: accentUse, titleFace, largePrint."
+                    },
+                    "theme": {
+                        "type": "object",
+                        "description": "Instead of the fields above: the theme file, with source."
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": [
+                            "editor"
+                        ],
+                        "description": "With theme: editor when it was made or changed in the theme editor (TH.25)."
                     }
                 }
             },
@@ -114591,12 +117021,16 @@
                                 },
                                 "plugin": {
                                     "type": "string"
+                                },
+                                "email_default": {
+                                    "type": "boolean"
                                 }
                             },
                             "required": [
                                 "type",
                                 "label",
-                                "plugin"
+                                "plugin",
+                                "email_default"
                             ]
                         }
                     }
@@ -126039,6 +128473,37 @@
                     "data"
                 ]
             },
+            "ThemeFileResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "theme": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "The theme file (schemas/theme/v1.json)."
+                            },
+                            "source": {
+                                "type": "string",
+                                "description": "whity, plugin, import, editor or store."
+                            },
+                            "editable": {
+                                "type": "boolean",
+                                "description": "True for the workspace's own themes; any other is changed as a copy."
+                            }
+                        },
+                        "required": [
+                            "theme",
+                            "source",
+                            "editable"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "ThemeListResponse": {
                 "type": "object",
                 "properties": {
@@ -126221,6 +128686,77 @@
                         "additionalProperties": {
                             "type": "string"
                         }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "ThemePreviewResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "valid": {
+                                "type": "boolean"
+                            },
+                            "problems": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Every problem with the draft, in words; empty when valid."
+                            },
+                            "light": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "description": "Every colour role for light, as #rrggbb."
+                            },
+                            "dark": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "description": "Every colour role for dark, as #rrggbb."
+                            },
+                            "vars": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "description": "Type, shape, density and motion values."
+                            },
+                            "fonts": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                }
+                            },
+                            "adjustments": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                },
+                                "description": "What the guard rails change: mode, role and change."
+                            },
+                            "roles": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "The colour roles a theme may set by hand."
+                            }
+                        },
+                        "required": [
+                            "valid",
+                            "problems"
+                        ]
                     }
                 },
                 "required": [

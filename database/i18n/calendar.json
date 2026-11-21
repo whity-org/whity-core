@@ -471,6 +471,8 @@
         "settings.slotStep": "Free times every",
         "settings.slotStepHint": "With 15 minutes, free times start at 09:00, 09:15, 09:30 and so on.",
         "settings.title": "Calendar settings",
+        "settings.walkins": "Walk-ins",
+        "settings.walkinsHint": "On: the front desk keeps a queue of people who come in without a booking and hands each to whoever is free. It appears as Walk-ins in the menu.",
         "settings.weekStart": "First day of the week",
         "settings.weekend": "Weekend",
         "settings.weekendHint": "Weekend days are shaded on the calendar. They can still have working hours.",
