@@ -23,7 +23,7 @@ use Whity\Database\Database;
  *
  * The contacts' own import tables (migration 261) are copied in, each import
  * once (matched on workspace, file and the time it was made), with its
- * changes; migration 402 then drops them. Nobody's import older than a day
+ * changes; migration 335 then drops them. Nobody's import older than a day
  * can be undone anyway, but one made today keeps its Undo.
  *
  * Every table is tenant-owned and named literally for TenantOwnedTablesTest

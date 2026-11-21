@@ -8,7 +8,7 @@ use PDO;
 
 /**
  * Data access for `import_jobs` and `import_job_changes` (WHIT-1322,
- * migration 401, design section 34 §6): one repository per kind of import, so
+ * migration 331, design section 34 §6): one repository per kind of import, so
  * a kind only ever sees its own imports. TENANT-OWNED: every statement binds
  * `tenant_id`, and every read of a job binds its `kind` too.
  */

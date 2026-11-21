@@ -9,7 +9,7 @@ use Whity\Core\Import\ImportJobRepository;
 
 /**
  * The contacts' imports (WHIT-953), kept in the shared `import_jobs` and
- * `import_job_changes` since WHIT-1322 (migration 401) as kind `contacts`.
+ * `import_job_changes` since WHIT-1322 (migration 331) as kind `contacts`.
  * The shape {@see ContactImportService} reads is unchanged. TENANT-OWNED:
  * every statement binds `tenant_id`.
  */

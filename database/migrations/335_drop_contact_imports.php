@@ -8,7 +8,7 @@ use Whity\Database\Database;
 
 /**
  * DropContactImports — the contacts' own import tables (migration 261) are
- * gone: migration 401 copied them into `import_jobs` and
+ * gone: migration 331 copied them into `import_jobs` and
  * `import_job_changes`, which every kind of import now shares (WHIT-1322,
  * design section 34 §6.1, register IM.2; no real customers, owner 16 November
  * 2026).

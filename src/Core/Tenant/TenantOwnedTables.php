@@ -138,8 +138,8 @@ final class TenantOwnedTables
         // WHIT-953 — contacts and their spreadsheet imports (design 3.3 A8).
         // Every query binds tenant_id.
         'contacts' => '261_create_contacts.php',
-        'import_jobs' => '401_create_import_jobs.php',
-        'import_job_changes' => '401_create_import_jobs.php',
+        'import_jobs' => '331_create_import_jobs.php',
+        'import_job_changes' => '331_create_import_jobs.php',
 
         // WHIT-954 — the workspace's own fields and their values (A9).
         'custom_field_definitions' => '263_create_custom_fields.php',
