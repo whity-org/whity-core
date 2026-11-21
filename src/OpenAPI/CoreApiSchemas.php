@@ -11046,6 +11046,9 @@ final class CoreApiSchemas
                 'service_id' => self::int() + ['description' => 'Empty for every service.'],
                 'percent' => self::str() + ['description' => 'A number from 0 to 100, such as 30 or 12.5.'],
             ], ['profile_id', 'percent']),
+            'CalendarCommissionCloseRequest' => self::object([
+                'period' => self::str() + ['description' => 'A period that has ended, such as last_month.'],
+            ], ['period']),
             'CalendarCommissionReportRow' => self::object([
                 'profile_id' => self::int(),
                 'person' => self::str(),
@@ -11057,6 +11060,21 @@ final class CoreApiSchemas
                 'sales' => self::str(),
                 'commission' => self::str(),
             ], ['profile_id', 'currency', 'bookings', 'sales_minor', 'commission_minor']),
+            'CalendarCommissionClose' => self::object([
+                'id' => self::int(),
+                'from' => self::str() + ['description' => 'First day, in the workspace time zone.'],
+                'to' => self::str() + ['description' => 'Last day, included.'],
+                'period' => self::str(),
+                'closed_at' => self::str(),
+                'closed_by_profile_id' => self::int(true),
+                'expense_ref' => self::str(true) + ['description' => 'What the books called it; null until booked.'],
+                'books' => self::str(),
+                'total' => self::str(),
+                'lines' => ['type' => 'array', 'items' => self::object([
+                    'profile_id' => self::int(), 'person' => self::str(), 'currency' => self::str(), 'bookings' => self::int(),
+                    'sales_minor' => self::int(), 'commission_minor' => self::int(),
+                ], ['profile_id', 'currency', 'commission_minor'])],
+            ], ['id', 'from', 'to', 'lines']),
             'CalendarStaff' => self::object([
                 'profile_id' => self::int(),
                 'display_name' => self::str(),
@@ -19953,6 +19971,41 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
                     404 => self::errorResponse('Not found'),
                     422 => self::errorResponse('Not a confirmed booking'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/closes', 'calendar:commission', [
+                'summary' => 'Every closed commission period, newest first',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Closes', self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CalendarCommissionClose')])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/closes/periods', 'calendar:commission', [
+                'summary' => 'The commission periods that may be closed now',
+                'description' => 'Ended, and touching no closed day.',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Periods', self::dataEnvelope(['type' => 'array', 'items' => self::object(['id' => self::str(), 'label' => self::str(), 'from' => self::str(), 'to' => self::str()], ['id', 'label', 'from', 'to'])])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/commission/closes', 'calendar:commission', [
+                'summary' => 'Close a commission period',
+                'description' => 'Freezes each person\'s totals, fires calendar.commission.closed, and sends it to the books when something books commission (WHIT-1334).',
+                'tags' => ['calendar'],
+                'request' => 'CalendarCommissionCloseRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The close', self::dataEnvelope(SchemaBuilder::ref('CalendarCommissionClose'))),
+                    409 => self::errorResponse('Not ended, already closed, or nothing to close'),
+                    422 => self::errorResponse('Unknown period'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/commission/closes/{id:\d+}/book', 'calendar:commission', [
+                'summary' => 'Send a closed commission period to the books again',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The close', self::dataEnvelope(SchemaBuilder::ref('CalendarCommissionClose'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('Already booked, or the books cannot take it'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/calendar/commission/rates', 'calendar:commission', [

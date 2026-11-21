@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.147).
+ * SDK identity (v1.148).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1542,12 +1542,20 @@ namespace Whity\Sdk;
  * does needs `^1.147`.
  *
  * Purely additive.)
+ *
+ * 1.148 (COMMISSION TO THE BOOKS (WHIT-1334, design section 35 §4.3): when an owner closes a
+ * commission period, core freezes each member of staff's totals and hands the close
+ * ({@see Calendar\CommissionClose}, its {@see Calendar\CommissionCloseLine}s) to the one
+ * {@see Contribute\WorkspaceCommissionExpenses} bound in the container, which answers the
+ * reference it booked it under. New event `calendar.commission.closed`, with an `.async` twin.
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.147.0';
+    public const VERSION = '1.148.0';
 
     /**
      * Static identity only — never instantiated.
