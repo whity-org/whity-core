@@ -37,7 +37,7 @@
  * one does.
  */
 
-import { use, useEffect, useState } from 'react';
+import { use, useEffect, useId, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@whity/ui/button';
 import { Icon, type IconName } from '@whity/ui/icon';
@@ -45,6 +45,7 @@ import { PublicShell } from '@/components/auth/public-shell';
 import { OutcomeIcon, type OutcomeTone } from '@/components/auth/public-outcome';
 import type { WorkspaceBrand } from '@/lib/branding-context';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
+import { DateDisplayProvider, useDateDisplay } from '@whity/features/datetime';
 import { api } from '@/lib/api/client';
 
 /** The wire shape of `GET /api/v1/document-verifications/{token}`. */
@@ -65,7 +66,28 @@ type Verification = {
   replaced_by?: { revision: string; issued_on: string | null };
   /** Only beside a code that verified: the issuer's logo and colour (WHIT-1044). */
   brand?: WorkspaceBrand | null;
+  /** The `signed` level (#1730): each signature and stamp, as a capacity with a date. */
+  signatures?: PublicSignature[];
+  /** The `signed` level (#1730): false when the trail's hash chain no longer holds. */
+  trail_intact?: boolean;
 };
+
+/**
+ * One signature or company stamp at the `signed` level (#1730). `capacity` is
+ * the role signed as, or for a stamp the legal name it stands for. `name` is
+ * there only when the workspace chose to show who signed.
+ */
+type PublicSignature = {
+  kind: 'signature' | 'stamp';
+  capacity: string | null;
+  on_behalf_of: string | null;
+  version: number;
+  signed_on: string | null;
+  name?: string;
+};
+
+/** What `GET /api/v1/document-verifications/{token}/files/{sha256}` answers (#1730). */
+type FileMatch = 'current' | 'earlier' | 'none';
 
 /**
  * The routing verbs the `stage` disclosure level can return.
@@ -76,6 +98,11 @@ type Verification = {
  *   verify.stage.acknowledged = Acknowledged
  *   verify.stage.returned = Returned
  *   verify.stage.noted = Noted
+ *   verify.stage.sent_back = Sent back
+ *   verify.stage.resubmitted = Resubmitted
+ *   verify.stage.signed = Signed
+ *   verify.stage.stamped = Stamped
+ *   verify.stage.declined = Declined
  */
 const STAGE_LABELS: Record<string, { key: string; text: string }> = {
   issued: { key: 'verify.stage.issued', text: 'Issued' },
@@ -83,6 +110,11 @@ const STAGE_LABELS: Record<string, { key: string; text: string }> = {
   acknowledged: { key: 'verify.stage.acknowledged', text: 'Acknowledged' },
   returned: { key: 'verify.stage.returned', text: 'Returned' },
   noted: { key: 'verify.stage.noted', text: 'Noted' },
+  sent_back: { key: 'verify.stage.sent_back', text: 'Sent back' },
+  resubmitted: { key: 'verify.stage.resubmitted', text: 'Resubmitted' },
+  signed: { key: 'verify.stage.signed', text: 'Signed' },
+  stamped: { key: 'verify.stage.stamped', text: 'Stamped' },
+  declined: { key: 'verify.stage.declined', text: 'Declined' },
 };
 
 /**
@@ -278,6 +310,39 @@ export default function VerifyDocumentPage({ params }: { params: Promise<{ token
               />
             )}
           </dl>
+        )}
+
+        {/* The `signed` level (#1730): told calmly, but before anything it would undermine. */}
+        {phase.kind === 'ready' && phase.data.verified && phase.data.trail_intact === false && (
+          <div
+            className="flex gap-3 rounded-card border border-warning/40 bg-warning-tint px-4 py-3 text-sm text-warning-text"
+            role="status"
+            data-testid="verify-trail-changed"
+          >
+            <Icon name="alert" className="mt-0.5 shrink-0" />
+            <p dir="auto">
+              {phase.data.issuer
+                ? t(
+                    'verify.trailChanged',
+                    'The record of how this was signed has been changed since. Check with {org} before relying on it.',
+                    { org: phase.data.issuer },
+                  )
+                : t(
+                    'verify.trailChangedNoIssuer',
+                    'The record of how this was signed has been changed since. Check with the organisation that issued it before relying on it.',
+                  )}
+            </p>
+          </div>
+        )}
+
+        {phase.kind === 'ready' && phase.data.verified && phase.data.signatures && phase.data.signatures.length > 0 && (
+          <DateDisplayProvider hidden={false}>
+            <SignatureList t={t} signatures={phase.data.signatures} />
+          </DateDisplayProvider>
+        )}
+
+        {phase.kind === 'ready' && phase.data.verified && (
+          <FileCheck t={t} token={token} issuer={phase.data.issuer} />
         )}
 
         {/* @date-display-ignore: same as `issued_on` directly above — this is
@@ -495,4 +560,285 @@ function stageLabel(t: TranslateFn, stage: string): string {
   const label = STAGE_LABELS[stage];
 
   return label ? t(label.key, label.text) : stage;
+}
+
+/**
+ * The signatures and company stamps at the `signed` level (#1730): each as the
+ * capacity it was made in and the day, with the person's name only when the
+ * workspace chose to show it.
+ *
+ * DATES. Mounted inside `DateDisplayProvider hidden={false}`: like `issued_on`
+ * above, this page is not governed by `ui.hide_dates` (#1068), which is about a
+ * workspace's own staff screens. The signing day is part of what a holder
+ * compares with the paper. It still goes through the one sanctioned formatter,
+ * so it reads "21 Nov 2026" with Western digits like the rest of the product.
+ *
+ * The version is shown only when the signatures were made on different
+ * versions, where it tells the reader something; on a document signed once it
+ * would be noise.
+ */
+function SignatureList({ t, signatures }: { t: TranslateFn; signatures: PublicSignature[] }) {
+  const dates = useDateDisplay();
+  const versionsDiffer = new Set(signatures.map((s) => s.version)).size > 1;
+
+  return (
+    <div className="grid gap-2" data-testid="verify-signatures">
+      <h2 className="text-sm font-medium text-foreground" dir="auto">
+        {t('verify.signatures.title', 'Signatures and stamps')}
+      </h2>
+      <ul className="grid gap-2">
+        {signatures.map((signature, index) => {
+          const day = dates.date(signature.signed_on);
+
+          return (
+            <li
+              key={index}
+              className="flex gap-3 rounded-card border border-border px-4 py-3 text-sm"
+              data-testid="verify-signature"
+            >
+              <Icon
+                name={signature.kind === 'stamp' ? 'evidence' : 'signature'}
+                className="mt-0.5 shrink-0 text-muted-foreground"
+              />
+              <div className="grid gap-0.5">
+                {signature.name ? (
+                  <p className="font-medium text-foreground" dir="auto" data-testid="verify-signature-name">
+                    {signature.name}
+                  </p>
+                ) : null}
+                <p className="text-foreground" dir="auto">
+                  {signatureLine(t, signature)}
+                  {day !== null ? <span className="text-muted-foreground">{` · ${day}`}</span> : null}
+                </p>
+                {versionsDiffer ? (
+                  <p className="text-muted-foreground" dir="auto">
+                    {t('verify.signatures.version', 'On version {version}', { version: String(signature.version) })}
+                  </p>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** "Signed as Director, for Example Bakery" / "Company stamp of Example Bakery LLC". */
+function signatureLine(t: TranslateFn, signature: PublicSignature): string {
+  if (signature.kind === 'stamp') {
+    return signature.capacity
+      ? t('verify.signatures.stampOf', 'Company stamp of {org}', { org: signature.capacity })
+      : t('verify.signatures.stamp', 'Company stamp');
+  }
+  if (signature.capacity && signature.on_behalf_of) {
+    return t('verify.signatures.asFor', 'Signed as {capacity}, for {org}', {
+      capacity: signature.capacity,
+      org: signature.on_behalf_of,
+    });
+  }
+  if (signature.capacity) {
+    return t('verify.signatures.as', 'Signed as {capacity}', { capacity: signature.capacity });
+  }
+  if (signature.on_behalf_of) {
+    return t('verify.signatures.for', 'Signed for {org}', { org: signature.on_behalf_of });
+  }
+
+  return t('verify.signatures.signed', 'Signed');
+}
+
+type FileCheckState =
+  | { kind: 'idle' }
+  | { kind: 'checking'; fileName: string }
+  | { kind: 'answered'; fileName: string; match: FileMatch }
+  | { kind: 'throttled' }
+  | { kind: 'unsupported' }
+  | { kind: 'failed' };
+
+/**
+ * "Check a file" (#1730): is the PDF in the reader's hands the one the issuer
+ * stored?
+ *
+ * The browser hashes the file and sends ONLY the SHA-256. The file itself never
+ * leaves the device, and the page says so, because the person holding it may
+ * well be holding something private. Offered only beside a code that verified:
+ * against a code that did not, every file would answer "none", which says
+ * nothing.
+ *
+ * The drop area follows the `Input` dropzone's look in @whity/ui (dashed
+ * `border-input`, the round primary-tint icon) but is its own small element: the
+ * shared one keeps a list of picked files with an English remove label, and
+ * nothing here is kept or removed.
+ */
+function FileCheck({ t, token, issuer }: { t: TranslateFn; token: string; issuer?: string }) {
+  const inputId = useId();
+  const [state, setState] = useState<FileCheckState>({ kind: 'idle' });
+  const [dragging, setDragging] = useState(false);
+
+  const check = async (file: File) => {
+    const subtle = typeof crypto !== 'undefined' ? crypto.subtle : undefined;
+    if (!subtle) {
+      setState({ kind: 'unsupported' });
+      return;
+    }
+    setState({ kind: 'checking', fileName: file.name });
+    try {
+      const digest = await subtle.digest('SHA-256', await readBytes(file));
+      const sha256 = Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+      const { data, response } = await api.GET('/api/v1/document-verifications/{token}/files/{sha256}', {
+        params: { path: { token, sha256 } },
+        credentials: 'omit',
+      });
+      if (response.status === 429) {
+        setState({ kind: 'throttled' });
+        return;
+      }
+      const match = (data as { data?: { match?: string } } | undefined)?.data?.match;
+      if (!response.ok || (match !== 'current' && match !== 'earlier' && match !== 'none')) {
+        setState({ kind: 'failed' });
+        return;
+      }
+      setState({ kind: 'answered', fileName: file.name, match });
+    } catch {
+      setState({ kind: 'failed' });
+    }
+  };
+
+  const pick = (files: FileList | null) => {
+    const file = files?.[0];
+    if (file) void check(file);
+  };
+
+  return (
+    <div className="grid gap-3" data-testid="verify-file-check">
+      <div className="grid gap-0.5">
+        <h2 className="text-sm font-medium text-foreground" dir="auto">
+          {t('verify.fileCheck.title', 'Check a file')}
+        </h2>
+        <p className="text-sm text-muted-foreground" dir="auto">
+          {t(
+            'verify.fileCheck.privacy',
+            'Choose the PDF you were given. It is checked on this device and never uploaded.',
+          )}
+        </p>
+      </div>
+      <label
+        htmlFor={inputId}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragging(false);
+          pick(e.dataTransfer.files);
+        }}
+        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-5 text-center transition-colors hover:border-primary/60 hover:bg-muted/30 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30 ${
+          dragging ? 'border-primary bg-primary/10' : 'border-input bg-card/60'
+        }`}
+        data-testid="verify-file-drop"
+      >
+        <span className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary" aria-hidden="true">
+          <Icon name="upload" />
+        </span>
+        <span className="text-sm font-medium text-foreground" dir="auto">
+          {t('verify.fileCheck.prompt', 'Choose a PDF, or drop it here')}
+        </span>
+        <input
+          id={inputId}
+          type="file"
+          accept="application/pdf,.pdf"
+          className="sr-only"
+          data-testid="verify-file-input"
+          onChange={(e) => {
+            pick(e.target.files);
+            e.target.value = '';
+          }}
+        />
+      </label>
+      <FileCheckAnswer t={t} state={state} issuer={issuer} />
+    </div>
+  );
+}
+
+function FileCheckAnswer({ t, state, issuer }: { t: TranslateFn; state: FileCheckState; issuer?: string }) {
+  if (state.kind === 'idle') return null;
+
+  if (state.kind === 'checking') {
+    return (
+      <p className="text-sm text-muted-foreground" role="status" dir="auto" data-testid="verify-file-answer">
+        {t('verify.fileCheck.checking', 'Checking {file}…', { file: state.fileName })}
+      </p>
+    );
+  }
+
+  const answered = state.kind === 'answered';
+  const current = answered && state.match === 'current';
+  const tone = current
+    ? 'bg-success-tint text-success-text'
+    : answered
+      ? 'bg-warning-tint text-warning-text'
+      : 'bg-muted text-foreground';
+  const icon: IconName = current ? 'success' : answered ? 'alert' : 'info';
+
+  return (
+    <div
+      className={`flex gap-3 rounded-card px-4 py-3 text-sm ${tone}`}
+      role="status"
+      data-testid="verify-file-answer"
+      data-match={answered ? state.match : undefined}
+    >
+      <Icon name={icon} className="mt-0.5 shrink-0" />
+      <div className="grid gap-0.5">
+        {answered && (
+          <p className="font-medium" dir="auto">
+            {state.fileName}
+          </p>
+        )}
+        <p dir="auto">{fileAnswer(t, state, issuer)}</p>
+      </div>
+    </div>
+  );
+}
+
+function fileAnswer(t: TranslateFn, state: FileCheckState, issuer?: string): string {
+  if (state.kind === 'answered') {
+    if (state.match === 'current') {
+      return issuer
+        ? t('verify.fileCheck.current', 'This file is the one {org} issued.', { org: issuer })
+        : t('verify.fileCheck.currentNoIssuer', 'This file is the one that was issued.');
+    }
+    if (state.match === 'earlier') {
+      return t(
+        'verify.fileCheck.earlier',
+        'This file is an earlier version of this document. Ask for the current one.',
+      );
+    }
+
+    return t(
+      'verify.fileCheck.none',
+      'This file doesn’t match. It may have been changed, or it may be a different document.',
+    );
+  }
+  if (state.kind === 'throttled') {
+    return t('verify.fileCheck.throttled', 'Too many checks. Please wait a little while and try again.');
+  }
+  if (state.kind === 'unsupported') {
+    return t('verify.fileCheck.unsupported', 'This browser can’t check files. Try an up-to-date browser.');
+  }
+
+  return t('verify.fileCheck.failed', 'We couldn’t check the file just now. Please try again shortly.');
+}
+
+/** A file's bytes: `Blob.arrayBuffer` where the browser has it, a FileReader where it doesn't. */
+function readBytes(file: Blob): Promise<ArrayBuffer> {
+  if (typeof file.arrayBuffer === 'function') return file.arrayBuffer();
+
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(file);
+  });
 }
