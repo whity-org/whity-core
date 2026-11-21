@@ -2287,6 +2287,11 @@ $frontendFeaturesHandler = new FrontendFeaturesApiHandler(
 );
 $router->register('GET', '/api/frontend/features', [$frontendFeaturesHandler, 'list'], null);
 
+// #1688: a five-minute token, bound to one plugin's routes, that the web app's
+// embed screen makes the framed page's API calls with (never the cookies).
+$pluginFrameTokenHandler = new \Whity\Api\PluginFrameTokenApiHandler($pluginLoader, $roleChecker, $router, $jwtParser);
+$router->register('POST', '/api/plugin-frames/{feature}/token', [$pluginFrameTokenHandler, 'issue'], null);
+
 // Record routes of workspace plugins (Whity Builder, WHIT-761): one fixed
 // family, registered once. The plugin, its record type and the permission that
 // gates each action are read from the workspace's live manifest per request, so

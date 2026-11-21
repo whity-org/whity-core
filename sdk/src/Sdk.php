@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.137).
+ * SDK identity (v1.143).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1526,12 +1526,21 @@ namespace Whity\Sdk;
  *
  * Purely additive: one new method on Context\InventoryScope, which only the host implements, and new
  * optional constructor arguments, last, on MoveLine and Move.)
+ *
+ * 1.143 (EMBEDDED SCREENS CALL THEIR OWN API (#1688): an `embed` screen's page talks to the app over a
+ * postMessage bridge, protocol {@see Frontend\FrameBridge::PROTOCOL}; {@see Frontend\FrameBridge::script()}
+ * is the page side (`whity.ready()`, `request()`, `resize()`, `navigate()`, `toast()`). The app makes the
+ * page's API calls with a five-minute token bound to the routes of the plugin that registered the screen,
+ * never with the person's cookies, and the route's permission is checked against the person as usual.
+ * A core route or another plugin's route refuses the token (WHIT-1329).
+ *
+ * Purely additive: one new class; an embed page that does not use the bridge works as before.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.137.0';
+    public const VERSION = '1.143.0';
 
     /**
      * Static identity only — never instantiated.

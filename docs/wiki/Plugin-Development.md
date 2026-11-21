@@ -970,6 +970,48 @@ dropped with a logged warning and the plugin still loads):
 The full working reference is the HelloWorld plugin: greetings CRUD routes with
 typed schemas, the descriptor above, and both migrations.
 
+### An embedded screen that calls its own API (SDK 1.143)
+
+A `screen: 'embed'` page runs in a sandboxed frame with no origin of its own,
+so a `fetch()` from it reaches the API with no session. Since SDK 1.143 (#1688)
+it calls the plugin's own routes through the app instead. Put the bridge in the
+page and use the `whity` global it defines:
+
+```php
+use Whity\Sdk\Frontend\FrameBridge;
+
+public function designer(Request $request): Response
+{
+    $nonce = bin2hex(random_bytes(16));
+    $html = '<!doctype html><html><body><ul id="parts"></ul>'
+        . '<script nonce="' . $nonce . '">' . FrameBridge::script() . '</script>'
+        . '<script nonce="' . $nonce . '">'
+        . 'whity.ready().then(() => whity.request("GET", "/api/bom/parts"))'
+        . '.then(r => { if (r.ok) { /* draw r.body */ whity.resize(); } });'
+        . '</script></body></html>';
+
+    return new Response(200, $html, [
+        'Content-Type' => 'text/html; charset=utf-8',
+        'Content-Security-Policy' => "default-src 'none'; script-src 'nonce-{$nonce}'; frame-ancestors 'self'",
+    ]);
+}
+```
+
+- `whity.request(method, path, body?)` answers `{ ok, status, body }`. The app
+  makes the call with a five-minute token bound to **your plugin's routes**,
+  never with the person's cookies; the route's `requiredPermission` is checked
+  against the person as usual. A core route or another plugin's route answers
+  401, so ask core for data on the server side, before you render.
+- `whity.ready()` gives `{ locale, dir, theme, apiBase }` so the page can match
+  the app's language, direction and light or dark theme.
+- `whity.resize()`, `whity.navigate('/admin/x/…')` (app pages only) and
+  `whity.toast(message, 'success' | 'error' | 'warning' | 'info')`.
+- Keep the frame on your own pages. The app answers whatever page the frame
+  shows, so sending it to another site hands that site the same bridge.
+
+Prefer `screen: 'blocks'` when the block vocabulary can say it: it needs no
+bridge and inherits the app's theme, direction and every renderer improvement.
+
 ---
 
 ## Step 9 — Expose plugin routes as MCP tools
