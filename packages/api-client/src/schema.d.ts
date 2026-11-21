@@ -13029,6 +13029,8 @@ export interface components {
         ApplyWorkspaceTemplateRequest: {
             /** @description Add the template's example contacts and bookings. Default true. */
             examples?: boolean;
+            /** @description Use the template's theme while the workspace still has the installation's theme. Default true. */
+            theme?: boolean;
         };
         ApplyWorkspaceTemplateResponse: {
             data: {
@@ -23125,6 +23127,8 @@ export interface components {
             hasExamples: boolean;
             hasSetup: boolean;
             offer?: components["schemas"]["WorkspaceTemplateOffer"] | null;
+            /** @description The theme the template suggests, when this workspace has it (SDK 1.131) */
+            theme?: components["schemas"]["WorkspaceTemplateTheme"] | null;
             chosen: boolean;
         };
         WorkspaceTemplateListResponse: {
@@ -23224,6 +23228,12 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+        };
+        WorkspaceTemplateTheme: {
+            /** @description The theme id, such as templates.market */
+            id: string;
+            /** @description The theme's name in the reader's language */
+            name?: string | null;
         };
         WorkspaceTrialResponse: {
             data: components["schemas"]["WorkspaceTrialState"] | null;

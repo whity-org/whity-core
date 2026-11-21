@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.130.0",
+    "sdk_version": "1.131.0",
     "core_version": "0.2.30",
     "updated": "2026-11-19",
     "ratings": {
@@ -1565,6 +1565,10 @@
                 {
                     "what": "PluginWorkspaceTemplatesInterface: ready starts for one kind of business, offered after a workspace is created and applied by core as the person choosing them",
                     "since": "1.116"
+                },
+                {
+                    "what": "A workspace template names its theme (`theme`), offered when the template is chosen",
+                    "since": "1.131"
                 },
                 {
                     "what": "PluginDisplayNameInterface: the name people read for a plugin, in English and Arabic",

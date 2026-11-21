@@ -74,5 +74,23 @@ final class WorkspaceTemplateValidatorTest extends TestCase
 
             return $t;
         }, 'template.offer.paid'];
+        yield 'a theme that is not an id' => [static function (array $t): array {
+            $t['theme'] = 'Market';
+
+            return $t;
+        }, 'template.theme'];
+        yield 'a theme that is not text' => [static function (array $t): array {
+            $t['theme'] = ['id' => 'templates.market'];
+
+            return $t;
+        }, 'template.theme'];
+    }
+
+    public function testATemplateMayNameItsTheme(): void
+    {
+        $template = ExampleBakeryTemplate::manifest();
+        $template['theme'] = 'templates.market';
+
+        self::assertSame([], WorkspaceTemplateValidator::errors($template));
     }
 }

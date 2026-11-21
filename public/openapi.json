@@ -87611,6 +87611,10 @@
                     "examples": {
                         "type": "boolean",
                         "description": "Add the template's example contacts and bookings. Default true."
+                    },
+                    "theme": {
+                        "type": "boolean",
+                        "description": "Use the template's theme while the workspace still has the installation's theme. Default true."
                     }
                 }
             },
@@ -122907,6 +122911,15 @@
                             }
                         ]
                     },
+                    "theme": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/WorkspaceTemplateTheme"
+                            }
+                        ],
+                        "description": "The theme the template suggests, when this workspace has it (SDK 1.131)"
+                    },
                     "chosen": {
                         "type": "boolean"
                     }
@@ -123219,6 +123232,23 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "WorkspaceTemplateTheme": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "The theme id, such as templates.market"
+                    },
+                    "name": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The theme's name in the reader's language"
+                    }
+                },
+                "required": [
+                    "id"
                 ]
             },
             "WorkspaceTrialResponse": {

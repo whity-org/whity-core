@@ -24,7 +24,8 @@ type Template = components['schemas']['WorkspaceTemplateCard'];
  * workspace is created, and from Settings › Plugins any time after (owner,
  * 2026-11-17: adopt mode, it only adds what is missing). Each card says what the template sets up and, when it
  * comes with a paid plugin, that the plugin can be tried free. Choosing one
- * asks once (examples on or off), applies it as the person, and opens its
+ * asks once (examples on or off, and its theme when it has one: SDK 1.131,
+ * TH.23), applies it as the person, and opens its
  * guided setup. Start blank is always last.
  *
  * No card for this screen yet: brand ask brand-ask-workspace-templates.md §1.
@@ -40,6 +41,7 @@ export default function TemplatePickerPage() {
   }, []);
   const [chosen, setChosen] = useState<Template | null>(null);
   const [examples, setExamples] = useState(true);
+  const [useTheme, setUseTheme] = useState(true);
   const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
 
@@ -49,13 +51,15 @@ export default function TemplatePickerPage() {
     try {
       const { response } = await api.POST('/api/v1/workspace/templates/{key}/apply', {
         params: { path: { key: template.key } },
-        body: { examples: template.hasExamples ? examples : false },
+        body: { examples: template.hasExamples ? examples : false, theme: template.theme ? useTheme : false },
       });
       if (!response.ok) {
         setApplyError(t('templates.applyError', 'The template could not be set up. Try again, or start blank.'));
         return;
       }
       router.push(template.hasSetup || template.offer ? templateSetupPath(template.key) : '/dashboard');
+      // The theme is drawn by the layout: fetch it again so the new look shows.
+      if (template.theme && useTheme) router.refresh();
     } finally {
       setApplying(false);
     }
@@ -101,6 +105,19 @@ export default function TemplatePickerPage() {
                     <span className="block text-foreground">{t('templates.examples', 'Add example customers and bookings')}</span>
                     <span className="block text-muted-foreground">
                       {t('templates.examplesHint', 'To see how it works. Remove them in one click when you are ready.')}
+                    </span>
+                  </span>
+                </label>
+              ) : null}
+              {chosen.theme ? (
+                <label className="flex items-start gap-3 text-sm">
+                  <Switch checked={useTheme} onCheckedChange={setUseTheme} />
+                  <span>
+                    <span className="block text-foreground">
+                      {t('templates.theme', 'Use its look: {name}', { name: chosen.theme.name ?? chosen.theme.id })}
+                    </span>
+                    <span className="block text-muted-foreground">
+                      {t('templates.themeHint', 'Colours, shapes and fonts made for this kind of business. Change it any time in Branding.')}
                     </span>
                   </span>
                 </label>

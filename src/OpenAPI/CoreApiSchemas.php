@@ -20410,6 +20410,10 @@ final class CoreApiSchemas
                 'reason' => ['type' => 'string', 'nullable' => true],
                 'trialEndsAt' => ['type' => 'string', 'nullable' => true],
             ], ['plugin', 'pluginName', 'free', 'paid', 'trialDays', 'trialAvailable', 'state']),
+            'WorkspaceTemplateTheme' => self::object([
+                'id' => self::str() + ['description' => 'The theme id, such as templates.market'],
+                'name' => ['type' => 'string', 'nullable' => true, 'description' => 'The theme\'s name in the reader\'s language'],
+            ], ['id']),
             'WorkspaceTemplateCard' => self::object([
                 'key' => self::str(),
                 'plugin' => ['type' => 'string', 'nullable' => true, 'description' => 'The plugin that offers it; null for core\'s Blank'],
@@ -20421,6 +20425,7 @@ final class CoreApiSchemas
                 'hasExamples' => self::bool(),
                 'hasSetup' => self::bool(),
                 'offer' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('WorkspaceTemplateOffer')]],
+                'theme' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('WorkspaceTemplateTheme')], 'description' => 'The theme the template suggests, when this workspace has it (SDK 1.131)'],
                 'chosen' => self::bool(),
             ], ['key', 'version', 'name', 'summary', 'setsUp', 'hasExamples', 'hasSetup', 'chosen']),
             'WorkspaceTemplateListResponse' => self::object([
@@ -20433,6 +20438,7 @@ final class CoreApiSchemas
             ], ['data']),
             'ApplyWorkspaceTemplateRequest' => self::object([
                 'examples' => self::bool() + ['description' => 'Add the template\'s example contacts and bookings. Default true.'],
+                'theme' => self::bool() + ['description' => 'Use the template\'s theme while the workspace still has the installation\'s theme. Default true.'],
             ], []),
             'ApplyWorkspaceTemplateResponse' => self::object([
                 'data' => self::object([

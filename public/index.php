@@ -2981,6 +2981,11 @@ $workspaceTemplatesHandler = new \Whity\Api\WorkspaceTemplatesApiHandler(
 );
 $workspaceCodePluginsHandler->useTemplateOnboardings(static fn (int $tenantId): array => $workspaceTemplatesHandler->onboardings($tenantId));
 $workspaceTemplatesHandler->useDisplayNames(static fn (): array => $pluginLoader->getDisplayNames());
+// SDK 1.131 (WHIT-1225): a template's theme is offered only when the workspace has it.
+$workspaceTemplatesHandler->useThemes(static fn (int $tenantId, string $id): ?array => (new \Whity\Core\Theme\ThemeLibrary(
+    new \Whity\Core\Theme\ThemeRepository($db->getPdo()),
+    static fn (): array => $pluginLoader->getPluginThemes(),
+))->find($tenantId, $id));
 $workspaceTemplatesHandler->useTrialStarter(static fn (int $tenantId, ?int $profileId, string $plugin, ?int $days): \Whity\Core\Response => $workspaceCodePluginsHandler->startTrialFor($tenantId, $profileId, $plugin, $days));
 $router->register('GET', '/api/workspace/templates', [$workspaceTemplatesHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 $router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', [$workspaceTemplatesHandler, 'apply'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
