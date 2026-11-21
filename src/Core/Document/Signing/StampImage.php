@@ -22,39 +22,39 @@ final class StampImage
 
     /**
      * Validate a data URL and return it in canonical form. Throws with a sentence
-     * for the person uploading it.
+     * for the person uploading it, in `clientMessage`.
      *
-     * @throws \InvalidArgumentException
+     * @throws StampImageRejectedException
      */
     public static function normalise(mixed $value): string
     {
         if (!is_string($value) || $value === '') {
-            throw new \InvalidArgumentException('Add the stamp\'s image, a PNG or JPEG file.');
+            throw new StampImageRejectedException('Add the stamp\'s image, a PNG or JPEG file.');
         }
         if (preg_match('#^data:(image/png|image/jpeg);base64,([A-Za-z0-9+/=\s]+)$#', $value, $m) !== 1) {
-            throw new \InvalidArgumentException('The stamp\'s image must be a PNG or JPEG file.');
+            throw new StampImageRejectedException('The stamp\'s image must be a PNG or JPEG file.');
         }
         $bytes = base64_decode(preg_replace('/\s+/', '', $m[2]) ?? '', true);
         if ($bytes === false || $bytes === '') {
-            throw new \InvalidArgumentException('The stamp\'s image could not be read. Choose the file again.');
+            throw new StampImageRejectedException('The stamp\'s image could not be read. Choose the file again.');
         }
         if (strlen($bytes) > self::MAX_BYTES) {
-            throw new \InvalidArgumentException('The stamp\'s image is too large. Use a file under 512 KB.');
+            throw new StampImageRejectedException('The stamp\'s image is too large. Use a file under 512 KB.');
         }
 
         $isPng = str_starts_with($bytes, "\x89PNG\r\n\x1a\n");
         $isJpeg = str_starts_with($bytes, "\xFF\xD8\xFF");
         if (($m[1] === 'image/png' && !$isPng) || ($m[1] === 'image/jpeg' && !$isJpeg)) {
-            throw new \InvalidArgumentException('The stamp\'s image must be a PNG or JPEG file.');
+            throw new StampImageRejectedException('The stamp\'s image must be a PNG or JPEG file.');
         }
 
         $size = @getimagesizefromstring($bytes);
         if ($size === false) {
-            throw new \InvalidArgumentException('The stamp\'s image could not be read. Choose the file again.');
+            throw new StampImageRejectedException('The stamp\'s image could not be read. Choose the file again.');
         }
         [$width, $height] = $size;
         if ($width < self::MIN_SIDE || $height < self::MIN_SIDE || $width > self::MAX_SIDE || $height > self::MAX_SIDE) {
-            throw new \InvalidArgumentException('The stamp\'s image must be between 32 and 4000 pixels on each side.');
+            throw new StampImageRejectedException('The stamp\'s image must be between 32 and 4000 pixels on each side.');
         }
 
         return 'data:' . $m[1] . ';base64,' . base64_encode($bytes);

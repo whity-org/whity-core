@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use Whity\Core\Document\Signing\CompanyStampRepository;
 use Whity\Core\Document\Signing\StampImage;
+use Whity\Core\Document\Signing\StampImageRejectedException;
 use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
@@ -80,8 +81,8 @@ final class CompanyStampsApiHandler
         }
         try {
             $image = StampImage::normalise($body['image'] ?? null);
-        } catch (\InvalidArgumentException $e) {
-            return Response::error($e->getMessage(), 422, ['field' => 'image']);
+        } catch (StampImageRejectedException $e) {
+            return Response::error($e->clientMessage, 422, ['field' => 'image']);
         }
         $holders = $this->holders($tenantId, $body['holders'] ?? ['people' => [], 'roles' => []]);
         if ($holders instanceof Response) {
@@ -125,8 +126,8 @@ final class CompanyStampsApiHandler
         if (array_key_exists('image', $body)) {
             try {
                 $changes['image'] = StampImage::normalise($body['image']);
-            } catch (\InvalidArgumentException $e) {
-                return Response::error($e->getMessage(), 422, ['field' => 'image']);
+            } catch (StampImageRejectedException $e) {
+                return Response::error($e->clientMessage, 422, ['field' => 'image']);
             }
         }
         $this->stamps->update($tenantId, $id, $changes);
