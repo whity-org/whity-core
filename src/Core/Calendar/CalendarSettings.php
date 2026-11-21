@@ -30,6 +30,8 @@ final class CalendarSettings
         public readonly bool $instantBooking = true,
         /** WHIT-1173: one booking may hold several services back to back. */
         public readonly bool $multiServiceBooking = false,
+        /** WHIT-1334: the walk-in queue at the front desk is on. */
+        public readonly bool $walkinsEnabled = false,
     ) {
     }
 
@@ -59,6 +61,7 @@ final class CalendarSettings
             $effective[SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? 'USD',
             ($effective[SettingsRegistry::CALENDAR_INSTANT_BOOKING] ?? 'true') !== 'false',
             ($effective[SettingsRegistry::CALENDAR_MULTI_SERVICE_BOOKING] ?? 'false') === 'true',
+            ($effective[SettingsRegistry::CALENDAR_WALKINS_ENABLED] ?? 'false') === 'true',
         );
     }
 
@@ -102,6 +105,7 @@ final class CalendarSettings
             'currency' => $this->currency,
             'instant_booking' => $this->instantBooking,
             'multi_service_booking' => $this->multiServiceBooking,
+            'walkins_enabled' => $this->walkinsEnabled,
         ];
     }
 }

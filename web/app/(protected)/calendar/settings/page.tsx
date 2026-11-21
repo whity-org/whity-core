@@ -42,6 +42,8 @@ interface Draft {
   instantBooking: boolean;
   /** WHIT-1173: one booking may hold several services back to back. */
   multiService: boolean;
+  /** WHIT-1334: the walk-in queue at the front desk. */
+  walkins: boolean;
   minNotice: string;
   maxAdvance: string;
   slotStep: string;
@@ -56,6 +58,7 @@ function draftOf(s: CalendarSettings): Draft {
     bookingPage: s.booking_page_enabled,
     instantBooking: s.instant_booking ?? true,
     multiService: s.multi_service_booking ?? false,
+    walkins: s.walkins_enabled ?? false,
     minNotice: String(s.min_notice_minutes),
     maxAdvance: String(s.max_advance_days),
     slotStep: String(s.slot_step_minutes),
@@ -96,6 +99,7 @@ export default function CalendarSettingsPage() {
     if (current.bookingPage !== saved.bookingPage) changes.push(t('settings.bookingPage', 'Booking page'));
     if (current.instantBooking !== saved.instantBooking) changes.push(t('settings.instantBooking', 'Instant booking'));
     if (current.multiService !== saved.multiService) changes.push(t('settings.multiService', 'Several services in one booking'));
+    if (current.walkins !== saved.walkins) changes.push(t('settings.walkins', 'Walk-ins'));
     if (current.minNotice !== saved.minNotice) changes.push(t('settings.minNotice', 'Least notice'));
     if (current.maxAdvance !== saved.maxAdvance) changes.push(t('settings.maxAdvance', 'How far ahead'));
     if (current.slotStep !== saved.slotStep) changes.push(t('settings.slotStep', 'Free times every'));
@@ -124,6 +128,7 @@ export default function CalendarSettingsPage() {
       booking_page_enabled: current.bookingPage,
       instant_booking: current.instantBooking,
       multi_service_booking: current.multiService,
+      walkins_enabled: current.walkins,
       min_notice_minutes: minNotice,
       max_advance_days: maxAdvance,
       slot_step_minutes: Number(current.slotStep),
@@ -231,6 +236,23 @@ export default function CalendarSettingsPage() {
                     onCheckedChange={(multiService) => update({ multiService })}
                     aria-label={t('settings.multiService', 'Several services in one booking')}
                     data-testid="settings-multi-service"
+                  />
+                </label>
+              </ChangedField>
+
+              <ChangedField changed={current.walkins !== saved.walkins}>
+                <label className="flex min-h-10 items-start justify-between gap-3">
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium text-foreground">{t('settings.walkins', 'Walk-ins')}</span>
+                    <span className="block text-sm text-muted-foreground">
+                      {t('settings.walkinsHint', 'On: the front desk keeps a queue of people who come in without a booking and hands each to whoever is free. It appears as Walk-ins in the menu.')}
+                    </span>
+                  </span>
+                  <Switch
+                    checked={current.walkins}
+                    onCheckedChange={(walkins) => update({ walkins })}
+                    aria-label={t('settings.walkins', 'Walk-ins')}
+                    data-testid="settings-walkins"
                   />
                 </label>
               </ChangedField>

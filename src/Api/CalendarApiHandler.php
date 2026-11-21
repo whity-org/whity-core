@@ -163,6 +163,7 @@ final class CalendarApiHandler
                 'weekend_days' => SettingsRegistry::CALENDAR_WEEKEND_DAYS,
                 'instant_booking' => SettingsRegistry::CALENDAR_INSTANT_BOOKING,
                 'multi_service_booking' => SettingsRegistry::CALENDAR_MULTI_SERVICE_BOOKING,
+                'walkins_enabled' => SettingsRegistry::CALENDAR_WALKINS_ENABLED,
             ];
             $writes = [];
             foreach ($map as $field => $key) {
