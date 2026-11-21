@@ -62,6 +62,13 @@ final class SsoAuthHandler
      */
     public const SIGNED_IN_EVENT = 'auth.federated.signed_in';
 
+    /**
+     * How long a started sign-in may take, in seconds. Long enough for a new
+     * person to create their account at the provider and type the emailed
+     * code (#2355); ten minutes sent slow sign-ups back to `expired`.
+     */
+    private const FLOW_TTL = 1800;
+
     public function __construct(
         private readonly OidcEngine $engine,
         private readonly IdentityProviderRepository $providers,
@@ -114,6 +121,14 @@ final class SsoAuthHandler
         // WHIT-1181: a verified phone_number from the operator's provider fills
         // the person's own phone, never one they set themselves.
         private readonly ?\Whity\Core\Identity\PersonalPhone $phones = null,
+        /**
+         * #2355: signing in from a form's public link that asks for it,
+         * `/start?form=<public slug>`. The form's workspace and the form page
+         * ride the signed flow cookie, so a new person joins that workspace
+         * under its open sign-up rules and lands on the form, instead of
+         * being offered a workspace of their own. Null refuses `form`.
+         */
+        private readonly ?\Whity\Core\Form\FormRepository $forms = null,
     ) {
     }
 
@@ -323,23 +338,36 @@ final class SsoAuthHandler
             }
         }
 
+        // #2355: sign-in started from a form's public link. The form names its
+        // workspace; both travel only inside the signed flow cookie.
+        $form = null;
+        $formSlug = $reauth === null && $joinTenantId === null
+            ? strtolower(trim((string) ($this->query('form') ?? '')))
+            : '';
+        if ($formSlug !== '') {
+            $form = $this->formTarget($request, $formSlug);
+            if ($form === null) {
+                return $this->formOutcome($formSlug, 'closed');
+            }
+        }
+
         // WHIT-1168: an invitation accepted by signing in. The token rides in
         // the signed flow cookie and is checked at the callback, where the
         // invited address must belong to the person who signed in.
-        $inviteToken = $reauth === null && $joinTenantId === null
+        $inviteToken = $reauth === null && $joinTenantId === null && $form === null
             ? trim((string) ($this->query('invite') ?? ''))
             : '';
         if ($inviteToken !== '' && ($this->invitations === null || strlen($inviteToken) > 256)) {
             $inviteToken = '';
         }
 
-        $tenantId = $joinTenantId !== null ? 0 : $this->resolveTenantId($request);
+        // Joining (from a sign-up page or a form) uses the operator's
+        // global-trust providers only.
+        $tenantId = $joinTenantId !== null || $form !== null ? 0 : $this->resolveTenantId($request);
         $config = $this->providers->findEnabledByProviderKey($tenantId, $providerKey);
         if ($config === null) {
             // Not configured for this tenant → generic bounce (no enumeration).
-            return $joinTenantId !== null
-                ? $this->joinOutcome($joinSlug, 'provider_unavailable')
-                : $this->fail('provider_unavailable');
+            return $this->startRefused($joinTenantId, $joinSlug, $form, 'provider_unavailable');
         }
 
         // A refused or unreachable issuer can throw rather than return null;
@@ -351,9 +379,7 @@ final class SsoAuthHandler
             $discovery = null;
         }
         if ($discovery === null) {
-            return $joinTenantId !== null
-                ? $this->joinOutcome($joinSlug, 'provider_unavailable')
-                : $this->fail('provider_unavailable');
+            return $this->startRefused($joinTenantId, $joinSlug, $form, 'provider_unavailable');
         }
 
         $provider = $this->providerFor($config);
@@ -376,13 +402,16 @@ final class SsoAuthHandler
             'join_tenant_id' => $joinTenantId,
             'join_slug'     => $joinTenantId !== null ? $joinSlug : null,
             'invite_token'  => $inviteToken !== '' ? $inviteToken : null,
+            'form_tenant_id' => $form['tenant_id'] ?? null,
+            'form_id'       => $form['form_id'] ?? null,
+            'form_slug'     => $form['slug'] ?? null,
             'reauth_profile_id' => $reauth['profile_id'] ?? null,
             'reauth_tenant_id'  => $reauth['tenant_id'] ?? null,
             'reauth_return_to'  => $reauth['return_to'] ?? null,
             'reauth_route_id'   => $reauth['route_id'] ?? null,
             'reauth_purpose'    => $reauth['purpose'] ?? null,
-        ], 600, 'oidc_flow');
-        CookieManager::setSsoFlowToken($flowToken, 600);
+        ], self::FLOW_TTL, 'oidc_flow');
+        CookieManager::setSsoFlowToken($flowToken, self::FLOW_TTL);
 
         $authorizeUrl = $this->engine->buildAuthorizationUrl(
             $provider,
@@ -516,6 +545,18 @@ final class SsoAuthHandler
             }
         }
 
+        // #2355: a sign-in started from a form's public link. Read from the
+        // signed flow cookie only, never from this request.
+        $formFlow = null;
+        if (isset($flow['form_tenant_id'], $flow['form_id'], $flow['form_slug'])
+            && is_int($flow['form_tenant_id']) && is_int($flow['form_id']) && is_string($flow['form_slug'])
+        ) {
+            $formFlow = ['tenant_id' => $flow['form_tenant_id'], 'form_id' => $flow['form_id'], 'slug' => $flow['form_slug']];
+            if ($tenantId !== 0) {
+                return $this->formOutcome($formFlow['slug'], 'closed');
+            }
+        }
+
         // Resolve the verified identity to a local profile (WC-f3b17bd2), applying
         // the provider's TRUST TIER: a system-tenant (operator) provider is
         // global-trust; any other tenant's provider is tenant-trust and may only
@@ -528,9 +569,11 @@ final class SsoAuthHandler
         $resolution = $this->linker->resolveForLogin($identity, $ctx);
         switch ($resolution['status']) {
             case 'refused_unverified':
-                return $joinTenantId !== null ? $this->joinOutcome($joinSlug, 'email_unverified') : $this->fail('email_unverified');
+                return $joinTenantId !== null ? $this->joinOutcome($joinSlug, 'email_unverified')
+                    : ($formFlow !== null ? $this->formOutcome($formFlow['slug'], 'email_unverified') : $this->fail('email_unverified'));
             case 'refused_conflict':
-                return $joinTenantId !== null ? $this->joinOutcome($joinSlug, 'link_conflict') : $this->fail('link_conflict');
+                return $joinTenantId !== null ? $this->joinOutcome($joinSlug, 'link_conflict')
+                    : ($formFlow !== null ? $this->formOutcome($formFlow['slug'], 'link_conflict') : $this->fail('link_conflict'));
             case 'refused_no_account':
                 // Tenant-trust IdP with no reachable local account in this tenant.
                 return $this->fail('no_account');
@@ -539,7 +582,8 @@ final class SsoAuthHandler
         // Non-refused statuses (existing/linked/provisioned) always carry a profile_id.
         $profileId = $resolution['profile_id'] ?? null;
         if ($profileId === null) {
-            return $joinTenantId !== null ? $this->joinOutcome($joinSlug, 'failed') : $this->fail('failed');
+            return $joinTenantId !== null ? $this->joinOutcome($joinSlug, 'failed')
+                : ($formFlow !== null ? $this->formOutcome($formFlow['slug'], 'failed') : $this->fail('failed'));
         }
 
         // WHIT-1181: only a global-trust (operator) provider speaks for the
@@ -555,6 +599,9 @@ final class SsoAuthHandler
 
         if ($joinTenantId !== null) {
             return $this->completeJoin($request, $joinTenantId, $joinSlug, $profileId, $identity, $ctx, $providerKey);
+        }
+        if ($formFlow !== null) {
+            return $this->completeForm($request, $formFlow, $profileId, $identity, $ctx, $providerKey);
         }
 
         // WHIT-1168: accept the invitation this sign-in was started from, then
@@ -729,6 +776,160 @@ final class SsoAuthHandler
         return $session->getStatusCode() === 200
             ? new Response(302, '', ['Location' => $this->frontendLink(\Whity\Core\Http\FrontendUrls::SSO_SUCCESS)])
             : $this->joinOutcome($joinSlug, 'failed');
+    }
+
+    /**
+     * Finish a sign-in started from a form's public link (#2355). Somebody
+     * already in the form's workspace is signed into it; anybody else joins it
+     * under its own sign-up rules (open mode, allowed domains, role), exactly
+     * as on its sign-up page. Either way they land on the form. When the
+     * workspace can't take them they go back to the form's public page, which
+     * says why: a workspace of their own is never offered from here.
+     *
+     * @param array{tenant_id: int, form_id: int, slug: string} $form
+     */
+    private function completeForm(
+        Request $request,
+        array $form,
+        int $profileId,
+        \Whity\Sdk\Auth\ExternalIdentity $identity,
+        FederatedProviderContext $ctx,
+        string $providerKey,
+    ): Response {
+        $email = $this->loginEmailFor($profileId, $identity->normalizedEmail());
+
+        // Already a member: straight into that workspace.
+        $session = $this->auth->completeFederatedLogin($profileId, $email, $request, $form['tenant_id'], false);
+        if ($session->getStatusCode() !== 200) {
+            if ($this->signups === null || !$this->signups->isOpen($form['tenant_id'])) {
+                return $this->formOutcome($form['slug'], 'closed');
+            }
+            // The provider's verified address is what the domain list is
+            // checked against, as on the sign-up page.
+            if (!$identity->hasVerifiedEmail()) {
+                return $this->formOutcome($form['slug'], 'email_unverified');
+            }
+
+            try {
+                $joined = $this->signups->joinVerified(
+                    $form['tenant_id'],
+                    $profileId,
+                    (string) $identity->normalizedEmail(),
+                    (string) ($identity->displayName ?? ''),
+                );
+            } catch (\Throwable $e) {
+                error_log('[sso] form join failed for profile ' . $profileId . ': ' . $e->getMessage());
+
+                return $this->formOutcome($form['slug'], 'failed');
+            }
+
+            $result = $joined['result'];
+            if ($result !== \Whity\Core\Signup\CustomerSignupService::CONFIRM_JOINED
+                && $result !== \Whity\Core\Signup\CustomerSignupService::CONFIRM_ALREADY_MEMBER
+            ) {
+                return $this->formOutcome($form['slug'], match ($result) {
+                    \Whity\Core\Signup\CustomerSignupService::CONFIRM_PENDING => 'pending',
+                    \Whity\Core\Signup\CustomerSignupService::CONFIRM_DOMAIN => 'domain',
+                    \Whity\Core\Signup\CustomerSignupService::CONFIRM_REFUSED => 'refused',
+                    default => 'closed',
+                });
+            }
+
+            $session = $this->auth->completeFederatedLogin($profileId, $email, $request, $form['tenant_id'], false);
+            if ($session->getStatusCode() !== 200) {
+                return $this->formOutcome($form['slug'], 'failed');
+            }
+        }
+
+        if ($this->hooks !== null) {
+            try {
+                $this->hooks->dispatch(self::SIGNED_IN_EVENT, [
+                    'profile_id'            => $profileId,
+                    'email'                 => $email,
+                    'provider_key'          => $providerKey,
+                    'issuer'                => $identity->issuer,
+                    'subject'               => $identity->subject,
+                    'global_trust'          => $ctx->isGlobalTrust(),
+                    'provider_tenant_id'    => $ctx->tenantId,
+                    'provisioned_tenant_id' => null,
+                ]);
+            } catch (\Throwable $e) {
+                error_log('[sso] ' . self::SIGNED_IN_EVENT . ' listener failed for profile ' . $profileId . ': ' . $e->getMessage());
+            }
+        }
+
+        return new Response(302, '', ['Location' => $this->formPage($form['form_id'])]);
+    }
+
+    /**
+     * The form a `?form=<public slug>` names, when its public link is live,
+     * asks people to sign in, and the request's host does not name a
+     * different workspace. Null otherwise: every refusal looks the same.
+     *
+     * @return array{tenant_id: int, form_id: int, slug: string}|null
+     */
+    private function formTarget(Request $request, string $slug): ?array
+    {
+        if ($this->forms === null || !\Whity\Core\Form\PublicFormLink::looksLikeSlug($slug)) {
+            return null;
+        }
+
+        $form = $this->forms->findByPublicSlug($slug);
+        if ($form === null
+            || !\Whity\Core\Form\PublicFormLink::servesPublicly($form)
+            || ($form['public_requires_sign_in'] ?? false) !== true
+        ) {
+            return null;
+        }
+        $tenantId = (int) ($form['tenant_id'] ?? 0);
+        $formId = (int) ($form['id'] ?? 0);
+        if ($tenantId <= 0 || $formId <= 0) {
+            return null;
+        }
+
+        $hostTenant = $this->hostResolver->resolveTenantIdByHost(\Whity\Core\Http\RequestHost::fromRequest($request));
+        if ($hostTenant !== null && $hostTenant !== $tenantId) {
+            return null;
+        }
+
+        return ['tenant_id' => $tenantId, 'form_id' => $formId, 'slug' => $slug];
+    }
+
+    /** Back to the form's public page with an outcome the page explains. */
+    private function formOutcome(string $slug, string $outcome): Response
+    {
+        if (!\Whity\Core\Form\PublicFormLink::looksLikeSlug($slug)) {
+            return $this->fail('failed');
+        }
+
+        return new Response(302, '', ['Location' => rtrim($this->frontendLink(\Whity\Core\Http\FrontendUrls::PUBLIC_FORM), '/')
+            . '/' . $slug . '?sso=' . rawurlencode($outcome)]);
+    }
+
+    /** The signed-in page where a form that asks for sign-in is filled in (WHIT-920). */
+    private function formPage(int $formId): string
+    {
+        $urls = $this->frontendUrls ?? new \Whity\Core\Http\FrontendUrls(['APP_URL' => $this->appUrl]);
+
+        return rtrim($urls->base(), '/') . '/forms/' . $formId;
+    }
+
+    /**
+     * A refused `/start`, answered where the visitor started: a workspace's
+     * sign-up page, a form's public page, or the sign-in page.
+     *
+     * @param array{tenant_id: int, form_id: int, slug: string}|null $form
+     */
+    private function startRefused(?int $joinTenantId, string $joinSlug, ?array $form, string $reason): Response
+    {
+        if ($joinTenantId !== null) {
+            return $this->joinOutcome($joinSlug, $reason);
+        }
+        if ($form !== null) {
+            return $this->formOutcome($form['slug'], $reason);
+        }
+
+        return $this->fail($reason);
     }
 
     /**

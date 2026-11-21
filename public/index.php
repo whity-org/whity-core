@@ -6555,6 +6555,8 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     $invitationService,
     // WHIT-1181: a verified phone_number fills the person's own phone.
     new \Whity\Core\Identity\PersonalPhone($db->getPdo()),
+    // #2355: signing in from a form's public link joins the form's workspace.
+    $formRepository,
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).
