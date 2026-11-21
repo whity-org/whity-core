@@ -1,6 +1,6 @@
 # 32 · Accounting in core
 
-**Status: proposed, waiting for the owner's answers to section 12.** Nothing here is built until they arrive. The register rows are AC.1–AC.30 (section "Accounting in core (PROPOSED)"). Ticket WHIT-1318.
+**Status: decided by the owner on 21 November 2026.** JoFotara goes in the paid plugin (Q1, "Paid plugin"), with Front Office using the same connector; Q3–Q10 and Q12–Q14 were accepted as recommended ("Accept all"); the paid plugin's price is open ("Decide later") and its name is a brand-team ask (Q2); for Q11 the owner will name a Jordanian accountant, and A1 does not merge until that person has reviewed the chart, nor A6 until they have reviewed the tax pack and return. Built phase by phase. The register rows are AC.1–AC.30 (section "Accounting in core"). Ticket WHIT-1318.
 
 On 21 November 2026 the owner placed accounting: **"Core basics, paid plugin"**. Core gets a double-entry ledger, the chart of accounts, journals, invoices and bills, the tax return, and SDK hooks. A paid plugin later adds multi-currency, bank feeds, fixed assets, budgets, consolidation and e-invoicing. For tax the owner chose **"Jordan first"**: Jordan's 16% general sales tax and JoFotara e-invoicing first; other MENA countries come later as plugin packs.
 
@@ -23,7 +23,7 @@ It is a different thing from **platform billing** (`src/Core/Billing`, `src/Core
 - Export for your accountant.
 - Permissions, routing for approvals, documents through the document themes, Arabic first, MCP tools, the Bookkeeping assistant as proposals, and everything in the plugin SDK from the first phase.
 
-**The paid accounting plugin** (name and price: Q2), in whity-plugins, licensed through Whity ID:
+**The paid accounting plugin** (name: a brand-team ask; price: open, Q2), in whity-plugins, licensed through Whity ID:
 - E-invoicing: JoFotara first (proposed in section 7), then other countries' systems.
 - Multi-currency: foreign-currency invoices, bills and bank accounts, rates, realised and unrealised exchange differences, revaluation.
 - Bank feeds (live connections to banks and providers) and the Bookkeeping assistant's automatic rules.
@@ -300,16 +300,16 @@ Filing directly with the department is not in scope; Whity prepares, the company
 
 **What goes to JoFotara.** JoFotara (the National Invoicing System of the Income and Sales Tax Department) receives every invoice and credit note a registered seller issues: the invoice as structured data (UBL 2.1 XML in the department's profile), with the seller's tax number, the buyer (with their tax or national number above the threshold the department sets), each line's quantity, price, discount and tax category, the totals, the invoice type (cash or on credit; general sales tax or special), the unique id and the invoice counter. JoFotara answers with acceptance, its reference and the QR code that must print on the invoice. Credit notes reference the original invoice. Supplier bills are not sent. The exact field list and the API come from the department's specification and are confirmed in the plugin's own spec.
 
-**Core or paid: proposed paid**, inside the paid accounting plugin, because:
+**Core or paid: paid** (decided), inside the paid accounting plugin, because:
 - the owner listed e-invoicing among the paid plugin's features ("A paid plugin later adds … e-invoicing");
 - register 6.8 already puts the Tax invoice and fiscal credit note "through JoFotara" in a paid product (Front Office, owner, 2 November 2026);
 - each country's connector (JoFotara, ZATCA, Egypt's ETA) is the same kind of work, kept up as the authorities change their specifications, which suits a maintained paid plugin.
 
 **Core makes it possible**, from A2: the `WorkspaceEInvoicing` extension point (a connector declares its country, is asked to `submit()` when an invoice or credit note is issued, may hold the issue until accepted, and writes the result back to the invoice's e-invoice columns), the gap-free numbering, the e-invoice columns, the tax-category codes on tax codes, the Tax invoice template slots for the QR and reference, a queue with retries for when the authority is down, and the counts on the tax return. A free workspace without the plugin issues invoices with `einvoice_status = none`, and the invoice and the Sales tax tab say plainly that Jordanian tax-registered sellers must also report each invoice to JoFotara (on its own portal, or by adding the plugin).
 
-**Front Office and JoFotara:** Front Office should use the accounting plugin's connector rather than keep its own, so there is one JoFotara integration (Q1).
+**Front Office and JoFotara:** Front Office uses the accounting plugin's connector rather than keeping its own, so there is one JoFotara integration (Q1).
 
-The opposite choice (JoFotara in core) is defensible: reporting is mandatory for registered sellers in Jordan, so a free Jordanian workspace without it cannot legally use core invoices on their own. Q1 asks the owner to confirm.
+The owner confirmed this on 21 November 2026 (Q1: "Paid plugin"), knowing that reporting is mandatory for registered sellers in Jordan; the notice above is what keeps a free Jordanian workspace informed.
 
 ## 8. Reports
 
@@ -435,12 +435,12 @@ Each phase is one pull request (two where marked), merged on green with auto-mer
 | Phase | What | Migrations (count) | Screens |
 | --- | --- | --- | --- |
 | **A0** | This spec and the register rows (no code) | — | — |
-| **A1 Ledger and chart** | Accounts, journals, fiscal years and periods, entries and lines with the append-only trigger, balances projection, the hash chain, posting service with `accounting.entry.posting`/`.posted`, manual entries (draft, approve, post, reverse), opening balances, the Jordan chart template, permissions and the Accountant role, trial balance and account statement, rebuild and verify commands, 1M-line load test. SDK `Accounts`, `Ledger`, `Periods`, `Reports::trialBalance`. | 3 (chart and journals; ledger, balances and trigger; permissions and seeds) | Money › Accounts (`TplLedger`), a journal entry, trial balance, accounting settings |
+| **A1 Ledger and chart** (merges after the accountant's review of the chart, Q11) | Accounts, journals, fiscal years and periods, entries and lines with the append-only trigger, balances projection, the hash chain, posting service with `accounting.entry.posting`/`.posted`, manual entries (draft, approve, post, reverse), opening balances, the Jordan chart template, permissions and the Accountant role, trial balance and account statement, rebuild and verify commands, 1M-line load test. SDK `Accounts`, `Ledger`, `Periods`, `Reports::trialBalance`. | 3 (chart and journals; ledger, balances and trigger; permissions and seeds) | Money › Accounts (`TplLedger`), a journal entry, trial balance, accounting settings |
 | **A2 Sales, tax and payments in** | Tax codes and the Jordan pack, the tax engine, sales invoices and credit notes, payments received, allocations, cheques received, `WorkspaceEInvoicing` point and e-invoice columns, invoice route subject, Invoice and Credit note starters wired, Receipt, Whity Pay contract (`recordReceived`, `recordTransfer`), aged receivables, customer statement, contact tabs. SDK `Invoices` (sale), `Payments`, `Taxes`. (Two PRs: tax and invoices; payments and Pay.) | 2 | Money › Invoices, an invoice, new invoice, Payments, contact tabs, phone invoice |
 | **A3 Purchases and payments out** | Supplier bills and credits, three-way match with inventory receipts (`TplReceiving` billed column), bill route subject, payments made and cheques written, aged payables, supplier statement, expense claims and petty cash (if Q5 is core). SDK `Invoices` (purchase). | 1 | Money › Bills, a bill, `TplReceiving` billed column, Expenses (Q5) |
 | **A4 Stock in the books** | Core's `WorkspaceAccountingExport` implementation, account mappings, the posting table of section 6, the shared lock date, opening stock value, "waiting for you" for moves with no cost. Needs inventory P7's extension point and IV.18's average cost (or ships them, section 6). | 1 | Settings › Stock in the books |
 | **A5 Reports and closing** | Profit and loss, balance sheet, aged reports polish, simple cash flow, comparisons and branches, month close checklist, year close, export for your accountant, Money Overview (`TplMoney`), `WorkspaceReports`. | 1 | Money › Overview, Reports, close a month, close a year, `TmMoneyMobile` |
-| **A6 Sales tax return and bank** | The Jordan return (prepare, download, mark filed, pay), `WorkspaceTaxPack`, statement import and matching, the Bookkeeping assistant's proposals, `WorkspaceBankFeed` point. | 1 | Money › Sales tax, bank matching, assistant proposals |
+| **A6 Sales tax return and bank** (merges after the accountant's review of the pack and return, Q11) | The Jordan return (prepare, download, mark filed, pay), `WorkspaceTaxPack`, statement import and matching, the Bookkeeping assistant's proposals, `WorkspaceBankFeed` point. | 1 | Money › Sales tax, bank matching, assistant proposals |
 | Buffer | Arabic and phone pass on every Money screen, the card comparisons, the accountant's review fixes, performance checks. | — | — |
 | **Paid plugin** (whity-plugins) | JoFotara connector first, then multi-currency, bank feeds, fixed assets, budgets, consolidation, other country packs; its own spec once the owner answers Q1 and Q2. | its own | its own |
 
@@ -448,7 +448,9 @@ About 9 core migration numbers in all; each is asked for at PR time.
 
 Screens without a card (Money › Bills, a bill, new invoice, an invoice record, Payments, bank matching, close a month, year close, accounting settings, opening balances walk-through, Reports tab layouts) go to the brand team as one ask (`brand-asks/brand-ask-accounting.md`) when this spec is approved. Until a card arrives a screen is built from the section 21 patterns and the existing cards.
 
-## 12. Questions for the owner
+## 12. Questions for the owner (answered 21 November 2026)
+
+Answers: Q1 "Paid plugin" (Front Office uses the same connector); Q2 price "Decide later", name a brand-team ask; Q11 "I'll name someone" (A1 and A6 wait at a draft PR for the review); all others "Accept all", as recommended.
 
 | # | Question | Options | Recommendation |
 | --- | --- | --- | --- |
@@ -467,6 +469,6 @@ Screens without a card (Money › Bills, a bill, new invoice, an invoice record,
 | Q13 | Sidebar | (a) Operations › Money with tabs Overview, Invoices, Bills, Payments, Accounts, Sales tax, Reports; Purchases and Sales stay inside Inventory; (b) split Purchases and Sales out now | **(a)** until A3 lands, then revisit IV.23. |
 | Q14 | Base currency | (a) fixed at the first posting, foreign currencies only with the paid plugin; (b) core allows other currencies without exchange differences | **(a).** |
 
-## 13. Register rows proposed
+## 13. Register rows
 
-AC.1–AC.30 in the register, section "Accounting in core (PROPOSED, 21 November 2026)", and changes to MO.1, R.2 and IV.1 quoting the owner's 21 November decision. Rows that depend on a question name it; the owner's answer replaces the recommendation. IV.12 and IV.23 (bills and the sidebar "until Money arrives") and 6.8 (the tax invoice) are left as they are until Q1 and Q13 are answered.
+AC.1–AC.30 in the register, section "Accounting in core (decided 21 November 2026)", and changes to MO.1, R.2, IV.1, IV.12, IV.23 and 6.8 quoting the owner's 21 November decisions.
