@@ -1,8 +1,8 @@
 # 32 · Accounting in core
 
-**Status: decided by the owner on 21 November 2026.** JoFotara goes in the paid plugin (Q1, "Paid plugin"), with Front Office using the same connector; Q3–Q10 and Q12–Q14 were accepted as recommended ("Accept all"); the paid plugin's price is open ("Decide later") and its name is a brand-team ask (Q2); for Q11 the owner will name a Jordanian accountant, and A1 does not merge until that person has reviewed the chart, nor A6 until they have reviewed the tax pack and return. Built phase by phase. The register rows are AC.1–AC.30 (section "Accounting in core"). Ticket WHIT-1318.
+**Status: decided by the owner on 21 November 2026, then changed the same day: all of accounting is core.** The owner's new approach: "I want to start a new approach... everything is in whity... and core supports almost everything that it makes sense to support... extra usage and users is what is paid, and outside integration plugins are paid like payment gateways, jofotara, etc..." Asked about accounting's extras, the owner answered "All into core": multi-currency, fixed assets, budgets and consolidation are free core features, and there is no paid accounting plugin. What is paid is "Seats and volume" (invoices a month is the accounting meter) and outside integration plugins: JoFotara and live bank feeds here. Q3–Q10 and Q12–Q14 stand as recommended ("Accept all"); Q1 and Q2 changed with the new approach (section 12); for Q11 the owner will name a Jordanian accountant, and A1 does not merge until that person has reviewed the chart, nor A6 until they have reviewed the tax pack and return. Built phase by phase. The register rows are AC.1–AC.30 (section "Accounting in core"). Ticket WHIT-1318.
 
-On 21 November 2026 the owner placed accounting: **"Core basics, paid plugin"**. Core gets a double-entry ledger, the chart of accounts, journals, invoices and bills, the tax return, and SDK hooks. A paid plugin later adds multi-currency, bank feeds, fixed assets, budgets, consolidation and e-invoicing. For tax the owner chose **"Jordan first"**: Jordan's 16% general sales tax and JoFotara e-invoicing first; other MENA countries come later as plugin packs.
+On 21 November 2026 the owner placed accounting: **"Core basics, paid plugin"**. Core gets a double-entry ledger, the chart of accounts, journals, invoices and bills, the tax return, and SDK hooks. A paid plugin later adds multi-currency, bank feeds, fixed assets, budgets, consolidation and e-invoicing. Later that day the owner changed this: "All into core". Core now also gets multi-currency, fixed assets, budgets and consolidation; JoFotara and live bank feeds are paid integration plugins, because outside integrations are what is paid. For tax the owner chose **"Jordan first"**: Jordan's 16% general sales tax and JoFotara e-invoicing first; other MENA countries come later as plugin packs.
 
 This spec turns the Money designs that already exist (MO.1, section 27; cards `TplMoney`, `TplLedger`, `TmMoneyMobile`, `TplDocInvoice`, `TplDocInvoiceAr`, `TplDocInvoiceLong`, `TplDocCreditNote`, `TplDocReceipt`, `TplReceiving`'s billed column, `TplReports`) into a data model, posting rules, permissions, an SDK surface and a build plan. It follows the shape of section 31 (inventory), and it closes what inventory left waiting for Money: supplier bills, the three-way match, and posting stock to the books (IV.12, IV.22, IV.23).
 
@@ -23,16 +23,23 @@ It is a different thing from **platform billing** (`src/Core/Billing`, `src/Core
 - Export for your accountant.
 - Permissions, routing for approvals, documents through the document themes, Arabic first, MCP tools, the Bookkeeping assistant as proposals, and everything in the plugin SDK from the first phase.
 
-**The paid accounting plugin** (name: a brand-team ask; price: open, Q2), in whity-plugins, licensed through Whity ID:
-- E-invoicing: JoFotara first (proposed in section 7), then other countries' systems.
+**Also in core** (owner, 21 November 2026: "All into core"), in later phases (section 11):
 - Multi-currency: foreign-currency invoices, bills and bank accounts, rates, realised and unrealised exchange differences, revaluation.
-- Bank feeds (live connections to banks and providers) and the Bookkeeping assistant's automatic rules.
 - Fixed assets and depreciation.
-- Budgets (MO's budgets per team move here).
+- Budgets (MO's budgets per team).
 - Consolidation of several workspaces.
-- Country packs beyond Jordan (Saudi Arabia's ZATCA, the UAE, Egypt's ETA and others), each a tax pack plus an e-invoicing connector.
+- The Bookkeeping assistant's rules for statement lines.
 
-**Not in either, for now:** payroll (a later HR plugin posts through the SDK), point of sale (a POS plugin posts through the SDK), cost centres beyond the branch dimension, projects accounting, and recurring invoices with their own schedules (Whity Pay's subscriptions already invoice).
+**Paid integration plugins** (outside integrations, priced with the other integrations such as payment gateways), in whity-plugins, licensed through Whity ID:
+- JoFotara: reporting invoices and credit notes to Jordan's Income and Sales Tax Department (section 7.4).
+- Live bank feeds: connections to banks and providers that write statement lines (statement file import and matching stay in core).
+- Later, other countries' e-invoicing systems (Saudi Arabia's ZATCA, Egypt's ETA and others), each through the same core extension point.
+
+**Tax packs** for other countries (codes, return layout, chart template) are plugin packs, as the owner decided for tax ("Jordan first"); a pack is not an outside integration.
+
+**What is paid in accounting:** seats and volume ("Seats and volume", owner, 21 November 2026). The accounting meter is invoices issued a month; how it is counted and charged is set by the business-model decision, not here.
+
+**Not in core accounting, for now:** payroll (a later HR plugin posts through the SDK), point of sale (a POS plugin posts through the SDK), cost centres beyond the branch dimension, projects accounting, and recurring invoices with their own schedules (Whity Pay's subscriptions already invoice).
 
 ## 2. Words
 
@@ -66,8 +73,8 @@ All tables are tenant-owned, carry `tenant_id`, and get rows in `CrossTenantReje
 
 An amount is a **whole number of minor units** in `BIGINT`, the same as `Money` (`src/Core/Money`): fils for JOD (3 decimals), cents for USD (2). No floats, no `bcmath`, sums in SQL, the same on PostgreSQL and SQLite.
 
-- Every workspace has one **base currency**: `billing.default_currency` at the moment of the first posting, then fixed (AC.6). Core books are in the base currency only; a document in another currency needs the paid plugin (Q14).
-- **Ready for multi-currency from day one.** Documents and lines store `currency`, the transaction amount, the base amount and the rate as a whole-number fraction (`rate_num / rate_den`), as inventory did with variants (IV.4): core always writes the base currency with rate 1/1, and the plugin later fills them in with no migration.
+- Every workspace has one **base currency**: `billing.default_currency` at the moment of the first posting, then fixed (AC.6). Until the multi-currency phase (A7) the books are in the base currency only (Q14); A7 adds foreign-currency documents in core.
+- **Ready for multi-currency from day one.** Documents and lines store `currency`, the transaction amount, the base amount and the rate as a whole-number fraction (`rate_num / rate_den`), as inventory did with variants (IV.4): core writes the base currency with rate 1/1 until A7 fills them in, with no migration.
 - **Rounding** happens once, at the edge, half away from zero, to the currency's decimals: per line for tax (JoFotara's rule, to be confirmed by the accountant, Q11), never inside the ledger. A document whose lines round to a total one minor unit away from a printed total posts the difference to the rounding account.
 
 ### 3.2 Tables
@@ -300,16 +307,11 @@ Filing directly with the department is not in scope; Whity prepares, the company
 
 **What goes to JoFotara.** JoFotara (the National Invoicing System of the Income and Sales Tax Department) receives every invoice and credit note a registered seller issues: the invoice as structured data (UBL 2.1 XML in the department's profile), with the seller's tax number, the buyer (with their tax or national number above the threshold the department sets), each line's quantity, price, discount and tax category, the totals, the invoice type (cash or on credit; general sales tax or special), the unique id and the invoice counter. JoFotara answers with acceptance, its reference and the QR code that must print on the invoice. Credit notes reference the original invoice. Supplier bills are not sent. The exact field list and the API come from the department's specification and are confirmed in the plugin's own spec.
 
-**Core or paid: paid** (decided), inside the paid accounting plugin, because:
-- the owner listed e-invoicing among the paid plugin's features ("A paid plugin later adds … e-invoicing");
-- register 6.8 already puts the Tax invoice and fiscal credit note "through JoFotara" in a paid product (Front Office, owner, 2 November 2026);
-- each country's connector (JoFotara, ZATCA, Egypt's ETA) is the same kind of work, kept up as the authorities change their specifications, which suits a maintained paid plugin.
+**Core or paid: a paid integration plugin** (decided). JoFotara is an outside integration, and outside integration plugins are what is paid: "outside integration plugins are paid like payment gateways, jofotara, etc." (owner, 21 November 2026). Each country's connector (JoFotara, ZATCA, Egypt's ETA) is kept up as its authority changes its specification.
 
-**Core makes it possible**, from A2: the `WorkspaceEInvoicing` extension point (a connector declares its country, is asked to `submit()` when an invoice or credit note is issued, may hold the issue until accepted, and writes the result back to the invoice's e-invoice columns), the gap-free numbering, the e-invoice columns, the tax-category codes on tax codes, the Tax invoice template slots for the QR and reference, a queue with retries for when the authority is down, and the counts on the tax return. A free workspace without the plugin issues invoices with `einvoice_status = none`, and the invoice and the Sales tax tab say plainly that Jordanian tax-registered sellers must also report each invoice to JoFotara (on its own portal, or by adding the plugin).
+**Core makes it possible**, from A2: the `WorkspaceEInvoicing` extension point (a connector declares its country, is asked to `submit()` when an invoice or credit note is issued, may hold the issue until accepted, and writes the result back to the invoice's e-invoice columns), the gap-free numbering, the e-invoice columns, the tax-category codes on tax codes, the Tax invoice template slots for the QR and reference, a queue with retries for when the authority is down, and the counts on the tax return. A free workspace without the plugin issues invoices with `einvoice_status = none`, and the invoice and the Sales tax tab say plainly that Jordanian tax-registered sellers must also report each invoice to JoFotara (on its own portal, or by adding the JoFotara plugin).
 
-**Front Office and JoFotara:** Front Office uses the accounting plugin's connector rather than keeping its own, so there is one JoFotara integration (Q1).
-
-The owner confirmed this on 21 November 2026 (Q1: "Paid plugin"), knowing that reporting is mandatory for registered sellers in Jordan; the notice above is what keeps a free Jordanian workspace informed.
+There is one JoFotara integration; everything in Whity that issues a tax invoice uses it. The owner first chose "Paid plugin" for Q1 (the accounting plugin), then moved the connector to its own integration plugin with the new approach, knowing that reporting is mandatory for registered sellers in Jordan; the notice above is what keeps a workspace without it informed.
 
 ## 8. Reports
 
@@ -374,7 +376,7 @@ Search gets `InvoicesSearchSource` (number, customer, amount) and `AccountsSearc
 
 ### 9.7 Plans
 
-Proposed like inventory (IV.24): everything in core works on every plan, with a warn-only limit on Free (Q6).
+Everything in core accounting works on every plan. What is paid is seats and volume ("Seats and volume", owner, 21 November 2026): accounting's volume meter is invoices issued a month. How it is counted and charged is set by the business-model decision, which owns the open-core rows; this section only names the meter. The paid integration plugins (JoFotara, live bank feeds) are priced with the other integrations.
 
 ## 10. Plugin SDK
 
@@ -414,11 +416,11 @@ All are added to the webhook event catalogue (ADR-0008).
 
 | Interface | Lets a plugin |
 | --- | --- |
-| `WorkspaceEInvoicing` | Report invoices and credit notes to a tax authority: `country()`, `submit(invoice)`, `status(invoice)`, whether issuing waits for acceptance; writes the reference, QR and status back. JoFotara is the first (paid plugin). |
+| `WorkspaceEInvoicing` | Report invoices and credit notes to a tax authority: `country()`, `submit(invoice)`, `status(invoice)`, whether issuing waits for acceptance; writes the reference, QR and status back. JoFotara is the first (a paid integration plugin). |
 | `WorkspaceTaxPack` | Bring a country: tax codes, return layout and boxes, chart template, invoice legal fields, period length, file format for the return. |
 | `WorkspaceChartTemplate` | Offer charts for an industry or a country. |
-| `WorkspaceBankFeed` | Write statement lines into `acc_bank_lines` from a live connection (paid plugin). |
-| `WorkspaceCurrencyRates` | Provide exchange rates; turning it on unlocks foreign-currency documents (paid plugin). |
+| `WorkspaceBankFeed` | Write statement lines into `acc_bank_lines` from a live connection (the paid bank feeds integration). |
+| `WorkspaceCurrencyRates` | Provide exchange rates from an outside source. Core's multi-currency (A7) keeps rates typed by people and a default source; a plugin adds others. |
 | `WorkspaceAccountingExport` | Already planned in IV.22: export entries and stock postings to another system; core's books are the default implementation (section 6). |
 | `WorkspaceReports` | Add reports to the Reports tab, reading through `Reports` and `Ledger`. |
 | `WorkspaceDocumentPosting` | Declare how a plugin's own documents post (a payroll run, a POS day, a depreciation run), so their entries show with the plugin's words and links. |
@@ -442,15 +444,18 @@ Each phase is one pull request (two where marked), merged on green with auto-mer
 | **A5 Reports and closing** | Profit and loss, balance sheet, aged reports polish, simple cash flow, comparisons and branches, month close checklist, year close, export for your accountant, Money Overview (`TplMoney`), `WorkspaceReports`. | 1 | Money › Overview, Reports, close a month, close a year, `TmMoneyMobile` |
 | **A6 Sales tax return and bank** (merges after the accountant's review of the pack and return, Q11) | The Jordan return (prepare, download, mark filed, pay), `WorkspaceTaxPack`, statement import and matching, the Bookkeeping assistant's proposals, `WorkspaceBankFeed` point. | 1 | Money › Sales tax, bank matching, assistant proposals |
 | Buffer | Arabic and phone pass on every Money screen, the card comparisons, the accountant's review fixes, performance checks. | — | — |
-| **Paid plugin** (whity-plugins) | JoFotara connector first, then multi-currency, bank feeds, fixed assets, budgets, consolidation, other country packs; its own spec once the owner answers Q1 and Q2. | its own | its own |
+| **A7 Multi-currency** | Foreign-currency invoices, bills, payments and bank accounts; rates (typed, and a default source); realised exchange differences on payment, unrealised revaluation at month end; `WorkspaceCurrencyRates`. | 1 | Currency on documents, rates, revaluation |
+| **A8 Fixed assets and budgets** | Assets with straight-line and declining depreciation posted monthly, disposal; budgets per account, team and month with actual against budget and the over-budget approval change (MO designs). | 2 | Assets, Budgets |
+| **A9 Consolidation** | Combined reports across workspaces the same owners hold, with eliminations between them. | 1 | Group reports |
+| **Integrations** (whity-plugins, paid) | JoFotara first (after A2), then live bank feeds (after A6); each its own spec. | their own | their own |
 
-About 9 core migration numbers in all; each is asked for at PR time.
+About 13 core migration numbers in all; each is asked for at PR time.
 
 Screens without a card (Money › Bills, a bill, new invoice, an invoice record, Payments, bank matching, close a month, year close, accounting settings, opening balances walk-through, Reports tab layouts) go to the brand team as one ask (`brand-asks/brand-ask-accounting.md`) when this spec is approved. Until a card arrives a screen is built from the section 21 patterns and the existing cards.
 
 ## 12. Questions for the owner (answered 21 November 2026)
 
-Answers: Q1 "Paid plugin" (Front Office uses the same connector); Q2 price "Decide later", name a brand-team ask; Q11 "I'll name someone" (A1 and A6 wait at a draft PR for the review); all others "Accept all", as recommended.
+Answers: Q1 "Paid plugin", then, with the owner's new approach the same day, a paid JoFotara integration plugin rather than an accounting plugin; Q2 dropped, as there is no accounting plugin (the JoFotara plugin is priced with the other integrations); Q6 became a volume meter (invoices a month), counted and charged by the business-model decision; Q14's "only with the paid plugin" became core's multi-currency phase A7; Q11 "I'll name someone" (A1 and A6 wait at a draft PR for the review); all others "Accept all", as recommended.
 
 | # | Question | Options | Recommendation |
 | --- | --- | --- | --- |
@@ -471,4 +476,4 @@ Answers: Q1 "Paid plugin" (Front Office uses the same connector); Q2 price "Deci
 
 ## 13. Register rows
 
-AC.1–AC.30 in the register, section "Accounting in core (decided 21 November 2026)", and changes to MO.1, R.2, IV.1, IV.12, IV.23 and 6.8 quoting the owner's 21 November decisions.
+AC.1–AC.30 in the register, section "Accounting in core (decided 21 November 2026)", and changes to MO.1, R.2, IV.1, IV.12, IV.23 and 6.8 quoting the owner's 21 November decisions, including the change of direction the same day ("All into core").
