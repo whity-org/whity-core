@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.131).
+ * SDK identity (v1.132).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1498,12 +1498,21 @@ namespace Whity\Sdk;
  *
  * Purely additive: one new optional manifest key. Older hosts refuse a manifest that carries it, so a
  * plugin that sets `theme` needs `^1.131`.)
+ *
+ * 1.132 (QUOTES: {@see Contribute\WorkspaceQuoteConversion} turns an accepted quote into something
+ * else, read as a {@see Sales\QuoteSnapshot} with its {@see Sales\QuoteSnapshotLine}s; it answers a
+ * {@see Sales\ConversionCheck} and a {@see Sales\ConversionResult}. Core's inventory (sales orders) and
+ * accounting (invoices) are its first implementations. New events: the filter `sales.quote.sending`
+ * (can veto) and `sales.quote.created|sent|accepted|declined|expired|converted|cancelled`, each with an
+ * `.async` twin (WHIT-1321, design section 34 §3).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.131.0';
+    public const VERSION = '1.132.0';
 
     /**
      * Static identity only — never instantiated.

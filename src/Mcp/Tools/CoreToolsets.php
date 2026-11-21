@@ -104,6 +104,11 @@ final class CoreToolsets
             'titleAr'     => 'المخزون',
             'description' => 'Items, units, places and stock: levels, history, opening stock and adjustments.',
         ],
+        'core.sales' => [
+            'title'       => 'Sales',
+            'titleAr'     => 'المبيعات',
+            'description' => 'Quotes to customers: drafting, sending, the customer\'s answer and turning them into orders or invoices.',
+        ],
         'core.convening' => [
             'title'       => 'Meetings',
             'titleAr'     => 'الاجتماعات',
@@ -177,6 +182,7 @@ final class CoreToolsets
         'contacts'                 => 'core.contacts',
         'custom-fields'            => 'core.contacts',
         'inventory'                => 'core.inventory',
+        'sales'                    => 'core.sales',
         'chat'                     => 'core.chat',
         'taxonomy'                 => 'core.taxonomy',
         'data-types'               => 'core.taxonomy',

@@ -949,6 +949,13 @@ final class SettingsRegistry
     public const INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID = 'inventory.purchase_route_template_id';
     public const INVENTORY_OVER_RECEIPT_PERCENT = 'inventory.over_receipt_percent';
 
+    // ---- Quotes to customers (WHIT-1321, design section 34 §3, QT.4) ----
+    //   - quote_valid_days: how long a new quote is valid, 1 to 365 days (30).
+    //   - quote_route_template_id: the route a quote travels before it can be
+    //     sent; 0 means none, and a person with quotes:write marks it ready.
+    public const SALES_QUOTE_VALID_DAYS = 'sales.quote_valid_days';
+    public const SALES_QUOTE_ROUTE_TEMPLATE_ID = 'sales.quote_route_template_id';
+
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
      * settings API cannot make (a customer-safe role, a permission other than
@@ -974,6 +981,8 @@ final class SettingsRegistry
         self::INVENTORY_TRANSFERS_ONE_STEP,
         self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID,
         self::INVENTORY_OVER_RECEIPT_PERCENT,
+        self::SALES_QUOTE_VALID_DAYS,
+        self::SALES_QUOTE_ROUTE_TEMPLATE_ID,
     ];
 
     /**
@@ -1500,6 +1509,8 @@ final class SettingsRegistry
         self::INVENTORY_TRANSFERS_ONE_STEP => 'false',
         self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID => '0',
         self::INVENTORY_OVER_RECEIPT_PERCENT => '0',
+        self::SALES_QUOTE_VALID_DAYS => '30',
+        self::SALES_QUOTE_ROUTE_TEMPLATE_ID => '0',
     ];
 
     /**
@@ -2016,6 +2027,10 @@ final class SettingsRegistry
                 : $key . ' must be a route template id, or 0 for the default.',
             self::INVENTORY_TRANSFERS_ONE_STEP => self::validateBoolean($value, self::INVENTORY_TRANSFERS_ONE_STEP),
             self::INVENTORY_OVER_RECEIPT_PERCENT => self::validateWholeNumberBetween($value, self::INVENTORY_OVER_RECEIPT_PERCENT, 0, 100),
+            self::SALES_QUOTE_VALID_DAYS => self::validateWholeNumberBetween($value, self::SALES_QUOTE_VALID_DAYS, 1, 365),
+            self::SALES_QUOTE_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
+                ? null
+                : $key . ' must be a route template id, or 0 for none.',
             default => "Unknown setting key: {$key}",
         };
     }
