@@ -94583,7 +94583,8 @@
                 "type": "object",
                 "properties": {
                     "profile_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "The member of staff, from GET /api/calendar/commission/staff."
                     },
                     "service_id": {
                         "type": "integer",

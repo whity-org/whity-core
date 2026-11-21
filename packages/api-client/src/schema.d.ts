@@ -14241,6 +14241,7 @@ export interface components {
             percent_bp: number;
         };
         CalendarCommissionRateRequest: {
+            /** @description The member of staff, from GET /api/calendar/commission/staff. */
             profile_id: number;
             /** @description Empty for every service. */
             service_id?: number;

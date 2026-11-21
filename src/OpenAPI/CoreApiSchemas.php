@@ -11042,7 +11042,7 @@ final class CoreApiSchemas
                 'percent_bp' => self::int() + ['description' => 'Basis points: 1250 is 12.5%.'],
             ], ['id', 'profile_id', 'percent_bp']),
             'CalendarCommissionRateRequest' => self::object([
-                'profile_id' => self::int(),
+                'profile_id' => self::int() + ['description' => 'The member of staff, from GET /api/calendar/commission/staff.'],
                 'service_id' => self::int() + ['description' => 'Empty for every service.'],
                 'percent' => self::str() + ['description' => 'A number from 0 to 100, such as 30 or 12.5.'],
             ], ['profile_id', 'percent']),
