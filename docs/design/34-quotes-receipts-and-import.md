@@ -1,6 +1,6 @@
 # 34 · Quotes, receipts, trading emails and import
 
-**Status: proposed, 21 November 2026 (WHIT-1320).** Lane L2 of the business model (section 33 §6, step 5). The owner decided on 21 November 2026 that Front Office's parts become free core features (BM.15) and that "Front Office" stops being a product name (BM.19). The inventory lane (section 31) and the accounting lane (section 32) already rebuild most of it in core. This section covers the four parts no lane covers yet: **quotes**, the **80 mm receipt**, the **trading emails** and **import**. The register rows are QT.1–QT.12, TR.1–TR.4 and IM.1–IM.9 (section "Quotes, receipts, trading emails and import"). Section 9 lists the owner's questions; nothing here is built before they are answered.
+**Status: decided by the owner on 21 November 2026 (WHIT-1320): "Accept all", every question in section 9 as recommended.** Lane L2 of the business model (section 33 §6, step 5). The owner decided on 21 November 2026 that Front Office's parts become free core features (BM.15) and that "Front Office" stops being a product name (BM.19). The inventory lane (section 31) and the accounting lane (section 32) already rebuild most of it in core. This section covers the four parts no lane covers yet: **quotes**, the **80 mm receipt**, the **trading emails** and **import**. The register rows are QT.1–QT.12, TR.1–TR.4 and IM.1–IM.9 (section "Quotes, receipts, trading emails and import"). Section 9 records the owner's answers.
 
 Once these four parts are on `develop`, Front Office is unpublished from the store and the `plugin.front-office.*` mapping comes out of core (section 8). app.whity.dev holds no `fo_*` data (section 33 §6, checked 21 November 2026), so no import from Front Office's tables is written.
 
@@ -236,7 +236,9 @@ When quotes, import, the receipt and the trading emails are on `develop`:
 3. **Docs:** 16-documents, 11-plans and 07-voice stop using "Front Office" as a product name (BM.19).
 4. **No core migration.** app.whity.dev has no `fo_*` tables and no `plugin.front-office.*` price or plan rows (checked 21 November 2026). A self-hosted install that had Front Office keeps its `fo_*` tables untouched (S.7); a one-off import command is written only if one turns up.
 
-## 9. Questions for the owner
+## 9. Questions for the owner (answered 21 November 2026)
+
+The owner answered "Accept all": each recommendation below stands as written.
 
 1. **Quote acceptance.** The public page asks the customer to type their name to accept; there is no drawn signature. Enough, or should accepting use core's e-signature (sign request) when the workspace turns it on? Recommended: **typed name**, with e-signature as a workspace setting later.
 2. **Reserving stock.** Does an accepted quote reserve its items? Recommended: **no**; stock is reserved when the sales order it turns into is confirmed (IV.13).

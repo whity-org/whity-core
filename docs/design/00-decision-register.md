@@ -1037,9 +1037,9 @@ Decided by the owner on 21 November 2026 (WHIT-1318, section 32), and changed th
 | AC.29 | Plans | Everything in core accounting works on every plan. What is paid is "Seats and volume" (owner, 21 Nov 2026); accounting's volume meter is invoices issued a month, counted and charged as the business-model decision sets. The JoFotara and bank feeds plugins are priced with the other integrations |
 | AC.30 | Sidebar | Operations › Money with tabs Overview, Invoices, Bills, Payments, Accounts, Sales tax, Reports; Purchases and Sales stay inside Inventory, revisited after A3 lands (Q13) |
 
-## Quotes, receipts, trading emails and import (proposed 21 November 2026)
+## Quotes, receipts, trading emails and import (decided 21 November 2026)
 
-Front Office's parts that no core lane covered (BM.15, BM.19), specified in section 34 (WHIT-1320). **Proposed**: the owner's questions are section 34 §9; the recommendations are written in until answered.
+Front Office's parts that no core lane covered (BM.15, BM.19), specified in section 34 (WHIT-1320). Decided by the owner on 21 November 2026: **"Accept all"**, so section 34 §9's eight recommendations stand (typed-name acceptance, no reservation on acceptance, revisions keep the number, Operations › Sales for every workspace, the receipt starter now, 5,000 rows inline and 100,000 in the background, the contact import tables copied and dropped, 30 days' validity).
 
 | # | Decision | Choice |
 | --- | --- | --- |
