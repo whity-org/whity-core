@@ -113,7 +113,8 @@ function ToggleGroup({
                 "data-[state=on]:bg-primary-tint data-[state=on]:text-primary-tint-foreground",
                 size === "sm"
                   ? cn("h-[22px] rounded-[5px] text-[0.8125rem]", iconOnly ? "w-[22px]" : "px-2")
-                  : cn("h-[30px] rounded-control-sm text-sm", iconOnly ? "w-[30px]" : "px-2.5")
+                  : // TH.18: a selected chip goes from pill to rounded when the theme morphs.
+                    cn("h-[30px] rounded-control-sm text-sm transition-[border-radius] duration-(--dur-morph) data-[state=on]:rounded-control-selected", iconOnly ? "w-[30px]" : "px-2.5")
               )}
             >
               {option.icon && <Icon name={option.icon} />}

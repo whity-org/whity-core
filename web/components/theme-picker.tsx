@@ -104,6 +104,8 @@ function optionName(key: TweakKey, value: string, t: TranslateFn, fonts: { id: s
       whity: t('theme.tweak.shape.whity', 'Whity'),
       soft: t('theme.tweak.shape.soft', 'Soft'),
       round: t('theme.tweak.shape.round', 'Round'),
+      pebble: t('theme.tweak.shape.pebble', 'Pebble'),
+      cut: t('theme.tweak.shape.cut', 'Cut'),
     };
     return names[value] ?? value;
   }

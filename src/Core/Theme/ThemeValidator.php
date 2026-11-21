@@ -22,12 +22,12 @@ final class ThemeValidator
     public const SCALES = ['standard', 'roomy', 'large'];
     public const TITLE_WEIGHTS = [500, 600];
     public const EMPHASES = ['quiet', 'expressive'];
-    public const SHAPES = ['square', 'crisp', 'whity', 'soft', 'round'];
+    public const SHAPES = ['square', 'crisp', 'whity', 'soft', 'round', 'pebble', 'cut'];
     public const MORPHS = ['off', 'on'];
     public const DENSITIES = ['compact', 'standard', 'comfortable'];
-    public const ELEVATIONS = ['plane', 'soft', 'flat'];
+    public const ELEVATIONS = ['plane', 'soft', 'flat', 'outline'];
     public const FLOATS = ['light', 'standard', 'strong'];
-    public const MOTIONS = ['calm', 'standard', 'expressive'];
+    public const MOTIONS = ['calm', 'standard', 'expressive', 'brisk'];
     public const ACCENT_USES = ['title', 'title-and-headings'];
     public const TITLE_FACES = ['readex', 'noto'];
 
