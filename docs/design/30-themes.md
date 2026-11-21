@@ -416,6 +416,15 @@ A theme may give one of a fixed list of component families its own preset:
   - a container and its edge-to-edge children (tables in cards, tabs in a page header) get matching inner radii automatically.
 - Out of scope: per-screen or per-component pixels, and avatars or status dots (they stay round, §3.3).
 
+**Built (WHIT-1225):**
+- The theme file's `shape.components` takes any of the seven families, each a preset name (`schemas/theme/v1.json`). The compiler writes that preset's whole radius set at the theme's density as `--wy-<family>-radius-*`, with its own corner (`--wy-<family>-corner-shape`) and morph, which follows the theme's `shape.morph` or the family preset's default. A family on the theme's own preset writes nothing.
+- Every radius utility reads a `--shape-*` property, set on `:root` and again on each family's elements, found by their `data-slot` (`SHAPE_FAMILIES` in `src/design/tokens/generate-tokens.js`): buttons (`button`, `icon-button`); fields (inputs, text areas, select triggers, search, tags, bilingual, phone, code, date and time triggers); chips (badges, actor chips, the phone filter chips); cards; dialogs (dialog, alert, sheet, popover, select, menus, menu bar, command palette); tables (the table container, the data table); navigation (sidebar nav, tab lists, toggle groups, view toggle, menu bar).
+- Anything inside a family's element without a family of its own follows it, so a container and its children match; edge-to-edge children are clipped by the container (§3.3).
+- Round is already the largest preset and its pill is half the control's own height, so `fields` and `cards` can't pass Round's cap.
+- The free shape tweak (TH.15) changes the theme's preset; families the theme set keep their own.
+- The CI check (`shape-clip-check.mjs`) runs two mixes as well as every preset: Round with every family on another preset, and Square with every family rounded.
+- Making them in the editor is the last step of TH.24.
+
 ### 14.3 Density
 
 - **Per area:** `density` stays one value, plus optional `density.tables` and `density.forms`. A clinic can have roomy forms and compact appointment tables.

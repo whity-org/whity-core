@@ -24,6 +24,12 @@ final class ThemeValidator
     public const EMPHASES = ['quiet', 'expressive'];
     public const SHAPES = ['square', 'crisp', 'whity', 'soft', 'round', 'pebble', 'cut'];
     public const MORPHS = ['off', 'on'];
+    /**
+     * TH.21 (30-themes 14.2): the component families a theme may give their
+     * own shape preset, a preset name only, never pixels. Keep in step with
+     * SHAPE_FAMILIES in src/design/tokens/generate-tokens.js.
+     */
+    public const COMPONENT_FAMILIES = ['buttons', 'fields', 'chips', 'cards', 'dialogs', 'tables', 'navigation'];
     public const DENSITIES = ['compact', 'standard', 'comfortable'];
     public const ELEVATIONS = ['plane', 'soft', 'flat', 'outline'];
     public const FLOATS = ['light', 'standard', 'strong'];
@@ -94,7 +100,19 @@ final class ThemeValidator
             }
         }
         if (array_key_exists('shape', $theme)) {
-            self::group($theme['shape'], 'shape', ['preset' => self::SHAPES, 'morph' => self::MORPHS], $errors);
+            $shape = $theme['shape'];
+            $components = self::isObject($shape) ? ($shape['components'] ?? null) : null;
+            if (self::isObject($shape)) {
+                unset($shape['components']);
+            }
+            self::group($shape, 'shape', ['preset' => self::SHAPES, 'morph' => self::MORPHS], $errors);
+            if (self::isObject($theme['shape']) && array_key_exists('components', $theme['shape'])) {
+                if (!self::isObject($components)) {
+                    $errors[] = 'shape.components must be an object.';
+                } else {
+                    self::group($components, 'shape.components', array_fill_keys(self::COMPONENT_FAMILIES, self::SHAPES), $errors);
+                }
+            }
         }
         if (array_key_exists('density', $theme) && !in_array($theme['density'], self::DENSITIES, true)) {
             $errors[] = 'density must be one of: ' . implode(', ', self::DENSITIES) . '.';

@@ -88,4 +88,19 @@ describe('brandThemeCss with a theme (WHIT-1225)', () => {
     expect(css).toBe(':root{--wy-corner-shape:bevel;--wy-radius-control-pressed:10px;}');
     expect(brandThemeCss({ light: {}, dark: {}, vars: { 'wy-corner-shape': 'bevel;}body{x:y' } })).not.toContain('bevel');
   });
+
+  it('writes a component family’s own corners only for the seven families (TH.21)', () => {
+    const css = brandThemeCss({
+      light: {},
+      dark: {},
+      vars: {
+        'wy-buttons-radius-control': '20px',
+        'wy-cards-corner-shape': 'bevel',
+        'wy-avatars-radius-control': '0px',
+        'wy-tables-radius-card': '1em',
+        'wy-navigation-radius-control-selected': '8px',
+      },
+    });
+    expect(css).toBe(':root{--wy-buttons-radius-control:20px;--wy-cards-corner-shape:bevel;--wy-navigation-radius-control-selected:8px;}');
+  });
 });

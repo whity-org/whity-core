@@ -516,6 +516,24 @@ final class ThemeCompiler
             $vars['wy-radius-control-selected'] = (int) round($small * 0.25) . 'px';
         }
 
+        // TH.21 (30-themes 14.2): a component family with its own preset
+        // gets the whole radius set under --wy-<family>-*, at this density,
+        // with its own morph and corner, so nothing falls through to the
+        // theme's preset. The family's element sets the --shape-* values its
+        // utilities read (generate-tokens.js, SHAPE_FAMILIES); every preset
+        // is one the corner rules and the CI check already cover.
+        $components = $theme['shape']['components'] ?? [];
+        foreach (ThemeValidator::COMPONENT_FAMILIES as $family) {
+            $preset = is_array($components) ? ($components[$family] ?? null) : null;
+            if (!is_string($preset) || !isset(self::SHAPES[$preset]) || $preset === $shape) {
+                continue;
+            }
+            $morphs = ($theme['shape']['morph'] ?? (in_array($preset, self::MORPH_BY_DEFAULT, true) ? 'on' : 'off')) === 'on';
+            foreach (self::radii($preset, $small, $control, $large, $morphs) as $name => $value) {
+                $vars["wy-{$family}-{$name}"] = $value;
+            }
+        }
+
         $motion = $theme['motion']['preset'] ?? 'calm';
         if (isset(self::SPRINGS[$motion])) {
             [$fast, $default, $slow] = self::SPRINGS[$motion];
@@ -529,6 +547,31 @@ final class ThemeCompiler
         }
 
         return $vars;
+    }
+
+    /**
+     * One preset's whole radius set at the given control heights, as the
+     * names after `wy-` (or `wy-<family>-`): every radius, the pressed and
+     * selected radii (the control's own when it doesn't morph) and the corner.
+     *
+     * @return array<string, string>
+     */
+    private static function radii(string $shape, int $small, int $control, int $large, bool $morph): array
+    {
+        [$share, $sm, $md, $lg, $xl, $xxl, $card, $dialog] = self::SHAPES[$shape];
+        $controlRadius = self::controlRadius($share, $control);
+
+        return [
+            'radius-control-sm' => self::controlRadius($share, $small) . 'px',
+            'radius-control' => "{$controlRadius}px",
+            'radius-control-lg' => self::controlRadius($share, $large) . 'px',
+            'radius-sm' => "{$sm}px", 'radius-md' => "{$md}px", 'radius-lg' => "{$lg}px",
+            'radius-xl' => "{$xl}px", 'radius-2xl' => "{$xxl}px",
+            'radius-card' => "{$card}px", 'radius-dialog' => "{$dialog}px",
+            'radius-control-pressed' => ($morph ? intdiv($controlRadius, 2) : $controlRadius) . 'px',
+            'radius-control-selected' => ($morph ? (int) round($small * 0.25) : self::controlRadius($share, $small)) . 'px',
+            'corner-shape' => $shape === 'cut' ? 'bevel' : 'round',
+        ];
     }
 
     /** The control radius for a share of its height; a negative share is the pill, half the height (3.3). */
