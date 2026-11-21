@@ -151,7 +151,9 @@ final class SettingsRegistryTest extends TestCase
              // WHIT-1235: batches and expiry.
              'inventory.fefo', 'inventory.expiry_warning_days',
              // WHIT-1321: quotes.
-             'sales.quote_valid_days', 'sales.quote_route_template_id'],
+             'sales.quote_valid_days', 'sales.quote_route_template_id',
+             // WHIT-1323: the trading emails' switches.
+             'sales.email_quote', 'sales.email_invoice', 'sales.email_receipt', 'sales.email_reminder'],
             SettingsRegistry::keys()
         );
     }
@@ -500,8 +502,9 @@ final class SettingsRegistryTest extends TestCase
         // 145 since WHIT-1308: plugins.store_allow_unsigned.
         // 146 since #2206: billing.local_runs_enabled.
         // 148 since WHIT-1321: sales.quote_valid_days and sales.quote_route_template_id.
-        // 150 since WHIT-1235: inventory.fefo and inventory.expiry_warning_days.
-        self::assertCount(150, $describe);
+        // 152 since WHIT-1323: sales.email_quote, _invoice, _receipt and _reminder.
+        // 154 since WHIT-1235: inventory.fefo and inventory.expiry_warning_days.
+        self::assertCount(154, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

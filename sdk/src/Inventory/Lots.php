@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Inventory;
 
 /**
- * Core's batches and serial numbers, for a plugin (SDK 1.134, WHIT-1235,
+ * Core's batches and serial numbers, for a plugin (SDK 1.137, WHIT-1235,
  * design 31 §3.5). Reach it through `$ctx->inventory()->lots()`, or the copy
  * in the container (`\Whity\app(Lots::class)`); both only read. It works in
  * the workspace the call runs in; with none, it throws

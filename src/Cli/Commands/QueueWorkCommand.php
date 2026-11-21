@@ -224,6 +224,7 @@ final class QueueWorkCommand implements CliCommand
                 null,
                 (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
                 $workerSender,
+                \Whity\Core\Usage\UsageLedger::forDatabase($pdo),
             );
             \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messaging);
             \Whity\register_service(\Whity\Sdk\Messaging\CustomerMessages::class, new \Whity\Core\Messaging\HostCustomerMessages(static fn (): \Whity\Core\Messaging\MessagingService => $messaging));

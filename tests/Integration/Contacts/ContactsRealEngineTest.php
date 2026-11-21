@@ -183,7 +183,7 @@ final class ContactsRealEngineTest extends TestCase
         $import = $this->imports->upload(1, 11, 'one.csv', "Name\nExample Bakery\n");
         $this->imports->check(1, $import['id'], ['mapping' => ['0' => 'name']]);
         $this->imports->run(1, $import['id'], 11);
-        $this->pdo->exec("UPDATE contact_imports SET imported_at = '2020-01-01 00:00:00' WHERE id = " . (int) $import['id']);
+        $this->pdo->exec("UPDATE import_jobs SET imported_at = '2020-01-01 00:00:00' WHERE id = " . (int) $import['id']);
 
         self::assertFalse($this->imports->show(1, $import['id'])['can_undo']);
         $this->expectException(ContactRejectedException::class);

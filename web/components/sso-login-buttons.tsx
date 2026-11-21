@@ -21,10 +21,13 @@ interface SsoProvider {
 /** Begin the hosted OIDC flow. A full-page navigation (NOT a client route):
  * the backend 302s to the provider and, on return, back to /dashboard or
  * /login?sso_error=… — so this must be a real document navigation. */
-function startUrl(providerKey: string, invite?: string): string {
+function startUrl(providerKey: string, invite?: string, form?: string): string {
   const base = `/api/v1/auth/sso/${encodeURIComponent(providerKey)}/start`;
   // WHIT-1168: an invitation accepted by signing in rides along to the callback.
-  return invite ? `${base}?invite=${encodeURIComponent(invite)}` : base;
+  if (invite) return `${base}?invite=${encodeURIComponent(invite)}`;
+  // #2355: signing in from a form's public link joins the form's workspace
+  // under its sign-up rules and comes back to the form.
+  return form ? `${base}?form=${encodeURIComponent(form)}` : base;
 }
 
 /** What the sign-in, sign-up and invitation pages learn from the providers list. */
@@ -51,11 +54,14 @@ export function ProviderIcon({ providerKey }: { providerKey: string }) {
 export function SsoLoginButtons({
   onLoaded,
   invite,
+  form,
 }: {
   /** Told once the list is in, so the page can drop the password form when it is off. */
   onLoaded?: (info: SsoSignInInfo) => void;
   /** An invitation token to accept by signing in. */
   invite?: string;
+  /** A form's public slug: signing in joins its workspace and returns to it (#2355). */
+  form?: string;
 } = {}) {
   const t = useTranslation('auth');
   const [providers, setProviders] = useState<SsoProvider[]>([]);
@@ -110,7 +116,7 @@ export function SsoLoginButtons({
           className="w-full gap-2"
           data-testid={`sso-start-${provider.provider_key}`}
         >
-          <a href={startUrl(provider.provider_key, invite)}>
+          <a href={startUrl(provider.provider_key, invite, form)}>
             <ProviderIcon providerKey={provider.provider_key} />
             {t('sso.signInWith', 'Continue with {provider}', {
               provider: provider.display_name,

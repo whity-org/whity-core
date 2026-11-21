@@ -487,10 +487,20 @@ All free in core (TH.16, TH.25).
 | Export the theme in use as a Whity theme file (JSON v1) | the picker (built, #2343) |
 | Import a Whity theme file | the picker |
 | Re-import a newer version of an imported theme | says what changed in words before replacing (built, #2343); the editor adds a side-by-side diff |
-| Import from shadcn CSS variables, a Tailwind v4 `@theme`, or Material Theme Builder JSON | the editor (11), the last step of TH.24 |
+| Import from shadcn CSS variables, a Tailwind v4 `@theme`, or Material Theme Builder JSON | the picker's "Import from another tool" (built, WHIT-1225, see below); the editor will open the result to change it |
 | Export resolved tokens as CSS, JSON, Tailwind or Flutter | the editor (11) |
 | Share a theme with another workspace you own | export and import now; a "Use in…" button with the editor |
 | Store packages (signed, hashed, through Whity ID, per the store move) | install free; a publisher may sell a theme through Whity Pay (TH.13); publishing from the editor |
+
+**The importers (built, WHIT-1225, TH.25).** `POST /api/v1/themes/convert` (`settings:write`) turns what another tool made into a Whity theme file and saves nothing. The picker shows the result with a preview and what was kept in words, then adds it through the same checked import as a theme file (TH.16), so a newer version still says what it changes (`ThemeImporter`).
+
+- **shadcn:** the `:root` and `.dark` blocks, including inside `@layer base`. Colours can be oklch, hsl, shadcn's bare `h s% l%`, rgb or hex; alpha is dropped.
+- **Tailwind v4:** the `@theme` block's `--color-*`, following `var()` within the block.
+- **Material Theme Builder JSON:** `coreColors` become the seeds, and the light and dark schemes become the roles Whity has. Surface containers lowest to highest become surfaces 1 to 5, and the scheme is Tonal.
+- **Colours:** the main colour (`primary`) becomes the seed. Each colour whose role Whity has becomes a colour set by hand in its mode. Status colours stay Whity's (TH.7), and the guard rails still apply when the theme is used, so the result says how many colours they will change.
+- **Radius and font:** `--radius` (shadcn's `rounded-lg`) becomes the nearest preset: 0 is Square, up to 6px Crisp, up to 11px Whity, up to 15px Soft, and larger Round. A font becomes its pair only when Whity has it with an Arabic face; otherwise the theme keeps Noto Sans and says so.
+- **Id and name:** the id is `imported.<name>`, and the name is plain text.
+- **Not yet built:** the editor, exporting resolved tokens as CSS, JSON, Tailwind or Flutter, and the side-by-side diff are the rest of section 11.
 
 ### 14.8 Free and paid
 

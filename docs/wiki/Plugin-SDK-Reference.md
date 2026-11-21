@@ -98,9 +98,9 @@ $inventory->stock()->move(new MoveRequest(
 | `Inventory\Operations` | Adjustments with a reason, counts and transfers, each an `Inventory\Operation` with its lines. Through `$ctx->inventory()->operations()`, bound to your plugin; the container copy reads. Above the workspace's value an adjustment or a count's differences wait for approval. | current | 1.128 |
 | `Inventory\Orders` | Purchase orders: draft for a supplier contact, send (the workspace's route or approved at once), receive in parts at the order's cost, cancel. Through `$ctx->inventory()->orders()`, bound to your plugin; the container copy reads. | current | 1.129 |
 
-| `Inventory\Lots` | Batches and serial numbers (`Inventory\Lot`): an item's, one by code, and what is expiring. Reads only. Stock coming in names its batch on the `MoveLine` (`lotCode`, `expiresOn`); stock leaving may name one, or takes the batches that expire first. | current | 1.134 |
+| `Inventory\Lots` | Batches and serial numbers (`Inventory\Lot`): an item's, one by code, and what is expiring. Reads only. Stock coming in names its batch on the `MoveLine` (`lotCode`, `expiresOn`); stock leaving may name one, or takes the batches that expire first. | current | 1.137 |
 
-`Context\InventoryScope` (`$ctx->inventory()`) holds the seven (`operations()` since 1.128, `orders()` since 1.129, `lots()` since 1.134). Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
+`Context\InventoryScope` (`$ctx->inventory()`) holds the seven (`operations()` since 1.128, `orders()` since 1.129, `lots()` since 1.137). Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
 
 ## Contribution points: what a plugin declares
 

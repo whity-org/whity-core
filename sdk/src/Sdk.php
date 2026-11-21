@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.134).
+ * SDK identity (v1.137).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1508,7 +1508,15 @@ namespace Whity\Sdk;
  *
  * Purely additive.)
  *
- * 1.134 (LOTS, SERIAL NUMBERS AND EXPIRY: {@see Inventory\Lots} reads an item's batches and serial
+ * 1.133 (USAGE METERS, READ-ONLY (section 33 §5, BM.17): the host service {@see Usage\Usage} gives a
+ * plugin its workspace's usage meters for a month, as Billing > Usage shows them: seats, customers,
+ * items, invoices, storage, messages by channel, agent runs and tool calls, and API calls, each with
+ * what was used, its base and whether it is near or past it ({@see Usage\UsageMeter}). Past a base is
+ * a warning only; nothing is ever refused.
+ *
+ * Purely additive: one new host service, null on older hosts.)
+ *
+ * 1.137 (LOTS, SERIAL NUMBERS AND EXPIRY: {@see Inventory\Lots} reads an item's batches and serial
  * numbers ({@see Inventory\Lot}) and what is expiring, through `$ctx->inventory()->lots()` or the container.
  * An item keeps batches when its `tracking` is `lot` (each batch with its expiry) or `serial`. A
  * {@see Inventory\MoveLine} gains `lotId`, `lotCode`, `expiresOn` and `madeOn`: stock coming in names its
@@ -1523,7 +1531,7 @@ namespace Whity\Sdk;
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.134.0';
+    public const VERSION = '1.137.0';
 
     /**
      * Static identity only — never instantiated.

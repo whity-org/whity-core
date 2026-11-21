@@ -71,9 +71,11 @@ final class SalesApiSchemas
             self::route('POST', '/api/sales/quotes/{id:\d+}/send', 'quotes:write', [
                 'summary' => 'Send a quote to the customer',
                 'description' => 'A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, '
-                    . 'answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`).',
+                    . 'answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`). '
+                    . 'It is emailed to the customer unless `email` is false or the workspace turned the quote email off; `emailed` says whether it was.',
                 'tags' => $tags,
-                'responses' => [200 => self::json('The quote and the customer\'s link', self::object(['data' => SchemaBuilder::ref('SalesQuote'), 'link' => self::str()], ['data', 'link']))]
+                'request' => 'SalesQuoteSendRequest',
+                'responses' => [200 => self::json('The quote and the customer\'s link', self::object(['data' => SchemaBuilder::ref('SalesQuote'), 'link' => self::str(), 'emailed' => self::bool()], ['data', 'link', 'emailed']))]
                     + $refused + $notFound + self::auth(),
             ]),
             self::route('POST', '/api/sales/quotes/{id:\d+}/link', 'quotes:write', [
@@ -199,6 +201,7 @@ final class SalesApiSchemas
                 'name' => self::str() + ['description' => 'Who accepted. Required when accepting.'],
                 'reason' => self::str() + ['description' => 'Why they declined, if they said.'],
             ], ['accepted']),
+            'SalesQuoteSendRequest' => self::object(['email' => self::bool() + ['description' => 'False to only make the link, without emailing the customer. True by default.']], []),
             'SalesQuoteConvertRequest' => self::object(['target' => self::str() + ['description' => 'A target key from GET …/targets, such as `sales_order` or `invoice`.']], ['target']),
             'SalesQuoteTarget' => self::object([
                 'key' => self::str(),
@@ -260,6 +263,10 @@ final class SalesApiSchemas
             'SalesSettings' => self::object([
                 'quote_valid_days' => self::int() + ['description' => 'How long a new quote is valid, 1 to 365 days.'],
                 'quote_route_template_id' => self::int(true) + ['description' => 'The route a quote travels before it goes out; null for none.'],
+                'email_quote' => self::bool() + ['description' => 'Email a quote to the customer when it is sent.'],
+                'email_invoice' => self::bool() + ['description' => 'Email an invoice to the customer when it is issued.'],
+                'email_receipt' => self::bool() + ['description' => 'Email a receipt when a payment arrives.'],
+                'email_reminder' => self::bool() + ['description' => 'Allow payment reminders by email.'],
             ], []),
             'PublicSalesQuote' => self::object([
                 'number' => self::str(true), 'revision' => self::int(), 'status' => self::str() + ['enum' => $statuses], 'customer' => self::str(),

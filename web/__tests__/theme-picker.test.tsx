@@ -164,3 +164,43 @@ it('previews the chosen font pair in English and Arabic, with only a well-formed
   expect(fontStack('Comic Sans; } body {')).toBeUndefined();
   expect(fontStack(stack)).toBe(stack);
 });
+
+// TH.25: a theme from shadcn, Tailwind or Material Theme Builder, seen before it is added.
+it('turns pasted shadcn CSS into a theme, shows what was kept, then adds it through the checked import', async () => {
+  const converted = { schemaVersion: 1, id: 'imported.acme', version: '1.0.0', name: { en: 'Acme' } };
+  POST.mockImplementation((path: string, init: { params?: { query?: { check?: string } }; body?: unknown }) => {
+    if (path === '/api/v1/themes/convert') {
+      return Promise.resolve({ data: { data: { theme: converted, notes: ['Kept 4 colours, with #2563eb as the main colour.'], preview: { light: swatch, dark: swatch }, adjustments: [] } } });
+    }
+    return Promise.resolve(
+      init.params?.query?.check === '1'
+        ? { data: { data: { id: 'imported.acme', version: '1.0.0', installed_version: null, changes: [] } } }
+        : { data: { data: { id: 'imported.acme', version: '1.0.0' } }, error: undefined },
+    );
+  });
+  render(<ThemePicker scope="tenant" canWrite />);
+  await screen.findByText('Sea');
+  fireEvent.click(screen.getByRole('button', { name: 'Import from another tool' }));
+  const dialog = await screen.findByTestId('theme-convert');
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Acme' } });
+  fireEvent.change(screen.getByLabelText('CSS'), { target: { value: ':root { --primary: #2563eb; }' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Make the theme' }));
+  expect(await screen.findByTestId('theme-convert-result')).toHaveTextContent('Kept 4 colours');
+  expect(POST).toHaveBeenCalledWith('/api/v1/themes/convert', { body: { format: 'shadcn', source: ':root { --primary: #2563eb; }', name: 'Acme' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Add this theme' }));
+  await waitFor(() => expect(POST).toHaveBeenCalledWith('/api/v1/themes', { body: converted }));
+  expect(POST).toHaveBeenCalledWith('/api/v1/themes', { params: { query: { check: '1' } }, body: converted });
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
+});
+
+it('says in words why something could not be turned into a theme', async () => {
+  POST.mockResolvedValue({ error: { errors: { source: 'No CSS variables were found. Paste the :root and .dark blocks, or the @theme block.' } } });
+  render(<ThemePicker scope="tenant" canWrite />);
+  await screen.findByText('Sea');
+  fireEvent.click(screen.getByRole('button', { name: 'Import from another tool' }));
+  await screen.findByTestId('theme-convert');
+  fireEvent.change(screen.getByLabelText('CSS'), { target: { value: 'body {}' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Make the theme' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('No CSS variables were found');
+  expect(screen.queryByTestId('theme-convert-result')).not.toBeInTheDocument();
+});

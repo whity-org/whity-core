@@ -8,7 +8,7 @@ use Whity\Core\Inventory\LotService;
 use Whity\Sdk\Inventory\Lot;
 use Whity\Sdk\Inventory\Lots;
 
-/** Core's batches and serial numbers for plugins (SDK 1.134, WHIT-1235), in the workspace the call runs in. Reads only. */
+/** Core's batches and serial numbers for plugins (SDK 1.137, WHIT-1235), in the workspace the call runs in. Reads only. */
 final class HostLots implements Lots
 {
     public function __construct(

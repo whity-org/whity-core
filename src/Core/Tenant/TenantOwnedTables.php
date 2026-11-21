@@ -138,8 +138,8 @@ final class TenantOwnedTables
         // WHIT-953 — contacts and their spreadsheet imports (design 3.3 A8).
         // Every query binds tenant_id.
         'contacts' => '261_create_contacts.php',
-        'contact_imports' => '261_create_contacts.php',
-        'contact_import_changes' => '261_create_contacts.php',
+        'import_jobs' => '331_create_import_jobs.php',
+        'import_job_changes' => '331_create_import_jobs.php',
 
         // WHIT-954 — the workspace's own fields and their values (A9).
         'custom_field_definitions' => '263_create_custom_fields.php',
@@ -162,6 +162,9 @@ final class TenantOwnedTables
         // Files, photos and voice sent in Chat (UC.10).
         'chat_attachments' => '279_create_chat_attachments.php',
         'stored_files' => '298_create_stored_files.php',
+        // The usage ledger and stored bytes (section 33 §5, WHIT-1325).
+        'usage_ledger' => '332_create_usage_ledger.php',
+        'tenant_storage_usage' => '333_create_tenant_storage_usage.php',
         // Who owns each workspace (WHIT-1169).
         'workspace_owners' => '300_create_workspace_owners.php',
         // Offers to hand a workspace over or co-own it (WHIT-1170).
@@ -662,7 +665,7 @@ final class TenantOwnedTables
         'inv_orders' => '321_create_inventory_orders.php',
         'inv_order_lines' => '321_create_inventory_orders.php',
         'inv_supplier_items' => '321_create_inventory_orders.php',
-        'inv_lots' => '336_create_inventory_lots.php',
+        'inv_lots' => '337_create_inventory_lots.php',
         'sales_quotes' => '330_create_sales_quotes.php',
         'sales_quote_lines' => '330_create_sales_quotes.php',
         'sales_quote_conversions' => '330_create_sales_quotes.php',

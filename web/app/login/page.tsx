@@ -104,6 +104,26 @@ function formatBackupCode(raw: string): string {
   return groups.join('-');
 }
 
+/**
+ * Where a sign-in started from a form's public link goes back to (#2355):
+ * `?form=<public slug>&next=/forms/<id>`. Only those exact shapes are taken,
+ * so the page can't be made to send anyone elsewhere.
+ */
+interface ReturnTo {
+  form: string | null;
+  next: string | null;
+}
+
+function readReturnTo(search: string): ReturnTo {
+  const params = new URLSearchParams(search);
+  const form = params.get('form');
+  const next = params.get('next');
+  return {
+    form: form !== null && /^[0-9a-f]{64}$/i.test(form) ? form.toLowerCase() : null,
+    next: next !== null && /^\/forms\/[1-9][0-9]{0,9}$/.test(next) ? next : null,
+  };
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading, refreshAuth } = useAuth();
@@ -161,18 +181,22 @@ export default function LoginPage() {
   // tick (a microtask) rather than set directly in the effect body, which keeps
   // it clear of React's set-state-in-effect rule while preserving the original
   // "enabled until mounted" timing. Focusing the DOM is a plain side effect.
+  const [returnTo, setReturnTo] = useState<ReturnTo>({ form: null, next: null });
   useEffect(() => {
     emailInputRef.current?.focus();
-    const flip = Promise.resolve().then(() => setIsMounted(true));
+    const flip = Promise.resolve().then(() => {
+      setReturnTo(readReturnTo(window.location.search));
+      setIsMounted(true);
+    });
     void flip;
   }, []);
 
   // Redirect if already authenticated
   useEffect(() => {
     if (isMounted && isAuthenticated()) {
-      router.push('/dashboard');
+      router.push(returnTo.next ?? '/dashboard');
     }
-  }, [isAuthenticated, router, isMounted]);
+  }, [isAuthenticated, router, isMounted, returnTo.next]);
 
   // Surface the SSO return markers the backend appends on a hosted-login bounce
   // (…/login?sso_error=<reason> or ?sso=select), then strip them from the URL so
@@ -274,7 +298,7 @@ export default function LoginPage() {
         } else {
           // Single-membership: session cookie already set — redirect in.
           await refreshAuth();
-          router.push((await continueSignupPlugin()) ?? '/dashboard');
+          router.push((await continueSignupPlugin()) ?? returnTo.next ?? '/dashboard');
         }
       } else {
         const errorData = ((loginError_ ?? {}) as unknown) as { message?: string };
@@ -314,7 +338,7 @@ export default function LoginPage() {
       if (response.ok) {
         // Session issued for the chosen tenant — redirect in.
         await refreshAuth();
-        router.push((await continueSignupPlugin()) ?? '/dashboard');
+        router.push((await continueSignupPlugin()) ?? returnTo.next ?? '/dashboard');
       } else {
         const errorData = ((selectError ?? {}) as unknown) as { message?: string };
         const message =
@@ -374,7 +398,7 @@ export default function LoginPage() {
       if (response.ok) {
         // 2FA successful - refresh auth state and redirect
         await refreshAuth();
-        router.push((await continueSignupPlugin()) ?? '/dashboard');
+        router.push((await continueSignupPlugin()) ?? returnTo.next ?? '/dashboard');
       } else if (response.status === 401) {
         const errorMsg = backupCodeMode
           ? t('recovery.error.invalid', 'Invalid recovery code. Please try again.')
@@ -486,7 +510,7 @@ export default function LoginPage() {
               <AlertDescription>{loginError}</AlertDescription>
             </Alert>
           )}
-          <SsoLoginButtons onLoaded={(info) => setPasswordSignIn(info.passwordSignIn)} />
+          <SsoLoginButtons form={returnTo.form ?? undefined} onLoaded={(info) => setPasswordSignIn(info.passwordSignIn)} />
           {!passwordSignIn && (
             <p className="text-center text-sm text-muted-foreground" data-testid="provider-only-note">
               {t(

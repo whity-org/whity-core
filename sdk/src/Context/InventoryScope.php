@@ -46,7 +46,7 @@ interface InventoryScope
     public function orders(): Orders;
 
     /**
-     * Batches, serial numbers and what is expiring (SDK 1.134, WHIT-1235).
+     * Batches, serial numbers and what is expiring (SDK 1.137, WHIT-1235).
      * Reads only.
      */
     public function lots(): Lots;

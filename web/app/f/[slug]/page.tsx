@@ -63,6 +63,26 @@ interface PublicForm {
   built_on_whity?: boolean;
 }
 
+/**
+ * What a sign-in started here came back with (#2355): `?sso=` on this page.
+ * The server joins a new person to the form's workspace under its sign-up
+ * rules, or sends them back here with one of these.
+ */
+type SsoOutcome = 'pending' | 'domain' | 'refused' | 'closed' | 'email_unverified' | 'link_conflict' | 'provider_unavailable' | 'failed';
+
+const SSO_OUTCOMES: readonly SsoOutcome[] = [
+  'pending', 'domain', 'refused', 'closed', 'email_unverified', 'link_conflict', 'provider_unavailable', 'failed',
+];
+
+/**
+ * Sign in from this form (#2355). The login page hands `form` to the sign-in
+ * provider, so a new person joins this form's workspace and comes back to the
+ * form, and `next` brings a password sign-in back to it too.
+ */
+function signInHref(slug: string, formId: number): string {
+  return `/login?${new URLSearchParams({ form: slug, next: `/forms/${formId}` }).toString()}`;
+}
+
 export default function PublicFormPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const { dir } = useDirection();
@@ -82,9 +102,12 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [submitted, setSubmitted] = useState(false);
   const [reference, setReference] = useState<string | null>(null);
+  const [ssoOutcome, setSsoOutcome] = useState<SsoOutcome | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    const returned = new URLSearchParams(window.location.search).get('sso');
+    const outcome = SSO_OUTCOMES.find((o) => o === returned) ?? null;
 
     api.GET('/api/v1/public/forms/{slug}', { params: { path: { slug } } })
       .then(({ data, error, response }) => {
@@ -98,6 +121,7 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
           return;
         }
         setForm(body.data);
+        setSsoOutcome(outcome);
       })
       .catch(() => {
         if (!cancelled) setLoadError('loadFailed');
@@ -256,11 +280,16 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
       <CardContent>
         {form.accepts_submissions && form.sign_in_required === true && typeof form.form_id === 'number' ? (
           <div className="space-y-3 py-6">
+            {ssoOutcome !== null && (
+              <p role="status" className="text-sm" data-testid="form-sso-outcome">
+                {ssoOutcomeText(ssoOutcome, t)}
+              </p>
+            )}
             <p className="text-sm text-muted-foreground">
               {t('fill.signInRequired', 'Sign in to fill in this form. It is sent under your own name, so you can follow it and make changes if you are asked to.')}
             </p>
             <Button asChild>
-              <a href={`/forms/${form.form_id}`}>{t('fill.signIn', 'Sign in to fill it in')}</a>
+              <a href={signInHref(slug, form.form_id)}>{t('fill.signIn', 'Sign in to fill it in')}</a>
             </Button>
           </div>
         ) : !form.accepts_submissions ? (
@@ -289,4 +318,26 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
       </CardContent>
     </Card>
   );
+}
+
+/** What came back from signing in from this form, in the reader's words (#2355). */
+function ssoOutcomeText(outcome: SsoOutcome, t: ReturnType<typeof useTranslation>): string {
+  switch (outcome) {
+    case 'pending':
+      return t('fill.sso.pending', 'Your request to join is waiting for the workspace to approve it. You can fill in this form once it is accepted.');
+    case 'domain':
+      return t('fill.sso.domain', 'This workspace only accepts sign-ups from some email domains, and that account’s email isn’t on one of them. Sign in with an address it accepts.');
+    case 'refused':
+      return t('fill.sso.refused', 'That account can’t join this workspace by signing up. Contact the workspace if you think this is wrong.');
+    case 'closed':
+      return t('fill.sso.closed', 'This workspace isn’t taking sign-ups, so only its members can fill in this form. Ask the workspace to invite you.');
+    case 'email_unverified':
+      return t('fill.sso.unverified', 'That account’s email isn’t verified yet. Verify it, then try again.');
+    case 'link_conflict':
+      return t('fill.sso.conflict', 'An account with that email already exists but its email isn’t confirmed. Sign in with email and confirm it first.');
+    case 'provider_unavailable':
+      return t('fill.sso.unavailable', 'The sign-in service couldn’t be reached. Try again later.');
+    default:
+      return t('fill.sso.failed', 'Signing in didn’t work. Try again.');
+  }
 }

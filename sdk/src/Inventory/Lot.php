@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Inventory;
 
 /**
- * A batch of one variant, or a serial number (SDK 1.134, WHIT-1235): its code,
+ * A batch of one variant, or a serial number (SDK 1.137, WHIT-1235): its code,
  * the dates it was made and expires, and how much of it is in stock now, in
  * the item's base unit. A serial number is a lot that holds exactly one piece.
  */

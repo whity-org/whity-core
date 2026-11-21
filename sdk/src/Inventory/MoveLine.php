@@ -10,7 +10,7 @@ namespace Whity\Sdk\Inventory;
  * `unit` (a unit code such as `kg` or `box`, or null for the item's base
  * unit); the host converts it exactly to the base unit.
  *
- * For an item that keeps batches or serial numbers (SDK 1.134, WHIT-1235):
+ * For an item that keeps batches or serial numbers (SDK 1.137, WHIT-1235):
  * stock coming in names its lot by `lotId` or `lotCode` (a new code makes the
  * lot, with `expiresOn` and `madeOn` as `YYYY-MM-DD`; `expiresOn` is needed
  * when the item expires and has no shelf life); stock leaving may name one,

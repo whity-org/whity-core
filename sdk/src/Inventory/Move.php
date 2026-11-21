@@ -30,7 +30,7 @@ final class Move
         public readonly ?int $reversesMoveId = null,
         public readonly ?int $unitCostMinor = null,
         public readonly ?string $currency = null,
-        /** The batch or serial number it moved (SDK 1.134), or null for an item without batches. */
+        /** The batch or serial number it moved (SDK 1.137), or null for an item without batches. */
         public readonly ?int $lotId = null,
     ) {
     }

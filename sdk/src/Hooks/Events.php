@@ -502,7 +502,7 @@ final class Events
     public const STOCK_LEVEL_RESTORED = 'stock.level.restored';
     public const STOCK_LEVEL_RESTORED_ASYNC = 'stock.level.restored.async';
 
-    // ---- batches and expiry (SDK 1.134, WHIT-1235) ----
+    // ---- batches and expiry (SDK 1.137, WHIT-1235) ----
     /**
      * A batch with stock expires within the workspace's warning window (7 days
      * unless changed). Fired once per batch by the daily job. Payload:
