@@ -19,7 +19,7 @@ use Whity\Http\JsonBody;
 /**
  * Workspace templates (SDK 1.116, WHIT-1194), all under `settings:write`:
  *   GET    /api/workspace/templates              → the cards, which ones this workspace chose, live examples
- *   POST   /api/workspace/templates/{key}/apply  → { examples?: bool } apply it as the caller
+ *   POST   /api/workspace/templates/{key}/apply  → { examples?: bool, theme?: bool } apply it as the caller
  *   DELETE /api/workspace/templates/examples     → remove the examples in one click
  *
  * and a chosen template's guided setup (WHIT-1195), listed with the plugins'
@@ -298,6 +298,40 @@ final class WorkspaceTemplatesApiHandler
         return $names[$plugin] ?? ['en' => $plugin, 'ar' => $plugin];
     }
 
+    /** @var (\Closure(int, string): ?array<string, mixed>)|null */
+    private ?\Closure $themes = null;
+
+    /**
+     * How a theme is found in a workspace: Whity's own, the plugins' and the
+     * imported ones ({@see \Whity\Core\Theme\ThemeLibrary::find()}). Without it
+     * no template offers a theme.
+     *
+     * @param \Closure(int, string): ?array<string, mixed> $find (workspace, theme id)
+     */
+    public function useThemes(\Closure $find): void
+    {
+        $this->themes = $find;
+    }
+
+    /**
+     * The template's theme (SDK 1.131, TH.23) when the workspace has it, with
+     * its name in the caller's language; null when the template names none or
+     * that theme is not installed here.
+     *
+     * @param array<string, mixed> $template
+     * @return array{id: string, name: ?string}|null
+     */
+    private function theme(array $template, int $tenantId, string $language): ?array
+    {
+        $id = $template['theme'] ?? null;
+        if (!is_string($id) || $this->themes === null) {
+            return null;
+        }
+        $theme = ($this->themes)($tenantId, $id);
+
+        return is_array($theme) ? ['id' => $id, 'name' => self::text($theme['name'] ?? null, $language)] : null;
+    }
+
     /** @var (\Closure(int, ?int, string, ?int): Response)|null */
     private ?\Closure $trialStarter = null;
 
@@ -352,6 +386,7 @@ final class WorkspaceTemplatesApiHandler
                     'hasExamples' => !empty($template['examples']['contacts']) || !empty($template['examples']['bookings']),
                     'hasSetup' => !empty($template['setup']['steps']),
                     'offer' => $this->offer($template, $tenantId, $language),
+                    'theme' => $this->theme($template, $tenantId, $language),
                     'chosen' => in_array($template['key'], $chosen, true),
                 ];
             }
@@ -377,14 +412,17 @@ final class WorkspaceTemplatesApiHandler
             if ($template === null) {
                 return Response::error('There is no such template.', 404);
             }
-            $examples = (JsonBody::parsed($request)['examples'] ?? true) !== false;
+            $body = JsonBody::parsed($request);
+            $examples = ($body['examples'] ?? true) !== false;
+            // The template's theme is offered on by default; only one installed here is set.
+            $theme = ($body['theme'] ?? true) !== false ? ($this->theme($template, $tenantId, $this->language())['id'] ?? null) : null;
 
-            $result = ($this->applier)()->apply($tenantId, $profileId, $template, $examples);
+            $result = ($this->applier)()->apply($tenantId, $profileId, $template, $examples, $theme);
             $this->audit?->record(self::AUDIT_APPLIED, [
                 'tenant_id' => $tenantId,
                 'actor_user_id' => $profileId,
                 'target_type' => 'workspace_template',
-                'metadata' => ['template' => $template['key'], 'version' => $template['version'], 'plugin' => $template['plugin'] ?? null, 'made' => $result['made'], 'skipped' => count($result['skipped'])],
+                'metadata' => ['template' => $template['key'], 'version' => $template['version'], 'plugin' => $template['plugin'] ?? null, 'theme' => $theme, 'made' => $result['made'], 'skipped' => count($result['skipped'])],
             ]);
 
             return Response::json(['data' => [

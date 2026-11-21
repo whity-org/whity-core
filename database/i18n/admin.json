@@ -4043,6 +4043,8 @@
         "templates.offers": "Offers {plugin} · {days}-day free trial",
         "templates.setsUp": "Sets up:",
         "templates.template": "Template",
+        "templates.theme": "Use its look: {name}",
+        "templates.themeHint": "Colours, shapes and fonts made for this kind of business. Change it any time in Branding.",
         "templates.title": "How will you use Whity?",
         "tenants.access.area": "workspaces",
         "tenants.actions.delete": "Delete",

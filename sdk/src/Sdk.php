@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.130).
+ * SDK identity (v1.131).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1489,12 +1489,21 @@ namespace Whity\Sdk;
  * puts time off on their own calendar through {@see Calendar\TimeOff} with no `calendar:write`.
  *
  * Purely additive: one new optional interface and one new host service.)
+ *
+ * 1.131 (A WORKSPACE TEMPLATE NAMES ITS THEME (WHIT-1225, 30-themes §14.6, TH.23):
+ * {@see Manifest\WorkspaceTemplateValidator} accepts an optional `theme`, a theme id such as
+ * `templates.market`, usually one the same plugin ships through {@see Contribute\PluginThemesInterface}.
+ * Choosing the template offers that theme, on by default; core sets it only while the workspace still
+ * has the installation's theme, and skips it when no theme by that id is installed.
+ *
+ * Purely additive: one new optional manifest key. Older hosts refuse a manifest that carries it, so a
+ * plugin that sets `theme` needs `^1.131`.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.130.0';
+    public const VERSION = '1.131.0';
 
     /**
      * Static identity only — never instantiated.

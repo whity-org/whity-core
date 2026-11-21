@@ -451,7 +451,7 @@ A pair is chosen by its **Arabic** face, and the Latin face follows. The list gr
 
 ### 14.6 More themes, one per workspace template
 
-The first seven workspace templates ship in the free `workspace-templates` store package, not in core. Their themes ship there too, through the plugin theme interface (SDK 1.125), as "From Workspace templates". Choosing a template offers its theme when the workspace is created, and the person can change it at any time, for free. A manifest names its theme with a new optional `theme` key. That is an SDK minor, to be numbered by the orchestrator when built.
+The first seven workspace templates ship in the free `workspace-templates` store package, not in core. Their themes ship there too, through the plugin theme interface (SDK 1.125), as "From Workspace templates". Choosing a template offers its theme when the workspace is created, and the person can change it at any time, for free. A manifest names its theme with a new optional `theme` key, SDK 1.131 (built in core). The template picker shows "Use its look" with the theme's name, on by default; core sets the theme only while the workspace still has the installation's theme, and offers nothing when the theme is not installed.
 
 | Template | Theme | Like |
 | --- | --- | --- |

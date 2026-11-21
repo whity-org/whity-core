@@ -4044,6 +4044,8 @@
         "templates.offers": "يتضمن عرض {plugin} · تجربة مجانية لمدة {days} يوماً",
         "templates.setsUp": "يُعدّ لك:",
         "templates.template": "القالب",
+        "templates.theme": "استخدم مظهره: {name}",
+        "templates.themeHint": "ألوان وأشكال وخطوط مصممة لهذا النوع من الأعمال. غيّرها متى شئت من الهوية البصرية.",
         "templates.title": "كيف ستستخدم Whity؟",
         "tenants.access.area": "مساحات العمل",
         "tenants.actions.delete": "حذف",
