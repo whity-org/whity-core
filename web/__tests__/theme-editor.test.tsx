@@ -124,3 +124,32 @@ it('compares the draft with where it started, side by side', async () => {
     body: { before: harbour, after: expect.objectContaining({ name: { en: 'Harbour (copy)' } }) },
   });
 });
+
+it('publishes: saves the theme, packages it for the store and hands over the file', async () => {
+  POST.mockImplementation((path: string) => {
+    if (path === '/api/v1/themes/preview') return Promise.resolve({ data: { data: valid } });
+    if (path === '/api/v1/themes/package') {
+      return Promise.resolve({
+        data: { data: { plugin: 'WorkspaceHarbourCopyTheme', filename: 'WorkspaceHarbourCopyTheme-1.0.0.zip', media_type: 'application/zip', sha256: 'ab'.repeat(32), size_bytes: 3, content_base64: btoa('zip') } },
+      });
+    }
+    return Promise.resolve({ data: { data: { id: 'workspace.harbour-copy', version: '1.0.0' } }, error: undefined });
+  });
+  const createObjectURL = jest.fn((_blob: Blob) => 'blob:pkg');
+  Object.assign(URL, { createObjectURL, revokeObjectURL: jest.fn() });
+  const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  render(<ThemeEditor start={harbour} editable={false} fonts={[]} />);
+  await settle();
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+  const dialog = await screen.findByTestId('theme-publish');
+  expect(POST).toHaveBeenCalledWith('/api/v1/themes', { body: { theme: expect.objectContaining({ id: 'workspace.harbour-copy' }), source: 'editor' } });
+  expect(POST).toHaveBeenCalledWith('/api/v1/themes/package', { body: { theme: expect.objectContaining({ id: 'workspace.harbour-copy', version: '1.0.0' }) } });
+  expect(dialog).toHaveTextContent('WorkspaceHarbourCopyTheme-1.0.0.zip');
+  expect(dialog).toHaveTextContent('ab'.repeat(32));
+  fireEvent.click(screen.getByRole('button', { name: 'Download the package' }));
+  expect(click).toHaveBeenCalled();
+  expect(createObjectURL.mock.calls[0][0].type).toBe('application/zip');
+  expect(push).not.toHaveBeenCalled();
+  click.mockRestore();
+});
