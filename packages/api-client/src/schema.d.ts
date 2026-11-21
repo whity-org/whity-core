@@ -22786,6 +22786,8 @@ export interface components {
                     font: {
                         id: string;
                         name: string;
+                        stack?: string;
+                        heading_stack?: string;
                     }[];
                 };
                 /** @description The workspace's colour overrides, light and dark, kept when the tweaks are saved. */

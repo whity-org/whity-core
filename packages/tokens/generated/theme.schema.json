@@ -21,7 +21,7 @@
       "propertyNames": { "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
       "additionalProperties": { "$ref": "#/$defs/hex" }
     },
-    "fontId": { "enum": ["noto", "plex", "readex", "cairo", "kufi"] }
+    "fontId": { "enum": ["noto", "plex", "readex", "cairo", "kufi", "rubik", "alexandria", "naskh", "ibm-kufi"] }
   },
   "properties": {
     "$schema": { "type": "string", "maxLength": 200 },
