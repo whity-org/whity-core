@@ -4338,6 +4338,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/document-verifications/{token}/files/{sha256}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check a file: is this PDF the one the issuer stored? (public, rate-limited)
+         * @description The browser hashes the PDF and sends only its SHA-256; the file never leaves the visitor's device (#1730). `current` is the newest PDF of the document, `earlier` an older one. Every code that does not verify answers `none` with the same 200, so this cannot be asked whether a code exists.
+         */
+        get: operations["get_api_v1_document_verifications_token_files_sha256"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/documents": {
         parameters: {
             query?: never;
@@ -47137,10 +47157,10 @@ export interface operations {
                             /** @description The issue DATE (YYYY-MM-DD), not a timestamp. ABSENT at the `undated` disclosure level — absent rather than null, because null would be a statement about the document and this is a statement about the page. */
                             issued_on?: string | null;
                             /**
-                             * @description Only at the `stage` and `described` disclosure levels
+                             * @description Only at the `stage`, `described` and `signed` disclosure levels
                              * @enum {string}
                              */
-                            stage?: "issued" | "forwarded" | "acknowledged" | "returned" | "noted";
+                            stage?: "issued" | "forwarded" | "acknowledged" | "returned" | "noted" | "sent_back" | "resubmitted" | "signed" | "stamped" | "declined";
                             /** @description Date only, and only at the `stage` level */
                             stage_on?: string | null;
                             /** @description Only at `described`, and only when the template has a public name: what kind of document it is. Never its title. */
@@ -47154,6 +47174,20 @@ export interface operations {
                                 revision: string;
                                 issued_on: string | null;
                             };
+                            /** @description Only at `signed` (#1730): the signatures and company stamps on the document, as capacities with dates. `name` only when the workspace turned on documents.qr_public_signer_names. */
+                            signatures?: {
+                                /** @enum {string} */
+                                kind: "signature" | "stamp";
+                                /** @description The capacity signed in, or the legal name a stamp stands for */
+                                capacity: string | null;
+                                on_behalf_of: string | null;
+                                version: number;
+                                /** @description Date only */
+                                signed_on: string | null;
+                                name?: string;
+                            }[];
+                            /** @description Only at `signed` (#1730): false when the hash chain of the document trail is broken, so the record behind the paper was changed. */
+                            trail_intact?: boolean;
                             /** @description Only beside a code that verified and names its issuer: the issuer logo and colour (WHIT-1044). */
                             brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
                         };
@@ -47171,6 +47205,88 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many verification attempts from this address */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Verification is temporarily unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_document_verifications_token_files_sha256: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+                sha256: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether the file matches */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            /** @enum {string} */
+                            match: "current" | "earlier" | "none";
+                        };
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a SHA-256 */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

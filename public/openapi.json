@@ -29266,13 +29266,18 @@
                                                 },
                                                 "stage": {
                                                     "type": "string",
-                                                    "description": "Only at the `stage` and `described` disclosure levels",
+                                                    "description": "Only at the `stage`, `described` and `signed` disclosure levels",
                                                     "enum": [
                                                         "issued",
                                                         "forwarded",
                                                         "acknowledged",
                                                         "returned",
-                                                        "noted"
+                                                        "noted",
+                                                        "sent_back",
+                                                        "resubmitted",
+                                                        "signed",
+                                                        "stamped",
+                                                        "declined"
                                                     ]
                                                 },
                                                 "stage_on": {
@@ -29309,6 +29314,53 @@
                                                         "issued_on"
                                                     ]
                                                 },
+                                                "signatures": {
+                                                    "type": "array",
+                                                    "description": "Only at `signed` (#1730): the signatures and company stamps on the document, as capacities with dates. `name` only when the workspace turned on documents.qr_public_signer_names.",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "kind": {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "signature",
+                                                                    "stamp"
+                                                                ]
+                                                            },
+                                                            "capacity": {
+                                                                "type": "string",
+                                                                "nullable": true,
+                                                                "description": "The capacity signed in, or the legal name a stamp stands for"
+                                                            },
+                                                            "on_behalf_of": {
+                                                                "type": "string",
+                                                                "nullable": true
+                                                            },
+                                                            "version": {
+                                                                "type": "integer"
+                                                            },
+                                                            "signed_on": {
+                                                                "type": "string",
+                                                                "nullable": true,
+                                                                "description": "Date only"
+                                                            },
+                                                            "name": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "kind",
+                                                            "capacity",
+                                                            "on_behalf_of",
+                                                            "version",
+                                                            "signed_on"
+                                                        ]
+                                                    }
+                                                },
+                                                "trail_intact": {
+                                                    "type": "boolean",
+                                                    "description": "Only at `signed` (#1730): false when the hash chain of the document trail is broken, so the record behind the paper was changed."
+                                                },
                                                 "brand": {
                                                     "nullable": true,
                                                     "allOf": [
@@ -29340,6 +29392,124 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification attempts from this address",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Verification is temporarily unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/document-verifications/{token}/files/{sha256}": {
+            "get": {
+                "operationId": "get_api_v1_document_verifications_token_files_sha256",
+                "summary": "Check a file: is this PDF the one the issuer stored? (public, rate-limited)",
+                "tags": [
+                    "documents"
+                ],
+                "description": "The browser hashes the PDF and sends only its SHA-256; the file never leaves the visitor's device (#1730). `current` is the newest PDF of the document, `earlier` an older one. Every code that does not verify answers `none` with the same 200, so this cannot be asked whether a code exists.",
+                "parameters": [
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "sha256",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Whether the file matches",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "match": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "current",
+                                                        "earlier",
+                                                        "none"
+                                                    ]
+                                                }
+                                            },
+                                            "required": [
+                                                "match"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a SHA-256",
                         "content": {
                             "application/json": {
                                 "schema": {

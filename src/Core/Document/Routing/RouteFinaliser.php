@@ -337,7 +337,10 @@ final class RouteFinaliser implements RouteFinaliseService
         $footnote = $approved['version'] > 0
             ? $this->labels->madeFrom($approved['version'], $approved['content_hash'])
             : '';
-        [$outcome, $artifact] = $issuing->renderFinal($actor, $source, $templateVersion, $values, $document, $footnote);
+        // #1730: who signed and stamped on this route, and the evidence page.
+        $evidence = (new \Whity\Core\Document\Signing\SignatureEvidence($this->db))
+            ->blocksForRoute($tenantId, (int) $row['route_id'], (string) ($source['lang'] ?? 'en'));
+        [$outcome, $artifact] = $issuing->renderFinal($actor, $source, $templateVersion, $values, $document, $footnote, $evidence);
 
         if ($artifact !== null) {
             return [self::DONE, '', $existingDocumentId, (int) $artifact['id']];
@@ -386,8 +389,9 @@ final class RouteFinaliser implements RouteFinaliseService
         }
         $footnote = $approved['version'] > 0 ? $this->labels->madeFrom($approved['version'], $approved['content_hash']) : '';
         $printouts = $issuing->formPrintouts($this->db);
+        $evidence = new \Whity\Core\Document\Signing\SignatureEvidence($this->db);
 
-        [$outcome, $artifact] = $issuing->renderBuiltPayload($actor, $document, static function (?\Whity\Core\Document\Qr\DocumentQrStamp $stamp) use ($printouts, $tenantId, $subjectId, $answers, $routeId, $footnote): ?array {
+        [$outcome, $artifact] = $issuing->renderBuiltPayload($actor, $document, static function (?\Whity\Core\Document\Qr\DocumentQrStamp $stamp) use ($printouts, $tenantId, $subjectId, $answers, $routeId, $footnote, $evidence): ?array {
             $payload = $printouts->payload($tenantId, $subjectId, [
                 'answers' => $answers,
                 'routeId' => $routeId,
@@ -400,6 +404,13 @@ final class RouteFinaliser implements RouteFinaliseService
             if ($payload !== null && $footnote !== '') {
                 // WHIT-921: which version a final document was made from.
                 $payload['content'][] = ['type' => 'paragraph', 'text' => $footnote];
+            }
+            if ($payload !== null) {
+                // #1730: a submission route that still carries a document can be signed.
+                $lang = is_string($payload['lang'] ?? null) ? $payload['lang'] : 'en';
+                foreach ($evidence->blocksForRoute($tenantId, $routeId, $lang) as $block) {
+                    $payload['content'][] = $block;
+                }
             }
 
             return $payload;

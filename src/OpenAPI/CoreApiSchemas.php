@@ -17894,8 +17894,9 @@ final class CoreApiSchemas
                                             ],
                                             'stage' => [
                                                 'type' => 'string',
-                                                'description' => 'Only at the `stage` and `described` disclosure levels',
-                                                'enum' => ['issued', 'forwarded', 'acknowledged', 'returned', 'noted'],
+                                                'description' => 'Only at the `stage`, `described` and `signed` disclosure levels',
+                                                'enum' => ['issued', 'forwarded', 'acknowledged', 'returned', 'noted',
+                                                    'sent_back', 'resubmitted', 'signed', 'stamped', 'declined'],
                                             ],
                                             'stage_on' => [
                                                 'type' => 'string',
@@ -17923,6 +17924,26 @@ final class CoreApiSchemas
                                                 ],
                                                 'required' => ['revision', 'issued_on'],
                                             ],
+                                            'signatures' => [
+                                                'type' => 'array',
+                                                'description' => 'Only at `signed` (#1730): the signatures and company stamps on the document, as capacities with dates. `name` only when the workspace turned on documents.qr_public_signer_names.',
+                                                'items' => [
+                                                    'type' => 'object',
+                                                    'properties' => [
+                                                        'kind' => ['type' => 'string', 'enum' => ['signature', 'stamp']],
+                                                        'capacity' => ['type' => 'string', 'nullable' => true, 'description' => 'The capacity signed in, or the legal name a stamp stands for'],
+                                                        'on_behalf_of' => ['type' => 'string', 'nullable' => true],
+                                                        'version' => ['type' => 'integer'],
+                                                        'signed_on' => ['type' => 'string', 'nullable' => true, 'description' => 'Date only'],
+                                                        'name' => ['type' => 'string'],
+                                                    ],
+                                                    'required' => ['kind', 'capacity', 'on_behalf_of', 'version', 'signed_on'],
+                                                ],
+                                            ],
+                                            'trail_intact' => [
+                                                'type' => 'boolean',
+                                                'description' => 'Only at `signed` (#1730): false when the hash chain of the document trail is broken, so the record behind the paper was changed.',
+                                            ],
                                             'brand' => [
                                                 'nullable' => true,
                                                 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')],
@@ -17934,6 +17955,37 @@ final class CoreApiSchemas
                                 ],
                             ]
                         ),
+                        429 => self::errorResponse('Too many verification attempts from this address'),
+                        503 => self::errorResponse('Verification is temporarily unavailable'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/document-verifications/{token}/files/{sha256:[0-9a-fA-F]{64}}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Check a file: is this PDF the one the issuer stored? (public, rate-limited)',
+                    'description' => 'The browser hashes the PDF and sends only its SHA-256; the file never leaves the '
+                        . 'visitor\'s device (#1730). `current` is the newest PDF of the document, `earlier` an older one. '
+                        . 'Every code that does not verify answers `none` with the same 200, so this cannot be asked '
+                        . 'whether a code exists.',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        200 => self::jsonResponse('Whether the file matches', [
+                            'type' => 'object',
+                            'properties' => [
+                                'data' => [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'match' => ['type' => 'string', 'enum' => ['current', 'earlier', 'none']],
+                                    ],
+                                    'required' => ['match'],
+                                ],
+                            ],
+                        ]),
+                        422 => self::errorResponse('Not a SHA-256'),
                         429 => self::errorResponse('Too many verification attempts from this address'),
                         503 => self::errorResponse('Verification is temporarily unavailable'),
                     ],
