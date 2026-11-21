@@ -4564,6 +4564,17 @@ final class CoreApiSchemas
                     422 => self::errorResponse('The file is not a valid theme, or uses a whity. id'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('POST', '/api/themes/convert', 'settings:write', [
+                'summary' => 'Turn a theme from shadcn, Tailwind or Material Theme Builder into a theme file',
+                'description' => 'Free (TH.25): shadcn CSS variables (:root and .dark), a Tailwind v4 @theme block, or Material Theme Builder JSON become a Whity theme file. Colours become the main colour and colours set by hand for the roles Whity has, the radius the nearest shape preset, the font its pair; status colours stay Whity\'s. Nothing is saved: import the result with POST /api/themes.',
+                'tags' => ['theme'],
+                'request' => 'ConvertThemeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The theme file, what was kept in words, and a preview', 'ConvertThemeResponse'),
+                    413 => self::errorResponse('The source is larger than 64 KB'),
+                    422 => self::errorResponse('Nothing usable was found; the error says what to paste'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('DELETE', '/api/themes/{themeId}', 'settings:write', [
                 'summary' => 'Remove a theme this workspace imported',
                 'description' => 'If the workspace was using it, it goes back to the installation\'s theme. Whity\'s own themes cannot be removed.',
@@ -12186,7 +12197,7 @@ final class CoreApiSchemas
                     'author' => ['type' => 'object', 'description' => 'Who made it: name.'],
                     'colour' => ['type' => 'object', 'description' => 'seeds (primary, secondary, tertiary as #rrggbb), scheme, neutral, contrast and overrides per mode.'],
                     'type' => ['type' => 'object', 'description' => 'family and headingFamily from the allowed fonts, scale, titleWeight and emphasis.'],
-                    'shape' => ['type' => 'object', 'description' => 'preset (square, crisp, whity, soft, round) and morph.'],
+                    'shape' => ['type' => 'object', 'description' => 'preset (square, crisp, whity, soft, round, pebble, cut), morph, and components: a preset for buttons, fields, chips, cards, dialogs, tables or navigation.'],
                     'density' => ['type' => 'string', 'description' => 'compact, standard or comfortable.'],
                     'elevation' => ['type' => 'object', 'description' => 'style (plane, soft, flat) and float.'],
                     'motion' => ['type' => 'object', 'description' => 'preset: calm, standard or expressive.'],
@@ -12203,6 +12214,18 @@ final class CoreApiSchemas
                     'to' => self::str(true),
                 ], ['field', 'from', 'to'])],
             ], ['id', 'version'])),
+            // TH.25: a theme from another tool, as a theme file to import.
+            'ConvertThemeRequest' => self::object([
+                'format' => ['type' => 'string', 'enum' => ['shadcn', 'tailwind', 'material'], 'description' => 'shadcn CSS variables, a Tailwind v4 @theme block, or Material Theme Builder JSON.'],
+                'source' => self::str() + ['description' => 'The CSS or JSON as pasted or read from the file, at most 64 KB.'],
+                'name' => self::str() + ['description' => 'The theme\'s name; "Imported from …" when empty.'],
+            ], ['format', 'source']),
+            'ConvertThemeResponse' => self::dataEnvelope(self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'A theme file (schemas/theme/v1.json), not saved yet.'],
+                'notes' => ['type' => 'array', 'items' => self::str(), 'description' => 'What was kept and what was not, in plain words.'],
+                'preview' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Colours for light and dark, and the corner radii.'],
+                'adjustments' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']], 'description' => 'What the guard rails change: mode, role and change.'],
+            ], ['theme', 'notes', 'preview', 'adjustments'])),
             'DeleteThemeResponse' => self::dataEnvelope(self::object(['deleted' => self::bool()], ['deleted'])),
 
             // ── Forgotten-password + 2FA-recovery (WC-password-reset-2fa-recovery) ──

@@ -11416,6 +11416,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/themes/convert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn a theme from shadcn, Tailwind or Material Theme Builder into a theme file
+         * @description Free (TH.25): shadcn CSS variables (:root and .dark), a Tailwind v4 @theme block, or Material Theme Builder JSON become a Whity theme file. Colours become the main colour and colours set by hand for the roles Whity has, the radius the nearest shape preset, the font its pair; status colours stay Whity's. Nothing is saved: import the result with POST /api/themes.
+         */
+        post: operations["post_api_v1_themes_convert"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/themes/export": {
         parameters: {
             query?: never;
@@ -14872,6 +14892,35 @@ export interface components {
             /** @description false retires the body: it keeps its history but convenes no new meetings. */
             is_active?: boolean;
         };
+        ConvertThemeRequest: {
+            /**
+             * @description shadcn CSS variables, a Tailwind v4 @theme block, or Material Theme Builder JSON.
+             * @enum {string}
+             */
+            format: "shadcn" | "tailwind" | "material";
+            /** @description The CSS or JSON as pasted or read from the file, at most 64 KB. */
+            source: string;
+            /** @description The theme's name; "Imported from …" when empty. */
+            name?: string;
+        };
+        ConvertThemeResponse: {
+            data: {
+                /** @description A theme file (schemas/theme/v1.json), not saved yet. */
+                theme: {
+                    [key: string]: unknown;
+                };
+                /** @description What was kept and what was not, in plain words. */
+                notes: string[];
+                /** @description Colours for light and dark, and the corner radii. */
+                preview: {
+                    [key: string]: unknown;
+                };
+                /** @description What the guard rails change: mode, role and change. */
+                adjustments: {
+                    [key: string]: string;
+                }[];
+            };
+        };
         CustomField: {
             id: number;
             record_type: string;
@@ -17893,7 +17942,7 @@ export interface components {
             colour?: Record<string, never>;
             /** @description family and headingFamily from the allowed fonts, scale, titleWeight and emphasis. */
             type?: Record<string, never>;
-            /** @description preset (square, crisp, whity, soft, round) and morph. */
+            /** @description preset (square, crisp, whity, soft, round, pebble, cut), morph, and components: a preset for buttons, fields, chips, cards, dialogs, tables or navigation. */
             shape?: Record<string, never>;
             /** @description compact, standard or comfortable. */
             density?: string;
@@ -85017,6 +85066,102 @@ export interface operations {
                 };
             };
             /** @description The file is not a valid theme, or uses a whity. id */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_themes_convert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConvertThemeRequest"];
+            };
+        };
+        responses: {
+            /** @description The theme file, what was kept in words, and a preview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConvertThemeResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The source is larger than 64 KB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Nothing usable was found; the error says what to paste */
             422: {
                 headers: {
                     [name: string]: unknown;
