@@ -56,12 +56,11 @@ step. See [ADR 0010](../adr/0010-subscription-plans-and-billing-extensibility.md
   (keys the plan sets → that value; keys it doesn't → registry default) and records
   `tenant_plan`.
 
-**Materialise, not live-link.** Applying a plan snapshots its values onto the
-tenant. Re-tuning a plan later does **not** silently change existing tenants — they
-get the new bundle only on re-apply (or, in future, on renewal). This is the
-billing-correct default and keeps the runtime path single-source. A bespoke
-per-tenant override ("+10 seats for this one customer") is applied *after* via the
-entitlements API and is intentionally cleared by a subsequent plan re-apply.
+**Read live (migration 151).** A tenant on a plan reads the plan's values at
+runtime, so re-tuning a plan reaches every tenant on it at once; `PlanService`
+refuses a change that takes something away from live tenants unless it is
+confirmed. Add-on packs (`is_addon` plans, `setTenantAddon`) add their numbers on
+top. A per-tenant override set through the entitlements API is final over both.
 
 ## 3. Subscriptions — lifecycle state on the tenant↔plan anchor
 
@@ -135,6 +134,40 @@ by a Postgres `shared_store` so limits hold across FrankenPHP workers:
 This is the same principle as the wall: the *number* is an entitlement/setting, the
 *mechanism* is generic. A single-customer sovereign deployment and a busy multi-tenant
 SaaS get the right behaviour from the same code with different data.
+
+## 6. Usage meters and the usage ledger (section 33 §5, BM.17)
+
+Every limit only warns (BM.4, SC.14): past a base, the work goes ahead and the
+people who can change the plan are told. `meters.enforcement` defaults to
+`warn`; an operator may still set `block` for document renders.
+
+`usage_ledger` (migration 332) is the durable history a bill is made from: one row
+per workspace, meter, month (in the workspace's own time zone) and dimension.
+
+| Meter | Base on | Kind | Fed by |
+|---|---|---|---|
+| `seats` | `members.max` | snapshot | `SeatService::used()` |
+| `customers` | `customers.per_month` | snapshot | `CustomerUsage` |
+| `inventory.items` | `inventory.items.max` | snapshot | `PlanLimitsReport::liveItems()` (IV.24) |
+| `invoices` | `invoices.per_month` | snapshot | accounting's `InvoiceUsageCounter`; 0 until accounting binds one |
+| `storage.bytes` | `storage.quota_bytes` | snapshot | `tenant_storage_usage` (migration 333), kept by `StoredFiles` |
+| `messages.outbound` | `messages.outbound.per_month` | counted, per channel | `MessagingService` |
+| `agents` | `agents.runs.per_month` (on `runs`) | counted: `runs`, `tool_calls` | `McpUsage`. A run is one agent's work in the 30 minutes from its first call. Tokens only when Whity supplies a model |
+| `api.calls` | `api.calls.per_month` | counted: `mcp` | `McpUsage`: MCP calls from a person's own AI |
+
+Snapshot meters are read once a day (`core.usage.snapshot`, queued by
+`schedule:run`) and whenever the usage screen opens; each month keeps the latest
+reading and the highest. Whity's own apps (web, phone, desktop) never count as API
+calls.
+
+- Owners read it on **Billing > Usage** (`GET /api/usage?period=YYYY-MM`,
+  `billing:view`); the limits card and banner (`GET /api/billing/limits`) read the
+  same ledger. Plugins read it through `Whity\Sdk\Usage\Usage` (SDK 1.133).
+- `whity-cli usage:storage-rebuild [--workspace=<id>] [--check]` sets stored bytes
+  from the files again; `whity-cli usage:snapshot` takes the snapshots now.
+- Every core limit defaults to unlimited, so a self-hosted install has no limits
+  (BM.3 Q14). The Free base is set on the free plan; migration 334 adds invoices
+  and API calls.
 
 ---
 

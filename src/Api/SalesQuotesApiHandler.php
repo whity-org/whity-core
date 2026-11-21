@@ -12,6 +12,7 @@ use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Sales\Quotes;
 use Whity\Core\Sales\SalesRejectedException;
+use Whity\Core\Sales\TradingEmails;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 use Whity\Core\Store\SharedStoreInterface;
@@ -42,6 +43,10 @@ final class SalesQuotesApiHandler
     private const SETTING_KEYS = [
         'quote_valid_days' => SettingsRegistry::SALES_QUOTE_VALID_DAYS,
         'quote_route_template_id' => SettingsRegistry::SALES_QUOTE_ROUTE_TEMPLATE_ID,
+        'email_quote' => SettingsRegistry::SALES_EMAIL_QUOTE,
+        'email_invoice' => SettingsRegistry::SALES_EMAIL_INVOICE,
+        'email_receipt' => SettingsRegistry::SALES_EMAIL_RECEIPT,
+        'email_reminder' => SettingsRegistry::SALES_EMAIL_REMINDER,
     ];
 
     public function __construct(
@@ -51,6 +56,7 @@ final class SalesQuotesApiHandler
         private readonly string $appBase,
         private readonly ?BrandingService $branding = null,
         private readonly ?\Closure $workspaceName = null,
+        private readonly ?TradingEmails $emails = null,
     ) {
     }
 
@@ -105,10 +111,16 @@ final class SalesQuotesApiHandler
     /** @param array<string, string> $params */
     public function send(Request $request, array $params): Response
     {
-        return $this->run($request, 'quote', function (int $tenantId, ?int $actor) use ($params): Response {
+        return $this->run($request, 'quote', function (int $tenantId, ?int $actor) use ($request, $params): Response {
+            $body = JsonBody::parsed($request);
+            $email = $body['email'] ?? true;
+            if (!is_bool($email)) {
+                throw SalesRejectedException::field('email', 'email is true (email it to the customer) or false (only make the link)');
+            }
             $sent = $this->quotes->send($tenantId, (int) $params['id'], $actor);
+            $link = $this->link($sent['token']);
 
-            return Response::json(['data' => $sent['quote'], 'link' => $this->link($sent['token'])]);
+            return Response::json(['data' => $sent['quote'], 'link' => $link, 'emailed' => $email && $this->emailQuote($tenantId, $sent['quote'], $link)]);
         });
     }
 
@@ -198,9 +210,10 @@ final class SalesQuotesApiHandler
             foreach (JsonBody::parsed($request) as $field => $value) {
                 $key = self::SETTING_KEYS[$field] ?? throw SalesRejectedException::field((string) $field, $field . ' is not a sales setting');
                 $text = match (true) {
-                    is_int($value) => (string) $value,
+                    is_bool($value) && str_starts_with((string) $field, 'email_') => $value ? 'true' : 'false',
+                    is_int($value) && !str_starts_with((string) $field, 'email_') => (string) $value,
                     $value === null && $field === 'quote_route_template_id' => '0',
-                    default => throw SalesRejectedException::field((string) $field, $field . ' is a whole number'),
+                    default => throw SalesRejectedException::field((string) $field, str_starts_with((string) $field, 'email_') ? $field . ' is true or false' : $field . ' is a whole number'),
                 };
                 $problem = SettingsRegistry::validate($key, $text);
                 if ($problem !== null) {
@@ -274,6 +287,35 @@ final class SalesQuotesApiHandler
 
     // ── helpers ──────────────────────────────────────────────────────────
 
+    /**
+     * Emails a quote just sent to its customer's address. Best effort: the
+     * quote has gone out either way, and the answer says whether an email did.
+     *
+     * @param array<string, mixed> $quote
+     */
+    private function emailQuote(int $tenantId, array $quote, string $link): bool
+    {
+        $to = (string) ($quote['contact_email'] ?? '');
+        if ($this->emails === null || $to === '') {
+            return false;
+        }
+        $what = [];
+        foreach (is_array($quote['lines'] ?? null) ? $quote['lines'] : [] as $line) {
+            if (is_array($line) && is_string($line['description'] ?? null) && $line['description'] !== '') {
+                $what[] = $line['description'];
+            }
+        }
+
+        return $this->emails->quote($tenantId, $to, [
+            'number' => (string) $quote['number'],
+            'customer' => (string) $quote['contact_name'],
+            'what' => count($what) <= 2 ? implode(', ', $what) : $what[0] . ', ' . $what[1] . ' …',
+            'total_minor' => (int) $quote['total_minor'],
+            'currency' => (string) $quote['currency'],
+            'valid_until' => (string) $quote['valid_until'],
+        ], $link);
+    }
+
     private function link(string $token): string
     {
         return rtrim($this->appBase, '/') . '/quote/' . $token;
@@ -287,7 +329,16 @@ final class SalesQuotesApiHandler
         $days = (int) ($effective[SettingsRegistry::SALES_QUOTE_VALID_DAYS] ?? $defaults[SettingsRegistry::SALES_QUOTE_VALID_DAYS]);
         $route = (int) ($effective[SettingsRegistry::SALES_QUOTE_ROUTE_TEMPLATE_ID] ?? 0);
 
-        return ['quote_valid_days' => $days, 'quote_route_template_id' => $route === 0 ? null : $route];
+        $on = static fn (string $key): bool => (string) ($effective[$key] ?? $defaults[$key] ?? 'true') === 'true';
+
+        return [
+            'quote_valid_days' => $days,
+            'quote_route_template_id' => $route === 0 ? null : $route,
+            'email_quote' => $on(SettingsRegistry::SALES_EMAIL_QUOTE),
+            'email_invoice' => $on(SettingsRegistry::SALES_EMAIL_INVOICE),
+            'email_receipt' => $on(SettingsRegistry::SALES_EMAIL_RECEIPT),
+            'email_reminder' => $on(SettingsRegistry::SALES_EMAIL_REMINDER),
+        ];
     }
 
     /** @return array<string, mixed>|null */

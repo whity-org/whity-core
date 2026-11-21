@@ -25,7 +25,8 @@ use Whity\Core\Money\Currency;
  * words and the running balance are typed in, and there is no JoFotara stamp or
  * reference. Nothing here makes a document compliant with JoFotara; section 16's
  * "Before shipping" review is still open. The invoice here is an Invoice: the
- * Tax invoice is what Front Office adds (owner, 2 Nov 2026).
+ * Tax invoice's stamp, reference and QR come from the JoFotara integration
+ * plugin through core's e-invoicing point (AC.22).
  *
  * Amounts are written in the workspace's currency when the starter is seeded
  * (CU.1–CU.3): the figures, the "Total USD" labels and the amount in words. The
@@ -40,6 +41,7 @@ final class GuidelineStarters
         'editor.invoice' => 'invoice',
         'editor.credit-note' => 'creditNote',
         'editor.receipt' => 'receipt',
+        'editor.receipt-80mm' => 'receipt80',
         'editor.statement' => 'statement',
         'editor.payment-reminder' => 'reminder',
         'editor.delivery-note' => 'deliveryNote',
@@ -95,7 +97,11 @@ final class GuidelineStarters
                     'kind' => $options['kind'] ?? 'template',
                     'title' => $title,
                     'lang' => $lang,
-                    'page' => ['size' => $options['size'] ?? 'A4', 'marginMm' => 16, 'letterhead' => true],
+                    'page' => [
+                        'size' => $options['size'] ?? 'A4',
+                        'marginMm' => isset($options['margin']) ? (int) $options['margin'] : 16,
+                        'letterhead' => ($options['letterhead'] ?? 'yes') === 'yes',
+                    ],
                     'own_fields' => array_values($this->own),
                     'blocks' => $blocks,
                 ];
@@ -174,6 +180,48 @@ final class GuidelineStarters
             // A5: one language, so the role fits on its line.
             $this->signature([[[$this->t('Received by', 'المستلِم'), null], [$this->f('received_by', 'Received by', 'المستلِم', 'Rana Haddad')]]]),
         ], ['size' => 'A5']];
+    }
+
+    /**
+     * The 80 mm till receipt (WHIT-1323, design section 34 §4, TR.1, card
+     * `TplReceipt80`): on core's 80 mm roll, with the business's name, tax
+     * number and address in its own header (no letterhead: a thermal printer is
+     * black only), the lines, the tax per rate, the total and how it was paid.
+     * It prints a paid sale once sales orders and payments are its sources;
+     * until then it previews with sample figures and can be changed freely
+     * (FP.2). The e-invoicing QR is the integration plugin's to add.
+     *
+     * @return array{0: string, 1: list<array<string, mixed>>, 2: array<string, string>}
+     */
+    private function receipt80(): array
+    {
+        return [$this->t('Receipt', 'إيصال'), [
+            $this->para($this->company('company.name', 'Company name', 'اسم الشركة')),
+            $this->facts([
+                [['Tax no.', 'الرقم الضريبي'], $this->company('company.tax_number', 'Tax number', 'الرقم الضريبي')],
+                [['Address', 'العنوان'], $this->company('company.address', 'Address', 'العنوان')],
+            ]),
+            $this->facts([
+                [['Receipt', 'الإيصال'], $this->f('receipt_no', 'Receipt number', 'رقم الإيصال', 'RCT-0207')],
+                [['Date', 'التاريخ'], $this->f('paid_at', 'Date and time', 'التاريخ والوقت', '21 Nov 2026, 09:42')],
+                [['Cashier', 'الكاشير'], $this->f('cashier', 'Cashier', 'الكاشير', 'Ahmad Khalil', 'أحمد خليل')],
+            ]),
+            $this->table(
+                [['Item', 'الصنف'], ['Amount', 'المبلغ']],
+                [
+                    [$this->f('line_1', 'Line 1', 'السطر 1', '2 × Croissant', '2 × كرواسون'), $this->f('line_1_amount', 'Line 1 amount', 'مبلغ السطر 1', $this->n('3.00'))],
+                    [$this->f('line_2', 'Line 2', 'السطر 2', '1 × Cappuccino', '1 × كابتشينو'), $this->f('line_2_amount', 'Line 2 amount', 'مبلغ السطر 2', $this->n('2.80'))],
+                ],
+                ['start', 'end'],
+            ),
+            $this->table(
+                [['Subtotal', 'المجموع'], ['Sales tax', 'ضريبة المبيعات'], ['Total ' . $this->currency, 'الإجمالي (' . $this->name()[2] . ')']],
+                [[$this->f('subtotal', 'Subtotal', 'المجموع', $this->n('5.00')), $this->f('tax', 'Sales tax', 'ضريبة المبيعات', $this->n('0.80')), $this->f('total', 'Total', 'الإجمالي', $this->n('5.80'), null, true)]],
+                ['end', 'end', 'end'],
+            ),
+            $this->labelled(['Paid by', 'الدفع عبر'], $this->f('method', 'Payment method', 'طريقة الدفع', 'Card', 'بطاقة')),
+            $this->para($this->txt($this->t('Thank you!', 'شكراً لكم'), true)),
+        ], ['size' => '80mm', 'margin' => '4', 'letterhead' => 'no']];
     }
 
     /** @return array{0: string, 1: list<array<string, mixed>>, 2: array<string, string>} */

@@ -3352,6 +3352,9 @@ $router->register('GET',  '/api/billing/trial',    [$externalBillingHandler, 'tr
 // its allowance, and the workspace's admins read the result on Billing.
 $customerUsage = new \Whity\Core\Usage\CustomerUsage($db->getPdo(), $entitlementService, $settingsService);
 $customerUsage->subscribe($hookManager);
+// Section 33 §5 (BM.17): the durable usage ledger every meter writes to, per
+// workspace and month, that a bill is made from.
+$usageLedger = new \Whity\Core\Usage\UsageLedger($db->getPdo(), $settingsService);
 $planLimitMeters = new \Whity\Core\Entitlement\MeterService(
     new DatabaseSharedStore($db->getPdo()),
     $entitlementService,
@@ -3382,11 +3385,26 @@ $planLimitsHandler = new \Whity\Api\PlanLimitsApiHandler(
         $entitlementService,
         new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService),
         $customerUsage,
-        $planLimitMeters
+        $planLimitMeters,
+        $usageLedger,
     ),
     $roleChecker
 );
 $router->register('GET',  '/api/billing/limits',   [$planLimitsHandler, 'show'],      null, null, CorePermissions::BILLING_VIEW);
+// Section 33 §5: every usage meter, its base and whether it is near or past it.
+$usageReport = new \Whity\Core\Usage\UsageReport(
+    $usageLedger,
+    new \Whity\Core\Usage\UsageSnapshots(
+        $db->getPdo(),
+        $usageLedger,
+        new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService),
+        $customerUsage,
+    ),
+    $entitlementService,
+);
+$router->register('GET',  '/api/usage',            [new \Whity\Api\UsageApiHandler($usageReport, $roleChecker), 'show'], null, null, CorePermissions::BILLING_VIEW);
+// SDK 1.133: a plugin reads its workspace's meters, read-only.
+\Whity\register_service(\Whity\Sdk\Usage\Usage::class, new \Whity\Core\Usage\HostUsage($usageReport));
 // More seats, or fewer. The only change the billing service supports in place:
 // a PLAN swap would mean cancelling and buying again, which either double-charges
 // or leaves a gap, so it is refused rather than faked.
@@ -5629,7 +5647,10 @@ $customFieldRecordTypes->register(new \Whity\Core\CustomFields\CustomFieldRecord
 ));
 $inventoryLocations = new \Whity\Core\Inventory\LocationService($inventoryDb, $inventoryWorkspace);
 $inventoryReasons = new \Whity\Core\Inventory\ReasonCatalog($inventoryDb, $inventoryWorkspace);
-$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager, $inventoryReasons);
+// WHIT-1235: lots, serial numbers and expiry; FEFO and the warning window are workspace settings.
+$inventoryLots = new \Whity\Core\Inventory\LotService($inventoryDb, static fn (int $tenantId): array => $settingsService->effective($tenantId));
+$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager, $inventoryReasons, $inventoryLots);
+$inventoryItems->useOpeningLots($inventoryLedger->moveIntoOpeningLots(...));
 // WHIT-1233: adjustments, counts and transfers as records. Above the
 // workspace's value an adjustment or a count's differences travel a route
 // (inventory.adjustment, inventory.count); reorder levels watch every posting.
@@ -5695,6 +5716,8 @@ $salesQuotesHandler = new \Whity\Api\SalesQuotesApiHandler(
     \Whity\Core\Http\FrontendUrls::fromEnv()->base(),
     $brandingService,
     static fn (int $tenantId): string => (new \Whity\Core\Branding\TenantHostRepository($db->getPdo()))->findNameById($tenantId) ?? '',
+    // WHIT-1323: sending a quote emails it to the customer (EM.1 "Money").
+    new \Whity\Core\Sales\TradingEmails($brandedEmailSender, $settingsService),
 );
 $router->register('GET',    '/api/sales/quotes',                     [$salesQuotesHandler, 'list'],     null, null, CorePermissions::QUOTES_READ);
 $router->register('POST',   '/api/sales/quotes',                     [$salesQuotesHandler, 'create'],   null, null, CorePermissions::QUOTES_WRITE);
@@ -5723,6 +5746,7 @@ $inventoryGuard = new \Whity\Core\Inventory\Host\HostInventoryGuard(
 \Whity\register_service(\Whity\Sdk\Inventory\Units::class, new \Whity\Core\Inventory\Host\HostUnits($inventoryUnits, $inventoryItems, $inventoryGuard)); // @phpstan-ignore-line
 \Whity\register_service(\Whity\Sdk\Inventory\Operations::class, new \Whity\Core\Inventory\Host\HostOperations($inventoryOperations, $inventoryGuard)); // @phpstan-ignore-line
 \Whity\register_service(\Whity\Sdk\Inventory\Orders::class, new \Whity\Core\Inventory\Host\HostOrders($inventoryPurchases, $inventoryGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Inventory\Lots::class, new \Whity\Core\Inventory\Host\HostLots($inventoryLots, $inventoryGuard)); // @phpstan-ignore-line
 $inventoryHandler = new \Whity\Api\InventoryApiHandler(
     $inventoryUnits,
     $inventoryItems,
@@ -5736,7 +5760,21 @@ $inventoryHandler = new \Whity\Api\InventoryApiHandler(
     $inventoryPurchases,
     $inventorySuppliers,
 );
-$router->register('GET',    '/api/inventory/units',                              [$inventoryHandler, 'listUnits'],      null, null, CorePermissions::INVENTORY_READ);
+// WHIT-1322: items and opening stock from a spreadsheet, on the import engine
+// contacts use (import_jobs; design section 34 §6). Opening stock also needs
+// stock:adjust, checked in the handler.
+$inventoryImportHandler = new \Whity\Api\InventoryImportApiHandler(
+    new \Whity\Core\Inventory\Import\InventoryImports($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryLedger, $inventoryItems->currencyFor(...), $inventorySuppliers),
+    $roleChecker,
+);
+$router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}',                         [$inventoryImportHandler, 'list'],       null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}',                         [$inventoryImportHandler, 'upload'],     null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}',                [$inventoryImportHandler, 'show'],       null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/check',          [$inventoryImportHandler, 'check'],      null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/run',            [$inventoryImportHandler, 'runImport'],  null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/undo',           [$inventoryImportHandler, 'undo'],       null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/skipped.csv',    [$inventoryImportHandler, 'skippedCsv'], null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/units',                            [$inventoryHandler, 'listUnits'],      null, null, CorePermissions::INVENTORY_READ);
 $router->register('POST',   '/api/inventory/units',                              [$inventoryHandler, 'createUnit'],     null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/categories',                         [$inventoryHandler, 'listCategories'], null, null, CorePermissions::INVENTORY_READ);
 $router->register('POST',   '/api/inventory/categories',                         [$inventoryHandler, 'createCategory'], null, null, CorePermissions::INVENTORY_WRITE);
@@ -5752,6 +5790,12 @@ $router->register('POST',   '/api/inventory/locations',                         
 $router->register('GET',    '/api/inventory/locations/{id:\d+}',                 [$inventoryHandler, 'showLocation'],   null, null, CorePermissions::INVENTORY_READ);
 $router->register('PATCH',  '/api/inventory/locations/{id:\d+}',                 [$inventoryHandler, 'updateLocation'], null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/stock',                              [$inventoryHandler, 'levels'],         null, null, CorePermissions::INVENTORY_READ);
+// WHIT-1235: batches and serial numbers, and what is expiring.
+$inventoryLotHandler = new \Whity\Api\InventoryLotApiHandler($inventoryLots);
+$router->register('GET',    '/api/inventory/lots',                               [$inventoryLotHandler, 'list'],     null, null, CorePermissions::INVENTORY_READ);
+$router->register('GET',    '/api/inventory/lots/expiring',                      [$inventoryLotHandler, 'expiring'], null, null, CorePermissions::INVENTORY_READ);
+$router->register('GET',    '/api/inventory/lots/{id:\d+}',                      [$inventoryLotHandler, 'show'],     null, null, CorePermissions::INVENTORY_READ);
+$router->register('PATCH',  '/api/inventory/lots/{id:\d+}',                      [$inventoryLotHandler, 'update'],   null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/stock/moves',                        [$inventoryHandler, 'moves'],          null, null, CorePermissions::INVENTORY_READ);
 $router->register('POST',   '/api/inventory/stock/adjustments',                  [$inventoryHandler, 'adjust'],         null, null, CorePermissions::STOCK_ADJUST);
 $router->register('POST',   '/api/inventory/stock/batches/{key:[a-f0-9]+}/undo', [$inventoryHandler, 'undo'],         null, null, CorePermissions::STOCK_ADJUST);
@@ -6184,6 +6228,7 @@ $messagingService = \Whity\Core\Messaging\CoreMessaging::build(
     $planLimitMeters,
     (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
     $brandedEmailSender,
+    $usageLedger,
 );
 \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messagingService);
 // WHIT-967 (SDK 1.99): a plugin messages a workspace's customer through Messages.
@@ -6423,7 +6468,10 @@ $themesHandler = new \Whity\Api\ThemesApiHandler(
 );
 $router->register('GET',    '/api/themes',            [$themesHandler, 'list'],   null, null, CorePermissions::SETTINGS_READ);
 $router->register('GET',    '/api/themes/export',     [$themesHandler, 'export'], null, null, CorePermissions::SETTINGS_READ);
+$router->register('GET',    '/api/themes/export/tokens', [$themesHandler, 'exportTokens'], null, null, CorePermissions::SETTINGS_READ);
+$router->register('POST',   '/api/themes/tokens',     [$themesHandler, 'tokens'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('POST',   '/api/themes',            [$themesHandler, 'import'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('POST',   '/api/themes/convert',    [$themesHandler, 'convert'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('DELETE', '/api/themes/{themeId}',  [$themesHandler, 'delete'], null, null, CorePermissions::SETTINGS_WRITE);
 
 // 13c-bis. Register the pending-registration review API (WC-235). Gated on
@@ -6519,6 +6567,8 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     $invitationService,
     // WHIT-1181: a verified phone_number fills the person's own phone.
     new \Whity\Core\Identity\PersonalPhone($db->getPdo()),
+    // #2355: signing in from a form's public link joins the form's workspace.
+    $formRepository,
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).
@@ -6851,7 +6901,7 @@ $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnl
 ))->registerOn($proposalDiffs);
 // WHIT-812: what an agent did that its person can still undo.
 $agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters, callKeys: new \Whity\Mcp\Tools\McpCallKeys($db->getPdo()));
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters, callKeys: new \Whity\Mcp\Tools\McpCallKeys($db->getPdo()), usage: new \Whity\Core\Usage\McpUsage($usageLedger, new DatabaseSharedStore($db->getPdo())));
 $mcpToolsCallHandler->setWorkspaceGate($pluginLoader);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:

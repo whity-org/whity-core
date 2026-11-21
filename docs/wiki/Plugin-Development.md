@@ -1789,7 +1789,7 @@ $notice = new Notice(
 - A single send reaches at most 1000 people.
 - Each person gets the subject and body in their own language, or the workspace's when they have none.
 
-**By email (SDK 1.135, #2209).** Every notice lands in the inbox. Add `'emailDefault' => true` to a type to also email it to people who never chose for that type:
+**By email (SDK 1.141, #2209).** Every notice lands in the inbox. Add `'emailDefault' => true` to a type to also email it to people who never chose for that type:
 
 ```php
 'task.assigned' => [
@@ -2056,6 +2056,7 @@ What to know:
 - **Refusals** throw `InventoryRejected` with a stable `reason` (`no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`); branch on it, not on the message.
 - **Adjust, count and transfer** (SDK 1.128). `$inventory->operations()` does what people do on the Inventory page: `adjust($placeId, 'damaged', [['variant_id' => $v, 'change' => '-2']], $profileId)`, `startCount()`, `recordCount()` and `finishCount()`, `transfer($fromId, $toId, $lines, $profileId)` and `receive()`. Each returns an `Operation` with a `number` (`ADJ-0001`) and a `status`. An adjustment or a count's differences worth more than the workspace's value comes back `waiting_approval` and posts once approved; don't treat that as a failure. They need `stock:adjust`, `stock:count` and `stock:transfer`.
 - **Order from suppliers** (SDK 1.129). `$inventory->orders()->createPurchase($supplierContactId, $placeId, [['variant_id' => $v, 'quantity' => '24', 'unit' => 'bag']], $profileId)` drafts a purchase order (the supplier's price fills a line without one); `submit()` sends it and `receive()` takes in what arrived, at the order's cost. They need `purchases:write`. `inventory.order.submitting` lets you refuse an order (a budget, a blocked supplier).
+- **Batches and expiry** (SDK 1.137). For an item whose `tracking` is `lot`, stock you bring in names its batch: `new MoveLine($variantId, '24', $supplier, $shop, lotCode: 'B-0412', expiresOn: '2027-03-31')`. Stock you take out may name one (`lotCode`), or core takes the batches that expire first. `$inventory->lots()->expiring()` lists what is expiring; listen for `stock.lot.expiring` and `stock.lot.expired` to act on it.
 - **Listen or refuse.** `stock.moved` (and `stock.moved.async` after commit) tells you what posted. `stock.moving` runs before, inside the transaction; throw `HookVetoException` to refuse the whole post (the caller gets 409 with your reason). `inventory.item.created`, `updated` and `archived` follow the items; `inventory.operation.done`, `inventory.count.differences`, `stock.level.below_reorder` and `stock.level.restored` follow operations and reorder levels (SDK 1.128).
 
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)

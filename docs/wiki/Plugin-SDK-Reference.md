@@ -47,7 +47,7 @@ These are the factories `PluginContext` uses. They keep working through SDK 2.0.
 | `Secrets\PluginSecrets` → `Secrets\SecretStore` | API keys and signing secrets: encrypted, never read back on screens or in the API. | argument | 1.60 |
 | `Storage\PluginFiles` → `Storage\PluginFileStore` | Uploads and exports under plain relative paths (`put`, `get`, `exists`, `list`, `delete`). `Storage\PluginFileController` serves them. | current | 1.63 |
 | `Documents\PluginDocuments` → `Documents\PluginDocumentStore` | Issue documents recorded as yours, then QR verification URLs and tracking for those documents only. | current | 1.63 |
-| `Notification\PluginNotifier` → `Notification\Notifier` | Notify a person, a role or a unit with a notice type you declared. Preferences apply; a type with `emailDefault` also goes by email (SDK 1.135). | current | WHIT-1030, WHIT-1250 |
+| `Notification\PluginNotifier` → `Notification\Notifier` | Notify a person, a role or a unit with a notice type you declared. Preferences apply; a type with `emailDefault` also goes by email (SDK 1.141). | current | WHIT-1030, WHIT-1250 |
 | `Jobs\PluginJobQueue` → `Jobs\JobQueue` | Enqueue your own jobs (idempotency key, delay) and read their `JobStatus`. | current | WHIT-1031 |
 | `Audit\PluginAudit` → `Audit\AuditTrail` | Record and read your audit entries. The host attributes actor, IP and workspace. | current | WHIT-1032 |
 
@@ -98,7 +98,9 @@ $inventory->stock()->move(new MoveRequest(
 | `Inventory\Operations` | Adjustments with a reason, counts and transfers, each an `Inventory\Operation` with its lines. Through `$ctx->inventory()->operations()`, bound to your plugin; the container copy reads. Above the workspace's value an adjustment or a count's differences wait for approval. | current | 1.128 |
 | `Inventory\Orders` | Purchase orders: draft for a supplier contact, send (the workspace's route or approved at once), receive in parts at the order's cost, cancel. Through `$ctx->inventory()->orders()`, bound to your plugin; the container copy reads. | current | 1.129 |
 
-`Context\InventoryScope` (`$ctx->inventory()`) holds the six (`operations()` since 1.128, `orders()` since 1.129). Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
+| `Inventory\Lots` | Batches and serial numbers (`Inventory\Lot`): an item's, one by code, and what is expiring. Reads only. Stock coming in names its batch on the `MoveLine` (`lotCode`, `expiresOn`); stock leaving may name one, or takes the batches that expire first. | current | 1.137 |
+
+`Context\InventoryScope` (`$ctx->inventory()`) holds the seven (`operations()` since 1.128, `orders()` since 1.129, `lots()` since 1.137). Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
 
 ## Contribution points: what a plugin declares
 

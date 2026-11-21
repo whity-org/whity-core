@@ -680,6 +680,18 @@
     "en": "Get a place",
     "ar": "عرض موقع"
   },
+  "get_api_inventory_lots": {
+    "en": "List an item's batches",
+    "ar": "عرض دفعات صنف"
+  },
+  "get_api_inventory_lots_expiring": {
+    "en": "List batches expiring soon",
+    "ar": "عرض الدفعات التي تنتهي صلاحيتها قريباً"
+  },
+  "get_api_inventory_lots_id": {
+    "en": "Show a batch",
+    "ar": "عرض دفعة"
+  },
   "get_api_inventory_operations": {
     "en": "List stock adjustments, counts and transfers",
     "ar": "عرض تسويات المخزون والجرد والتحويلات"
@@ -1056,6 +1068,10 @@
     "en": "Export the theme in use as a theme file",
     "ar": "تصدير السمة المستخدمة كملف سمة"
   },
+  "get_api_themes_export_tokens": {
+    "en": "Export the theme in use for another tool",
+    "ar": "تصدير المظهر المستخدم لأداة أخرى"
+  },
   "get_api_time_window_types": {
     "en": "List the kinds of period in your workspace",
     "ar": "عرض أنواع الفترات"
@@ -1227,6 +1243,10 @@
   "patch_api_inventory_locations_id": {
     "en": "Change a place",
     "ar": "تعديل موقع"
+  },
+  "patch_api_inventory_lots_id": {
+    "en": "Correct a batch's dates or notes",
+    "ar": "تصحيح تواريخ دفعة أو ملاحظاتها"
   },
   "patch_api_inventory_purchase_orders_id": {
     "en": "Change a draft purchase order",
@@ -2012,6 +2032,14 @@
     "en": "Import a theme into this workspace",
     "ar": "استيراد سمة إلى مساحة العمل"
   },
+  "post_api_themes_convert": {
+    "en": "Turn a theme from another tool into a theme file",
+    "ar": "تحويل مظهر من أداة أخرى إلى ملف مظهر"
+  },
+  "post_api_themes_tokens": {
+    "en": "Export a draft theme for another tool",
+    "ar": "تصدير مسودة مظهر لأداة أخرى"
+  },
   "post_api_time_window_types": {
     "en": "Add a period kind, or adopt a built-in one",
     "ar": "إضافة نوع فترة"
@@ -2272,6 +2300,10 @@
     "en": "Change a task in Taskaat",
     "ar": "تعديل مهمة في Taskaat"
   },
+  "get_api_usage": {
+    "en": "See what your workspace used against what its plan includes",
+    "ar": "عرض ما استخدمته مساحة العمل مقارنة بما تشمله باقتها"
+  },
   "get_api_sales_quotes": {
     "en": "List quotes",
     "ar": "عرض عروض الأسعار"
@@ -2327,5 +2359,33 @@
   "patch_api_sales_settings": {
     "en": "Change the sales settings",
     "ar": "تعديل إعدادات المبيعات"
+  },
+  "get_api_inventory_imports_kind": {
+    "en": "List imports of items or opening stock",
+    "ar": "عرض عمليات استيراد الأصناف أو الرصيد الافتتاحي"
+  },
+  "post_api_inventory_imports_kind": {
+    "en": "Upload a spreadsheet of items or opening stock",
+    "ar": "رفع جدول أصناف أو رصيد افتتاحي"
+  },
+  "get_api_inventory_imports_kind_id": {
+    "en": "Show an import of items or opening stock",
+    "ar": "عرض عملية استيراد أصناف أو رصيد افتتاحي"
+  },
+  "post_api_inventory_imports_kind_id_check": {
+    "en": "Check what an import will do",
+    "ar": "فحص ما ستفعله عملية الاستيراد"
+  },
+  "post_api_inventory_imports_kind_id_run": {
+    "en": "Run an import of items or opening stock",
+    "ar": "تنفيذ استيراد الأصناف أو الرصيد الافتتاحي"
+  },
+  "post_api_inventory_imports_kind_id_undo": {
+    "en": "Undo an import of items or opening stock",
+    "ar": "التراجع عن استيراد الأصناف أو الرصيد الافتتاحي"
+  },
+  "get_api_inventory_imports_kind_id_skipped_csv": {
+    "en": "Download the rows an import skipped",
+    "ar": "تنزيل الصفوف التي تخطاها الاستيراد"
   }
 }

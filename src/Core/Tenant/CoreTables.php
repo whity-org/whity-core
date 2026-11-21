@@ -69,8 +69,8 @@ final class CoreTables
         'calendar_view_preferences' => '278_create_calendar_view_preferences.php',
         'calendar_event_people' => '284_extend_calendar_events.php',
         'calendar_working_hours' => '247_create_calendar.php',
-        'contact_import_changes' => '261_create_contacts.php',
-        'contact_imports' => '261_create_contacts.php',
+        'import_job_changes' => '331_create_import_jobs.php',
+        'import_jobs' => '331_create_import_jobs.php',
         'contacts' => '261_create_contacts.php',
         'convening_bodies' => '130_create_convening.php',
         'convening_body_members' => '130_create_convening.php',
@@ -141,6 +141,7 @@ final class CoreTables
         'inv_reasons' => '320_create_inventory_operations.php',
         'inv_reorder_rules' => '320_create_inventory_operations.php',
         'inv_supplier_items' => '321_create_inventory_orders.php',
+        'inv_lots' => '337_create_inventory_lots.php',
         'inv_units' => '317_create_inventory_items.php',
         'inv_variants' => '317_create_inventory_items.php',
         'plugin_secrets' => '187_create_plugin_secrets.php',
@@ -245,6 +246,9 @@ final class CoreTables
         // Files, photos and voice sent in Chat (UC.10).
         'chat_attachments' => '279_create_chat_attachments.php',
         'stored_files' => '298_create_stored_files.php',
+        // The usage ledger and stored bytes (section 33 §5, WHIT-1325).
+        'usage_ledger' => '332_create_usage_ledger.php',
+        'tenant_storage_usage' => '333_create_tenant_storage_usage.php',
         // Who owns each workspace (WHIT-1169).
         'workspace_owners' => '300_create_workspace_owners.php',
         // Offers to hand a workspace over or co-own it (WHIT-1170).

@@ -28,6 +28,11 @@ use Whity\Sdk\Inventory\Quantity;
  * loss, ...) are the other end of stock entering or leaving and hold none.
  * {@see self::rebuild()} recomputes levels from the ledger.
  *
+ * LOTS (WHIT-1235): for an item that keeps batches or serial numbers, each
+ * line is given its lot inside the posting transaction ({@see LotService}):
+ * named or made when stock comes in, named or picked first-expiring-first
+ * when it leaves; one line may become one per lot.
+ *
  * NEGATIVE STOCK is allowed (register IV.8, the default); the workspace
  * setting that forbids it arrives with the inventory settings screen, as a
  * `stock.moving` rule.
@@ -53,7 +58,16 @@ final class StockLedger
         private readonly UnitCatalog $units,
         private readonly ?HookManager $hooks = null,
         private readonly ?ReasonCatalog $reasons = null,
+        ?LotService $lots = null,
     ) {
+        $this->lots = $lots ?? new LotService($db);
+    }
+
+    private readonly LotService $lots;
+
+    public function lots(): LotService
+    {
+        return $this->lots;
     }
 
     // ── posting ──────────────────────────────────────────────────────────
@@ -124,6 +138,10 @@ final class StockLedger
                 'from_location_id' => $negative ? $place : $other,
                 'to_location_id' => $negative ? $other : $place,
                 'note' => $raw['note'] ?? '',
+                'lot_id' => $raw['lot_id'] ?? null,
+                'lot_code' => $raw['lot_code'] ?? null,
+                'expires_on' => $raw['expires_on'] ?? null,
+                'made_on' => $raw['made_on'] ?? null,
             ], $field);
         }
         if ($kind === 'adjustment') {
@@ -190,6 +208,39 @@ final class StockLedger
     }
 
     /**
+     * An item now keeps batches (WHIT-1235, design 31 §3.5): its stock with
+     * no batch goes into the batch OPENING at each place, as one batch of
+     * moves through the opening place.
+     */
+    public function moveIntoOpeningLots(int $tenantId, int $itemId, ?int $actor): void
+    {
+        $opening = $this->workspace->virtualId($tenantId, 'opening');
+        $lines = [];
+        foreach ($this->db->all(
+            'SELECT l.variant_id, l.location_id, l.on_hand FROM inv_levels l JOIN inv_variants v ON v.tenant_id = l.tenant_id AND v.id = l.variant_id
+              WHERE l.tenant_id = :tenant_id AND v.item_id = :item_id AND l.lot_id = 0 AND l.on_hand <> 0
+              ORDER BY l.variant_id, l.location_id',
+            [':tenant_id' => $tenantId, ':item_id' => $itemId]
+        ) as $l) {
+            $variant = (int) $l['variant_id'];
+            $place = (int) $l['location_id'];
+            $steps = (int) $l['on_hand'];
+            $lot = $this->lots->opening($tenantId, $variant);
+            $base = ['variant_id' => $variant, 'steps' => abs($steps), 'entered_unit_id' => null, 'entered_quantity' => null,
+                'unit_cost_minor' => null, 'currency' => null, 'note' => '', 'reason_code' => ''];
+            // Out of "no batch", into OPENING (the other way round for stock below 0).
+            $lines[] = $base + ['lot_id' => null, 'from_location_id' => $steps > 0 ? $place : $opening, 'to_location_id' => $steps > 0 ? $opening : $place];
+            $lines[] = $base + ['lot_id' => $lot, 'from_location_id' => $steps > 0 ? $opening : $place, 'to_location_id' => $steps > 0 ? $place : $opening];
+        }
+        if ($lines === []) {
+            return;
+        }
+        foreach (array_chunk($lines, self::MAX_LINES) as $chunk) {
+            $this->write($tenantId, $actor, $chunk, ['source_type' => 'opening', 'note' => 'Batches turned on: stock moved into the batch OPENING', 'lots_resolved' => true]);
+        }
+    }
+
+    /**
      * Posts lines already in base-unit steps, as stock operations keep them
      * (WHIT-1233). Each line may carry its own `reason_code` and the
      * `source_line_id` of the operation line it came from.
@@ -219,13 +270,18 @@ final class StockLedger
      * One line as a person or plugin writes it, checked and converted to
      * base-unit steps, without posting it.
      *
-     * @return array{variant_id: int, from_location_id: int, to_location_id: int, steps: int, entered_unit_id: ?int, entered_quantity: ?int, unit_cost_minor: ?int, currency: ?string, note: string}
+     * @return array{variant_id: int, from_location_id: int, to_location_id: int, steps: int, entered_unit_id: ?int, entered_quantity: ?int, unit_cost_minor: ?int, currency: ?string, note: string, lot_input: array<string, mixed>}
      */
     public function prepareLine(int $tenantId, mixed $raw, string $field): array
     {
         $this->workspace->ensure($tenantId);
+        $line = $this->line($tenantId, $raw, $field);
+        $found = $this->items->variantForStock($tenantId, $line['variant_id']);
+        if ($found !== null) {
+            $this->lots->check($tenantId, $found, $line['lot_input'], isset($this->virtualIds($tenantId)[$line['from_location_id']]), $field);
+        }
 
-        return $this->line($tenantId, $raw, $field);
+        return $line;
     }
 
     /** On hand now at one place, in base-unit steps, all lots together. */
@@ -255,11 +311,17 @@ final class StockLedger
 
         try {
             $ids = $this->db->transaction(function () use ($tenantId, $actor, $lines, $meta, $sourceType, $sourceId, $occurredAt, $batchKey, $note, $reason): array {
+                if (($meta['lots_resolved'] ?? false) !== true) {
+                    $lines = $this->withLots($tenantId, $lines, substr($occurredAt, 0, 10));
+                }
+                if (count($lines) > self::MAX_LINES * 4) {
+                    throw InventoryRejectedException::field('lines', 'This takes from too many batches at once; send it in parts');
+                }
                 $this->hooks?->dispatch(Events::STOCK_MOVING, [
                     'tenant_id' => $tenantId, 'batch_key' => $batchKey, 'source_type' => $sourceType, 'source_id' => $sourceId,
                     'reason_code' => $reason, 'acting_profile_id' => $actor, 'occurred_at' => $occurredAt,
                     'lines' => array_map(static fn (array $l): array => [
-                        'variant_id' => $l['variant_id'], 'from_location_id' => $l['from_location_id'],
+                        'variant_id' => $l['variant_id'], 'lot_id' => $l['lot_id'] ?? null, 'from_location_id' => $l['from_location_id'],
                         'to_location_id' => $l['to_location_id'], 'quantity' => $l['steps'],
                         'reason_code' => $l['reason_code'] ?? $reason,
                     ], $lines),
@@ -341,7 +403,7 @@ final class StockLedger
     /**
      * One raw line, checked and converted to base-unit steps.
      *
-     * @return array{variant_id: int, from_location_id: int, to_location_id: int, steps: int, entered_unit_id: ?int, entered_quantity: ?int, unit_cost_minor: ?int, currency: ?string, note: string}
+     * @return array{variant_id: int, from_location_id: int, to_location_id: int, steps: int, entered_unit_id: ?int, entered_quantity: ?int, unit_cost_minor: ?int, currency: ?string, note: string, lot_input: array<string, mixed>}
      */
     private function line(int $tenantId, mixed $raw, string $field): array
     {
@@ -392,6 +454,26 @@ final class StockLedger
             'unit_cost_minor' => $cost,
             'currency' => $currency,
             'note' => is_string($raw['note'] ?? null) ? trim($raw['note']) : '',
+            'lot_input' => self::lotInput($raw),
+        ];
+    }
+
+    /**
+     * What a raw line says about its lot.
+     *
+     * @param array<mixed> $raw
+     * @return array{lot_id: mixed, lot_code: ?string, expires_on: mixed, made_on: mixed, supplier_contact_id: mixed}
+     */
+    public static function lotInput(array $raw): array
+    {
+        $code = $raw['lot_code'] ?? null;
+
+        return [
+            'lot_id' => $raw['lot_id'] ?? null,
+            'lot_code' => is_string($code) && trim($code) !== '' ? InventoryNames::westernDigits(trim($code)) : null,
+            'expires_on' => $raw['expires_on'] ?? null,
+            'made_on' => $raw['made_on'] ?? null,
+            'supplier_contact_id' => $raw['supplier_contact_id'] ?? null,
         ];
     }
 
@@ -410,6 +492,37 @@ final class StockLedger
         }
 
         return ['id' => (int) $row['id'], 'kind' => (string) $row['kind']];
+    }
+
+    /**
+     * Each line with its lot ({@see LotService::linesFor()}). An undo keeps
+     * the lots of the moves it reverses.
+     *
+     * @param list<array<string, mixed>> $lines
+     * @return list<array<string, mixed>>
+     */
+    private function withLots(int $tenantId, array $lines, string $occurredOn): array
+    {
+        $virtual = $this->virtualIds($tenantId);
+        $found = [];
+        $out = [];
+        foreach ($lines as $i => $line) {
+            $input = $line['lot_input'] ?? ['lot_id' => $line['lot_id'] ?? null];
+            unset($line['lot_input']);
+            if (($line['reverses_move_id'] ?? null) !== null) {
+                $out[] = $line + ['lot_id' => null];
+                continue;
+            }
+            $variantId = (int) $line['variant_id'];
+            $found[$variantId] ??= $this->items->variantForStock($tenantId, $variantId)
+                ?? throw InventoryRejectedException::field('lines', 'lines[' . $i . '].variant_id is not an item here');
+            unset($line['lot_id']);
+            foreach ($this->lots->linesFor($tenantId, $found[$variantId], $line, $input, isset($virtual[(int) $line['from_location_id']]), 'lines[' . $i . ']', $occurredOn) as $part) {
+                $out[] = $part;
+            }
+        }
+
+        return $out;
     }
 
     // ── reading ──────────────────────────────────────────────────────────
@@ -656,7 +769,7 @@ final class StockLedger
             'tenant_id' => $tenantId, 'batch_key' => $batchKey, 'source_type' => $sourceType, 'source_id' => $sourceId,
             'acting_profile_id' => $actor, 'move_ids' => $ids,
             'moves' => array_map(static fn (array $m): array => [
-                'id' => $m['id'], 'variant_id' => $m['variant_id'], 'from_location_id' => $m['from_location_id'],
+                'id' => $m['id'], 'variant_id' => $m['variant_id'], 'lot_id' => $m['lot_id'], 'from_location_id' => $m['from_location_id'],
                 'to_location_id' => $m['to_location_id'], 'quantity' => $m['quantity'],
             ], $moves),
         ];

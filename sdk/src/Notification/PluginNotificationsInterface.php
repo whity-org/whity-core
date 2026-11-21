@@ -27,7 +27,7 @@ namespace Whity\Sdk\Notification;
  *     }
  *
  * Every notice lands in the person's inbox. `emailDefault` (optional, SDK
- * 1.135) also sends it by email to a person who never chose for the type;
+ * 1.141) also sends it by email to a person who never chose for the type;
  * left out, it is false, so email comes only when the person turns it on in
  * Preferences › Notifications. The person's choice always wins, and the
  * workspace's email switch applies as for core's notices. The email carries the

@@ -52,6 +52,29 @@ final class ThemeFonts
         return self::PAIRS[$id]['name'] ?? self::PAIRS[self::DEFAULT]['name'];
     }
 
+    /** The family name behind each font variable, for exports outside Whity (TH.25). */
+    private const FAMILIES = [
+        'font-noto-sans' => 'Noto Sans', 'font-noto-sans-arabic' => 'Noto Sans Arabic',
+        'font-ibm-plex-sans' => 'IBM Plex Sans', 'font-ibm-plex-sans-arabic' => 'IBM Plex Sans Arabic',
+        'font-readex-pro' => 'Readex Pro', 'font-cairo' => 'Cairo', 'font-noto-kufi-arabic' => 'Noto Kufi Arabic',
+        'font-rubik' => 'Rubik', 'font-alexandria' => 'Alexandria',
+        'font-noto-serif' => 'Noto Serif', 'font-noto-naskh-arabic' => 'Noto Naskh Arabic',
+    ];
+
+    /**
+     * The pair's family names, Latin then Arabic (one when they're the same
+     * face), as another tool needs them: no CSS variables.
+     *
+     * @return list<string>
+     */
+    public static function families(string $id, bool $heading = false): array
+    {
+        $pair = self::PAIRS[$id] ?? self::PAIRS[self::DEFAULT];
+        $arabic = $heading && isset($pair['headingArabic']) ? $pair['headingArabic'] : $pair['arabic'];
+
+        return array_values(array_unique([self::FAMILIES[$pair['latin']], self::FAMILIES[$arabic]]));
+    }
+
     /** The font stack as CSS: Latin first, then Arabic, then the system faces. */
     public static function stack(string $id, bool $heading = false): string
     {

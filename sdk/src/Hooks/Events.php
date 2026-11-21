@@ -502,6 +502,19 @@ final class Events
     public const STOCK_LEVEL_RESTORED = 'stock.level.restored';
     public const STOCK_LEVEL_RESTORED_ASYNC = 'stock.level.restored.async';
 
+    // ---- batches and expiry (SDK 1.137, WHIT-1235) ----
+    /**
+     * A batch with stock expires within the workspace's warning window (7 days
+     * unless changed). Fired once per batch by the daily job. Payload:
+     * `tenant_id`, `lot_id`, `variant_id`, `item_id`, `code`, `expires_on`
+     * (`YYYY-MM-DD`), `on_hand` (base-unit decimal, every place together).
+     */
+    public const STOCK_LOT_EXPIRING = 'stock.lot.expiring';
+    public const STOCK_LOT_EXPIRING_ASYNC = 'stock.lot.expiring.async';
+    /** A batch with stock passed its expiry date. Fired once, the day after. Payload as `stock.lot.expiring`. */
+    public const STOCK_LOT_EXPIRED = 'stock.lot.expired';
+    public const STOCK_LOT_EXPIRED_ASYNC = 'stock.lot.expired.async';
+
     // ---- orders: purchase orders now, sales orders later (SDK 1.129, WHIT-1234) ----
     /**
      * FILTER hook, before an order goes to its route or is approved. Payload:

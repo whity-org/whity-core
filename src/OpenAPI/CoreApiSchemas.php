@@ -179,6 +179,7 @@ final class CoreApiSchemas
             self::externalBillingRoutes(),
             ContactsApiSchemas::routes(),
             InventoryApiSchemas::routes(),
+            ImportApiSchemas::routes(),
             SalesApiSchemas::routes(),
             ContactsApiSchemas::customFieldRoutes()
         ));
@@ -4551,6 +4552,28 @@ final class CoreApiSchemas
                 'tags' => ['theme'],
                 'responses' => [200 => self::jsonResponse('The theme file', 'ThemeExportResponse')] + self::authErrors(),
             ]),
+            // TH.25: resolved tokens for other tools.
+            self::permissionRoute('GET', '/api/themes/export/tokens', 'settings:read', [
+                'summary' => 'Export the theme in use as CSS, JSON, Tailwind or Flutter',
+                'description' => 'Free (TH.25): the theme this workspace uses, with its main colour, colour overrides and tweaks, as resolved tokens: every colour for light and dark after the guard rails, every radius and size with Whity\'s defaults, the fonts by family name and the motion timings. css is custom properties, json the Design Tokens Community Group format, tailwind a Tailwind v4 @theme file, flutter a Dart file like whity_tokens\' AppTokens with Material 3 colour schemes.',
+                'tags' => ['theme'],
+                'parameters' => [['name' => 'format', 'in' => 'query', 'required' => true, 'description' => 'css, json, tailwind or flutter', 'schema' => ['type' => 'string', 'enum' => ['css', 'json', 'tailwind', 'flutter']]]],
+                'responses' => [
+                    200 => self::jsonResponse('The file, its name and media type', 'ThemeTokensResponse'),
+                    422 => self::errorResponse('Unknown format'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes/tokens', 'settings:write', [
+                'summary' => 'Export a draft theme as CSS, JSON, Tailwind or Flutter',
+                'description' => 'The theme editor\'s export (TH.25): a theme file, saved or not, as resolved tokens in the same formats as GET /api/themes/export/tokens. Nothing is saved.',
+                'tags' => ['theme'],
+                'request' => 'ThemeTokensRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The file, its name and media type', 'ThemeTokensResponse'),
+                    413 => self::errorResponse('The theme is larger than 32 KB'),
+                    422 => self::errorResponse('Unknown format, or the theme has problems'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('POST', '/api/themes', 'settings:write', [
                 'summary' => 'Import a theme file into this workspace',
                 'description' => 'A theme file in the format of schemas/theme/v1.json: choices, never CSS. Importing the same id again replaces it. It is not applied until branding_theme is set to its id. With check=1 nothing is saved: the answer says which version is installed and what the file changes (TH.16).',
@@ -4562,6 +4585,17 @@ final class CoreApiSchemas
                     201 => self::jsonResponse('The theme was imported', 'ImportThemeResponse'),
                     413 => self::errorResponse('The file is larger than 32 KB'),
                     422 => self::errorResponse('The file is not a valid theme, or uses a whity. id'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes/convert', 'settings:write', [
+                'summary' => 'Turn a theme from shadcn, Tailwind or Material Theme Builder into a theme file',
+                'description' => 'Free (TH.25): shadcn CSS variables (:root and .dark), a Tailwind v4 @theme block, or Material Theme Builder JSON become a Whity theme file. Colours become the main colour and colours set by hand for the roles Whity has, the radius the nearest shape preset, the font its pair; status colours stay Whity\'s. Nothing is saved: import the result with POST /api/themes.',
+                'tags' => ['theme'],
+                'request' => 'ConvertThemeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The theme file, what was kept in words, and a preview', 'ConvertThemeResponse'),
+                    413 => self::errorResponse('The source is larger than 64 KB'),
+                    422 => self::errorResponse('Nothing usable was found; the error says what to paste'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('DELETE', '/api/themes/{themeId}', 'settings:write', [
@@ -6394,6 +6428,31 @@ final class CoreApiSchemas
                 'resets_at' => self::str(true),
             ], ['key', 'kind', 'used', 'limit', 'over', 'resets_at']),
             'PlanLimitListResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('PlanLimit')]),
+            // Section 33 §5: one usage meter for one month, from the usage ledger.
+            'UsageMeter' => self::object([
+                'meter' => ['type' => 'string', 'enum' => ['seats', 'customers', 'inventory.items', 'invoices', 'storage.bytes', 'messages.outbound', 'agents', 'api.calls']],
+                'key' => self::str() + ['description' => 'The entitlement its base is set on.'],
+                'kind' => ['type' => 'string', 'enum' => ['counted', 'snapshot']],
+                'unit' => ['type' => 'string', 'enum' => ['count', 'bytes']],
+                'used' => self::int(),
+                'peak' => self::int() + ['description' => 'The month\'s highest reading; for a counted meter, the same as used.'],
+                'base' => self::int(true) + ['description' => 'Null when there is no limit.'],
+                'state' => ['type' => 'string', 'enum' => ['unlimited', 'ok', 'near', 'over']],
+                'dimensions' => [
+                    'type' => 'object',
+                    'description' => 'The meter split: messages by channel, API calls by `api` or `mcp`, agents by `runs`, `tool_calls`, `tokens_in`, `tokens_out`.',
+                    'additionalProperties' => ['type' => 'integer'],
+                ],
+                'resets_at' => self::str(true),
+            ], ['meter', 'key', 'kind', 'unit', 'used', 'peak', 'base', 'state', 'dimensions', 'resets_at']),
+            'UsageReport' => self::object([
+                'period' => self::str() + ['description' => 'YYYY-MM, in the workspace\'s time zone.'],
+                'current' => self::bool(),
+                'resets_at' => self::str(true),
+                'meters' => ['type' => 'array', 'items' => SchemaBuilder::ref('UsageMeter')],
+                'periods' => ['type' => 'array', 'items' => self::str(), 'description' => 'Months with usage, newest first.'],
+            ], ['period', 'current', 'resets_at', 'meters', 'periods']),
+            'UsageReportResponse' => self::dataEnvelope(SchemaBuilder::ref('UsageReport')),
 
             // ── Subscription / billing state (WC-billing) ─────────────────────
             'PlanRef' => self::object([
@@ -12172,6 +12231,16 @@ final class CoreApiSchemas
                 'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'A theme file (schemas/theme/v1.json) with the main colour, colour overrides and tweaks folded in.'],
                 'filename' => self::str(),
             ], ['theme', 'filename'])),
+            'ThemeTokensRequest' => self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'A theme file (schemas/theme/v1.json).'],
+                'format' => ['type' => 'string', 'enum' => ['css', 'json', 'tailwind', 'flutter'], 'description' => 'css for CSS variables, json for Design Tokens JSON, tailwind for a Tailwind v4 @theme file, flutter for a Dart file.'],
+            ], ['theme', 'format']),
+            'ThemeTokensResponse' => self::dataEnvelope(self::object([
+                'format' => ['type' => 'string', 'enum' => ['css', 'json', 'tailwind', 'flutter'], 'description' => 'The format the file is in.'],
+                'filename' => self::str(),
+                'media_type' => self::str(),
+                'content' => self::str() + ['description' => 'The file\'s text.'],
+            ], ['format', 'filename', 'media_type', 'content'])),
             'ImportThemeRequest' => [
                 'type' => 'object',
                 'description' => 'A theme file (schemas/theme/v1.json).',
@@ -12187,7 +12256,7 @@ final class CoreApiSchemas
                     'author' => ['type' => 'object', 'description' => 'Who made it: name.'],
                     'colour' => ['type' => 'object', 'description' => 'seeds (primary, secondary, tertiary as #rrggbb), scheme, neutral, contrast and overrides per mode.'],
                     'type' => ['type' => 'object', 'description' => 'family and headingFamily from the allowed fonts, scale, titleWeight and emphasis.'],
-                    'shape' => ['type' => 'object', 'description' => 'preset (square, crisp, whity, soft, round) and morph.'],
+                    'shape' => ['type' => 'object', 'description' => 'preset (square, crisp, whity, soft, round, pebble, cut), morph, and components: a preset for buttons, fields, chips, cards, dialogs, tables or navigation.'],
                     'density' => ['type' => 'string', 'description' => 'compact, standard or comfortable.'],
                     'elevation' => ['type' => 'object', 'description' => 'style (plane, soft, flat) and float.'],
                     'motion' => ['type' => 'object', 'description' => 'preset: calm, standard or expressive.'],
@@ -12204,6 +12273,18 @@ final class CoreApiSchemas
                     'to' => self::str(true),
                 ], ['field', 'from', 'to'])],
             ], ['id', 'version'])),
+            // TH.25: a theme from another tool, as a theme file to import.
+            'ConvertThemeRequest' => self::object([
+                'format' => ['type' => 'string', 'enum' => ['shadcn', 'tailwind', 'material'], 'description' => 'shadcn CSS variables, a Tailwind v4 @theme block, or Material Theme Builder JSON.'],
+                'source' => self::str() + ['description' => 'The CSS or JSON as pasted or read from the file, at most 64 KB.'],
+                'name' => self::str() + ['description' => 'The theme\'s name; "Imported from …" when empty.'],
+            ], ['format', 'source']),
+            'ConvertThemeResponse' => self::dataEnvelope(self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'A theme file (schemas/theme/v1.json), not saved yet.'],
+                'notes' => ['type' => 'array', 'items' => self::str(), 'description' => 'What was kept and what was not, in plain words.'],
+                'preview' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Colours for light and dark, and the corner radii.'],
+                'adjustments' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']], 'description' => 'What the guard rails change: mode, role and change.'],
+            ], ['theme', 'notes', 'preview', 'adjustments'])),
             'DeleteThemeResponse' => self::dataEnvelope(self::object(['deleted' => self::bool()], ['deleted'])),
 
             // ── Forgotten-password + 2FA-recovery (WC-password-reset-2fa-recovery) ──
@@ -12815,7 +12896,7 @@ final class CoreApiSchemas
                 'counts' => SchemaBuilder::ref('DataTypeBulkCounts'),
                 'results' => ['type' => 'array', 'items' => SchemaBuilder::ref('DataTypeBulkResult')],
             ], ['key', 'action', 'counts', 'results'])),
-        ] + self::workspacePluginComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components() + SalesApiSchemas::components();
+        ] + self::workspacePluginComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components() + ImportApiSchemas::components() + SalesApiSchemas::components();
     }
 
     /**
@@ -15204,6 +15285,20 @@ final class CoreApiSchemas
                 'tags' => ['billing'],
                 'responses' => [
                     200 => self::jsonResponse('This workspace\'s limits', 'PlanLimitListResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/usage', 'billing:view', [
+                'summary' => 'Every usage meter for this workspace and month',
+                'description' =>
+                    'Seats, customers, items, invoices, storage, messages (by channel), agents (runs and '
+                    . 'tool calls) and API calls, each with what was used, the base (null when there is no '
+                    . 'limit) and whether it is near or past it. Past a base is a warning only: nothing '
+                    . 'is refused (BM.4). The current month is read live; an earlier one as it was kept.',
+                'tags' => ['billing'],
+                'parameters' => [self::queryParam('period', 'string', 'A month, YYYY-MM; the current month when left out.')],
+                'responses' => [
+                    200 => self::jsonResponse('This workspace\'s usage', 'UsageReportResponse'),
+                    422 => self::errorResponse('The month is not written YYYY-MM'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/billing/receipts', 'billing:view', [

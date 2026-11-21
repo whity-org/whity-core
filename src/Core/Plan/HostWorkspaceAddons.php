@@ -70,7 +70,7 @@ final class HostWorkspaceAddons implements WorkspaceAddons
         }
     }
 
-    /** `plugin.front-office.monthly` is the product `plugin.front-office`. */
+    /** `plugin.jofotara.monthly` is the product `plugin.jofotara`. */
     public static function productOf(string $planKey): string
     {
         $cut = strrpos($planKey, '.');

@@ -7,7 +7,7 @@ namespace Whity\Core\CustomFields;
 /**
  * The record types fields can be added to (WHIT-954): core's own, and those
  * plugins register. The extension point a paid plugin uses to give its own
- * records custom fields without patching core (Front Office: items, stock).
+ * records custom fields without patching core (core's inventory uses it for items).
  *
  * Built once at boot and only read after; worker-safe.
  */

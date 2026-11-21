@@ -316,6 +316,8 @@ final class PurchaseOrders
                 'entered_quantity' => $steps['entered_steps'], 'order_line_id' => $line['id'],
                 'unit_cost_minor' => $line['unit_cost_minor'], 'currency' => (string) $order['currency'],
                 'note' => is_string($raw['note'] ?? null) ? mb_substr(trim($raw['note']), 0, 500) : '',
+                // The batch and its expiry, typed on receipt (WHIT-1235); the lot is made when it posts.
+                'lot_input' => ['supplier_contact_id' => (int) $order['contact_id']] + StockLedger::lotInput($raw),
             ];
         }
 

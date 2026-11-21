@@ -38751,6 +38751,939 @@
                 ]
             }
         },
+        "/api/v1/inventory/imports/{kind}": {
+            "get": {
+                "operationId": "get_api_v1_inventory_imports_kind",
+                "summary": "Recent imports of items, opening stock or supplier prices",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "items",
+                                "opening_stock",
+                                "supplier_prices"
+                            ]
+                        },
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The last 20, newest first",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventoryImportListItem"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_inventory_imports_kind",
+                "summary": "Upload a spreadsheet of items, opening stock or supplier prices",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "CSV or Excel, as a `file` upload or as `text` or `content_base64` with `file_name`. Up to 5,000 rows. Answers the import with each column, its examples and its suggested target. Nothing changes yet.",
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "items",
+                                "opening_stock",
+                                "supplier_prices"
+                            ]
+                        },
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryImportUploadRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The import",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryImport"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not possible in the import's state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/imports/{kind}/{id}": {
+            "get": {
+                "operationId": "get_api_v1_inventory_imports_kind_id",
+                "summary": "An import of items, opening stock or supplier prices",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "items",
+                                "opening_stock",
+                                "supplier_prices"
+                            ]
+                        },
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The import",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryImport"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/imports/{kind}/{id}/check": {
+            "post": {
+                "operationId": "post_api_v1_inventory_imports_kind_id_check",
+                "summary": "Work out what an import will do",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "With the columns matched, every row is created, updated (items by SKU, supplier prices by supplier and SKU) or skipped with a reason. Items take a row per variant: the option columns (`option1`-`option3`) are named by their headings, and rows share an item by `group` or by name. Nothing changes.",
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "items",
+                                "opening_stock",
+                                "supplier_prices"
+                            ]
+                        },
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryImportCheckRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The import with its summary",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryImport"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not possible in the import's state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/imports/{kind}/{id}/run": {
+            "post": {
+                "operationId": "post_api_v1_inventory_imports_kind_id_run",
+                "summary": "Run a checked import",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Works the plan out again against the data as it is now and applies it in one transaction. It can be undone for 24 hours.",
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "items",
+                                "opening_stock",
+                                "supplier_prices"
+                            ]
+                        },
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The import",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryImport"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not possible in the import's state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/imports/{kind}/{id}/skipped.csv": {
+            "get": {
+                "operationId": "get_api_v1_inventory_imports_kind_id_skipped_csv",
+                "summary": "The skipped rows as a CSV, with their reasons",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "items",
+                                "opening_stock",
+                                "supplier_prices"
+                            ]
+                        },
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A CSV file",
+                        "content": {
+                            "text/csv": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not possible in the import's state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/imports/{kind}/{id}/undo": {
+            "post": {
+                "operationId": "post_api_v1_inventory_imports_kind_id_undo",
+                "summary": "Undo an import, within 24 hours",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Items it made are archived and items it changed get their values back, variants included; supplier prices it made are removed and changed ones put back; opening stock is reversed, unless that stock has moved since (409).",
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "kind",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "items",
+                                "opening_stock",
+                                "supplier_prices"
+                            ]
+                        },
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The import",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryImport"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not possible in the import's state",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/inventory/items": {
             "get": {
                 "operationId": "get_api_v1_inventory_items",
@@ -39999,6 +40932,429 @@
                     },
                     "422": {
                         "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/lots": {
+            "get": {
+                "operationId": "get_api_v1_inventory_lots",
+                "summary": "An item's batches or serial numbers, with what each holds where",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Soonest expiring first. Batches with no stock left are listed only with `with_empty=true`.",
+                "parameters": [
+                    {
+                        "name": "item_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "The item (or give variant_id).",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "variant_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this variant.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "with_empty",
+                        "in": "query",
+                        "required": false,
+                        "description": "`true` to list batches with no stock left too.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Batches",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventoryLot"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/lots/expiring": {
+            "get": {
+                "operationId": "get_api_v1_inventory_lots_expiring",
+                "summary": "Batches with stock that are expiring soon or have expired",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "Within the workspace's warning window (7 days unless changed) or `days`, soonest first.",
+                "parameters": [
+                    {
+                        "name": "days",
+                        "in": "query",
+                        "required": false,
+                        "description": "How many days ahead, 0 to 3650.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Batches",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/InventoryLot"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/inventory/lots/{id}": {
+            "get": {
+                "operationId": "get_api_v1_inventory_lots_id",
+                "summary": "One batch or serial number",
+                "tags": [
+                    "inventory"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The batch",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryLot"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "patch_api_v1_inventory_lots_id",
+                "summary": "Correct a batch's dates or notes",
+                "tags": [
+                    "inventory"
+                ],
+                "description": "A new expiry date may be told again as expiring or expired.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InventoryLotRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The batch",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/InventoryLot"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -71411,7 +72767,7 @@
                 "tags": [
                     "sales"
                 ],
-                "description": "A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`).",
+                "description": "A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`). It is emailed to the customer unless `email` is false or the workspace turned the quote email off; `emailed` says whether it was.",
                 "parameters": [
                     {
                         "name": "id",
@@ -71422,6 +72778,16 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SalesQuoteSendRequest"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "The quote and the customer's link",
@@ -71435,12 +72801,26 @@
                                         },
                                         "link": {
                                             "type": "string"
+                                        },
+                                        "emailed": {
+                                            "type": "boolean"
                                         }
                                     },
                                     "required": [
                                         "data",
-                                        "link"
+                                        "link",
+                                        "emailed"
                                     ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
                                 }
                             }
                         }
@@ -78817,6 +80197,123 @@
                 ]
             }
         },
+        "/api/v1/themes/convert": {
+            "post": {
+                "operationId": "post_api_v1_themes_convert",
+                "summary": "Turn a theme from shadcn, Tailwind or Material Theme Builder into a theme file",
+                "tags": [
+                    "theme"
+                ],
+                "description": "Free (TH.25): shadcn CSS variables (:root and .dark), a Tailwind v4 @theme block, or Material Theme Builder JSON become a Whity theme file. Colours become the main colour and colours set by hand for the roles Whity has, the radius the nearest shape preset, the font its pair; status colours stay Whity's. Nothing is saved: import the result with POST /api/themes.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ConvertThemeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The theme file, what was kept in words, and a preview",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ConvertThemeResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "The source is larger than 64 KB",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Nothing usable was found; the error says what to paste",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/themes/export": {
             "get": {
                 "operationId": "get_api_v1_themes_export",
@@ -78868,6 +80365,227 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/themes/export/tokens": {
+            "get": {
+                "operationId": "get_api_v1_themes_export_tokens",
+                "summary": "Export the theme in use as CSS, JSON, Tailwind or Flutter",
+                "tags": [
+                    "theme"
+                ],
+                "description": "Free (TH.25): the theme this workspace uses, with its main colour, colour overrides and tweaks, as resolved tokens: every colour for light and dark after the guard rails, every radius and size with Whity's defaults, the fonts by family name and the motion timings. css is custom properties, json the Design Tokens Community Group format, tailwind a Tailwind v4 @theme file, flutter a Dart file like whity_tokens' AppTokens with Material 3 colour schemes.",
+                "parameters": [
+                    {
+                        "name": "format",
+                        "in": "query",
+                        "required": true,
+                        "description": "css, json, tailwind or flutter",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "css",
+                                "json",
+                                "tailwind",
+                                "flutter"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The file, its name and media type",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemeTokensResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown format",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/themes/tokens": {
+            "post": {
+                "operationId": "post_api_v1_themes_tokens",
+                "summary": "Export a draft theme as CSS, JSON, Tailwind or Flutter",
+                "tags": [
+                    "theme"
+                ],
+                "description": "The theme editor's export (TH.25): a theme file, saved or not, as resolved tokens in the same formats as GET /api/themes/export/tokens. Nothing is saved.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ThemeTokensRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The file, its name and media type",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemeTokensResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "The theme is larger than 32 KB",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown format, or the theme has problems",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -81704,6 +83422,104 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/usage": {
+            "get": {
+                "operationId": "get_api_v1_usage",
+                "summary": "Every usage meter for this workspace and month",
+                "tags": [
+                    "billing"
+                ],
+                "description": "Seats, customers, items, invoices, storage, messages (by channel), agents (runs and tool calls) and API calls, each with what was used, the base (null when there is no limit) and whether it is near or past it. Past a base is a warning only: nothing is refused (BM.4). The current month is read live; an earlier one as it was kept.",
+                "parameters": [
+                    {
+                        "name": "period",
+                        "in": "query",
+                        "required": false,
+                        "description": "A month, YYYY-MM; the current month when left out.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "This workspace's usage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/UsageReportResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The month is not written YYYY-MM",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -94986,6 +96802,78 @@
                 },
                 "minProperties": 1
             },
+            "ConvertThemeRequest": {
+                "type": "object",
+                "properties": {
+                    "format": {
+                        "type": "string",
+                        "enum": [
+                            "shadcn",
+                            "tailwind",
+                            "material"
+                        ],
+                        "description": "shadcn CSS variables, a Tailwind v4 @theme block, or Material Theme Builder JSON."
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "The CSS or JSON as pasted or read from the file, at most 64 KB."
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "The theme's name; \"Imported from \u2026\" when empty."
+                    }
+                },
+                "required": [
+                    "format",
+                    "source"
+                ]
+            },
+            "ConvertThemeResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "theme": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "A theme file (schemas/theme/v1.json), not saved yet."
+                            },
+                            "notes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "What was kept and what was not, in plain words."
+                            },
+                            "preview": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "Colours for light and dark, and the corner radii."
+                            },
+                            "adjustments": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                },
+                                "description": "What the guard rails change: mode, role and change."
+                            }
+                        },
+                        "required": [
+                            "theme",
+                            "notes",
+                            "preview",
+                            "adjustments"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "CustomField": {
                 "type": "object",
                 "properties": {
@@ -104974,7 +106862,7 @@
                     },
                     "shape": {
                         "type": "object",
-                        "description": "preset (square, crisp, whity, soft, round) and morph."
+                        "description": "preset (square, crisp, whity, soft, round, pebble, cut), morph, and components: a preset for buttons, fields, chips, cards, dialogs, tables or navigation."
                     },
                     "density": {
                         "type": "string",
@@ -105286,6 +107174,24 @@
                                 },
                                 "note": {
                                     "type": "string"
+                                },
+                                "lot_code": {
+                                    "type": "string",
+                                    "description": "For an item that keeps batches: the batch code (a new one makes the batch) or serial number."
+                                },
+                                "lot_id": {
+                                    "type": "integer",
+                                    "description": "Or the batch by id."
+                                },
+                                "expires_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "A new batch's expiry date; needed when the item expires and has no shelf life."
+                                },
+                                "made_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "When a new batch was made."
                                 }
                             },
                             "required": [
@@ -105433,6 +107339,24 @@
                                 },
                                 "note": {
                                     "type": "string"
+                                },
+                                "lot_code": {
+                                    "type": "string",
+                                    "description": "For an item that keeps batches: the batch any extra found belongs to (a new code makes it); a shortfall comes out of the batches that expire first."
+                                },
+                                "lot_id": {
+                                    "type": "integer",
+                                    "description": "Or the batch by id."
+                                },
+                                "expires_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "A new batch's expiry date; needed when the item expires and has no shelf life."
+                                },
+                                "made_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "When a new batch was made."
                                 }
                             },
                             "required": [
@@ -105482,6 +107406,234 @@
                 "required": [
                     "location_id"
                 ]
+            },
+            "InventoryImport": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "items",
+                            "opening_stock",
+                            "supplier_prices"
+                        ]
+                    },
+                    "file_name": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "uploaded",
+                            "checked",
+                            "imported",
+                            "undone"
+                        ]
+                    },
+                    "row_count": {
+                        "type": "integer"
+                    },
+                    "columns": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "index": {
+                                    "type": "integer"
+                                },
+                                "header": {
+                                    "type": "string"
+                                },
+                                "examples": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "empty": {
+                                    "type": "boolean"
+                                },
+                                "suggestion": {
+                                    "type": "object",
+                                    "nullable": true,
+                                    "properties": {
+                                        "target": {
+                                            "type": "string"
+                                        },
+                                        "confidence": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            },
+                            "required": [
+                                "index",
+                                "header"
+                            ]
+                        }
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "key": {
+                                    "type": "string"
+                                },
+                                "label": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "key",
+                                "label"
+                            ]
+                        }
+                    },
+                    "options": {
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "summary": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "Counts, and up to 200 rows with what each does and why."
+                    },
+                    "imported_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "undone_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "undo_until": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "can_undo": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "kind",
+                    "file_name",
+                    "status",
+                    "row_count",
+                    "columns",
+                    "targets",
+                    "can_undo"
+                ]
+            },
+            "InventoryImportCheckRequest": {
+                "type": "object",
+                "properties": {
+                    "mapping": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string",
+                            "nullable": true
+                        },
+                        "description": "Column index => target key from `targets`, such as `{\"0\": \"sku\", \"1\": \"name\"}`. Items need `sku`; opening stock needs `sku` and `quantity`; supplier prices need `sku` and `price`."
+                    },
+                    "location_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Opening stock: the place for rows that name none."
+                    },
+                    "contact_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Supplier prices: the supplier for rows that name none."
+                    }
+                },
+                "required": [
+                    "mapping"
+                ]
+            },
+            "InventoryImportListItem": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "kind": {
+                        "type": "string"
+                    },
+                    "file_name": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string"
+                    },
+                    "summary": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "create": {
+                                "type": "integer"
+                            },
+                            "update": {
+                                "type": "integer"
+                            },
+                            "skip": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "create",
+                            "update",
+                            "skip"
+                        ]
+                    },
+                    "created_by_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "imported_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "undo_until": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "can_undo": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "kind",
+                    "status"
+                ]
+            },
+            "InventoryImportUploadRequest": {
+                "type": "object",
+                "properties": {
+                    "file_name": {
+                        "type": "string",
+                        "description": "The file's name, such as items.csv; .xlsx is read as Excel."
+                    },
+                    "text": {
+                        "type": "string",
+                        "description": "The CSV itself."
+                    },
+                    "content_base64": {
+                        "type": "string",
+                        "description": "The file, base64."
+                    }
+                }
             },
             "InventoryItem": {
                 "type": "object",
@@ -105791,6 +107943,15 @@
                         "nullable": true,
                         "description": "The category it belongs to, or null for none."
                     },
+                    "tracking": {
+                        "type": "string",
+                        "enum": [
+                            "none",
+                            "lot",
+                            "serial"
+                        ],
+                        "description": "`lot` keeps batches (each with its expiry), `serial` a serial number per piece, `none` (the default) neither. Batches can be turned on while the item has stock, which goes into the batch OPENING; serial numbers, and turning batches off, only at 0 stock."
+                    },
                     "expires": {
                         "type": "boolean",
                         "description": "True when the item goes off and its stock has expiry dates."
@@ -106003,6 +108164,130 @@
                     "is_active": {
                         "type": "boolean",
                         "description": "False to stop using the place; its history stays."
+                    }
+                }
+            },
+            "InventoryLot": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "variant_id": {
+                        "type": "integer"
+                    },
+                    "item_id": {
+                        "type": "integer"
+                    },
+                    "item_name": {
+                        "type": "string"
+                    },
+                    "item_names": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "The name in each language, such as `{\"en\": \"Flour\", \"ar\": \"\u0637\u062d\u064a\u0646\"}`."
+                    },
+                    "sku": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": "string",
+                        "description": "The batch code or serial number."
+                    },
+                    "is_serial": {
+                        "type": "boolean"
+                    },
+                    "made_on": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "expires_on": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "supplier_contact_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "supplier_name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "on_hand": {
+                        "type": "string",
+                        "pattern": "^-?\\d+(\\.\\d+)?$",
+                        "description": "Every place together, in the item's base unit."
+                    },
+                    "on_hand_steps": {
+                        "type": "integer"
+                    },
+                    "unit": {
+                        "type": "string"
+                    },
+                    "places": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "location_id": {
+                                    "type": "integer"
+                                },
+                                "on_hand": {
+                                    "type": "string",
+                                    "pattern": "^-?\\d+(\\.\\d+)?$",
+                                    "description": "There."
+                                }
+                            },
+                            "required": [
+                                "location_id",
+                                "on_hand"
+                            ]
+                        }
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "variant_id",
+                    "item_id",
+                    "item_name",
+                    "sku",
+                    "code",
+                    "is_serial",
+                    "made_on",
+                    "expires_on",
+                    "on_hand",
+                    "unit",
+                    "places",
+                    "created_at"
+                ]
+            },
+            "InventoryLotRequest": {
+                "type": "object",
+                "properties": {
+                    "expires_on": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "date",
+                        "description": "The batch's expiry date, such as 2027-03-31; null when it has none."
+                    },
+                    "made_on": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "date",
+                        "description": "When the batch was made; null when not known."
+                    },
+                    "notes": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "description": "A note kept with the batch."
                     }
                 }
             },
@@ -106323,6 +108608,24 @@
                                 "reason_code": {
                                     "type": "string",
                                     "description": "This line's own reason, when it differs."
+                                },
+                                "lot_code": {
+                                    "type": "string",
+                                    "description": "For an item that keeps batches: the batch code (a new one makes the batch) or serial number."
+                                },
+                                "lot_id": {
+                                    "type": "integer",
+                                    "description": "Or the batch by id."
+                                },
+                                "expires_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "A new batch's expiry date; needed when the item expires and has no shelf life."
+                                },
+                                "made_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "When a new batch was made."
                                 }
                             },
                             "required": [
@@ -106444,6 +108747,16 @@
                     "order_line_id": {
                         "type": "integer",
                         "nullable": true
+                    },
+                    "lot_code": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The batch or serial number the line named."
+                    },
+                    "lot_expires_on": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "That batch's expiry date."
                     }
                 },
                 "required": [
@@ -107069,6 +109382,24 @@
                                 },
                                 "note": {
                                     "type": "string"
+                                },
+                                "lot_code": {
+                                    "type": "string",
+                                    "description": "For an item that keeps batches: the batch code (a new one makes the batch) or serial number."
+                                },
+                                "lot_id": {
+                                    "type": "integer",
+                                    "description": "Or the batch by id."
+                                },
+                                "expires_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "A new batch's expiry date; needed when the item expires and has no shelf life."
+                                },
+                                "made_on": {
+                                    "type": "string",
+                                    "format": "date",
+                                    "description": "When a new batch was made."
                                 }
                             },
                             "required": [
@@ -107284,6 +109615,12 @@
                     },
                     "over_receipt_percent": {
                         "type": "integer"
+                    },
+                    "fefo": {
+                        "type": "boolean"
+                    },
+                    "expiry_warning_days": {
+                        "type": "integer"
                     }
                 },
                 "required": [
@@ -107293,7 +109630,9 @@
                     "count_route_template_id",
                     "transfers_one_step",
                     "purchase_route_template_id",
-                    "over_receipt_percent"
+                    "over_receipt_percent",
+                    "fefo",
+                    "expiry_warning_days"
                 ]
             },
             "InventorySettingsRequest": {
@@ -107331,6 +109670,14 @@
                     "over_receipt_percent": {
                         "type": "integer",
                         "description": "How far past the order a receipt may go before it asks, 0 to 100 (0: anything over asks)."
+                    },
+                    "fefo": {
+                        "type": "boolean",
+                        "description": "True (the default) to take the batch that expires first; false takes the oldest batch."
+                    },
+                    "expiry_warning_days": {
+                        "type": "integer",
+                        "description": "Days before its expiry a batch counts as expiring soon, 1 to 365 (7)."
                     }
                 }
             },
@@ -107491,6 +109838,14 @@
                                 },
                                 "note": {
                                     "type": "string"
+                                },
+                                "lot_code": {
+                                    "type": "string",
+                                    "description": "For an item that keeps batches: the batch to take from. Left out, the batches that expire first are taken."
+                                },
+                                "lot_id": {
+                                    "type": "integer",
+                                    "description": "Or the batch by id."
                                 }
                             },
                             "required": [
@@ -118139,6 +120494,15 @@
                     "lines"
                 ]
             },
+            "SalesQuoteSendRequest": {
+                "type": "object",
+                "properties": {
+                    "email": {
+                        "type": "boolean",
+                        "description": "False to only make the link, without emailing the customer. True by default."
+                    }
+                }
+            },
             "SalesQuoteTarget": {
                 "type": "object",
                 "properties": {
@@ -118234,6 +120598,22 @@
                         "type": "integer",
                         "nullable": true,
                         "description": "The route a quote travels before it goes out; null for none."
+                    },
+                    "email_quote": {
+                        "type": "boolean",
+                        "description": "Email a quote to the customer when it is sent."
+                    },
+                    "email_invoice": {
+                        "type": "boolean",
+                        "description": "Email an invoice to the customer when it is issued."
+                    },
+                    "email_receipt": {
+                        "type": "boolean",
+                        "description": "Email a receipt when a payment arrives."
+                    },
+                    "email_reminder": {
+                        "type": "boolean",
+                        "description": "Allow payment reminders by email."
                     }
                 }
             },
@@ -122550,6 +124930,69 @@
                     "data"
                 ]
             },
+            "ThemeTokensRequest": {
+                "type": "object",
+                "properties": {
+                    "theme": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "A theme file (schemas/theme/v1.json)."
+                    },
+                    "format": {
+                        "type": "string",
+                        "enum": [
+                            "css",
+                            "json",
+                            "tailwind",
+                            "flutter"
+                        ],
+                        "description": "css for CSS variables, json for Design Tokens JSON, tailwind for a Tailwind v4 @theme file, flutter for a Dart file."
+                    }
+                },
+                "required": [
+                    "theme",
+                    "format"
+                ]
+            },
+            "ThemeTokensResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "format": {
+                                "type": "string",
+                                "enum": [
+                                    "css",
+                                    "json",
+                                    "tailwind",
+                                    "flutter"
+                                ],
+                                "description": "The format the file is in."
+                            },
+                            "filename": {
+                                "type": "string"
+                            },
+                            "media_type": {
+                                "type": "string"
+                            },
+                            "content": {
+                                "type": "string",
+                                "description": "The file's text."
+                            }
+                        },
+                        "required": [
+                            "format",
+                            "filename",
+                            "media_type",
+                            "content"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "TimeWindow": {
                 "type": "object",
                 "properties": {
@@ -124055,6 +126498,133 @@
                 },
                 "required": [
                     "unread_count"
+                ]
+            },
+            "UsageMeter": {
+                "type": "object",
+                "properties": {
+                    "meter": {
+                        "type": "string",
+                        "enum": [
+                            "seats",
+                            "customers",
+                            "inventory.items",
+                            "invoices",
+                            "storage.bytes",
+                            "messages.outbound",
+                            "agents",
+                            "api.calls"
+                        ]
+                    },
+                    "key": {
+                        "type": "string",
+                        "description": "The entitlement its base is set on."
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "counted",
+                            "snapshot"
+                        ]
+                    },
+                    "unit": {
+                        "type": "string",
+                        "enum": [
+                            "count",
+                            "bytes"
+                        ]
+                    },
+                    "used": {
+                        "type": "integer"
+                    },
+                    "peak": {
+                        "type": "integer",
+                        "description": "The month's highest reading; for a counted meter, the same as used."
+                    },
+                    "base": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Null when there is no limit."
+                    },
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "unlimited",
+                            "ok",
+                            "near",
+                            "over"
+                        ]
+                    },
+                    "dimensions": {
+                        "type": "object",
+                        "description": "The meter split: messages by channel, API calls by `api` or `mcp`, agents by `runs`, `tool_calls`, `tokens_in`, `tokens_out`.",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
+                    },
+                    "resets_at": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "meter",
+                    "key",
+                    "kind",
+                    "unit",
+                    "used",
+                    "peak",
+                    "base",
+                    "state",
+                    "dimensions",
+                    "resets_at"
+                ]
+            },
+            "UsageReport": {
+                "type": "object",
+                "properties": {
+                    "period": {
+                        "type": "string",
+                        "description": "YYYY-MM, in the workspace's time zone."
+                    },
+                    "current": {
+                        "type": "boolean"
+                    },
+                    "resets_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "meters": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/UsageMeter"
+                        }
+                    },
+                    "periods": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Months with usage, newest first."
+                    }
+                },
+                "required": [
+                    "period",
+                    "current",
+                    "resets_at",
+                    "meters",
+                    "periods"
+                ]
+            },
+            "UsageReportResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/UsageReport"
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "User": {

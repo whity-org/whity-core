@@ -8,11 +8,11 @@ namespace Whity\Core\Document\Print;
  * The papers a document can print on (6.1), by the name a document's
  * `page.size` carries.
  *
- * Core ships A4 (the default), A5, Letter and an 80 mm roll. The roll is the
- * extension point for a paid plugin's receipt (Front Office's `TplReceipt80`,
- * release 0.2.29): the plugin draws the receipt as a document whose
- * `page.size` is `80mm`, and core prints it on the roll. Core knows only the
- * paper, nothing about receipts.
+ * Core ships A4 (the default), A5, Letter and an 80 mm roll. The roll carries
+ * the till receipt (`TplReceipt80`, the `editor.receipt-80mm` starter, TR.1)
+ * and anything a plugin draws as a document whose `page.size` is `80mm`; core
+ * prints it on the roll. This class knows only the paper, nothing about
+ * receipts.
  *
  * A roll has no natural height: render-service paginates against `heightMm`,
  * so the roll's is long enough for a receipt to fit one "page", and the

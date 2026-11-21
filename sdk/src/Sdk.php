@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.135).
+ * SDK identity (v1.141).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1508,20 +1508,39 @@ namespace Whity\Sdk;
  *
  * Purely additive.)
  *
- * 1.135 (NOTICES BY EMAIL: a type in {@see Notification\PluginNotificationsInterface::getNotificationTypes()}
+ * 1.133 (USAGE METERS, READ-ONLY (section 33 §5, BM.17): the host service {@see Usage\Usage} gives a
+ * plugin its workspace's usage meters for a month, as Billing > Usage shows them: seats, customers,
+ * items, invoices, storage, messages by channel, agent runs and tool calls, and API calls, each with
+ * what was used, its base and whether it is near or past it ({@see Usage\UsageMeter}). Past a base is
+ * a warning only; nothing is ever refused.
+ *
+ * Purely additive: one new host service, null on older hosts.)
+ *
+ * 1.137 (LOTS, SERIAL NUMBERS AND EXPIRY: {@see Inventory\Lots} reads an item's batches and serial
+ * numbers ({@see Inventory\Lot}) and what is expiring, through `$ctx->inventory()->lots()` or the container.
+ * An item keeps batches when its `tracking` is `lot` (each batch with its expiry) or `serial`. A
+ * {@see Inventory\MoveLine} gains `lotId`, `lotCode`, `expiresOn` and `madeOn`: stock coming in names its
+ * batch (a new code makes it), stock leaving may name one or takes the batches that expire first.
+ * {@see Inventory\Move} gains `lotId`. New events, fired once per batch by a daily job:
+ * `stock.lot.expiring` and `stock.lot.expired`, each with an `.async` twin (WHIT-1235, design 31 §3.5).
+ *
+ * Purely additive: one new method on Context\InventoryScope, which only the host implements, and new
+ * optional constructor arguments, last, on MoveLine and Move.)
+ *
+ * 1.141 (NOTICES BY EMAIL: a type in {@see Notification\PluginNotificationsInterface::getNotificationTypes()}
  * may carry `emailDefault` (bool, optional, false when left out). Every notice still lands in the inbox;
  * with `emailDefault` it also goes by email to a person who never chose for the type. The person's own
  * choice always wins, and the workspace's email switch applies as for core notices. The email carries
  * the Notice's subject and body only, never `data` (WHIT-1250, #2209).
  *
  * Purely additive: one optional key. Older hosts ignore it and keep notices in-app, so a plugin that
- * needs the email needs `^1.135`.)
+ * needs the email needs `^1.141`.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.135.0';
+    public const VERSION = '1.141.0';
 
     /**
      * Static identity only — never instantiated.
