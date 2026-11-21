@@ -123069,7 +123069,8 @@
                             "json",
                             "tailwind",
                             "flutter"
-                        ]
+                        ],
+                        "description": "css for CSS variables, json for Design Tokens JSON, tailwind for a Tailwind v4 @theme file, flutter for a Dart file."
                     }
                 },
                 "required": [
@@ -123090,7 +123091,8 @@
                                     "json",
                                     "tailwind",
                                     "flutter"
-                                ]
+                                ],
+                                "description": "The format the file is in."
                             },
                             "filename": {
                                 "type": "string"

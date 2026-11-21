@@ -22903,12 +22903,18 @@ export interface components {
             theme: {
                 [key: string]: unknown;
             };
-            /** @enum {string} */
+            /**
+             * @description css for CSS variables, json for Design Tokens JSON, tailwind for a Tailwind v4 @theme file, flutter for a Dart file.
+             * @enum {string}
+             */
             format: "css" | "json" | "tailwind" | "flutter";
         };
         ThemeTokensResponse: {
             data: {
-                /** @enum {string} */
+                /**
+                 * @description The format the file is in.
+                 * @enum {string}
+                 */
                 format: "css" | "json" | "tailwind" | "flutter";
                 filename: string;
                 media_type: string;

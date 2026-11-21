@@ -12231,10 +12231,10 @@ final class CoreApiSchemas
             ], ['theme', 'filename'])),
             'ThemeTokensRequest' => self::object([
                 'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'A theme file (schemas/theme/v1.json).'],
-                'format' => ['type' => 'string', 'enum' => ['css', 'json', 'tailwind', 'flutter']],
+                'format' => ['type' => 'string', 'enum' => ['css', 'json', 'tailwind', 'flutter'], 'description' => 'css for CSS variables, json for Design Tokens JSON, tailwind for a Tailwind v4 @theme file, flutter for a Dart file.'],
             ], ['theme', 'format']),
             'ThemeTokensResponse' => self::dataEnvelope(self::object([
-                'format' => ['type' => 'string', 'enum' => ['css', 'json', 'tailwind', 'flutter']],
+                'format' => ['type' => 'string', 'enum' => ['css', 'json', 'tailwind', 'flutter'], 'description' => 'The format the file is in.'],
                 'filename' => self::str(),
                 'media_type' => self::str(),
                 'content' => self::str() + ['description' => 'The file\'s text.'],
