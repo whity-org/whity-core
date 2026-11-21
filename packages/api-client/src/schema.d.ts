@@ -5830,6 +5830,67 @@ export interface paths {
         patch: operations["patch_api_v1_inventory_locations_id"];
         trace?: never;
     };
+    "/api/v1/inventory/lots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * An item's batches or serial numbers, with what each holds where
+         * @description Soonest expiring first. Batches with no stock left are listed only with `with_empty=true`.
+         */
+        get: operations["get_api_v1_inventory_lots"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/lots/expiring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Batches with stock that are expiring soon or have expired
+         * @description Within the workspace's warning window (7 days unless changed) or `days`, soonest first.
+         */
+        get: operations["get_api_v1_inventory_lots_expiring"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/inventory/lots/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One batch or serial number */
+        get: operations["get_api_v1_inventory_lots_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Correct a batch's dates or notes
+         * @description A new expiry date may be told again as expiring or expired.
+         */
+        patch: operations["patch_api_v1_inventory_lots_id"];
+        trace?: never;
+    };
     "/api/v1/inventory/operations": {
         parameters: {
             query?: never;
@@ -17994,6 +18055,20 @@ export interface components {
                 /** @description A unit code; the item's base unit when left out. */
                 unit?: string;
                 note?: string;
+                /** @description For an item that keeps batches: the batch code (a new one makes the batch) or serial number. */
+                lot_code?: string;
+                /** @description Or the batch by id. */
+                lot_id?: number;
+                /**
+                 * Format: date
+                 * @description A new batch's expiry date; needed when the item expires and has no shelf life.
+                 */
+                expires_on?: string;
+                /**
+                 * Format: date
+                 * @description When a new batch was made.
+                 */
+                made_on?: string;
             }[];
             /** @description For an adjustment: why, from the workspace's reasons (GET /api/inventory/reasons), such as expired, damaged, spoiled, unsold or found. One place per adjustment. */
             reason_code?: string;
@@ -18039,6 +18114,20 @@ export interface components {
                 /** @description A unit code; the item's base unit when left out. */
                 unit?: string;
                 note?: string;
+                /** @description For an item that keeps batches: the batch any extra found belongs to (a new code makes it); a shortfall comes out of the batches that expire first. */
+                lot_code?: string;
+                /** @description Or the batch by id. */
+                lot_id?: number;
+                /**
+                 * Format: date
+                 * @description A new batch's expiry date; needed when the item expires and has no shelf life.
+                 */
+                expires_on?: string;
+                /**
+                 * Format: date
+                 * @description When a new batch was made.
+                 */
+                made_on?: string;
             }[];
         };
         InventoryCountRequest: {
@@ -18144,6 +18233,11 @@ export interface components {
             description?: string;
             /** @description The category it belongs to, or null for none. */
             category_id?: number | null;
+            /**
+             * @description `lot` keeps batches (each with its expiry), `serial` a serial number per piece, `none` (the default) neither. Batches can be turned on while the item has stock, which goes into the batch OPENING; serial numbers, and turning batches off, only at 0 stock.
+             * @enum {string}
+             */
+            tracking?: "none" | "lot" | "serial";
             /** @description True when the item goes off and its stock has expiry dates. */
             expires?: boolean;
             /** @description Days it keeps once made or received, for working out expiry dates. */
@@ -18217,6 +18311,49 @@ export interface components {
             address?: string;
             /** @description False to stop using the place; its history stays. */
             is_active?: boolean;
+        };
+        InventoryLot: {
+            id: number;
+            variant_id: number;
+            item_id: number;
+            item_name: string;
+            /** @description The name in each language, such as `{"en": "Flour", "ar": "طحين"}`. */
+            item_names?: {
+                [key: string]: string;
+            };
+            sku: string;
+            /** @description The batch code or serial number. */
+            code: string;
+            is_serial: boolean;
+            made_on: string | null;
+            expires_on: string | null;
+            supplier_contact_id?: number | null;
+            supplier_name?: string | null;
+            notes?: string;
+            /** @description Every place together, in the item's base unit. */
+            on_hand: string;
+            on_hand_steps?: number;
+            unit: string;
+            places: {
+                location_id: number;
+                /** @description There. */
+                on_hand: string;
+            }[];
+            created_at: string;
+        };
+        InventoryLotRequest: {
+            /**
+             * Format: date
+             * @description The batch's expiry date, such as 2027-03-31; null when it has none.
+             */
+            expires_on?: string | null;
+            /**
+             * Format: date
+             * @description When the batch was made; null when not known.
+             */
+            made_on?: string | null;
+            /** @description A note kept with the batch. */
+            notes?: string;
         };
         InventoryMove: {
             id: number;
@@ -18308,6 +18445,20 @@ export interface components {
                 note?: string;
                 /** @description This line's own reason, when it differs. */
                 reason_code?: string;
+                /** @description For an item that keeps batches: the batch code (a new one makes the batch) or serial number. */
+                lot_code?: string;
+                /** @description Or the batch by id. */
+                lot_id?: number;
+                /**
+                 * Format: date
+                 * @description A new batch's expiry date; needed when the item expires and has no shelf life.
+                 */
+                expires_on?: string;
+                /**
+                 * Format: date
+                 * @description When a new batch was made.
+                 */
+                made_on?: string;
             }[];
             /** @description Any unique text; sending the same key again changes nothing and answers the first result. */
             idempotency_key?: string;
@@ -18346,6 +18497,10 @@ export interface components {
             counted_at?: string | null;
             counted_by_profile_id?: number | null;
             order_line_id?: number | null;
+            /** @description The batch or serial number the line named. */
+            lot_code?: string | null;
+            /** @description That batch's expiry date. */
+            lot_expires_on?: string | null;
         };
         InventoryPrintRequest: {
             /**
@@ -18547,6 +18702,20 @@ export interface components {
                 /** @description The unit counted in; the line's unit when left out. */
                 unit?: string;
                 note?: string;
+                /** @description For an item that keeps batches: the batch code (a new one makes the batch) or serial number. */
+                lot_code?: string;
+                /** @description Or the batch by id. */
+                lot_id?: number;
+                /**
+                 * Format: date
+                 * @description A new batch's expiry date; needed when the item expires and has no shelf life.
+                 */
+                expires_on?: string;
+                /**
+                 * Format: date
+                 * @description When a new batch was made.
+                 */
+                made_on?: string;
             }[];
             /** @description True to receive more than ordered past the workspace's tolerance. */
             allow_over?: boolean;
@@ -18618,6 +18787,8 @@ export interface components {
             transfers_one_step: boolean;
             purchase_route_template_id: number | null;
             over_receipt_percent: number;
+            fefo: boolean;
+            expiry_warning_days: number;
         };
         InventorySettingsRequest: {
             /** @description An amount such as 25, in each item's currency; null never asks. */
@@ -18634,6 +18805,10 @@ export interface components {
             purchase_route_template_id?: number | null;
             /** @description How far past the order a receipt may go before it asks, 0 to 100 (0: anything over asks). */
             over_receipt_percent?: number;
+            /** @description True (the default) to take the batch that expires first; false takes the oldest batch. */
+            fefo?: boolean;
+            /** @description Days before its expiry a batch counts as expiring soon, 1 to 365 (7). */
+            expiry_warning_days?: number;
         };
         InventorySupplierItem: {
             id: number;
@@ -18689,6 +18864,10 @@ export interface components {
                 /** @description A unit code; the item's base unit when left out. */
                 unit?: string;
                 note?: string;
+                /** @description For an item that keeps batches: the batch to take from. Left out, the batches that expire first are taken. */
+                lot_code?: string;
+                /** @description Or the batch by id. */
+                lot_id?: number;
             }[];
             /** @description A note kept with the transfer. */
             note?: string;
@@ -54611,6 +54790,301 @@ export interface operations {
             };
             /** @description A value that doesn't look right */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_lots: {
+        parameters: {
+            query?: {
+                /** @description The item (or give variant_id). */
+                item_id?: number;
+                /** @description Only this variant. */
+                variant_id?: number;
+                /** @description `true` to list batches with no stock left too. */
+                with_empty?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Batches */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryLot"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_lots_expiring: {
+        parameters: {
+            query?: {
+                /** @description How many days ahead, 0 to 3650. */
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Batches */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryLot"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_inventory_lots_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The batch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryLot"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_inventory_lots_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InventoryLotRequest"];
+            };
+        };
+        responses: {
+            /** @description The batch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["InventoryLot"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

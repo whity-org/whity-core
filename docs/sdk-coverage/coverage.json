@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.132.0",
+    "sdk_version": "1.134.0",
     "core_version": "0.2.30",
     "updated": "2026-11-21",
     "ratings": {
@@ -158,6 +158,14 @@
                     "since": "1.129"
                 },
                 {
+                    "what": "Inventory\\Lots: batches and serial numbers with their expiry and what each holds where, and what is expiring, through $ctx->inventory()->lots(); MoveLine names a batch (lotId, lotCode, expiresOn, madeOn), and stock leaving without one takes the batches that expire first",
+                    "since": "1.134"
+                },
+                {
+                    "what": "Events stock.lot.expiring and stock.lot.expired, once per batch",
+                    "since": "1.134"
+                },
+                {
                     "what": "Contribute\\WorkspaceQuoteConversion: what an accepted quote turns into (a sales order, an invoice), read as a Sales\\QuoteSnapshot; core's inventory and accounting implement it",
                     "since": "1.132"
                 },
@@ -169,7 +177,7 @@
             "missing": [
                 "Reorder levels and reasons as SDK services (they are on the API and MCP)",
                 "Sales orders and reservations (P5); supplier prices as an SDK service (they are on the API and MCP)",
-                "Lots and expiry (P4)",
+                "Scanning GS1 barcodes and batch labels (P4b)",
                 "Costing, accounting export, operation kinds, item fields, barcode parsers and price lists as extension points (P7)"
             ],
             "security": "Reads are trusted to the plugin. Writes check the acting person's permissions like the routes do, and a plugin's moves are named by the host, never by the plugin.",

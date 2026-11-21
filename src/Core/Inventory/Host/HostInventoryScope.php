@@ -8,6 +8,7 @@ use Whity\Sdk\Context\InventoryScope;
 use Whity\Sdk\Context\ServiceUnavailable;
 use Whity\Sdk\Inventory\Items;
 use Whity\Sdk\Inventory\Locations;
+use Whity\Sdk\Inventory\Lots;
 use Whity\Sdk\Inventory\Operations;
 use Whity\Sdk\Inventory\Orders;
 use Whity\Sdk\Inventory\Stock;
@@ -44,6 +45,11 @@ final class HostInventoryScope implements InventoryScope
     public function units(): Units
     {
         return self::resolve(Units::class);
+    }
+
+    public function lots(): Lots
+    {
+        return self::resolve(Lots::class);
     }
 
     public function stock(): Stock

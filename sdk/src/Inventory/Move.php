@@ -30,6 +30,8 @@ final class Move
         public readonly ?int $reversesMoveId = null,
         public readonly ?int $unitCostMinor = null,
         public readonly ?string $currency = null,
+        /** The batch or serial number it moved (SDK 1.134), or null for an item without batches. */
+        public readonly ?int $lotId = null,
     ) {
     }
 
@@ -56,6 +58,7 @@ final class Move
             reversesMoveId: $int('reverses_move_id'),
             unitCostMinor: $int('unit_cost_minor'),
             currency: is_string($data['currency'] ?? null) ? $data['currency'] : null,
+            lotId: $int('lot_id'),
         );
     }
 }

@@ -364,6 +364,10 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `stock.level.below_reorder.async` | `STOCK_LEVEL_BELOW_REORDER_ASYNC` | queued |  |
 | `stock.level.restored` | `STOCK_LEVEL_RESTORED` | observe | Back at or above the reorder level. Payload: `tenant_id`, `rule_id`, `variant_id`, `location_id`, `available`, `min_quantity`. |
 | `stock.level.restored.async` | `STOCK_LEVEL_RESTORED_ASYNC` | queued |  |
+| `stock.lot.expiring` | `STOCK_LOT_EXPIRING` | observe | A batch with stock expires within the workspace's warning window (7 days unless changed); once per batch, from the daily job. Payload: `tenant_id`, `lot_id`, `variant_id`, `item_id`, `code`, `expires_on`, `on_hand`. |
+| `stock.lot.expiring.async` | `STOCK_LOT_EXPIRING_ASYNC` | queued |  |
+| `stock.lot.expired` | `STOCK_LOT_EXPIRED` | observe | A batch with stock passed its expiry date; once, the day after. Payload as `stock.lot.expiring`. |
+| `stock.lot.expired.async` | `STOCK_LOT_EXPIRED_ASYNC` | queued |  |
 | `inventory.order.submitting` | `INVENTORY_ORDER_SUBMITTING` | veto | Before an order goes to its route or is approved (SDK 1.129). Payload: `tenant_id`, `order_id`, `kind`, `number`, `contact_id`, `location_id`, `currency`, `total_minor`, `acting_profile_id`, `lines` (`variant_id`, `quantity`, `price_minor`, `line_total_minor`). Throw `HookVetoException` to refuse it (409 with your reason). |
 | `inventory.order.created` | `INVENTORY_ORDER_CREATED` | observe | An order was drafted. Every `inventory.order.*` notification carries `tenant_id`, `order_id`, `kind`, `number`, `contact_id`, `status`, `acting_profile_id`. |
 | `inventory.order.created.async` | `INVENTORY_ORDER_CREATED_ASYNC` | queued |  |

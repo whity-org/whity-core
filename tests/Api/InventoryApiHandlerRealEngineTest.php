@@ -106,7 +106,7 @@ final class InventoryApiHandlerRealEngineTest extends TestCase
         foreach (array_keys($byRoute) as $route) {
             [$method, $path] = explode(' ', $route, 2);
             self::assertMatchesRegularExpression(
-                '#\$router->register\(\'' . $method . '\',\s+\'' . preg_quote($path, '#') . '\',\s+\[\$inventory(Print)?Handler, \'\w+\'\],\s+null, null, CorePermissions::(INVENTORY_READ|INVENTORY_WRITE|STOCK_ADJUST|STOCK_COUNT|STOCK_TRANSFER|INVENTORY_SETTINGS|PURCHASES_READ|PURCHASES_WRITE)\);#',
+                '#\$router->register\(\'' . $method . '\',\s+\'' . preg_quote($path, '#') . '\',\s+\[\$inventory(Print|Lot)?Handler, \'\w+\'\],\s+null, null, CorePermissions::(INVENTORY_READ|INVENTORY_WRITE|STOCK_ADJUST|STOCK_COUNT|STOCK_TRANSFER|INVENTORY_SETTINGS|PURCHASES_READ|PURCHASES_WRITE)\);#',
                 $index,
                 $route . ' is registered with its permission'
             );

@@ -6,6 +6,7 @@ namespace Whity\Sdk\Context;
 
 use Whity\Sdk\Inventory\Items;
 use Whity\Sdk\Inventory\Locations;
+use Whity\Sdk\Inventory\Lots;
 use Whity\Sdk\Inventory\Operations;
 use Whity\Sdk\Inventory\Orders;
 use Whity\Sdk\Inventory\Stock;
@@ -43,4 +44,10 @@ interface InventoryScope
      * WHIT-1234).
      */
     public function orders(): Orders;
+
+    /**
+     * Batches, serial numbers and what is expiring (SDK 1.134, WHIT-1235).
+     * Reads only.
+     */
+    public function lots(): Lots;
 }

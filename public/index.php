@@ -5629,7 +5629,10 @@ $customFieldRecordTypes->register(new \Whity\Core\CustomFields\CustomFieldRecord
 ));
 $inventoryLocations = new \Whity\Core\Inventory\LocationService($inventoryDb, $inventoryWorkspace);
 $inventoryReasons = new \Whity\Core\Inventory\ReasonCatalog($inventoryDb, $inventoryWorkspace);
-$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager, $inventoryReasons);
+// WHIT-1235: lots, serial numbers and expiry; FEFO and the warning window are workspace settings.
+$inventoryLots = new \Whity\Core\Inventory\LotService($inventoryDb, static fn (int $tenantId): array => $settingsService->effective($tenantId));
+$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager, $inventoryReasons, $inventoryLots);
+$inventoryItems->useOpeningLots($inventoryLedger->moveIntoOpeningLots(...));
 // WHIT-1233: adjustments, counts and transfers as records. Above the
 // workspace's value an adjustment or a count's differences travel a route
 // (inventory.adjustment, inventory.count); reorder levels watch every posting.
@@ -5723,6 +5726,7 @@ $inventoryGuard = new \Whity\Core\Inventory\Host\HostInventoryGuard(
 \Whity\register_service(\Whity\Sdk\Inventory\Units::class, new \Whity\Core\Inventory\Host\HostUnits($inventoryUnits, $inventoryItems, $inventoryGuard)); // @phpstan-ignore-line
 \Whity\register_service(\Whity\Sdk\Inventory\Operations::class, new \Whity\Core\Inventory\Host\HostOperations($inventoryOperations, $inventoryGuard)); // @phpstan-ignore-line
 \Whity\register_service(\Whity\Sdk\Inventory\Orders::class, new \Whity\Core\Inventory\Host\HostOrders($inventoryPurchases, $inventoryGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Inventory\Lots::class, new \Whity\Core\Inventory\Host\HostLots($inventoryLots, $inventoryGuard)); // @phpstan-ignore-line
 $inventoryHandler = new \Whity\Api\InventoryApiHandler(
     $inventoryUnits,
     $inventoryItems,
@@ -5752,6 +5756,12 @@ $router->register('POST',   '/api/inventory/locations',                         
 $router->register('GET',    '/api/inventory/locations/{id:\d+}',                 [$inventoryHandler, 'showLocation'],   null, null, CorePermissions::INVENTORY_READ);
 $router->register('PATCH',  '/api/inventory/locations/{id:\d+}',                 [$inventoryHandler, 'updateLocation'], null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/stock',                              [$inventoryHandler, 'levels'],         null, null, CorePermissions::INVENTORY_READ);
+// WHIT-1235: batches and serial numbers, and what is expiring.
+$inventoryLotHandler = new \Whity\Api\InventoryLotApiHandler($inventoryLots);
+$router->register('GET',    '/api/inventory/lots',                               [$inventoryLotHandler, 'list'],     null, null, CorePermissions::INVENTORY_READ);
+$router->register('GET',    '/api/inventory/lots/expiring',                      [$inventoryLotHandler, 'expiring'], null, null, CorePermissions::INVENTORY_READ);
+$router->register('GET',    '/api/inventory/lots/{id:\d+}',                      [$inventoryLotHandler, 'show'],     null, null, CorePermissions::INVENTORY_READ);
+$router->register('PATCH',  '/api/inventory/lots/{id:\d+}',                      [$inventoryLotHandler, 'update'],   null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/stock/moves',                        [$inventoryHandler, 'moves'],          null, null, CorePermissions::INVENTORY_READ);
 $router->register('POST',   '/api/inventory/stock/adjustments',                  [$inventoryHandler, 'adjust'],         null, null, CorePermissions::STOCK_ADJUST);
 $router->register('POST',   '/api/inventory/stock/batches/{key:[a-f0-9]+}/undo', [$inventoryHandler, 'undo'],         null, null, CorePermissions::STOCK_ADJUST);

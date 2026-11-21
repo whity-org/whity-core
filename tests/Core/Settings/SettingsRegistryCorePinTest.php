@@ -233,6 +233,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             // WHIT-1234: purchasing.
             'inventory.purchase_route_template_id',
             'inventory.over_receipt_percent',
+            // WHIT-1235: batches and expiry.
+            'inventory.fefo',
+            'inventory.expiry_warning_days',
             'sales.quote_valid_days',
             'sales.quote_route_template_id',
         ];
@@ -484,6 +487,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'inventory.transfers_one_step' => 'false',
             'inventory.purchase_route_template_id' => '0',
             'inventory.over_receipt_percent' => '0',
+            'inventory.fefo' => 'true',
+            'inventory.expiry_warning_days' => '7',
             'sales.quote_valid_days' => '30',
             'sales.quote_route_template_id' => '0',
         ];

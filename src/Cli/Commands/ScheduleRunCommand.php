@@ -263,6 +263,15 @@ final class ScheduleRunCommand implements CliCommand
             ]);
         }
 
+        // WHIT-1235: batches expiring and expired, once a day at 05:00 UTC;
+        // each batch is told once.
+        if ($now->format('H:i') === '05:00') {
+            $this->queue->dispatch(\Whity\Core\Inventory\LotExpiryJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'inventory-lot-expiry-' . $now->format('Ymd'),
+            ]);
+        }
+
         // EM.1: the agents' daily summary, once an hour; the job sends only
         // where it is 18:00, and at most once a day per person.
         if ((int) $now->format('i') === 0) {

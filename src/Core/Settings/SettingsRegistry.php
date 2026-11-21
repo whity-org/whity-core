@@ -948,6 +948,12 @@ final class SettingsRegistry
     //     it asks (IV.12: 0 by default, so anything over asks).
     public const INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID = 'inventory.purchase_route_template_id';
     public const INVENTORY_OVER_RECEIPT_PERCENT = 'inventory.over_receipt_percent';
+    //   - fefo: stock leaving a place takes the batch that expires first
+    //     (IN.1, design 31 §3.5); off takes the oldest batch (WHIT-1235).
+    //   - expiry_warning_days: how many days before its expiry a batch is
+    //     "expiring soon" (IN.1: 7).
+    public const INVENTORY_FEFO = 'inventory.fefo';
+    public const INVENTORY_EXPIRY_WARNING_DAYS = 'inventory.expiry_warning_days';
 
     // ---- Quotes to customers (WHIT-1321, design section 34 §3, QT.4) ----
     //   - quote_valid_days: how long a new quote is valid, 1 to 365 days (30).
@@ -981,6 +987,8 @@ final class SettingsRegistry
         self::INVENTORY_TRANSFERS_ONE_STEP,
         self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID,
         self::INVENTORY_OVER_RECEIPT_PERCENT,
+        self::INVENTORY_FEFO,
+        self::INVENTORY_EXPIRY_WARNING_DAYS,
         self::SALES_QUOTE_VALID_DAYS,
         self::SALES_QUOTE_ROUTE_TEMPLATE_ID,
     ];
@@ -1103,6 +1111,7 @@ final class SettingsRegistry
         self::SIGNUP_CUSTOMER_INVITES,
         self::MESSAGING_WEBCHAT_ENABLED,
         self::INVENTORY_TRANSFERS_ONE_STEP,
+        self::INVENTORY_FEFO,
         self::MAINTENANCE_ACTIVE,
         self::ERROR_TRACKING_ENABLED,
         self::ERROR_TRACKING_NOTIFY_ADMINS,
@@ -1509,6 +1518,8 @@ final class SettingsRegistry
         self::INVENTORY_TRANSFERS_ONE_STEP => 'false',
         self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID => '0',
         self::INVENTORY_OVER_RECEIPT_PERCENT => '0',
+        self::INVENTORY_FEFO => 'true',
+        self::INVENTORY_EXPIRY_WARNING_DAYS => '7',
         self::SALES_QUOTE_VALID_DAYS => '30',
         self::SALES_QUOTE_ROUTE_TEMPLATE_ID => '0',
     ];
@@ -2027,6 +2038,8 @@ final class SettingsRegistry
                 : $key . ' must be a route template id, or 0 for the default.',
             self::INVENTORY_TRANSFERS_ONE_STEP => self::validateBoolean($value, self::INVENTORY_TRANSFERS_ONE_STEP),
             self::INVENTORY_OVER_RECEIPT_PERCENT => self::validateWholeNumberBetween($value, self::INVENTORY_OVER_RECEIPT_PERCENT, 0, 100),
+            self::INVENTORY_FEFO => self::validateBoolean($value, self::INVENTORY_FEFO),
+            self::INVENTORY_EXPIRY_WARNING_DAYS => self::validateWholeNumberBetween($value, self::INVENTORY_EXPIRY_WARNING_DAYS, 1, 365),
             self::SALES_QUOTE_VALID_DAYS => self::validateWholeNumberBetween($value, self::SALES_QUOTE_VALID_DAYS, 1, 365),
             self::SALES_QUOTE_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
                 ? null

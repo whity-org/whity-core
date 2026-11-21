@@ -680,6 +680,18 @@
     "en": "Get a place",
     "ar": "عرض موقع"
   },
+  "get_api_inventory_lots": {
+    "en": "List an item's batches",
+    "ar": "عرض دفعات صنف"
+  },
+  "get_api_inventory_lots_expiring": {
+    "en": "List batches expiring soon",
+    "ar": "عرض الدفعات التي تنتهي صلاحيتها قريباً"
+  },
+  "get_api_inventory_lots_id": {
+    "en": "Show a batch",
+    "ar": "عرض دفعة"
+  },
   "get_api_inventory_operations": {
     "en": "List stock adjustments, counts and transfers",
     "ar": "عرض تسويات المخزون والجرد والتحويلات"
@@ -1227,6 +1239,10 @@
   "patch_api_inventory_locations_id": {
     "en": "Change a place",
     "ar": "تعديل موقع"
+  },
+  "patch_api_inventory_lots_id": {
+    "en": "Correct a batch's dates or notes",
+    "ar": "تصحيح تواريخ دفعة أو ملاحظاتها"
   },
   "patch_api_inventory_purchase_orders_id": {
     "en": "Change a draft purchase order",

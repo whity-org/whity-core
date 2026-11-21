@@ -262,6 +262,18 @@ final class QueueWorkCommand implements CliCommand
                 new \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob($pdo, static fn (): ?\Whity\Core\PluginLoader => $loaded->loader, $auditLogger, $this->logger),
                 false
             );
+            // WHIT-1235: batches expiring and expired, told once each. Internal.
+            $registry->register(
+                \Whity\Core\Inventory\LotExpiryJob::NAME,
+                new \Whity\Core\Inventory\LotExpiryJob(
+                    new \Whity\Core\Inventory\LotService(
+                        new \Whity\Core\Inventory\InventoryDb($pdo),
+                        static fn (int $tenantId): array => $workerSettings->effective($tenantId),
+                    ),
+                    $hookManager,
+                ),
+                false
+            );
             // WHIT-1153: reminders before a cash payment's cover ends. Internal.
             $cashRecipients = new \Whity\Core\Mail\WorkspaceRecipients(
                 $pdo,
