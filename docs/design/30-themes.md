@@ -1,6 +1,6 @@
 # Themes: the Whity UI theme standard
 
-Status: **decided by the owner on 19 Nov 2026** (WHIT-1225). Register: "Themes (version 3.6)", TH.1–TH.14. Every recommendation in section 13 was accepted except TH.6, where the owner chose **headings and body**: a theme may set the whole font pair on product screens.
+Status: **decided by the owner on 19 Nov 2026** (WHIT-1225), expansion (section 14) on 21 Nov 2026. Register: "Themes (version 3.6)", TH.1–TH.24. Every recommendation in section 13 was accepted except TH.6, where the owner chose **headings and body**: a theme may set the whole font pair on product screens.
 
 Owner's direction, 19 Nov 2026: themes are **tokens only**, in the spirit of Material 3 Expressive and the shadcn/ui theme customizer. **Applying a theme is free** in core, whether it comes from Whity, a plugin or the store. **The visual theme editor is paid** and is part of **Whity Studio**.
 
@@ -356,3 +356,139 @@ Studio, store theme listings and the SDK interface follow as their own pieces of
 | TH.14 | What the free picker does | Choose a theme, set the primary seed and overrides; the rest is Studio. As recommended |
 
 TH.1–TH.3, TH.5 and TH.8 were decided as written in this spec.
+
+## 14. Expansion (decided 21 November 2026)
+
+**Status: decided by the owner on 21 Nov 2026** (register TH.15–TH.24): every question in 14.9 was answered as recommended. Building follows 14.9 question 10, one PR per step. The decisions in section 13 stand:
+- tokens only;
+- applying any theme is free;
+- the editor is part of paid Whity Studio;
+- plugins can ship themes.
+
+Every addition below stays a value in the theme file (section 4), checked by the guard rails (section 6), so a theme still can't add CSS, URLs or code. The questions and the owner's answers are in 14.9.
+
+### 14.1 More shape and the corner rules (builds on the §3.3 corner rules in #2340)
+
+- **Two more presets:**
+  - `pebble`: Soft's corners on cards and dialogs, a full pill on single-line controls. It sits between Soft and Round, for people who like Round's buttons but not its cards.
+  - `cut`: M3's cut corners (a 45° chamfer) at Crisp's sizes, for formal brands such as law firms and banks.
+  - `cut` needs `corner-shape`, which isn't in every browser yet. Where it's missing the browser draws rounded corners instead, so nothing breaks.
+- **Shape morph switched on** (`shape.morph`, stored since 12.1). Two things change shape on press or selection:
+  - the main button gets squarer while pressed;
+  - a selected chip goes from pill to rounded.
+
+  It follows the person's Animations setting: Calm and Off show the end state with no movement.
+- **The corner rules stay global.** The corner rules from §3.3 apply to every preset, and every new preset joins the CI check before it can ship:
+  - a pill is half the height;
+  - padding grows with the corner;
+  - nested corners use the outer radius less the padding.
+
+### 14.2 Per-component shape overrides
+
+A theme may give one of a fixed list of component families its own preset:
+
+```json
+"shape": { "preset": "soft", "components": { "buttons": "round", "cards": "crisp" } }
+```
+
+- **Families (closed list):** `buttons`, `fields` (inputs, selects, text areas), `chips` (chips, badges, tags), `cards`, `dialogs` (dialogs, sheets, popovers, menus), `tables`, `navigation` (sidebar items, tabs, segmented controls).
+- **Values:** a preset name only, never pixels, so the corner rules and the CI check still cover every combination.
+- **Guard rails:**
+  - `fields` and `cards` never go past Round's cap, because they grow;
+  - a container and its edge-to-edge children (tables in cards, tabs in a page header) get matching inner radii automatically.
+- Out of scope: per-screen or per-component pixels, and avatars or status dots (they stay round, §3.3).
+
+### 14.3 Density
+
+- **Per area:** `density` stays one value, plus optional `density.tables` and `density.forms`. A clinic can have roomy forms and compact appointment tables.
+- **Per person**, like Higher contrast: a **Compact / Standard / Comfortable** choice in Language and display that wins over the theme's. It never goes below A.1 (Compact is the floor), and it's off on phones, where 48px targets hold (M.5).
+- Spacing inside cards and dialogs follows density as well as the shape rule.
+
+### 14.4 Typography pairs, Arabic first
+
+A pair is chosen by its **Arabic** face, and the Latin face follows. The list grows only through a PR that adds the files, licence (OFL) and metrics (§3.2):
+
+| Id | Arabic | Latin | Why | Has 400/500/600 |
+| --- | --- | --- | --- | --- |
+| `noto` | Noto Sans Arabic | Noto Sans | default | yes |
+| `plex` | IBM Plex Sans Arabic | IBM Plex Sans | corporate, government | yes |
+| `readex` | Readex Pro | Readex Pro | modern, one family | yes |
+| `cairo` | Cairo | Cairo | rounded, friendly | yes |
+| `kufi` | Noto Kufi Arabic (headings) | Noto Sans | formal headings | yes |
+| *new* `rubik` | Rubik | Rubik | soft geometric, retail and salons | yes |
+| *new* `alexandria` | Alexandria | Alexandria | contemporary Kufi, tech and schools | yes |
+| *new* `naskh` | Noto Naskh Arabic (body) | Noto Serif | classic, law and print-like | yes |
+| *new* `ibm-kufi` | IBM Plex Sans Arabic (body) + Noto Kufi Arabic (headings) | IBM Plex Sans | formal with a corporate body | yes |
+
+- Tajawal and Almarai stay out until they have a 600 weight (12.1).
+- The picker previews each pair with one Arabic and one English sentence at body and title size.
+- **Arabic metrics:** each pair carries its own line height and size-adjust, so Arabic stays at 100% of the Latin size (3.7a) and lines don't jump when the language changes.
+
+### 14.5 Elevation and motion
+
+- **Elevation:**
+  - add `outline` (no shadows anywhere; floating layers get a 1px border and the plane becomes a 2px border), for high-contrast and print-like brands;
+  - `elevation.float` already has three steps; keep them.
+- **Motion:**
+  - add `motion.preset: brisk`: M3 standard springs at 0.8× the durations, for busy front desks;
+  - morph (14.1) uses the theme's spring.
+
+  The person's Animations setting still wins (06-motion, LT.4).
+
+### 14.6 More themes, one per workspace template
+
+The first seven workspace templates ship in the free `workspace-templates` store package, not in core. Their themes ship there too, through the plugin theme interface (SDK 1.125), as "From Workspace templates". Choosing a template offers its theme when the workspace is created, and the person can change it at any time, for free. A manifest names its theme with a new optional `theme` key. That is an SDK minor, to be numbered by the orchestrator when built.
+
+| Template | Theme | Like |
+| --- | --- | --- |
+| Coffee house | `templates.roastery` | warm brown and cream, Cairo, soft |
+| Study house | `templates.library` | quiet green, Plex, crisp, roomy |
+| Meeting rooms space | `templates.studio` | tonal violet, Readex, round, brisk |
+| Salon | `templates.salon` | Bloom's pink, Rubik, round with crisp cards, expressive |
+| Clinic | `templates.clinic` | calm teal, Plex, soft, comfortable |
+| Bakery or Café | `templates.market` | Desert's warm tones, Cairo, pebble |
+| Car dealership | `templates.showroom` | Ink with a red accent, Alexandria, cut, outline |
+
+Whity's own five (Whity, Harbour, Ink, Bloom, Desert) stay in core for every workspace.
+
+### 14.7 Theme import and export
+
+| | Free (core) | Whity Studio (paid) |
+| --- | --- | --- |
+| Export the theme in use as a Whity theme file (JSON v1) | yes, from the picker | yes |
+| Import a Whity theme file | yes (today) | yes |
+| Re-import a newer version of an imported theme | yes, shows what changed in words before applying | yes, plus a side-by-side diff |
+| Import from shadcn CSS variables, a Tailwind v4 `@theme`, or Material Theme Builder JSON | no | yes (11) |
+| Export resolved tokens as CSS, JSON, Tailwind or Flutter | no | yes (11) |
+| Share a theme with another workspace you own | yes, by export and import | yes, a "Use in…" button |
+| Store packages (signed, hashed, through Whity ID, per the store move) | install free; paid themes through Whity Pay | publish |
+
+### 14.8 Free versus Whity Studio
+
+| | Free (core) | Whity Studio (paid) |
+| --- | --- | --- |
+| Apply any theme: Whity's, a plugin's, imported, from the store | yes | yes |
+| Main colour, colour overrides, Higher contrast, per-person density | yes | yes |
+| Pick the theme's shape preset, density and font pair from the lists, on top of the chosen theme (a "tweak", like the main colour) | **question 1** | yes |
+| Per-component shape overrides (14.2) | read when a theme has them | author them |
+| Live editor, seed generator, logo colours, presets to start from, preview across key screens, contrast report, versions, publishing (11) | no | yes |
+| Export and import as in 14.7 | the free rows | all |
+
+### 14.9 Questions for the owner (answered 21 Nov 2026: all as recommended, TH.15–TH.24)
+
+1. **Free tweaks.** Can a free workspace change the shape preset, density and font pair on top of a theme, as it changes the main colour today? Recommended: **yes**. They're single choices from closed lists, cheap to support, and they answer most "make it ours" requests. Studio keeps everything that needs an editor.
+2. **New shape presets.** Add Pebble and Cut (14.1)? Recommended: **both**, with Cut falling back to rounded corners where `corner-shape` isn't supported.
+3. **Morph on by default** in the Round and Pebble presets? Recommended: **yes**, with Calm and Off showing no movement.
+4. **Per-component overrides** (14.2): the seven families and presets only, no pixels? Recommended: **yes**.
+5. **Per-person density** in Language and display (14.3)? Recommended: **yes**, desktop only, never below A.1.
+6. **The four new font pairs** (Rubik, Alexandria, Naskh, IBM Plex with Kufi)? Recommended: **all four**. Naskh is for product screens only if TH.6 still allows the whole pair; print keeps E.46.
+7. **Outline elevation and brisk motion** (14.5)? Recommended: **yes**.
+8. **A theme per workspace template** (14.6), shipped in the templates package and offered at creation? Recommended: **yes**.
+9. **Free export** of the theme in use (14.7)? Recommended: **yes**. A workspace's look is its own data.
+10. **Order of work.** Recommended:
+    - free tweaks and export;
+    - presets and morph;
+    - fonts;
+    - template themes;
+    - per-component overrides;
+    - Studio's importers.

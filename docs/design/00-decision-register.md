@@ -936,6 +936,23 @@ Owner's direction (19 Nov 2026): themes are tokens only, in the spirit of Materi
 | TH.13 | Plugins and the store | Plugins ship theme files through a new SDK interface (the route-based `PluginThemeInterface` is deprecated); store themes are signed packages; publishers may sell themes through Whity Pay; applying is free. **Owner:** yes, through Whity Pay, as recommended. |
 | TH.14 | Free and paid | Free in core: apply any installed theme, set the primary seed and overrides, import a theme file. Whity Studio (paid): live editor, seeds from the logo, presets, import from shadcn and Material Theme Builder, export, preview across key screens, documents and the phone, versions, publishing to the store. **Owner:** accepted as recommended. |
 
+### Theme expansion (decided 21 November 2026)
+
+Proposed in `30-themes.md` §14 (WHIT-1225) and answered by the owner on 21 Nov 2026: "Yes, both" for 14.9 questions 1 and 9; for the additions "Pebble and Cut shapes", "Morph, outline, brisk", "Four Arabic font pairs", "Per-component and density"; a theme per workspace template "Yes"; the order "As recommended".
+
+| # | Decision | Decided |
+| --- | --- | --- |
+| TH.15 | Free tweaks | A free workspace may pick the shape preset, density and font pair from the allowed lists on top of the chosen theme, like the main colour. Changes TH.14. **Owner:** "Yes, both" |
+| TH.16 | Free export | Export the theme in use as a Whity theme file (JSON v1) from the picker, free; re-importing a newer version shows what changed in words. Changes TH.14. **Owner:** "Yes, both" |
+| TH.17 | Shape presets | Add Pebble (Soft's cards and dialogs, pill single-line controls) and Cut (45° chamfer at Crisp's sizes, rounded where `corner-shape` is missing). The §3.3 corner rules and the CI shape check cover every preset. **Owner:** "Pebble and Cut shapes" |
+| TH.18 | Shape morph | On by default in Round and Pebble: the main button squares while pressed, a selected chip goes pill to rounded. Calm and Off show the end state. **Owner:** "Morph, outline, brisk" |
+| TH.19 | Outline elevation and brisk motion | Elevation `outline` (no shadows; 1px borders on floating layers, the plane a 2px border); motion `brisk` (standard springs at 0.8× durations). The person's Animations setting wins. **Owner:** "Morph, outline, brisk" |
+| TH.20 | Font pairs | Add `rubik`, `alexandria`, `naskh` (Noto Naskh Arabic with Noto Serif) and `ibm-kufi` (IBM Plex body, Noto Kufi Arabic headings), each with 400/500/600, OFL and its own Arabic metrics. Print keeps E.46. **Owner:** "Four Arabic font pairs" |
+| TH.21 | Per-component shape | A theme may give seven families (buttons, fields, chips, cards, dialogs, tables, navigation) their own preset, by name only, never pixels; fields and cards never past Round's cap. Studio authors them; core applies them. **Owner:** "Per-component and density" |
+| TH.22 | Density per area and per person | `density.tables` and `density.forms` in the theme; a per-person Compact / Standard / Comfortable choice in Language and display, desktop only, never below A.1. **Owner:** "Per-component and density" |
+| TH.23 | Template themes | One theme per workspace template, shipped in the `workspace-templates` package through the plugin theme interface and offered when the workspace is created; a manifest names it with a new optional `theme` key (SDK minor). **Owner:** "Yes" |
+| TH.24 | Order of work | Free tweaks and export; presets and morph (with outline and brisk); fonts; template themes; per-component overrides and density; Studio's importers. One PR per step. **Owner:** "As recommended" |
+
 ## Inventory in core (decided 19 November 2026)
 
 Decided by the owner on 19 November 2026 (WHIT-1228, section 31): D1–D8, D10 and D11 as recommended; D9 as IV.24; build as planned, P1–P7 across 0.2.31–0.2.39 with 0.2.39 as the buffer. The owner lifted WHIT-667 for inventory ("Core basics now, spec first").
