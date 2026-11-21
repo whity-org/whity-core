@@ -2286,6 +2286,8 @@ $frontendFeaturesHandler = new FrontendFeaturesApiHandler(
         \Whity\Core\Convening\ConveningFeatures::all($router),
         // WHIT-1334: the front desk's Walk-ins screen (design section 35).
         \Whity\Core\Calendar\FrontDeskFeatures::all($router),
+        // WHIT-1334: the Commission screen (design section 35 §4).
+        \Whity\Core\Calendar\CommissionFeatures::all($router),
     ),
     $tenantManifestHost
 );
@@ -5557,6 +5559,26 @@ $router->register('GET',    '/api/calendar/walkins/staff',                  [$wa
 $router->register('POST',   '/api/calendar/walkins/assign',                 [$walkinsHandler, 'assignChosen'],     null, null, CorePermissions::CALENDAR_FRONT_DESK);
 $router->register('POST',   '/api/calendar/walkins/{id:\d+}/assign',        [$walkinsHandler, 'assignNext'],       null, null, CorePermissions::CALENDAR_FRONT_DESK);
 $router->register('POST',   '/api/calendar/walkins/{id:\d+}/left',          [$walkinsHandler, 'left'],             null, null, CorePermissions::CALENDAR_FRONT_DESK);
+
+// WHIT-1334 (design section 35 §4, SL.5-SL.7): staff commission rates and the
+// report from done bookings, moved from the Salons plugin.
+$commissionHandler = new \Whity\Api\CommissionApiHandler(
+    new \Whity\Core\Calendar\Commission($db->getPdo(), $calendarBookingService, $calendarRepository, $calendarServiceRepository),
+    $languageRegistry,
+);
+$router->register('GET',    '/api/calendar/commission/rates',               [$commissionHandler, 'rates'],         null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('POST',   '/api/calendar/commission/rates',               [$commissionHandler, 'setRate'],       null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('DELETE', '/api/calendar/commission/rates/{id:\d+}',      [$commissionHandler, 'removeRate'],    null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('GET',    '/api/calendar/commission/periods',             [$commissionHandler, 'periods'],       null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('GET',    '/api/calendar/commission/report',              [$commissionHandler, 'report'],        null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('GET',    '/api/calendar/commission/staff',               [$commissionHandler, 'staff'],         null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('GET',    '/api/calendar/commission/services',            [$commissionHandler, 'services'],      null, null, CorePermissions::CALENDAR_COMMISSION);
+$hookManager->listen('navigation.register', function ($data, $context) use ($languageRegistry) {
+    $items = $data['items'] ?? [];
+    $items[] = \Whity\Core\Calendar\CommissionFeatures::navigationItem($languageRegistry->getCurrentLanguageCode());
+
+    return ['items' => $items];
+});
 $hookManager->listen('navigation.register', function ($data, $context) use ($calendarBookingService, $languageRegistry) {
     $tenantId = \Whity\Core\Tenant\TenantContext::getTenantId();
     if ($tenantId === null || !$calendarBookingService->settingsFor($tenantId)->walkinsEnabled) {
