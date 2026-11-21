@@ -17,6 +17,8 @@ final class SigningRefusedException extends \RuntimeException
     public const SECOND_FACTOR_INVALID = 'second_factor_invalid';
     public const THROTTLED = 'throttled';
     public const NOT_SIGNER = 'not_signer';
+    /** #1729: the caller is not a holder of the company stamp the step asks for. */
+    public const NOT_HOLDER = 'not_holder';
 
     public function __construct(
         public readonly string $reason,

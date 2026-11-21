@@ -257,6 +257,10 @@ final class CorePermissions
     // (PermissionRegistry). Migration 172 grants it to every role that held
     // DOCUMENTS_PUBLISH.
     public const DOCUMENTS_THEMES = 'documents:themes';
+    // Company stamps (#1729, migration 336): create, change and archive the
+    // workspace's stamps and choose who holds them. Applying a stamp needs no
+    // permission: being a holder reached by a `stamp` step is the authority.
+    public const DOCUMENTS_STAMPS = 'documents:stamps';
     // Comments and suggestions in the editor (editor M5; E.10, E.29). Suggest
     // is the permission of people who read but don't edit, and of agents,
     // whose every change is a suggestion (E.4); accepting and rejecting stays
@@ -601,6 +605,7 @@ final class CorePermissions
             self::DOCUMENTS_ISSUE,
             self::DOCUMENTS_WITHDRAW,
             self::DOCUMENTS_THEMES,
+            self::DOCUMENTS_STAMPS,
             self::DOCUMENTS_SUGGEST,
             self::DOCUMENTS_COMMENT,
             self::DOCUMENTS_READ_ALL,

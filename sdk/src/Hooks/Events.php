@@ -316,6 +316,13 @@ final class Events
     public const ROUTE_SIGNED_ASYNC = 'route.signed.async';
 
     /**
+     * A holder applied a company stamp on a stamp step (#1729). Payload also has `step_id`
+     * and `stamp_id`.
+     */
+    public const ROUTE_STAMPED = 'route.stamped';
+    public const ROUTE_STAMPED_ASYNC = 'route.stamped.async';
+
+    /**
      * A route's finalise step made its final document. Payload: `id` (the document),
      * `document_id`, `route_id`, `subject_type`, `subject_id`, `artifact_id`, `tenant_id`.
      */

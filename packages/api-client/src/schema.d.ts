@@ -4292,6 +4292,99 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/document-stamps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The workspace's company stamps, with their holders
+         * @description Archived stamps are left out unless `?archived=true`.
+         */
+        get: operations["get_api_v1_document_stamps"];
+        put?: never;
+        /**
+         * Add a company stamp
+         * @description Applying it is an authorised person applying the image, not a certified electronic seal.
+         */
+        post: operations["post_api_v1_document_stamps"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-stamps/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One company stamp, with its holders */
+        get: operations["get_api_v1_document_stamps_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change a stamp's name, legal name or image. Stamps already applied keep their own copy. */
+        patch: operations["patch_api_v1_document_stamps_id"];
+        trace?: never;
+    };
+    "/api/v1/document-stamps/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive a stamp. New stamp steps cannot ask for it; records already made keep it. */
+        post: operations["post_api_v1_document_stamps_id_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-stamps/{id}/holders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace a stamp's holders: named people and roles */
+        put: operations["put_api_v1_document_stamps_id_holders"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/document-stamps/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring an archived stamp back */
+        post: operations["post_api_v1_document_stamps_id_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/document-template-slots": {
         parameters: {
             query?: never;
@@ -4901,6 +4994,43 @@ export interface paths {
         put?: never;
         /** Email yourself a one-time code to confirm a signature */
         post: operations["post_api_v1_documents_id_routes_routeid_signing_code"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{id}/routes/{routeId}/stamp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply the company stamp your open stamp step asks for
+         * @description Only a holder of the stamp (named, or through a role) can apply it. Needs the stamp consent line in its current wording, the content hash you were shown and the second check your account uses, as for a signature. The act and a sealed stamp record (with the names and image of the stamp copied in) are written together. An authorised person applying the image, not a certified electronic seal.
+         */
+        post: operations["post_api_v1_documents_id_routes_routeid_stamp"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{id}/routes/{routeId}/stamping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What you see before applying a company stamp: the step, the stamp, whether you hold it, the content hash, the consent version and how you will confirm */
+        get: operations["get_api_v1_documents_id_routes_routeid_stamping"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -13856,6 +13986,13 @@ export interface components {
                 revokedCredentials: number;
             };
         };
+        AppliedStamp: {
+            id?: number | null;
+            name: string;
+            legal_name: string;
+            /** @description On the audit: the PNG or JPEG data URL that was applied. */
+            image?: string;
+        };
         ApplyWorkspaceTemplateRequest: {
             /** @description Add the template's example contacts and bookings. Default true. */
             examples?: boolean;
@@ -15305,6 +15442,57 @@ export interface components {
         CodePluginAccessResponse: {
             data: components["schemas"]["CodePluginAccess"];
         };
+        CompanyStamp: {
+            id: number;
+            name: string;
+            legal_name: string;
+            /** @description A PNG or JPEG data URL, at most 512 KB. */
+            image: string;
+            image_hash?: string;
+            holders: {
+                people: {
+                    profile_id: number;
+                    name: string;
+                }[];
+                roles: {
+                    role_id: number;
+                    name: string;
+                }[];
+            };
+            created_at?: string;
+            updated_at?: string;
+            archived_at: string | null;
+        };
+        CompanyStampHolders: {
+            /** @description Profile ids of members of this workspace. */
+            people?: number[];
+            /** @description Role ids; everyone holding one holds the stamp. */
+            roles?: number[];
+        };
+        CompanyStampListResponse: {
+            data: components["schemas"]["CompanyStamp"][];
+        };
+        CompanyStampRequest: {
+            /** @description At most 200 characters. */
+            name: string;
+            /** @description The legal name the stamp stands for. At most 300 characters. */
+            legal_name: string;
+            /** @description A PNG or JPEG data URL, at most 512 KB, 32 to 4000 pixels a side. */
+            image: string;
+            /** @description Who may apply the stamp: profile ids in `people`, role ids in `roles`. */
+            holders?: components["schemas"]["CompanyStampHolders"];
+        };
+        CompanyStampResponse: {
+            data: components["schemas"]["CompanyStamp"];
+        };
+        CompanyStampUpdateRequest: {
+            /** @description The new name of the stamp. At most 200 characters. */
+            name?: string;
+            /** @description The new legal name the stamp stands for. At most 300 characters. */
+            legal_name?: string;
+            /** @description A new image: a PNG or JPEG data URL, at most 512 KB. Stamps already applied keep their own copy. */
+            image?: string;
+        };
         Contact: {
             id: number;
             name: string;
@@ -16657,7 +16845,9 @@ export interface components {
                 /** @description The subject's people questions (a form's people pickers, such as `supervisor`) whose answers this step leaves out: not asked, not counted in the quorum, not printed among the approvals. */
                 exclude_named_in?: string[];
                 /** @enum {string|null} */
-                kind?: "sign" | "finalise" | null;
+                kind?: "sign" | "stamp" | "finalise" | null;
+                /** @description On a stamp step: one of the company stamps of the workspace (GET /api/document-stamps). */
+                stamp_id?: number | null;
                 /** @description On a signing step: the capacity the signer signs in, such as "Director". At most 200 characters. */
                 sign_capacity?: string | null;
                 /** @description On a signing step: whom the signer signs for, such as the workspace. At most 200 characters. */
@@ -16727,6 +16917,7 @@ export interface components {
             sign_capacity?: string | null;
             sign_on_behalf_of?: string | null;
             final_template_id?: number | null;
+            stamp_id?: number | null;
             inputs?: components["schemas"]["RouteStepInput"][];
             exclude_named_in?: string[];
             rejection_count: number;
@@ -16742,6 +16933,9 @@ export interface components {
             /** @description Server time, UTC, to the second. */
             at: string;
             subject_version: number;
+            /** @enum {string} */
+            kind?: "signature" | "stamp";
+            stamp?: components["schemas"]["AppliedStamp"] | null;
         };
         DocumentSource: {
             /** @description How documents from this template are numbered, when it has its own rule */
@@ -22770,6 +22964,9 @@ export interface components {
         };
         SignatureRecord: {
             id: number;
+            /** @enum {string} */
+            kind?: "signature" | "stamp";
+            stamp?: components["schemas"]["AppliedStamp"] | null;
             route_id: number;
             event_id: number;
             step_id?: number;
@@ -22949,6 +23146,48 @@ export interface components {
                     status: string;
                 }[];
             };
+        };
+        StampRequest: {
+            content_hash: string;
+            consent: boolean;
+            /** @description The stamp consent version from the stamping context. */
+            consent_version: string;
+            second_factor: {
+                /** @enum {string} */
+                method: "totp" | "email_code" | "fresh_sign_in";
+                code?: string | null;
+            };
+        };
+        StampingContext: {
+            route_id: number;
+            can_stamp: boolean;
+            is_holder: boolean;
+            step?: {
+                id: number;
+                position: number;
+                label?: string | null;
+                /** @enum {string} */
+                quorum: "all" | "any";
+            } | null;
+            stamp?: components["schemas"]["AppliedStamp"] | null;
+            subject?: {
+                type: string;
+                id: number;
+                title?: string | null;
+                version: number;
+                content_hash: string;
+            } | null;
+            consent_version: string;
+            second_factor: {
+                /** @enum {string} */
+                method: "totp" | "email_code" | "fresh_sign_in";
+                provider_key?: string | null;
+                email_hint?: string | null;
+                signed_in_again: boolean;
+            };
+        };
+        StampingContextResponse: {
+            data: components["schemas"]["StampingContext"];
         };
         StorageConfig: {
             id: number;
@@ -47033,6 +47272,537 @@ export interface operations {
             };
         };
     };
+    get_api_v1_document_stamps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The stamps */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyStampListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_document_stamps: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyStampRequest"];
+            };
+        };
+        responses: {
+            /** @description The stamp */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyStampResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A name, legal name, image or holder could not be used */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_document_stamps_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The stamp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyStampResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Stamp not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_document_stamps_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyStampUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The stamp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyStampResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Stamp not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A name, legal name or image could not be used */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_document_stamps_id_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The stamp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyStampResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Stamp not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_document_stamps_id_holders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyStampHolders"];
+            };
+        };
+        responses: {
+            /** @description The stamp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyStampResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Stamp not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A holder is not in this workspace, or a role is not one it has */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_document_stamps_id_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The stamp */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyStampResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Stamp not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_document_template_slots: {
         parameters: {
             query?: never;
@@ -50283,6 +51053,182 @@ export interface operations {
             };
             /** @description Too many codes were sent */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_documents_id_routes_routeid_stamp: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                routeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StampRequest"];
+            };
+        };
+        responses: {
+            /** @description The stamp record and the trail entry */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description You do not hold this company stamp */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document or route not found, or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The content changed since you opened it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Consent or second check missing or not correct, or nothing here waits for your stamp */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many tries */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_documents_id_routes_routeid_stamping: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                routeId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The stamping context */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StampingContextResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Document or route not found, or not visible to the caller */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
