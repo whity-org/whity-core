@@ -11764,6 +11764,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/themes/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview a draft theme in the live editor
+         * @description Free (TH.25): compiles a draft theme file as it would be used, with every colour for light and dark, the type, shape, density and motion values, what the guard rails change, and the roles a colour may be set by hand for. A draft with problems answers valid=false and lists them all. Nothing is saved; saving is POST /api/themes with {theme, source: "editor"}.
+         */
+        post: operations["post_api_v1_themes_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/themes/tokens": {
         parameters: {
             query?: never;
@@ -11791,7 +11811,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get one theme's file, for the editor
+         * @description The theme file as installed. editable is true for the workspace's own themes (imported or made in the editor); any other is changed as a copy.
+         */
+        get: operations["get_api_v1_themes_themeid"];
         put?: never;
         post?: never;
         /**
@@ -18308,18 +18332,18 @@ export interface components {
             domain?: string | null;
             enabled?: boolean;
         };
-        /** @description A theme file (schemas/theme/v1.json). */
+        /** @description A theme file (schemas/theme/v1.json): schemaVersion, id, version and name are required. Or {theme, source} with the file under theme. */
         ImportThemeRequest: {
             /** @description The schema address, https://whity.dev/schema/theme/v1.json. */
             $schema?: string;
             /** @description The format version, 1. */
-            schemaVersion: number;
+            schemaVersion?: number;
             /** @description vendor.name in lowercase, like acme.harbour; whity. is reserved. */
-            id: string;
+            id?: string;
             /** @description A version number like 1.0.0. */
-            version: string;
+            version?: string;
             /** @description The name in English (en) and Arabic (ar). */
-            name: Record<string, never>;
+            name?: Record<string, never>;
             /** @description A short description in English (en) and Arabic (ar). */
             description?: Record<string, never>;
             /** @description Who made it: name. */
@@ -18338,6 +18362,13 @@ export interface components {
             motion?: Record<string, never>;
             /** @description Defaults for the workspace's document theme: accentUse, titleFace, largePrint. */
             documents?: Record<string, never>;
+            /** @description Instead of the fields above: the theme file, with source. */
+            theme?: Record<string, never>;
+            /**
+             * @description With theme: editor when it was made or changed in the theme editor (TH.25).
+             * @enum {string}
+             */
+            source?: "editor";
         };
         ImportThemeResponse: {
             data: {
@@ -20279,6 +20310,7 @@ export interface components {
                     ar: string;
                 };
                 plugin: string;
+                email_default: boolean;
             }[];
         };
         NotificationPreferencesUpdateRequest: {
@@ -23358,6 +23390,18 @@ export interface components {
                 filename: string;
             };
         };
+        ThemeFileResponse: {
+            data: {
+                /** @description The theme file (schemas/theme/v1.json). */
+                theme: {
+                    [key: string]: unknown;
+                };
+                /** @description whity, plugin, import, editor or store. */
+                source: string;
+                /** @description True for the workspace's own themes; any other is changed as a copy. */
+                editable: boolean;
+            };
+        };
         ThemeListResponse: {
             data: {
                 /** @description The id of the theme in use (whity.default when none was chosen). */
@@ -23417,6 +23461,34 @@ export interface components {
         ThemeOverridesResponse: {
             data: {
                 [key: string]: string;
+            };
+        };
+        ThemePreviewResponse: {
+            data: {
+                valid: boolean;
+                /** @description Every problem with the draft, in words; empty when valid. */
+                problems: string[];
+                /** @description Every colour role for light, as #rrggbb. */
+                light?: {
+                    [key: string]: string;
+                };
+                /** @description Every colour role for dark, as #rrggbb. */
+                dark?: {
+                    [key: string]: string;
+                };
+                /** @description Type, shape, density and motion values. */
+                vars?: {
+                    [key: string]: string;
+                };
+                fonts?: {
+                    [key: string]: string;
+                };
+                /** @description What the guard rails change: mode, role and change. */
+                adjustments?: {
+                    [key: string]: string;
+                }[];
+                /** @description The colour roles a theme may set by hand. */
+                roles?: string[];
             };
         };
         ThemeTokensRequest: {
@@ -87468,6 +87540,93 @@ export interface operations {
             };
         };
     };
+    post_api_v1_themes_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImportThemeRequest"];
+            };
+        };
+        responses: {
+            /** @description The compiled draft, or its problems */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemePreviewResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The theme is larger than 32 KB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_themes_tokens: {
         parameters: {
             query?: never;
@@ -87546,6 +87705,74 @@ export interface operations {
             };
             /** @description Unknown format, or the theme has problems */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_themes_themeid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The theme's id, like acme.harbour */
+                themeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The theme file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeFileResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This workspace has no theme with that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

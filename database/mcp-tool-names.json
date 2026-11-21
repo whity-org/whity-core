@@ -1072,6 +1072,10 @@
     "en": "Export the theme in use for another tool",
     "ar": "تصدير المظهر المستخدم لأداة أخرى"
   },
+  "get_api_themes_themeid": {
+    "en": "Get one theme's file",
+    "ar": "عرض ملف مظهر"
+  },
   "get_api_time_window_types": {
     "en": "List the kinds of period in your workspace",
     "ar": "عرض أنواع الفترات"
@@ -2035,6 +2039,10 @@
   "post_api_themes_convert": {
     "en": "Turn a theme from another tool into a theme file",
     "ar": "تحويل مظهر من أداة أخرى إلى ملف مظهر"
+  },
+  "post_api_themes_preview": {
+    "en": "Preview a draft theme",
+    "ar": "معاينة مسودة مظهر"
   },
   "post_api_themes_tokens": {
     "en": "Export a draft theme for another tool",
