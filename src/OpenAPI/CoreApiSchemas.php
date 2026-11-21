@@ -4630,6 +4630,17 @@ final class CoreApiSchemas
                     422 => self::errorResponse('One of the themes has problems; the error says which'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('POST', '/api/themes/package', 'settings:write', [
+                'summary' => 'Package a theme for the store',
+                'description' => 'Publishing (TH.25): the theme as a store-ready package, a theme-only plugin zip that ships it through the plugin theme interface (SDK 1.125), with manifest.json listing every file\'s sha256. The publisher downloads it and submits it to the store; a direct upload comes with the Whity ID store\'s publisher API. Whity\'s own themes cannot be packaged. Nothing is saved.',
+                'tags' => ['theme'],
+                'request' => 'PackageThemeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The package, its name and its sha256', 'ThemePackageResponse'),
+                    413 => self::errorResponse('The theme is larger than 32 KB'),
+                    422 => self::errorResponse('The theme has problems, or is one of Whity\'s own'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('DELETE', '/api/themes/{themeId}', 'settings:write', [
                 'summary' => 'Remove a theme this workspace imported',
                 'description' => 'If the workspace was using it, it goes back to the installation\'s theme. Whity\'s own themes cannot be removed.',
@@ -12420,6 +12431,17 @@ final class CoreApiSchemas
                 'before' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The older theme compiled: light, dark, vars, fonts, adjustments.'],
                 'after' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The newer theme compiled, the same way.'],
             ], ['changes', 'before', 'after'])),
+            'PackageThemeRequest' => self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The theme file to package, as saved (schemas/theme/v1.json).'],
+            ], ['theme']),
+            'ThemePackageResponse' => self::dataEnvelope(self::object([
+                'plugin' => self::str() + ['description' => 'The plugin\'s name in the package, like AcmeHarbourTheme.'],
+                'filename' => self::str(),
+                'media_type' => self::str(),
+                'sha256' => self::str() + ['description' => 'The zip\'s sha256, which the store checks.'],
+                'size_bytes' => self::int(),
+                'content_base64' => self::str() + ['description' => 'The zip, base64-encoded.'],
+            ], ['plugin', 'filename', 'media_type', 'sha256', 'size_bytes', 'content_base64'])),
             'DeleteThemeResponse' => self::dataEnvelope(self::object(['deleted' => self::bool()], ['deleted'])),
 
             // ── Forgotten-password + 2FA-recovery (WC-password-reset-2fa-recovery) ──

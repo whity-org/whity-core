@@ -11968,6 +11968,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/themes/package": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Package a theme for the store
+         * @description Publishing (TH.25): the theme as a store-ready package, a theme-only plugin zip that ships it through the plugin theme interface (SDK 1.125), with manifest.json listing every file's sha256. The publisher downloads it and submits it to the store; a direct upload comes with the Whity ID store's publisher API. Whity's own themes cannot be packaged. Nothing is saved.
+         */
+        post: operations["post_api_v1_themes_package"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/themes/preview": {
         parameters: {
             query?: never;
@@ -20817,6 +20837,12 @@ export interface components {
         OwnershipOfferResponse: {
             data: components["schemas"]["OwnershipOffer"];
         };
+        PackageThemeRequest: {
+            /** @description The theme file to package, as saved (schemas/theme/v1.json). */
+            theme: {
+                [key: string]: unknown;
+            };
+        };
         Pagination: {
             page: number;
             perPage: number;
@@ -23758,6 +23784,19 @@ export interface components {
         ThemeOverridesResponse: {
             data: {
                 [key: string]: string;
+            };
+        };
+        ThemePackageResponse: {
+            data: {
+                /** @description The plugin's name in the package, like AcmeHarbourTheme. */
+                plugin: string;
+                filename: string;
+                media_type: string;
+                /** @description The zip's sha256, which the store checks. */
+                sha256: string;
+                size_bytes: number;
+                /** @description The zip, base64-encoded. */
+                content_base64: string;
             };
         };
         ThemePreviewResponse: {
@@ -88812,6 +88851,102 @@ export interface operations {
                 };
             };
             /** @description Unknown format */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_themes_package: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PackageThemeRequest"];
+            };
+        };
+        responses: {
+            /** @description The package, its name and its sha256 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemePackageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The theme is larger than 32 KB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The theme has problems, or is one of Whity's own */
             422: {
                 headers: {
                     [name: string]: unknown;

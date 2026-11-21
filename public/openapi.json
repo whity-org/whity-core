@@ -82606,6 +82606,123 @@
                 ]
             }
         },
+        "/api/v1/themes/package": {
+            "post": {
+                "operationId": "post_api_v1_themes_package",
+                "summary": "Package a theme for the store",
+                "tags": [
+                    "theme"
+                ],
+                "description": "Publishing (TH.25): the theme as a store-ready package, a theme-only plugin zip that ships it through the plugin theme interface (SDK 1.125), with manifest.json listing every file's sha256. The publisher downloads it and submits it to the store; a direct upload comes with the Whity ID store's publisher API. Whity's own themes cannot be packaged. Nothing is saved.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PackageThemeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The package, its name and its sha256",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemePackageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "The theme is larger than 32 KB",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The theme has problems, or is one of Whity's own",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/themes/preview": {
             "post": {
                 "operationId": "post_api_v1_themes_preview",
@@ -116995,6 +117112,19 @@
                     "data"
                 ]
             },
+            "PackageThemeRequest": {
+                "type": "object",
+                "properties": {
+                    "theme": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The theme file to package, as saved (schemas/theme/v1.json)."
+                    }
+                },
+                "required": [
+                    "theme"
+                ]
+            },
             "Pagination": {
                 "type": "object",
                 "properties": {
@@ -127656,6 +127786,48 @@
                         "additionalProperties": {
                             "type": "string"
                         }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "ThemePackageResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "plugin": {
+                                "type": "string",
+                                "description": "The plugin's name in the package, like AcmeHarbourTheme."
+                            },
+                            "filename": {
+                                "type": "string"
+                            },
+                            "media_type": {
+                                "type": "string"
+                            },
+                            "sha256": {
+                                "type": "string",
+                                "description": "The zip's sha256, which the store checks."
+                            },
+                            "size_bytes": {
+                                "type": "integer"
+                            },
+                            "content_base64": {
+                                "type": "string",
+                                "description": "The zip, base64-encoded."
+                            }
+                        },
+                        "required": [
+                            "plugin",
+                            "filename",
+                            "media_type",
+                            "sha256",
+                            "size_bytes",
+                            "content_base64"
+                        ]
                     }
                 },
                 "required": [

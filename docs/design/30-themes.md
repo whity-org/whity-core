@@ -334,6 +334,16 @@ This section first described Whity Studio, a paid tool for making themes. On 21 
 - **Saving:** saving goes through the theme import with `source: "editor"`. The workspace's own theme (imported or made here) gets its next patch version; any other is saved as a copy under `workspace.<name>` with no author. "Save and use" also sets `branding_theme`.
 - **Not in this step:** generating seeds from the logo or a colour wheel, presets to start from, the wider preview across key screens, the contrast report, versions, export of resolved tokens, and publishing. Export and the side-by-side diff came next (below, 14.7); publishing waits on the store.
 
+**Publishing (built, WHIT-1225, decided 21 Nov 2026).** Publish in the editor saves the theme, then makes its store package and hands it to the publisher to download and submit to the store.
+- **The package:** `ThemePackage`, through `POST /api/v1/themes/package` (`settings:write`). It is a theme-only plugin zip that ships the theme through the plugin theme interface (SDK 1.125), the way the workspace templates ship theirs.
+- **What's inside:** one top-level folder named after the plugin, the plugin installer's own format. The plugin class only returns the theme file next to it.
+- **Nothing typed becomes code:** the class and namespace come from the theme id (letters and digits). The name and version are read from the theme file at runtime.
+- **Checksums:** `manifest.json` lists every file's sha256. Fixed file times mean the same theme always makes the same bytes, and the zip's sha256 is shown with the download.
+- **Whity's own themes** can't be packaged: make a copy to publish your own.
+- **Direct upload** comes once the Whity ID store module has a publisher API. The store is moving into Whity ID, so the old store plugin gets no upload.
+
+**Next: versions (decided 21 Nov 2026, not built).** Each save of a workspace's own theme keeps its earlier versions: a history list, compare any two with the side-by-side diff, and restore one as a new version. Workspaces using a theme move to a new version when it is published to them. This needs a table for the versions, a migration whose number is asked for at PR time.
+
 The editor is built last in the order of TH.24, after the per-component overrides. Whether the wider Studio product (records and pages, R.2) moves the same way is for the business-model register, not this spec.
 
 ## 12. Build plan (phase 2, after approval)

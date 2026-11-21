@@ -28,7 +28,7 @@ import { useToast } from '@/lib/toast-context';
 import { adjustmentText, changeText, errorReason, roleName, type FontOption } from '@/components/theme-picker';
 import { ThemeSample } from '@/components/theme-sample';
 import { ThemeDiff } from '@/components/theme-diff';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@whity/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
 
 /** A theme file as JSON (schemas/theme/v1.json); the server checks it. */
 export type ThemeFile = Record<string, unknown>;
@@ -211,6 +211,28 @@ function ColourField({
   );
 }
 
+interface ThemePackageData {
+  plugin: string;
+  filename: string;
+  media_type: string;
+  sha256: string;
+  size_bytes: number;
+  content_base64: string;
+}
+
+/** Hands the person the package to keep (the zip arrives base64-encoded). */
+function downloadPackage(pkg: ThemePackageData): void {
+  const binary = atob(pkg.content_base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([bytes], { type: pkg.media_type }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = pkg.filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 interface ThemeEditorProps {
   /** The theme to start from: a file as installed. */
   start: ThemeFile;
@@ -233,6 +255,7 @@ export function ThemeEditor({ start, editable, fonts }: ThemeEditorProps) {
   const [preview, setPreview] = useState<ThemePreviewData | null>(null);
   const [saving, setSaving] = useState(false);
   const [comparing, setComparing] = useState(false);
+  const [published, setPublished] = useState<ThemePackageData | null>(null);
   const [newRole, setNewRole] = useState({ role: '', mode: 'light', colour: '#0961bb' });
   const sequence = useRef(0);
 
@@ -332,16 +355,44 @@ export function ThemeEditor({ start, editable, fonts }: ThemeEditorProps) {
 
   const overrides = (mode: 'light' | 'dark') => (valueAt(theme, ['colour', 'overrides', mode]) as Record<string, string> | undefined) ?? {};
 
+  /** Saves the draft as the workspace's theme; the saved file, or null when it couldn't be saved. */
+  const store = async (): Promise<ThemeFile | null> => {
+    const file = themeToSave(theme, editable);
+    const { error: saveError } = await api.POST('/api/v1/themes', { body: { theme: file, source: 'editor' } as never });
+    if (saveError) {
+      const reason = errorReason(saveError, 'theme');
+      addToast(reason ?? t('theme.editor.saveFailed', 'The theme could not be saved. Try again.'), 'error');
+      return null;
+    }
+    return file;
+  };
+
+  /**
+   * Publishing (TH.25): save, then package the saved theme for the store and
+   * hand it to the publisher. A direct upload comes with the store's
+   * publisher API.
+   */
+  const publish = async () => {
+    setSaving(true);
+    try {
+      const file = await store();
+      if (!file) return;
+      const { data: body, error: packageError } = await api.POST('/api/v1/themes/package', { body: { theme: file } as never });
+      if (packageError || !body) {
+        addToast(errorReason(packageError, 'theme') ?? t('theme.publish.failed', 'The theme was saved but could not be packaged. Try again.'), 'error');
+        return;
+      }
+      setPublished(body.data as ThemePackageData);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const save = async (use: boolean) => {
     setSaving(true);
     try {
-      const file = themeToSave(theme, editable);
-      const { error: saveError } = await api.POST('/api/v1/themes', { body: { theme: file, source: 'editor' } as never });
-      if (saveError) {
-        const reason = errorReason(saveError, 'theme');
-        addToast(reason ?? t('theme.editor.saveFailed', 'The theme could not be saved. Try again.'), 'error');
-        return;
-      }
+      const file = await store();
+      if (!file) return;
       if (use) {
         const { error: useError } = await api.PATCH('/api/v1/settings', { body: { settings: { branding_theme: file.id as string } } });
         if (useError) {
@@ -389,6 +440,9 @@ export function ThemeEditor({ start, editable, fonts }: ThemeEditorProps) {
           <Button variant="outline" disabled={saving || !preview?.valid || nameEn.trim() === ''} onClick={() => void save(false)}>
             {t('theme.editor.save', 'Save')}
           </Button>
+          <Button variant="outline" disabled={saving || !preview?.valid || nameEn.trim() === ''} onClick={() => void publish()}>
+            {t('theme.publish.open', 'Publish')}
+          </Button>
           <Button disabled={saving || !preview?.valid || nameEn.trim() === ''} onClick={() => void save(true)}>
             {t('theme.editor.saveUse', 'Save and use')}
           </Button>
@@ -410,6 +464,39 @@ export function ThemeEditor({ start, editable, fonts }: ThemeEditorProps) {
               describe={changeText}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={published !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPublished(null);
+            router.push('/admin/settings/branding');
+          }
+        }}
+      >
+        <DialogContent data-testid="theme-publish">
+          <DialogHeader>
+            <DialogTitle>{t('theme.publish.title', 'Your theme is ready for the store')}</DialogTitle>
+            <DialogDescription>
+              {t('theme.publish.description', 'It is saved in this workspace. Download the store package and submit it to the Whity store as its publisher.')}
+            </DialogDescription>
+          </DialogHeader>
+          {published && (
+            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+              <dt className="text-muted-foreground">{t('theme.publish.file', 'File')}</dt>
+              <dd className="truncate font-mono text-xs" dir="ltr">{published.filename}</dd>
+              <dt className="text-muted-foreground">{t('theme.publish.checksum', 'Checksum (SHA-256)')}</dt>
+              <dd className="break-all font-mono text-xs" dir="ltr">{published.sha256}</dd>
+            </dl>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {t('theme.publish.later', 'Publishing straight to the store from here comes when the store accepts uploads from publishers.')}
+          </p>
+          <DialogFooter>
+            <Button onClick={() => published && downloadPackage(published)}>{t('theme.publish.download', 'Download the package')}</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
