@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.137).
+ * SDK identity (v1.140).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1526,12 +1526,19 @@ namespace Whity\Sdk;
  *
  * Purely additive: one new method on Context\InventoryScope, which only the host implements, and new
  * optional constructor arguments, last, on MoveLine and Move.)
+ *
+ * 1.140 (WALK-INS (WHIT-1334, design section 35 §3): a workspace template may set the calendar's
+ * `walkins_enabled`, which turns on the walk-in queue at the front desk, and give a role
+ * `calendar:front_desk`. Older hosts refuse a template that sets it, so a template plugin that
+ * does needs `^1.140`.
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.137.0';
+    public const VERSION = '1.140.0';
 
     /**
      * Static identity only — never instantiated.
