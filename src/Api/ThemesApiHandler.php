@@ -38,6 +38,9 @@ use Whity\Core\Theme\ThemeValidator;
  *   POST   /api/v1/themes/convert    settings:write  turn shadcn CSS, a Tailwind @theme block
  *                                                    or Material Theme Builder JSON into a
  *                                                    theme file; nothing is saved (TH.25)
+ *   GET    /api/v1/themes/{themeId}  settings:read   one theme's file, for the editor
+ *   POST   /api/v1/themes/preview    settings:write  compile a draft for the live editor;
+ *                                                    nothing is saved (TH.25)
  *   DELETE /api/v1/themes/{themeId}  settings:write  remove an imported theme
  *
  * The free tweaks (TH.15: shape, density, font pair) are part of the
@@ -202,7 +205,9 @@ final class ThemesApiHandler
                     'changes' => $installed === null ? [] : ThemeTweaks::changes($installed, $theme),
                 ]], 200);
             }
-            $this->repository->save($tenantId, $theme, 'import', false, self::profileId($request));
+            // TH.25: a theme made or changed in the editor says so, as an import says it came from a file.
+            $source = is_array($decoded) && ($decoded['source'] ?? null) === 'editor' && is_array($decoded['theme'] ?? null) ? 'editor' : 'import';
+            $this->repository->save($tenantId, $theme, $source, false, self::profileId($request));
 
             return Response::json(['data' => ['id' => $theme['id'], 'version' => $theme['version']]], 201);
         });
@@ -245,6 +250,69 @@ final class ThemesApiHandler
                     'card_radius' => $compiled['vars']['wy-radius-card'] ?? '12px',
                 ],
                 'adjustments' => $compiled['adjustments'],
+            ]], 200);
+        });
+    }
+
+    /**
+     * One theme's file, as the editor starts from it (TH.25). `editable` is
+     * true for the workspace's own (imported or made here); any other is
+     * changed as a copy.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function show(Request $request, array $params = []): Response
+    {
+        return $this->inWorkspace(function (int $tenantId) use ($params): Response {
+            $id = (string) ($params['themeId'] ?? '');
+            if (preg_match(ThemeValidator::ID_RE, $id) !== 1) {
+                return Response::error('Theme not found', 404);
+            }
+            foreach ((new ThemeLibrary($this->repository, $this->pluginThemes))->available($tenantId) as $entry) {
+                if (($entry['theme']['id'] ?? null) === $id) {
+                    return Response::json(['data' => [
+                        'theme' => $entry['theme'],
+                        'source' => $entry['source'],
+                        'editable' => in_array($entry['source'], ['import', 'editor'], true),
+                    ]], 200);
+                }
+            }
+
+            return Response::error('Theme not found', 404);
+        });
+    }
+
+    /**
+     * The live editor's preview (TH.25, 30-themes 11): a draft theme compiled
+     * as it would be used, with every colour in both modes so the editor can
+     * show light and dark side by side whatever mode the person is in, the
+     * roles a colour may be set by hand for, and every problem with the draft
+     * so the editor can say them all at once. Nothing is saved.
+     */
+    public function preview(Request $request): Response
+    {
+        return $this->inWorkspace(function () use ($request): Response {
+            $body = $request->getBody();
+            if (strlen($body) > self::MAX_BYTES) {
+                return Response::error('The theme is too large.', 413);
+            }
+            $decoded = json_decode($body, true);
+            $theme = is_array($decoded) && is_array($decoded['theme'] ?? null) ? $decoded['theme'] : $decoded;
+            $errors = ThemeValidator::validate($theme);
+            if ($errors !== []) {
+                return Response::json(['data' => ['valid' => false, 'problems' => array_slice($errors, 0, 20)]], 200);
+            }
+            $compiled = ThemeCompiler::compile($theme);
+
+            return Response::json(['data' => [
+                'valid' => true,
+                'problems' => [],
+                'light' => array_merge(ThemeCompiler::base('light'), $compiled['light']),
+                'dark' => array_merge(ThemeCompiler::base('dark'), $compiled['dark']),
+                'vars' => $compiled['vars'] === [] ? new \stdClass() : $compiled['vars'],
+                'fonts' => ['body' => ThemeFonts::name($compiled['fonts']['body']), 'heading' => ThemeFonts::name($compiled['fonts']['heading'])],
+                'adjustments' => $compiled['adjustments'],
+                'roles' => ThemeCompiler::overridableRoles(),
             ]], 200);
         });
     }
