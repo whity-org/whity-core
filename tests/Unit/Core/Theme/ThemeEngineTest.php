@@ -399,4 +399,26 @@ final class ThemeEngineTest extends TestCase
         }
         self::assertSame($standard['ease-out'], $brisk['ease-out']);
     }
+
+    /** TH.20: every pair's faces are loaded by the web app, and ibm-kufi heads in Kufi. */
+    public function testEveryFontPairIsLoadedByTheWebApp(): void
+    {
+        $layout = (string) file_get_contents(__DIR__ . '/../../../../web/app/layout.tsx');
+        foreach (ThemeFonts::ids() as $id) {
+            foreach ([ThemeFonts::stack($id), ThemeFonts::stack($id, true)] as $stack) {
+                preg_match_all('/var\(--(font-[a-z0-9-]+)\)/', $stack, $m);
+                foreach ($m[1] as $var) {
+                    self::assertStringContainsString("variable: \"--{$var}\"", $layout, "{$id} needs {$var} in web/app/layout.tsx");
+                }
+            }
+        }
+        self::assertSame(['noto', 'plex', 'readex', 'cairo', 'kufi', 'rubik', 'alexandria', 'naskh', 'ibm-kufi'], ThemeFonts::ids());
+
+        $vars = ThemeCompiler::compile(self::theme(['type' => ['family' => 'ibm-kufi']]))['vars'];
+        self::assertStringContainsString('--font-ibm-plex-sans-arabic', $vars['font-sans']);
+        self::assertStringNotContainsString('kufi', $vars['font-sans']);
+        self::assertStringContainsString('--font-noto-kufi-arabic', $vars['font-heading']);
+        self::assertStringContainsString('--font-ibm-plex-sans)', $vars['font-heading']);
+        self::assertStringContainsString('--font-noto-naskh-arabic', ThemeFonts::stack('naskh'));
+    }
 }

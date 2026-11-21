@@ -473,7 +473,7 @@ final class ThemeCompiler
             $vars['font-sans'] = ThemeFonts::stack($body);
         }
         if ($heading !== $body || $body !== ThemeFonts::DEFAULT) {
-            $vars['font-heading'] = ThemeFonts::stack($heading);
+            $vars['font-heading'] = ThemeFonts::stack($heading, true);
         }
         $scale = self::SCALES[$theme['type']['scale'] ?? 'standard'] ?? null;
         foreach ($scale ?? [] as $step => $px) {

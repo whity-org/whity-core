@@ -12162,7 +12162,7 @@ final class CoreApiSchemas
                 'options' => self::object([
                     'shape' => ['type' => 'array', 'items' => self::str()],
                     'density' => ['type' => 'array', 'items' => self::str()],
-                    'font' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'name' => self::str()], ['id', 'name'])],
+                    'font' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'name' => self::str(), 'stack' => self::str(), 'heading_stack' => self::str()], ['id', 'name'])],
                 ], ['shape', 'density', 'font']),
                 'colour_overrides' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The workspace\'s colour overrides, light and dark, kept when the tweaks are saved.'],
             ], ['current', 'themes'])),

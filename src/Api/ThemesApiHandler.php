@@ -83,7 +83,8 @@ final class ThemesApiHandler
                 ];
             }
 
-            $fonts = array_map(static fn (string $id): array => ['id' => $id, 'name' => ThemeFonts::name($id)], ThemeFonts::ids());
+            // TH.20: each pair with its CSS stacks, so the picker previews it in its own faces.
+            $fonts = array_map(static fn (string $id): array => ['id' => $id, 'name' => ThemeFonts::name($id), 'stack' => ThemeFonts::stack($id), 'heading_stack' => ThemeFonts::stack($id, true)], ThemeFonts::ids());
 
             return Response::json(['data' => [
                 'current' => $current,
