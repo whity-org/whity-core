@@ -155,6 +155,8 @@ final class CorePermissionDescriptions
         CorePermissions::CALENDAR_READ                => 'See the team\'s calendars, bookings and services',
         CorePermissions::CALENDAR_WRITE               => 'Keep your own calendar events, and book, move and cancel customer bookings',
         CorePermissions::CALENDAR_MANAGE              => 'Set up services, everyone\'s working hours and time off, and the public booking page',
+        CorePermissions::CALENDAR_FRONT_DESK          => 'Add walk-ins to the queue at the front desk and hand them to staff',
+        CorePermissions::CALENDAR_COMMISSION          => 'Set staff commission rates and see what each earned',
         CorePermissions::CONTACTS_READ                => 'See customers and suppliers, their tags and details',
         CorePermissions::CONTACTS_WRITE               => 'Add and change customers and suppliers, and their tags',
         CorePermissions::CONTACTS_IMPORT              => 'Import customers and suppliers from a spreadsheet, and undo an import',

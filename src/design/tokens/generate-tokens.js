@@ -533,7 +533,9 @@ function shapeDeclarations(base, family) {
 }
 
 function generateShapeScopes(base) {
-  const lines = [`@layer base { :root { ${shapeDeclarations(base, null)} } }`];
+  // The theme editor's preview (TH.25) sets a draft's --wy-* on its own
+  // element, so it recomputes the --shape-* values there as :root does.
+  const lines = [`@layer base { :root, [data-theme-preview] { ${shapeDeclarations(base, null)} } }`];
   for (const [family, slots] of Object.entries(SHAPE_FAMILIES)) {
     const selector = slots.map((slot) => `[data-slot="${slot}"]`).join(', ');
     lines.push(`@layer base { ${selector} { ${shapeDeclarations(base, family)} } }`);

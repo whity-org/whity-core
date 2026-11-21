@@ -129,6 +129,11 @@ final class TenantOwnedTables
         'calendar_bookings' => '248_create_calendar_bookings.php',
         // WHIT-1173: the services of a booking of several, back to back.
         'calendar_booking_services' => '302_create_calendar_booking_services.php',
+        // WHIT-1334: the walk-in queue at the front desk (design section 35).
+        'calendar_walkins' => '338_create_calendar_walkins.php',
+        'calendar_commission_rates' => '340_create_calendar_commission_rates.php',
+        'calendar_commission_closes' => '342_create_calendar_commission_closes.php',
+        'calendar_commission_close_lines' => '342_create_calendar_commission_closes.php',
         // Design 3.3: rooms a service needs, filtered by branch.
         'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
         // Design 3.5: each person's own calendar view choices (CV.2, CV.4).

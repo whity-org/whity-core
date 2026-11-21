@@ -878,6 +878,11 @@ final class SettingsRegistry
      * desk. Off by default; the Salons plugin turns it on.
      */
     public const CALENDAR_MULTI_SERVICE_BOOKING = 'calendar.multi_service_booking';
+    /**
+     * WHIT-1334 (design section 35, SL.3): the walk-in queue at the front
+     * desk. Off by default; the salon workspace template turns it on.
+     */
+    public const CALENDAR_WALKINS_ENABLED = 'calendar.walkins_enabled';
 
     /**
      * Whether the web app offers itself as an installable app (#1733): the web
@@ -1156,6 +1161,7 @@ final class SettingsRegistry
         self::CALENDAR_BOOKING_PAGE_ENABLED,
         self::CALENDAR_INSTANT_BOOKING,
         self::CALENDAR_MULTI_SERVICE_BOOKING,
+        self::CALENDAR_WALKINS_ENABLED,
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
         self::BILLING_LOCAL_RUNS_ENABLED,
@@ -1507,6 +1513,7 @@ final class SettingsRegistry
         self::CALENDAR_WEEKEND_DAYS => 'friday,saturday',
         self::CALENDAR_INSTANT_BOOKING => 'true',
         self::CALENDAR_MULTI_SERVICE_BOOKING => 'false',
+        self::CALENDAR_WALKINS_ENABLED => 'false',
         // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
         self::APP_INSTALLABLE => 'true',
         // Empty: the plans page shows the active plans as they are, and the
@@ -2005,6 +2012,7 @@ final class SettingsRegistry
             self::CALENDAR_WEEKEND_DAYS => self::validateWeekdayList($value),
             self::CALENDAR_INSTANT_BOOKING => self::validateBoolean($value, self::CALENDAR_INSTANT_BOOKING),
             self::CALENDAR_MULTI_SERVICE_BOOKING => self::validateBoolean($value, self::CALENDAR_MULTI_SERVICE_BOOKING),
+            self::CALENDAR_WALKINS_ENABLED => self::validateBoolean($value, self::CALENDAR_WALKINS_ENABLED),
             self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the

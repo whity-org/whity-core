@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Frontend;
 
 /**
- * The page side of the embedded-screen bridge (SDK 1.143, #1688).
+ * The page side of the embedded-screen bridge (SDK 1.150, #1688).
  *
  * An `embed` screen ({@see \Whity\Sdk\PluginFrontendInterface}) runs in a
  * sandboxed frame with an opaque origin: it cannot reach the app, the person's

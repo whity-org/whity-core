@@ -32,7 +32,7 @@ final class NotificationPreferencesApiHandler
         private readonly TokenValidator $tokenValidator,
         private readonly NotificationPreferenceRepository $repo,
         private readonly NotificationPreferenceResolver $resolver,
-        /** @var (\Closure(): list<array{type: string, label: array{en: string, ar: string}, plugin: string}>)|null */
+        /** @var (\Closure(): list<array{type: string, label: array{en: string, ar: string}, plugin: string, email_default: bool}>)|null */
         private readonly ?\Closure $pluginTypes = null,
     ) {}
 

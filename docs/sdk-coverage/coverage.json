@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.143.0",
+    "sdk_version": "1.150.0",
     "core_version": "0.2.30",
     "updated": "2026-11-21",
     "ratings": {
@@ -867,6 +867,10 @@
                     "since": "1.90"
                 },
                 {
+                    "what": "A declared type can also go by email (emailDefault), following each person's preferences and the workspace's email switch",
+                    "since": "1.141"
+                },
+                {
                     "what": "WorkspaceEmails host service: send an email as the workspace (its brand, language and the EM.1 layout) to anyone, such as a customer's invoice; plain text only, one button, best effort",
                     "since": "1.100"
                 },
@@ -1370,14 +1374,14 @@
                 },
                 {
                     "what": "Embedded screens call their own plugin's API through a message bridge (FrameBridge), with a five-minute token bound to the plugin's routes",
-                    "since": "1.143"
+                    "since": "1.150"
                 }
             ],
             "missing": [
                 "Native screens for store plugins (custom screens need a change in this repository)",
                 "Blocks outside /admin/x pages"
             ],
-            "security": "Embedded screens run in a sandboxed frame with no origin of their own (0.2.30). Since SDK 1.143 they reach the API only through the app's message bridge, with a short-lived token that works on their own plugin's routes alone. Native screens for store plugins still need a design.",
+            "security": "Embedded screens run in a sandboxed frame with no origin of their own (0.2.30). Since SDK 1.150 they reach the API only through the app's message bridge, with a short-lived token that works on their own plugin's routes alone. Native screens for store plugins still need a design.",
             "plan": "later"
         },
         {
@@ -1593,6 +1597,14 @@
                 {
                     "what": "A workspace template names its theme (`theme`), offered when the template is chosen",
                     "since": "1.131"
+                },
+                {
+                    "what": "A workspace template turns on the walk-in queue (`calendar.settings.walkins_enabled`) and may give a role `calendar:front_desk`",
+                    "since": "1.147"
+                },
+                {
+                    "what": "WorkspaceCommissionExpenses (Contribute): book a closed commission period (CommissionClose) as an expense; event calendar.commission.closed",
+                    "since": "1.148"
                 },
                 {
                     "what": "PluginDisplayNameInterface: the name people read for a plugin, in English and Arabic",

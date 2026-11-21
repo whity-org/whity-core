@@ -63,7 +63,7 @@ namespace Whity\Sdk;
  *     (replacing any `sandbox` the handler wrote), so it has an opaque origin
  *     even when opened in a tab. It cannot read the host page, cookies or
  *     storage, and its own calls to the API carry no session. Render the data
- *     into the HTML on the server, or, since SDK 1.143 (#1688), call the
+ *     into the HTML on the server, or, since SDK 1.150 (#1688), call the
  *     plugin's OWN routes through the app with
  *     {@see \Whity\Sdk\Frontend\FrameBridge::script()}: the app makes each
  *     call with a five-minute token bound to this plugin's routes (never the

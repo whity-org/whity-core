@@ -242,9 +242,12 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.143.0',
+            '1.150.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.143 ADDS Frontend\FrameBridge: an embedded screen calls its own plugin routes through the app, with a short-lived token bound to them (#1688). '
+            'SDK 1.150 ADDS Frontend\FrameBridge: an embedded screen calls its own plugin routes through the app, with a short-lived token bound to them (#1688). '
+            . 'SDK 1.148 ADDS Contribute\\WorkspaceCommissionExpenses, Calendar\\CommissionClose and the calendar.commission.closed event: a closed commission period goes to the books (WHIT-1334). '
+            . 'SDK 1.147 ADDS the workspace template calendar setting `walkins_enabled`: a template turns on the walk-in queue (WHIT-1334). '
+            . 'SDK 1.141 ADDS the optional notification type `emailDefault` key: a plugin notice can also go by email, per each person\'s preferences (WHIT-1250, #2209). '
             . 'SDK 1.137 ADDS Inventory\\Lots and Inventory\\Lot, lot fields on MoveLine and Move, and the stock.lot.expiring|expired events: batches, serial numbers and expiry (WHIT-1235). '
             . 'SDK 1.133 ADDS Usage\\Usage: a workspace\'s usage meters for a month, read-only, with each base and warning state (section 33 §5). '
             . 'SDK 1.132 ADDS Contribute\\WorkspaceQuoteConversion and the sales.quote.* events: what an accepted quote turns into (WHIT-1321). '

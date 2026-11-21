@@ -587,6 +587,17 @@ final class Events
     public const SALES_QUOTE_CANCELLED = 'sales.quote.cancelled';
     public const SALES_QUOTE_CANCELLED_ASYNC = 'sales.quote.cancelled.async';
 
+    // ---- staff commission (SDK 1.141, WHIT-1334, design section 35 §4.3) ----
+    /**
+     * An owner closed a commission period: its totals are frozen. Payload:
+     * `tenant_id`, `close_id`, `from` and `to` (the workspace's dates, both
+     * included), `acting_profile_id`, and `lines` (each `profile_id`,
+     * `currency`, `bookings`, `sales_minor`, `commission_minor`). To book it,
+     * implement {@see \Whity\Sdk\Contribute\WorkspaceCommissionExpenses}.
+     */
+    public const CALENDAR_COMMISSION_CLOSED = 'calendar.commission.closed';
+    public const CALENDAR_COMMISSION_CLOSED_ASYNC = 'calendar.commission.closed.async';
+
     /**
      * The event name to dispatch for one of THIS plugin's own events (SDK 1.29).
      *

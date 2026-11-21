@@ -970,10 +970,10 @@ dropped with a logged warning and the plugin still loads):
 The full working reference is the HelloWorld plugin: greetings CRUD routes with
 typed schemas, the descriptor above, and both migrations.
 
-### An embedded screen that calls its own API (SDK 1.143)
+### An embedded screen that calls its own API (SDK 1.150)
 
 A `screen: 'embed'` page runs in a sandboxed frame with no origin of its own,
-so a `fetch()` from it reaches the API with no session. Since SDK 1.143 (#1688)
+so a `fetch()` from it reaches the API with no session. Since SDK 1.150 (#1688)
 it calls the plugin's own routes through the app instead. Put the bridge in the
 page and use the `whity` global it defines:
 
@@ -1828,9 +1828,21 @@ $notice = new Notice(
 - Only active members of that workspace are reached. Anyone else counts as nobody, so check the returned number rather than expecting an error.
 - Your type is stored as `your_plugin:order.shipped`, so it can't be mistaken for another plugin's or for a core notice, and it always respects a person's opt-outs, even if you name it `security.alert`.
 - Pass the plugin itself to `for()`. An object the host didn't load is refused.
-- A single send reaches at most 1000 people, and notifications are in-app only for now.
+- A single send reaches at most 1000 people.
+- Each person gets the subject and body in their own language, or the workspace's when they have none.
 
-Declared types and their labels are listed in `GET /api/me/notification-preferences` as `plugin_types`.
+**By email (SDK 1.141, #2209).** Every notice lands in the inbox. Add `'emailDefault' => true` to a type to also email it to people who never chose for that type:
+
+```php
+'task.assigned' => [
+    'label' => ['en' => 'A task was given to you', 'ar' => 'أُسندت إليك مهمة'],
+    'emailDefault' => true,
+],
+```
+
+Left out, it is false: nobody gets that type by email until they turn it on in Preferences › Notifications, so existing plugins send no email on upgrade. A person's own choice for the type always wins, and turning every email off, or the workspace turning its email off, stops it like any core email. The email has the workspace's brand and carries only the Notice's subject and body, never `data`. You still name people by profile id: the host finds the address, and `toPerson()` returns the same count whether or not an email went. A failed email is retried by the delivery job and never thrown to you.
+
+Declared types and their labels are listed in `GET /api/me/notification-preferences` as `plugin_types`, with `email_default`.
 
 To react to routes and forms (SDK 1.94), listen to `Events::DOCUMENT_ROUTED`, `DOCUMENT_ROUTE_ACTED`, `ROUTE_SENT_BACK`, `ROUTE_RESUBMITTED`, `ROUTE_SIGNED`, `ROUTE_COMPLETED` (with `outcome`: `approved`, `rejected` or null) and `DOCUMENT_FINALISED`, and to `Events::FORM_SUBMITTED`, `SUBMISSION_REVIEWED` and `SUBMISSION_WITHDRAWN`. They fire after the change is saved and carry ids only, because a submission holds personal data and may be anonymous. A route payload names its `subject_type` and `subject_id`; `document_id` is null for a form submission with no document yet. A form submission's final document also fires `document.issuing` and `document.issued` with `origin: route`, so a listener can refuse it or read its id.
 
