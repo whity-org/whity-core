@@ -8,13 +8,14 @@ import { Input } from '@whity/ui/input';
 import { Switch } from '@whity/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@whity/ui/table';
 import { Tabs, TabsList, TabsTrigger } from '@whity/ui/tabs';
-import type { TranslateFn } from '@whity/features/i18n';
+import { useTranslation } from '@whity/features/i18n';
 
 /**
  * What a screen looks like in a theme (TH.25): the real components, so every
  * shape family shows. Its values come from `previewThemeCss` with the same scope.
  */
-export function ThemeSample({ mode, t, scope = '' }: { mode: 'light' | 'dark'; t: TranslateFn; scope?: string }) {
+export function ThemeSample({ mode, scope = '' }: { mode: 'light' | 'dark'; scope?: string }) {
+  const t = useTranslation('admin');
   const people = ['Amro Saleh', 'Awss Haddad', 'Ahmad Khalil'];
   return (
     <div

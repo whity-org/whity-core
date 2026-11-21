@@ -17,7 +17,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { IconArrowLeft, IconX } from '@tabler/icons-react';
 import { Button } from '@whity/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@whity/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
@@ -594,11 +594,11 @@ export function ThemeEditor({ start, editable, fonts }: ThemeEditorProps) {
           <div className="grid gap-3 xl:grid-cols-2">
             <div className="grid gap-1.5">
               <span className="text-sm font-medium">{t('theme.editor.light', 'Light')}</span>
-              <ThemeSample mode="light" t={t} />
+              <ThemeSample mode="light" />
             </div>
             <div className="grid gap-1.5">
               <span className="text-sm font-medium">{t('theme.editor.dark', 'Dark')}</span>
-              <ThemeSample mode="dark" t={t} />
+              <ThemeSample mode="dark" />
             </div>
           </div>
           {preview?.valid && preview.fonts?.body && (

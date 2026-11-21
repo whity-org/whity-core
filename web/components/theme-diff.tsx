@@ -45,11 +45,10 @@ export function ThemeDiff({ before, after, beforeLabel, afterLabel, describe }: 
 
   useEffect(() => {
     let live = true;
-    setFailed(false);
     void api.POST('/api/v1/themes/compare', { body: { before, after } as never }).then(({ data: body, error }) => {
       if (!live) return;
-      if (error || !body) setFailed(true);
-      else setCompared(body.data as Compared);
+      setFailed(Boolean(error) || !body);
+      if (body && !error) setCompared(body.data as Compared);
     });
     return () => {
       live = false;
@@ -93,11 +92,11 @@ export function ThemeDiff({ before, after, beforeLabel, afterLabel, describe }: 
       <div className="grid gap-3 md:grid-cols-2">
         <div className="grid content-start gap-1.5">
           <span className="text-sm font-medium">{beforeLabel}</span>
-          <ThemeSample mode={mode} scope="before-" t={t} />
+          <ThemeSample mode={mode} scope="before-" />
         </div>
         <div className="grid content-start gap-1.5">
           <span className="text-sm font-medium">{afterLabel}</span>
-          <ThemeSample mode={mode} scope="after-" t={t} />
+          <ThemeSample mode={mode} scope="after-" />
         </div>
       </div>
     </div>
