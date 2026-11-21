@@ -15,6 +15,8 @@ import type { PluginFeature } from '@/lib/plugin-features';
 jest.mock('@/components/admin/admin-header', () => ({
   AdminHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
 }));
+jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));
+jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast: jest.fn() }) }));
 
 const feature = {
   id: 'bom-designer',
@@ -49,5 +51,17 @@ describe('EmbedScreen frame (WHIT-1217)', () => {
     const frame = screen.getByTitle('BOM Designer');
     expect(frame.getAttribute('src')).toBe('/api/v1/bom/designer');
     expect(frame.getAttribute('referrerpolicy')).toBe('no-referrer');
+  });
+
+  it('listens for its frame on the bridge and stops when it goes (#1688)', () => {
+    const add = jest.spyOn(window, 'addEventListener');
+    const remove = jest.spyOn(window, 'removeEventListener');
+    const { unmount } = render(<EmbedScreen feature={feature} />);
+    const listener = add.mock.calls.find(([type]) => type === 'message')?.[1];
+    expect(listener).toBeDefined();
+    unmount();
+    expect(remove).toHaveBeenCalledWith('message', listener);
+    add.mockRestore();
+    remove.mockRestore();
   });
 });
