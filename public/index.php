@@ -5760,16 +5760,16 @@ $inventoryHandler = new \Whity\Api\InventoryApiHandler(
 // contacts use (import_jobs; design section 34 §6). Opening stock also needs
 // stock:adjust, checked in the handler.
 $inventoryImportHandler = new \Whity\Api\InventoryImportApiHandler(
-    new \Whity\Core\Inventory\Import\InventoryImports($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryLedger, $inventoryItems->currencyFor(...)),
+    new \Whity\Core\Inventory\Import\InventoryImports($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryLedger, $inventoryItems->currencyFor(...), $inventorySuppliers),
     $roleChecker,
 );
-$router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock}',                         [$inventoryImportHandler, 'list'],       null, null, CorePermissions::INVENTORY_WRITE);
-$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock}',                         [$inventoryImportHandler, 'upload'],     null, null, CorePermissions::INVENTORY_WRITE);
-$router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock}/{id:\d+}',                [$inventoryImportHandler, 'show'],       null, null, CorePermissions::INVENTORY_WRITE);
-$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock}/{id:\d+}/check',          [$inventoryImportHandler, 'check'],      null, null, CorePermissions::INVENTORY_WRITE);
-$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock}/{id:\d+}/run',            [$inventoryImportHandler, 'runImport'],  null, null, CorePermissions::INVENTORY_WRITE);
-$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock}/{id:\d+}/undo',           [$inventoryImportHandler, 'undo'],       null, null, CorePermissions::INVENTORY_WRITE);
-$router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock}/{id:\d+}/skipped.csv',    [$inventoryImportHandler, 'skippedCsv'], null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}',                         [$inventoryImportHandler, 'list'],       null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}',                         [$inventoryImportHandler, 'upload'],     null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}',                [$inventoryImportHandler, 'show'],       null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/check',          [$inventoryImportHandler, 'check'],      null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/run',            [$inventoryImportHandler, 'runImport'],  null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/undo',           [$inventoryImportHandler, 'undo'],       null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/skipped.csv',    [$inventoryImportHandler, 'skippedCsv'], null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/units',                            [$inventoryHandler, 'listUnits'],      null, null, CorePermissions::INVENTORY_READ);
 $router->register('POST',   '/api/inventory/units',                              [$inventoryHandler, 'createUnit'],     null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/categories',                         [$inventoryHandler, 'listCategories'], null, null, CorePermissions::INVENTORY_READ);

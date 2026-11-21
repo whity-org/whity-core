@@ -5699,11 +5699,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Recent imports of items or opening stock */
+        /** Recent imports of items, opening stock or supplier prices */
         get: operations["get_api_v1_inventory_imports_kind"];
         put?: never;
         /**
-         * Upload a spreadsheet of items or opening stock
+         * Upload a spreadsheet of items, opening stock or supplier prices
          * @description CSV or Excel, as a `file` upload or as `text` or `content_base64` with `file_name`. Up to 5,000 rows. Answers the import with each column, its examples and its suggested target. Nothing changes yet.
          */
         post: operations["post_api_v1_inventory_imports_kind"];
@@ -5720,7 +5720,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** An import of items or opening stock */
+        /** An import of items, opening stock or supplier prices */
         get: operations["get_api_v1_inventory_imports_kind_id"];
         put?: never;
         post?: never;
@@ -5741,7 +5741,7 @@ export interface paths {
         put?: never;
         /**
          * Work out what an import will do
-         * @description With the columns matched, every row is created, updated (items, matched by SKU) or skipped with a reason. Nothing changes.
+         * @description With the columns matched, every row is created, updated (items by SKU, supplier prices by supplier and SKU) or skipped with a reason. Items take a row per variant: the option columns (`option1`-`option3`) are named by their headings, and rows share an item by `group` or by name. Nothing changes.
          */
         post: operations["post_api_v1_inventory_imports_kind_id_check"];
         delete?: never;
@@ -5798,7 +5798,7 @@ export interface paths {
         put?: never;
         /**
          * Undo an import, within 24 hours
-         * @description Items it made are archived and items it changed get their values back; opening stock is reversed, unless that stock has moved since (409).
+         * @description Items it made are archived and items it changed get their values back, variants included; supplier prices it made are removed and changed ones put back; opening stock is reversed, unless that stock has moved since (409).
          */
         post: operations["post_api_v1_inventory_imports_kind_id_undo"];
         delete?: never;
@@ -18242,7 +18242,7 @@ export interface components {
         InventoryImport: {
             id: number;
             /** @enum {string} */
-            kind: "items" | "opening_stock";
+            kind: "items" | "opening_stock" | "supplier_prices";
             file_name: string;
             /** @enum {string} */
             status: "uploaded" | "checked" | "imported" | "undone";
@@ -18271,12 +18271,14 @@ export interface components {
             created_at?: string;
         };
         InventoryImportCheckRequest: {
-            /** @description Column index => target key from `targets`, such as `{"0": "sku", "1": "name"}`. Items need `sku`; opening stock needs `sku` and `quantity`. */
+            /** @description Column index => target key from `targets`, such as `{"0": "sku", "1": "name"}`. Items need `sku`; opening stock needs `sku` and `quantity`; supplier prices need `sku` and `price`. */
             mapping: {
                 [key: string]: string | null;
             };
             /** @description Opening stock: the place for rows that name none. */
             location_id?: number | null;
+            /** @description Supplier prices: the supplier for rows that name none. */
+            contact_id?: number | null;
         };
         InventoryImportListItem: {
             id: number;
@@ -54010,8 +54012,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
-                kind: "items" | "opening_stock";
+                /** @description `items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock" | "supplier_prices";
             };
             cookie?: never;
         };
@@ -54080,8 +54082,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
-                kind: "items" | "opening_stock";
+                /** @description `items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock" | "supplier_prices";
             };
             cookie?: never;
         };
@@ -54181,8 +54183,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
-                kind: "items" | "opening_stock";
+                /** @description `items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock" | "supplier_prices";
                 id: number;
             };
             cookie?: never;
@@ -54252,8 +54254,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
-                kind: "items" | "opening_stock";
+                /** @description `items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock" | "supplier_prices";
                 id: number;
             };
             cookie?: never;
@@ -54354,8 +54356,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
-                kind: "items" | "opening_stock";
+                /** @description `items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock" | "supplier_prices";
                 id: number;
             };
             cookie?: never;
@@ -54443,8 +54445,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
-                kind: "items" | "opening_stock";
+                /** @description `items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock" | "supplier_prices";
                 id: number;
             };
             cookie?: never;
@@ -54530,8 +54532,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description `items` or `opening_stock`. Opening stock also needs `stock:adjust`. */
-                kind: "items" | "opening_stock";
+                /** @description `items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`. */
+                kind: "items" | "opening_stock" | "supplier_prices";
                 id: number;
             };
             cookie?: never;

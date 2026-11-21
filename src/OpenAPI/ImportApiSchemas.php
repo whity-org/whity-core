@@ -19,21 +19,21 @@ final class ImportApiSchemas
     public static function routes(): array
     {
         $tags = ['inventory'];
-        $base = '/api/inventory/imports/{kind:items|opening_stock}';
-        $kind = ['name' => 'kind', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string', 'enum' => ['items', 'opening_stock']], 'description' => '`items` or `opening_stock`. Opening stock also needs `stock:adjust`.'];
+        $base = '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}';
+        $kind = ['name' => 'kind', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string', 'enum' => ['items', 'opening_stock', 'supplier_prices']], 'description' => '`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`.'];
         $import = self::object(['data' => SchemaBuilder::ref('InventoryImport')], ['data']);
         $notFound = [404 => self::error('Not found')];
         $refused = [409 => self::error('Not possible in the import\'s state'), 422 => self::error('A value that doesn\'t look right')];
 
         return [
             self::route('GET', $base, [
-                'summary' => 'Recent imports of items or opening stock',
+                'summary' => 'Recent imports of items, opening stock or supplier prices',
                 'tags' => $tags,
                 'parameters' => [$kind],
                 'responses' => [200 => self::json('The last 20, newest first', self::object(['data' => ['type' => 'array', 'items' => SchemaBuilder::ref('InventoryImportListItem')]], ['data']))] + self::auth(),
             ]),
             self::route('POST', $base, [
-                'summary' => 'Upload a spreadsheet of items or opening stock',
+                'summary' => 'Upload a spreadsheet of items, opening stock or supplier prices',
                 'description' => 'CSV or Excel, as a `file` upload or as `text` or `content_base64` with `file_name`. Up to 5,000 rows. '
                     . 'Answers the import with each column, its examples and its suggested target. Nothing changes yet.',
                 'tags' => $tags,
@@ -42,14 +42,15 @@ final class ImportApiSchemas
                 'responses' => [201 => self::json('The import', $import)] + $refused + self::auth(),
             ]),
             self::route('GET', $base . '/{id:\d+}', [
-                'summary' => 'An import of items or opening stock',
+                'summary' => 'An import of items, opening stock or supplier prices',
                 'tags' => $tags,
                 'parameters' => [$kind],
                 'responses' => [200 => self::json('The import', $import)] + $notFound + self::auth(),
             ]),
             self::route('POST', $base . '/{id:\d+}/check', [
                 'summary' => 'Work out what an import will do',
-                'description' => 'With the columns matched, every row is created, updated (items, matched by SKU) or skipped with a reason. Nothing changes.',
+                'description' => 'With the columns matched, every row is created, updated (items by SKU, supplier prices by supplier and SKU) or skipped with a reason. '
+                    . 'Items take a row per variant: the option columns (`option1`-`option3`) are named by their headings, and rows share an item by `group` or by name. Nothing changes.',
                 'tags' => $tags,
                 'parameters' => [$kind],
                 'request' => 'InventoryImportCheckRequest',
@@ -64,7 +65,8 @@ final class ImportApiSchemas
             ]),
             self::route('POST', $base . '/{id:\d+}/undo', [
                 'summary' => 'Undo an import, within 24 hours',
-                'description' => 'Items it made are archived and items it changed get their values back; opening stock is reversed, unless that stock has moved since (409).',
+                'description' => 'Items it made are archived and items it changed get their values back, variants included; supplier prices it made are removed and changed ones put back; '
+                    . 'opening stock is reversed, unless that stock has moved since (409).',
                 'tags' => $tags,
                 'parameters' => [$kind],
                 'responses' => [200 => self::json('The import', $import)] + $refused + $notFound + self::auth(),
@@ -90,8 +92,9 @@ final class ImportApiSchemas
                 'content_base64' => self::str() + ['description' => 'The file, base64.'],
             ], []),
             'InventoryImportCheckRequest' => self::object([
-                'mapping' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'nullable' => true], 'description' => 'Column index => target key from `targets`, such as `{"0": "sku", "1": "name"}`. Items need `sku`; opening stock needs `sku` and `quantity`.'],
+                'mapping' => ['type' => 'object', 'additionalProperties' => ['type' => 'string', 'nullable' => true], 'description' => 'Column index => target key from `targets`, such as `{"0": "sku", "1": "name"}`. Items need `sku`; opening stock needs `sku` and `quantity`; supplier prices need `sku` and `price`.'],
                 'location_id' => self::int(true) + ['description' => 'Opening stock: the place for rows that name none.'],
+                'contact_id' => self::int(true) + ['description' => 'Supplier prices: the supplier for rows that name none.'],
             ], ['mapping']),
             'InventoryImportListItem' => self::object([
                 'id' => self::int(), 'kind' => self::str(), 'file_name' => self::str(), 'status' => self::str(),
@@ -101,7 +104,7 @@ final class ImportApiSchemas
             ], ['id', 'kind', 'status']),
             'InventoryImport' => self::object([
                 'id' => self::int(),
-                'kind' => self::str() + ['enum' => ['items', 'opening_stock']],
+                'kind' => self::str() + ['enum' => ['items', 'opening_stock', 'supplier_prices']],
                 'file_name' => self::str(),
                 'status' => self::str() + ['enum' => ['uploaded', 'checked', 'imported', 'undone']],
                 'row_count' => self::int(),

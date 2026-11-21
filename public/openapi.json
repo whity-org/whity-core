@@ -38754,7 +38754,7 @@
         "/api/v1/inventory/imports/{kind}": {
             "get": {
                 "operationId": "get_api_v1_inventory_imports_kind",
-                "summary": "Recent imports of items or opening stock",
+                "summary": "Recent imports of items, opening stock or supplier prices",
                 "tags": [
                     "inventory"
                 ],
@@ -38775,10 +38775,11 @@
                             "type": "string",
                             "enum": [
                                 "items",
-                                "opening_stock"
+                                "opening_stock",
+                                "supplier_prices"
                             ]
                         },
-                        "description": "`items` or `opening_stock`. Opening stock also needs `stock:adjust`."
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
                     }
                 ],
                 "responses": {
@@ -38862,7 +38863,7 @@
             },
             "post": {
                 "operationId": "post_api_v1_inventory_imports_kind",
-                "summary": "Upload a spreadsheet of items or opening stock",
+                "summary": "Upload a spreadsheet of items, opening stock or supplier prices",
                 "tags": [
                     "inventory"
                 ],
@@ -38884,10 +38885,11 @@
                             "type": "string",
                             "enum": [
                                 "items",
-                                "opening_stock"
+                                "opening_stock",
+                                "supplier_prices"
                             ]
                         },
-                        "description": "`items` or `opening_stock`. Opening stock also needs `stock:adjust`."
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
                     }
                 ],
                 "requestBody": {
@@ -39010,7 +39012,7 @@
         "/api/v1/inventory/imports/{kind}/{id}": {
             "get": {
                 "operationId": "get_api_v1_inventory_imports_kind_id",
-                "summary": "An import of items or opening stock",
+                "summary": "An import of items, opening stock or supplier prices",
                 "tags": [
                     "inventory"
                 ],
@@ -39039,10 +39041,11 @@
                             "type": "string",
                             "enum": [
                                 "items",
-                                "opening_stock"
+                                "opening_stock",
+                                "supplier_prices"
                             ]
                         },
-                        "description": "`items` or `opening_stock`. Opening stock also needs `stock:adjust`."
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
                     }
                 ],
                 "responses": {
@@ -39129,7 +39132,7 @@
                 "tags": [
                     "inventory"
                 ],
-                "description": "With the columns matched, every row is created, updated (items, matched by SKU) or skipped with a reason. Nothing changes.",
+                "description": "With the columns matched, every row is created, updated (items by SKU, supplier prices by supplier and SKU) or skipped with a reason. Items take a row per variant: the option columns (`option1`-`option3`) are named by their headings, and rows share an item by `group` or by name. Nothing changes.",
                 "parameters": [
                     {
                         "name": "kind",
@@ -39155,10 +39158,11 @@
                             "type": "string",
                             "enum": [
                                 "items",
-                                "opening_stock"
+                                "opening_stock",
+                                "supplier_prices"
                             ]
                         },
-                        "description": "`items` or `opening_stock`. Opening stock also needs `stock:adjust`."
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
                     }
                 ],
                 "requestBody": {
@@ -39311,10 +39315,11 @@
                             "type": "string",
                             "enum": [
                                 "items",
-                                "opening_stock"
+                                "opening_stock",
+                                "supplier_prices"
                             ]
                         },
-                        "description": "`items` or `opening_stock`. Opening stock also needs `stock:adjust`."
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
                     }
                 ],
                 "responses": {
@@ -39446,10 +39451,11 @@
                             "type": "string",
                             "enum": [
                                 "items",
-                                "opening_stock"
+                                "opening_stock",
+                                "supplier_prices"
                             ]
                         },
-                        "description": "`items` or `opening_stock`. Opening stock also needs `stock:adjust`."
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
                     }
                 ],
                 "responses": {
@@ -39548,7 +39554,7 @@
                 "tags": [
                     "inventory"
                 ],
-                "description": "Items it made are archived and items it changed get their values back; opening stock is reversed, unless that stock has moved since (409).",
+                "description": "Items it made are archived and items it changed get their values back, variants included; supplier prices it made are removed and changed ones put back; opening stock is reversed, unless that stock has moved since (409).",
                 "parameters": [
                     {
                         "name": "kind",
@@ -39574,10 +39580,11 @@
                             "type": "string",
                             "enum": [
                                 "items",
-                                "opening_stock"
+                                "opening_stock",
+                                "supplier_prices"
                             ]
                         },
-                        "description": "`items` or `opening_stock`. Opening stock also needs `stock:adjust`."
+                        "description": "`items`, `opening_stock` or `supplier_prices`. Opening stock also needs `stock:adjust`."
                     }
                 ],
                 "responses": {
@@ -106730,7 +106737,8 @@
                         "type": "string",
                         "enum": [
                             "items",
-                            "opening_stock"
+                            "opening_stock",
+                            "supplier_prices"
                         ]
                     },
                     "file_name": {
@@ -106853,12 +106861,17 @@
                             "type": "string",
                             "nullable": true
                         },
-                        "description": "Column index => target key from `targets`, such as `{\"0\": \"sku\", \"1\": \"name\"}`. Items need `sku`; opening stock needs `sku` and `quantity`."
+                        "description": "Column index => target key from `targets`, such as `{\"0\": \"sku\", \"1\": \"name\"}`. Items need `sku`; opening stock needs `sku` and `quantity`; supplier prices need `sku` and `price`."
                     },
                     "location_id": {
                         "type": "integer",
                         "nullable": true,
                         "description": "Opening stock: the place for rows that name none."
+                    },
+                    "contact_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Supplier prices: the supplier for rows that name none."
                     }
                 },
                 "required": [
