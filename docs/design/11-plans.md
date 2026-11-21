@@ -15,7 +15,7 @@ Whity is a branded house: one name and one plain noun that says what each thing 
 | Whity Builder | No-code plugin builder at builder.whity.dev | Closed, paid service today; moves into core as Studio's editor after Front Office, then builder.whity.dev retires (owner, section 33 Q1) | Built |
 | Whity Marketplace | Partners and developers sell plugins | Revenue share | Later |
 
-Whity Front Office, until 21 Nov 2026 a closed, paid app, moves into core (BM.15, BM.19); Whity Studio is not a paid product (BM.15). Section 33 has the plan.
+Front Office, until 21 Nov 2026 a closed, paid app, is retired: its parts are core features with plain names (stock, purchasing, quotes, invoices, receipts, import; BM.15, BM.19, sections 31, 32 and 34). Whity Studio is not a paid product (BM.15). Section 33 has the plan.
 
 When a plan doesn't include a feature, the screen shows it greyed behind a `PlanGate` card naming the plan: owners can upgrade, everyone else can ask an owner. Never hide it (decision 2.1d). Since 21 Nov 2026 plans differ only in seats and volume (BM.17), so `PlanGate` is for what still differs: hosted services and the white-label items under review (section 33 Q6).
 

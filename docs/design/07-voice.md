@@ -46,4 +46,4 @@ Say what happened and what to do. No apology, no blame, one next step. Technical
 
 ## The name
 
-"Whity", one word, capital W, in Latin letters in every language. Products are Whity plus one noun: Whity Core, Whity SDK, Whity Render, Whity ID, Whity Front Office. Third-party plugins name the job first: "Invoicing for Whity". In mockups, use clearly fictional names (Example Bakery) or placeholders ([Tenant name], [price]).
+"Whity", one word, capital W, in Latin letters in every language. Products are Whity plus one noun: Whity Core, Whity SDK, Whity Render, Whity ID, Whity Pay. Features inside core are named plainly (quotes, invoices, receipts, stock), never as products; "Front Office" was retired as a name on 21 Nov 2026 (BM.19). Third-party plugins name the job first: "Invoicing for Whity". In mockups, use clearly fictional names (Example Bakery) or placeholders ([Tenant name], [price]).
