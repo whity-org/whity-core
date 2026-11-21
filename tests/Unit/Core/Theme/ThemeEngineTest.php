@@ -278,8 +278,7 @@ final class ThemeEngineTest extends TestCase
                 $presets[$density === 'standard' ? $shape : "{$shape}-{$density}"] = (object) $keep;
             }
         }
-        $json = json_encode($presets, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "
-";
+        $json = json_encode($presets, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
         if (getenv('UPDATE_SHAPE_PRESETS') === '1') {
             file_put_contents($file, $json);
         }
