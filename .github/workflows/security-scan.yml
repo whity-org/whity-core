@@ -69,6 +69,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # The whole history, so the gate below can compare with the base.
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v7
@@ -78,9 +81,9 @@ jobs:
       - name: Install Semgrep
         run: python -m pip install --quiet semgrep
 
-      # Registry rulesets: general security audit + PHP + JS/TS. Semgrep exits
-      # non-zero when it finds something; continue-on-error keeps the job green
-      # so the SARIF (uploaded below) is the signal, not a hard build failure.
+      # Registry rulesets: general security audit + PHP + JS/TS. This full scan
+      # is the REPORT: every finding goes to the Security tab as SARIF, and it
+      # never fails the job (older findings were triaged and dismissed there).
       - name: Semgrep scan
         continue-on-error: true
         run: >-
@@ -99,6 +102,25 @@ jobs:
           sarif_file: semgrep.sarif
           category: semgrep
 
+      # READINESS CO-21: the GATE. On a pull request and in the merge queue,
+      # an ERROR-severity finding that the change ADDS fails the job; findings
+      # already in the base are left to the report above. A push to a branch
+      # has nothing to compare with and stays report-only.
+      - name: Semgrep gate (new ERROR findings)
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+        run: >-
+          semgrep scan
+          --config p/security-audit
+          --config p/php
+          --config p/javascript
+          --config p/typescript
+          --severity ERROR
+          --baseline-commit "$BASE_SHA"
+          --error
+          --metrics off
+
   dependency-reaudit:
     name: Dependency re-audit (composer + npm)
     # Scheduled only: the PR gate already audits changes (automated-tests.yml).
@@ -110,7 +132,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           coverage: none
