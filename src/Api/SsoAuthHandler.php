@@ -281,6 +281,8 @@ final class SsoAuthHandler
     private function frontendLink(string $link): string
     {
         $urls = $this->frontendUrls ?? new \Whity\Core\Http\FrontendUrls(['APP_URL' => $this->appUrl]);
+        // #2386: a sign-in lands on the instance's home page, not always /dashboard.
+        $urls = $urls->withHomePath(\Whity\Core\Navigation\HomeLinks::homePath($this->settings));
 
         return $urls->linkOrPath($link);
     }

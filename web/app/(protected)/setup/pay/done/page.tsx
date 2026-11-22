@@ -11,6 +11,7 @@ import { PublicOutcome } from '@/components/auth/public-outcome';
 import { Button } from '@whity/ui/button';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
+import { useHomePath } from '@/lib/branding-context';
 
 /**
  * Back from adding a card in the payment step (WHIT-1207).
@@ -34,6 +35,7 @@ const ENDED_UNPAID = new Set(['failed', 'declined', 'expired', 'canceled', 'canc
 function PaymentStepDoneContent() {
   const t = useTranslation('common');
   const router = useRouter();
+  const homePath = useHomePath();
   const dates = useDateDisplay();
   const searchParams = useSearchParams();
   const reference = searchParams.get('checkout') ?? '';
@@ -49,7 +51,7 @@ function PaymentStepDoneContent() {
 
   const goOn = async () => {
     setLeaving(true);
-    router.replace((await templatePickerPath()) ?? '/dashboard');
+    router.replace((await templatePickerPath()) ?? homePath);
   };
 
   const continueButton = (

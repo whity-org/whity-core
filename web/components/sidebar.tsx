@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useNavigation } from '@/lib/navigation-context';
 import type { Membership } from '@/lib/auth-context';
-import { useBranding } from '@/lib/branding-context';
+import { useBranding, useHomePath } from '@/lib/branding-context';
 import { useThemeMode } from '@/lib/theme-mode-context';
 import { useToast } from '@/lib/toast-context';
 import { Avatar } from '@whity/ui/avatar';
@@ -34,6 +34,7 @@ import { useRoleSummaryLabels } from '@/hooks/useRoleSummaryLabels';
 import { useCanOfferWorkspaceCreate } from '@/lib/use-workspace-create';
 import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
 import {
+  IconArrowLeft,
   IconLogout,
   IconUserCog,
   IconBell,
@@ -153,6 +154,7 @@ export function Sidebar() {
   const router = useRouter();
   const { logout, user, memberships } = useAuth();
   const branding = useBranding();
+  const homePath = useHomePath();
   const { resolved: resolvedTheme, setPreference } = useThemeMode();
   const t = useTranslation('common');
   // Whether this instance offers a language choice at all (`i18n.enabled`).
@@ -189,7 +191,7 @@ export function Sidebar() {
     router.push('/login');
   };
 
-  const header = collapsed ? (
+  const brand = collapsed ? (
     branding.logoSquareUrl ? (
       <img
         src={branding.logoSquareUrl}
@@ -228,6 +230,36 @@ export function Sidebar() {
         </p>
       )}
     </>
+  );
+
+  // #2386: the logo goes home (the instance's home page), and a product that
+  // runs Whity beside its own app can add a way back to it.
+  const back = branding.backToProduct ?? null;
+  const backLabel = back ? back.label : '';
+  const header = (
+    <div className={`flex flex-col gap-2 ${collapsed ? 'items-center' : ''}`}>
+      <Link
+        href={homePath}
+        className="rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+        aria-label={t('sidebar.homeLink', '{name}: home').replace('{name}', branding.siteName)}
+        data-testid="sidebar-home-link"
+        onClick={() => setIsMobileOpen(false)}
+      >
+        {brand}
+      </Link>
+      {back && (
+        <a
+          href={back.url}
+          className={`inline-flex min-h-8 items-center gap-1 rounded-md text-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring ${collapsed ? 'justify-center' : ''}`}
+          aria-label={collapsed ? backLabel : undefined}
+          title={collapsed ? backLabel : undefined}
+          data-testid="sidebar-back-to-product"
+        >
+          <IconArrowLeft size={16} className="shrink-0 rtl:rotate-180" aria-hidden="true" />
+          {!collapsed && <span className="truncate">{backLabel}</span>}
+        </a>
+      )}
+    </div>
   );
 
   // The foot is the person, as on every 3.3 card: avatar, name and role in one

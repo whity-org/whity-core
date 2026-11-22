@@ -18,6 +18,7 @@ import { OutcomeIcon } from '@/components/auth/public-outcome';
 import { MAIN_COLOUR_SWATCHES } from '@/components/branding-main-colour';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
 import type { components } from '@whity/api-client';
+import { useHomePath } from '@/lib/branding-context';
 
 /**
  * "No workspace yet" (WHIT-994, decision M.29): where somebody lands after
@@ -73,6 +74,7 @@ function waitingLabel(t: TranslateFn, status: string): string {
 
 export default function WelcomePage() {
   const t = useTranslation('auth');
+  const homePath = useHomePath();
   const uiLanguage = useLanguageCode();
   const router = useRouter();
   const { refreshAuth } = useAuth();
@@ -162,7 +164,7 @@ export default function WelcomePage() {
         // A plugin sign-up link (/register?plugin=salons) started this, through
         // the identity provider: start its trial as registering does (WHIT-1168).
         await refreshAuth();
-        router.push((await continueSignupPlugin()) ?? (await templatePickerPath()) ?? '/dashboard');
+        router.push((await continueSignupPlugin()) ?? (await templatePickerPath()) ?? homePath);
         return;
       }
       if (response.ok && body.requires_tenant_selection) {

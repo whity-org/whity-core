@@ -48,6 +48,13 @@ final class FrontendUrls
     public const TASKAAT_CONNECT = 'TASKAAT_CONNECT_URL';
     /** WHIT-994: where an SSO sign-in that belongs to no workspace lands (create one, or ask for an invitation). */
     public const SSO_NO_WORKSPACE = 'SSO_NO_WORKSPACE_URL';
+    /**
+     * #2386: the instance's home, where people land after signing in. Its
+     * path is the instance's home path ({@see withHomePath()}, else
+     * WHITY_HOME_PATH, else /dashboard). SSO_SUCCESS follows it unless
+     * SSO_SUCCESS_URL is set.
+     */
+    public const HOME = 'HOME_URL';
 
     /**
      * The bundled admin's path for each link — what an override replaces.
@@ -67,7 +74,14 @@ final class FrontendUrls
         self::BOOKING_MANAGE => '/booking',
         self::TASKAAT_CONNECT => '/tasks/connect',
         self::SSO_NO_WORKSPACE => '/welcome',
+        self::HOME => '/dashboard',
     ];
+
+    /** The links whose path is the instance's home path. */
+    private const HOME_LINKS = [self::HOME, self::SSO_SUCCESS];
+
+    /** Set by {@see withHomePath()}: the home path the instance settings chose. */
+    private ?string $homePath = null;
 
     /**
      * @param array<string, string> $env Variable name => value. Only the keys
@@ -83,7 +97,7 @@ final class FrontendUrls
      */
     public static function fromEnv(): self
     {
-        $names = array_merge(['FRONTEND_URL', 'APP_URL', 'WHITY_PUBLIC_URL'], array_keys(self::DEFAULT_PATHS));
+        $names = array_merge(['FRONTEND_URL', 'APP_URL', 'WHITY_PUBLIC_URL', \Whity\Core\Navigation\HomeLinks::HOME_ENV], array_keys(self::DEFAULT_PATHS));
         $env = [];
         foreach ($names as $name) {
             $value = $_ENV[$name] ?? getenv($name);
@@ -93,6 +107,20 @@ final class FrontendUrls
         }
 
         return new self($env);
+    }
+
+    /**
+     * A copy whose home and SSO-success links use this path (#2386), for
+     * callers that read the instance settings
+     * ({@see \Whity\Core\Navigation\HomeLinks::homePath()}). A value that
+     * is not a path on this site is ignored.
+     */
+    public function withHomePath(string $path): self
+    {
+        $copy = clone $this;
+        $copy->homePath = \Whity\Core\Navigation\HomeLinks::isLocalPath($path) ? $path : null;
+
+        return $copy;
     }
 
     /**
@@ -133,7 +161,7 @@ final class FrontendUrls
 
         $base = $this->base();
 
-        return $base === '' ? '' : $base . self::DEFAULT_PATHS[$link];
+        return $base === '' ? '' : $base . $this->path($link);
     }
 
     /**
@@ -148,7 +176,23 @@ final class FrontendUrls
     {
         $url = $this->link($link);
 
-        return $url !== '' ? $url : self::DEFAULT_PATHS[$link];
+        return $url !== '' ? $url : $this->path($link);
+    }
+
+    /** The bundled admin's path for a link; the home links follow the home path. */
+    private function path(string $link): string
+    {
+        if (in_array($link, self::HOME_LINKS, true)) {
+            if ($this->homePath !== null) {
+                return $this->homePath;
+            }
+            $env = trim($this->env[\Whity\Core\Navigation\HomeLinks::HOME_ENV] ?? '');
+            if ($env !== '' && \Whity\Core\Navigation\HomeLinks::isLocalPath($env)) {
+                return $env;
+            }
+        }
+
+        return self::DEFAULT_PATHS[$link];
     }
 
     private function value(string $name): string

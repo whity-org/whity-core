@@ -22,6 +22,7 @@ import { RoleSummary } from '@whity/ui/role-summary';
 import { useRoleSummaryLabels } from '@/hooks/useRoleSummaryLabels';
 import { SSO_ERROR_KEYS } from './sso-error-keys';
 import { localizedText } from '@whity/ui/localized-text';
+import { useHomePath } from '@/lib/branding-context';
 
 /**
  * THIS SCREEN IS THE TRANSLATION TEMPLATE — the first one converted from
@@ -126,6 +127,7 @@ function readReturnTo(search: string): ReturnTo {
 
 export default function LoginPage() {
   const router = useRouter();
+  const homePath = useHomePath();
   const { isAuthenticated, isLoading, refreshAuth } = useAuth();
   const { addToast } = useToast();
   const branding = useBranding();
@@ -194,7 +196,7 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isMounted && isAuthenticated()) {
-      router.push(returnTo.next ?? '/dashboard');
+      router.push(returnTo.next ?? homePath);
     }
   }, [isAuthenticated, router, isMounted, returnTo.next]);
 
@@ -298,7 +300,7 @@ export default function LoginPage() {
         } else {
           // Single-membership: session cookie already set — redirect in.
           await refreshAuth();
-          router.push((await continueSignupPlugin()) ?? returnTo.next ?? '/dashboard');
+          router.push((await continueSignupPlugin()) ?? returnTo.next ?? homePath);
         }
       } else {
         const errorData = ((loginError_ ?? {}) as unknown) as { message?: string };
@@ -338,7 +340,7 @@ export default function LoginPage() {
       if (response.ok) {
         // Session issued for the chosen tenant — redirect in.
         await refreshAuth();
-        router.push((await continueSignupPlugin()) ?? returnTo.next ?? '/dashboard');
+        router.push((await continueSignupPlugin()) ?? returnTo.next ?? homePath);
       } else {
         const errorData = ((selectError ?? {}) as unknown) as { message?: string };
         const message =
@@ -398,7 +400,7 @@ export default function LoginPage() {
       if (response.ok) {
         // 2FA successful - refresh auth state and redirect
         await refreshAuth();
-        router.push((await continueSignupPlugin()) ?? returnTo.next ?? '/dashboard');
+        router.push((await continueSignupPlugin()) ?? returnTo.next ?? homePath);
       } else if (response.status === 401) {
         const errorMsg = backupCodeMode
           ? t('recovery.error.invalid', 'Invalid recovery code. Please try again.')

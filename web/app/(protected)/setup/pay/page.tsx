@@ -15,6 +15,7 @@ import { LoadingRows } from '@whity/ui/page-states';
 import { moneyText } from '@whity/ui/money/currency';
 import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
+import { useHomePath } from '@/lib/branding-context';
 
 /**
  * The payment step after creating a further workspace (WHIT-1207, owner
@@ -34,6 +35,7 @@ import { useTranslation } from '@whity/features/i18n';
 export default function WorkspacePaymentStepPage() {
   const t = useTranslation('common');
   const router = useRouter();
+  const homePath = useHomePath();
   const dates = useDateDisplay();
   const { user, memberships } = useAuth();
   const { hasPermission, loading: capabilitiesLoading } = useCapabilities();
@@ -63,7 +65,7 @@ export default function WorkspacePaymentStepPage() {
   const onward = async () => {
     if (movedOn.current) return;
     movedOn.current = true;
-    router.replace((await templatePickerPath()) ?? '/dashboard');
+    router.replace((await templatePickerPath()) ?? homePath);
   };
   const goOn = () => {
     setLeaving(true);
