@@ -31,6 +31,8 @@ final class ThemeEditorApiTest extends TestCase
         $this->db = \Tests\Support\SchemaFromMigrations::make();
         $this->db->exec('DELETE FROM theme_versions');
         $this->db->exec('DELETE FROM themes');
+        // The workspace the themes belong to: PostgreSQL holds themes to it (tenant_id foreign key).
+        $this->db->exec("INSERT INTO tenants (id, name, slug) SELECT 7, 'workspace-seven', 'workspace-seven' WHERE NOT EXISTS (SELECT 1 FROM tenants WHERE id = 7)");
         // Preview, show and import read no settings.
         $settings = (new ReflectionClass(SettingsService::class))->newInstanceWithoutConstructor();
         $this->handler = new ThemesApiHandler(new ThemeRepository($this->db), $settings);

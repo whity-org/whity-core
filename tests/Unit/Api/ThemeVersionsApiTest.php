@@ -40,6 +40,8 @@ final class ThemeVersionsApiTest extends TestCase
         $this->pdo = self::$schema;
         $this->pdo->exec('DELETE FROM theme_versions');
         $this->pdo->exec('DELETE FROM themes');
+        // The workspace the themes belong to: PostgreSQL holds themes to it (tenant_id foreign key).
+        $this->pdo->exec("INSERT INTO tenants (id, name, slug) SELECT 7, 'workspace-seven', 'workspace-seven' WHERE NOT EXISTS (SELECT 1 FROM tenants WHERE id = 7)");
         $this->pdo->exec('DELETE FROM profiles WHERE id IN (901, 902)');
         $this->pdo->exec("INSERT INTO profiles (id, display_name, password_hash) VALUES (901, 'Amro Saleh', ''), (902, '', '')");
         // A theme saved before versions existed: the migration makes it the first version.
