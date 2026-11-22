@@ -55,3 +55,17 @@ test('a report becomes one short line without the query string', () => {
   expect(describeReport(modern[0])).toBe('[csp] frame-src blocked=https://elsewhere.example/ page=https://app.example/p');
   expect(reportsIn('nonsense')).toEqual([]);
 });
+
+test('a report can not split or forge a log line', () => {
+  const [report] = reportsIn({
+    'csp-report': {
+      'effective-directive': 'script-src\n[csp] forged',
+      'blocked-uri': 'https://evil.example/a\r\n[csp] forged line',
+      'document-uri': 'https://app.example/p\u2028x',
+    },
+  });
+
+  const line = describeReport(report);
+  expect(line).not.toMatch(/[\r\n\u2028]/);
+  expect(line.startsWith('[csp] ')).toBe(true);
+});

@@ -19,11 +19,16 @@ let linesThisWindow = 0;
 
 type Report = Record<string, unknown>;
 
+/** Control characters out, so a report can't forge or split a log line. */
+function printable(value: string): string {
+  return value.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, '');
+}
+
 function withoutQuery(value: unknown): string {
   if (typeof value !== 'string') return '';
   const cut = value.split(/[?#]/)[0] ?? '';
 
-  return cut.slice(0, 200);
+  return printable(cut).slice(0, 200);
 }
 
 /** The reports in a body, in either format browsers send. */
@@ -43,7 +48,7 @@ export function reportsIn(body: unknown): Report[] {
 
 /** One log line for a report: what was blocked, by which directive, on which page. */
 export function describeReport(report: Report): string {
-  const directive = String(report['effectiveDirective'] ?? report['effective-directive'] ?? report['violated-directive'] ?? '').slice(0, 60);
+  const directive = printable(String(report['effectiveDirective'] ?? report['effective-directive'] ?? report['violated-directive'] ?? '')).slice(0, 60);
   const blocked = withoutQuery(report['blockedURL'] ?? report['blocked-uri']);
   const page = withoutQuery(report['documentURL'] ?? report['document-uri']);
 
