@@ -48,7 +48,7 @@ export const SYSTEM_ADMIN: Credentials = {
  */
 export const DELEGATE_USER: Credentials = {
   email: process.env.E2E_DELEGATE_EMAIL ?? 'delegate@example.com',
-  password: process.env.E2E_DELEGATE_PASSWORD ?? 'delegate123',
+  password: process.env.E2E_DELEGATE_PASSWORD ?? 'delegate-e2e-123',
 };
 
 /**
