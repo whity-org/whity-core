@@ -618,7 +618,7 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
 
         $shown = self::data($this->call('show', self::OWNER, ['id' => (string) $documentId]));
         self::assertSame(
-            ['reason' => 'The document renderer is not reachable', 'fix' => null, 'code' => 'render_unavailable', 'route_id' => null],
+            ['reason' => 'The document renderer is not reachable', 'fix' => null],
             $shown['pdf_pending']
         );
 
@@ -626,37 +626,6 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
         self::assertSame(404, $content->getStatusCode());
         self::assertStringContainsString('PDF not available yet: The document renderer is not reachable', $content->getBody());
         self::assertStringNotContainsString('render:8130', $content->getBody() . json_encode($shown));
-    }
-
-    /**
-     * WHIT-1370: a route's final document whose PDF Whity Render refused (AAU
-     * IRB's application: one question taller than a page) says so by code, for
-     * the page to word in the reader's language, and names its route so the
-     * page's "Try again" can ask that route for it again.
-     */
-    public function testARouteFinalDocumentWithARefusedPdfNamesItsRouteToTryAgain(): void
-    {
-        $this->fakeRender->readiness = RenderReadiness::unreachable('0.2.27', 'http://render:8130');
-        $templateId = $this->editor->published(self::TENANT, self::OWNER, 'Refused Template');
-        TenantContext::reset();
-        TenantContext::setTenantId(self::TENANT);
-        $req = new Request('POST', '/api/documents', [], (string) json_encode(['document_source_id' => $templateId, 'title' => 'Ethics application']));
-        $req->user = (object) ['profile_id' => self::OWNER, 'active_tenant_id' => self::TENANT];
-        $documentId = (int) self::data($this->handler->create($req))['id'];
-        // The renderer is reachable again; the print was refused, not missed.
-        $this->fakeRender->readiness = RenderReadiness::ready('0.2.27', '0.2.27');
-
-        $this->pdo->exec('PRAGMA foreign_keys = OFF');
-        $this->pdo->prepare(
-            "INSERT INTO route_finalisations (tenant_id, route_id, step_id, subject_type, subject_id, status, reason, document_id, attempts)
-             VALUES (:tenant, 3, 18, 'form_submission', 4, 'failed', 'render_refused', :document, 1)"
-        )->execute([':tenant' => self::TENANT, ':document' => $documentId]);
-
-        $shown = self::data($this->call('show', self::OWNER, ['id' => (string) $documentId]));
-        self::assertSame(
-            ['reason' => 'The PDF could not be laid out', 'fix' => null, 'code' => 'render_refused', 'route_id' => 3],
-            $shown['pdf_pending']
-        );
     }
 
     public function testARecordWithAPdfHasNoPendingNote(): void

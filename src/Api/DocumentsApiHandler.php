@@ -597,7 +597,7 @@ final class DocumentsApiHandler
         }
 
         if (($data['artifacts'] ?? []) === []) {
-            $data['pdf_pending'] = $this->pdfPending($tenantId, $callerId, $documentId);
+            $data['pdf_pending'] = $this->pdfPending($tenantId, $callerId);
         }
 
         // WHIT-922: who has signed the document as it is now, in what capacity,
@@ -629,32 +629,12 @@ final class DocumentsApiHandler
      * With a ready renderer the record still has no PDF when its print was
      * refused or failed at issue time; asking for it again is the way out.
      *
-     * WHIT-1370: `code` says which, so the page can say it in the reader's
-     * language, and a route's final document names its route: "Try again" on
-     * the document page asks that route for its final document again
-     * (POST /api/v1/routes/{route_id}/final-document/retry, which checks who
-     * may ask).
-     *
-     * @return array{reason: string, fix: ?string, code: string, route_id: ?int}
+     * @return array{reason: string, fix: ?string}
      */
-    private function pdfPending(int $tenantId, int $callerId, int $documentId): array
+    private function pdfPending(int $tenantId, int $callerId): array
     {
-        $unavailable = $this->issuing->renderUnavailable($tenantId);
-        $final = (new \Whity\Core\Document\Routing\RouteFinalisationRepository($this->db))->findForDocument($tenantId, $documentId);
-        $routeId = $final !== null && $final['status'] !== \Whity\Core\Document\Routing\RouteFinalisationRepository::DONE
-            ? (int) $final['route_id']
-            : null;
-        $code = match (true) {
-            $unavailable !== null => 'render_unavailable',
-            $routeId !== null && $final['status'] === \Whity\Core\Document\Routing\RouteFinalisationRepository::WAITING => 'final_waiting',
-            $routeId !== null && is_string($final['reason'] ?? null) && $final['reason'] !== '' => (string) $final['reason'],
-            default => 'not_made',
-        };
-        $reason = $unavailable ?? match ($code) {
-            'render_refused' => 'The PDF could not be laid out',
-            'final_waiting' => 'The PDF is being made',
-            default => 'The PDF was not made when this document was issued',
-        };
+        $reason = $this->issuing->renderUnavailable($tenantId)
+            ?? 'The PDF was not made when this document was issued';
         $operator = $tenantId === SettingsService::SYSTEM_TENANT_ID
             && $this->roleChecker->hasPermissionForProfile($callerId, CorePermissions::SETTINGS_MANAGE, $tenantId);
         $fix = null;
@@ -663,7 +643,7 @@ final class DocumentsApiHandler
                 ?? 'Print it again from the document page.';
         }
 
-        return ['reason' => $reason, 'fix' => $fix, 'code' => $code, 'route_id' => $routeId];
+        return ['reason' => $reason, 'fix' => $fix];
     }
 
     /**

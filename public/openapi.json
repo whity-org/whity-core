@@ -113550,20 +113550,11 @@
                             "fix": {
                                 "type": "string",
                                 "nullable": true
-                            },
-                            "code": {
-                                "type": "string"
-                            },
-                            "route_id": {
-                                "type": "integer",
-                                "nullable": true
                             }
                         },
                         "required": [
                             "reason",
-                            "fix",
-                            "code",
-                            "route_id"
+                            "fix"
                         ]
                     },
                     "signatures": {

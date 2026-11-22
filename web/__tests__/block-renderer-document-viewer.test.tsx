@@ -411,30 +411,6 @@ describe('when the document cannot be shown', () => {
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
   });
 
-  it('says a refused layout in plain words and asks the route to make it again (WHIT-1370)', async () => {
-    const pending = { ...documentWith(1), artifacts: [], pdf_pending: { reason: 'The PDF could not be laid out', fix: null, code: 'render_refused', route_id: 3 } };
-    mockApiClient.mockImplementation((url: string, init?: RequestInit) => {
-      if (init?.method === 'POST') {
-        return Promise.resolve({ ok: true, status: 202, json: () => Promise.resolve({ data: { status: 'waiting' } }) });
-      }
-      return Promise.resolve(jsonResponse({ data: pending }));
-    });
-    renderTree(viewerTree(), '7');
-
-    expect(
-      await screen.findByText('Whity could not lay out the PDF. Try again; if it happens again, tell your workspace administrator.')
-    ).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
-
-    await waitFor(() =>
-      expect(mockApiClient).toHaveBeenCalledWith('/api/v1/routes/3/final-document/retry', expect.objectContaining({ method: 'POST' }))
-    );
-    // Then it looks again (the toast itself is drawn by the app's Toaster).
-    await waitFor(() =>
-      expect(mockApiClient.mock.calls.filter(([url, init]) => url === '/api/v1/documents/7' && init === undefined).length).toBe(2)
-    );
-  });
-
   it('keeps the record on screen when only the bytes fail', async () => {
     serve(documentWith(2), 503);
     renderTree(viewerTree(), '7');

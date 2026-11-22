@@ -6693,17 +6693,10 @@ final class CoreApiSchemas
                 // reachable, version mismatch, switched off); `fix` is the
                 // operator's change and is null unless the caller holds
                 // settings:manage in the system tenant.
-                // WHIT-1370: `code` names the reason for the page to word
-                // (`render_unavailable`, `render_refused`, `final_waiting`,
-                // another route finalisation reason, or `not_made`);
-                // `route_id` is the route whose final document this is, to
-                // try again through its final-document/retry.
                 'pdf_pending' => self::object([
                     'reason' => self::str(),
                     'fix' => self::str(true),
-                    'code' => self::str(),
-                    'route_id' => self::int(true),
-                ], ['reason', 'fix', 'code', 'route_id']),
+                ], ['reason', 'fix']),
                 // WHIT-922: the signatures standing on the current version, on
                 // GET /api/documents/{id} only. A signature on an earlier
                 // version is not carried over.

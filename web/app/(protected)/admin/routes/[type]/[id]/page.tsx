@@ -593,7 +593,7 @@ function finalReason(t: (key: string, fallback?: string) => string, reason: stri
     case 'template_unpublished':
       return t('subject.final.reason.templateUnpublished', 'The template for the final document has not been published.');
     case 'render_refused':
-      return t('subject.final.reason.renderRefused', 'Whity could not lay out the PDF. Try again; if it happens again, tell your workspace administrator.');
+      return t('subject.final.reason.renderRefused', 'The template could not be made into a PDF. Check its content.');
     case 'refused_by_plugin':
       return t('subject.final.reason.refusedByPlugin', 'An add-on stopped the final document from being made.');
     case 'gave_up':

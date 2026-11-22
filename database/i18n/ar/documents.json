@@ -1458,7 +1458,7 @@
         "subject.final.reason.other": "تعذّر إنشاؤه.",
         "subject.final.reason.pdfsOff": "ملفات PDF متوقفة في مساحة العمل هذه.",
         "subject.final.reason.refusedByPlugin": "منعت إضافةٌ إنشاء المستند النهائي.",
-        "subject.final.reason.renderRefused": "تعذّر على Whity ترتيب صفحات ملف PDF. أعد المحاولة، وإن تكرّر ذلك فأبلغ مسؤول مساحة العمل.",
+        "subject.final.reason.renderRefused": "تعذّر تحويل القالب إلى ملف PDF. راجع محتواه.",
         "subject.final.reason.renderUnavailable": "لا يمكن إنشاء ملفات PDF الآن. سيعيد Whity المحاولة.",
         "subject.final.reason.templateMissing": "قالب المستند النهائي لم يعد موجودًا.",
         "subject.final.reason.templateUnpublished": "قالب المستند النهائي لم يُنشر بعد.",
