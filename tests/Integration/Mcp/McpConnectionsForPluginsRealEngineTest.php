@@ -76,6 +76,31 @@ final class McpConnectionsForPluginsRealEngineTest extends TestCase
         AuditContext::reset();
     }
 
+    public function testMakingAndTakingBackAConnectionIsOnTheAuditTrail(): void
+    {
+        // READINESS CO-8: a credential that can act as the person is on the
+        // trail when it is made and when it is taken back, never its token.
+        $hooks = new HookManager();
+        (new \Whity\Core\Audit\AuditLogger($this->pdo))->subscribe($hooks);
+        $tokens = new McpTokenService($this->pdo, new JwtParser(self::JWT_SECRET), new McpConnectionEvents($this->pdo, $hooks));
+
+        $token = $tokens->issue(self::OMAR, self::BAKERY, 'Claude on my laptop', ['tools:call']);
+        $jti = $this->jti($token);
+        $id = $this->connectionId($jti);
+        self::assertTrue($tokens->revoke($jti, self::OMAR, self::BAKERY));
+
+        $stmt = $this->pdo->query("SELECT action, tenant_id, target_type, target_id, metadata FROM audit_log WHERE action LIKE 'mcp.connection.%' ORDER BY id");
+        self::assertNotFalse($stmt);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        self::assertSame(['mcp.connection.created', 'mcp.connection.revoked'], array_column($rows, 'action'));
+        foreach ($rows as $row) {
+            self::assertSame([self::BAKERY, 'mcp_token', $id], [(int) $row['tenant_id'], $row['target_type'], (int) $row['target_id']]);
+            self::assertStringNotContainsString($jti, (string) $row['metadata']);
+            self::assertStringNotContainsString($token, (string) $row['metadata']);
+        }
+        self::assertStringContainsString('"by":"owner"', (string) $rows[1]['metadata']);
+    }
+
     public function testEventsNameTheConnectionByIdAndNeverCarryTheToken(): void
     {
         $token = $this->tokens->issue(self::OMAR, self::BAKERY, 'Claude on my laptop', ['tools:call']);
