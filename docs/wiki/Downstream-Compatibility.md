@@ -42,16 +42,15 @@ Whity needs on top of them.
 | Variable | Container | Since | Page |
 |---|---|---|---|
 | `WHITY_HIDDEN_NAV_IDS` | backend | 0.2.32 | [Hiding pages](Hiding-Pages.md) |
-| `WHITY_HOME_PATH` | backend | 0.2.33 | [Home page and back link](Home-Page-And-Back-Link.md) |
-| `WHITY_BACK_TO_PRODUCT_URL`, `WHITY_BACK_TO_PRODUCT_LABEL` | backend | 0.2.33 | [Home page and back link](Home-Page-And-Back-Link.md) |
-| `WHITY_TRUSTED_PROXIES` | backend | 0.2.33 | [Same-origin setup](Same-Origin-Setup.md) |
-| `WHITY_CLIENT_IP_SECRET` | backend and web | 0.2.33 | [Same-origin setup](Same-Origin-Setup.md) |
-| `WHITY_PWA_SCOPE` | web | 0.2.33 | [Same-origin setup](Same-Origin-Setup.md) |
-| `APP_URL`, `FRONTEND_URL` and the `*_URL` link overrides (`SSO_SUCCESS_URL`, `SSO_LOGIN_URL`, …; `HOME_URL` since 0.2.33) | backend | before 0.2.32 | [Same-origin setup](Same-Origin-Setup.md), `src/Core/Http/FrontendUrls.php` |
+| `WHITY_HOME_PATH` | backend | 0.2.32 | [Home page and back link](Home-Page-And-Back-Link.md) |
+| `WHITY_BACK_TO_PRODUCT_URL`, `WHITY_BACK_TO_PRODUCT_LABEL` | backend | 0.2.32 | [Home page and back link](Home-Page-And-Back-Link.md) |
+| `WHITY_TRUSTED_PROXIES` | backend | 0.2.32 | [Same-origin setup](Same-Origin-Setup.md) |
+| `WHITY_CLIENT_IP_SECRET` | backend and web | 0.2.32 | [Same-origin setup](Same-Origin-Setup.md) |
+| `WHITY_PWA_SCOPE` | web | 0.2.32 | [Same-origin setup](Same-Origin-Setup.md) |
+| `APP_URL`, `FRONTEND_URL` and the `*_URL` link overrides (`SSO_SUCCESS_URL`, `SSO_LOGIN_URL`, `HOME_URL`, …) | backend | before 0.2.32 | [Same-origin setup](Same-Origin-Setup.md), `src/Core/Http/FrontendUrls.php` |
 | `PWA_ENABLED`, `TRUSTED_PROXY_HOPS`, `WHITY_BACKEND_URL` | backend / web | before 0.2.32 | [Same-origin setup](Same-Origin-Setup.md) |
 
-The route manifest and hiding pages ship in 0.2.32; the home page, the back
-link and the same-origin pieces in 0.2.33, as planned on #2386. `/web-build`
+"0.2.32" means the first release after 0.2.31, which ships them. `/web-build`
 and `/api/health` say which version you run.
 
 ### Instance settings
