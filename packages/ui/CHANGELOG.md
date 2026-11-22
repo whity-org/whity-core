@@ -1,5 +1,24 @@
 # @whity/ui
 
+## 1.0.1
+
+### Patch Changes
+
+- 5b8f7b6: The compact file field pads its chips by `p-inset-control`, the view toggle and
+  the loading table clip their edge-to-edge children to their own rounded
+  corner, so no shape preset cuts their content (WHIT-1225).
+- 27b3e0d: The main button takes `rounded-control-pressed` while pressed at its standard
+  size, and a selected toggle chip takes `rounded-control-selected`, so themes
+  that morph (TH.18) change their corner; without such a theme nothing changes.
+- Updated dependencies [75370b6]
+- Updated dependencies [a6ffc53]
+- Updated dependencies [5b8f7b6]
+- Updated dependencies [27b3e0d]
+- Updated dependencies [79f8370]
+- Updated dependencies [64a09ca]
+- Updated dependencies [83a5255]
+  - @whity/tokens@1.2.0
+
 ## 1.0.0
 
 ### Major Changes

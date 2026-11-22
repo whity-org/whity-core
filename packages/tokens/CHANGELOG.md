@@ -1,5 +1,48 @@
 # @whity/tokens
 
+## 1.2.0
+
+### Minor Changes
+
+- 75370b6: Per-component shape overrides (WHIT-1225, TH.21): every radius utility now reads a
+  `--shape-*` property set on `:root` from `--wy-radius-*`, and again on the
+  elements of seven component families (`data-slot`) from `--wy-<family>-radius-*`,
+  so a family can carry its own preset. `--corner-shape` follows the same way as
+  `--shape-corner`. The theme schema accepts `shape.components`.
+- 27b3e0d: Theme shapes Pebble and Cut, shape morph and the outline and brisk presets
+  (WHIT-1225, TH.17-TH.19): `--radius-control-pressed`, `--radius-control-selected`,
+  `--dur-morph` (0 under Calm and Off), and `corner-shape: var(--wy-corner-shape)`
+  on themed corners. The theme schema accepts `pebble`, `cut`, `outline` and `brisk`.
+- 79f8370: The websites' token CSS and the brand logos now ship in the package (WHIT-1055),
+  so other repos install them instead of keeping copies.
+  
+  - `@whity/tokens/site.css`: the brand handoff's plain-CSS tokens (both themes,
+    `@font-face`, type classes), with fonts read from the package's own `fonts/`.
+  - `@whity/tokens/logos/*`: the logo set (lockups, marks, wordmarks, app icons,
+    favicons, "Built on Whity" badges) as SVG, PNG and ICO.
+  - `npx whity-tokens copy <folder> [--no-fonts] [--no-logos]` writes
+    `tokens.css`, `fonts/` and `logos/` into a folder a static site serves.
+- 83a5255: Themes (WHIT-1225, TH.1-TH.14):
+  
+  - New colour roles in light and dark: `surface-1` to `surface-5`, `primary-container` and
+    `on-primary-container`, `secondary-container` and `on-secondary-container`, and `tertiary`
+    with `tertiary-foreground`, `tertiary-container` and `on-tertiary-container`.
+  - The radius utilities read `--wy-radius-*` first, so a workspace theme's shape preset
+    can change corners; without it they keep decision 4.2's values.
+  - `@whity/tokens/theme.schema.json`: the theme file format (schema version 1), the
+    same schema core validates against.
+
+### Patch Changes
+
+- a6ffc53: The theme schema's font ids add `rubik`, `alexandria`, `naskh` and `ibm-kufi`
+  (WHIT-1225, TH.20).
+- 5b8f7b6: Adds `--spacing-inset-control` (padding that grows with the control radius, 30%
+  of it and never under 4px) and `--radius-control-inner` (the control radius less
+  that padding), so fields that hold chips keep them clear of a round corner
+  (WHIT-1225).
+- 64a09ca: The shape values (`--shape-*`) are computed on `[data-theme-preview]` as well as
+  `:root`, so the theme editor's preview (WHIT-1225, TH.25) shows a draft's corners.
+
 ## 1.1.0
 
 ### Minor Changes
