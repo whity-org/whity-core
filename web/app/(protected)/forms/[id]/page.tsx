@@ -41,7 +41,8 @@ import { useDateDisplay } from '@whity/features/datetime';
 import {
   type Answer, type LocalizedText, type ReferenceOption, type UploadedFileRef
 } from '@/components/forms/form-fields';
-import { FormFill, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
+import { FormFill, formContentLanguage, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
+import { ContentDirection } from '@whity/ui/content-direction';
 import { useRefusalMessage, type RefusalBody } from '@/components/forms/form-refusals';
 import { useFormDraft } from '@/components/forms/use-form-draft';
 import { localizedText } from '@whity/ui/localized-text';
@@ -429,6 +430,8 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   const translatedDescription = Array.isArray(rendered.form.description_i18n) ? null : rendered.form.description_i18n;
   const description = localizedText(translatedDescription, preferArabic ? 'ar' : 'en') || rendered.form.description;
   const submitLabel = localizedText(rendered.form.submit_label, preferArabic ? 'ar' : 'en') || t('fill.send', 'Send');
+  // WHIT-1379: the form reads in its own language's direction; the page around it keeps the interface's.
+  const content = formContentLanguage(rendered.form, rendered.fields, rendered.sections ?? [], preferArabic);
 
   if (submitted) {
     return (
@@ -456,7 +459,7 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4">
       <Card>
-        <FormHeader title={title} description={description} banner={rendered.form.banner} />
+        <FormHeader title={title} description={description} banner={rendered.form.banner} content={content} />
 
         <CardContent>
           {!rendered.accepts_submissions ? (
@@ -503,30 +506,32 @@ export default function FillFormPage({ params }: { params: Promise<{ id: string 
                 </p>
               )}
 
-              <FormFill
-                key={attempt}
-                fields={rendered.fields}
-                sections={rendered.sections ?? []}
-                answers={answers}
-                onAnswersChange={changeAnswers}
-                preferArabic={preferArabic}
-                references={{ ou_ref: units, profile_ref: people }}
-                upload={uploadAttachment}
-                submitLabel={submitLabel}
-                submit={submitAnswers}
-                initialStep={startStep}
-                onStepChange={changeStep}
-                footer={
-                  draft.failed ? (
-                    t('fill.draftFailed', 'Your draft could not be saved. You can still send the form.')
-                  ) : draft.savedAt !== null ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      <Icon name="check" size={16} />
-                      {t('fill.draftSaved', 'Draft saved at {time}', { time: time(draft.savedAt) ?? '' })}
-                    </span>
-                  ) : undefined
-                }
-              />
+              <ContentDirection content={content}>
+                <FormFill
+                  key={attempt}
+                  fields={rendered.fields}
+                  sections={rendered.sections ?? []}
+                  answers={answers}
+                  onAnswersChange={changeAnswers}
+                  preferArabic={preferArabic}
+                  references={{ ou_ref: units, profile_ref: people }}
+                  upload={uploadAttachment}
+                  submitLabel={submitLabel}
+                  submit={submitAnswers}
+                  initialStep={startStep}
+                  onStepChange={changeStep}
+                  footer={
+                    draft.failed ? (
+                      t('fill.draftFailed', 'Your draft could not be saved. You can still send the form.')
+                    ) : draft.savedAt !== null ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Icon name="check" size={16} />
+                        {t('fill.draftSaved', 'Draft saved at {time}', { time: time(draft.savedAt) ?? '' })}
+                      </span>
+                    ) : undefined
+                  }
+                />
+              </ContentDirection>
             </div>
           )}
         </CardContent>
