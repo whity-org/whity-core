@@ -528,7 +528,7 @@ class EnforceTenantIsolation
         // stashed claims instead of re-decoding the token.
         $token = $this->extractToken($request);
         $payload = $token === null ? null : $this->jwtParser->parse($token);
-        $payload = $this->signedInClaims($payload, $path);
+        $payload = $this->signedInClaims($payload, $path, $request);
         $request->setAttribute(Request::ATTR_JWT_CLAIMS, $payload);
 
         // Dual-claim membership gate (WC-d4340daf, ADR 0005 §5): when the token
@@ -871,7 +871,7 @@ class EnforceTenantIsolation
      * @param array<string, mixed>|null $payload
      * @return array<string, mixed>|null
      */
-    private function signedInClaims(?array $payload, string $path): ?array
+    private function signedInClaims(?array $payload, string $path, Request $request): ?array
     {
         if ($payload === null || !array_key_exists('type', $payload)) {
             return $payload;
@@ -880,6 +880,20 @@ class EnforceTenantIsolation
         $type = $payload['type'];
         if ($type === 'access') {
             return $this->accessTokenLive === null || ($this->accessTokenLive)($payload) ? $payload : null;
+        }
+
+        // An embedded plugin screen's token (#1688): only as a Bearer header, only
+        // on a route of the plugin it names, and only while its session stands.
+        if ($type === \Whity\Core\Plugin\PluginFrameTokens::TYPE
+            && \Whity\Core\Plugin\PluginFrameTokens::admits(
+                $payload,
+                $request,
+                $this->router,
+                $this->bearerFromHeader($request) !== null,
+                $this->accessTokenLive,
+            )
+        ) {
+            return $payload;
         }
 
         // Required two-step setup runs before a session exists, on these routes only.
@@ -897,11 +911,21 @@ class EnforceTenantIsolation
         return null;
     }
 
-    private function extractToken(Request $request): ?string
+    private function bearerFromHeader(Request $request): ?string
     {
         $authHeader = $request->getHeader('Authorization');
         if ($authHeader !== null && preg_match('/^Bearer\s+(\S+)$/', $authHeader, $matches) === 1) {
             return $matches[1];
+        }
+
+        return null;
+    }
+
+    private function extractToken(Request $request): ?string
+    {
+        $bearer = $this->bearerFromHeader($request);
+        if ($bearer !== null) {
+            return $bearer;
         }
 
         $cookieHeader = $request->getHeader('Cookie');
