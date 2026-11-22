@@ -246,6 +246,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             'sales.email_invoice',
             'sales.email_receipt',
             'sales.email_reminder',
+            'accounting.invoice_route_template_id',
+            'accounting.invoice_payment_terms_days',
+            'accounting.prices_include_tax',
         ];
     }
 
@@ -506,6 +509,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             'sales.email_invoice' => 'true',
             'sales.email_receipt' => 'true',
             'sales.email_reminder' => 'true',
+            'accounting.invoice_route_template_id' => '0',
+            'accounting.invoice_payment_terms_days' => '0',
+            'accounting.prices_include_tax' => 'false',
         ];
     }
 

@@ -190,6 +190,27 @@ final class ContactsRealEngineTest extends TestCase
         $this->imports->undo(1, $import['id']);
     }
 
+    public function testAnImportWhoseContactIsInTheBooksCannotBeUndone(): void
+    {
+        $import = $this->imports->upload(1, 11, 'one.csv', "Name\nExample Bakery\n");
+        $this->imports->check(1, $import['id'], ['mapping' => ['0' => 'name']]);
+        $this->imports->run(1, $import['id'], 11);
+        $contactId = (int) $this->pdo->query("SELECT id FROM contacts WHERE tenant_id = 1 AND name = 'Example Bakery'")->fetchColumn();
+        // A line in the books names the contact (WHIT-1318): the books keep what was posted.
+        $this->pdo->exec(
+            "INSERT INTO acc_invoices (tenant_id, kind, contact_id, issue_date, status, currency) VALUES (1, 'sale', {$contactId}, '2026-11-22', 'draft', 'JOD')"
+        );
+
+        try {
+            $this->imports->undo(1, $import['id']);
+            self::fail('an import whose contact is in the books was undone');
+        } catch (ContactRejectedException $e) {
+            self::assertSame(409, $e->status);
+            self::assertSame('in_the_books', $e->extra['code'] ?? null);
+        }
+        self::assertSame(1, $this->contacts->list(1, [], 50, 0)['total'], 'the contact stays');
+    }
+
     public function testACheckNeedsTheNameColumn(): void
     {
         $import = $this->imports->upload(1, 11, 'one.csv', "Name,Mobile\nExample Bakery,0791234567\n");

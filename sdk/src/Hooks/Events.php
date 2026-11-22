@@ -632,6 +632,29 @@ final class Events
     public const ACCOUNTING_PERIOD_REOPENED = 'accounting.period.reopened';
     public const ACCOUNTING_PERIOD_REOPENED_ASYNC = 'accounting.period.reopened.async';
 
+    // ---- accounting: sales invoices (SDK 1.155, WHIT-1318, design section 32 §5.2) ----
+    /**
+     * FILTER hook, before an invoice or credit note is issued (numbered,
+     * frozen and posted). Payload: as `accounting.invoice.issued` below, plus
+     * `lines` (each `variant_id`, `description`, `quantity`,
+     * `unit_price_minor`, `net_minor`, `tax_code`, `tax_minor`,
+     * `total_minor`). Return it unchanged; refuse with
+     * {@see HookVetoException} (a credit limit): the caller gets 409.
+     */
+    public const ACCOUNTING_INVOICE_ISSUING = 'accounting.invoice.issuing';
+    /**
+     * An invoice or credit note was issued. This and `accounting.invoice.credited`
+     * carry `tenant_id`, `invoice_id`, `kind` (`sale`, `sale_credit`),
+     * `number`, `contact_id`, `status`, `issue_date`, `due_date`, `currency`,
+     * `total_minor`, `tax_minor`, `due_minor`, `credits_invoice_id` and
+     * `acting_profile_id`.
+     */
+    public const ACCOUNTING_INVOICE_ISSUED = 'accounting.invoice.issued';
+    public const ACCOUNTING_INVOICE_ISSUED_ASYNC = 'accounting.invoice.issued.async';
+    /** A credit note settled an invoice. Also carries `credit_note_id` and `amount_minor`. */
+    public const ACCOUNTING_INVOICE_CREDITED = 'accounting.invoice.credited';
+    public const ACCOUNTING_INVOICE_CREDITED_ASYNC = 'accounting.invoice.credited.async';
+
     /**
      * The event name to dispatch for one of THIS plugin's own events (SDK 1.29).
      *

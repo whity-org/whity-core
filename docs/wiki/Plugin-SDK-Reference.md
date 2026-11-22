@@ -133,6 +133,9 @@ $entry = $books->ledger()->post(new EntryRequest(
 | `Accounting\Ledger` | Post balanced entries (minor units of the base currency) and `reverse()` them as your plugin, idempotent by key, only through `$ctx->accounting()->ledger()`; read entries and balances. The container copy reads and refuses writes (`use_plugin_context`). | current | 1.154 |
 | `Accounting\Periods` | The month a date is in, whether it is open, the lock date. | current | 1.154 |
 | `Accounting\Reports` | The trial balance for a range, optionally one branch. | current | 1.154 |
+| `Accounting\Invoices` | Sales invoices and credit notes: `createDraft()`, `issue()` (numbered, frozen and posted, or sent for approval), `credit()`, `cancelDraft()`, and reads. Writes only through `$ctx->accounting()->invoices()`, acting as a person with `invoices:write`; drafts belong to your plugin and `externalRef` is kept under its name. | current | 1.155 |
+| `Accounting\Taxes` | The tax codes, the code for an item's tax category on a date, and a line's net and tax (`compute()`). | current | 1.155 |
+| `Contribute\WorkspaceEInvoicing` | Report issued invoices to a tax authority (JoFotara first): `country()`, `isOn()`, `submit()` answering an `EInvoiceResult`. One is bound in the container; it runs after commit and never blocks issuing. | current | 1.155 |
 
 `Context\AccountingScope` (`$ctx->accounting()`) holds the four. Refusals throw `Accounting\AccountingRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `unbalanced`, `period_closed`, `conflict`, `vetoed`, `use_plugin_context`.
 

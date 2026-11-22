@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.154).
+ * SDK identity (v1.155).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1600,12 +1600,25 @@ namespace Whity\Sdk;
  * `accounting.period.reopened`, each notification with an `.async` twin (WHIT-1318, design section 32).
  *
  * Purely additive: one new method on Context\PluginScope, which only the host implements.)
+ *
+ * 1.155 (SALES INVOICES AND TAXES: host services {@see Accounting\Invoices} (sales invoices and credit notes:
+ * draft, issue, credit, cancel a draft; read) and {@see Accounting\Taxes} (the workspace's tax codes, the code
+ * for an item's tax category, a line's net and tax), on the plugin context as `$ctx->accounting()->invoices()`
+ * and `->taxes()`. Drafts and credit notes made through the context belong to the plugin and its external
+ * references are kept under its name; the container's copy reads. Value objects {@see Accounting\Invoice},
+ * {@see Accounting\InvoiceLine}, {@see Accounting\TaxCode}, {@see Accounting\EInvoiceResult}. Extension point
+ * {@see Contribute\WorkspaceEInvoicing}: one connector bound in the container reports issued invoices to a tax
+ * authority (JoFotara first). New events `accounting.invoice.issuing` (a filter that can veto),
+ * `accounting.invoice.issued` and `accounting.invoice.credited`, each notification with an `.async` twin
+ * (WHIT-1318 A2a, design section 32 §5.2, §7).
+ *
+ * Purely additive: two new methods on Context\AccountingScope, which only the host implements.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.154.0';
+    public const VERSION = '1.155.0';
 
     /**
      * Static identity only — never instantiated.

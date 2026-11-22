@@ -983,6 +983,16 @@ final class SettingsRegistry
     public const SALES_EMAIL_RECEIPT = 'sales.email_receipt';
     public const SALES_EMAIL_REMINDER = 'sales.email_reminder';
 
+    // ---- Sales invoices (WHIT-1318 A2a, design section 32 §5.2, AC.11) ----
+    //   - invoice_route_template_id: the route an invoice travels before it is
+    //     issued; 0 means none, and a person with invoices:write issues it.
+    //   - invoice_payment_terms_days: days from issue to due on a new invoice,
+    //     0 to 365 (0: due on issue).
+    //   - prices_include_tax: whether a new invoice's prices include tax.
+    public const ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID = 'accounting.invoice_route_template_id';
+    public const ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS = 'accounting.invoice_payment_terms_days';
+    public const ACCOUNTING_PRICES_INCLUDE_TAX = 'accounting.prices_include_tax';
+
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
      * settings API cannot make (a customer-safe role, a permission other than
@@ -1016,6 +1026,9 @@ final class SettingsRegistry
         self::SALES_EMAIL_INVOICE,
         self::SALES_EMAIL_RECEIPT,
         self::SALES_EMAIL_REMINDER,
+        self::ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID,
+        self::ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS,
+        self::ACCOUNTING_PRICES_INCLUDE_TAX,
     ];
 
     /**
@@ -1558,6 +1571,9 @@ final class SettingsRegistry
         self::SALES_EMAIL_INVOICE => 'true',
         self::SALES_EMAIL_RECEIPT => 'true',
         self::SALES_EMAIL_REMINDER => 'true',
+        self::ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID => '0',
+        self::ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS => '0',
+        self::ACCOUNTING_PRICES_INCLUDE_TAX => 'false',
     ];
 
     /**
@@ -2083,6 +2099,11 @@ final class SettingsRegistry
                 ? null
                 : $key . ' must be a route template id, or 0 for none.',
             self::SALES_EMAIL_QUOTE, self::SALES_EMAIL_INVOICE, self::SALES_EMAIL_RECEIPT, self::SALES_EMAIL_REMINDER => self::validateBoolean($value, $key),
+            self::ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
+                ? null
+                : $key . ' must be a route template id, or 0 for none.',
+            self::ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS => self::validateWholeNumberBetween($value, $key, 0, 365),
+            self::ACCOUNTING_PRICES_INCLUDE_TAX => self::validateBoolean($value, $key),
             default => "Unknown setting key: {$key}",
         };
     }

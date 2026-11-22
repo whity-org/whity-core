@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Whity\Sdk\Context;
 
 use Whity\Sdk\Accounting\Accounts;
+use Whity\Sdk\Accounting\Invoices;
 use Whity\Sdk\Accounting\Ledger;
 use Whity\Sdk\Accounting\Periods;
 use Whity\Sdk\Accounting\Reports;
+use Whity\Sdk\Accounting\Taxes;
 
 /**
  * Core's books for one plugin, in the workspace the call runs in (SDK 1.154,
@@ -30,4 +32,10 @@ interface AccountingScope
     public function periods(): Periods;
 
     public function reports(): Reports;
+
+    /** Sales invoices and credit notes; drafts and credits are your plugin's (SDK 1.155). */
+    public function invoices(): Invoices;
+
+    /** Tax codes and the arithmetic of a line, read-only (SDK 1.155). */
+    public function taxes(): Taxes;
 }
