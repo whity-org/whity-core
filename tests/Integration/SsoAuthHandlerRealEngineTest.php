@@ -421,6 +421,138 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         }
     }
 
+    /**
+     * The whole fresh-sign-in round trip for a gated approval (WHIT-1147, found on
+     * app.whity.dev 2026-11-22): an owner who signs in only through the provider starts
+     * the check, signs in again there, comes back, and the approval goes through.
+     */
+    public function testAnOwnerWhoSignsInAgainCanApproveWithinFiveMinutes(): void
+    {
+        $purpose = 'workspace-ownership:offer-' . $this->tenantId . '-9-co_owner';
+        $result = $this->gateRoundTrip($purpose, ['auth_time' => time()]);
+
+        self::assertStringEndsWith('/admin/settings/owners?identity_check=signed_in', $result['location']);
+        self::assertSame('fresh_sign_in', $result['verify']($purpose));
+        self::assertNull($result['verify']($purpose), 'used once');
+    }
+
+    /**
+     * Accepting an ownership offer is checked in the OFFER's workspace, while the sign-in comes
+     * back under whichever workspace the person has open. Both must find the same record.
+     */
+    public function testAFreshSignInCountsWhicheverWorkspaceIsOpen(): void
+    {
+        $this->exec("INSERT INTO tenants (name, slug, created_at) VALUES ('AAU IRB', 'aau-irb', NOW())");
+        $offerTenant = (int) $this->pdo->lastInsertId();
+        $purpose = 'workspace-ownership:accept-1';
+        $result = $this->gateRoundTrip($purpose, ['auth_time' => time()]);
+
+        self::assertStringEndsWith('?identity_check=signed_in', $result['location']);
+        $check = new \Whity\Core\Security\IdentityCheck($this->pdo, new \Whity\Core\Document\Signing\SigningChallengeRepository($this->pdo));
+        self::assertSame('fresh_sign_in', $check->verify($offerTenant, $this->profileId, $purpose, null));
+    }
+
+    /**
+     * A sign-in the provider did not make just now (an old session it answered from, or one
+     * with no `auth_time` at all) confirms nothing, and the page is told why.
+     *
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function staleSignIns(): iterable
+    {
+        yield 'ten minutes old' => [['auth_time' => time() - 600]];
+        yield 'no auth_time' => [[]];
+        yield 'in the future' => [['auth_time' => time() + 3600]];
+    }
+
+    /** @param array<string, mixed> $claims */
+    #[\PHPUnit\Framework\Attributes\DataProvider('staleSignIns')]
+    public function testAStaleSignInConfirmsNothing(array $claims): void
+    {
+        $purpose = 'workspace-ownership:offer-' . $this->tenantId . '-9-co_owner';
+        $result = $this->gateRoundTrip($purpose, $claims);
+
+        self::assertStringEndsWith('?identity_check=sign_in_not_fresh', $result['location']);
+        self::assertNull($result['verify']($purpose));
+    }
+
+    /** Someone else signing in at the provider never confirms this approver. */
+    public function testADifferentPersonsSignInConfirmsNothing(): void
+    {
+        $this->exec("INSERT INTO profiles (display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
+            VALUES ('Mallory', 'x', false, 0, 0, NOW(), NOW())");
+        $other = (int) $this->pdo->lastInsertId();
+        (new ExternalIdentityRepository($this->pdo))->link($other, 'google', self::ISSUER, 'google-sub-mallory', 'mallory@acme.test');
+
+        $purpose = 'workspace-ownership:offer-' . $this->tenantId . '-9-co_owner';
+        $result = $this->gateRoundTrip($purpose, ['auth_time' => time()], 'google-sub-mallory');
+
+        self::assertStringEndsWith('?identity_check=sign_in_mismatch', $result['location']);
+        self::assertNull($result['verify']($purpose));
+    }
+
+    /** A fresh sign-in for one approval does not approve another, and runs out after five minutes. */
+    public function testAFreshSignInCountsForThatApprovalOnlyAndForFiveMinutes(): void
+    {
+        $purpose = 'workspace-ownership:remove-' . $this->tenantId . '-9';
+        $result = $this->gateRoundTrip($purpose, ['auth_time' => time()]);
+
+        self::assertNull($result['verify']('workspace-ownership:remove-' . $this->tenantId . '-10'), 'another approval');
+        $this->exec("UPDATE signing_challenges SET expires_at = '2000-01-01 00:00:00'");
+        self::assertNull($result['verify']($purpose), 'after five minutes');
+    }
+
+    /**
+     * @param array<string, mixed> $claims
+     * @return array{location: string, verify: \Closure(string): ?string}
+     */
+    private function gateRoundTrip(string $purpose, array $claims, string $sub = self::SUBJECT): array
+    {
+        $this->linkIdentity();
+        $this->exec("UPDATE profiles SET auth_method = 'idp' WHERE id = " . $this->profileId);
+        $handler = new SsoAuthHandler(...$this->handlerArgsWithReauth());
+        $challenges = new \Whity\Core\Document\Signing\SigningChallengeRepository($this->pdo);
+        $check = new \Whity\Core\Security\IdentityCheck($this->pdo, $challenges);
+
+        $started = $check->start($this->tenantId, $this->profileId, $purpose, 'changing who owns a workspace');
+        self::assertSame('fresh_sign_in', $started['method'] ?? null);
+        self::assertSame($purpose, $started['purpose'] ?? null, 'the page is told which approval to sign in again for');
+
+        $_COOKIE = ['access_token' => $this->jwtParser->create([
+            'profile_id' => $this->profileId, 'active_tenant_id' => $this->tenantId,
+            'email' => 'alice@acme.test', 'role' => 'admin', 'token_epoch' => 0,
+        ], 900, 'access')];
+        $_GET = ['reauth' => 'gate', 'purpose' => $purpose, 'return_to' => '/admin/settings/owners'];
+        $start = $handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+        $authorize = $this->location($start);
+        self::assertStringStartsWith('https://accounts.google.com/', $authorize, $authorize);
+        parse_str((string) parse_url($authorize, PHP_URL_QUERY), $q);
+        self::assertSame('login', $q['prompt'] ?? null);
+
+        // The flow cookie start() set (headers can't be read back under the CLI).
+        $_COOKIE['sso_flow_token'] = $this->jwtParser->create([
+            'state' => $q['state'], 'nonce' => $q['nonce'], 'code_verifier' => 'v',
+            'provider_id' => $this->providerId, 'tenant_id' => 0, 'provider_key' => 'google',
+            'reauth_profile_id' => $this->profileId, 'reauth_tenant_id' => $this->tenantId,
+            'reauth_return_to' => '/admin/settings/owners', 'reauth_route_id' => null,
+            'reauth_purpose' => $purpose,
+        ], 600, 'oidc_flow');
+        $now = time();
+        $this->http->tokenResponse = ['id_token' => JWT::encode([
+            'iss' => self::ISSUER, 'aud' => self::CLIENT_ID, 'sub' => $sub, 'email' => 'alice@acme.test',
+            'email_verified' => true, 'nonce' => $q['nonce'], 'iat' => $now, 'exp' => $now + 3600,
+        ] + $claims, $this->privatePem, 'RS256', $this->kid), 'access_token' => 'at'];
+        $_GET = ['code' => 'c', 'state' => $q['state']];
+        $back = $handler->callback(new Request('GET', '/api/v1/auth/sso/google/callback', [], ''), ['provider' => 'google']);
+        $_GET = [];
+        $_COOKIE = [];
+
+        return [
+            'location' => $this->location($back),
+            'verify' => fn (string $p): ?string => $check->verify($this->tenantId, $this->profileId, $p, null),
+        ];
+    }
+
     /** @return array<string, mixed> */
     private function handlerArgsWithReauth(): array
     {

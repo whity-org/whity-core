@@ -59,6 +59,7 @@ import {
   ConfirmItsYouDialog,
   isIdentityCheckFailure,
   startProposalIdentityCheck,
+  useFreshSignInReturn,
   type IdentityCheck,
 } from '@/components/security/confirm-its-you-dialog';
 
@@ -89,6 +90,8 @@ export default function ApprovalsPage() {
     check: IdentityCheck;
   } | null>(null);
   const [gateError, setGateError] = useState<string | null>(null);
+  // Back from signing in again: the same proposal, ready to approve.
+  const signInOutcome = useFreshSignInReturn<NonNullable<typeof gated>>(setGated);
   const impactPlanCard = useImpactPlanCard();
 
   // The undo meters count down without a request: the window's end is known.
@@ -585,6 +588,8 @@ export default function ApprovalsPage() {
         check={gated?.check ?? null}
         busy={gated !== null && busyId === gated.proposal.id}
         error={gateError}
+        resume={gated}
+        signInOutcome={signInOutcome}
         onCancel={() => setGated(null)}
         onClearError={() => setGateError(null)}
         onConfirm={(code) => {

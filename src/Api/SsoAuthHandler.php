@@ -233,7 +233,12 @@ final class SsoAuthHandler
         }
 
         if ($purpose !== null) {
-            $this->signingChallenges->recordGateFreshSignIn($signingTenantId, $profileId, \Whity\Core\Security\IdentityCheck::key($purpose));
+            // Kept where the approval's check looks for it, whichever workspace is open now.
+            $this->signingChallenges->recordGateFreshSignIn(
+                \Whity\Core\Security\IdentityCheck::FRESH_SIGN_IN_TENANT,
+                $profileId,
+                \Whity\Core\Security\IdentityCheck::key($purpose),
+            );
         } else {
             $this->signingChallenges->recordFreshSignIn($signingTenantId, $profileId, $routeId);
         }

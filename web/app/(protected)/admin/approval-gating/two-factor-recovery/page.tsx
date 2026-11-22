@@ -21,6 +21,7 @@ import {
   ConfirmItsYouDialog,
   isIdentityCheckFailure,
   startIdentityCheck,
+  useFreshSignInReturn,
   type IdentityCheck,
 } from '@/components/security/confirm-its-you-dialog';
 import { useDateDisplay } from '@whity/features/datetime';
@@ -85,6 +86,11 @@ export default function TwoFactorRecoveryApprovalsPage() {
   // The "confirm it's you" step before an approval.
   const [confirming, setConfirming] = useState<IdentityCheck | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
+  // Back from signing in again: the same request selected, ready to approve.
+  const signInOutcome = useFreshSignInReturn<{ id: number; check: IdentityCheck }>((kept) => {
+    setSelectedId(kept.id);
+    setConfirming(kept.check);
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -430,6 +436,8 @@ export default function TwoFactorRecoveryApprovalsPage() {
         check={confirming}
         busy={busy}
         error={codeError}
+        resume={confirming !== null && selectedId !== null ? { id: selectedId, check: confirming } : null}
+        signInOutcome={signInOutcome}
         onCancel={() => setConfirming(null)}
         onClearError={() => setCodeError(null)}
         onConfirm={(value) => void approve(value)}

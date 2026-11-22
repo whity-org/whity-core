@@ -168,7 +168,7 @@ final class AwayAndIdentityCheckRealEngineTest extends TestCase
         self::assertNull($check->verify(self::TENANT, self::EMAD, 'password-reset:7', null), 'not before signing in again');
 
         $challenges = new SigningChallengeRepository($this->pdo);
-        $challenges->recordGateFreshSignIn(self::TENANT, self::EMAD, IdentityCheck::key('password-reset:7'));
+        $challenges->recordGateFreshSignIn(IdentityCheck::FRESH_SIGN_IN_TENANT, self::EMAD, IdentityCheck::key('password-reset:7'));
 
         self::assertNull($check->verify(self::TENANT, self::EMAD, 'password-reset:8', null), 'not for another approval');
         self::assertNull($check->verify(self::TENANT, self::AMRO, 'password-reset:7', null), 'not for another admin');
@@ -181,7 +181,7 @@ final class AwayAndIdentityCheckRealEngineTest extends TestCase
         $this->pdo->exec("UPDATE profiles SET auth_method = 'idp' WHERE id = " . self::EMAD);
         $this->pdo->exec("INSERT INTO external_identities (profile_id, provider_id, provider_key, issuer, subject, last_login_at)
                           VALUES (" . self::EMAD . ", NULL, 'whity_id', 'https://id.whity.test', 'sub-emad', CURRENT_TIMESTAMP)");
-        (new SigningChallengeRepository($this->pdo))->recordGateFreshSignIn(self::TENANT, self::EMAD, IdentityCheck::key('agent-proposal:3'));
+        (new SigningChallengeRepository($this->pdo))->recordGateFreshSignIn(IdentityCheck::FRESH_SIGN_IN_TENANT, self::EMAD, IdentityCheck::key('agent-proposal:3'));
         $this->pdo->exec("UPDATE signing_challenges SET expires_at = '2000-01-01 00:00:00'");
 
         self::assertNull($this->identityCheck()->verify(self::TENANT, self::EMAD, 'agent-proposal:3', null));
