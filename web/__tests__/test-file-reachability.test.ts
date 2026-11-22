@@ -86,6 +86,12 @@ const RUNNERS: { name: string; owns: (file: string) => boolean }[] = [
         file.startsWith('templates/tauri-desktop/src/')),
   },
   {
+    // node:test, run by the `route-manifest` CI job (#2386):
+    // `node --test web/scripts/route-manifest.test.mjs`.
+    name: 'route manifest node:test',
+    owns: (file) => file === 'web/scripts/route-manifest.test.mjs',
+  },
+  {
     // render-service/jest.config.js, run by the `render-service` CI job.
     name: 'render-service Jest project',
     owns: (file) => file.startsWith('render-service/test/'),
