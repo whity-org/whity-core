@@ -4620,6 +4620,28 @@ final class CoreApiSchemas
                     413 => self::errorResponse('The theme is larger than 32 KB'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('POST', '/api/themes/compare', 'settings:read', [
+                'summary' => 'Compare two themes side by side',
+                'description' => 'The side-by-side diff (TH.25): what the newer theme changes, field by field as a re-import says it (TH.16), and both themes compiled for a preview, every colour in both modes. Nothing is saved.',
+                'tags' => ['theme'],
+                'request' => 'CompareThemesRequest',
+                'responses' => [
+                    200 => self::jsonResponse('What changes and both previews', 'CompareThemesResponse'),
+                    413 => self::errorResponse('The themes are larger than 64 KB together'),
+                    422 => self::errorResponse('One of the themes has problems; the error says which'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes/package', 'settings:write', [
+                'summary' => 'Package a theme for the store',
+                'description' => 'Publishing (TH.25): the theme as a store-ready package, a theme-only plugin zip that ships it through the plugin theme interface (SDK 1.125), with manifest.json listing every file\'s sha256. The publisher downloads it and submits it to the store; a direct upload comes with the Whity ID store\'s publisher API. Whity\'s own themes cannot be packaged. Nothing is saved.',
+                'tags' => ['theme'],
+                'request' => 'PackageThemeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The package, its name and its sha256', 'ThemePackageResponse'),
+                    413 => self::errorResponse('The theme is larger than 32 KB'),
+                    422 => self::errorResponse('The theme has problems, or is one of Whity\'s own'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('DELETE', '/api/themes/{themeId}', 'settings:write', [
                 'summary' => 'Remove a theme this workspace imported',
                 'description' => 'If the workspace was using it, it goes back to the installation\'s theme. Whity\'s own themes cannot be removed.',
@@ -11246,6 +11268,7 @@ final class CoreApiSchemas
                 'staff_profile_ids' => ['type' => 'array', 'items' => self::int()],
                 'room_id' => self::int(true) + ['description' => 'The room it needs; booked with the person.'],
                 'needs_approval' => self::bool() + ['description' => 'A customer\'s booking is a request staff accept first.'],
+                'item_id' => self::int(true) + ['description' => 'The inventory service item that holds its name and price (WHIT-1334).'],
             ], ['id', 'name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_minor', 'currency', 'bookable_online', 'active', 'sort_order', 'staff_profile_ids']),
             'CalendarServiceRequest' => self::object([
                 'name' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Text, or a `{ar, en}` map.'],
@@ -12491,6 +12514,30 @@ final class CoreApiSchemas
                 'adjustments' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']], 'description' => 'What the guard rails change: mode, role and change.'],
                 'roles' => ['type' => 'array', 'items' => self::str(), 'description' => 'The colour roles a theme may set by hand.'],
             ], ['valid', 'problems'])),
+            'CompareThemesRequest' => self::object([
+                'before' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The older theme file, such as the installed version.'],
+                'after' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The newer theme file, such as a file to import or the editor\'s draft.'],
+            ], ['before', 'after']),
+            'CompareThemesResponse' => self::dataEnvelope(self::object([
+                'changes' => ['type' => 'array', 'description' => 'What the newer theme changes, field by field.', 'items' => self::object([
+                    'field' => self::str(),
+                    'from' => self::str(true),
+                    'to' => self::str(true),
+                ], ['field', 'from', 'to'])],
+                'before' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The older theme compiled: light, dark, vars, fonts, adjustments.'],
+                'after' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The newer theme compiled, the same way.'],
+            ], ['changes', 'before', 'after'])),
+            'PackageThemeRequest' => self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The theme file to package, as saved (schemas/theme/v1.json).'],
+            ], ['theme']),
+            'ThemePackageResponse' => self::dataEnvelope(self::object([
+                'plugin' => self::str() + ['description' => 'The plugin\'s name in the package, like AcmeHarbourTheme.'],
+                'filename' => self::str(),
+                'media_type' => self::str(),
+                'sha256' => self::str() + ['description' => 'The zip\'s sha256, which the store checks.'],
+                'size_bytes' => self::int(),
+                'content_base64' => self::str() + ['description' => 'The zip, base64-encoded.'],
+            ], ['plugin', 'filename', 'media_type', 'sha256', 'size_bytes', 'content_base64'])),
             'DeleteThemeResponse' => self::dataEnvelope(self::object(['deleted' => self::bool()], ['deleted'])),
 
             // ── Forgotten-password + 2FA-recovery (WC-password-reset-2fa-recovery) ──
@@ -20259,6 +20306,14 @@ final class CoreApiSchemas
                 'tags' => ['calendar'],
                 'responses' => [
                     200 => self::jsonResponse('Services', self::dataEnvelope(['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name'])])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/price-list', 'calendar:read', [
+                'summary' => 'The price list as a page to print',
+                'description' => 'A whole HTML page: every active service in English and Arabic, how long it takes and its price, from its inventory service item (WHIT-1334).',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => ['description' => 'The page', 'content' => ['text/html' => ['schema' => self::str()]]],
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/calendar/walkins', 'calendar:front_desk', [

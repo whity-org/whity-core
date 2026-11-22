@@ -16,21 +16,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { IconArrowLeft, IconX } from '@tabler/icons-react';
-import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
-import { Checkbox } from '@whity/ui/checkbox';
+import { Card, CardContent, CardHeader, CardTitle } from '@whity/ui/card';
 import { Input } from '@whity/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
-import { Switch } from '@whity/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@whity/ui/table';
-import { Tabs, TabsList, TabsTrigger } from '@whity/ui/tabs';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { api } from '@/lib/api/client';
 import { previewThemeCss } from '@/lib/brand-theme-css';
 import { useRefreshBranding } from '@/lib/branding-context';
 import { useToast } from '@/lib/toast-context';
-import { adjustmentText, roleName, type FontOption } from '@/components/theme-picker';
+import { adjustmentText, changeText, errorReason, roleName, type FontOption } from '@/components/theme-picker';
+import { ThemeSample } from '@/components/theme-sample';
+import { ThemeDiff } from '@/components/theme-diff';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
 
 /** A theme file as JSON (schemas/theme/v1.json); the server checks it. */
 export type ThemeFile = Record<string, unknown>;
@@ -213,74 +211,26 @@ function ColourField({
   );
 }
 
-/** What a screen looks like in the draft: the real components, so every shape family shows. */
-function ThemeSample({ mode, t }: { mode: 'light' | 'dark'; t: TranslateFn }) {
-  const people = ['Amro Saleh', 'Awss Haddad', 'Ahmad Khalil'];
-  return (
-    <div
-      data-theme-preview={mode}
-      data-testid={`theme-editor-preview-${mode}`}
-      // A picture of the theme, not part of the page: nothing in it can be used.
-      inert
-      className={`${mode === 'dark' ? 'dark ' : ''}grid gap-3 rounded-card border border-border bg-background p-3 font-sans text-foreground`}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-base font-semibold">Example Bakery</span>
-        <Badge variant="success">{t('theme.editor.sample.paid', 'Paid')}</Badge>
-      </div>
-      <Tabs defaultValue="orders">
-        <TabsList>
-          <TabsTrigger value="orders">{t('theme.editor.sample.orders', 'Orders')}</TabsTrigger>
-          <TabsTrigger value="customers">{t('theme.editor.sample.customers', 'Customers')}</TabsTrigger>
-        </TabsList>
-      </Tabs>
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('theme.editor.sample.order', 'New order')}</CardTitle>
-          <CardDescription>{t('theme.editor.sample.orderHint', 'Fill in the order and save it.')}</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3">
-          <Input label={t('theme.editor.sample.customer', 'Customer')} defaultValue="Example Bakery" />
-          <div className="flex items-center gap-2 text-sm">
-            <Checkbox defaultChecked aria-label={t('theme.editor.sample.deliver', 'Deliver')} />
-            {t('theme.editor.sample.deliver', 'Deliver')}
-            <Switch defaultChecked className="ms-auto" aria-label={t('theme.editor.sample.remind', 'Remind me')} />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button>{t('theme.editor.sample.save', 'Save order')}</Button>
-            <Button variant="outline">{t('theme.editor.sample.cancel', 'Cancel')}</Button>
-          </div>
-        </CardContent>
-      </Card>
-      <div data-slot="table-container" className="overflow-hidden rounded-card border border-border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('theme.editor.sample.name', 'Name')}</TableHead>
-              <TableHead>{t('theme.editor.sample.status', 'Status')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {people.map((person, i) => (
-              <TableRow key={person}>
-                <TableCell>{person}</TableCell>
-                <TableCell>
-                  <Badge variant={i === 0 ? 'default' : 'outline'}>
-                    {i === 0 ? t('theme.editor.sample.new', 'New') : t('theme.editor.sample.done', 'Done')}
-                  </Badge>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-      <div className="flex h-10 items-end gap-1.5" aria-hidden="true">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <span key={n} className="flex-1 rounded-sm" style={{ height: `${30 + n * 12}%`, background: `var(--chart-${n})` }} />
-        ))}
-      </div>
-    </div>
-  );
+interface ThemePackageData {
+  plugin: string;
+  filename: string;
+  media_type: string;
+  sha256: string;
+  size_bytes: number;
+  content_base64: string;
+}
+
+/** Hands the person the package to keep (the zip arrives base64-encoded). */
+function downloadPackage(pkg: ThemePackageData): void {
+  const binary = atob(pkg.content_base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([bytes], { type: pkg.media_type }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = pkg.filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 interface ThemeEditorProps {
@@ -304,6 +254,8 @@ export function ThemeEditor({ start, editable, fonts }: ThemeEditorProps) {
   });
   const [preview, setPreview] = useState<ThemePreviewData | null>(null);
   const [saving, setSaving] = useState(false);
+  const [comparing, setComparing] = useState(false);
+  const [published, setPublished] = useState<ThemePackageData | null>(null);
   const [newRole, setNewRole] = useState({ role: '', mode: 'light', colour: '#0961bb' });
   const sequence = useRef(0);
 
@@ -403,16 +355,44 @@ export function ThemeEditor({ start, editable, fonts }: ThemeEditorProps) {
 
   const overrides = (mode: 'light' | 'dark') => (valueAt(theme, ['colour', 'overrides', mode]) as Record<string, string> | undefined) ?? {};
 
+  /** Saves the draft as the workspace's theme; the saved file, or null when it couldn't be saved. */
+  const store = async (): Promise<ThemeFile | null> => {
+    const file = themeToSave(theme, editable);
+    const { error: saveError } = await api.POST('/api/v1/themes', { body: { theme: file, source: 'editor' } as never });
+    if (saveError) {
+      const reason = errorReason(saveError, 'theme');
+      addToast(reason ?? t('theme.editor.saveFailed', 'The theme could not be saved. Try again.'), 'error');
+      return null;
+    }
+    return file;
+  };
+
+  /**
+   * Publishing (TH.25): save, then package the saved theme for the store and
+   * hand it to the publisher. A direct upload comes with the store's
+   * publisher API.
+   */
+  const publish = async () => {
+    setSaving(true);
+    try {
+      const file = await store();
+      if (!file) return;
+      const { data: body, error: packageError } = await api.POST('/api/v1/themes/package', { body: { theme: file } as never });
+      if (packageError || !body) {
+        addToast(errorReason(packageError, 'theme') ?? t('theme.publish.failed', 'The theme was saved but could not be packaged. Try again.'), 'error');
+        return;
+      }
+      setPublished(body.data as ThemePackageData);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const save = async (use: boolean) => {
     setSaving(true);
     try {
-      const file = themeToSave(theme, editable);
-      const { error: saveError } = await api.POST('/api/v1/themes', { body: { theme: file, source: 'editor' } as never });
-      if (saveError) {
-        const reason = (saveError as { errors?: { theme?: string } }).errors?.theme;
-        addToast(reason ?? t('theme.editor.saveFailed', 'The theme could not be saved. Try again.'), 'error');
-        return;
-      }
+      const file = await store();
+      if (!file) return;
       if (use) {
         const { error: useError } = await api.PATCH('/api/v1/settings', { body: { settings: { branding_theme: file.id as string } } });
         if (useError) {
@@ -454,14 +434,71 @@ export function ThemeEditor({ start, editable, fonts }: ThemeEditorProps) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" disabled={!preview?.valid} onClick={() => setComparing(true)}>
+            {t('theme.diff.open', 'Compare')}
+          </Button>
           <Button variant="outline" disabled={saving || !preview?.valid || nameEn.trim() === ''} onClick={() => void save(false)}>
             {t('theme.editor.save', 'Save')}
+          </Button>
+          <Button variant="outline" disabled={saving || !preview?.valid || nameEn.trim() === ''} onClick={() => void publish()}>
+            {t('theme.publish.open', 'Publish')}
           </Button>
           <Button disabled={saving || !preview?.valid || nameEn.trim() === ''} onClick={() => void save(true)}>
             {t('theme.editor.saveUse', 'Save and use')}
           </Button>
         </div>
       </div>
+
+      <Dialog open={comparing} onOpenChange={setComparing}>
+        <DialogContent className="sm:max-w-3xl" data-testid="theme-editor-compare">
+          <DialogHeader>
+            <DialogTitle>{t('theme.diff.title', 'Compare with where you started')}</DialogTitle>
+            <DialogDescription>{t('theme.diff.description', 'What your changes do, side by side.')}</DialogDescription>
+          </DialogHeader>
+          {comparing && (
+            <ThemeDiff
+              before={start}
+              after={theme}
+              beforeLabel={t('theme.diff.started', 'Where you started')}
+              afterLabel={t('theme.diff.yours', 'Your changes')}
+              describe={changeText}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={published !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPublished(null);
+            router.push('/admin/settings/branding');
+          }
+        }}
+      >
+        <DialogContent data-testid="theme-publish">
+          <DialogHeader>
+            <DialogTitle>{t('theme.publish.title', 'Your theme is ready for the store')}</DialogTitle>
+            <DialogDescription>
+              {t('theme.publish.description', 'It is saved in this workspace. Download the store package and submit it to the Whity store as its publisher.')}
+            </DialogDescription>
+          </DialogHeader>
+          {published && (
+            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+              <dt className="text-muted-foreground">{t('theme.publish.file', 'File')}</dt>
+              <dd className="truncate font-mono text-xs" dir="ltr">{published.filename}</dd>
+              <dt className="text-muted-foreground">{t('theme.publish.checksum', 'Checksum (SHA-256)')}</dt>
+              <dd className="break-all font-mono text-xs" dir="ltr">{published.sha256}</dd>
+            </dl>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {t('theme.publish.later', 'Publishing straight to the store from here comes when the store accepts uploads from publishers.')}
+          </p>
+          <DialogFooter>
+            <Button onClick={() => published && downloadPackage(published)}>{t('theme.publish.download', 'Download the package')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {problems.length > 0 && (
         <div role="alert" className="rounded-card border border-destructive/40 bg-error-tint p-3 text-sm text-error-text" data-testid="theme-editor-problems">
@@ -644,11 +681,11 @@ export function ThemeEditor({ start, editable, fonts }: ThemeEditorProps) {
           <div className="grid gap-3 xl:grid-cols-2">
             <div className="grid gap-1.5">
               <span className="text-sm font-medium">{t('theme.editor.light', 'Light')}</span>
-              <ThemeSample mode="light" t={t} />
+              <ThemeSample mode="light" />
             </div>
             <div className="grid gap-1.5">
               <span className="text-sm font-medium">{t('theme.editor.dark', 'Dark')}</span>
-              <ThemeSample mode="dark" t={t} />
+              <ThemeSample mode="dark" />
             </div>
           </div>
           {preview?.valid && preview.fonts?.body && (

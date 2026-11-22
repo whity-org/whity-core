@@ -100,14 +100,17 @@ export function brandThemeCss(theme: unknown, high?: unknown): string {
  * elements, `[data-theme-preview="light"]` and `[data-theme-preview="dark"]`,
  * so light and dark sit side by side whatever mode the page is in. The same
  * name and value checks as the workspace's theme; nothing reaches `:root`.
+ * A scope (lowercase letters and hyphens) lets a page hold several, such as
+ * `before-light` and `after-light` in a comparison.
  */
-export function previewThemeCss(preview: unknown): string {
+export function previewThemeCss(preview: unknown, scope = ''): string {
+  if (!/^[a-z-]*$/.test(scope)) return '';
   if (!isObject(preview)) return '';
   const vars = varDeclarations(preview.vars);
   let css = '';
   for (const mode of ['light', 'dark'] as const) {
     const body = declarations(preview[mode]) + vars;
-    if (body !== '') css += `[data-theme-preview="${mode}"]{${body}}`;
+    if (body !== '') css += `[data-theme-preview="${scope}${mode}"]{${body}}`;
   }
   return css;
 }

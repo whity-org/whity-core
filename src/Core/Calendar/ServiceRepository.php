@@ -16,7 +16,7 @@ use Whity\Core\i18n\LocalizedText;
 final class ServiceRepository
 {
     private const COLUMNS = 'id, name, description, duration_minutes, buffer_before_minutes, buffer_after_minutes,
-                             price_minor, currency, bookable_online, active, sort_order, room_id, needs_approval';
+                             price_minor, currency, bookable_online, active, sort_order, room_id, needs_approval, item_id';
 
     public function __construct(private readonly PDO $db)
     {
@@ -94,6 +94,44 @@ final class ServiceRepository
         $stmt->execute();
     }
 
+    /** WHIT-1334 (SL.8): link a service to its inventory service item. */
+    public function setItem(int $tenantId, int $id, int $itemId): void
+    {
+        $this->db->prepare('UPDATE calendar_services SET item_id = :item WHERE tenant_id = :tenant_id AND id = :id')
+            ->execute([':item' => $itemId, ':tenant_id' => $tenantId, ':id' => $id]);
+    }
+
+    /** The service linked to an inventory item, if any. */
+    public function idForItem(int $tenantId, int $itemId): ?int
+    {
+        $stmt = $this->db->prepare('SELECT id FROM calendar_services WHERE tenant_id = :tenant_id AND item_id = :item');
+        $stmt->execute([':tenant_id' => $tenantId, ':item' => $itemId]);
+        $id = $stmt->fetchColumn();
+
+        return $id === false ? null : (int) $id;
+    }
+
+    /**
+     * Copy the item's name and price onto its service (the price list's one
+     * price, SL.8), without touching anything else.
+     *
+     * @param array<string, string> $name
+     */
+    public function copyFromItem(int $tenantId, int $id, array $name, ?int $priceMinor, string $currency, bool $active): void
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE calendar_services SET name = :name, price_minor = :price, currency = :currency, active = :active
+              WHERE tenant_id = :tenant_id AND id = :id'
+        );
+        $stmt->bindValue(':name', LocalizedText::encode($name));
+        $stmt->bindValue(':price', $priceMinor, $priceMinor === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmt->bindValue(':currency', $currency);
+        $stmt->bindValue(':active', $active, PDO::PARAM_BOOL);
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+    }
+
     /** @param list<int> $profileIds */
     public function replaceStaff(int $tenantId, int $serviceId, array $profileIds): void
     {
@@ -165,6 +203,8 @@ final class ServiceRepository
             // booking is a request staff accept first.
             'room_id' => $r['room_id'] !== null ? (int) $r['room_id'] : null,
             'needs_approval' => DbBool::of($r['needs_approval']),
+            // WHIT-1334 (SL.8): the inventory service item whose price this is.
+            'item_id' => $r['item_id'] !== null ? (int) $r['item_id'] : null,
         ];
     }
 }
