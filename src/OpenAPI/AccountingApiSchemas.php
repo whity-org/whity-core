@@ -189,6 +189,102 @@ final class AccountingApiSchemas
                 'responses' => [200 => self::json('The trial balance', self::data(SchemaBuilder::ref('AccountingTrialBalance')))] + self::auth(),
             ]),
             ...self::invoiceRoutes($notFound, $refused),
+            ...self::paymentRoutes($notFound, $refused),
+        ];
+    }
+
+    /**
+     * Phase A2b: payments received, allocations, cheques, transfers, aged
+     * receivables and the customer statement.
+     *
+     * @param array<int, array<string, mixed>> $notFound
+     * @param array<int, array<string, mixed>> $refused
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function paymentRoutes(array $notFound, array $refused): array
+    {
+        $tags = ['accounting'];
+        $payment = self::data(SchemaBuilder::ref('AccountingPayment'));
+
+        return [
+            self::route('GET', '/api/accounting/payments', 'payments:read', [
+                'summary' => 'List payments',
+                'description' => 'Money received and transfers, newest first. `unallocated_minor` is what a payment has not settled yet, the customer\'s credit.',
+                'tags' => $tags,
+                'parameters' => [
+                    self::param('direction', 'string', '`in` (received) or `transfer`.'),
+                    self::param('contact_id', 'integer', 'One customer\'s payments.'),
+                    self::param('method', 'string', '`cash`, `bank_transfer`, `cliq`, `card`, `cheque`, `whity_pay` or `other`.'),
+                    self::param('cheque_status', 'string', '`waiting`, `cleared` or `bounced`.'),
+                    self::param('from', 'string', 'Paid on or after, YYYY-MM-DD.'),
+                    self::param('to', 'string', 'Paid on or before, YYYY-MM-DD.'),
+                    self::param('q', 'string', 'Part of the number, the reference or the customer\'s name.'),
+                    self::param('limit', 'integer', 'At most 200. Default 50.'),
+                    self::param('offset', 'integer', 'Skip this many.'),
+                ],
+                'responses' => [200 => self::json('Payments', self::list('AccountingPayment'))] + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/payments', 'payments:write', [
+                'summary' => 'Record money a customer paid',
+                'description' => 'Posts it at once: the bank, cash, cheques to collect or the payment provider is debited and the customer owes less. It settles the invoices given; anything left stays as the customer\'s credit. A cheque dated later waits on Cheques to collect until it is deposited. `idempotency_key` records it once.',
+                'tags' => $tags,
+                'request' => 'AccountingPaymentRequest',
+                'responses' => [201 => self::json('The payment', $payment), 200 => self::json('The same payment, already recorded with this key', $payment)] + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/payments/{id:\d+}', 'payments:read', [
+                'summary' => 'Show a payment',
+                'description' => 'With what it settled.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The payment', $payment)] + $notFound + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/payments/{id:\d+}/allocations', 'payments:write', [
+                'summary' => 'Settle an invoice with a payment',
+                'description' => 'Uses what the payment has left, up to what the invoice still owes, or `amount_minor`. Posts nothing: the customer\'s balance already moved.',
+                'tags' => $tags,
+                'request' => 'AccountingAllocationRequest',
+                'responses' => [200 => self::json('The payment', $payment)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/payments/{id:\d+}/deposit', 'payments:write', [
+                'summary' => 'Deposit a waiting cheque',
+                'description' => 'Moves it from Cheques to collect to the bank.',
+                'tags' => $tags,
+                'request' => 'AccountingChequeDepositRequest',
+                'responses' => [200 => self::json('The payment', $payment)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/payments/{id:\d+}/bounce', 'payments:write', [
+                'summary' => 'Record a bounced cheque',
+                'description' => 'Reverses its entries, reopens the invoices it paid and posts the bank\'s fee when there is one.',
+                'tags' => $tags,
+                'request' => 'AccountingChequeBounceRequest',
+                'responses' => [200 => self::json('The payment', $payment)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/transfers', 'payments:write', [
+                'summary' => 'Move money between the workspace\'s own accounts',
+                'description' => 'Cash to the bank, or a payment provider\'s payout from Money at payment providers to the bank.',
+                'tags' => $tags,
+                'request' => 'AccountingTransferRequest',
+                'responses' => [201 => self::json('The transfer', $payment), 200 => self::json('The same transfer, already recorded with this key', $payment)] + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/reports/aged-receivables', 'invoices:read', [
+                'summary' => 'Aged receivables',
+                'description' => 'What each customer owes on a date, by days past due (not yet due, 1-30, 31-60, 61-90, over 90), with their credit beside it. Minor units.',
+                'tags' => $tags,
+                'parameters' => [
+                    self::param('as_of', 'string', 'YYYY-MM-DD. Default: today.'),
+                    self::param('contact_id', 'integer', 'One customer only.'),
+                ],
+                'responses' => [200 => self::json('Aged receivables', self::data(SchemaBuilder::ref('AccountingAgedReceivables')))] + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/customers/{id:\d+}/statement', 'invoices:read', [
+                'summary' => 'A customer\'s statement',
+                'description' => 'From the books: what they owed before `from`, every invoice, credit note, payment and bounced cheque on their account, a running balance and what they owe at `to`.',
+                'tags' => $tags,
+                'parameters' => [
+                    self::param('from', 'string', 'YYYY-MM-DD. Default: the first of January.'),
+                    self::param('to', 'string', 'YYYY-MM-DD. Default: today.'),
+                ],
+                'responses' => [200 => self::json('The statement', self::data(SchemaBuilder::ref('AccountingCustomerStatement')))] + $notFound + self::auth(),
+            ]),
         ];
     }
 
@@ -512,7 +608,7 @@ final class AccountingApiSchemas
                 ], ['line_id', 'entry_id', 'number', 'date', 'debit_minor', 'credit_minor', 'balance_minor'])],
                 'next' => ['type' => 'object', 'nullable' => true, 'properties' => ['after_date' => self::str(), 'after_line' => self::int()]],
             ], ['account', 'from', 'to', 'currency', 'opening_minor', 'closing_minor', 'lines', 'next']),
-        ] + self::invoiceComponents($names);
+        ] + self::invoiceComponents($names) + self::paymentComponents();
     }
 
     /**
@@ -673,6 +769,135 @@ final class AccountingApiSchemas
                 'invoice_payment_terms_days' => self::int() + ['description' => 'Days from issue to due on a new invoice, 0 to 365.'],
                 'prices_include_tax' => self::bool() + ['description' => 'Whether a new invoice\'s prices include tax.'],
             ], []),
+        ];
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private static function paymentComponents(): array
+    {
+        $buckets = [
+            'not_due' => self::int() + ['description' => 'Not yet due.'],
+            'days_1_30' => self::int(),
+            'days_31_60' => self::int(),
+            'days_61_90' => self::int(),
+            'days_over_90' => self::int(),
+            'credit_minor' => self::int() + ['description' => 'Money received or credited that settles nothing yet.'],
+            'balance_minor' => self::int() + ['description' => 'What is owed, less the credit.'],
+        ];
+
+        return [
+            'AccountingPayment' => self::object([
+                'id' => self::int(),
+                'direction' => self::str() + ['enum' => ['in', 'out', 'transfer']],
+                'number' => self::str(),
+                'contact_id' => self::int(true),
+                'contact_name' => self::str(true),
+                'paid_on' => self::str(),
+                'amount_minor' => self::int(),
+                'currency' => self::str(),
+                'method' => self::str() + ['enum' => ['cash', 'bank_transfer', 'cliq', 'card', 'cheque', 'whity_pay', 'other']],
+                'account_id' => self::int(),
+                'from_account_id' => self::int(true),
+                'reference' => self::str(),
+                'cheque_number' => self::str(true),
+                'cheque_bank' => self::str(true),
+                'cheque_due_on' => self::str(true),
+                'cheque_status' => ['type' => 'string', 'nullable' => true, 'enum' => ['waiting', 'cleared', 'bounced', null]],
+                'fee_minor' => self::int(),
+                'status' => self::str() + ['enum' => ['posted', 'bounced']],
+                'allocated_minor' => self::int(),
+                'unallocated_minor' => self::int() + ['description' => 'What it has not settled yet: the customer\'s credit.'],
+                'notes' => self::str(),
+                'entry_id' => self::int(true),
+                'deposit_entry_id' => self::int(true),
+                'bounce_entry_id' => self::int(true),
+                'external_ref' => self::str(true),
+                'created_by_profile_id' => self::int(true),
+                'agent_id' => self::int(true),
+                'on_behalf_of_profile_id' => self::int(true),
+                'owner_plugin' => self::str(true),
+                'created_at' => self::str(),
+                'allocations' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::int(),
+                    'invoice_id' => self::int(),
+                    'invoice_number' => self::str(true),
+                    'amount_minor' => self::int(),
+                    'allocated_on' => self::str(),
+                    'released' => self::bool() + ['description' => 'True when a bounced cheque released it.'],
+                ], ['id', 'invoice_id', 'amount_minor', 'allocated_on', 'released'])],
+            ], ['id', 'direction', 'number', 'paid_on', 'amount_minor', 'currency', 'method', 'status', 'unallocated_minor']),
+            'AccountingPaymentRequest' => self::object([
+                'contact_id' => self::int() + ['description' => 'The customer who paid.'],
+                'paid_on' => self::str() + ['description' => 'YYYY-MM-DD. Default: today.'],
+                'amount' => self::str() + ['description' => 'In normal units, such as "125.500".'],
+                'amount_minor' => self::int() + ['description' => 'Or the amount in minor units.'],
+                'method' => self::str() + ['enum' => ['cash', 'bank_transfer', 'cliq', 'card', 'cheque', 'whity_pay', 'other'], 'description' => 'Default: bank_transfer. It picks the account the money goes to.'],
+                'account_id' => self::int() + ['description' => 'The bank or cash account it went to, instead of the method\'s.'],
+                'reference' => self::str() + ['description' => 'The bank\'s or provider\'s reference.'],
+                'cheque_number' => self::str() + ['description' => 'Needed for a cheque.'],
+                'cheque_bank' => self::str() + ['description' => 'The bank the cheque is drawn on.'],
+                'cheque_due_on' => self::str() + ['description' => 'YYYY-MM-DD. A later date keeps it on Cheques to collect until deposited.'],
+                'fee_minor' => self::int() + ['description' => 'What a card or Whity Pay provider kept, in minor units.'],
+                'invoice_id' => self::int() + ['description' => 'Settle this invoice with it.'],
+                'allocations' => ['type' => 'array', 'description' => 'Or settle several invoices.', 'items' => self::object([
+                    'invoice_id' => self::int(),
+                    'amount_minor' => self::int() + ['description' => 'Default: all that fits.'],
+                ], ['invoice_id'])],
+                'notes' => self::str() + ['description' => 'Up to 2000 characters.'],
+                'idempotency_key' => self::str() + ['description' => 'Retrying with the same key returns the same payment.'],
+            ], ['contact_id']),
+            'AccountingAllocationRequest' => self::object([
+                'invoice_id' => self::int() + ['description' => 'The invoice to settle.'],
+                'amount_minor' => self::int() + ['description' => 'Default: all that fits.'],
+            ], ['invoice_id']),
+            'AccountingChequeDepositRequest' => self::object([
+                'deposited_on' => self::str() + ['description' => 'YYYY-MM-DD. Default: today.'],
+                'account_id' => self::int() + ['description' => 'The bank account it went into. Default: Bank.'],
+            ], []),
+            'AccountingChequeBounceRequest' => self::object([
+                'bounced_on' => self::str() + ['description' => 'YYYY-MM-DD. Default: today.'],
+                'fee_minor' => self::int() + ['description' => 'The bank\'s fee, in minor units.'],
+                'note' => self::str() + ['description' => 'Why, kept on the reversing entry.'],
+            ], []),
+            'AccountingTransferRequest' => self::object([
+                'from_account_id' => self::int() + ['description' => 'Where the money left: cash, a bank, or Money at payment providers.'],
+                'to_account_id' => self::int() + ['description' => 'Where it arrived.'],
+                'amount' => self::str() + ['description' => 'In normal units, such as "500.000".'],
+                'amount_minor' => self::int() + ['description' => 'Or the amount in minor units.'],
+                'paid_on' => self::str() + ['description' => 'YYYY-MM-DD. Default: today.'],
+                'reference' => self::str() + ['description' => 'The bank\'s or provider\'s reference.'],
+                'notes' => self::str() + ['description' => 'Up to 2000 characters.'],
+                'idempotency_key' => self::str() + ['description' => 'Retrying with the same key returns the same transfer.'],
+            ], ['from_account_id', 'to_account_id']),
+            'AccountingAgedReceivables' => self::object([
+                'as_of' => self::str(),
+                'currency' => self::str(),
+                'rows' => ['type' => 'array', 'items' => self::object([
+                    'contact_id' => self::int(),
+                    'contact_name' => self::str(),
+                ] + $buckets, ['contact_id', 'contact_name', 'not_due', 'balance_minor'])],
+                'totals' => self::object($buckets, ['balance_minor']),
+            ], ['as_of', 'currency', 'rows', 'totals']),
+            'AccountingCustomerStatement' => self::object([
+                'contact' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name']),
+                'from' => self::str(),
+                'to' => self::str(),
+                'currency' => self::str(),
+                'opening_minor' => self::int(),
+                'closing_minor' => self::int(),
+                'lines' => ['type' => 'array', 'items' => self::object([
+                    'line_id' => self::int(),
+                    'entry_id' => self::int(),
+                    'number' => self::str(),
+                    'date' => self::str(),
+                    'memo' => self::str(),
+                    'source_type' => self::str(),
+                    'source_id' => self::int(true),
+                    'debit_minor' => self::int(),
+                    'credit_minor' => self::int(),
+                    'balance_minor' => self::int(),
+                ], ['line_id', 'entry_id', 'number', 'date', 'debit_minor', 'credit_minor', 'balance_minor'])],
+            ], ['contact', 'from', 'to', 'currency', 'opening_minor', 'closing_minor', 'lines']),
         ];
     }
 

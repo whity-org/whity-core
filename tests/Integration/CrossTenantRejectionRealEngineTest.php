@@ -3025,6 +3025,36 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         self::assertSame('draft', $invoices->get(self::TENANT_A, $draft['id'])['status']);
         self::assertSame('issued', $invoices->get(self::TENANT_A, $issued['id'])['status']);
         self::assertSame(0, $invoices->get(self::TENANT_A, $issued['id'])['credited_minor']);
+
+        // ---- payments (WHIT-1318 A2b, migration 351) ----
+        $payments = new \Whity\Core\Accounting\Payments($db, $books, $ledger, $invoices, new \Whity\Database\SequenceCounters($this->pdo));
+        $receivables = new \Whity\Core\Accounting\Receivables($db, $books);
+        $cheque = $payments->receive(self::TENANT_A, null, [
+            'contact_id' => $customerA, 'amount_minor' => 100, 'method' => 'cheque', 'cheque_number' => '1', 'cheque_due_on' => '2027-06-01',
+        ])['payment'];
+        self::assertSame([], $payments->list(self::TENANT_B));
+        self::assertSame([], $receivables->aged(self::TENANT_B, gmdate('Y-m-d'))['rows']);
+        foreach ([
+            'read a payment' => fn () => $payments->get(self::TENANT_B, $cheque['id']),
+            'deposit a cheque' => fn () => $payments->deposit(self::TENANT_B, $cheque['id'], null),
+            'bounce a cheque' => fn () => $payments->bounce(self::TENANT_B, $cheque['id'], null),
+            'allocate a payment' => fn () => $payments->allocate(self::TENANT_B, $cheque['id'], $issued['id'], null, null),
+            'read a statement' => fn () => $receivables->statement(self::TENANT_B, $customerA, '2026-01-01', gmdate('Y-m-d')),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} of Tenant A");
+            } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+                self::assertSame(404, $e->status, "a foreign record answers 404 to {$what}");
+            }
+        }
+        try {
+            $payments->receive(self::TENANT_B, null, ['contact_id' => $contactIds[2], 'amount_minor' => 100, 'invoice_id' => $issued['id']]);
+            self::fail('Tenant B settled Tenant A\'s invoice');
+        } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+            self::assertSame('invoice_id', $e->extra['field'] ?? null);
+        }
+        self::assertSame('waiting', $payments->get(self::TENANT_A, $cheque['id'])['cheque_status']);
     }
 
     private function contactService(): \Whity\Core\Contacts\ContactService

@@ -759,6 +759,8 @@ final class EntryPointServiceWiringRealBootTest extends TestCase
             // Sales invoices and tax codes (SDK 1.155, WHIT-1318 A2a).
             \Whity\Sdk\Accounting\Invoices::class,
             \Whity\Sdk\Accounting\Taxes::class,
+            // Payments (SDK 1.156, WHIT-1318 A2b): Whity Pay records here.
+            \Whity\Sdk\Accounting\Payments::class,
         ];
         $list = var_export($services, true);
 

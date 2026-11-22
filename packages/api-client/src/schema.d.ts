@@ -355,6 +355,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/customers/{id}/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A customer's statement
+         * @description From the books: what they owed before `from`, every invoice, credit note, payment and bounced cheque on their account, a running balance and what they owe at `to`.
+         */
+        get: operations["get_api_v1_accounting_customers_id_statement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/entries": {
         parameters: {
             query?: never;
@@ -643,6 +663,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List payments
+         * @description Money received and transfers, newest first. `unallocated_minor` is what a payment has not settled yet, the customer's credit.
+         */
+        get: operations["get_api_v1_accounting_payments"];
+        put?: never;
+        /**
+         * Record money a customer paid
+         * @description Posts it at once: the bank, cash, cheques to collect or the payment provider is debited and the customer owes less. It settles the invoices given; anything left stays as the customer's credit. A cheque dated later waits on Cheques to collect until it is deposited. `idempotency_key` records it once.
+         */
+        post: operations["post_api_v1_accounting_payments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/payments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show a payment
+         * @description With what it settled.
+         */
+        get: operations["get_api_v1_accounting_payments_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/payments/{id}/allocations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Settle an invoice with a payment
+         * @description Uses what the payment has left, up to what the invoice still owes, or `amount_minor`. Posts nothing: the customer's balance already moved.
+         */
+        post: operations["post_api_v1_accounting_payments_id_allocations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/payments/{id}/bounce": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a bounced cheque
+         * @description Reverses its entries, reopens the invoices it paid and posts the bank's fee when there is one.
+         */
+        post: operations["post_api_v1_accounting_payments_id_bounce"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/payments/{id}/deposit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deposit a waiting cheque
+         * @description Moves it from Cheques to collect to the bank.
+         */
+        post: operations["post_api_v1_accounting_payments_id_deposit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/periods": {
         parameters: {
             query?: never;
@@ -694,6 +818,26 @@ export interface paths {
         put?: never;
         /** Reopen a closed month, saying why */
         post: operations["post_api_v1_accounting_periods_id_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/reports/aged-receivables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Aged receivables
+         * @description What each customer owes on a date, by days past due (not yet due, 1-30, 31-60, 61-90, over 90), with their credit beside it. Minor units.
+         */
+        get: operations["get_api_v1_accounting_reports_aged_receivables"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -795,6 +939,26 @@ export interface paths {
         put?: never;
         /** Restore an archived tax code */
         post: operations["post_api_v1_accounting_tax_codes_id_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move money between the workspace's own accounts
+         * @description Cash to the bank, or a payment provider's payout from Money at payment providers to the bank.
+         */
+        post: operations["post_api_v1_accounting_transfers"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14307,12 +14471,62 @@ export interface components {
             /** @description False when only documents (invoices, bills) may post to it. Default true. */
             allows_manual?: boolean;
         };
+        AccountingAgedReceivables: {
+            as_of: string;
+            currency: string;
+            rows: {
+                contact_id: number;
+                contact_name: string;
+                /** @description Not yet due. */
+                not_due: number;
+                days_1_30?: number;
+                days_31_60?: number;
+                days_61_90?: number;
+                days_over_90?: number;
+                /** @description Money received or credited that settles nothing yet. */
+                credit_minor?: number;
+                /** @description What is owed, less the credit. */
+                balance_minor: number;
+            }[];
+            totals: {
+                /** @description Not yet due. */
+                not_due?: number;
+                days_1_30?: number;
+                days_31_60?: number;
+                days_61_90?: number;
+                days_over_90?: number;
+                /** @description Money received or credited that settles nothing yet. */
+                credit_minor?: number;
+                /** @description What is owed, less the credit. */
+                balance_minor: number;
+            };
+        };
+        AccountingAllocationRequest: {
+            /** @description The invoice to settle. */
+            invoice_id: number;
+            /** @description Default: all that fits. */
+            amount_minor?: number;
+        };
         AccountingBooks: {
             base_currency: string;
             currency_fixed: boolean;
             tax_pack: string;
             year_start_month: number;
             lock_date: string | null;
+        };
+        AccountingChequeBounceRequest: {
+            /** @description YYYY-MM-DD. Default: today. */
+            bounced_on?: string;
+            /** @description The bank's fee, in minor units. */
+            fee_minor?: number;
+            /** @description Why, kept on the reversing entry. */
+            note?: string;
+        };
+        AccountingChequeDepositRequest: {
+            /** @description YYYY-MM-DD. Default: today. */
+            deposited_on?: string;
+            /** @description The bank account it went into. Default: Bank. */
+            account_id?: number;
         };
         AccountingCreditNoteRequest: {
             /** @description Leave out to credit everything still not credited. */
@@ -14327,6 +14541,29 @@ export interface components {
             issue_date?: string;
             /** @description Retrying with the same key returns the same credit note. */
             idempotency_key?: string;
+        };
+        AccountingCustomerStatement: {
+            contact: {
+                id: number;
+                name: string;
+            };
+            from: string;
+            to: string;
+            currency: string;
+            opening_minor: number;
+            closing_minor: number;
+            lines: {
+                line_id: number;
+                entry_id: number;
+                number: string;
+                date: string;
+                memo?: string;
+                source_type?: string;
+                source_id?: number | null;
+                debit_minor: number;
+                credit_minor: number;
+                balance_minor: number;
+            }[];
         };
         AccountingEntry: {
             id: number;
@@ -14605,6 +14842,91 @@ export interface components {
                 description?: string;
             }[];
         };
+        AccountingPayment: {
+            id: number;
+            /** @enum {string} */
+            direction: "in" | "out" | "transfer";
+            number: string;
+            contact_id?: number | null;
+            contact_name?: string | null;
+            paid_on: string;
+            amount_minor: number;
+            currency: string;
+            /** @enum {string} */
+            method: "cash" | "bank_transfer" | "cliq" | "card" | "cheque" | "whity_pay" | "other";
+            account_id?: number;
+            from_account_id?: number | null;
+            reference?: string;
+            cheque_number?: string | null;
+            cheque_bank?: string | null;
+            cheque_due_on?: string | null;
+            /** @enum {string|null} */
+            cheque_status?: "waiting" | "cleared" | "bounced" | null;
+            fee_minor?: number;
+            /** @enum {string} */
+            status: "posted" | "bounced";
+            allocated_minor?: number;
+            /** @description What it has not settled yet: the customer's credit. */
+            unallocated_minor: number;
+            notes?: string;
+            entry_id?: number | null;
+            deposit_entry_id?: number | null;
+            bounce_entry_id?: number | null;
+            external_ref?: string | null;
+            created_by_profile_id?: number | null;
+            agent_id?: number | null;
+            on_behalf_of_profile_id?: number | null;
+            owner_plugin?: string | null;
+            created_at?: string;
+            allocations?: {
+                id: number;
+                invoice_id: number;
+                invoice_number?: string | null;
+                amount_minor: number;
+                allocated_on: string;
+                /** @description True when a bounced cheque released it. */
+                released: boolean;
+            }[];
+        };
+        AccountingPaymentRequest: {
+            /** @description The customer who paid. */
+            contact_id: number;
+            /** @description YYYY-MM-DD. Default: today. */
+            paid_on?: string;
+            /** @description In normal units, such as "125.500". */
+            amount?: string;
+            /** @description Or the amount in minor units. */
+            amount_minor?: number;
+            /**
+             * @description Default: bank_transfer. It picks the account the money goes to.
+             * @enum {string}
+             */
+            method?: "cash" | "bank_transfer" | "cliq" | "card" | "cheque" | "whity_pay" | "other";
+            /** @description The bank or cash account it went to, instead of the method's. */
+            account_id?: number;
+            /** @description The bank's or provider's reference. */
+            reference?: string;
+            /** @description Needed for a cheque. */
+            cheque_number?: string;
+            /** @description The bank the cheque is drawn on. */
+            cheque_bank?: string;
+            /** @description YYYY-MM-DD. A later date keeps it on Cheques to collect until deposited. */
+            cheque_due_on?: string;
+            /** @description What a card or Whity Pay provider kept, in minor units. */
+            fee_minor?: number;
+            /** @description Settle this invoice with it. */
+            invoice_id?: number;
+            /** @description Or settle several invoices. */
+            allocations?: {
+                invoice_id: number;
+                /** @description Default: all that fits. */
+                amount_minor?: number;
+            }[];
+            /** @description Up to 2000 characters. */
+            notes?: string;
+            /** @description Retrying with the same key returns the same payment. */
+            idempotency_key?: string;
+        };
         AccountingPeriod: {
             id: number;
             fiscal_year_id?: number;
@@ -14731,6 +15053,24 @@ export interface components {
             valid_from?: string | null;
             /** @description YYYY-MM-DD, the last day it applies. */
             valid_to?: string | null;
+        };
+        AccountingTransferRequest: {
+            /** @description Where the money left: cash, a bank, or Money at payment providers. */
+            from_account_id: number;
+            /** @description Where it arrived. */
+            to_account_id: number;
+            /** @description In normal units, such as "500.000". */
+            amount?: string;
+            /** @description Or the amount in minor units. */
+            amount_minor?: number;
+            /** @description YYYY-MM-DD. Default: today. */
+            paid_on?: string;
+            /** @description The bank's or provider's reference. */
+            reference?: string;
+            /** @description Up to 2000 characters. */
+            notes?: string;
+            /** @description Retrying with the same key returns the same transfer. */
+            idempotency_key?: string;
         };
         AccountingTrialBalance: {
             from: string;
@@ -28199,6 +28539,80 @@ export interface operations {
             };
         };
     };
+    get_api_v1_accounting_customers_id_statement: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM-DD. Default: the first of January. */
+                from?: string;
+                /** @description YYYY-MM-DD. Default: today. */
+                to?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The statement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingCustomerStatement"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_accounting_entries: {
         parameters: {
             query?: {
@@ -29846,6 +30260,570 @@ export interface operations {
             };
         };
     };
+    get_api_v1_accounting_payments: {
+        parameters: {
+            query?: {
+                /** @description `in` (received) or `transfer`. */
+                direction?: string;
+                /** @description One customer's payments. */
+                contact_id?: number;
+                /** @description `cash`, `bank_transfer`, `cliq`, `card`, `cheque`, `whity_pay` or `other`. */
+                method?: string;
+                /** @description `waiting`, `cleared` or `bounced`. */
+                cheque_status?: string;
+                /** @description Paid on or after, YYYY-MM-DD. */
+                from?: string;
+                /** @description Paid on or before, YYYY-MM-DD. */
+                to?: string;
+                /** @description Part of the number, the reference or the customer's name. */
+                q?: string;
+                /** @description At most 200. Default 50. */
+                limit?: number;
+                /** @description Skip this many. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Payments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_payments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingPaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description The same payment, already recorded with this key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description The payment */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_payments_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The payment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_payments_id_allocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingAllocationRequest"];
+            };
+        };
+        responses: {
+            /** @description The payment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_payments_id_bounce: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingChequeBounceRequest"];
+            };
+        };
+        responses: {
+            /** @description The payment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_payments_id_deposit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingChequeDepositRequest"];
+            };
+        };
+        responses: {
+            /** @description The payment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_accounting_periods: {
         parameters: {
             query?: {
@@ -30085,6 +31063,78 @@ export interface operations {
             };
             /** @description A value that doesn't look right */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_reports_aged_receivables: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM-DD. Default: today. */
+                as_of?: string;
+                /** @description One customer only. */
+                contact_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Aged receivables */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingAgedReceivables"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -30567,6 +31617,115 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_transfers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description The same transfer, already recorded with this key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description The transfer */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

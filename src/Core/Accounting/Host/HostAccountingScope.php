@@ -7,6 +7,7 @@ namespace Whity\Core\Accounting\Host;
 use Whity\Sdk\Accounting\Accounts;
 use Whity\Sdk\Accounting\Invoices;
 use Whity\Sdk\Accounting\Ledger;
+use Whity\Sdk\Accounting\Payments;
 use Whity\Sdk\Accounting\Periods;
 use Whity\Sdk\Accounting\Reports;
 use Whity\Sdk\Accounting\Taxes;
@@ -27,6 +28,8 @@ final class HostAccountingScope implements AccountingScope
     private ?Accounts $accounts = null;
 
     private ?Invoices $invoices = null;
+
+    private ?Payments $payments = null;
 
     public function __construct(private readonly PluginInterface $plugin)
     {
@@ -84,6 +87,19 @@ final class HostAccountingScope implements AccountingScope
     public function taxes(): Taxes
     {
         return self::resolve(Taxes::class);
+    }
+
+    public function payments(): Payments
+    {
+        if ($this->payments === null) {
+            $host = self::resolve(Payments::class);
+            if (!$host instanceof HostPayments) {
+                throw ServiceUnavailable::named(Payments::class);
+            }
+            $this->payments = $host->for($this->plugin);
+        }
+
+        return $this->payments;
     }
 
     /**

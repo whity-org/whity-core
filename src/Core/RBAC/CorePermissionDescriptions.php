@@ -177,6 +177,8 @@ final class CorePermissionDescriptions
         CorePermissions::ACCOUNTING_SETTINGS          => 'Change the chart of accounts and the accounting settings',
         CorePermissions::INVOICES_READ                => 'See invoices and credit notes',
         CorePermissions::INVOICES_WRITE               => 'Draft, issue and credit invoices',
+        CorePermissions::PAYMENTS_READ                => 'See payments and what they settle',
+        CorePermissions::PAYMENTS_WRITE               => 'Record payments, allocate them and handle cheques',
         CorePermissions::FIELDS_MANAGE                => 'Add, change and archive the workspace\'s own fields on its records',
         CorePermissions::TASKS_READ                   => 'See tasks and boards in the workspace\'s Taskaat',
         CorePermissions::TASKS_WRITE                  => 'Create and change tasks in the workspace\'s Taskaat: checks, evidence and reviews',

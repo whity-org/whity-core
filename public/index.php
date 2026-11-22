@@ -6051,6 +6051,22 @@ $router->register('POST',   '/api/accounting/invoices/{id:\d+}/cancel',         
 $router->register('POST',   '/api/accounting/invoices/{id:\d+}/credit-notes',     [$accountingInvoicesHandler, 'credit'],         null, null, CorePermissions::INVOICES_WRITE);
 $router->register('GET',    '/api/accounting/invoice-settings',                   [$accountingInvoicesHandler, 'showSettings'],   null, null, CorePermissions::INVOICES_READ);
 $router->register('PATCH',  '/api/accounting/invoice-settings',                   [$accountingInvoicesHandler, 'updateSettings'], null, null, CorePermissions::ACCOUNTING_SETTINGS);
+// WHIT-1318 A2b: payments received, allocations, cheques, transfers, aged
+// receivables and the customer statement. Whity Pay records its payments and
+// payouts through the SDK's Payments (recordReceived, recordTransfer).
+$accountingPayments = new \Whity\Core\Accounting\Payments($accountingDb, $accountingWorkspace, $accountingLedger, $accountingInvoices, new \Whity\Database\SequenceCounters($db->getPdo()), $hookManager);
+$accountingReceivables = new \Whity\Core\Accounting\Receivables($accountingDb, $accountingWorkspace);
+\Whity\register_service(\Whity\Sdk\Accounting\Payments::class, new \Whity\Core\Accounting\Host\HostPayments($accountingPayments, $accountingGuard)); // @phpstan-ignore-line
+$accountingPaymentsHandler = new \Whity\Api\AccountingPaymentsApiHandler($accountingPayments, $accountingReceivables);
+$router->register('GET',    '/api/accounting/payments',                           [$accountingPaymentsHandler, 'list'],      null, null, CorePermissions::PAYMENTS_READ);
+$router->register('POST',   '/api/accounting/payments',                           [$accountingPaymentsHandler, 'receive'],   null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('GET',    '/api/accounting/payments/{id:\d+}',                  [$accountingPaymentsHandler, 'show'],      null, null, CorePermissions::PAYMENTS_READ);
+$router->register('POST',   '/api/accounting/payments/{id:\d+}/allocations',      [$accountingPaymentsHandler, 'allocate'],  null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('POST',   '/api/accounting/payments/{id:\d+}/deposit',          [$accountingPaymentsHandler, 'deposit'],   null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('POST',   '/api/accounting/payments/{id:\d+}/bounce',           [$accountingPaymentsHandler, 'bounce'],    null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('POST',   '/api/accounting/transfers',                          [$accountingPaymentsHandler, 'transfer'],  null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('GET',    '/api/accounting/reports/aged-receivables',           [$accountingPaymentsHandler, 'aged'],      null, null, CorePermissions::INVOICES_READ);
+$router->register('GET',    '/api/accounting/customers/{id:\d+}/statement',       [$accountingPaymentsHandler, 'statement'], null, null, CorePermissions::INVOICES_READ);
 
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,
