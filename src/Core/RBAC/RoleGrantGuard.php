@@ -33,6 +33,10 @@ use Whity\Core\Response;
  * admin who is not an owner must still be able to make somebody else admin,
  * which carries them.
  *
+ * PLUGIN PERMISSIONS IN THE SYSTEM WORKSPACE. A caller acting in the System
+ * workspace (tenant 0) who holds `plugins:enable` may grant any permission a
+ * plugin can own ({@see CorePermissions::isPluginOwnable()}), held or not.
+ *
  * Callers check that a role is visible to the tenant FIRST, so somebody else's
  * private role reads as "not found" and never as "has permissions you do not
  * hold".
@@ -41,6 +45,9 @@ final class RoleGrantGuard
 {
     /** The machine reason on every refusal, shared with the bulk role change. */
     public const REASON = 'exceeds_your_access';
+
+    /** The System workspace, where plugins are enabled for the whole install. */
+    private const SYSTEM_TENANT_ID = 0;
 
     public function __construct(private readonly RoleChecker $roleChecker)
     {
@@ -69,9 +76,21 @@ final class RoleGrantGuard
             true
         );
 
+        // In the System workspace, whoever may enable plugins may also hand out
+        // what those plugins declare. Somebody has to: nobody holds a plugin's
+        // permission until it is granted (admin has no wildcard), so without
+        // this a permission like `whity_pay:manage` could never reach any role.
+        // It widens nothing real, because choosing which plugin code runs is
+        // already more than any one of its permissions. Core permissions, and
+        // anything under a core resource, are still compared as before.
+        $pluginGrantor = $tenantId === self::SYSTEM_TENANT_ID && isset($held[CorePermissions::PLUGINS_ENABLE]);
+
         $missing = [];
         foreach ($permissions as $permission) {
             if (isset($held[$permission]) || in_array($permission, WorkspaceOwners::OWNER_ONLY_PERMISSIONS, true)) {
+                continue;
+            }
+            if ($pluginGrantor && CorePermissions::isPluginOwnable($permission)) {
                 continue;
             }
             $missing[$permission] = true;

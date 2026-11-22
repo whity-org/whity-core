@@ -53,6 +53,72 @@ final class PluginRoleSeeder
     }
 
     /**
+     * Put the permissions a plugin declares into the global `permissions`
+     * catalogue, so roles can be granted them.
+     *
+     * Every loaded plugin goes through this, not only ones that seed roles: a
+     * plugin like Whity Pay declares `whity_pay:manage` and expects an operator
+     * to grant it, and a grant needs a catalogue row. Called on every boot, so
+     * an install that is already running picks up a plugin's permissions on the
+     * next deploy without anyone running a command.
+     *
+     * Same boundary as grants (GHSA-r4hx-wj99-jw8m): only well-formed slugs the
+     * plugin declares itself, never a core permission or one under a core
+     * resource. Idempotent (ON CONFLICT DO NOTHING), and an existing row keeps
+     * its description. Rows are never removed here: disabling or uninstalling
+     * a plugin leaves them, because roles may still hold them.
+     *
+     * @param PluginInterface $plugin The loaded plugin.
+     * @return int How many rows were added.
+     */
+    public function catalogue(PluginInterface $plugin): int
+    {
+        $slugs = array_keys($this->ownPermissions($plugin, self::SYSTEM_TENANT_ID));
+        if ($slugs === []) {
+            return 0;
+        }
+
+        $pluginName = $plugin->getName();
+        try {
+            // One read on the usual boot, where every row is already there.
+            $placeholders = implode(',', array_fill(0, count($slugs), '?'));
+            $existing = $this->pdo->prepare("SELECT name FROM permissions WHERE name IN ({$placeholders})");
+            $existing->execute($slugs);
+            $missing = array_values(array_diff($slugs, $existing->fetchAll(PDO::FETCH_COLUMN)));
+            if ($missing === []) {
+                return 0;
+            }
+
+            $insert = $this->pdo->prepare(
+                'INSERT INTO permissions (name, description) VALUES (:name, :description)
+                 ON CONFLICT (name) DO NOTHING'
+            );
+            $added = 0;
+            foreach ($missing as $slug) {
+                $insert->execute([':name' => $slug, ':description' => $slug]);
+                $added += $insert->rowCount();
+            }
+        } catch (PDOException $e) {
+            $this->log(
+                'error',
+                sprintf('PluginRoleSeeder: could not catalogue permissions for plugin "%s": %s', $pluginName, $e->getMessage()),
+                ['plugin' => $pluginName]
+            );
+            return 0;
+        }
+
+        if ($added > 0) {
+            $this->log(
+                'info',
+                sprintf('PluginRoleSeeder: catalogued %d permission(s) for plugin "%s".', $added, $pluginName),
+                ['plugin' => $pluginName, 'permissions' => $missing]
+            );
+        }
+
+        return $added;
+    }
+
+    /**
      * Seed the roles and permission grants declared by a plugin.
      *
      * Called after the plugin registers successfully (activation path). If the
@@ -466,21 +532,11 @@ final class PluginRoleSeeder
             return [];
         }
 
-        $core = CorePermissions::all();
-        $coreResources = [];
-        foreach ($core as $permission) {
-            $coreResources[explode(':', $permission, 2)[0]] = true;
-        }
-
         $own = [];
         foreach ($declared as $slug) {
-            if (!is_string($slug) || !str_contains($slug, ':')) {
-                continue;
+            if (is_string($slug) && CorePermissions::isPluginOwnable($slug)) {
+                $own[$slug] = true;
             }
-            if (in_array($slug, $core, true) || isset($coreResources[explode(':', $slug, 2)[0]])) {
-                continue;
-            }
-            $own[$slug] = true;
         }
 
         return $own;
@@ -564,8 +620,9 @@ final class PluginRoleSeeder
      * operator made first is never attributed to the plugin.
      *
      * Silently skips the slug when it does not exist in the permissions catalogue
-     * rather than raising an error — the catalogue may not yet contain plugin
-     * permissions that are registered later.
+     * rather than raising an error. The loader catalogues a plugin's own
+     * permissions ({@see catalogue()}) before seeding, so a skip means the slug
+     * was refused there (malformed, or core).
      *
      * @param int    $roleId     The role to grant to.
      * @param string $slug       The `resource:action` permission slug.
