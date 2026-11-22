@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.151).
+ * SDK identity (v1.152).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1571,12 +1571,22 @@ namespace Whity\Sdk;
  *
  * Purely additive: a plugin that declares nothing keeps every service as before; `database()` is new and
  * needs the declaration. One new method on PluginScope, which only the host implements.)
+ *
+ * 1.152 (LOGS, ERRORS, ROUTE LIMITS AND INSTALL CALLBACKS (#1686, WHIT-1331)):
+ * {@see Context\PluginScope::log()} gives {@see Log\PluginLog} and {@see Context\PluginScope::errors()} gives
+ * {@see Log\ErrorReporter}; both pass everything through core's error scrubber and are tagged by the host with
+ * the plugin and workspace. A plugin route may declare `'rateLimit' => <calls a minute>` (1 to 10000), per person
+ * or, signed out, per address; past it the host answers 429. {@see PluginInstallLifecycleInterface} is told once
+ * per version per deployment that the plugin was installed or upgraded, after its migrations.
+ *
+ * Purely additive: two new methods on PluginScope, which only the host implements; one optional route key; one
+ * optional interface.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.151.0';
+    public const VERSION = '1.152.0';
 
     /**
      * Static identity only — never instantiated.
