@@ -304,11 +304,10 @@ final class RegisterApiHandler
                 // workspace and gating it are therefore one act or neither.
                 //
                 // `expired` is the status because it is the one the wall already
-                // refuses, and `block_writes` because an unpaid workspace is
-                // READ-ONLY, the same as a trial that ended unpaid (2026-11-22):
-                // its owner can open it, look around and reach Billing to pay.
-                // `block_all` walled every read too, so the owner could not
-                // even switch into it to pay.
+                // refuses, and `block_all` because a workspace nobody has paid
+                // for should do nothing except accept payment — the billing
+                // routes are exempt from the wall precisely so that stays
+                // reachable.
                 //
                 // The status is later overwritten by whatever the billing
                 // service says. It is not a claim that a subscription lapsed;
@@ -322,7 +321,7 @@ final class RegisterApiHandler
                     )->execute([
                         ':tenant_id' => $tenantId,
                         ':status'    => 'expired',
-                        ':mode'      => 'block_writes',
+                        ':mode'      => 'block_all',
                     ]);
                 }
 

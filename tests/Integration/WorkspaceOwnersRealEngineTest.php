@@ -131,7 +131,7 @@ final class WorkspaceOwnersRealEngineTest extends TestCase
 
         $stmt = $this->pdo->prepare('SELECT status, enforcement_mode FROM tenant_plan WHERE tenant_id = :t');
         $stmt->execute([':t' => $tenantId]);
-        self::assertSame(['status' => 'expired', 'enforcement_mode' => 'block_writes'], $stmt->fetch(PDO::FETCH_ASSOC));
+        self::assertSame(['status' => 'expired', 'enforcement_mode' => 'block_all'], $stmt->fetch(PDO::FETCH_ASSOC));
     }
 
     public function testOnlyAnOwnerKeepsBillingPay(): void

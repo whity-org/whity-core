@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Integration;
 
-use Database\Migrations\MakeExpiredWorkspacesReadOnly;
 use PDO;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\SchemaFromMigrations;
@@ -21,7 +20,6 @@ use Whity\Core\Subscription\SubscriptionRepository;
 use Whity\Core\Subscription\SubscriptionService;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Core\Tenant\WorkspaceOwners;
-use Whity\Database\Database;
 use Whity\Http\Middleware\PaymentWall;
 use Whity\Sdk\Http\Request as SdkRequest;
 use Whity\Sdk\Http\Response;
@@ -48,10 +46,12 @@ final class ExpiredSwitchJwtParser extends JwtParser
  * app.whity.dev): `POST /api/v1/auth/switch-tenant` answered 402, so the owner
  * of an expired workspace could never open it to reach Billing and pay.
  *
- * Now the switch succeeds, the workspace is read-only the same way a trial
- * that ended unpaid is (reads pass, changes are refused, Billing stays open),
- * and people who can't pay learn it is paused and who its owners are. The
- * trial-ended path is pinned unchanged alongside.
+ * Now the switch succeeds and the session is minted, but the workspace stays
+ * as locked as before: on `block_all` (how sign-up gates an unpaid workspace)
+ * every normal page and every change is still 402, and only Billing, the plan
+ * picker, checkout and the caller's own capabilities stay open. People who
+ * can't pay learn it is paused and who its owners are. The trial-ended path
+ * is pinned unchanged alongside.
  */
 final class ExpiredWorkspaceSwitchTest extends TestCase
 {
@@ -101,7 +101,7 @@ final class ExpiredWorkspaceSwitchTest extends TestCase
 
     public function testTheOwnerSwitchesIntoAnExpiredWorkspaceAndGetsASession(): void
     {
-        $this->expire(self::EXPIRED, SubscriptionService::MODE_BLOCK_WRITES);
+        $this->expire(self::EXPIRED, SubscriptionService::MODE_BLOCK_ALL);
 
         $response = $this->switchAs($this->owner, from: self::HOME, to: self::EXPIRED);
 
@@ -125,39 +125,45 @@ final class ExpiredWorkspaceSwitchTest extends TestCase
         self::assertSame(200, $res->getStatusCode());
     }
 
-    public function testInsideAnExpiredWorkspaceBillingIsOpenReadsPassAndChangesAreRefused(): void
+    /** As strict as before for everything but paying: pages and changes are 402. */
+    public function testInsideAnExpiredWorkspaceOnlyBillingIsOpen(): void
     {
-        $this->expire(self::EXPIRED, SubscriptionService::MODE_BLOCK_WRITES);
+        $this->expire(self::EXPIRED, SubscriptionService::MODE_BLOCK_ALL);
 
         foreach (['/api/v1/billing', '/api/v1/billing/pause', '/api/v1/billing/plans', '/api/v1/subscription', '/api/v1/me/capabilities'] as $path) {
             self::assertSame(200, $this->throughWall('GET', $path, self::EXPIRED)->getStatusCode(), "{$path} must stay open");
         }
         self::assertSame(200, $this->throughWall('POST', '/api/v1/billing/checkout', self::EXPIRED)->getStatusCode());
 
-        self::assertSame(200, $this->throughWall('GET', '/api/v1/contacts', self::EXPIRED)->getStatusCode(), 'read-only: reads pass');
-        $write = $this->throughWall('POST', '/api/v1/contacts', self::EXPIRED);
-        self::assertSame(402, $write->getStatusCode(), 'read-only: changes are refused');
+        foreach (['/api/v1/contacts', '/api/v1/documents', '/api/v1/me/notifications', '/api/v1/navigation'] as $path) {
+            self::assertSame(402, $this->throughWall('GET', $path, self::EXPIRED)->getStatusCode(), "{$path} must stay walled");
+        }
+        self::assertSame(402, $this->throughWall('POST', '/api/v1/contacts', self::EXPIRED)->getStatusCode());
+    }
+
+    /** A lapse an operator set to block writes only stays read-only, as before. */
+    public function testALapseOnBlockWritesStaysReadOnly(): void
+    {
+        $this->expire(self::EXPIRED, SubscriptionService::MODE_BLOCK_WRITES);
+
+        self::assertSame(200, $this->switchAs($this->owner, from: self::HOME, to: self::EXPIRED)->getStatusCode());
+        self::assertSame(200, $this->throughWall('GET', '/api/v1/contacts', self::EXPIRED)->getStatusCode());
+        self::assertSame(402, $this->throughWall('POST', '/api/v1/contacts', self::EXPIRED)->getStatusCode());
+        self::assertFalse($this->pause()->stateFor(self::EXPIRED)['reads_refused'] ?? null);
     }
 
     // ── who is told what ────────────────────────────────────────────────────
 
     public function testAPausedWorkspaceNamesItsOwnersForEveryMember(): void
     {
-        $this->expire(self::EXPIRED, SubscriptionService::MODE_BLOCK_WRITES);
+        $this->expire(self::EXPIRED, SubscriptionService::MODE_BLOCK_ALL);
 
         $state = $this->pause()->stateFor(self::EXPIRED);
 
         self::assertIsArray($state);
         self::assertSame('expired', $state['status']);
-        self::assertFalse($state['reads_refused']);
+        self::assertTrue($state['reads_refused']);
         self::assertSame([['name' => 'Amro Saleh']], $state['owners']);
-    }
-
-    public function testAWorkspaceWalledOnReadsTooSaysSo(): void
-    {
-        $this->expire(self::EXPIRED, SubscriptionService::MODE_BLOCK_ALL);
-
-        self::assertTrue($this->pause()->stateFor(self::EXPIRED)['reads_refused'] ?? null);
     }
 
     public function testAnOwnerWithNoNameIsNamedByAddress(): void
@@ -200,25 +206,6 @@ final class ExpiredWorkspaceSwitchTest extends TestCase
         self::assertIsArray($trial);
         self::assertTrue($trial['read_only']);
         self::assertSame('trialing', $trial['status']);
-    }
-
-    // ── migration 355 ───────────────────────────────────────────────────────
-
-    public function testTheMigrationMakesClosedGatesReadOnlyAndLeavesTheRest(): void
-    {
-        $this->expire(self::EXPIRED, SubscriptionService::MODE_BLOCK_ALL);
-        $this->subscriptions->setSubscription(self::TRIAL_ENDED, [
-            'status' => SubscriptionService::STATUS_CANCELED,
-            'enforcement_mode' => SubscriptionService::MODE_BLOCK_ALL,
-        ]);
-
-        $pdo = $this->pdo;
-        $db = Database::withFactory(static fn (): PDO => $pdo);
-        MakeExpiredWorkspacesReadOnly::up($db);
-        MakeExpiredWorkspacesReadOnly::up($db);
-
-        self::assertSame('block_writes', $this->subscriptions->getSubscription(self::EXPIRED)['enforcement_mode'] ?? null);
-        self::assertSame('block_all', $this->subscriptions->getSubscription(self::TRIAL_ENDED)['enforcement_mode'] ?? null);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

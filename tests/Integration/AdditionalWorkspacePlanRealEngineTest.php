@@ -205,7 +205,7 @@ final class AdditionalWorkspacePlanRealEngineTest extends TestCase
         $first = $this->planRow((int) $this->creator->createFor($pid, 'Example Bakery')['tenant_id']);
         self::assertIsArray($first);
         // The first keeps sign-up's own closed gate, unchanged.
-        self::assertSame(['expired', 'block_writes'], [$first['status'], $first['enforcement_mode']]);
+        self::assertSame(['expired', 'block_all'], [$first['status'], $first['enforcement_mode']]);
 
         $second = $this->planRow((int) $this->creator->createFor($pid, 'Example Cafe')['tenant_id']);
         self::assertIsArray($second);

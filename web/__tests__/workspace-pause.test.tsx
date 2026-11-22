@@ -116,7 +116,9 @@ describe('a paused workspace', () => {
 
     shell();
 
-    expect(await screen.findByTestId('workspace-paused-banner')).toBeInTheDocument();
+    const banner = await screen.findByTestId('workspace-paused-banner');
+    expect(banner).toHaveTextContent('Example Studio is paused.');
+    expect(banner).toHaveTextContent('Choose a plan on Billing to open it again.');
     expect(screen.getByText('The page')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Go to Billing' })).not.toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();

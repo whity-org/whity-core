@@ -16,10 +16,11 @@ import { useTranslation } from '@whity/features/i18n';
 /**
  * A workspace paused because its plan expired or was canceled (2026-11-22).
  *
- * - People who can pay (owners): the workspace opens READ-ONLY, the same as a
- *   trial that ended unpaid, with a line across the app pointing to Billing.
- *   When the wall refuses reads too, every page but Billing and the person's
- *   own pages sends them to Billing.
+ * - People who can pay (owners): the switch into it succeeds and a line across
+ *   the app points to Billing. Where the wall refuses reads too (`block_all`,
+ *   how an unpaid workspace is gated) every page but Billing and the person's
+ *   own pages sends them to Billing; where it refuses only changes, the
+ *   workspace is read-only, like a trial that ended unpaid.
  * - Everyone else: a plain page that says it is paused until an owner pays and
  *   names the owners. The sidebar stays, so they can open another workspace or
  *   sign out.
@@ -101,10 +102,14 @@ export function WorkspacePauseBanner() {
       <Icon name="lock" size={18} className="text-warning-text" />
       <span className="min-w-0 flex-1">
         <span className="font-semibold">
-          {t('billing.pause.owner.title', '{workspace} is read-only.', { workspace })}
+          {pause.reads_refused
+            ? t('billing.pause.owner.titlePaused', '{workspace} is paused.', { workspace })
+            : t('billing.pause.owner.title', '{workspace} is read-only.', { workspace })}
         </span>{' '}
         {t('billing.pause.owner.why', 'Its plan ended without payment. Nothing was deleted.')}{' '}
-        {t('billing.pause.owner.next', 'Choose a plan on Billing to make changes again.')}
+        {pause.reads_refused
+          ? t('billing.pause.owner.nextPaused', 'Choose a plan on Billing to open it again.')
+          : t('billing.pause.owner.next', 'Choose a plan on Billing to make changes again.')}
       </span>
       {!onBilling && (
         <Button asChild size="sm" variant="outline" data-testid="workspace-paused-billing">
