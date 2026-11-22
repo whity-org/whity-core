@@ -72,7 +72,7 @@ zip = "9"
 
 # SHA-256 verification of a downloaded plugin package against the server-
 # declared checksum, before anything touches disk.
-sha2 = "0.10"
+sha2 = "0.11"
 
 # Whole-app self-update (WC-app-self-update, src/self_update.rs), checked
 # before every plugin sync since a plugin package assumes a compatible app
