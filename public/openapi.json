@@ -64820,6 +64820,87 @@
                 ]
             }
         },
+        "/api/v1/plugin-frames/{feature}/token": {
+            "post": {
+                "operationId": "post_api_v1_plugin_frames_feature_token",
+                "summary": "A five-minute token for an embedded plugin screen, bound to the routes of its plugin",
+                "tags": [
+                    "frontend"
+                ],
+                "parameters": [
+                    {
+                        "name": "feature",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The token and its lifetime in seconds",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PluginFrameTokenResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No embed screen by that id that the caller may see",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/plugin-secrets/{plugin}/{key}": {
             "delete": {
                 "operationId": "delete_api_v1_plugin_secrets_plugin_key",
@@ -119913,6 +119994,29 @@
                     "name",
                     "enabled",
                     "file"
+                ]
+            },
+            "PluginFrameTokenResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "token": {
+                                "type": "string"
+                            },
+                            "expiresIn": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "token",
+                            "expiresIn"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "PluginListMeta": {

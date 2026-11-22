@@ -3085,6 +3085,22 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+            // #1688: the embed screen's bridge asks for this; the handler checks
+            // the screen's own permission and answers 404 for anything else.
+            [
+                'method' => 'POST',
+                'path' => '/api/plugin-frames/{feature}/token',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'A five-minute token for an embedded plugin screen, bound to the routes of its plugin',
+                    'tags' => ['frontend'],
+                    'responses' => [
+                        200 => self::jsonResponse('The token and its lifetime in seconds', 'PluginFrameTokenResponse'),
+                        404 => self::errorResponse('No embed screen by that id that the caller may see'),
+                    ] + self::authErrors(),
+                ],
+            ],
         ];
     }
 
@@ -11705,6 +11721,12 @@ final class CoreApiSchemas
             // `dropped` is NOT required: it is present only for a caller holding
             // plugins:read, and its absence is what says "not yours to read" as
             // distinct from an empty array's "nothing was refused".
+            'PluginFrameTokenResponse' => self::object([
+                'data' => self::object([
+                    'token' => self::str(),
+                    'expiresIn' => self::int(),
+                ], ['token', 'expiresIn']),
+            ], ['data']),
             'FrontendFeatureListResponse' => self::object(
                 [
                     'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('FrontendFeature')],

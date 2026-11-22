@@ -270,6 +270,13 @@ warning — the plugin still loads. Duplicate ids across plugins keep the first
 `GET /api/frontend/features`, returning each caller only the entries whose
 `requiredPermission` they hold.
 
+An `embed` screen's page runs sandboxed with no origin of its own. Since 1.150
+it calls the plugin's own routes through the app with
+`Whity\Sdk\Frontend\FrameBridge::script()` (`whity.request()`, `resize()`,
+`navigate()`, `toast()`): the app makes each call with a five-minute token that
+works only on this plugin's routes, never with the person's cookies. See
+"An embedded screen that calls its own API" in `docs/wiki/Plugin-Development.md`.
+
 ### Declaring requirements
 
 ```php
