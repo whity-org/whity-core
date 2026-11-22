@@ -48,6 +48,11 @@ describe('FlowLayoutError', () => {
     expect(err.problems).toEqual(problems);
   });
 
+  test('a form printout’s blocks are named as a person reads them (WHIT-1370)', () => {
+    expect(describeProblem({ page: 11, reason: 'unit taller than the content box', kind: 'content', unit: 'formQuestion' })).toMatch(/^A question on page 11/);
+    expect(describeProblem({ page: 2, reason: 'unit taller than the content box', kind: 'content', unit: 'approvals' })).toMatch(/^An approvals list on page 2/);
+  });
+
   test('each problem has a sentence a person can act on', () => {
     expect(describeProblem({ page: 2, reason: 'unit taller than the content box', kind: 'content', unit: 'figure' })).toBe(
       'A figure on page 2 is taller than a page and cannot be split; shorten it or split it into smaller blocks.'

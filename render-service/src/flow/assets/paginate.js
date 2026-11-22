@@ -72,6 +72,10 @@
 
   /* ---------------------------------------------------------------- utils */
 
+  function bottomOf(el) {
+    return el.getBoundingClientRect().bottom;
+  }
+
   function mmToPx(value) {
     return value * state.pxPerMm;
   }
@@ -137,10 +141,6 @@
       limit = contentTop + state.contentHeightPx;
     }
 
-    function bottomOf(el) {
-      return el.getBoundingClientRect().bottom;
-    }
-
     /* A per-block layout hint (#1186), read off the unit the HTML emitted.
      * Attributes rather than CSS because THIS function decides pages: it
      * measures every unit and packs the boxes itself, so `break-inside: avoid`
@@ -195,11 +195,19 @@
         carry.className = 'ff ff-q-carry';
         carry.setAttribute('data-flow-unit', 'formContinued');
         carry.innerHTML = node.getAttribute('data-flow-continued');
+        // A word the caller did not send: the document's own (labels.continued).
+        Array.prototype.forEach.call(carry.querySelectorAll('[data-flow-label]'), function (el) {
+          el.textContent = (doc.labels && doc.labels[el.getAttribute('data-flow-label')]) || '';
+        });
         current.content.appendChild(carry);
       }
 
       current.content.appendChild(node);
       var overflows = bottomOf(node) > limit + FIT_EPSILON;
+      /* Taller than a whole page (WHIT-1370): moving it to the next page
+       * cannot help, so "keep together" gives way and it is split where it
+       * stands. Measured now, while it is in a page box. */
+      var tallerThanPage = overflows && node.getBoundingClientRect().height > state.contentHeightPx + FIT_EPSILON;
 
       if (!overflows) {
         if (node.getAttribute && node.getAttribute('data-flow-unit') === 'heading') {
@@ -254,11 +262,18 @@
        * and still does not fit, the block below places it anyway and records
        * the overflow — a promise that cannot be kept is reported rather than
        * quietly broken. */
-      if (!hint(node, 'data-keep-together')) {
-        if (node.getAttribute && node.getAttribute('data-flow-unit') === 'paragraph') {
-          tail = splitParagraph(node, current.content, limit);
-        } else if (node.getAttribute && node.getAttribute('data-flow-unit') === 'table') {
-          tail = splitTable(node, current.content, limit);
+      var unitType = node.getAttribute ? node.getAttribute('data-flow-unit') : null;
+      /* A unit that cannot be placed whole on ANY page is never refused for
+       * its height alone (WHIT-1370): it splits between its items, or, when a
+       * single item is taller than what is left, inside that item's text. */
+      var mustSplit = tallerThanPage || isFirstOnPage;
+      if (!hint(node, 'data-keep-together') || mustSplit) {
+        if (unitType === 'paragraph') {
+          tail = splitParagraph(node, current.content, limit, mustSplit);
+        } else if (unitType === 'table') {
+          tail = splitTable(node, current.content, limit, mustSplit);
+        } else if (mustSplit) {
+          tail = splitItems(node, current.content, limit, isFirstOnPage);
         }
       }
 
@@ -276,6 +291,7 @@
         // treats a non-empty overflow list as a failed render.
         current.content.appendChild(node);
         scaleFigureToFit(node, limit - contentTop);
+        scaleImagesToFit(node, limit);
         if (bottomOf(node) > limit + FIT_EPSILON) {
           state.problems.push({
             page: pages.length,
@@ -304,7 +320,7 @@
    * the paragraph cannot be split usefully — too few lines fit, or too few
    * would be left over, which is the orphan/widow rule.
    */
-  function splitParagraph(node, container, limit) {
+  function splitParagraph(node, container, limit, mustSplit) {
     container.appendChild(node);
 
     var probe = document.createRange();
@@ -312,8 +328,11 @@
     var lines = Array.prototype.filter.call(probe.getClientRects(), function (r) {
       return r.height > 0.5;
     });
+    /* Orphan and widow control is a nicety; a paragraph that has to split
+     * (it fits no page whole) keeps one line rather than none (WHIT-1370). */
+    var minLines = mustSplit ? 1 : MIN_LINES;
 
-    if (lines.length < MIN_LINES * 2) {
+    if (lines.length < minLines * 2) {
       container.removeChild(node);
       return null;
     }
@@ -327,7 +346,7 @@
       }
     }
 
-    if (kept < MIN_LINES || lines.length - kept < MIN_LINES) {
+    if (kept < minLines || lines.length - kept < minLines) {
       container.removeChild(node);
       return null;
     }
@@ -451,13 +470,33 @@
    * continuation and marking its caption as continued. The anchor stays on
    * the head, which is where the front-matter entry should point.
    */
-  function splitTable(node, container, limit) {
+  function splitTable(node, container, limit, mustSplit) {
     container.appendChild(node);
+    var snapshot = node.cloneNode(true);
+    // A row cut at the limit can still run over by its cells' padding and
+    // rules; the cut is made again that much higher (WHIT-1370).
+    var shrink = 0;
+    for (var attempt = 0; attempt < 4; attempt += 1) {
+      var outcome = trySplitTable(node, limit, mustSplit, limit - shrink);
+      if (outcome && outcome.tail) {
+        return outcome.tail;
+      }
+      restoreFrom(node, snapshot);
+      if (!outcome || !mustSplit || !outcome.rowSplit) {
+        break;
+      }
+      shrink += outcome.over + 1;
+    }
+    container.removeChild(node);
+    return null;
+  }
 
+  /** One try at splitTable. {tail} on success, {over, rowSplit} when the head
+   * still runs over, null when there is no place to split. */
+  function trySplitTable(node, limit, mustSplit, cellLimit) {
     var table = node.querySelector('table');
     var tbody = table ? table.querySelector('tbody') : null;
-    if (!tbody || tbody.rows.length < 2) {
-      container.removeChild(node);
+    if (!tbody || tbody.rows.length < (mustSplit ? 1 : 2)) {
       return null;
     }
 
@@ -471,8 +510,21 @@
       }
     }
 
+    /* One row taller than what is left of a page that has to take it: the
+     * row's cells split at a line, each cell's rest continuing in a copy of
+     * the row on the next page (WHIT-1370). */
+    var rowSplit = false;
+    if (kept < rows.length && mustSplit) {
+      var rowTail = splitTextCells(rows[kept], cellLimit);
+      if (rowTail) {
+        rows[kept].parentNode.insertBefore(rowTail, rows[kept].nextSibling);
+        rows = Array.prototype.slice.call(tbody.rows);
+        kept += 1;
+        rowSplit = true;
+      }
+    }
+
     if (kept < 1 || kept >= rows.length) {
-      container.removeChild(node);
       return null;
     }
 
@@ -506,16 +558,334 @@
     tailTable.appendChild(tailBody);
     tail.appendChild(tailTable);
 
-    if (node.getBoundingClientRect().bottom > limit + FIT_EPSILON) {
-      // Removing the rows was not enough (an enormous caption, say). Undo.
-      for (var k = 0; k < tailBody.rows.length; ) {
-        tbody.appendChild(tailBody.rows[0]);
+    var over = bottomOf(node) - limit;
+    if (over > FIT_EPSILON) {
+      // Removing the rows was not enough (an enormous caption, say): the
+      // caller puts the table back as it was.
+      return { over: over, rowSplit: rowSplit };
+    }
+
+    return { tail: tail };
+  }
+
+  /** Put `node` back exactly as `snapshot` (a deep copy) was, keeping the
+   * element itself: the caller still holds it. */
+  function restoreFrom(node, snapshot) {
+    var copy = snapshot.cloneNode(true);
+    while (node.firstChild) {
+      node.removeChild(node.firstChild);
+    }
+    while (copy.firstChild) {
+      node.appendChild(copy.firstChild);
+    }
+    Array.prototype.slice.call(node.attributes).forEach(function (a) {
+      node.removeAttribute(a.name);
+    });
+    Array.prototype.forEach.call(copy.attributes, function (a) {
+      node.setAttribute(a.name, a.value);
+    });
+  }
+
+  /* ----------------------------------------------- splitting any unit */
+
+  /** The unit's own split points (`data-flow-item`), in document order: not
+   * those of a unit nested inside it. */
+  function ownItems(node) {
+    return Array.prototype.filter.call(node.querySelectorAll('[data-flow-item]'), function (el) {
+      var owner = el.parentNode;
+      while (owner && owner !== node) {
+        if (owner.getAttribute && owner.getAttribute('data-flow-unit')) {
+          return false;
+        }
+        owner = owner.parentNode;
       }
+      return owner === node;
+    });
+  }
+
+  /** The child-index path from `root` down to `el`. */
+  function pathTo(root, el) {
+    var path = [];
+    while (el && el !== root) {
+      path.unshift(Array.prototype.indexOf.call(el.parentNode.childNodes, el));
+      el = el.parentNode;
+    }
+    return path;
+  }
+
+  function follow(root, path) {
+    var el = root;
+    for (var i = 0; i < path.length; i += 1) {
+      el = el.childNodes[path[i]];
+    }
+    return el;
+  }
+
+  /**
+   * Cut `node` just before `item`: `node` keeps everything above it and a copy
+   * of `node` (returned) takes the item and everything after it. Whatever sits
+   * before the item in the copy is dropped, except a part marked
+   * `data-flow-repeat` (a table's header row, a grid's column heads), which
+   * prints again, and a part marked `data-flow-slot`, which is kept empty so a
+   * two-column row keeps its columns.
+   */
+  function cutBefore(node, item) {
+    var path = pathTo(node, item);
+    var tail = node.cloneNode(true);
+    var el = item;
+    while (el !== node) {
+      while (el.nextSibling) {
+        el.parentNode.removeChild(el.nextSibling);
+      }
+      var up = el.parentNode;
+      if (el === item) {
+        up.removeChild(el);
+      }
+      el = up;
+    }
+    var copy = follow(tail, path);
+    while (copy !== tail) {
+      var sibling = copy.previousSibling;
+      while (sibling) {
+        var before = sibling.previousSibling;
+        if (sibling.nodeType === 1 && sibling.getAttribute('data-flow-repeat') === '1') {
+          // printed again on the continuation
+        } else if (sibling.nodeType === 1 && sibling.getAttribute('data-flow-slot') === '1') {
+          sibling.innerHTML = '';
+        } else {
+          sibling.parentNode.removeChild(sibling);
+        }
+        sibling = before;
+      }
+      copy = copy.parentNode;
+    }
+    tail.removeAttribute('data-anchor');
+    tail.setAttribute('data-flow-split', 'tail');
+    node.setAttribute('data-flow-split', 'head');
+    // The question's "continued" line rides on the continuation only (FP.8).
+    var carry = node.getAttribute('data-flow-tail-continued');
+    if (carry) {
+      tail.setAttribute('data-flow-continued', carry);
+    }
+    return tail;
+  }
+
+  /**
+   * Split a unit that cannot be placed whole (WHIT-1370) between its items:
+   * a question's Yes / No rows, options, facts or table rows, a list's items,
+   * a fields panel's fields, approvals. The head, with as many items as fit,
+   * is left in `container`; the rest is returned as a copy of the unit.
+   *
+   * When not even the first item fits and the unit is the first thing on its
+   * page (there is no better page to wait for), that item's own text splits.
+   *
+   * Null when nothing useful fits here: the caller then moves the unit to a
+   * fresh page, or, if it is already on one, places it and reports it.
+   */
+  function splitItems(node, container, limit, firstOnPage) {
+    container.appendChild(node);
+    var items = ownItems(node);
+    if (items.length === 0) {
       container.removeChild(node);
       return null;
     }
 
-    return tail;
+    var over = items.length;
+    for (var i = 0; i < items.length; i += 1) {
+      if (items[i].getBoundingClientRect().bottom > limit + FIT_EPSILON) {
+        over = i;
+        break;
+      }
+    }
+
+    // Cut before the first item that does not fit, or, when the items all fit
+    // and only what follows them does not, before the last one; step back an
+    // item at a time while the head (with its padding and rules) still runs over.
+    var snapshot = node.cloneNode(true);
+    for (var k = Math.min(over, items.length - 1); k >= 1; k -= 1) {
+      var tail = cutBefore(node, ownItems(node)[k]);
+      if (bottomOf(node) <= limit + FIT_EPSILON) {
+        return tail;
+      }
+      restoreFrom(node, snapshot);
+    }
+
+    if (firstOnPage || node.getBoundingClientRect().height > state.contentHeightPx + FIT_EPSILON) {
+      // Not even the first item fits under the unit's head: its text splits,
+      // the cut moved up by however much padding and rules still ran over.
+      var shrink = 0;
+      for (var attempt = 0; attempt < 4; attempt += 1) {
+        var first = ownItems(node)[0];
+        var rest = first ? splitTextCells(first, limit - shrink) : null;
+        if (!rest) {
+          break;
+        }
+        rest.setAttribute('data-flow-item', '1');
+        first.parentNode.insertBefore(rest, first.nextSibling);
+        var tail2 = cutBefore(node, rest);
+        var overBy = bottomOf(node) - limit;
+        if (overBy <= FIT_EPSILON) {
+          return tail2;
+        }
+        restoreFrom(node, snapshot);
+        shrink += overBy + 1;
+      }
+    }
+
+    container.removeChild(node);
+    return null;
+  }
+
+  /**
+   * Where the text of `cell` crosses `limit`: {all: true} when it all fits,
+   * null when none of it does, else the (text node, offset) to cut at,
+   * moved back to a space so a word is not broken.
+   */
+  function textCut(cell, limit) {
+    var texts = [];
+    var total = 0;
+    var walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT, null);
+    var textNode = walker.nextNode();
+    while (textNode) {
+      texts.push({ node: textNode, start: total, length: textNode.data.length });
+      total += textNode.data.length;
+      textNode = walker.nextNode();
+    }
+    if (total === 0) {
+      return { all: true };
+    }
+    function locate(offset) {
+      for (var i = 0; i < texts.length; i += 1) {
+        if (offset <= texts[i].start + texts[i].length) {
+          return { node: texts[i].node, offset: offset - texts[i].start };
+        }
+      }
+      var last = texts[texts.length - 1];
+      return { node: last.node, offset: last.length };
+    }
+    var range = document.createRange();
+    function fits(offset) {
+      var at = locate(offset);
+      range.setStart(cell, 0);
+      range.setEnd(at.node, at.offset);
+      var rects = Array.prototype.filter.call(range.getClientRects(), function (r) {
+        return r.height > 0.5;
+      });
+      if (rects.length === 0) {
+        return true;
+      }
+      return rects[rects.length - 1].bottom <= limit + FIT_EPSILON;
+    }
+    if (fits(total)) {
+      return { all: true };
+    }
+    var low = 1;
+    var high = total;
+    var best = 0;
+    while (low <= high) {
+      var mid = (low + high) >> 1;
+      if (fits(mid)) {
+        best = mid;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+    if (best <= 0) {
+      return null;
+    }
+    var flat = texts
+      .map(function (t) {
+        return t.node.data;
+      })
+      .join('');
+    var cut = best;
+    for (var back = 0; back < 40 && cut > 1; back += 1) {
+      if (/\s/.test(flat.charAt(cut - 1))) {
+        break;
+      }
+      cut -= 1;
+    }
+    if (cut <= 1) {
+      cut = best;
+    }
+    return locate(cut);
+  }
+
+  /**
+   * Split one item's text at `limit`: a table row cell by cell (each cell
+   * keeps what fits and its rest goes to the same column of a copy of the
+   * row), anything else as one cell. The item keeps the head; the copy with
+   * the rest is returned, or null when no cell has anything that fits.
+   */
+  function splitTextCells(item, limit) {
+    var cells = item.tagName === 'TR' ? Array.prototype.slice.call(item.cells) : [item];
+    var cuts = [];
+    var anyKept = false;
+    var anyRest = false;
+    for (var i = 0; i < cells.length; i += 1) {
+      var cut = textCut(cells[i], limit);
+      cuts.push(cut);
+      if (cut === null) {
+        anyRest = true;
+      } else if (cut.all) {
+        anyKept = true;
+      } else {
+        anyKept = true;
+        anyRest = true;
+      }
+    }
+    if (!anyKept || !anyRest) {
+      return null;
+    }
+    var rest = item.cloneNode(false);
+    rest.setAttribute('data-flow-split', 'tail');
+    for (var j = 0; j < cells.length; j += 1) {
+      var target = item.tagName === 'TR' ? cells[j].cloneNode(false) : rest;
+      var range = document.createRange();
+      if (cuts[j] === null) {
+        range.selectNodeContents(cells[j]);
+      } else if (!cuts[j].all) {
+        range.setStart(cuts[j].node, cuts[j].offset);
+        range.setEnd(cells[j], cells[j].childNodes.length);
+      } else {
+        range = null;
+      }
+      if (range) {
+        target.appendChild(range.extractContents());
+      }
+      if (target !== rest) {
+        rest.appendChild(target);
+      }
+    }
+    return rest;
+  }
+
+  /** Shrink the tallest image in a unit placed alone on a page and still too
+   * tall (a signature, a logo, an embedded picture) so the unit fits. */
+  function scaleImagesToFit(node, limit) {
+    var excess = bottomOf(node) - limit;
+    if (excess <= FIT_EPSILON || !node.querySelectorAll) {
+      return;
+    }
+    var tallest = null;
+    var tallestHeight = 0;
+    Array.prototype.forEach.call(node.querySelectorAll('img, svg'), function (el) {
+      var h = el.getBoundingClientRect().height;
+      if (h > tallestHeight) {
+        tallest = el;
+        tallestHeight = h;
+      }
+    });
+    if (!tallest || tallestHeight - excess < 20) {
+      return;
+    }
+    var target = tallestHeight - excess - 2;
+    tallest.style.height = target + 'px';
+    tallest.style.maxHeight = target + 'px';
+    tallest.style.width = 'auto';
+    tallest.style.maxWidth = '100%';
+    tallest.style.objectFit = 'contain';
   }
 
   /** Shrink an oversized figure so it fits one content box, rather than

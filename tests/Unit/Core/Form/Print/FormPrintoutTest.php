@@ -203,6 +203,74 @@ final class FormPrintoutTest extends TestCase
         self::assertSame([['text' => 'Option 2', 'chosen' => true]], $q['answer']['options']);
     }
 
+    /**
+     * WHIT-1370: AAU IRB's application was refused whole because one question
+     * was taller than a page. What core sends for an answer longer than a page,
+     * a table row taller than a page and a signature drawn far taller than it
+     * is wide must reach Whity Render whole and in the shape it splits or
+     * scales (render-service/scripts/check-flow-tall-blocks.js proves that side
+     * in a real browser): nothing is cut short here, and a long answer is never
+     * one unsplittable two-column row.
+     */
+    public function testBlocksTallerThanAPageReachTheRendererWholeAndSplittable(): void
+    {
+        $long = trim(str_repeat('The participants will keep a sleep diary for six weeks before their exams. ', 160));
+        self::assertGreaterThan(10000, mb_strlen($long), 'longer than an A4 page at 9.5 pt');
+        $drugs = [
+            'field_key' => 'drugs_list', 'field_type' => 'repeating', 'label' => ['en' => 'Identify the drugs'],
+            'help_text' => null, 'help_text_i18n' => [], 'is_required' => false, 'options' => [],
+            'validation' => ['columns' => array_map(
+                static fn (int $i): array => ['key' => 'c' . $i, 'type' => 'textarea', 'label' => ['en' => 'Column ' . $i]],
+                range(1, 8),
+            )],
+            'section_key' => 'regulated', 'visible_when' => null,
+        ];
+        // Eight narrow columns of 500 characters each: one row taller than a page.
+        $tallRow = array_combine(array_map(static fn (int $i): string => 'c' . $i, range(1, 8)), array_fill(0, 8, str_repeat('word ', 100)));
+        $tallDrawing = ['viewBox' => [40, 4000], 'paths' => ['M20 0 L20 4000']];
+
+        foreach (['stacked', 'twoColumns'] as $questions) {
+            $payload = $this->build(
+                ['questions' => $questions, 'longAnswers' => 'countAndContinued'],
+                ['aims' => $long, 'reviewed' => $long, 'drugs' => 'yes', 'drugs_list' => [$tallRow, ['c1' => 'Short']],
+                    'pi_sign' => ['name' => 'Dr Ahmad Khalil', 'signed_at' => '2026-11-02T09:12:00Z', 'drawing' => $tallDrawing]],
+                extraFields: [$drugs],
+            );
+            $byText = [];
+            foreach (self::blocks($payload, 'formQuestion') as $q) {
+                $byText[$q['text']] = $q;
+            }
+
+            // An answer longer than a page: whole, stacked, and (a textarea) with "continued".
+            foreach (['Aims of the project', 'Has another committee reviewed it?'] as $text) {
+                $q = $byText[$text];
+                self::assertSame('text', $q['answer']['kind']);
+                self::assertSame([$long], $q['answer']['paragraphs'], "$questions: $text prints whole");
+                self::assertArrayNotHasKey('layout', $q, "$questions: $text is never one two-column row");
+                self::assertTrue(FormPrintout::isLongText($q['answer']));
+            }
+            self::assertSame('continued', $byText['Aims of the project']['continued']);
+
+            // A table row taller than a page: every row, every column, no row layout.
+            $table = $byText['Identify the drugs'];
+            self::assertSame('table', $table['answer']['kind']);
+            self::assertCount(2, $table['answer']['rows']);
+            self::assertCount(8, $table['answer']['rows'][0]);
+            self::assertSame(500, mb_strlen($table['answer']['rows'][0][0]));
+            self::assertArrayNotHasKey('layout', $table);
+
+            // A drawing far taller than wide: sent as drawn; the pad scales it.
+            self::assertSame($tallDrawing, self::blocks($payload, 'signatureRow')[0]['drawing']);
+        }
+
+        // A short answer keeps its two columns, as before.
+        $short = $this->build(['questions' => 'twoColumns']);
+        $title = array_values(array_filter(self::blocks($short, 'formQuestion'), static fn (array $q): bool => $q['text'] === 'Project title'))[0];
+        self::assertSame('row', $title['layout']);
+        self::assertFalse(FormPrintout::isLongText(['kind' => 'text', 'paragraphs' => [str_repeat('x', FormPrintout::LONG_ANSWER_CHARS)]]));
+        self::assertTrue(FormPrintout::isLongText(['kind' => 'text', 'paragraphs' => [str_repeat('x', FormPrintout::LONG_ANSWER_CHARS + 1)]]));
+    }
+
     public function testSignaturesAreConfirmedInWhityBesideTheDrawing(): void
     {
         $row = self::blocks($this->build(), 'signatureRow')[0];
