@@ -7709,6 +7709,8 @@ if ($isWorker) {
 
                 // Create request from PHP superglobals
                 $request = Request::fromGlobals();
+                // #2386 (CE-4): believe X-Whity-Client-Ip only from a trusted proxy.
+                \Whity\Core\RateLimit\ClientIp::authenticate($request, $_SERVER);
 
                 // Resolve CORS headers once per request from the allowlist (WC-53).
                 // A plugin's public form sets its own (WHIT-906): they never allow credentials.
@@ -7873,6 +7875,8 @@ if ($isWorker) {
     try {
         // Create request from PHP superglobals
         $request = Request::fromGlobals();
+        // #2386 (CE-4): believe X-Whity-Client-Ip only from a trusted proxy.
+        \Whity\Core\RateLimit\ClientIp::authenticate($request, $_SERVER);
 
         // Resolve CORS headers once per request from the allowlist (WC-53).
         // A plugin's public form sets its own (WHIT-906): they never allow credentials.

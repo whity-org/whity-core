@@ -1,0 +1,130 @@
+# Whity beside another app on one origin, behind Caddy (whity-org/whity-core#2386).
+# Guide: docs/wiki/Same-Origin-Setup.md. This is the shape that was tested
+# end to end; adapt the images, the other app and the secrets to yours.
+#
+#   cp .env.example .env    # then fill in the secrets
+#   docker compose up -d postgres
+#   docker compose run --rm --no-deps app php public/index.php migrate run
+#   docker compose up -d
+#   ./smoke.sh http://localhost:8080
+#
+# Migrate BEFORE starting the app: on an empty database its workers fail to
+# boot and restart, which would also kill a migration run inside them.
+#
+# Only Caddy publishes a port. The backend and the web app are reachable only
+# on the compose network, and the backend believes the client-IP header only
+# from Caddy's fixed address (WHITY_TRUSTED_PROXIES) or with the web app's
+# signature (WHITY_CLIENT_IP_SECRET).
+
+name: ${COMPOSE_PROJECT_NAME:-whity-same-origin}
+
+services:
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "${PUBLISH:-8080}:8080"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:8080}
+      WHITY_BACKEND: app:80
+      WHITY_WEB: web:3000
+      OTHER_APP: other:80
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./whity-paths.caddy:/etc/caddy/whity-paths.caddy:ro
+    networks:
+      edge:
+        ipv4_address: ${CADDY_IP:-172.30.0.10}
+
+  app:
+    image: ${WHITY_IMAGE:-ghcr.io/whity-org/whity-core:latest}
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      # The ONE origin people use. The SSO callback is built on it
+      # (APP_URL/api/v1/auth/sso/<key>/callback) and every link in emails and
+      # redirects starts with it, so FRONTEND_URL is not needed.
+      APP_URL: ${ORIGIN:?ORIGIN must be the public origin, e.g. https://campus.example.com}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: whity_core
+      DB_USER: whity
+      DB_PASSWORD: ${DB_PASSWORD:?}
+      JWT_SECRET: ${JWT_SECRET:?}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?}
+      INITIAL_SYSTEM_ADMIN_EMAIL: ${INITIAL_SYSTEM_ADMIN_EMAIL:-}
+      INITIAL_SYSTEM_ADMIN_PASSWORD: ${INITIAL_SYSTEM_ADMIN_PASSWORD:?}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:?}
+      INITIAL_USER_PASSWORD: ${INITIAL_USER_PASSWORD:?}
+      INITIAL_SUPERUSER_PASSWORD: ${INITIAL_SUPERUSER_PASSWORD:?}
+      CADDY_GLOBAL_OPTIONS: "auto_https off"
+      SERVER_NAME: ":80"
+      SERVER_ROOT: "public/"
+      FRANKENPHP_CONFIG: "worker /app/public/index.php 4"
+      STORAGE_ROOT: /app/storage
+      # CE-4: who may set X-Whity-Client-Ip. Caddy by address, the web app by signature.
+      WHITY_TRUSTED_PROXIES: ${CADDY_IP:-172.30.0.10}
+      WHITY_CLIENT_IP_SECRET: ${WHITY_CLIENT_IP_SECRET:?WHITY_CLIENT_IP_SECRET must be 32+ random characters}
+      # Optional, see Hiding pages and Home page and back link.
+      WHITY_HIDDEN_NAV_IDS: ${WHITY_HIDDEN_NAV_IDS:-}
+      WHITY_HOME_PATH: ${WHITY_HOME_PATH:-}
+      WHITY_BACK_TO_PRODUCT_URL: ${WHITY_BACK_TO_PRODUCT_URL:-}
+      WHITY_BACK_TO_PRODUCT_LABEL: ${WHITY_BACK_TO_PRODUCT_LABEL:-}
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [edge, internal]
+
+  web:
+    image: ${WHITY_WEB_IMAGE:-ghcr.io/whity-org/whity-core/web:latest}
+    restart: unless-stopped
+    init: true
+    environment:
+      WHITY_BACKEND_URL: http://app
+      # Caddy is the one hop in front: read the browser's host and address from it.
+      TRUSTED_PROXY_HOPS: "1"
+      WHITY_CLIENT_IP_SECRET: ${WHITY_CLIENT_IP_SECRET:?}
+      # The service worker stays off the other app's pages; narrow it further
+      # with a prefix such as /admin/, or turn installing off with PWA_ENABLED=false
+      # on the app container.
+      WHITY_PWA_SCOPE: ${WHITY_PWA_SCOPE:-/}
+    depends_on: [app]
+    networks: [edge]
+
+  postgres:
+    image: pgvector/pgvector:pg15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: whity
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?}
+      POSTGRES_DB: whity_core
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U whity -d whity_core"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [internal]
+
+  # Stand-in for your app: it answers every path Whity does not own.
+  other:
+    image: caddy:2
+    command: ["caddy", "respond", "--listen", ":80", "--body", "Example Bakery app: this path belongs to the other app."]
+    networks: [edge]
+
+networks:
+  edge:
+    ipam:
+      config:
+        - subnet: ${EDGE_SUBNET:-172.30.0.0/24}
+  internal:
+    ipam:
+      config:
+        - subnet: ${INTERNAL_SUBNET:-172.31.0.0/24}
+
+volumes:
+  storage: {}
+  pgdata: {}

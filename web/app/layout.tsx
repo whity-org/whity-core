@@ -23,6 +23,7 @@ import { UiPreferencesProvider } from "@/lib/ui-preferences-context";
 import { getAppInstall } from "@/lib/pwa/app-install";
 import { appIconUrl } from "@/lib/pwa/shared";
 import { AppInstall } from "@/components/pwa/app-install";
+import { pwaScope } from "@/lib/pwa/scope";
 
 // Design-token font families (see src/design/tokens/base.json): Noto Sans
 // (latin) + Noto Sans Arabic together drive --font-sans / --font-heading (see
@@ -294,6 +295,7 @@ export default async function RootLayout({
                               state={appInstall.state}
                               name={appInstall.siteName}
                               iconUrl={appIconUrl("192", appInstall.version)}
+                              scope={pwaScope()}
                             />
                           </PluginFeaturesProvider>
                         </NavigationProvider>
