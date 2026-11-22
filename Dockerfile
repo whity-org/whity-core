@@ -124,12 +124,23 @@ WORKDIR /app
 
 # The application tree (.dockerignore keeps dev artifacts, tests, the web
 # frontend and any locally deployed plugins out — only the reference plugins
-# ship). composer.json resolves whity/plugin-sdk from the in-repo sdk/ path
-# repository, which this COPY brings along.
-COPY . /app
-
+# ship), then the autoloader for it, exactly as `composer install` writes it.
+#
+# Dependencies come first (WHIT-1340), so the install layer is keyed on the
+# lock file and reused, from the registry layer cache images.yml configures, by
+# every commit that does not change a dependency. composer.json resolves
+# whity/plugin-sdk from the in-repo sdk/ path repository, and resolving it needs
+# only sdk/composer.json; the package is linked into vendor/ and its sources
+# arrive with the tree. No autoloader until the classes it maps are there.
+# composer.json defines no install scripts, so --no-scripts skips nothing.
+COPY composer.json composer.lock ./
+COPY sdk/composer.json sdk/composer.json
 RUN composer install --no-dev --prefer-dist --no-progress --no-interaction \
+        --no-autoloader --no-scripts \
     && composer clear-cache
+
+COPY . /app
+RUN composer dump-autoload --no-dev
 
 # The image's IDENTITY, baked in beside the code it describes (#1049).
 #

@@ -194,12 +194,12 @@ feature/… ──▶ develop ──▶ main ──▶ tag v0.x.y
 
 - **Open PRs against `develop`.** It is the default branch, so a PR opened with
   no explicit base already targets it.
-- **`main` receives `develop`** when a release is being cut, plus direct
-  bug-fix PRs for anything that must ship without waiting for the rest of
-  `develop`.
-- **Releases are cut by the pipeline, not by hand.** You run one workflow and
-  merge two PRs; the tag, both images, the GitHub Release and the back-merge are
-  automatic. See [Cutting a release](#cutting-a-release) below.
+- **`main` receives a release branch cut from `develop`** when a release is
+  being cut, plus direct bug-fix PRs for anything that must ship without
+  waiting for the rest of `develop`.
+- **Releases are cut by the pipeline, not by hand.** One workflow dispatch, on
+  the owner's word; the merges, the tag, the images, the GitHub Release and the
+  back-merge are automatic. See [Cutting a release](#cutting-a-release) below.
 
 Both branches are protected identically: a PR is required, and `CI gate`,
 `CodeQL` and `Semgrep SAST (PHP + JS/TS)` must pass. Neither accepts a direct
@@ -210,39 +210,49 @@ never reports would block a PR forever.
 
 ### Cutting a release
 
-Run **Actions → Release — prepare**, give it a version (`0.2.2`, no leading `v`),
-and merge the two PRs it produces. Nothing else is manual.
+Only a release into `main` needs the owner. On their word, run **Actions →
+Release — prepare** with a version (`0.2.2`, no leading `v`). Nothing else is
+manual (WHIT-1340).
 
 ```
-  you: run "Release — prepare" with a version
+  owner's word → run "Release — prepare" with a version
         │
         ▼
-  release/X.Y.Z ──PR──▶ develop          ← you merge  (1)
-        │
-        │  bumps CoreVersion, dates the CHANGELOG,
-        │  regenerates openapi.json + both typed clients
+  release/X.Y.Z (cut from develop)
+        │  folds changelog.d/ into CHANGELOG.md, bumps CoreVersion,
+        │  regenerates openapi.json + the typed client, versions npm packages
         ▼
-  release-promote.yml sees the bump land on develop
-        │
-        ▼
-  develop ──PR──▶ main                    ← you merge  (2)
-        │
+  release/X.Y.Z ──PR──▶ main     auto-merge, merge commit, once main's
+        │                        required checks pass
         ▼
   release.yml sees main move and:
-    · runs the full gate suite
-    · builds + pushes BOTH images
+    · skips the suites the release PR's CI already passed on this tree
+    · runs migrate + seed + idempotency on real PostgreSQL
+    · builds + pushes the app, web and render images (registry layer cache)
     · smoke-tests the PUBLISHED images (/login 200, /api/health ok)
     · tags main as vX.Y.Z            ← only now, after everything passed
     · creates the GitHub Release
-    · opens the back-merge PR         ← you merge  (3, zero file changes)
+    · opens the back-merge PR into develop, auto-merge armed
 ```
 
 Why it is shaped this way:
 
-- **The two merges stay human.** `main` and `develop` refuse direct pushes from
-  everyone, admins included. A pipeline that needed that relaxed to run would
-  trade a real safety property for two clicks.
-- **The tag is created last**, after the suite, both image builds and the smoke
+- **The release PR goes straight to `main`.** That freezes the release at the
+  develop commit it was cut from: what lands on develop afterwards waits for the
+  next one. Until v0.2.31 the bump went through develop's merge queue first and
+  a second PR promoted develop to main (`release-promote.yml`, retired), two
+  hand merges and 56 minutes in all; now the release is tagged in about 25.
+- **Auto-merge, not a relaxed branch.** `main` and `develop` still refuse direct
+  pushes from everyone, admins included. Auto-merge merges only once the
+  required checks pass, so the dispatch is the only approval the release needs.
+  It is armed with the release token: a merge made with `github.token` would
+  not start `release.yml`.
+- **No suite runs twice on the same code.** A PR into `main` runs every suite,
+  with coverage. When `scripts/release-equivalence.sh` finds that green run on
+  the release commit's exact tree, `release.yml` skips PHPUnit, PHPStan, the
+  plugin guards and the frontend suites; when it cannot prove it, they run. Its
+  header spells out what counts.
+- **The tag is created last**, after the suite, the image builds and the smoke
   test. Releases are immutable, so a tag orphaned by a failed build cannot be
   moved — the next attempt would need a new version number for a failure that
   had nothing to do with the code. Creating it at the end makes a failed run
@@ -250,9 +260,10 @@ Why it is shaped this way:
 - **Pushing to `main` does not always release.** `release.yml` only proceeds
   when `v` + `CoreVersion::VERSION` has no tag yet, so ordinary fixes can land
   on `main` without publishing anything.
-- **Merge the develop → main PR with a merge commit, never a squash.** A squash
-  creates a commit that exists nowhere on `develop`, leaving the branches
-  permanently divergent and turning every later release into a conflict.
+- **Merge commits, never squashes**, for the release PR and the back-merge. A
+  squash creates a commit that exists nowhere on the other branch, leaving the
+  branches permanently divergent and turning every later release into a
+  conflict. The workflows set the method themselves.
 - **Regeneration happens in CI, not on a laptop.** `generate:openapi` runs the
   live router, so a locally-installed plugin publishes its routes into core's
   public contract. A clean CI checkout has only the in-tree plugins.
@@ -261,20 +272,25 @@ Pushing a `vX.Y.Z` tag by hand still works, as an escape hatch for re-running a
 release whose publish step failed.
 
 **The back-merge PR comes from a branch off `develop`.** `release.yml` builds
-`chore/back-merge-vX.Y.Z` as a merge of `develop` and `main` and opens the PR
-from it. Merge it with a **merge commit**; a squash would drop the very commit
-it exists to carry. If `develop` moves first, **Update branch** brings it up to
-date, and nothing ever pushes to `main`. Until v0.2.17 the PR's head was `main`
-itself, which strict protection (enforced for admins) let merge only while
-`develop` had not moved, so most back-merges had to be rebuilt by hand. The PR
-normally changes no files; when it does, `main` carries something that never
-went through `develop` (a hotfix), and the PR says so. If the two branches
-conflict, the job stops and asks for a person.
+`chore/back-merge-vX.Y.Z` as a merge of `develop` and `main`, opens the PR from
+it and arms auto-merge, so develop's merge queue merges it (with a merge
+commit) once its checks pass. It carries the release commit, the version bump
+and dated CHANGELOG, to develop; any other file means `main` carries something
+that never went through `develop` (a hotfix), and the PR says so. Until v0.2.17
+the PR's head was `main` itself, which strict protection (enforced for admins)
+let merge only while `develop` had not moved, so most back-merges had to be
+rebuilt by hand. If the two branches conflict, the job stops and asks for a
+person; the release is already published by then, and the next **Release —
+prepare** refuses to run until the back-merge has landed, because the release
+PR could not otherwise be up to date with `main`.
 
 #### The release token
 
-Every PR the pipeline opens (the release PR, the develop → main PR and the
-back-merge) needs its CI to run before it can merge. GitHub holds the workflow
+Every PR the pipeline opens (the release PR and the back-merge) needs its CI
+to run before it can merge, and the release PR's merge must be made by the
+release token: a merge made with `github.token` starts no workflow, so
+`release.yml` would never run. Without a release token, auto-merge is not armed
+and someone merges the release PR by hand. GitHub holds the workflow
 runs of a PR opened with the built-in `github.token` until someone with write
 access approves them, so with no release token configured each release PR sits
 at **Approve workflows to run**. The jobs still work, and each one's summary
