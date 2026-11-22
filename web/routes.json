@@ -1145,6 +1145,14 @@
       "since": "0.2.28"
     },
     {
+      "path": "/csp-report",
+      "kind": "file",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.31"
+    },
+    {
       "path": "/dashboard",
       "kind": "page",
       "area": "protected",
