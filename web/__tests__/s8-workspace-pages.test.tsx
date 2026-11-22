@@ -14,7 +14,11 @@ jest.mock('next/navigation', () => ({
 }));
 
 const apiClient = jest.fn();
-jest.mock('@/lib/auth-context', () => ({ useAuth: () => ({ apiClient }) }));
+const sessionChanged = jest.fn(async () => undefined);
+jest.mock('@/lib/auth-context', () => ({
+  useAuth: () => ({ apiClient }),
+  useOptionalAuth: () => ({ sessionChanged }),
+}));
 // The typed client is adapted onto the URL router below: the template and its
 // path params become the concrete URL, and a body travels as init.body.
 async function viaRouter(
@@ -161,6 +165,8 @@ describe('change plan', () => {
       idempotency_key: 'key-12345678',
     });
     expect(addToast).toHaveBeenCalledWith('You’re now on Large.', 'success');
+    // Limits and banners follow the new plan, here and in other tabs (2026-11-22).
+    expect(sessionChanged).toHaveBeenCalled();
   });
 
   it('says a cheaper plan waits for renewal', async () => {
@@ -172,6 +178,8 @@ describe('change plan', () => {
     await waitFor(() =>
       expect(addToast).toHaveBeenCalledWith('You’ll move to Tiny at your next renewal.', 'success')
     );
+    // Nothing changes until the renewal, so nothing refreshes.
+    expect(sessionChanged).not.toHaveBeenCalled();
   });
 
   it('says so when it fails, and does not report a change', async () => {
