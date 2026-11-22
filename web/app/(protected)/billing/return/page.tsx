@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
 import { apiFetch } from '@/lib/api/client';
+import { useOptionalAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';
 import { PublicOutcome } from '@/components/auth/public-outcome';
 import { Button } from '@whity/ui/button';
@@ -50,6 +51,9 @@ interface BillingReturn {
  */
 const ENDED_UNPAID = new Set(['failed', 'declined', 'expired', 'canceled', 'cancelled']);
 
+/** Checkouts whose return already refreshed the session, for this page load. */
+const refreshedCheckouts = new Set<string>();
+
 function BillingReturnContent() {
   const t = useTranslation('admin');
   const dates = useDateDisplay();
@@ -71,6 +75,17 @@ function BillingReturnContent() {
     }
     return (body as { data?: BillingReturn } | undefined)?.data as BillingReturn;
   }, [reference]);
+
+  // A paid workspace: banners, limits and Billing refresh here and in every tab
+  // (2026-11-22). Once per checkout, since the refresh remounts this page.
+  const auth = useOptionalAuth();
+  const sessionChanged = auth?.sessionChanged;
+  const hasAccess = data?.has_access === true;
+  useEffect(() => {
+    if (!hasAccess || sessionChanged === undefined || refreshedCheckouts.has(reference)) return;
+    refreshedCheckouts.add(reference);
+    void sessionChanged();
+  }, [hasAccess, reference, sessionChanged]);
 
   const toBilling = (variant: 'default' | 'outline') => (
     <Button asChild size="lg" variant={variant} className="w-full">
