@@ -98,6 +98,9 @@ services:
   render:
     image: ghcr.io/whity-org/whity-core/render:${WHITY_VERSION}
     restart: unless-stopped
+    # READINESS CO-25: no capabilities and no privilege gain for the browser tier.
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     profiles:
       - render
     init: true
