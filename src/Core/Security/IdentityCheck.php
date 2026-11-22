@@ -47,6 +47,18 @@ class IdentityCheck
     /** Email codes for gating carry no route. */
     private const NO_ROUTE = 0;
 
+    /**
+     * Where a fresh sign-in for a gated approval is kept: the platform workspace, always.
+     *
+     * The sign-in is recorded when the person comes back from their provider, under whatever
+     * workspace their session has open; the approval is checked under the workspace it belongs
+     * to. Those differ when someone accepts an ownership offer from another workspace, so a
+     * sign-in recorded in one was never found in the other. It is the person's own proof, bound
+     * to them and to the approval's purpose (whose subject names the workspace where it matters),
+     * so one fixed place loses nothing and both sides agree.
+     */
+    public const FRESH_SIGN_IN_TENANT = 0;
+
     public function __construct(
         private readonly PDO $db,
         private readonly SigningChallengeRepository $challenges,
@@ -108,7 +120,7 @@ class IdentityCheck
      *
      * @param string $purpose what is being approved, e.g. "2fa-recovery:12"
      * @param string $what    the plain words for the email: "approving a two-step reset"
-     * @return array{method: string, email_hint: ?string}|null
+     * @return array{method: string, email_hint: ?string, provider_key?: ?string, purpose?: string}|null
      */
     public function start(int $tenantId, int $profileId, string $purpose, string $what): ?array
     {
@@ -147,7 +159,7 @@ class IdentityCheck
         $method = $this->methodFor($profileId);
         if ($method === self::FRESH_SIGN_IN) {
             // No code: the provider's answer was recorded when the approver came back (WHIT-1147).
-            return $this->challenges->consumeGateFreshSignIn($tenantId, $profileId, self::key($purpose)) ? $method : null;
+            return $this->challenges->consumeGateFreshSignIn(self::FRESH_SIGN_IN_TENANT, $profileId, self::key($purpose)) ? $method : null;
         }
         $code = preg_replace('/\s+/', '', (string) $code) ?? '';
         if ($code === '') {

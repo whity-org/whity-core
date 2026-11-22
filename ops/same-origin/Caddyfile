@@ -1,0 +1,43 @@
+# Whity and another app on ONE origin (whity-org/whity-core#2386).
+#
+# Guide: docs/wiki/Same-Origin-Setup.md. Three upstreams:
+#
+#   WHITY_BACKEND  the whity-core image (FrankenPHP), e.g. app:80
+#   WHITY_WEB      the whity-core web image (Next.js), e.g. web:3000
+#   OTHER_APP      your own app, which keeps every path Whity does not use
+#
+# SITE_ADDRESS is the origin, e.g. campus.example.com (Caddy gets a
+# certificate for it) or :8080 for a plain-http local test.
+
+{$SITE_ADDRESS::8080} {
+	# 1. Straight to the backend: the API, MCP and its OAuth discovery.
+	#    Caddy sets the client IP itself and drops anything the browser sent
+	#    under that name, including the underscore spelling PHP folds onto
+	#    the same variable. The backend believes the header only from this
+	#    proxy's address (WHITY_TRUSTED_PROXIES).
+	@backend path /api /api/* /mcp /mcp/* /.well-known/oauth-protected-resource /.well-known/oauth-protected-resource/*
+	handle @backend {
+		reverse_proxy {$WHITY_BACKEND:app:80} {
+			header_up -X-Whity-Client-Ip-Signature
+			header_up -X_Whity_Client_Ip
+			header_up -X_Whity_Client_Ip_Signature
+			header_up X-Whity-Client-Ip {remote_host}
+			header_up X-Forwarded-Host {host}
+		}
+	}
+
+	# 2. The Whity web app: its pages, its build files and Next's assets.
+	#    Regenerate this list after an upgrade:
+	#      docker run --rm <web image> node web/scripts/route-manifest.mjs --caddy > whity-paths.caddy
+	import whity-paths.caddy
+	handle @whity {
+		reverse_proxy {$WHITY_WEB:web:3000} {
+			header_up X-Forwarded-Host {host}
+		}
+	}
+
+	# 3. Everything else, `/` included, is your app.
+	handle {
+		reverse_proxy {$OTHER_APP:other:80}
+	}
+}

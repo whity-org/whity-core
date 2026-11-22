@@ -28,7 +28,7 @@ interface Throwaway {
 
 /**
  * Create a throwaway regular user via the admin API and return its credentials.
- * The backend requires a password of at least 8 characters here.
+ * The backend requires a password of at least 12 characters here.
  */
 async function createThrowawayUser(api: APIRequestContext): Promise<Throwaway> {
   const email = `wc64-${uniqueSuffix()}@example.com`;

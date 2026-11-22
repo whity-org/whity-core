@@ -97,7 +97,7 @@
  * flags is measuring a browser this service does not run.
  */
 
-const { CHROMIUM_LAUNCH_ARGS, chromiumExecutablePath } = require('./renderer');
+const { CHROMIUM_LAUNCH_ARGS, chromiumExecutablePath, lockDownPage } = require('./renderer');
 
 /*
  * puppeteer-core is ESM-only from v25 and is loaded where it is used, not at
@@ -714,6 +714,7 @@ function summarise(results) {
 async function withPage(browser, html, fn) {
   const page = await browser.newPage();
   try {
+    await lockDownPage(page);
     await page.setContent(html, { waitUntil: 'load', timeout: PROBE_TIMEOUT_MS });
     return await fn(page);
   } finally {

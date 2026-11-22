@@ -1,5 +1,5 @@
 import { backendUrl } from '@/lib/backend-url';
-import { CLIENT_IP_HEADER, stripClientIpHeaders, trustedClientIp, trustedForwardedHost } from '@/lib/trusted-client-ip';
+import { setClientIpHeaders, stripClientIpHeaders, trustedClientIp, trustedForwardedHost } from '@/lib/trusted-client-ip';
 
 /**
  * Forward `/mcp` to the backend (WHIT-697).
@@ -42,7 +42,7 @@ export async function forwardMcp(request: Request, upstreamPath: string): Promis
     // the internal header the backend trusts.
     stripClientIpHeaders(headers);
     const clientIp = trustedClientIp(request);
-    if (clientIp) headers.set(CLIENT_IP_HEADER, clientIp);
+    setClientIpHeaders(headers, clientIp);
     // WHIT-1287 (#2195): the host the browser asked for, as the /api proxy sends it.
     const forwardedHost = trustedForwardedHost(request);
     if (forwardedHost) headers.set('X-Forwarded-Host', forwardedHost);

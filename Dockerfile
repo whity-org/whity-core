@@ -25,12 +25,21 @@
 #                     release workflow builds this stage and pushes it to GHCR;
 #                     container-based deployments run it as-is (see
 #                     docs/wiki/Core-Update.md).
-FROM dunglas/frankenphp:1-php8.4.27 AS base
+FROM dunglas/frankenphp:1-php8.4.28 AS base
 
 # Install required packages for the PostgreSQL and zip extensions. libzip-dev
 # backs ext-zip, which the staged plugin-upload installer (WC-220) needs to
 # safely inspect/extract uploaded .zip packages via ZipArchive.
-RUN apt-get update && apt-get install -y \
+#
+# `apt-get upgrade` takes Debian's security point releases at build time
+# (WHIT-1336). The upstream image is rebuilt for PHP releases, not Debian ones:
+# on 2026-11-22 the newest dunglas/frankenphp:1-php8.4 still shipped glibc
+# 2.41-12+deb13u4 with deb13u5 already in trixie, and Trivy reported every
+# glibc CVE fixed between them against this image. With the upgrade here, a
+# rebuild clears them without waiting for upstream.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y \
     libpq-dev \
     libzip-dev \
     && rm -rf /var/lib/apt/lists/*
@@ -83,9 +92,17 @@ RUN { \
 # a session by itself to do so, so an unauthenticated POST reaches it on a
 # platform that — like this one — never calls session_start() anywhere.
 # Nothing here reads upload progress, so turning it off costs us nothing.
+#
+# display_errors — the image never copies php.ini-production, so PHP's built-in
+# default (display_errors=1) applied: a warning or deprecation inside a request
+# was printed into the response body with file paths (READINESS CE-20). Errors
+# go to the log instead, which is where the worker's error_log already writes.
 RUN { \
       echo 'expose_php = Off'; \
       echo 'session.upload_progress.enabled = 0'; \
+      echo 'display_errors = Off'; \
+      echo 'display_startup_errors = Off'; \
+      echo 'log_errors = On'; \
     } > "$PHP_INI_DIR/conf.d/zz-whity-security.ini"
 
 # Set working directory
@@ -115,12 +132,23 @@ WORKDIR /app
 
 # The application tree (.dockerignore keeps dev artifacts, tests, the web
 # frontend and any locally deployed plugins out — only the reference plugins
-# ship). composer.json resolves whity/plugin-sdk from the in-repo sdk/ path
-# repository, which this COPY brings along.
-COPY . /app
-
+# ship), then the autoloader for it, exactly as `composer install` writes it.
+#
+# Dependencies come first (WHIT-1340), so the install layer is keyed on the
+# lock file and reused, from the registry layer cache images.yml configures, by
+# every commit that does not change a dependency. composer.json resolves
+# whity/plugin-sdk from the in-repo sdk/ path repository, and resolving it needs
+# only sdk/composer.json; the package is linked into vendor/ and its sources
+# arrive with the tree. No autoloader until the classes it maps are there.
+# composer.json defines no install scripts, so --no-scripts skips nothing.
+COPY composer.json composer.lock ./
+COPY sdk/composer.json sdk/composer.json
 RUN composer install --no-dev --prefer-dist --no-progress --no-interaction \
+        --no-autoloader --no-scripts \
     && composer clear-cache
+
+COPY . /app
+RUN composer dump-autoload --no-dev
 
 # The image's IDENTITY, baked in beside the code it describes (#1049).
 #

@@ -182,6 +182,7 @@ final class CoreApiSchemas
             InventoryApiSchemas::routes(),
             ImportApiSchemas::routes(),
             SalesApiSchemas::routes(),
+            AccountingApiSchemas::routes(),
             ContactsApiSchemas::customFieldRoutes()
         ));
     }
@@ -3591,6 +3592,23 @@ final class CoreApiSchemas
                     ],
                 ],
             ],
+            // #2386: public, so the web server's route guard can ask before sign-in.
+            [
+                'method' => 'GET',
+                'path' => '/api/navigation/hidden',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The menu items and Settings pages hidden on this instance (public)',
+                    'description' => 'The union of the navigation.hidden_ids setting and the WHITY_HIDDEN_NAV_IDS '
+                        . 'environment variable. Hidden items leave GET /api/navigation and GET /api/settings/tabs, '
+                        . 'and the web app answers their pages with 404. See docs/wiki/Hiding-Pages.md.',
+                    'tags' => ['platform-ops'],
+                    'responses' => [
+                        200 => self::jsonResponse('The hidden ids', 'HiddenNavIdsResponse'),
+                    ],
+                ],
+            ],
             self::permissionRoute('GET', '/api/migrations', 'migrations:read', [
                 'summary' => 'List database migrations and their execution state',
                 'tags' => ['platform-ops'],
@@ -4656,6 +4674,38 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The package, its name and its sha256', 'ThemePackageResponse'),
                     413 => self::errorResponse('The theme is larger than 32 KB'),
                     422 => self::errorResponse('The theme has problems, or is one of Whity\'s own'),
+                ] + self::authErrors(),
+            ]),
+            // TH.25: versions of the workspace's own themes.
+            self::permissionRoute('GET', '/api/themes/{themeId}/versions', 'settings:read', [
+                'summary' => 'List a theme\'s versions',
+                'description' => 'The history of one of this workspace\'s own themes (imported, made in the editor or restored), newest first: each version, how it came in, when and who saved it, and which is in use. Whity\'s and plugins\' themes have no history here.',
+                'tags' => ['theme'],
+                'parameters' => [['name' => 'themeId', 'in' => 'path', 'required' => true, 'description' => 'The theme\'s id, like acme.harbour', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('The versions', 'ThemeVersionsResponse'),
+                    404 => self::errorResponse('This workspace has no theme of its own with that id'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/themes/{themeId}/versions/{version}', 'settings:read', [
+                'summary' => 'Get one version of a theme',
+                'description' => 'That version\'s theme file, for comparing it with another (POST /api/themes/compare).',
+                'tags' => ['theme'],
+                'parameters' => [['name' => 'themeId', 'in' => 'path', 'required' => true, 'description' => 'The theme\'s id, like acme.harbour', 'schema' => ['type' => 'string']], ['name' => 'version', 'in' => 'path', 'required' => true, 'description' => 'A version number like 1.2.0', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('The theme file', 'ThemeVersionFileResponse'),
+                    404 => self::errorResponse('No such version'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes/{themeId}/versions/{version}/restore', 'settings:write', [
+                'summary' => 'Restore an earlier version of a theme',
+                'description' => 'Saves that version\'s file as the next version, numbered past the newest, so the history only grows. Workspaces using the theme see it at once.',
+                'tags' => ['theme'],
+                'parameters' => [['name' => 'themeId', 'in' => 'path', 'required' => true, 'description' => 'The theme\'s id, like acme.harbour', 'schema' => ['type' => 'string']], ['name' => 'version', 'in' => 'path', 'required' => true, 'description' => 'A version number like 1.2.0', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    201 => self::jsonResponse('Restored as a new version', 'RestoreThemeVersionResponse'),
+                    404 => self::errorResponse('No such version'),
+                    422 => self::errorResponse('That version is no longer a valid theme'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('DELETE', '/api/themes/{themeId}', 'settings:write', [
@@ -6285,6 +6335,19 @@ final class CoreApiSchemas
                 'pay_online' => self::bool() + ['description' => 'This deployment takes payments online'],
                 'card_step' => self::bool() + ['description' => 'A card can be added now and first charged when the trial ends'],
             ], ['plan_key', 'plan_name', 'status', 'trial_ends_at', 'days_left', 'read_only', 'card_added', 'price', 'pay_online', 'card_step']),
+            // 2026-11-22: a workspace paused because its plan expired or was canceled.
+            'WorkspacePauseState' => self::object([
+                'status' => self::str() + ['description' => 'expired or canceled'],
+                'reads_refused' => self::bool() + ['description' => 'The wall refuses reads too, not only changes'],
+                'owners' => [
+                    'type' => 'array',
+                    'description' => 'The owners who can pay, by name',
+                    'items' => self::object(['name' => self::str()], ['name']),
+                ],
+            ], ['status', 'reads_refused', 'owners']),
+            'WorkspacePauseResponse' => self::object([
+                'data' => ['allOf' => [['$ref' => '#/components/schemas/WorkspacePauseState']], 'nullable' => true],
+            ], ['data']),
             'WorkspaceTrialResponse' => self::object([
                 'data' => ['allOf' => [['$ref' => '#/components/schemas/WorkspaceTrialState']], 'nullable' => true],
             ], ['data']),
@@ -6643,10 +6706,17 @@ final class CoreApiSchemas
                 // reachable, version mismatch, switched off); `fix` is the
                 // operator's change and is null unless the caller holds
                 // settings:manage in the system tenant.
+                // WHIT-1370: `code` names the reason for the page to word
+                // (`render_unavailable`, `render_refused`, `final_waiting`,
+                // another route finalisation reason, or `not_made`);
+                // `route_id` is the route whose final document this is, to
+                // try again through its final-document/retry.
                 'pdf_pending' => self::object([
                     'reason' => self::str(),
                     'fix' => self::str(true),
-                ], ['reason', 'fix']),
+                    'code' => self::str(),
+                    'route_id' => self::int(true),
+                ], ['reason', 'fix', 'code', 'route_id']),
                 // WHIT-922: the signatures standing on the current version, on
                 // GET /api/documents/{id} only. A signature on an earlier
                 // version is not carried over.
@@ -12034,6 +12104,11 @@ final class CoreApiSchemas
                 'requiredPermission' => self::str(true),
             ], ['id', 'label', 'href', 'icon', 'group', 'order']),
             'NavigationListResponse' => self::listEnvelope('NavigationItem'),
+            // GET /api/navigation/hidden (#2386)
+            'HiddenNavIdsResponse' => self::dataEnvelope(self::object([
+                'nav' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Menu item ids, as on GET /api/navigation.'],
+                'settings' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Settings page ids, without the settings. prefix.'],
+            ], ['nav', 'settings'])),
 
             // GET /api/settings/tabs (WC-tabs-nav-be)
             'SettingsTab' => self::object([
@@ -12413,6 +12488,15 @@ final class CoreApiSchemas
                 'builtOnWhity' => ['type' => 'boolean', 'description' => 'Whether this workspace\'s public pages show "Built on Whity". False when its plan removes the credit.'],
                 // CU.4: the workspace currency, so the app writes money in it.
                 'currency' => ['type' => 'string', 'description' => 'The workspace currency as an ISO 4217 code (billing.default_currency; USD by default). Amounts with a currency of their own show in that one.'],
+                // #2386: an instance's home and its way back to the product beside it.
+                'homePath' => ['type' => 'string', 'description' => 'Where people land after signing in and where home links go: a path on this site (navigation.home_path, else WHITY_HOME_PATH, else /dashboard).'],
+                'backToProduct' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'description' => 'A link at the top of the sidebar back to the product Whity runs beside (navigation.back_to_product_url and _label, else WHITY_BACK_TO_PRODUCT_URL and _LABEL), or null for none.',
+                    'properties' => ['url' => self::str(), 'label' => self::str()],
+                    'required' => ['url', 'label'],
+                ],
             ], ['siteName', 'logoWideUrl', 'logoSquareUrl', 'faviconUrl', 'mainColor', 'theme', 'installable']),
             // GET /api/branding — the standard data envelope around Branding.
             'BrandingResponse' => self::dataEnvelope(SchemaBuilder::ref('Branding')),
@@ -12566,6 +12650,25 @@ final class CoreApiSchemas
                 'size_bytes' => self::int(),
                 'content_base64' => self::str() + ['description' => 'The zip, base64-encoded.'],
             ], ['plugin', 'filename', 'media_type', 'sha256', 'size_bytes', 'content_base64'])),
+            'ThemeVersionsResponse' => self::dataEnvelope(self::object([
+                'theme_id' => self::str(),
+                'current' => self::str() + ['description' => 'The version in use.'],
+                'versions' => ['type' => 'array', 'description' => 'Newest first.', 'items' => self::object([
+                    'version' => self::str(),
+                    'source' => self::str() + ['description' => 'import, editor or restore.'],
+                    'saved_at' => self::str(),
+                    'saved_by' => self::str(true) + ['description' => 'The name of the person who saved it, when known.'],
+                    'current' => self::bool(),
+                ], ['version', 'source', 'saved_at', 'current'])],
+            ], ['theme_id', 'current', 'versions'])),
+            'ThemeVersionFileResponse' => self::dataEnvelope(self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The theme file (schemas/theme/v1.json).'],
+            ], ['theme'])),
+            'RestoreThemeVersionResponse' => self::dataEnvelope(self::object([
+                'id' => self::str(),
+                'version' => self::str() + ['description' => 'The new version number.'],
+                'restored_from' => self::str() + ['description' => 'The version it was made from.'],
+            ], ['id', 'version', 'restored_from'])),
             'DeleteThemeResponse' => self::dataEnvelope(self::object(['deleted' => self::bool()], ['deleted'])),
 
             // ── Forgotten-password + 2FA-recovery (WC-password-reset-2fa-recovery) ──
@@ -13177,7 +13280,7 @@ final class CoreApiSchemas
                 'counts' => SchemaBuilder::ref('DataTypeBulkCounts'),
                 'results' => ['type' => 'array', 'items' => SchemaBuilder::ref('DataTypeBulkResult')],
             ], ['key', 'action', 'counts', 'results'])),
-        ] + self::workspacePluginComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components() + ImportApiSchemas::components() + SalesApiSchemas::components();
+        ] + self::workspacePluginComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components() + ImportApiSchemas::components() + SalesApiSchemas::components() + AccountingApiSchemas::components();
     }
 
     /**
@@ -15554,6 +15657,18 @@ final class CoreApiSchemas
                 'tags' => ['billing'],
                 'responses' => [
                     200 => self::jsonResponse('The trial of this workspace','WorkspaceTrialResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/billing/pause', [
+                'summary' => 'Whether this workspace is paused because its plan lapsed, and who its owners are',
+                'description' =>
+                    'For every member: when the subscription of this workspace expired or was canceled '
+                    . 'and changes are refused, its status, whether reads are refused too, and the names of its '
+                    . 'owners, so people who cannot pay are told who can. `data` is null when the workspace '
+                    . 'is not paused. Not behind the payment wall.',
+                'tags' => ['billing'],
+                'responses' => [
+                    200 => self::jsonResponse('Whether this workspace is paused', 'WorkspacePauseResponse'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/billing/limits', 'billing:view', [

@@ -53,6 +53,32 @@ final class BaseImagePinTest extends TestCase
      * is the thing people route around. This asks only the question the floating
      * tag got wrong.
      */
+    /**
+     * READINESS CO-24: the web, render and local-CI images are watched by
+     * Dependabot too (.github/dependabot.yml), which only works when their
+     * bases name an exact version. A floating tag (`node:22-bookworm-slim`,
+     * `php:8.4-cli`) has nothing for it to bump.
+     */
+    public function test_every_other_dockerfile_pins_an_exact_base_version(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $checked = 0;
+        foreach (['web/Dockerfile', 'render-service/Dockerfile', 'docker/ci-local/Dockerfile'] as $file) {
+            $text = (string) file_get_contents($root . '/' . $file);
+            $found = preg_match_all('/^FROM\s+(\S+)/m', $text, $m);
+            self::assertGreaterThan(0, $found, "no FROM line in {$file}");
+            foreach ($m[1] as $image) {
+                $checked++;
+                self::assertMatchesRegularExpression(
+                    '/:\d+\.\d+\.\d+/',
+                    $image,
+                    "{$file}: the base image {$image} does not name an exact version, so Dependabot can't bump it",
+                );
+            }
+        }
+        self::assertGreaterThanOrEqual(6, $checked, 'the scan found fewer FROM lines than these Dockerfiles have');
+    }
+
     public function test_the_base_image_pins_an_exact_php_patch_version(): void
     {
         // `\s*$` rather than `$`, because this repository is checked out with
@@ -93,6 +119,18 @@ final class BaseImagePinTest extends TestCase
             $this->dockerfile,
             'expose_php is not disabled, so every response advertises the exact PHP patch level',
         );
+    }
+
+    /**
+     * The image doesn't copy php.ini-production, so without these PHP's
+     * built-in display_errors=1 prints warnings, with file paths, into
+     * response bodies (READINESS CE-20).
+     */
+    public function test_errors_are_logged_not_shown(): void
+    {
+        foreach (["echo 'display_errors = Off';", "echo 'display_startup_errors = Off';", "echo 'log_errors = On';"] as $line) {
+            self::assertStringContainsString($line, $this->dockerfile, 'missing from the security ini: ' . $line);
+        }
     }
 
     /**

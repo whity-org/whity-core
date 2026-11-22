@@ -207,6 +207,8 @@ final class CoreJobs
                     isset($GLOBALS['whity_services'][\Whity\Core\Hooks\HookManager::class]) ? \Whity\app(\Whity\Core\Hooks\HookManager::class) : null,
                 )
             ), false);
+            // WHIT-1339: settled audit rows into the hash chain. Internal: the scheduler queues it every five minutes.
+            $registry->register(\Whity\Core\Audit\AuditSealJob::NAME, new \Whity\Core\Audit\AuditSealJob(new \Whity\Core\Audit\AuditSeals($pdo)), false);
             // WHIT-931: MCP idempotency keys older than a day. Internal: the scheduler queues it hourly.
             $registry->register(\Whity\Mcp\Tools\McpCallKeysPruneJob::NAME, new \Whity\Mcp\Tools\McpCallKeysPruneJob(new \Whity\Mcp\Tools\McpCallKeys($pdo)), false);
             // Section 33 §5: every workspace's snapshot meters into the usage ledger. Internal: the scheduler queues it daily.

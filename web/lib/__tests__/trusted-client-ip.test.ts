@@ -1,4 +1,4 @@
-import { CLIENT_IP_HEADER, stripClientIpHeaders, trustedClientIp, trustedForwardedHost, trustedForwardedHostFrom, trustedProxyHops } from '@/lib/trusted-client-ip';
+import { CLIENT_IP_HEADER, CLIENT_IP_SIGNATURE_HEADER, setClientIpHeaders, signClientIp, stripClientIpHeaders, trustedClientIp, trustedForwardedHost, trustedForwardedHostFrom, trustedProxyHops } from '@/lib/trusted-client-ip';
 
 /**
  * Minimal Headers-like backing the stripClientIpHeaders tests, so they do not
@@ -198,5 +198,45 @@ describe('trustedForwardedHost', () => {
     expect(trustedForwardedHostFrom(h, 0)).toBe('bakery.example.com');
     expect(trustedForwardedHostFrom(h, 1)).toBe('other.example.com');
     expect(trustedForwardedHostFrom(new FakeHeaders({}), 0)).toBeNull();
+  });
+});
+
+describe('client IP signature (#2386, CE-4)', () => {
+  const secret = 'a-shared-secret-that-is-long-enough-123';
+
+  it('matches what the backend computes (ClientIp::sign)', () => {
+    // php -r '... ClientIp::sign("203.0.113.7", secret, 1800000000)'
+    expect(signClientIp('203.0.113.7', secret, 1800000000)).toBe(
+      'v1=1800000000.b6d8299f999974eeda1695015db793489fe60e8480fddb015ad4810bd7a97dd4',
+    );
+  });
+
+  it('signs nothing without a secret of usable length', () => {
+    expect(signClientIp('203.0.113.7', undefined)).toBeNull();
+    expect(signClientIp('203.0.113.7', 'short')).toBeNull();
+  });
+
+  it('sets the IP and, with the secret, its signature', () => {
+    const previous = process.env.WHITY_CLIENT_IP_SECRET;
+    process.env.WHITY_CLIENT_IP_SECRET = secret;
+    try {
+      const headers = new Headers();
+      setClientIpHeaders(headers, '203.0.113.7');
+      expect(headers.get(CLIENT_IP_HEADER)).toBe('203.0.113.7');
+      expect(headers.get(CLIENT_IP_SIGNATURE_HEADER)).toMatch(/^v1=\d+\.[0-9a-f]{64}$/);
+
+      const none = new Headers();
+      setClientIpHeaders(none, null);
+      expect(none.get(CLIENT_IP_HEADER)).toBeNull();
+    } finally {
+      if (previous === undefined) delete process.env.WHITY_CLIENT_IP_SECRET;
+      else process.env.WHITY_CLIENT_IP_SECRET = previous;
+    }
+  });
+
+  it('strips a signature the client sent', () => {
+    const headers = new Headers({ [CLIENT_IP_SIGNATURE_HEADER]: 'v1=1.forged' });
+    stripClientIpHeaders(headers);
+    expect(headers.get(CLIENT_IP_SIGNATURE_HEADER)).toBeNull();
   });
 });

@@ -4,21 +4,23 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useTranslation } from '@whity/features/i18n';
+import { useHomePath } from '@/lib/branding-context';
 
 export default function Home() {
   const router = useRouter();
+  const homePath = useHomePath();
   const { isLoading, isAuthenticated } = useAuth();
   const t = useTranslation('common');
 
   useEffect(() => {
     if (!isLoading) {
       if (isAuthenticated()) {
-        router.push('/dashboard');
+        router.push(homePath);
       } else {
         router.push('/login');
       }
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, router, homePath]);
 
   return (
     <div className="flex items-center justify-center min-h-screen">

@@ -28,7 +28,24 @@
 # that tree with devDependencies pruned away, because `next` itself is a runtime
 # dependency but everything that produced the build is not.
 
-FROM node:22-bookworm-slim AS build
+# Only the workspace manifests (and their bin/ files, so `npm ci` links the
+# `whity` and `whity-tokens` commands as before), so the `npm ci` layer below is
+# keyed on them and nothing else (WHIT-1340). COPY cannot keep the directory
+# shape of a glob like packages/*/package.json, so this stage copies the trees
+# and deletes everything but each workspace's package.json. BuildKit keys the
+# `COPY --from=manifests` that follows on the CONTENT of what this stage
+# leaves, so a commit that changes packages/ui/src, and not a manifest, reuses
+# the cached install from the registry cache (images.yml).
+FROM node:22.23.5-bookworm-slim AS manifests
+WORKDIR /src
+COPY package.json package-lock.json ./
+COPY packages packages
+COPY templates templates
+COPY web/package.json web/package.json
+RUN find packages templates -type f ! -regex '^[^/]*/[^/]*/\(package\.json\|bin/.*\)$' -delete \
+    && find packages templates -mindepth 1 -type d -empty -delete
+
+FROM node:22.23.5-bookworm-slim AS build
 
 # Deliberately NOT NODE_ENV=production in this stage: that would make `npm ci`
 # skip the devDependencies that ARE the build toolchain.
@@ -41,15 +58,16 @@ WORKDIR /app
 # — including web's own manifest, ahead of its source: a workspace missing from
 # the tree does not fail `npm ci`, it silently drops that workspace's
 # dependencies and the failure surfaces much later as `next: not found`.
-# templates/ contributes only its package.json (Dockerfile.dockerignore drops
-# the rest); packages/ arrives whole because web consumes @whity/ui as
-# source, not as a build artifact.
-COPY package.json package-lock.json ./
-COPY packages packages
-COPY templates templates
-COPY web/package.json web/package.json
+# The `manifests` stage above supplies exactly those files. No workspace has an
+# install script, so nothing in `npm ci` needs a workspace's other sources.
+COPY --from=manifests /src/ ./
 RUN npm ci
 
+# Now the sources. templates/ contributes only its package.json
+# (Dockerfile.dockerignore drops the rest); packages/ arrives whole because web
+# consumes @whity/ui as source, not as a build artifact.
+COPY packages packages
+COPY templates templates
 COPY web web
 
 # The bundle's IDENTITY, baked in at build time (WHIT-587).
@@ -96,7 +114,7 @@ RUN grep -Eq '^[0-9a-f]{7,40}$' web/.next/BUILD_ID \
 # Strip the toolchain from the tree the runtime stage inherits.
 RUN npm prune --omit=dev
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:22.23.5-bookworm-slim AS runtime
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1

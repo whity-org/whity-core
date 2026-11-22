@@ -20,6 +20,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy';
 
 /**
  * Self-service profile editor (WC-64).
@@ -39,7 +40,8 @@ import { useTranslation, type TranslateFn } from '@whity/features/i18n';
  * success a toast is shown and the auth context is refreshed so the new email
  * propagates immediately (the backend re-issues the auth cookies).
  */
-const MIN_PASSWORD_LENGTH = 8;
+// READINESS CE-5: the server's minimum, from one place.
+const MIN_PASSWORD_LENGTH = PASSWORD_MIN_LENGTH;
 
 /**
  * The schema is BUILT from `t` rather than declared at module scope, because a

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.153).
+ * SDK identity (v1.160).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1586,12 +1586,86 @@ namespace Whity\Sdk;
  * `stamp_id` (#1729).
  *
  * Purely additive.)
+ *
+ * 1.154 (ACCOUNTING: host services {@see Accounting\Accounts}, {@see Accounting\Ledger},
+ * {@see Accounting\Periods} and {@see Accounting\Reports} read core's chart of accounts, its append-only
+ * double-entry ledger, its months and the trial balance without HTTP, and {@see Context\AccountingScope}
+ * puts them on the plugin context as `$ctx->accounting()`. An {@see Accounting\EntryRequest} posts balanced
+ * lines in the base currency's minor units, in an open month, under the plugin's own name, acting as a
+ * person holding `accounting:post`, idempotent by key, undone by `reverse()` (the mirror entry). Entries are
+ * hash-chained per workspace. A plugin adds accounts it owns through the context's `accounts()`; the
+ * container's copies only read (`use_plugin_context`). Refusals throw {@see Accounting\AccountingRejected}
+ * with a stable reason (`unbalanced`, `period_closed`...). New events `accounting.entry.posting` (a filter that
+ * can veto), `accounting.entry.posted`, `accounting.entry.reversed`, `accounting.period.closed` and
+ * `accounting.period.reopened`, each notification with an `.async` twin (WHIT-1318, design section 32).
+ *
+ * Purely additive: one new method on Context\PluginScope, which only the host implements.)
+ *
+ * 1.155 (SALES INVOICES AND TAXES: host services {@see Accounting\Invoices} (sales invoices and credit notes:
+ * draft, issue, credit, cancel a draft; read) and {@see Accounting\Taxes} (the workspace's tax codes, the code
+ * for an item's tax category, a line's net and tax), on the plugin context as `$ctx->accounting()->invoices()`
+ * and `->taxes()`. Drafts and credit notes made through the context belong to the plugin and its external
+ * references are kept under its name; the container's copy reads. Value objects {@see Accounting\Invoice},
+ * {@see Accounting\InvoiceLine}, {@see Accounting\TaxCode}, {@see Accounting\EInvoiceResult}. Extension point
+ * {@see Contribute\WorkspaceEInvoicing}: one connector bound in the container reports issued invoices to a tax
+ * authority (JoFotara first). New events `accounting.invoice.issuing` (a filter that can veto),
+ * `accounting.invoice.issued` and `accounting.invoice.credited`, each notification with an `.async` twin
+ * (WHIT-1318 A2a, design section 32 §5.2, §7).
+ *
+ * Purely additive: two new methods on Context\AccountingScope, which only the host implements.)
+ *
+ * 1.156 (PAYMENTS: host service {@see Accounting\Payments} records money a customer paid
+ * (`recordReceived()` with a {@see Accounting\PaymentRequest}: posted at once, settling an invoice when
+ * named, a provider's fee to Bank and payment fees), settles invoices with what a payment has left
+ * (`allocate()`), moves money between the workspace's own accounts (`recordTransfer()`, a payment
+ * provider's payout to the bank), and reads payments ({@see Accounting\Payment}). On the plugin context as
+ * `$ctx->accounting()->payments()`; its payments belong to the plugin and its external references are kept
+ * under its name, so Whity Pay's payment id records once. New events `accounting.payment.recorded`,
+ * `accounting.payment.allocated`, `accounting.invoice.paid`, `accounting.invoice.partly_paid` and
+ * `accounting.cheque.bounced`, each with an `.async` twin (WHIT-1318 A2b, design section 32 §5.4, §5.5).
+ *
+ * Purely additive: one new method on Context\AccountingScope, which only the host implements.)
+ *
+ * 1.157 (SUPPLIER BILLS AND PAYMENTS MADE: {@see Accounting\Invoices} drafts a supplier bill with `kind`
+ * `purchase` (a supplier, their own `supplierNumber`, input tax codes, cost or asset accounts) and `issue()`
+ * posts it (Dr costs and the tax to reclaim, Cr We owe suppliers); `credit()` makes a supplier credit.
+ * {@see Accounting\Payments::recordMade()} records money paid to a supplier, settling the bill named; a cheque
+ * dated later waits on Cheques we wrote. Writes on bills act as a person holding `bills:write`. New events
+ * `accounting.bill.posting` (a filter that can veto), `accounting.bill.posted` and `accounting.bill.paid`,
+ * each notification with an `.async` twin. Core accounting now implements
+ * {@see Contribute\WorkspaceCommissionExpenses}: a closed commission period posts Staff commission against
+ * Commission to pay (WHIT-1318 A3a, design section 32 §5.3, §5.4).
+ *
+ * Purely additive: one new method on Accounting\Payments, which only the host implements.)
+ *
+ * 1.158 (EXPENSE CLAIMS: {@see Accounting\Invoice} carries `claimantProfileId`, set on an expense claim (a
+ * supplier bill from the member of staff who paid, through their own contact). New event
+ * `accounting.expense.claimed`, with an `.async` twin, when a person files one (WHIT-1318 A3b, design section
+ * 32 §5.3, Q5).
+ *
+ * Purely additive: one new optional constructor argument on Accounting\Invoice.)
+ *
+ * 1.159 (STOCK IN THE BOOKS: extension point {@see Contribute\WorkspaceAccountingExport} (IV.22): core hands
+ * each posted stock batch, as an {@see Inventory\StockPosting} of {@see Inventory\StockPostingMove}s with their
+ * places, virtual roles, branches and values, to the one export bound in the container, inside the stock
+ * transaction, for each workspace whose `keepsStock()` answers true; throwing refuses the batch. Values come from core's moving average cost (IV.18). Core
+ * accounting is the default export and posts each batch to the stock journal (WHIT-1318 A4a, design section 31
+ * §6.3, section 32 §6).
+ *
+ * Purely additive: one new extension point and two value objects.)
+ *
+ * 1.160 (WORKSPACE HANDLES: a workspace's `slug` is now its public @handle, unique on the installation, and an
+ * owner may change it; the old one still leads to the workspace for 90 days. New event `tenant.handle_changed`
+ * (`id`, `old_handle`, `new_handle`, `by_profile_id`) so a plugin that stored a handle can update it (WHIT-1363,
+ * design section 36 §3, HD.4).
+ *
+ * Purely additive: one new event.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.153.0';
+    public const VERSION = '1.160.0';
 
     /**
      * Static identity only — never instantiated.

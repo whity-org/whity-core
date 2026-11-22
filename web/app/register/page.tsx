@@ -17,6 +17,8 @@ import { clearReferral, readReferralCode } from '@/lib/referral';
 import { continueSignupPlugin, rememberSignupPlugin, signupPluginFrom } from '@/lib/signup-plugin';
 import { templatePickerPath } from '@/lib/workspace-template';
 import { SsoLoginButtons } from '@/components/sso-login-buttons';
+import { useHomePath } from '@/lib/branding-context';
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy';
 
 /**
  * Self-service registration (WC-235). Provisions a NEW workspace (tenant) with
@@ -26,10 +28,10 @@ import { SsoLoginButtons } from '@/components/sso-login-buttons';
  * to the dashboard. Mirrors the login page's structure, components, and CSRF
  * (X-Requested-With) convention.
  */
-const PASSWORD_MIN_LENGTH = 8;
 
 export default function RegisterPage() {
   const router = useRouter();
+  const homePath = useHomePath();
   const { isAuthenticated, isLoading, refreshAuth } = useAuth();
   const { addToast } = useToast();
   const branding = useBranding();
@@ -110,9 +112,9 @@ export default function RegisterPage() {
   // Already signed in → no need to register.
   useEffect(() => {
     if (isMounted && isAuthenticated()) {
-      router.push('/dashboard');
+      router.push(homePath);
     }
-  }, [isAuthenticated, router, isMounted]);
+  }, [isAuthenticated, router, isMounted, homePath]);
 
   const validateFields = (): boolean => {
     const errors: { email?: string; password?: string; tenantName?: string } = {};
@@ -218,7 +220,7 @@ export default function RegisterPage() {
         if (loginRes.ok) {
           await refreshAuth();
           addToast(t('register.toast.welcome', 'Welcome! Your workspace is ready.'), 'success');
-          router.push((await continueSignupPlugin()) ?? (await templatePickerPath()) ?? '/dashboard');
+          router.push((await continueSignupPlugin()) ?? (await templatePickerPath()) ?? homePath);
         } else {
           // Account exists but auto-login did not complete (unexpected for a
           // fresh single-membership owner) — send them to the login page.

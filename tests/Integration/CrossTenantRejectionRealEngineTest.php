@@ -242,7 +242,7 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
     {
         TenantContext::setTenantId(self::TENANT_A);
         $response = $this->usersHandler()->create(
-            $this->req('POST', '/api/users', ['email' => 'newbie@t1.example', 'password' => 'secret-123', 'role' => 'user'])
+            $this->req('POST', '/api/users', ['email' => 'newbie@t1.example', 'password' => 'secret-123-long', 'role' => 'user'])
         );
 
         $this->assertSame(201, $response->getStatusCode());
@@ -270,7 +270,7 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         TenantContext::setTenantId(self::TENANT_A);
         // Profile 101 (a1@t1.example) already has an active membership in Tenant A.
         $response = $this->usersHandler()->create(
-            $this->req('POST', '/api/users', ['email' => 'a1@t1.example', 'password' => 'secret-123', 'role' => 'user'])
+            $this->req('POST', '/api/users', ['email' => 'a1@t1.example', 'password' => 'secret-123-long', 'role' => 'user'])
         );
 
         $this->assertSame(409, $response->getStatusCode(), 'A duplicate active membership must be rejected');
@@ -2885,6 +2885,236 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         self::assertFalse($after['archived']);
         self::assertSame('50.000', $after['on_hand']);
         self::assertCount(1, $ledger->history(self::TENANT_A));
+    }
+
+    // ==================== accounting (WHIT-1318, migrations 344-345) ====================
+
+    public function testAccountingIsTenantScopedAndForeignAccountsEntriesAndMonthsCannotBeTouched(): void
+    {
+        $db = new \Whity\Core\Accounting\AccountingDb($this->pdo);
+        $books = new \Whity\Core\Accounting\AccountingWorkspace($db, static fn (int $t): string => 'USD');
+        $periods = new \Whity\Core\Accounting\Periods($db, $books);
+        $ledger = new \Whity\Core\Accounting\Ledger($db, $books, $periods, new \Whity\Database\SequenceCounters($this->pdo));
+        $chart = new \Whity\Core\Accounting\ChartOfAccounts($db, $books);
+        $manual = new \Whity\Core\Accounting\ManualEntries($db, $books, $ledger);
+        $reports = new \Whity\Core\Accounting\AccountingReports($db, $books, $periods);
+        $today = gmdate('Y-m-d');
+
+        $rent = (int) ($chart->byCode(self::TENANT_A, '6200')['id'] ?? 0);
+        $bank = (int) ($chart->byCode(self::TENANT_A, '1110')['id'] ?? 0);
+        $entry = $ledger->post(self::TENANT_A, null, [
+            'journal' => 'GEN', 'date' => $today, 'source_type' => 'manual',
+            'lines' => [['account_id' => $rent, 'debit_minor' => 1000], ['account_id' => $bank, 'credit_minor' => 1000]],
+        ])['entry'];
+        $draft = $manual->create(self::TENANT_A, null, ['date' => $today, 'lines' => [
+            ['account_id' => $rent, 'debit' => '1.00'], ['account_id' => $bank, 'credit' => '1.00'],
+        ]]);
+        $month = $periods->periodFor(self::TENANT_A, $today);
+
+        self::assertSame([], $ledger->entries(self::TENANT_B, []));
+        self::assertSame([], $manual->list(self::TENANT_B));
+        self::assertSame([], $reports->trialBalance(self::TENANT_B, substr($today, 0, 8) . '01', $today)['rows']);
+        self::assertNotContains($rent, array_column($chart->list(self::TENANT_B), 'id'));
+        self::assertNotContains($month['id'], array_column($periods->list(self::TENANT_B), 'id'));
+
+        foreach ([
+            'read an account' => fn () => $chart->get(self::TENANT_B, $rent),
+            'rename an account' => fn () => $chart->update(self::TENANT_B, $rent, ['name' => 'Taken']),
+            'archive an account' => fn () => $chart->archive(self::TENANT_B, $rent),
+            'read an entry' => fn () => $ledger->entry(self::TENANT_B, $entry['id']),
+            'reverse an entry' => fn () => $ledger->reverse(self::TENANT_B, $entry['id'], null),
+            'read a draft' => fn () => $manual->get(self::TENANT_B, $draft['id']),
+            'post a draft' => fn () => $manual->post(self::TENANT_B, $draft['id'], null),
+            'close a month' => fn () => $periods->close(self::TENANT_B, $month['id'], null),
+            'read a statement' => fn () => $reports->accountStatement(self::TENANT_B, $rent, $today, $today),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} of Tenant A");
+            } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+                self::assertSame(404, $e->status, "a foreign record answers 404 to {$what}");
+            }
+        }
+        try {
+            $ledger->post(self::TENANT_B, null, [
+                'journal' => 'GEN', 'date' => $today, 'source_type' => 'manual',
+                'lines' => [['account_id' => $rent, 'debit_minor' => 1], ['account_id' => $bank, 'credit_minor' => 1]],
+            ]);
+            self::fail('Tenant B posted to Tenant A\'s accounts');
+        } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+            self::assertSame(422, $e->status);
+        }
+
+        self::assertSame('open', $periods->get(self::TENANT_A, $month['id'])['status']);
+        self::assertSame('draft', $manual->get(self::TENANT_A, $draft['id'])['status']);
+        self::assertNull($ledger->entry(self::TENANT_A, $entry['id'])['reversed_by_entry_id']);
+        self::assertSame(1000, $ledger->balance(self::TENANT_A, $rent, $today));
+    }
+
+    // ==================== accounting invoices (WHIT-1318 A2a, migration 350) ====================
+
+    public function testInvoicesAreTenantScopedAndForeignInvoicesCannotBeTouched(): void
+    {
+        $db = new \Whity\Core\Accounting\AccountingDb($this->pdo);
+        $books = new \Whity\Core\Accounting\AccountingWorkspace($db, static fn (int $t): string => 'USD');
+        $periods = new \Whity\Core\Accounting\Periods($db, $books);
+        $ledger = new \Whity\Core\Accounting\Ledger($db, $books, $periods, new \Whity\Database\SequenceCounters($this->pdo));
+        $taxes = new \Whity\Core\Accounting\Taxes($db, $books);
+        $invDb = new \Whity\Core\Inventory\InventoryDb($this->pdo);
+        $invWorkspace = new \Whity\Core\Inventory\InventoryWorkspace($invDb);
+        $units = new \Whity\Core\Inventory\UnitCatalog($invDb, $invWorkspace);
+        $invoices = new \Whity\Core\Accounting\Invoices(
+            $db,
+            $books,
+            $ledger,
+            $taxes,
+            new \Whity\Core\Inventory\ItemService($invDb, $invWorkspace, $units, static fn (int $t): string => 'USD'),
+            $units,
+            new \Whity\Database\SequenceCounters($this->pdo),
+            static fn (int $t): array => [],
+            null,
+            static fn (): ?\Whity\Sdk\Contribute\WorkspaceEInvoicing => null,
+        );
+        $this->pdo->exec("INSERT INTO contacts (tenant_id, name, is_customer, is_supplier) VALUES (1, 'Example Cafe', true, false), (2, 'Other Cafe', true, false)");
+        $contactIds = [];
+        foreach ([1 => 'Example Cafe', 2 => 'Other Cafe'] as $tenant => $name) {
+            $found = $this->pdo->prepare('SELECT id FROM contacts WHERE tenant_id = :tenant AND name = :name');
+            $found->execute([':tenant' => $tenant, ':name' => $name]);
+            $contactIds[$tenant] = (int) $found->fetchColumn();
+        }
+        $customerA = $contactIds[1];
+        $issued = $invoices->issue(self::TENANT_A, $invoices->create(self::TENANT_A, null, [
+            'contact_id' => $customerA, 'lines' => [['description' => 'Catering', 'unit_price_minor' => 1000]],
+        ])['invoice']['id'], null);
+        $draft = $invoices->create(self::TENANT_A, null, ['contact_id' => $customerA, 'lines' => [['description' => 'Cake', 'unit_price_minor' => 500]]])['invoice'];
+
+        self::assertSame([], $invoices->list(self::TENANT_B));
+        self::assertNotContains($issued['lines'][0]['tax_code_id'], array_column($taxes->list(self::TENANT_B), 'id'));
+
+        foreach ([
+            'read an invoice' => fn () => $invoices->get(self::TENANT_B, $issued['id']),
+            'change a draft' => fn () => $invoices->update(self::TENANT_B, $draft['id'], ['notes' => 'Taken']),
+            'issue a draft' => fn () => $invoices->issue(self::TENANT_B, $draft['id'], null),
+            'cancel a draft' => fn () => $invoices->cancel(self::TENANT_B, $draft['id'], null),
+            'credit an invoice' => fn () => $invoices->credit(self::TENANT_B, $issued['id'], null, []),
+            'read a tax code' => fn () => $taxes->get(self::TENANT_B, $issued['lines'][0]['tax_code_id']),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} of Tenant A");
+            } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+                self::assertSame(404, $e->status, "a foreign record answers 404 to {$what}");
+            }
+        }
+        try {
+            $invoices->create(self::TENANT_B, null, ['contact_id' => $customerA, 'lines' => [['description' => 'X', 'unit_price_minor' => 1]]]);
+            self::fail('Tenant B invoiced Tenant A\'s customer');
+        } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+            self::assertSame('contact_id', $e->extra['field'] ?? null);
+        }
+        try {
+            $invoices->create(self::TENANT_B, null, [
+                'contact_id' => $contactIds[2],
+                'lines' => [['description' => 'X', 'unit_price_minor' => 1, 'tax_code' => $issued['lines'][0]['tax_code_id']]],
+            ]);
+            self::fail('Tenant B used Tenant A\'s tax code');
+        } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+            self::assertSame('lines[0].tax_code', $e->extra['field'] ?? null);
+        }
+
+        self::assertSame('draft', $invoices->get(self::TENANT_A, $draft['id'])['status']);
+        self::assertSame('issued', $invoices->get(self::TENANT_A, $issued['id'])['status']);
+        self::assertSame(0, $invoices->get(self::TENANT_A, $issued['id'])['credited_minor']);
+
+        // ---- payments (WHIT-1318 A2b, migration 351) ----
+        $payments = new \Whity\Core\Accounting\Payments($db, $books, $ledger, $invoices, new \Whity\Database\SequenceCounters($this->pdo));
+        $receivables = new \Whity\Core\Accounting\Receivables($db, $books);
+        $cheque = $payments->receive(self::TENANT_A, null, [
+            'contact_id' => $customerA, 'amount_minor' => 100, 'method' => 'cheque', 'cheque_number' => '1', 'cheque_due_on' => '2027-06-01',
+        ])['payment'];
+        self::assertSame([], $payments->list(self::TENANT_B));
+        self::assertSame([], $receivables->aged(self::TENANT_B, gmdate('Y-m-d'))['rows']);
+        foreach ([
+            'read a payment' => fn () => $payments->get(self::TENANT_B, $cheque['id']),
+            'deposit a cheque' => fn () => $payments->deposit(self::TENANT_B, $cheque['id'], null),
+            'bounce a cheque' => fn () => $payments->bounce(self::TENANT_B, $cheque['id'], null),
+            'allocate a payment' => fn () => $payments->allocate(self::TENANT_B, $cheque['id'], $issued['id'], null, null),
+            'read a statement' => fn () => $receivables->statement(self::TENANT_B, $customerA, '2026-01-01', gmdate('Y-m-d')),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} of Tenant A");
+            } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+                self::assertSame(404, $e->status, "a foreign record answers 404 to {$what}");
+            }
+        }
+        try {
+            $payments->receive(self::TENANT_B, null, ['contact_id' => $contactIds[2], 'amount_minor' => 100, 'invoice_id' => $issued['id']]);
+            self::fail('Tenant B settled Tenant A\'s invoice');
+        } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+            self::assertSame('invoice_id', $e->extra['field'] ?? null);
+        }
+        self::assertSame('waiting', $payments->get(self::TENANT_A, $cheque['id'])['cheque_status']);
+
+        // ---- supplier bills (WHIT-1318 A3a, migration 352) ----
+        $this->pdo->exec("INSERT INTO contacts (tenant_id, name, is_customer, is_supplier) VALUES (1, 'Jordan Flour Mills', false, true)");
+        $found = $this->pdo->prepare("SELECT id FROM contacts WHERE tenant_id = 1 AND name = 'Jordan Flour Mills'");
+        $found->execute();
+        $supplierA = (int) $found->fetchColumn();
+        $bill = $invoices->issue(self::TENANT_A, $invoices->create(self::TENANT_A, null, [
+            'kind' => 'purchase', 'contact_id' => $supplierA, 'lines' => [['description' => 'Flour', 'unit_price_minor' => 1000]],
+        ])['invoice']['id'], null);
+        self::assertSame([], $invoices->list(self::TENANT_B, ['side' => 'purchase']));
+        self::assertSame([], $receivables->aged(self::TENANT_B, gmdate('Y-m-d'), null, 'purchase')['rows']);
+        foreach ([
+            'read a bill' => fn () => $invoices->get(self::TENANT_B, $bill['id']),
+            'credit a bill' => fn () => $invoices->credit(self::TENANT_B, $bill['id'], null, []),
+            'read a supplier statement' => fn () => $receivables->statement(self::TENANT_B, $supplierA, '2026-01-01', gmdate('Y-m-d'), 'purchase'),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} of Tenant A");
+            } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+                self::assertSame(404, $e->status, "a foreign record answers 404 to {$what}");
+            }
+        }
+        try {
+            $payments->pay(self::TENANT_B, null, ['contact_id' => $supplierA, 'amount_minor' => 100]);
+            self::fail('Tenant B paid Tenant A\'s supplier');
+        } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+            self::assertSame('contact_id', $e->extra['field'] ?? null);
+        }
+
+        // ---- expense claims (WHIT-1318 A3b, migration 353) ----
+        $expenses = new \Whity\Core\Accounting\Expenses($db, $books, $invoices, $payments);
+        // A person only in workspace A.
+        $memberA = 9901;
+        $this->pdo->exec(
+            "INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
+             VALUES (9901, 'Emad Nasser', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+        );
+        $roleA = $this->pdo->query('SELECT role_id FROM memberships WHERE tenant_id = 1 ORDER BY id LIMIT 1');
+        self::assertNotFalse($roleA);
+        $this->pdo->exec("INSERT INTO memberships (profile_id, tenant_id, role_id, status, kind, created_at) VALUES (9901, 1, " . (int) $roleA->fetchColumn() . ", 'active', 'member', CURRENT_TIMESTAMP)");
+        $claimA = $expenses->claim(self::TENANT_A, $memberA, ['lines' => [['description' => 'Taxi', 'amount_minor' => 1000]]]);
+        self::assertSame([], $expenses->claims(self::TENANT_B, null));
+        foreach ([
+            'read a claim' => fn () => $expenses->get(self::TENANT_B, $claimA['id']),
+            'pay back a claim' => fn () => $expenses->reimburse(self::TENANT_B, $claimA['id'], null, []),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} of Tenant A");
+            } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+                self::assertSame(404, $e->status, "a foreign record answers 404 to {$what}");
+            }
+        }
+        try {
+            $expenses->claim(self::TENANT_B, $memberA, ['lines' => [['description' => 'Taxi', 'amount_minor' => 1000]]]);
+            self::fail('a member of A claimed in B');
+        } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+            self::assertSame(403, $e->status);
+        }
     }
 
     private function contactService(): \Whity\Core\Contacts\ContactService

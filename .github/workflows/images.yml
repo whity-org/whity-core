@@ -35,8 +35,7 @@ jobs:
 
     permissions:
       contents: read
-      packages: write
-      security-events: write   # WC-d: upload the Trivy image-scan SARIF
+      packages: write   # the image tags and the :buildcache layer cache
 
     # EVERY tier of the product is published here, by ONE matrixed job, so they
     # can never drift apart: identical gates, identical tags, identical scan.
@@ -104,6 +103,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # BuildKit in a container (the docker-container driver) rather than the
+      # runner's Docker engine: only this driver can read and write a layer
+      # cache in a registry (WHIT-1340). The image is pushed straight from
+      # BuildKit, so it is never loaded into the runner's engine; the scan
+      # below pulls it from GHCR like any deployment would.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
       # GHCR requires a lowercase repository path; github.repository may not be.
       - name: Resolve image name
         id: image
@@ -142,21 +149,92 @@ jobs:
           build-args: |
             WHITY_BUILD_COMMIT=${{ inputs.commit }}
           tags: ${{ steps.image.outputs.tags }}
+          # The layer cache (WHIT-1340). One `:buildcache` tag per image, shared
+          # by develop and release builds: every green develop push refreshes it,
+          # so a release finds the dependency layers (composer install, the
+          # render tier's Chromium, the web image's npm ci) already built.
+          # mode=max keeps the build stages' layers too, which is where those
+          # installs live. A cache that cannot be read or written never fails
+          # the build (ignore-error), it only makes it slower. The commit is a
+          # build arg, so everything after it rebuilds every time, as it must:
+          # the cache can only reuse work that does not depend on the commit.
+          cache-from: type=registry,ref=${{ steps.image.outputs.name }}:buildcache
+          cache-to: type=registry,ref=${{ steps.image.outputs.name }}:buildcache,mode=max,ignore-error=true
+          # READINESS CO-22: every pushed image carries an SBOM (what is in it)
+          # and SLSA provenance (which commit and workflow built it) as BuildKit
+          # attestations beside it in GHCR. `docker buildx imagetools inspect
+          # <image> --format '{{ json .SBOM }}'` reads the SBOM back.
+          sbom: true
+          provenance: mode=max
 
-      # WC-d: scan the just-pushed release image for OS/library CVEs. REPORT-ONLY
-      # for now (exit-code 0): a base-image HIGH/CRITICAL must not block the first
-      # release. ignore-unfixed drops CVEs with no available fix (pure noise for a
-      # gate). Findings land in the Security tab via the SARIF upload below; flip
-      # exit-code to '1' to make it a hard release gate once the image is triaged.
-      - name: Trivy image vulnerability scan (report)
+  # WC-d: scan the just-pushed images for OS/library CVEs. A GATE since
+  # READINESS CO-21 (it was report-only): a HIGH or CRITICAL with a fix
+  # available fails the build, so an image that apt/npm could patch is never
+  # released. ignore-unfixed drops CVEs with no fix (nothing to act on), and
+  # `.trivyignore` holds any accepted one, each with its reason and an expiry.
+  # The SARIF is uploaded either way, so the Security tab shows the findings.
+  #
+  # Its own job, beside `smoke` rather than inside `image` (WHIT-1340): it took
+  # a minute and a half of the web leg's seven, on the release's critical path,
+  # for a result that gates nothing. It still finishes before the caller's next
+  # job starts, because that job waits for this whole workflow.
+  scan:
+    name: Scan ${{ matrix.image }} image (Trivy)
+    runs-on: ubuntu-latest
+    needs: [image]
+
+    permissions:
+      contents: read
+      packages: read
+      security-events: write   # upload the Trivy image-scan SARIF
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: app
+            suffix: ''
+          - image: web
+            suffix: /web
+          - image: render
+            suffix: /render
+
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve image name
+        id: image
+        env:
+          SUFFIX: ${{ matrix.suffix }}
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}${SUFFIX}" >> "$GITHUB_OUTPUT"
+
+      # The image is in GHCR, not in this runner's engine, so Trivy pulls it.
+      # These credentials cover a private package; a public one needs none.
+      - name: Checkout (.trivyignore)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.commit }}
+          sparse-checkout: .trivyignore
+          sparse-checkout-cone-mode: false
+
+      - name: Trivy image vulnerability scan (gate)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
           image-ref: ${{ steps.image.outputs.name }}:${{ inputs.tag }}
           format: sarif
           output: trivy-results.sarif
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: '0'
+          trivyignores: .trivyignore
+          exit-code: '1'
 
       # One category per image: code scanning REPLACES the previous results for a
       # category, so a shared one would leave whichever leg finished last as the
@@ -478,6 +556,24 @@ jobs:
             exit 1
           fi
           echo "Bundle identity check passed."
+
+      # whity-org/whity-core#2386: a product that shares an origin with this
+      # image reads the route list from it, so the image must serve one, for
+      # the same core version it reports above.
+      - name: The served bundle must list its routes
+        run: |
+          BODY=$(curl -s --max-time 10 http://localhost:3000/web-build/routes.json)
+          python3 - "$BODY" <<'PY'
+          import json, sys
+          d = json.loads(sys.argv[1])
+          routes = d.get("routes") or []
+          paths = {r["path"] for r in routes}
+          missing = [p for p in ("/login", "/dashboard", "/web-build/routes.json") if p not in paths]
+          if d.get("schema") != 1 or not d.get("core_version") or missing:
+              print(f"::error::/web-build/routes.json is not a usable manifest: schema={d.get('schema')} core_version={d.get('core_version')} missing={missing}")
+              sys.exit(1)
+          print(f"Route manifest check passed: {len(routes)} routes for {d['core_version']}.")
+          PY
 
       # On the same bridge and under the container name `render`, because that
       # is the hostname RENDER_SERVICE_URL defaults to in every compose file —

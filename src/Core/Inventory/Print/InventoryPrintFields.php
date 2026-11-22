@@ -45,6 +45,7 @@ abstract class InventoryPrintFields implements DocumentFieldProvider
             new PurchaseOrderFieldProvider($db, $settings, $labels),
             new ReceiptFieldProvider($db, $settings, $labels),
             new VariantLabelFieldProvider($db, $settings, $labels),
+            new LotLabelFieldProvider($db, $settings, $labels),
         ];
     }
 

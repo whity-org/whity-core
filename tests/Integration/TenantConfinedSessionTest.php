@@ -153,6 +153,10 @@ final class TenantConfinedSessionTest extends TestCase
             ['POST', '/api/v1/auth/2fa/setup'],
             ['POST', '/api/v1/auth/2fa/disable'],
             ['PUT', '/api/v1/me/phone'],
+            // TM-9: a new workspace and a long-lived agent credential.
+            ['POST', '/api/v1/workspaces'],
+            ['POST', '/api/workspaces'],
+            ['POST', '/api/v1/me/agents/7/credentials'],
         ];
         foreach ($refused as [$method, $path]) {
             TenantContext::reset();
@@ -160,7 +164,7 @@ final class TenantConfinedSessionTest extends TestCase
             self::assertSame(403, $response->getStatusCode(), $method . ' ' . $path . ' must be refused');
         }
 
-        foreach ([['GET', '/api/v1/users'], ['GET', '/api/v1/me/notifications'], ['GET', '/api/v1/me/phone']] as [$method, $path]) {
+        foreach ([['GET', '/api/v1/users'], ['GET', '/api/v1/me/notifications'], ['GET', '/api/v1/me/phone'], ['GET', '/api/v1/workspaces/new'], ['POST', '/api/v1/me/agents/7/assignment']] as [$method, $path]) {
             TenantContext::reset();
             $response = $middleware->handle($this->bearerRequest($method, $path, $tokens['access_token']), $ok);
             self::assertSame(200, $response->getStatusCode(), $method . ' ' . $path . ' must stay open');

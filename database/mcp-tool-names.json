@@ -250,6 +250,122 @@
     "en": "List two-step sign-in recovery requests waiting for approval",
     "ar": "عرض طلبات استعادة التحقق بخطوتين المعلقة"
   },
+  "get_api_accounting_accounts": {
+    "en": "List the chart of accounts",
+    "ar": "عرض دليل الحسابات"
+  },
+  "get_api_accounting_accounts_id": {
+    "en": "Show an account",
+    "ar": "عرض حساب"
+  },
+  "get_api_accounting_accounts_id_statement": {
+    "en": "Show an account's statement",
+    "ar": "عرض كشف حساب"
+  },
+  "get_api_accounting_bill_settings": {
+    "en": "Show the bill settings",
+    "ar": "عرض إعدادات فواتير الموردين"
+  },
+  "get_api_accounting_bills": {
+    "en": "List supplier bills",
+    "ar": "عرض فواتير الموردين"
+  },
+  "get_api_accounting_bills_id": {
+    "en": "Show a supplier bill",
+    "ar": "عرض فاتورة مورد"
+  },
+  "get_api_accounting_books": {
+    "en": "Show the workspace's books",
+    "ar": "عرض دفاتر مساحة العمل"
+  },
+  "get_api_accounting_customers_id_statement": {
+    "en": "A customer's statement",
+    "ar": "كشف حساب عميل"
+  },
+  "get_api_accounting_entries": {
+    "en": "List journal entries",
+    "ar": "عرض القيود"
+  },
+  "get_api_accounting_entries_id": {
+    "en": "Show a journal entry",
+    "ar": "عرض قيد"
+  },
+  "get_api_accounting_expense_claims": {
+    "en": "List expense claims",
+    "ar": "عرض مطالبات المصاريف"
+  },
+  "get_api_accounting_expense_claims_id": {
+    "en": "Show an expense claim",
+    "ar": "عرض مطالبة مصاريف"
+  },
+  "get_api_accounting_invoice_settings": {
+    "en": "Show the invoice settings",
+    "ar": "عرض إعدادات الفواتير"
+  },
+  "get_api_accounting_invoices": {
+    "en": "List invoices and credit notes",
+    "ar": "عرض الفواتير والإشعارات الدائنة"
+  },
+  "get_api_accounting_invoices_id": {
+    "en": "Show an invoice",
+    "ar": "عرض فاتورة"
+  },
+  "get_api_accounting_journals": {
+    "en": "List the journals",
+    "ar": "عرض دفاتر اليومية"
+  },
+  "get_api_accounting_manual_entries": {
+    "en": "List journal entries people wrote",
+    "ar": "عرض القيود اليدوية"
+  },
+  "get_api_accounting_manual_entries_id": {
+    "en": "Show a draft journal entry",
+    "ar": "عرض قيد يدوي"
+  },
+  "get_api_accounting_payments": {
+    "en": "List payments",
+    "ar": "عرض الدفعات"
+  },
+  "get_api_accounting_payments_id": {
+    "en": "Show a payment",
+    "ar": "عرض دفعة"
+  },
+  "get_api_accounting_periods": {
+    "en": "List the months of the books",
+    "ar": "عرض الفترات المحاسبية"
+  },
+  "get_api_accounting_petty_cash": {
+    "en": "Show petty cash",
+    "ar": "عرض النثرية"
+  },
+  "get_api_accounting_reports_aged_payables": {
+    "en": "Aged payables",
+    "ar": "أعمار الذمم الدائنة"
+  },
+  "get_api_accounting_reports_aged_receivables": {
+    "en": "Aged receivables",
+    "ar": "أعمار الذمم المدينة"
+  },
+  "get_api_accounting_reports_trial_balance": {
+    "en": "Show the trial balance",
+    "ar": "عرض ميزان المراجعة"
+  },
+  "get_api_accounting_stock": {
+    "en": "Show stock in the books",
+    "ar": "عرض المخزون في الدفاتر"
+  },
+  "get_api_accounting_stock_waiting": {
+    "en": "Stock changes waiting for a cost",
+    "ar": "حركات مخزون بانتظار التكلفة"
+  },
+  "get_api_accounting_suppliers_id_statement": {
+    "en": "A supplier's statement",
+    "ar": "كشف حساب مورد"
+  },
+  "get_api_accounting_tax_codes": {
+    "en": "List the tax codes",
+    "ar": "عرض رموز الضريبة"
+  },
   "get_api_admin_languages": {
     "en": "List every language, including switched-off ones",
     "ar": "عرض كل اللغات"
@@ -1084,6 +1200,14 @@
     "en": "Get one theme's file",
     "ar": "عرض ملف مظهر"
   },
+  "get_api_themes_themeid_versions": {
+    "en": "List a theme's versions",
+    "ar": "عرض إصدارات مظهر"
+  },
+  "get_api_themes_themeid_versions_version": {
+    "en": "Get one version of a theme",
+    "ar": "عرض إصدار من مظهر"
+  },
   "get_api_time_window_types": {
     "en": "List the kinds of period in your workspace",
     "ar": "عرض أنواع الفترات"
@@ -1182,6 +1306,38 @@
   "patch_api_2fa_policies_id": {
     "en": "Change how long people have to set up two-step sign-in",
     "ar": "تغيير مهلة تفعيل التحقق بخطوتين"
+  },
+  "patch_api_accounting_accounts_id": {
+    "en": "Change an account",
+    "ar": "تعديل حساب"
+  },
+  "patch_api_accounting_bill_settings": {
+    "en": "Change the bill settings",
+    "ar": "تعديل إعدادات فواتير الموردين"
+  },
+  "patch_api_accounting_bills_id": {
+    "en": "Change a draft bill",
+    "ar": "تعديل مسودة فاتورة مورد"
+  },
+  "patch_api_accounting_invoice_settings": {
+    "en": "Change the invoice settings",
+    "ar": "تعديل إعدادات الفواتير"
+  },
+  "patch_api_accounting_invoices_id": {
+    "en": "Change a draft invoice",
+    "ar": "تعديل مسودة فاتورة"
+  },
+  "patch_api_accounting_manual_entries_id": {
+    "en": "Change a draft journal entry",
+    "ar": "تعديل مسودة قيد"
+  },
+  "patch_api_accounting_stock": {
+    "en": "Turn stock in the books on or off",
+    "ar": "تشغيل أو إيقاف المخزون في الدفاتر"
+  },
+  "patch_api_accounting_tax_codes_id": {
+    "en": "Change a tax code",
+    "ar": "تعديل رمز ضريبة"
   },
   "patch_api_affiliate_payouts_id": {
     "en": "Record that a payout was transferred",
@@ -1370,6 +1526,130 @@
   "post_api_2fa_recovery_identity_check": {
     "en": "Start an admin's check that it's them before approving a two-step reset",
     "ar": "بدء تحقق المسؤول من هويته قبل الموافقة على إعادة تعيين التحقق بخطوتين"
+  },
+  "post_api_accounting_accounts": {
+    "en": "Add an account to the chart",
+    "ar": "إضافة حساب إلى الدليل"
+  },
+  "post_api_accounting_accounts_id_archive": {
+    "en": "Archive an account",
+    "ar": "أرشفة حساب"
+  },
+  "post_api_accounting_accounts_id_restore": {
+    "en": "Bring an account back",
+    "ar": "استعادة حساب"
+  },
+  "post_api_accounting_bills": {
+    "en": "Enter a supplier bill",
+    "ar": "إدخال فاتورة مورد"
+  },
+  "post_api_accounting_bills_id_cancel": {
+    "en": "Cancel a draft bill",
+    "ar": "إلغاء مسودة فاتورة مورد"
+  },
+  "post_api_accounting_bills_id_credits": {
+    "en": "Record a supplier credit",
+    "ar": "تسجيل إشعار دائن من مورد"
+  },
+  "post_api_accounting_bills_id_post": {
+    "en": "Post a supplier bill",
+    "ar": "ترحيل فاتورة مورد"
+  },
+  "post_api_accounting_entries_id_reverse": {
+    "en": "Reverse a journal entry",
+    "ar": "عكس قيد"
+  },
+  "post_api_accounting_expense_claims": {
+    "en": "Claim back money spent",
+    "ar": "تقديم مطالبة مصاريف"
+  },
+  "post_api_accounting_expense_claims_id_reimburse": {
+    "en": "Pay back an expense claim",
+    "ar": "سداد مطالبة مصاريف"
+  },
+  "post_api_accounting_invoices": {
+    "en": "Draft a sales invoice",
+    "ar": "إنشاء مسودة فاتورة مبيعات"
+  },
+  "post_api_accounting_invoices_id_cancel": {
+    "en": "Cancel a draft invoice",
+    "ar": "إلغاء مسودة فاتورة"
+  },
+  "post_api_accounting_invoices_id_credit_notes": {
+    "en": "Credit an invoice",
+    "ar": "إصدار إشعار دائن لفاتورة"
+  },
+  "post_api_accounting_invoices_id_issue": {
+    "en": "Issue an invoice",
+    "ar": "إصدار فاتورة"
+  },
+  "post_api_accounting_manual_entries": {
+    "en": "Draft a journal entry",
+    "ar": "إنشاء مسودة قيد"
+  },
+  "post_api_accounting_manual_entries_id_cancel": {
+    "en": "Cancel a draft journal entry",
+    "ar": "إلغاء مسودة قيد"
+  },
+  "post_api_accounting_manual_entries_id_post": {
+    "en": "Post a journal entry to the books",
+    "ar": "ترحيل قيد إلى الدفاتر"
+  },
+  "post_api_accounting_payments": {
+    "en": "Record a payment received",
+    "ar": "تسجيل دفعة مقبوضة"
+  },
+  "post_api_accounting_payments_id_allocations": {
+    "en": "Settle an invoice with a payment",
+    "ar": "تسوية فاتورة بدفعة"
+  },
+  "post_api_accounting_payments_id_bounce": {
+    "en": "Record a bounced cheque",
+    "ar": "تسجيل شيك مرتجع"
+  },
+  "post_api_accounting_payments_id_deposit": {
+    "en": "Deposit a cheque",
+    "ar": "إيداع شيك"
+  },
+  "post_api_accounting_payments_made": {
+    "en": "Record a payment to a supplier",
+    "ar": "تسجيل دفعة لمورد"
+  },
+  "post_api_accounting_periods_id_close": {
+    "en": "Close a month",
+    "ar": "إقفال شهر"
+  },
+  "post_api_accounting_periods_id_reopen": {
+    "en": "Reopen a month",
+    "ar": "إعادة فتح شهر"
+  },
+  "post_api_accounting_petty_cash_spends": {
+    "en": "Record a petty cash spend",
+    "ar": "تسجيل مصروف من النثرية"
+  },
+  "post_api_accounting_stock_costs": {
+    "en": "Give stock a cost",
+    "ar": "تحديد تكلفة المخزون"
+  },
+  "post_api_accounting_stock_opening": {
+    "en": "Bring stock into the books",
+    "ar": "إدخال المخزون إلى الدفاتر"
+  },
+  "post_api_accounting_tax_codes": {
+    "en": "Add a tax code",
+    "ar": "إضافة رمز ضريبة"
+  },
+  "post_api_accounting_tax_codes_id_archive": {
+    "en": "Archive a tax code",
+    "ar": "أرشفة رمز ضريبة"
+  },
+  "post_api_accounting_tax_codes_id_restore": {
+    "en": "Restore a tax code",
+    "ar": "استعادة رمز ضريبة"
+  },
+  "post_api_accounting_transfers": {
+    "en": "Move money between accounts",
+    "ar": "تحويل مبلغ بين الحسابات"
   },
   "post_api_affiliates": {
     "en": "Create an affiliate",
@@ -2076,6 +2356,10 @@
     "en": "Preview a draft theme",
     "ar": "معاينة مسودة مظهر"
   },
+  "post_api_themes_themeid_versions_version_restore": {
+    "en": "Restore an earlier version of a theme",
+    "ar": "استعادة إصدار سابق من مظهر"
+  },
   "post_api_themes_tokens": {
     "en": "Export a draft theme for another tool",
     "ar": "تصدير مسودة مظهر لأداة أخرى"
@@ -2372,6 +2656,10 @@
     "en": "Send a quote to the customer",
     "ar": "إرسال عرض سعر إلى العميل"
   },
+  "post_api_sales_quotes_id_print": {
+    "en": "Print a quote",
+    "ar": "طباعة عرض سعر"
+  },
   "post_api_sales_quotes_id_link": {
     "en": "Make a new link to a quote",
     "ar": "إنشاء رابط جديد لعرض سعر"
@@ -2403,6 +2691,10 @@
   "patch_api_sales_settings": {
     "en": "Change the sales settings",
     "ar": "تعديل إعدادات المبيعات"
+  },
+  "get_api_imports_kinds": {
+    "en": "List what you may import",
+    "ar": "عرض ما يمكنك استيراده"
   },
   "get_api_inventory_imports_kind": {
     "en": "List imports of items or opening stock",

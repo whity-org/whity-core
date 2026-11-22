@@ -144,6 +144,15 @@ final class Events
     public const TENANT_DELETING = 'tenant.deleting';
     public const TENANT_DELETED = 'tenant.deleted';
     public const TENANT_DELETED_ASYNC = 'tenant.deleted.async';
+    /**
+     * A workspace's @handle changed (design section 36, HD.4). The old one
+     * still leads to the workspace for 90 days; a plugin that stored the
+     * handle (in a link, a webhook address) should update it.
+     *
+     * Payload: `id` (the workspace), `old_handle` (null when it had none),
+     * `new_handle`, `by_profile_id` (null for an operator script).
+     */
+    public const TENANT_HANDLE_CHANGED = 'tenant.handle_changed';
 
     // ---- roles ----
     public const ROLE_CREATING = 'role.creating';
@@ -604,6 +613,101 @@ final class Events
      */
     public const CALENDAR_COMMISSION_CLOSED = 'calendar.commission.closed';
     public const CALENDAR_COMMISSION_CLOSED_ASYNC = 'calendar.commission.closed.async';
+
+    // ---- accounting: the ledger and periods (SDK 1.154, WHIT-1318, design section 32) ----
+    /**
+     * FILTER hook, before a journal entry posts, inside its transaction.
+     * Payload: `tenant_id`, `journal` (its code), `date`, `memo`,
+     * `source_type`, `source_id`, `acting_profile_id`, `reverses_entry_id`, and
+     * `lines` (each `account_id`, `debit_minor`, `credit_minor`, `contact_id`,
+     * `ou_id`). Return the payload unchanged; refuse the entry with
+     * {@see HookVetoException} (the caller gets 409 and your reason).
+     */
+    public const ACCOUNTING_ENTRY_POSTING = 'accounting.entry.posting';
+    /**
+     * A journal entry posted. Payload: `tenant_id`, `entry_id`, `number`,
+     * `journal`, `date`, `source_type`, `source_id`, `reverses_entry_id`,
+     * `total_minor`, `currency`, `acting_profile_id`.
+     */
+    public const ACCOUNTING_ENTRY_POSTED = 'accounting.entry.posted';
+    public const ACCOUNTING_ENTRY_POSTED_ASYNC = 'accounting.entry.posted.async';
+    /** An entry was reversed. Payload: `tenant_id`, `entry_id` (the original), `reversal_entry_id`, `acting_profile_id`. */
+    public const ACCOUNTING_ENTRY_REVERSED = 'accounting.entry.reversed';
+    public const ACCOUNTING_ENTRY_REVERSED_ASYNC = 'accounting.entry.reversed.async';
+    /** A month was closed. Payload: `tenant_id`, `period_id`, `starts_on`, `ends_on`, `acting_profile_id`. */
+    public const ACCOUNTING_PERIOD_CLOSED = 'accounting.period.closed';
+    public const ACCOUNTING_PERIOD_CLOSED_ASYNC = 'accounting.period.closed.async';
+    /** A closed month was reopened. Payload as closed, plus `reason`. */
+    public const ACCOUNTING_PERIOD_REOPENED = 'accounting.period.reopened';
+    public const ACCOUNTING_PERIOD_REOPENED_ASYNC = 'accounting.period.reopened.async';
+
+    // ---- accounting: sales invoices (SDK 1.155, WHIT-1318, design section 32 §5.2) ----
+    /**
+     * FILTER hook, before an invoice or credit note is issued (numbered,
+     * frozen and posted). Payload: as `accounting.invoice.issued` below, plus
+     * `lines` (each `variant_id`, `description`, `quantity`,
+     * `unit_price_minor`, `net_minor`, `tax_code`, `tax_minor`,
+     * `total_minor`). Return it unchanged; refuse with
+     * {@see HookVetoException} (a credit limit): the caller gets 409.
+     */
+    public const ACCOUNTING_INVOICE_ISSUING = 'accounting.invoice.issuing';
+    /**
+     * An invoice or credit note was issued. This and `accounting.invoice.credited`
+     * carry `tenant_id`, `invoice_id`, `kind` (`sale`, `sale_credit`),
+     * `number`, `contact_id`, `status`, `issue_date`, `due_date`, `currency`,
+     * `total_minor`, `tax_minor`, `due_minor`, `credits_invoice_id` and
+     * `acting_profile_id`.
+     */
+    public const ACCOUNTING_INVOICE_ISSUED = 'accounting.invoice.issued';
+    public const ACCOUNTING_INVOICE_ISSUED_ASYNC = 'accounting.invoice.issued.async';
+    /** A credit note settled an invoice. Also carries `credit_note_id` and `amount_minor`. */
+    public const ACCOUNTING_INVOICE_CREDITED = 'accounting.invoice.credited';
+    public const ACCOUNTING_INVOICE_CREDITED_ASYNC = 'accounting.invoice.credited.async';
+    /** Payments settled all of an invoice. Payload as `accounting.invoice.issued`. (SDK 1.156) */
+    public const ACCOUNTING_INVOICE_PAID = 'accounting.invoice.paid';
+    public const ACCOUNTING_INVOICE_PAID_ASYNC = 'accounting.invoice.paid.async';
+    /** A payment settled part of an invoice. Payload as `accounting.invoice.issued`. (SDK 1.156) */
+    public const ACCOUNTING_INVOICE_PARTLY_PAID = 'accounting.invoice.partly_paid';
+    public const ACCOUNTING_INVOICE_PARTLY_PAID_ASYNC = 'accounting.invoice.partly_paid.async';
+
+    // ---- accounting: payments and cheques (SDK 1.156, WHIT-1318, design section 32 §5.4) ----
+    /**
+     * A payment was recorded and posted: money received or a transfer between
+     * the workspace's own accounts. This and the payment events below carry
+     * `tenant_id`, `payment_id`, `direction` (`in`, `transfer`), `number`,
+     * `contact_id`, `paid_on`, `amount_minor`, `currency`, `method`, `status`,
+     * `cheque_status`, `unallocated_minor` and `acting_profile_id`.
+     */
+    public const ACCOUNTING_PAYMENT_RECORDED = 'accounting.payment.recorded';
+    public const ACCOUNTING_PAYMENT_RECORDED_ASYNC = 'accounting.payment.recorded.async';
+    /** A payment settled an invoice. Also carries `invoice_id` and `amount_minor` (the share). */
+    public const ACCOUNTING_PAYMENT_ALLOCATED = 'accounting.payment.allocated';
+    public const ACCOUNTING_PAYMENT_ALLOCATED_ASYNC = 'accounting.payment.allocated.async';
+    /** A cheque bounced: its entries were reversed and the invoices it paid reopened. Also carries `fee_minor` and `reopened_invoice_ids`. */
+    public const ACCOUNTING_CHEQUE_BOUNCED = 'accounting.cheque.bounced';
+    public const ACCOUNTING_CHEQUE_BOUNCED_ASYNC = 'accounting.cheque.bounced.async';
+
+    // ---- accounting: supplier bills (SDK 1.157, WHIT-1318, design section 32 §5.3) ----
+    /**
+     * FILTER hook, before a supplier bill or supplier credit is posted.
+     * Payload as `accounting.invoice.issuing` (the same document shape, with
+     * `kind` `purchase` or `purchase_credit`). Throw {@see HookVetoException}
+     * to refuse it: the caller gets 409.
+     */
+    public const ACCOUNTING_BILL_POSTING = 'accounting.bill.posting';
+    /** A supplier bill or supplier credit was posted. Payload as `accounting.invoice.issued`. */
+    public const ACCOUNTING_BILL_POSTED = 'accounting.bill.posted';
+    public const ACCOUNTING_BILL_POSTED_ASYNC = 'accounting.bill.posted.async';
+    /** Payments settled all of a bill. Payload as `accounting.invoice.issued`. */
+    public const ACCOUNTING_BILL_PAID = 'accounting.bill.paid';
+    public const ACCOUNTING_BILL_PAID_ASYNC = 'accounting.bill.paid.async';
+    /**
+     * A person filed an expense claim (SDK 1.158, WHIT-1318 A3b). Payload as
+     * `accounting.invoice.issued` (the claim is a bill of kind `purchase`), plus
+     * `claimant_profile_id`. It posts later when the bill route approves it.
+     */
+    public const ACCOUNTING_EXPENSE_CLAIMED = 'accounting.expense.claimed';
+    public const ACCOUNTING_EXPENSE_CLAIMED_ASYNC = 'accounting.expense.claimed.async';
 
     /**
      * The event name to dispatch for one of THIS plugin's own events (SDK 1.29).

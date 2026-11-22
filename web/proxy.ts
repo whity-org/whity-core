@@ -1,0 +1,42 @@
+import { NextResponse, type NextRequest } from 'next/server';
+import { isPathHidden } from '@/lib/routes/hidden';
+import { hiddenIdsForGuard } from '@/lib/routes/hidden-cache';
+import { buildCsp, cspNonce } from '@/lib/csp';
+
+/**
+ * The route guard for hidden pages (whity-org/whity-core#2386).
+ *
+ * An operator hides menu items and Settings pages by id (`navigation.hidden_ids`
+ * or `WHITY_HIDDEN_NAV_IDS` on the backend). The server already leaves them out
+ * of every menu; this makes their pages answer 404 too, so a bookmark or a
+ * typed address finds nothing either. The path maps to its ids through the
+ * route manifest (lib/routes/hidden.ts); the list comes from the backend,
+ * cached (lib/routes/hidden-cache.ts).
+ */
+export async function proxy(request: NextRequest): Promise<NextResponse> {
+  // READINESS CE-12: a fresh nonce for every page, and the policy that names
+  // it. Next reads the policy from the REQUEST to put the nonce on its own
+  // scripts (it reads the Report-Only header too); the layout reads `x-nonce`
+  // for the three blocking bootstraps. Report-Only for now (lib/csp.ts).
+  const nonce = cspNonce();
+  const policy = buildCsp(nonce, process.env.NODE_ENV === 'development');
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('content-security-policy-report-only', policy);
+
+  const response = isPathHidden(request.nextUrl.pathname, await hiddenIdsForGuard())
+    // A path no route answers: Next renders the app's not-found page.
+    ? NextResponse.rewrite(new URL('/_whity/hidden', request.url), { status: 404, request: { headers: requestHeaders } })
+    : NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set('Content-Security-Policy-Report-Only', policy);
+
+  return response;
+}
+
+export const config = {
+  // Pages only. The API, MCP, build files and Next's own assets have no menu
+  // id, so they never go through the guard.
+  matcher: [
+    '/((?!api/|mcp|_next/|\\.well-known/|web-build|sw\\.js|manifest\\.webmanifest|openapi\\.json|app-icon/|push-icon/|favicon).*)',
+  ],
+};

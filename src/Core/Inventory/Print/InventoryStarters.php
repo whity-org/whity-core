@@ -21,12 +21,14 @@ final class InventoryStarters
     public const PURCHASE_ORDER = 'inventory.purchase-order';
     public const GOODS_RECEIVED = 'inventory.goods-received';
     public const ITEM_LABELS = 'inventory.item-labels';
+    public const BATCH_LABELS = 'inventory.batch-labels';
 
     /** starter key without its language => [builder, record type]. */
     private const DOCUMENTS = [
         self::PURCHASE_ORDER => ['purchaseOrder', PurchaseOrderFieldProvider::RECORD_TYPE],
         self::GOODS_RECEIVED => ['goodsReceived', ReceiptFieldProvider::RECORD_TYPE],
         self::ITEM_LABELS => ['itemLabels', VariantLabelFieldProvider::RECORD_TYPE],
+        self::BATCH_LABELS => ['batchLabels', LotLabelFieldProvider::RECORD_TYPE],
     ];
 
     private string $lang = 'en';
@@ -173,6 +175,30 @@ final class InventoryStarters
             'marginMm' => 10,
             'letterhead' => false,
             // Avery L7160: 3 × 7 labels of 63.5 × 38.1 mm.
+            'labels' => ['columns' => 3, 'rows' => 7, 'size' => ['widthMm' => 63.5, 'heightMm' => 38.1], 'gapMm' => 2.5, 'gapYMm' => 0],
+        ]];
+    }
+
+    /**
+     * Batch labels (WHIT-1235): the item, the batch code and its expiry, and
+     * a barcode that scans back to the item and the batch.
+     *
+     * @return array{0: string, 1: list<array<string, mixed>>, 2: string, 3: array<string, mixed>}
+     */
+    private function batchLabels(): array
+    {
+        $ar = $this->lang === 'ar';
+
+        return [$this->t('Batch labels', 'ملصقات الدفعات'), [
+            $this->para($this->f($ar ? 'item.name_ar' : 'item.name', 'Name', 'الاسم', true)),
+            $this->para($this->txt($this->t('Batch ', 'الدفعة ')), $this->f('lot.code', 'Batch code', 'رمز الدفعة', true)),
+            $this->para($this->txt($this->t('Use by ', 'تنتهي في ')), $this->f($ar ? 'lot.expires_on_ar' : 'lot.expires_on', 'Expires on', 'تاريخ الانتهاء')),
+            ['id' => $this->id(), 'type' => 'barcode', 'symbology' => 'code128', 'value' => [$this->f('lot.barcode', 'Batch barcode', 'باركود الدفعة')], 'showText' => true, 'heightMm' => 10],
+        ], 'label', [
+            'size' => 'A4',
+            'marginMm' => 10,
+            'letterhead' => false,
+            // Avery L7160, as item labels: 3 × 7 labels of 63.5 × 38.1 mm.
             'labels' => ['columns' => 3, 'rows' => 7, 'size' => ['widthMm' => 63.5, 'heightMm' => 38.1], 'gapMm' => 2.5, 'gapYMm' => 0],
         ]];
     }

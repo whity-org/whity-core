@@ -274,6 +274,7 @@
         "sidebar.group.settings": "Settings",
         "sidebar.group.work": "Work",
         "sidebar.group.workspace": "Workspace",
+        "sidebar.homeLink": "{name}: home",
         "sidebar.item.agents": "Agents",
         "sidebar.item.aiPrincipals": "Connected AI apps",
         "sidebar.item.approvalGating": "Sign-up approvals",
@@ -314,6 +315,7 @@
         "sidebar.item.promotions": "Promotions",
         "sidebar.item.relations": "Family Relations",
         "sidebar.item.roles": "Roles",
+        "sidebar.item.sales": "Sales",
         "sidebar.item.savedBlocks": "Saved blocks",
         "sidebar.item.settings": "Settings",
         "sidebar.item.system": "System",
@@ -332,7 +334,6 @@
         "sidebar.notifications": "Notifications",
         "sidebar.openNav": "Open navigation",
         "sidebar.tenantSwitcher.create": "Create workspace",
-        "sidebar.tenantSwitcher.error": "Couldn’t switch workspace",
         "sidebar.tenantSwitcher.find": "Find a workspace",
         "sidebar.tenantSwitcher.noResults": "No workspace matches",
         "sidebar.tenantSwitcher.owner": "Owner",
@@ -348,7 +349,9 @@
         "system.error.retry": "Try again",
         "system.error.title": "Something went wrong on our side",
         "system.notFound.body": "It may have moved, or the link is wrong. Check the address or go back to your dashboard.",
+        "system.notFound.bodyHome": "It may have moved, or the link is wrong. Check the address or go back to the home page.",
         "system.notFound.home": "Go to dashboard",
+        "system.notFound.homePage": "Go to the home page",
         "system.notFound.title": "We can’t find that page",
         "tagPicker.error": "Failed to load tags.",
         "tagPicker.loading": "Loading tags…",
@@ -443,6 +446,13 @@
         "workspacePay.opening": "Opening the card page…",
         "workspacePay.skip": "Not now",
         "workspacePay.thisWorkspace": "This workspace",
-        "workspacePay.title": "Add a card for {workspace}"
+        "workspacePay.title": "Add a card for {workspace}",
+        "workspaceSwitch.refused.confined": "This sign-in only works in the workspace you signed in to. Sign in with Whity ID to open your other workspaces.",
+        "workspaceSwitch.refused.notMember": "You’re no longer a member of that workspace. Ask one of its owners to add you again.",
+        "workspaceSwitch.refused.other": "That workspace couldn’t be opened. Try again.",
+        "workspaceSwitch.refused.paused": "That workspace is paused until an owner pays.",
+        "workspaceSwitch.refused.signedOut": "Your sign-in has ended. Sign in again, then open the workspace.",
+        "workspaceSwitch.refused.tooMany": "Too many tries in a row. Wait a minute, then try again.",
+        "workspaceSwitch.refused.unreachable": "Whity couldn’t be reached. Check your connection, then try again."
     }
 }

@@ -15,7 +15,8 @@ import { api } from '@/lib/api/client';
 import { useTranslation } from '@whity/features/i18n';
 import { useLocalizedUnits, type UnitNames } from '@/hooks/useLocalizedUnits';
 import { type Answer, type LocalizedText, type ReferenceOption } from '@/components/forms/form-fields';
-import { FormFill, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
+import { FormFill, formContentLanguage, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
+import { ContentDirection } from '@whity/ui/content-direction';
 import type { RefusalBody } from '@/components/forms/form-refusals';
 import { localizedText } from '@whity/ui/localized-text';
 
@@ -108,6 +109,8 @@ export default function PreviewFormPage({ params }: { params: Promise<{ id: stri
   const translatedDescription = Array.isArray(rendered.form.description_i18n) ? null : rendered.form.description_i18n;
   const description = localizedText(translatedDescription, preferArabic ? 'ar' : 'en') || rendered.form.description;
   const submitLabel = localizedText(rendered.form.submit_label, preferArabic ? 'ar' : 'en') || t('fill.send', 'Send');
+  // WHIT-1379: the form reads in its own language's direction; the page around it keeps the interface's.
+  const content = formContentLanguage(rendered.form, rendered.fields, rendered.sections ?? [], preferArabic);
 
   async function nothingIsSent(): Promise<RefusalBody | null> {
     return { error: t('preview.nothingSent', 'This is a preview. Nothing was sent.') };
@@ -121,21 +124,23 @@ export default function PreviewFormPage({ params }: { params: Promise<{ id: stri
         </AlertDescription>
       </Alert>
       <Card>
-        <FormHeader title={title} description={description} banner={rendered.form.banner} />
+        <FormHeader title={title} description={description} banner={rendered.form.banner} content={content} />
         <CardContent>
-          <FormFill
-            fields={rendered.fields}
-            sections={rendered.sections ?? []}
-            answers={answers}
-            onAnswersChange={setAnswers}
-            preferArabic={preferArabic}
-            references={{ ou_ref: units }}
-            upload={async () => {
-              throw new Error(t('preview.noUploads', 'Files are not uploaded in a preview.'));
-            }}
-            submitLabel={submitLabel}
-            submit={nothingIsSent}
-          />
+          <ContentDirection content={content}>
+            <FormFill
+              fields={rendered.fields}
+              sections={rendered.sections ?? []}
+              answers={answers}
+              onAnswersChange={setAnswers}
+              preferArabic={preferArabic}
+              references={{ ou_ref: units }}
+              upload={async () => {
+                throw new Error(t('preview.noUploads', 'Files are not uploaded in a preview.'));
+              }}
+              submitLabel={submitLabel}
+              submit={nothingIsSent}
+            />
+          </ContentDirection>
         </CardContent>
       </Card>
     </div>

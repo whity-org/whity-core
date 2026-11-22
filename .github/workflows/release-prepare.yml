@@ -1,30 +1,38 @@
 # Step 1 of the release pipeline: prepare the version bump.
 #
-# THE PIPELINE, END TO END
+# THE PIPELINE, END TO END (WHIT-1340)
 #
 #   feature/… ──PR──▶ develop
 #                        │
-#      (1) you run this workflow with a version
+#      (1) the owner says "release"; this workflow is dispatched with a version
 #                        │
 #                        ▼
-#            release/X.Y.Z ──PR──▶ develop     ← you merge
-#                                     │
-#      (2) release-promote.yml sees the bump land
-#                                     ▼
-#                         develop ──PR──▶ main ← you merge
-#                                            │
-#      (3) release.yml sees main move, tags it,
-#          builds both images, publishes the Release,
-#          and opens the back-merge PR
+#            release/X.Y.Z ──PR──▶ main    auto-merge (merge commit) once
+#                                    │     main's required checks are green
+#      (2) release.yml sees main move: skips the suites that PR's CI already
+#          ran on the same tree, runs the PostgreSQL migrate/seed check,
+#          builds and smoke-tests the images, tags vX.Y.Z, publishes the
+#          Release, and opens the back-merge PR with auto-merge armed
+#                                    │
+#                                    ▼
+#            chore/back-merge-vX.Y.Z ──PR──▶ develop   merge queue
 #
-# Two merges by a human; everything else is automatic. The merges stay manual on
-# purpose: `main` and `develop` refuse direct pushes from everyone including
-# admins, and a release pipeline that needs that protection relaxed to function
-# would trade a real safety property for two clicks.
+# One dispatch, no further clicks. The dispatch IS the owner's approval, which
+# is why only the orchestrator runs it, and only on the owner's word.
+#
+# Until v0.2.31 the bump went to develop first, then a second PR promoted
+# develop to main (release-promote.yml, now retired): two merges by hand, the
+# release content still moving while the first one queued, and the full suites
+# run three times over the same code. Measured on v0.2.31: 56 minutes.
+#
+# The PR goes straight to main, so the release is FROZEN at the develop commit
+# it was cut from: nothing that lands on develop afterwards slips in. It merges
+# by auto-merge, and `main` still refuses direct pushes from everyone including
+# admins, so it merges only once main's required checks pass on it.
 #
 # This workflow only ever writes to a NEW `release/X.Y.Z` branch. It cannot move
-# develop or main, so the worst a mistaken run can do is leave an unmerged branch
-# and a PR you close.
+# develop or main, so the worst a mistaken run can do is leave a branch and a PR
+# you close (closing the PR before it merges cancels the release cleanly).
 name: Release — prepare
 
 on:
@@ -114,6 +122,19 @@ jobs:
             exit 1
           fi
 
+          # The PR into main can only auto-merge when its head is up to date
+          # with main: main's protection is strict, and nothing here may update
+          # the branch by merging main into it. So main must already be inside
+          # the commit being released. It is, once the previous release's
+          # back-merge has landed on develop; when it has not (or a hotfix went
+          # to main and has not come back), stop now rather than open a PR that
+          # can never merge.
+          git fetch --quiet origin main
+          if ! git merge-base --is-ancestor origin/main HEAD; then
+            echo "::error::main has commits that ${{ inputs.ref }} does not. Merge the open back-merge PR (chore/back-merge-v…) into develop first, then run this again."
+            exit 1
+          fi
+
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
           echo "branch=release/${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -168,6 +189,27 @@ jobs:
 
       - name: Install Node dependencies
         run: npm ci
+
+      # whity-org/whity-core#2386: the release notes list the web routes this
+      # release adds and removes, against the last release's web/routes.json.
+      # Written as a fragment so the next step folds it in with the rest. A
+      # previous release without the file (before 0.2.32) has nothing to
+      # compare with, so it is skipped.
+      - name: Write the added and removed web routes into the notes
+        run: |
+          PREV=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
+          if [ -z "$PREV" ] || ! git cat-file -e "$PREV:web/routes.json" 2>/dev/null; then
+            echo "No web/routes.json in ${PREV:-any earlier release}; nothing to compare."
+            exit 0
+          fi
+          git show "$PREV:web/routes.json" > "$RUNNER_TEMP/routes-prev.json"
+          node web/scripts/route-manifest.mjs --diff "$RUNNER_TEMP/routes-prev.json" > "$RUNNER_TEMP/routes.md"
+          if [ -s "$RUNNER_TEMP/routes.md" ]; then
+            cp "$RUNNER_TEMP/routes.md" "changelog.d/routes-${{ steps.check.outputs.version }}.changed.md"
+            cat "$RUNNER_TEMP/routes.md"
+          else
+            echo "No web routes added or removed since $PREV."
+          fi
 
       - name: Fold changelog fragments into [Unreleased]
         # Each PR adds a file under changelog.d/ instead of editing the shared
@@ -284,38 +326,69 @@ jobs:
           changesets version the npm packages, which publish when main moves."
           git push origin "$BRANCH"
 
-      - name: Open the release PR
+      # Straight to main (WHIT-1340), with auto-merge armed: the dispatch was the
+      # owner's approval, so nothing waits for a click. It merges the moment
+      # main's required checks (CI gate, CodeQL, Semgrep, E2E gate) pass, and
+      # never earlier: auto-merge cannot bypass protection.
+      #
+      # MERGE COMMIT, never squash. release.yml finds this PR's head as the
+      # second parent of the merge commit, to skip the suites this PR's CI
+      # already ran on the same tree; and the back-merge carries that commit
+      # to develop, which a squash would make a stranger to develop's history.
+      #
+      # Armed only with the release token. A merge made by github.token pushes
+      # main without starting any workflow (GitHub's rule against workflows
+      # triggering workflows), so release.yml would never run.
+      - name: Open the release PR to main and arm auto-merge
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || secrets.RELEASE_TOKEN || github.token }}
           TOKEN_KIND: ${{ steps.app-token.outputs.token != '' && 'app' || secrets.RELEASE_TOKEN != '' && 'pat' || 'builtin' }}
+          VERSION: ${{ steps.check.outputs.version }}
+          BRANCH: ${{ steps.check.outputs.branch }}
+          FROM_REF: ${{ inputs.ref }}
         run: |
-          VERSION="${{ steps.check.outputs.version }}"
+          FROM_SHA=$(git rev-parse HEAD~1)
+
+          # The body goes through a FILE: an inline multi-line --body keeps this
+          # block's indentation, and Markdown renders indented lines as code.
+          cat > "${RUNNER_TEMP}/release-body.md" <<EOF
+          Prepared by **Release — prepare** from \`${FROM_REF}\` at ${FROM_SHA}. The release content is frozen there: nothing that lands on develop after it is in this release.
+
+          Bumps \`CoreVersion::VERSION\` to \`${VERSION}\`, folds the changelog fragments into a dated CHANGELOG section, and regenerates \`public/openapi.json\` plus the typed client (the spec embeds the version). Pending changesets version the npm packages; each one whose version is new on npm publishes when **main** moves.
+
+          ### What happens next, with nobody clicking
+
+          1. Auto-merge merges this PR with a merge commit once main's required checks pass.
+          2. \`release.yml\` sees main move. It skips PHPUnit, PHPStan and the frontend suites when this PR's own CI already passed them on the same tree, runs the PostgreSQL migrate and seed check, builds and smoke-tests the images, tags \`v${VERSION}\`, publishes the GitHub Release, and opens the back-merge PR into develop with auto-merge armed.
+
+          Closing this PR before it merges cancels the release cleanly: nothing is tagged or published until **main** moves.
+
+          The CHANGELOG section this dated is the release notes.
+          EOF
+
           URL=$(gh pr create \
-            --base develop \
-            --head "${{ steps.check.outputs.branch }}" \
+            --base main \
+            --head "$BRANCH" \
             --title "release: ${VERSION}" \
-            --body "Prepared by **Release — prepare** from \`${{ inputs.ref }}\`.
-
-          Bumps \`CoreVersion::VERSION\` to \`${VERSION}\`, dates the CHANGELOG section, and regenerates \`public/openapi.json\` plus both typed clients (the spec embeds the version and the clients are generated from it, so the drift gates fail otherwise). Pending changesets version the npm packages (\`@whity/api-client\`, \`@whity/ui\`, \`@whity/tokens\`, \`@whity/features\`, \`@whity/cli\`); each one whose version is new on npm publishes when **main** moves.
-
-          ### What happens when you merge this
-
-          1. \`release-promote.yml\` notices the bump landed on \`develop\` and opens a **develop → main** PR.
-          2. Merging that one makes \`release.yml\` tag \`main\` as \`v${VERSION}\`, build and push both images, smoke-test them, publish the GitHub Release, and open the back-merge PR.
-
-          Nothing is tagged or published until **main** moves, so closing this PR cancels the release cleanly.
-
-          ### Before merging
-
-          Read the CHANGELOG section this dated. It is the release notes.")
+            --body-file "${RUNNER_TEMP}/release-body.md")
           echo "Opened ${URL}"
+
           if [ "$TOKEN_KIND" = "builtin" ]; then
-            echo "::warning::The release PR was opened with github.token, so GitHub holds its CI for approval. Approve the runs on ${URL}, or configure the release token (CONTRIBUTING.md, 'The release token')."
+            echo "::warning::The release PR was opened with github.token: its CI waits for approval, and auto-merge is NOT armed, because a merge by github.token would not start release.yml. Approve the runs on ${URL} and merge it with a merge commit by hand, or configure the release token (CONTRIBUTING.md, 'The release token')."
             {
-              echo "### CI on ${URL} is waiting for approval"
+              echo "### ${URL} needs a person"
               echo ""
-              echo "This PR was opened with github.token, and GitHub holds the workflow runs of such PRs until someone with write access approves them: open the PR and choose **Approve workflows to run**."
+              echo "This PR was opened with github.token. GitHub holds its workflow runs until someone with write access approves them (**Approve workflows to run**), and a merge made by github.token would not start \`release.yml\`, so auto-merge is not armed: merge it by hand, with a merge commit, once it is green."
               echo ""
-              echo "Configure the release token (CONTRIBUTING.md, *The release token*) and release PRs start their CI on their own."
+              echo "Configure the release token (CONTRIBUTING.md, *The release token*) and the release runs from the dispatch alone."
             } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
+
+          gh pr merge "$URL" --auto --merge
+          echo "Auto-merge armed on ${URL} (merge commit)."
+          {
+            echo "### Release ${VERSION} is on its way"
+            echo ""
+            echo "${URL} merges into main by itself once its checks pass; \`release.yml\` then tags and publishes \`v${VERSION}\`."
+          } >> "$GITHUB_STEP_SUMMARY"

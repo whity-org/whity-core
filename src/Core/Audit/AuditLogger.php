@@ -310,6 +310,12 @@ final class AuditLogger implements AuditLoggerInterface
             // this row is the only place any of it still exists.
             'user.membership.added'   => ['user.membership.added', 'user', 'profile_id'],
             'user.membership.removed' => ['user.membership.removed', 'user', 'profile_id'],
+
+            // An AI connection (MCP token) made or taken back, whoever did it:
+            // the owner, an admin, or the agent's removal (READINESS CO-8).
+            // The payload names the connection by row id, never the token.
+            'mcp.connection.created' => ['mcp.connection.created', 'mcp_token', 'connection_id'],
+            'mcp.connection.revoked' => ['mcp.connection.revoked', 'mcp_token', 'connection_id'],
         ];
 
         foreach ($crudEvents as $event => [$action, $targetType, $idKey]) {

@@ -2175,6 +2175,42 @@ What to know:
 - **Batches and expiry** (SDK 1.137). For an item whose `tracking` is `lot`, stock you bring in names its batch: `new MoveLine($variantId, '24', $supplier, $shop, lotCode: 'B-0412', expiresOn: '2027-03-31')`. Stock you take out may name one (`lotCode`), or core takes the batches that expire first. `$inventory->lots()->expiring()` lists what is expiring; listen for `stock.lot.expiring` and `stock.lot.expired` to act on it.
 - **Listen or refuse.** `stock.moved` (and `stock.moved.async` after commit) tells you what posted. `stock.moving` runs before, inside the transaction; throw `HookVetoException` to refuse the whole post (the caller gets 409 with your reason). `inventory.item.created`, `updated` and `archived` follow the items; `inventory.operation.done`, `inventory.count.differences`, `stock.level.below_reorder` and `stock.level.restored` follow operations and reorder levels (SDK 1.128).
 
+## Step 12k — Post to core's books (SDK 1.154)
+
+Accounting is core (WHIT-1318, design section 32). A payroll, point-of-sale or rental plugin posts its money to the workspace's own books instead of keeping a ledger of its own, through `$ctx->accounting()` (SDK 1.154). On an older host it throws `Context\ServiceUnavailable`. A plugin that declares its services (`PluginCapabilitiesInterface`) lists `Service::ACCOUNTING`; without it the call throws `ServiceNotDeclared`.
+
+```php
+use Whity\Sdk\Accounting\{EntryRequest, EntryRequestLine};
+
+$ctx = \Whity\app(\Whity\Sdk\PluginContext::class)->for($this);
+$books = $ctx->accounting();
+
+$salaries = $books->accounts()->byCode('6100');
+$owed = $books->accounts()->byCode('2300');
+if ($books->periods()->isOpen($runDate)) {
+    $entry = $books->ledger()->post(new EntryRequest(
+        actingProfileId: $payrollOfficerId,                        // must hold accounting:post
+        journal: 'GEN',
+        date: $runDate,
+        lines: [EntryRequestLine::debit($salaries->id, $grossMinor), EntryRequestLine::credit($owed->id, $grossMinor)],
+        sourceType: 'payroll_run',                                  // stored as "<your plugin>.payroll_run"
+        sourceId: $runId,
+        idempotencyKey: 'run-' . $runId,                            // a retry posts nothing twice
+    ));
+}
+```
+
+What to know:
+
+- **The ledger is double entry and append-only.** Each entry's debits equal its credits, in whole minor units of the books' base currency (fils for dinars, cents for dollars). Entries are never changed; `$books->ledger()->reverse($entry->id, $profileId)` posts the mirror.
+- **Your entries carry your name.** The context's `ledger()` is bound to the plugin the loader loaded, and the host prefixes `sourceType` with its name. Accounts you add through `$books->accounts()->create()` belong to your plugin. `\Whity\app(Ledger::class)` only reads.
+- **Months close.** An entry dated in a closed month, or on or before the lock date, is refused with reason `period_closed`; ask `periods()->isOpen()` first.
+- **Writes act as a person.** `post()` and `reverse()` need `accounting:post`; `accounts()->create()` needs `accounting:settings`.
+- **Refusals** throw `AccountingRejected` with a stable `reason` (`no_workspace`, `forbidden`, `not_found`, `invalid`, `unbalanced`, `period_closed`, `conflict`, `vetoed`, `use_plugin_context`).
+- **Listen or refuse.** `accounting.entry.posted` (and `.async` after commit) tells you what posted; `accounting.entry.posting` runs before, inside the transaction; throw `HookVetoException` to refuse.
+- **Invoice instead of posting by hand (SDK 1.155).** A plugin that sells (rentals, bookings, subscriptions) drafts a sales invoice with `$books->invoices()->createDraft([...], $profileId, 'booking-' . $id)` and issues it with `issue()`: core numbers it, taxes each line from its tax category (`$books->taxes()`), posts it and shows it in the customer's invoices. Credit it with `credit()`; an issued invoice is never edited. `accounting.invoice.issuing` lets a plugin refuse one (a credit limit).
+- **Record what was paid (SDK 1.156).** A payment plugin records each payment that succeeded with `$books->payments()->recordReceived(new PaymentRequest($profileId, $customerId, $amountMinor, 'whity_pay', invoiceId: $invoiceId, feeMinor: $fee, externalRef: $providerPaymentId))`; the same `externalRef` records once, so a webhook delivered twice is harmless. When the provider pays out, `recordTransfer($clearing->id, $bank->id, $amountMinor, $profileId)` moves it from Money at payment providers to the bank.
+
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 
 Everything a plugin only *declares* can live in a JSON file instead of PHP methods: its identity and requirements, permissions, roles, `blocks` screens, owned tables, data types and limits. Put `plugin.json` next to an empty class:

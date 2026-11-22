@@ -1,0 +1,1620 @@
+{
+  "schema": 1,
+  "routes": [
+    {
+      "path": "/",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/.well-known/oauth-protected-resource",
+      "kind": "forwarder",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.17"
+    },
+    {
+      "path": "/.well-known/oauth-protected-resource/mcp",
+      "kind": "forwarder",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.17"
+    },
+    {
+      "path": "/.well-known/oauth-protected-resource/mcp/:path*",
+      "kind": "forwarder",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.21"
+    },
+    {
+      "path": "/accept-invitation",
+      "kind": "page",
+      "area": "auth",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.1"
+    },
+    {
+      "path": "/account-recovery",
+      "kind": "page",
+      "area": "auth",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/agent-activity",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.23"
+    },
+    {
+      "path": "/admin/agents",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.23"
+    },
+    {
+      "path": "/admin/agents/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.23"
+    },
+    {
+      "path": "/admin/agents/new",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.23"
+    },
+    {
+      "path": "/admin/ai-principals",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "ai-principals"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/ai-principals/:jti",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "ai-principals"
+      ],
+      "settings_ids": [],
+      "since": "0.2.21"
+    },
+    {
+      "path": "/admin/ai-principals/new-agent-key",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "ai-principals"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/admin/approval-gating",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.24"
+    },
+    {
+      "path": "/admin/approval-gating/password-resets",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/approval-gating/two-factor-recovery",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/approvals",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "approvals"
+      ],
+      "settings_ids": [],
+      "since": "0.2.20"
+    },
+    {
+      "path": "/admin/audit-logs",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "audit-logs"
+      ],
+      "settings_ids": [
+        "audit-logs"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/billing",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "billing"
+      ],
+      "settings_ids": [],
+      "since": "0.2.7"
+    },
+    {
+      "path": "/admin/delegations",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "delegations"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/document-library",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "document-library"
+      ],
+      "settings_ids": [],
+      "since": "0.2.6"
+    },
+    {
+      "path": "/admin/document-library/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "document-library"
+      ],
+      "settings_ids": [],
+      "since": "0.2.6"
+    },
+    {
+      "path": "/admin/document-library/:id/audit",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "document-library"
+      ],
+      "settings_ids": [],
+      "since": "0.2.26"
+    },
+    {
+      "path": "/admin/document-route-templates",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "document-route-templates"
+      ],
+      "settings_ids": [],
+      "since": "0.2.7"
+    },
+    {
+      "path": "/admin/document-route-templates/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "document-route-templates"
+      ],
+      "settings_ids": [],
+      "since": "0.2.7"
+    },
+    {
+      "path": "/admin/document-routing/:documentId",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.6"
+    },
+    {
+      "path": "/admin/document-sources",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "document-sources"
+      ],
+      "settings_ids": [],
+      "since": "0.2.17"
+    },
+    {
+      "path": "/admin/document-sources/:id",
+      "kind": "page",
+      "area": "editor",
+      "nav_ids": [
+        "document-sources"
+      ],
+      "settings_ids": [],
+      "since": "0.2.17"
+    },
+    {
+      "path": "/admin/document-sources/saved-blocks",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "saved-blocks"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/admin/document-sources/saved-blocks/:id",
+      "kind": "page",
+      "area": "editor",
+      "nav_ids": [
+        "saved-blocks"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/admin/document-stamps",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [
+        "document-stamps"
+      ],
+      "since": "0.2.30"
+    },
+    {
+      "path": "/admin/document-templates",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "document-templates"
+      ],
+      "settings_ids": [],
+      "since": "0.2.7"
+    },
+    {
+      "path": "/admin/document-themes",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [
+        "document-themes"
+      ],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/admin/documents",
+      "kind": "page",
+      "area": "editor",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/errors",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "errors"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/inbox",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "inbox"
+      ],
+      "settings_ids": [],
+      "since": "0.2.6"
+    },
+    {
+      "path": "/admin/languages",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "languages"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/languages/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "languages"
+      ],
+      "settings_ids": [],
+      "since": "0.2.6"
+    },
+    {
+      "path": "/admin/mcp-tools",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "mcp-tools"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/messages",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/admin/my-agents",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "my-agents"
+      ],
+      "settings_ids": [],
+      "since": "0.2.23"
+    },
+    {
+      "path": "/admin/my-agents/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "my-agents"
+      ],
+      "settings_ids": [],
+      "since": "0.2.23"
+    },
+    {
+      "path": "/admin/notifications",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "notifications"
+      ],
+      "settings_ids": [
+        "notification-log"
+      ],
+      "since": "0.2.9"
+    },
+    {
+      "path": "/admin/ous",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "ous"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/plugins",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "plugins"
+      ],
+      "settings_ids": [
+        "plugins"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/plugins/store",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "plugins"
+      ],
+      "settings_ids": [
+        "plugins"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/plugins/store/:plugin",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "plugins"
+      ],
+      "settings_ids": [
+        "plugins"
+      ],
+      "since": "0.2.23"
+    },
+    {
+      "path": "/admin/plugins/store/connect",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "plugins"
+      ],
+      "settings_ids": [
+        "plugins"
+      ],
+      "since": "0.2.26"
+    },
+    {
+      "path": "/admin/promotions",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "promotions"
+      ],
+      "settings_ids": [],
+      "since": "0.2.7"
+    },
+    {
+      "path": "/admin/registrations",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "approval-gating"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/relations",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "relations"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/roles",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "roles"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/roles/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "roles"
+      ],
+      "settings_ids": [],
+      "since": "0.2.4"
+    },
+    {
+      "path": "/admin/routes/:type/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.26"
+    },
+    {
+      "path": "/admin/settings",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "general"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/settings/branding",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "branding"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/settings/branding/theme",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "branding"
+      ],
+      "since": "0.2.30"
+    },
+    {
+      "path": "/admin/settings/customer-signup",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "customer-signup"
+      ],
+      "since": "0.2.25"
+    },
+    {
+      "path": "/admin/settings/email",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "platform-email"
+      ],
+      "settings_ids": [
+        "email"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/settings/email-domains",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "email-domains"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/settings/error-tracking",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "error-tracking"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/settings/feature-flags",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "platform-feature-flags"
+      ],
+      "settings_ids": [
+        "feature-flags"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/settings/fields",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "fields"
+      ],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/admin/settings/import",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "import"
+      ],
+      "since": "0.2.31"
+    },
+    {
+      "path": "/admin/settings/menu",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "general"
+      ],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/admin/settings/messages",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "messages"
+      ],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/admin/settings/owners",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "owners"
+      ],
+      "since": "0.2.29"
+    },
+    {
+      "path": "/admin/settings/public-forms",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "public-forms"
+      ],
+      "since": "0.2.25"
+    },
+    {
+      "path": "/admin/settings/security",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "security"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/settings/signup",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "signup"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/settings/sso",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "sso"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/settings/storage",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "platform-storage"
+      ],
+      "settings_ids": [
+        "storage"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/setup/:plugin",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/admin/stats",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "system"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/tag-groups",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "tag-groups"
+      ],
+      "settings_ids": [
+        "tag-groups"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/tag-groups/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "tag-groups"
+      ],
+      "settings_ids": [
+        "tag-groups"
+      ],
+      "since": "0.2.6"
+    },
+    {
+      "path": "/admin/tags",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "tags"
+      ],
+      "settings_ids": [
+        "tags"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/tenants",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "tenants"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/tenants/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "tenants"
+      ],
+      "settings_ids": [],
+      "since": "0.2.6"
+    },
+    {
+      "path": "/admin/translations",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "translations"
+      ],
+      "settings_ids": [
+        "translations"
+      ],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/user-groups",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "user-groups"
+      ],
+      "settings_ids": [],
+      "since": "0.2.7"
+    },
+    {
+      "path": "/admin/users",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "users"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/users/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "users"
+      ],
+      "settings_ids": [],
+      "since": "0.2.4"
+    },
+    {
+      "path": "/admin/x/:featureId",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/admin/x/:featureId/:recordId",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.6"
+    },
+    {
+      "path": "/admin/x/forms-builder",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "forms-builder"
+      ],
+      "settings_ids": [],
+      "since": "0.2.23"
+    },
+    {
+      "path": "/admin/x/forms-builder/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "forms-builder"
+      ],
+      "settings_ids": [],
+      "since": "0.2.23"
+    },
+    {
+      "path": "/admin/x/forms-catalog",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "forms-catalog",
+        "member-forms"
+      ],
+      "settings_ids": [],
+      "since": "0.2.23"
+    },
+    {
+      "path": "/admin/x/my-form-submissions",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "my-form-submissions"
+      ],
+      "settings_ids": [],
+      "since": "0.2.23"
+    },
+    {
+      "path": "/api/:path*",
+      "kind": "forwarder",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/app-icon/:icon",
+      "kind": "file",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.26"
+    },
+    {
+      "path": "/billing",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "tenant-billing"
+      ],
+      "settings_ids": [
+        "billing"
+      ],
+      "since": "0.2.7"
+    },
+    {
+      "path": "/billing/return",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "tenant-billing"
+      ],
+      "settings_ids": [
+        "billing"
+      ],
+      "since": "0.2.8"
+    },
+    {
+      "path": "/billing/usage",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "tenant-billing"
+      ],
+      "settings_ids": [
+        "billing"
+      ],
+      "since": "0.2.30"
+    },
+    {
+      "path": "/boards",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "boards"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/boards/:board",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "boards"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/book/:workspace",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/booking/:token",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/calendar",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "calendar"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/calendar/hours",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "calendar"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/calendar/meetings",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "convening-meetings"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/calendar/meetings/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "convening-meetings"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/calendar/meetings/bodies",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "convening-meetings"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/calendar/rooms",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "calendar"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/calendar/services",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "calendar"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/calendar/services/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "calendar"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/calendar/settings",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "calendar"
+      ],
+      "settings_ids": [
+        "bookings"
+      ],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/chat",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "chat"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/chat/:workspace",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/contacts",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "contacts"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/contacts/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "contacts"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/contacts/import",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "contacts"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/csp-report",
+      "kind": "file",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.31"
+    },
+    {
+      "path": "/dashboard",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "dashboard"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/f/:slug",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.7"
+    },
+    {
+      "path": "/forgot-password",
+      "kind": "page",
+      "area": "auth",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/forms/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.7"
+    },
+    {
+      "path": "/forms/:id/preview",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.24"
+    },
+    {
+      "path": "/inventory",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "inventory"
+      ],
+      "settings_ids": [],
+      "since": "0.2.30"
+    },
+    {
+      "path": "/inventory/adjustments",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "inventory"
+      ],
+      "settings_ids": [],
+      "since": "0.2.30"
+    },
+    {
+      "path": "/inventory/counts/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "inventory"
+      ],
+      "settings_ids": [],
+      "since": "0.2.30"
+    },
+    {
+      "path": "/inventory/import",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "inventory"
+      ],
+      "settings_ids": [],
+      "since": "0.2.31"
+    },
+    {
+      "path": "/inventory/items/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "inventory"
+      ],
+      "settings_ids": [],
+      "since": "0.2.30"
+    },
+    {
+      "path": "/inventory/purchase-orders/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "inventory"
+      ],
+      "settings_ids": [],
+      "since": "0.2.30"
+    },
+    {
+      "path": "/join/:workspace",
+      "kind": "page",
+      "area": "auth",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.25"
+    },
+    {
+      "path": "/join/confirm",
+      "kind": "page",
+      "area": "auth",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.25"
+    },
+    {
+      "path": "/licensing",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [
+        "devices"
+      ],
+      "since": "0.2.8"
+    },
+    {
+      "path": "/login",
+      "kind": "page",
+      "area": "auth",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/manifest.webmanifest",
+      "kind": "file",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.26"
+    },
+    {
+      "path": "/mcp",
+      "kind": "forwarder",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.17"
+    },
+    {
+      "path": "/mcp/:path*",
+      "kind": "forwarder",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.21"
+    },
+    {
+      "path": "/messages",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "my-messages"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/more",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/onboarding",
+      "kind": "page",
+      "area": "auth",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/openapi.json",
+      "kind": "file",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/ownership-offers/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.29"
+    },
+    {
+      "path": "/push-icon/:kind",
+      "kind": "file",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/quote/:token",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.31"
+    },
+    {
+      "path": "/register",
+      "kind": "page",
+      "area": "auth",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/reset-password",
+      "kind": "page",
+      "area": "auth",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/sales",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "sales"
+      ],
+      "settings_ids": [],
+      "since": "0.2.31"
+    },
+    {
+      "path": "/sales/quotes/:id",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "sales"
+      ],
+      "settings_ids": [],
+      "since": "0.2.31"
+    },
+    {
+      "path": "/sales/quotes/new",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "sales"
+      ],
+      "settings_ids": [],
+      "since": "0.2.31"
+    },
+    {
+      "path": "/settings",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "settings"
+      ],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/settings/display",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "settings"
+      ],
+      "settings_ids": [
+        "display"
+      ],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/settings/notifications",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "settings"
+      ],
+      "settings_ids": [
+        "notifications"
+      ],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/settings/profile",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "settings"
+      ],
+      "settings_ids": [
+        "profile"
+      ],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/settings/role",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "settings"
+      ],
+      "settings_ids": [
+        "role"
+      ],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/settings/security",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "settings"
+      ],
+      "settings_ids": [
+        "password"
+      ],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/settings/signed-in",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "settings"
+      ],
+      "settings_ids": [
+        "signed-in"
+      ],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/setup/pay",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.29"
+    },
+    {
+      "path": "/setup/pay/done",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.29"
+    },
+    {
+      "path": "/setup/template",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.29"
+    },
+    {
+      "path": "/status",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/sw.js",
+      "kind": "file",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.26"
+    },
+    {
+      "path": "/tasks",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "tasks"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/tasks/connect",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "tasks"
+      ],
+      "settings_ids": [],
+      "since": "0.2.26"
+    },
+    {
+      "path": "/tasks/connection",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "tasks"
+      ],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/verify-email",
+      "kind": "page",
+      "area": "auth",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.1.0"
+    },
+    {
+      "path": "/verify/:token",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.7"
+    },
+    {
+      "path": "/web-build",
+      "kind": "file",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.0"
+    },
+    {
+      "path": "/web-build/routes.json",
+      "kind": "file",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.31"
+    },
+    {
+      "path": "/welcome",
+      "kind": "page",
+      "area": "auth",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.28"
+    },
+    {
+      "path": "/workspaces/new",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.29"
+    }
+  ]
+}

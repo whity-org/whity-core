@@ -42,6 +42,20 @@ import {
   type ItemKind,
 } from '@/lib/inventory/api';
 
+export const TRACKING = ['none', 'lot', 'serial'] as const;
+export type Tracking = (typeof TRACKING)[number];
+
+export function trackingLabel(t: ReturnType<typeof useTranslation>, tracking: string): string {
+  switch (tracking) {
+    case 'lot':
+      return t('inventory.tracking.lot', 'Batches');
+    case 'serial':
+      return t('inventory.tracking.serial', 'Serial numbers');
+    default:
+      return t('inventory.tracking.none', 'Nothing more');
+  }
+}
+
 export function kindLabel(t: ReturnType<typeof useTranslation>, kind: string): string {
   switch (kind) {
     case 'consumable':
@@ -91,6 +105,12 @@ export function ItemFormDialog({
   const [optionValues, setOptionValues] = useState('');
   const [openingPlace, setOpeningPlace] = useState<string>(places[0] ? String(places[0].id) : '');
   const [openingQuantity, setOpeningQuantity] = useState('');
+  // Batches and expiry (WHIT-1235, design 31 §3.5): off by default.
+  const [tracking, setTracking] = useState<Tracking>((item?.tracking as Tracking | undefined) ?? 'none');
+  const [expires, setExpires] = useState(item?.expires ?? false);
+  const [shelfLife, setShelfLife] = useState(item?.shelf_life_days != null ? String(item.shelf_life_days) : '');
+  const [openingBatch, setOpeningBatch] = useState('');
+  const [openingExpiry, setOpeningExpiry] = useState('');
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -108,6 +128,15 @@ export function ItemFormDialog({
       sale_price_minor: price(salePrice),
       purchase_price_minor: price(purchasePrice),
     };
+    if (kind !== 'service') {
+      if (shelfLife.trim() !== '' && !/^\d{1,5}$/.test(shelfLife.trim())) {
+        setProblem(t('inventory.error.shelfLife', 'Shelf life is a whole number of days.'));
+        return;
+      }
+      if (adding || tracking !== item?.tracking) body.tracking = tracking;
+      body.expires = expires;
+      body.shelf_life_days = expires && shelfLife.trim() !== '' ? Number(shelfLife.trim()) : null;
+    }
     if (adding || unit !== item?.base_unit.code) body.unit = unit;
     if (adding && hasVariants) {
       const values = optionValues
@@ -136,7 +165,15 @@ export function ItemFormDialog({
       if (adding && kind !== 'service' && openingPlace !== '' && openingQuantity.trim() !== '' && saved.variants.length === 1) {
         await inventoryApi.adjust({
           kind: 'opening',
-          lines: [{ variant_id: saved.variants[0].id, location_id: Number(openingPlace), change: openingQuantity.trim() }],
+          lines: [
+            {
+              variant_id: saved.variants[0].id,
+              location_id: Number(openingPlace),
+              change: openingQuantity.trim(),
+              ...(tracking !== 'none' && openingBatch.trim() !== '' ? { lot_code: openingBatch.trim() } : {}),
+              ...(tracking !== 'none' && openingExpiry !== '' ? { expires_on: openingExpiry } : {}),
+            },
+          ],
         });
       }
       onSaved(saved);
@@ -275,6 +312,58 @@ export function ItemFormDialog({
             </div>
           </div>
 
+          {kind !== 'service' && (
+            <section className="space-y-3 border-t border-border pt-4" data-testid="item-tracking">
+              <h3 className="text-sm font-semibold">{t('inventory.tracking.title', 'Batches and expiry')}</h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium" htmlFor="item-tracking-select">
+                    {t('inventory.tracking.label', 'Keep track of')}
+                  </label>
+                  <Select value={tracking} onValueChange={(v) => setTracking(v as Tracking)}>
+                    <SelectTrigger id="item-tracking-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TRACKING.map((k) => (
+                        <SelectItem key={k} value={k}>
+                          {trackingLabel(t, k)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {tracking === 'serial'
+                      ? t('inventory.tracking.serialHint', 'Each piece is received with its own serial number.')
+                      : tracking === 'lot'
+                        ? t('inventory.tracking.lotHint', 'Each delivery is a batch with its own code. What leaves takes the batch that expires first.')
+                        : t('inventory.tracking.noneHint', 'Stock is one amount in each place.')}
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                    <label htmlFor="item-expires" className="text-sm">
+                      {t('inventory.tracking.expires', 'It goes off')}
+                    </label>
+                    <Switch id="item-expires" checked={expires} onCheckedChange={setExpires} />
+                  </div>
+                  {expires && (
+                    <Input
+                      id="item-shelf-life"
+                      dir="ltr"
+                      inputMode="numeric"
+                      className="font-mono"
+                      label={t('inventory.tracking.shelfLife', 'Keeps for, in days')}
+                      helperText={t('inventory.tracking.shelfLifeHint', 'Gives a batch its expiry date when none is typed.')}
+                      value={shelfLife}
+                      onChange={(e) => setShelfLife(e.target.value)}
+                    />
+                  )}
+                </div>
+              </div>
+            </section>
+          )}
+
           {adding && kind !== 'service' && !hasVariants && places.length > 0 && (
             <section className="space-y-3 border-t border-border pt-4">
               <h3 className="text-sm font-semibold">{t('inventory.opening.title', 'Stock you have now')}</h3>
@@ -305,6 +394,28 @@ export function ItemFormDialog({
                   value={openingQuantity}
                   onChange={(e) => setOpeningQuantity(e.target.value)}
                 />
+                {tracking !== 'none' && (
+                  <>
+                    <Input
+                      id="item-opening-batch"
+                      dir="ltr"
+                      className="font-mono"
+                      label={tracking === 'serial' ? t('inventory.field.serial', 'Serial number') : t('inventory.field.batch', 'Batch code')}
+                      value={openingBatch}
+                      onChange={(e) => setOpeningBatch(e.target.value)}
+                    />
+                    {expires && (
+                      <Input
+                        id="item-opening-expiry"
+                        type="date"
+                        dir="ltr"
+                        label={t('inventory.field.expiresOn', 'Expires on')}
+                        value={openingExpiry}
+                        onChange={(e) => setOpeningExpiry(e.target.value)}
+                      />
+                    )}
+                  </>
+                )}
               </div>
             </section>
           )}

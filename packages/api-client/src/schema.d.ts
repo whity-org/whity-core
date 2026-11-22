@@ -233,6 +233,1109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the chart of accounts
+         * @description In tree order, each with its depth and its balance to date (debits minus credits, minor units). Headings carry their children's balances.
+         */
+        get: operations["get_api_v1_accounting_accounts"];
+        put?: never;
+        /**
+         * Add an account to the chart
+         * @description Under a heading (its type is taken), or at the top with a `type`.
+         */
+        post: operations["post_api_v1_accounting_accounts"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/accounts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Show one account */
+        get: operations["get_api_v1_accounting_accounts_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename, recode or move an account
+         * @description The code can change only until the account has entries. It stays under a heading of its own type.
+         */
+        patch: operations["patch_api_v1_accounting_accounts_id"];
+        trace?: never;
+    };
+    "/api/v1/accounting/accounts/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive an account
+         * @description Refused for an account the books use (receivable, sales tax...), one with a balance, or a heading with open accounts under it.
+         */
+        post: operations["post_api_v1_accounting_accounts_id_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/accounts/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring an archived account back */
+        post: operations["post_api_v1_accounting_accounts_id_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/accounts/{id}/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * An account's lines with a running balance
+         * @description Oldest first, with the opening and closing balance. For income and costs the opening counts only this fiscal year. Page on with `after_date` and `after_line` from `next`.
+         */
+        get: operations["get_api_v1_accounting_accounts_id_statement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/bill-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Show the bill settings */
+        get: operations["get_api_v1_accounting_bill_settings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change the bill settings
+         * @description The approval route bills travel before they are posted; null for none.
+         */
+        patch: operations["patch_api_v1_accounting_bill_settings"];
+        trace?: never;
+    };
+    "/api/v1/accounting/bills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List supplier bills and supplier credits
+         * @description Newest first. `due_minor` is what is still owed to the supplier.
+         */
+        get: operations["get_api_v1_accounting_bills"];
+        put?: never;
+        /**
+         * Enter a supplier bill
+         * @description A draft posts nothing. Lines are costs or things bought (an expense or an asset account; default Other costs), each with the tax to reclaim from its tax category. `supplier_number` is the supplier's own invoice number. Bills are not matched to stock receipts yet; that comes with stock in the books.
+         */
+        post: operations["post_api_v1_accounting_bills"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/bills/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Show a supplier bill or credit */
+        get: operations["get_api_v1_accounting_bills_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a draft bill
+         * @description Only a draft changes; `lines`, when given, replace every line.
+         */
+        patch: operations["patch_api_v1_accounting_bills_id"];
+        trace?: never;
+    };
+    "/api/v1/accounting/bills/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a draft bill */
+        post: operations["post_api_v1_accounting_bills_id_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/bills/{id}/credits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a supplier credit for a bill
+         * @description Posts the mirror of all or some lines (SCR-2026-0001) and settles what the bill still owes.
+         */
+        post: operations["post_api_v1_accounting_bills_id_credits"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/bills/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post a supplier bill
+         * @description Numbers it (BIL-2026-0001), freezes it and posts it: each line's cost and the tax to reclaim are debited, We owe suppliers credited. With a bill route it goes for approval first.
+         */
+        post: operations["post_api_v1_accounting_bills_id_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show the workspace's books: base currency, tax pack and lock date
+         * @description The books are set up the first time accounting is opened, with the Jordan chart of accounts. The base currency is fixed at the first posting.
+         */
+        get: operations["get_api_v1_accounting_books"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/customers/{id}/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A customer's statement
+         * @description From the books: what they owed before `from`, every invoice, credit note, payment and bounced cheque on their account, a running balance and what they owe at `to`.
+         */
+        get: operations["get_api_v1_accounting_customers_id_statement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List posted journal entries
+         * @description Newest first, without their lines. Page back with `before_id`.
+         */
+        get: operations["get_api_v1_accounting_entries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/entries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Show one posted entry with its lines */
+        get: operations["get_api_v1_accounting_entries_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/entries/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reverse a posted entry
+         * @description Posts its mirror, every debit a credit, linked to it. An entry is reversed once. Dated `date` when given, else the original date while its month is open, else today.
+         */
+        post: operations["post_api_v1_accounting_entries_id_reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/expense-claims": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List expense claims
+         * @description Your own claims, newest first. With `all=true`, people who can read bills see everyone's.
+         */
+        get: operations["get_api_v1_accounting_expense_claims"];
+        put?: never;
+        /**
+         * Claim back money you spent
+         * @description Each line is what you paid, tax included. The claim is a bill from you: it posts the costs and the tax to reclaim against what the workspace owes you, after the bill route when the workspace has one, and is paid back as a payment made.
+         */
+        post: operations["post_api_v1_accounting_expense_claims"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/expense-claims/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show an expense claim
+         * @description Your own, or anyone's when you can read bills.
+         */
+        get: operations["get_api_v1_accounting_expense_claims_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/expense-claims/{id}/reimburse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pay back an expense claim
+         * @description Pays the person what the claim is still owed, from the bank by default.
+         */
+        post: operations["post_api_v1_accounting_expense_claims_id_reimburse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/invoice-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Show the invoice settings */
+        get: operations["get_api_v1_accounting_invoice_settings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change the invoice settings
+         * @description The approval route invoices travel before they are issued (null for none), the default payment terms in days, and whether prices include tax by default.
+         */
+        patch: operations["patch_api_v1_accounting_invoice_settings"];
+        trace?: never;
+    };
+    "/api/v1/accounting/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List sales invoices and credit notes
+         * @description Newest first. `due_minor` is what the customer still owes; `overdue` is true past the due date.
+         */
+        get: operations["get_api_v1_accounting_invoices"];
+        put?: never;
+        /**
+         * Draft a sales invoice
+         * @description A draft posts nothing. Lines come from items (price, unit and tax category from the item) or are free text. Each line gets the tax code its tax category maps to unless one is given, and the Sales (or Services) account unless an income account is given. `idempotency_key` returns the same draft on a retry.
+         */
+        post: operations["post_api_v1_accounting_invoices"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/invoices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show an invoice or credit note
+         * @description With its lines and what has settled it (credit notes now, payments later).
+         */
+        get: operations["get_api_v1_accounting_invoices_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a draft invoice
+         * @description Only a draft changes. `lines`, when given, replace every line. An issued invoice is credited instead.
+         */
+        patch: operations["patch_api_v1_accounting_invoices_id"];
+        trace?: never;
+    };
+    "/api/v1/accounting/invoices/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel a draft invoice
+         * @description A draft, or one waiting for approval. An issued invoice is never cancelled; credit it.
+         */
+        post: operations["post_api_v1_accounting_invoices_id_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/invoices/{id}/credit-notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Credit an issued invoice
+         * @description Issues a credit note at once for every line still not credited, or for the `lines` given, and posts the mirror of those lines. It settles what the invoice still owes; anything beyond stays as the customer's credit.
+         */
+        post: operations["post_api_v1_accounting_invoices_id_credit_notes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/invoices/{id}/issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue an invoice
+         * @description Gives it the next number (INV-2026-0001), freezes it and posts it to the books: the customer owes the total, sales and the sales tax collected are credited. When the workspace has an invoice route it goes for approval first and comes back `waiting_approval`. A plugin may refuse it (409).
+         */
+        post: operations["post_api_v1_accounting_invoices_id_issue"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/journals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the journals
+         * @description Sales, purchases, bank, cash, general, stock and opening balances, and any a plugin added.
+         */
+        get: operations["get_api_v1_accounting_journals"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/manual-entries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List journal entries people wrote
+         * @description Drafts, posted and cancelled, newest first.
+         */
+        get: operations["get_api_v1_accounting_manual_entries"];
+        put?: never;
+        /**
+         * Draft a journal entry
+         * @description Amounts in the base currency's normal units ("12.500"). A draft is not in the books until it is posted. Accounts kept by documents (receivables, payables, stock, tax) take lines only in the opening journal.
+         */
+        post: operations["post_api_v1_accounting_manual_entries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/manual-entries/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Show one manual entry with its lines */
+        get: operations["get_api_v1_accounting_manual_entries_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a draft journal entry
+         * @description Sending `lines` replaces them all.
+         */
+        patch: operations["patch_api_v1_accounting_manual_entries_id"];
+        trace?: never;
+    };
+    "/api/v1/accounting/manual-entries/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a draft journal entry */
+        post: operations["post_api_v1_accounting_manual_entries_id_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/manual-entries/{id}/post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post a draft journal entry to the books
+         * @description Refused when debits and credits differ, or the date is in a closed month.
+         */
+        post: operations["post_api_v1_accounting_manual_entries_id_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List payments
+         * @description Money received and transfers, newest first. `unallocated_minor` is what a payment has not settled yet, the customer's credit.
+         */
+        get: operations["get_api_v1_accounting_payments"];
+        put?: never;
+        /**
+         * Record money a customer paid
+         * @description Posts it at once: the bank, cash, cheques to collect or the payment provider is debited and the customer owes less. It settles the invoices given; anything left stays as the customer's credit. A cheque dated later waits on Cheques to collect until it is deposited. `idempotency_key` records it once.
+         */
+        post: operations["post_api_v1_accounting_payments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/payments-made": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record money paid to a supplier
+         * @description Posts it at once: We owe suppliers is debited, the bank or cash credited, or Cheques we wrote for a cheque dated later until it clears (`/payments/{id}/deposit`). It settles the bills given.
+         */
+        post: operations["post_api_v1_accounting_payments_made"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/payments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show a payment
+         * @description With what it settled.
+         */
+        get: operations["get_api_v1_accounting_payments_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/payments/{id}/allocations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Settle an invoice with a payment
+         * @description Uses what the payment has left, up to what the invoice still owes, or `amount_minor`. Posts nothing: the customer's balance already moved.
+         */
+        post: operations["post_api_v1_accounting_payments_id_allocations"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/payments/{id}/bounce": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record a bounced cheque
+         * @description Reverses its entries, reopens the invoices it paid and posts the bank's fee when there is one.
+         */
+        post: operations["post_api_v1_accounting_payments_id_bounce"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/payments/{id}/deposit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deposit a waiting cheque
+         * @description Moves it from Cheques to collect to the bank.
+         */
+        post: operations["post_api_v1_accounting_payments_id_deposit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/periods": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the months of the books
+         * @description Newest first: open, closed or locked.
+         */
+        get: operations["get_api_v1_accounting_periods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/periods/{id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Close a month
+         * @description Nothing more can be posted with a date in it until it is reopened.
+         */
+        post: operations["post_api_v1_accounting_periods_id_close"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/periods/{id}/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reopen a closed month, saying why */
+        post: operations["post_api_v1_accounting_periods_id_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/petty-cash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show petty cash
+         * @description The Petty cash account and what is in it. Its history is the account's statement; top it up with a transfer from the bank.
+         */
+        get: operations["get_api_v1_accounting_petty_cash"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/petty-cash/spends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record money spent from petty cash
+         * @description A bill from Cash purchases, posted and paid at once from Petty cash, so its costs and reclaimable tax reach the books. Amounts are what was paid, tax included.
+         */
+        post: operations["post_api_v1_accounting_petty_cash_spends"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/reports/aged-payables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Aged payables
+         * @description What is owed to each supplier on a date, by days past due, with what they owe back beside it. Minor units.
+         */
+        get: operations["get_api_v1_accounting_reports_aged_payables"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/reports/aged-receivables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Aged receivables
+         * @description What each customer owes on a date, by days past due (not yet due, 1-30, 31-60, 61-90, over 90), with their credit beside it. Minor units.
+         */
+        get: operations["get_api_v1_accounting_reports_aged_receivables"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/reports/trial-balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The trial balance
+         * @description Every account with an opening balance or lines: opening, debits and credits in the range, closing, in minor units. `balanced` is true when debits equal credits.
+         */
+        get: operations["get_api_v1_accounting_reports_trial_balance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show stock in the books
+         * @description Whether stock posts to the books, since when, what the stock is worth at its moving average cost and what the Stock account says. Minor units.
+         */
+        get: operations["get_api_v1_accounting_stock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Turn stock in the books on or off
+         * @description On by default. Off stops posting stock; on again brings the Stock account to the stock's value with the next stock change, or at once with `/stock/opening`.
+         */
+        patch: operations["patch_api_v1_accounting_stock"];
+        trace?: never;
+    };
+    "/api/v1/accounting/stock/costs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give stock with no cost its cost
+         * @description For an item on hand whose cost is unknown (no purchase price and no priced receipt): sets the cost of one base unit, in the workspace's currency, and posts the stock's value against Opening balances so the Stock account takes it in.
+         */
+        post: operations["post_api_v1_accounting_stock_costs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/stock/opening": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bring stock into the books now
+         * @description Values all stock at its current cost and posts what the Stock account lacks against Opening balances, once. Otherwise it happens with the first stock change.
+         */
+        post: operations["post_api_v1_accounting_stock_opening"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/stock/waiting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stock waiting for a cost
+         * @description Items on hand whose cost is unknown, so they are not in the Stock account, and moves since stock went into the books that posted nothing for want of a cost.
+         */
+        get: operations["get_api_v1_accounting_stock_waiting"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/suppliers/{id}/statement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A supplier's statement
+         * @description From the books: what was owed to them before `from`, every bill, credit and payment, a running balance and what is owed at `to`.
+         */
+        get: operations["get_api_v1_accounting_suppliers_id_statement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/tax-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the tax codes
+         * @description The workspace's sales tax codes: `output` codes go on sales, `input` codes on purchases. An item's tax category picks the code.
+         */
+        get: operations["get_api_v1_accounting_tax_codes"];
+        put?: never;
+        /**
+         * Add a tax code
+         * @description The Jordan codes come with the books and can be renamed, pointed at another account or archived. A rate never changes: a new rate is a new code from the date it starts, and the old one ends with valid_to.
+         */
+        post: operations["post_api_v1_accounting_tax_codes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/tax-codes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Change a tax code
+         * @description Its name, its account, its tax category and when it stops. Not its rate, direction or treatment.
+         */
+        patch: operations["patch_api_v1_accounting_tax_codes_id"];
+        trace?: never;
+    };
+    "/api/v1/accounting/tax-codes/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive a tax code
+         * @description New lines can no longer use it; invoices that did keep it.
+         */
+        post: operations["post_api_v1_accounting_tax_codes_id_archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/tax-codes/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore an archived tax code */
+        post: operations["post_api_v1_accounting_tax_codes_id_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/transfers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Move money between the workspace's own accounts
+         * @description Cash to the bank, or a payment provider's payout from Money at payment providers to the bank.
+         */
+        post: operations["post_api_v1_accounting_transfers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/languages": {
         parameters: {
             query?: never;
@@ -1053,6 +2156,26 @@ export interface paths {
          * @description CONFIGURED rails only. Offering one that cannot take money produces a button whose only outcome is an error the customer cannot act on. Each row says what the rail can do — in particular whether it can charge unattended, which is the difference between a subscription that renews itself and one where the customer must push the money every period.
          */
         get: operations["get_api_v1_billing_methods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether this workspace is paused because its plan lapsed, and who its owners are
+         * @description For every member: when the subscription of this workspace expired or was canceled and changes are refused, its status, whether reads are refused too, and the names of its owners, so people who cannot pay are told who can. `data` is null when the workspace is not paused. Not behind the payment wall.
+         */
+        get: operations["get_api_v1_billing_pause"];
         put?: never;
         post?: never;
         delete?: never;
@@ -5952,6 +7075,26 @@ export interface paths {
         patch: operations["patch_api_v1_identity_providers_id"];
         trace?: never;
     };
+    "/api/v1/imports/kinds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What you may import here
+         * @description Every kind of import the signed-in person may use in this workspace (contacts, items, opening stock, supplier prices, and kinds added later), each with the base of its endpoints `path`, the names of its columns in English and Arabic, the columns that must be matched and the choices it asks. The endpoints of every kind have the same shape: upload, check, run, undo and skipped.csv under `path`. A kind needing a permission you lack is left out.
+         */
+        get: operations["get_api_v1_imports_kinds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/instance/complete-setup": {
         parameters: {
             query?: never;
@@ -6286,7 +7429,7 @@ export interface paths {
         };
         /**
          * Find the item a scanned barcode or SKU belongs to
-         * @description Answers the item, the variant, and the unit the barcode stands for (a box barcode means a box).
+         * @description Answers the item, the variant, and the unit the barcode stands for (a box barcode means a box). A GS1 barcode (GS1-128, DataMatrix or QR, raw or with identifiers in brackets) is found by its GTIN, and `scanned` says the batch, expiry, production date and count it carries (WHIT-1235).
          */
         get: operations["get_api_v1_inventory_items_lookup"];
         put?: never;
@@ -8839,6 +9982,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/navigation/hidden": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The menu items and Settings pages hidden on this instance (public)
+         * @description The union of the navigation.hidden_ids setting and the WHITY_HIDDEN_NAV_IDS environment variable. Hidden items leave GET /api/navigation and GET /api/settings/tabs, and the web app answers their pages with 404. See docs/wiki/Hiding-Pages.md.
+         */
+        get: operations["get_api_v1_navigation_hidden"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notification-metrics": {
         parameters: {
             query?: never;
@@ -11137,9 +12300,29 @@ export interface paths {
         put?: never;
         /**
          * Make a new link to a quote
-         * @description The link before it stops working.
+         * @description The link before it stops working. A new printed copy carries the QR of the new link (`document_id`).
          */
         post: operations["post_api_v1_sales_quotes_id_link"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/quotes/{id}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Print a quote
+         * @description Its PDF, `{lang: "en" | "ar"}`. A quote that went out prints the copy it went out as, with its QR; a draft prints a working copy without one. The id of the document is in `X-Document-Id`. When this instance cannot make PDFs, the answer is JSON naming the document, with 202.
+         */
+        post: operations["post_api_v1_sales_quotes_id_print"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11177,7 +12360,7 @@ export interface paths {
         put?: never;
         /**
          * Send a quote to the customer
-         * @description A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`). It is emailed to the customer unless `email` is false or the workspace turned the quote email off; `emailed` says whether it was.
+         * @description A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`). It is emailed to the customer unless `email` is false or the workspace turned the quote email off; `emailed` says whether it was. Its printed copy, with the QR of the link, is issued in the language of the workspace and named in `document_id` (null when it could not be made; the quote has gone out all the same).
          */
         post: operations["post_api_v1_sales_quotes_id_send"];
         delete?: never;
@@ -12214,6 +13397,66 @@ export interface paths {
          * @description If the workspace was using it, it goes back to the installation's theme. Whity's own themes cannot be removed.
          */
         delete: operations["delete_api_v1_themes_themeid"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/themes/{themeId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a theme's versions
+         * @description The history of one of this workspace's own themes (imported, made in the editor or restored), newest first: each version, how it came in, when and who saved it, and which is in use. Whity's and plugins' themes have no history here.
+         */
+        get: operations["get_api_v1_themes_themeid_versions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/themes/{themeId}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one version of a theme
+         * @description That version's theme file, for comparing it with another (POST /api/themes/compare).
+         */
+        get: operations["get_api_v1_themes_themeid_versions_version"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/themes/{themeId}/versions/{version}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an earlier version of a theme
+         * @description Saves that version's file as the next version, numbered past the newest, so the history only grows. Workspaces using the theme see it at once.
+         */
+        post: operations["post_api_v1_themes_themeid_versions_version_restore"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -13597,6 +14840,868 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccountingAccount: {
+            id: number;
+            parent_id: number | null;
+            code: string;
+            name: string;
+            /** @description The name in each language, such as `{"en": "Rent", "ar": "الإيجار"}`. */
+            names: {
+                [key: string]: string;
+            };
+            /** @enum {string} */
+            type: "asset" | "liability" | "equity" | "income" | "expense";
+            subtype: string;
+            is_group: boolean;
+            role: string | null;
+            allows_manual: boolean;
+            ou_id?: number | null;
+            currency?: string | null;
+            is_seeded?: boolean;
+            owner_plugin?: string | null;
+            archived_at: string | null;
+            /** @description Debits minus credits to date. In minor units of the base currency. */
+            balance_minor: number;
+            depth?: number;
+            has_lines?: boolean;
+        };
+        AccountingAccountChanges: {
+            /** @description A new code, while the account has no entries. */
+            code?: string;
+            /** @description Text, or `{en, ar}`. */
+            name?: string | {
+                en?: string;
+                ar?: string;
+            };
+            /** @description Another heading of the same type, or null for the top. */
+            parent_id?: number | null;
+            /** @description See AccountingAccountRequest. */
+            subtype?: string;
+            /** @description Whether people may write lines on it by hand. */
+            allows_manual?: boolean;
+        };
+        AccountingAccountRequest: {
+            /** @description Up to 20 letters, digits, dots or dashes, unique in the chart, such as `6150`. */
+            code: string;
+            /** @description Text, or `{en, ar}`. */
+            name: string | {
+                en?: string;
+                ar?: string;
+            };
+            /** @description The heading it sits under; its type is taken from it. */
+            parent_id?: number | null;
+            /**
+             * @description Needed only for an account at the top of the chart.
+             * @enum {string}
+             */
+            type?: "asset" | "liability" | "equity" | "income" | "expense";
+            /** @description `bank`, `cash`, `receivable`, `payable`, `tax`, `inventory`, `cost_of_sales`, `fixed_asset`, `current_asset`, `current_liability`, `long_term_liability` or `other` (the default). */
+            subtype?: string;
+            /** @description True for a heading that holds other accounts and no lines. */
+            is_group?: boolean;
+            /** @description False when only documents (invoices, bills) may post to it. Default true. */
+            allows_manual?: boolean;
+        };
+        AccountingAgedReceivables: {
+            as_of: string;
+            currency: string;
+            rows: {
+                contact_id: number;
+                contact_name: string;
+                /** @description Not yet due. */
+                not_due: number;
+                days_1_30?: number;
+                days_31_60?: number;
+                days_61_90?: number;
+                days_over_90?: number;
+                /** @description Money received or credited that settles nothing yet. */
+                credit_minor?: number;
+                /** @description What is owed, less the credit. */
+                balance_minor: number;
+            }[];
+            totals: {
+                /** @description Not yet due. */
+                not_due?: number;
+                days_1_30?: number;
+                days_31_60?: number;
+                days_61_90?: number;
+                days_over_90?: number;
+                /** @description Money received or credited that settles nothing yet. */
+                credit_minor?: number;
+                /** @description What is owed, less the credit. */
+                balance_minor: number;
+            };
+        };
+        AccountingAllocationRequest: {
+            /** @description The invoice to settle. */
+            invoice_id: number;
+            /** @description Default: all that fits. */
+            amount_minor?: number;
+        };
+        AccountingBillChanges: {
+            /** @description The supplier: a contact marked as a supplier. */
+            contact_id?: number;
+            /** @description The supplier's own invoice number. */
+            supplier_number?: string;
+            /** @description The bill's date, YYYY-MM-DD. Default: today. */
+            issue_date?: string;
+            /** @description YYYY-MM-DD. Default: the date plus the payment terms. */
+            due_date?: string | null;
+            /** @description Days from the bill's date to due, 0 to 365. */
+            payment_terms_days?: number;
+            /** @description Whether the prices typed include tax. */
+            prices_include_tax?: boolean;
+            /** @description Up to 2000 characters. */
+            notes?: string;
+            /** @description 1 to 300 lines. */
+            lines?: {
+                /** @description An item bought. Its name, purchase price and tax category are used unless given. */
+                variant_id?: number | null;
+                /** @description What was bought. Needed for a line without an item. */
+                description?: string;
+                /** @description In normal units, such as "2.5". Default 1. */
+                quantity?: string;
+                /** @description An item's unit code. Default: its base unit. */
+                unit?: string;
+                /** @description The price of one, in minor units. */
+                unit_price_minor?: number;
+                /** @description Discount in basis points, 0 to 10000. */
+                discount_bp?: number;
+                /** @description An input tax code by id or code (JO-GST-IN-16). Default: from the tax category. */
+                tax_code?: number | string;
+                /** @description `standard`, `zero`, `exempt`, or a category a code the workspace added serves. */
+                tax_category?: string;
+                /** @description A cost or an asset bought, such as Equipment. Default: Other costs. */
+                account_id?: number | null;
+                /** @description The account by its code, instead of account_id. */
+                account_code?: string;
+                /** @description The branch the cost belongs to. */
+                ou_id?: number | null;
+            }[];
+        };
+        AccountingBillRequest: {
+            /** @description The supplier: a contact marked as a supplier. */
+            contact_id: number;
+            /** @description The supplier's own invoice number. */
+            supplier_number?: string;
+            /** @description The bill's date, YYYY-MM-DD. Default: today. */
+            issue_date?: string;
+            /** @description YYYY-MM-DD. Default: the date plus the payment terms. */
+            due_date?: string | null;
+            /** @description Days from the bill's date to due, 0 to 365. */
+            payment_terms_days?: number;
+            /** @description Whether the prices typed include tax. */
+            prices_include_tax?: boolean;
+            /** @description Up to 2000 characters. */
+            notes?: string;
+            /** @description 1 to 300 lines. */
+            lines: {
+                /** @description An item bought. Its name, purchase price and tax category are used unless given. */
+                variant_id?: number | null;
+                /** @description What was bought. Needed for a line without an item. */
+                description?: string;
+                /** @description In normal units, such as "2.5". Default 1. */
+                quantity?: string;
+                /** @description An item's unit code. Default: its base unit. */
+                unit?: string;
+                /** @description The price of one, in minor units. */
+                unit_price_minor?: number;
+                /** @description Discount in basis points, 0 to 10000. */
+                discount_bp?: number;
+                /** @description An input tax code by id or code (JO-GST-IN-16). Default: from the tax category. */
+                tax_code?: number | string;
+                /** @description `standard`, `zero`, `exempt`, or a category a code the workspace added serves. */
+                tax_category?: string;
+                /** @description A cost or an asset bought, such as Equipment. Default: Other costs. */
+                account_id?: number | null;
+                /** @description The account by its code, instead of account_id. */
+                account_code?: string;
+                /** @description The branch the cost belongs to. */
+                ou_id?: number | null;
+            }[];
+            /** @description Retrying with the same key returns the same draft. */
+            idempotency_key?: string;
+        };
+        AccountingBillSettings: {
+            /** @description The route bills travel before they are posted; null for none. */
+            bill_route_template_id?: number | null;
+        };
+        AccountingBooks: {
+            base_currency: string;
+            currency_fixed: boolean;
+            tax_pack: string;
+            year_start_month: number;
+            lock_date: string | null;
+        };
+        AccountingChequeBounceRequest: {
+            /** @description YYYY-MM-DD. Default: today. */
+            bounced_on?: string;
+            /** @description The bank's fee, in minor units. */
+            fee_minor?: number;
+            /** @description Why, kept on the reversing entry. */
+            note?: string;
+        };
+        AccountingChequeDepositRequest: {
+            /** @description YYYY-MM-DD. Default: today. */
+            deposited_on?: string;
+            /** @description The bank account it went into. Default: Bank. */
+            account_id?: number;
+        };
+        AccountingCreditNoteRequest: {
+            /** @description Leave out to credit everything still not credited. */
+            lines?: {
+                line_id: number;
+                /** @description How much to credit, in normal units. Default: all that is left. */
+                quantity?: string;
+            }[];
+            /** @description Why, printed on the credit note. Up to 2000 characters. */
+            reason?: string;
+            /** @description YYYY-MM-DD. */
+            issue_date?: string;
+            /** @description Retrying with the same key returns the same credit note. */
+            idempotency_key?: string;
+        };
+        AccountingCustomerStatement: {
+            contact: {
+                id: number;
+                name: string;
+            };
+            from: string;
+            to: string;
+            currency: string;
+            opening_minor: number;
+            closing_minor: number;
+            lines: {
+                line_id: number;
+                entry_id: number;
+                number: string;
+                date: string;
+                memo?: string;
+                source_type?: string;
+                source_id?: number | null;
+                debit_minor: number;
+                credit_minor: number;
+                balance_minor: number;
+            }[];
+        };
+        AccountingEntry: {
+            id: number;
+            journal_id: number;
+            journal_code: string;
+            period_id?: number;
+            /** @description Such as `GEN-2026-0042`. */
+            number: string;
+            date: string;
+            memo: string;
+            /** @description `manual`, `opening`, `reversal`, or a plugin's `<plugin>.<kind>`. */
+            source_type: string;
+            source_id?: number | null;
+            reverses_entry_id?: number | null;
+            reversed_by_entry_id?: number | null;
+            currency: string;
+            /** @description The sum of the debits. In minor units of the base currency. */
+            total_minor: number;
+            posted_by_profile_id?: number | null;
+            agent_id?: number | null;
+            on_behalf_of_profile_id?: number | null;
+            /** @description SHA-256 over the entry and the hash of the entry before it in the workspace. */
+            hash: string;
+            prev_hash?: string;
+            posted_at?: string;
+            lines?: {
+                id: number;
+                line_no: number;
+                account_id: number;
+                account_code: string;
+                account_name: string;
+                debit_minor: number;
+                credit_minor: number;
+                contact_id: number | null;
+                ou_id: number | null;
+                description: string;
+            }[];
+        };
+        AccountingExpenseClaimRequest: {
+            /** @description When it was paid, YYYY-MM-DD. Default: today. */
+            date?: string;
+            /** @description 1 to 50 lines. */
+            lines: {
+                /** @description What it was: "Taxi to the bank". */
+                description: string;
+                /** @description What was paid, tax included, such as "12.500". */
+                amount?: string;
+                /** @description Or the amount in minor units. */
+                amount_minor?: number;
+                /** @description `standard` (default), `zero` or `exempt`. */
+                tax_category?: string;
+                /** @description An input tax code instead of the category. */
+                tax_code?: number | string;
+                /** @description The cost it was. Default: Other costs. */
+                account_id?: number;
+                /** @description The cost by its code, instead of account_id. */
+                account_code?: string;
+            }[];
+            /** @description Where and why. Up to 2000 characters. */
+            notes?: string;
+            /** @description The photo of the receipt, a file uploaded to the workspace. */
+            receipt_stored_file_id?: number;
+            /** @description Retrying with the same key returns the same record. */
+            idempotency_key?: string;
+        };
+        AccountingInvoice: {
+            id: number;
+            /** @enum {string} */
+            kind: "sale" | "sale_credit" | "purchase" | "purchase_credit";
+            number: string | null;
+            /** @description On a bill: the supplier's own invoice number. */
+            supplier_number?: string | null;
+            /** @enum {string} */
+            status: "draft" | "waiting_approval" | "issued" | "partly_paid" | "paid" | "credited" | "cancelled";
+            contact_id: number;
+            contact_name?: string;
+            issue_date: string;
+            supply_date?: string | null;
+            due_date?: string | null;
+            payment_terms_days?: number;
+            overdue?: boolean;
+            currency: string;
+            prices_include_tax?: boolean;
+            subtotal_minor: number;
+            discount_minor?: number;
+            tax_minor: number;
+            total_minor: number;
+            paid_minor?: number;
+            credited_minor?: number;
+            /** @description What is still owed. */
+            due_minor: number;
+            /** @description On a credit note: the invoice it credits. */
+            credits_invoice_id?: number | null;
+            /** @description The journal entry it posted, once issued. */
+            entry_id?: number | null;
+            route_id?: number | null;
+            /** @enum {string} */
+            einvoice_status?: "none" | "pending" | "accepted" | "rejected" | "not_required";
+            einvoice_uuid?: string | null;
+            einvoice_ref?: string | null;
+            einvoice_qr?: string | null;
+            einvoice_message?: string;
+            notes?: string;
+            external_ref?: string | null;
+            quote_id?: number | null;
+            issued_at?: string | null;
+            issued_by_profile_id?: number | null;
+            created_by_profile_id?: number | null;
+            agent_id?: number | null;
+            on_behalf_of_profile_id?: number | null;
+            owner_plugin?: string | null;
+            /** @description On an expense claim: the person who paid and is owed it. */
+            claimant_profile_id?: number | null;
+            /** @description The photo of the receipt. */
+            receipt_stored_file_id?: number | null;
+            created_at?: string;
+            lines?: components["schemas"]["AccountingInvoiceLine"][];
+            allocations?: {
+                id: number;
+                invoice_id: number;
+                credit_invoice_id?: number | null;
+                credit_number?: string | null;
+                payment_id?: number | null;
+                amount_minor: number;
+                allocated_on: string;
+            }[];
+        };
+        AccountingInvoiceChanges: {
+            /** @description The customer: a contact marked as a customer. */
+            contact_id?: number;
+            /** @description YYYY-MM-DD. */
+            issue_date?: string;
+            /** @description YYYY-MM-DD. */
+            supply_date?: string | null;
+            /** @description YYYY-MM-DD. */
+            due_date?: string | null;
+            /** @description Days from issue to due, 0 to 365. Default: the workspace's. */
+            payment_terms_days?: number;
+            /** @description Whether the prices typed include tax. Default: the workspace's setting. */
+            prices_include_tax?: boolean;
+            /** @description Printed on the invoice. Up to 2000 characters. */
+            notes?: string;
+            /** @description 1 to 300 lines. */
+            lines?: {
+                /** @description An item. Its name, price, unit and tax category are used unless given. */
+                variant_id?: number | null;
+                /** @description What was sold. Needed for a line without an item. */
+                description?: string;
+                /** @description In normal units, such as "2.5". Default 1. */
+                quantity?: string;
+                /** @description An item's unit code (box, kg). Default: its base unit. */
+                unit?: string;
+                /** @description The price of one, in minor units. */
+                unit_price_minor?: number;
+                /** @description Discount in basis points, 0 to 10000 (1000 = 10%). */
+                discount_bp?: number;
+                /** @description A tax code by id or code (JO-GST-16). Default: from the tax category. */
+                tax_code?: number | string;
+                /** @description `standard`, `zero`, `exempt`, or a category a code the workspace added serves. Default: the item's, else standard. */
+                tax_category?: string;
+                /** @description An income account. Default: Sales, or Services for a service item. */
+                account_id?: number | null;
+                /** @description The income account by its code, instead of account_id. */
+                account_code?: string;
+                /** @description The branch (organisational unit) the sale belongs to. */
+                ou_id?: number | null;
+            }[];
+        };
+        AccountingInvoiceLine: {
+            id: number;
+            line_no: number;
+            variant_id?: number | null;
+            unit_id?: number | null;
+            description: string;
+            /** @description In steps of quantity_decimals: 25 with one decimal is 2.5. */
+            quantity: number;
+            quantity_decimals: number;
+            unit_price_minor: number;
+            discount_bp?: number;
+            net_minor: number;
+            tax_code_id: number;
+            tax_code?: string;
+            tax_rate_bp?: number;
+            tax_minor: number;
+            total_minor: number;
+            account_id: number;
+            account_code?: string;
+            account_name?: string;
+            ou_id?: number | null;
+            credits_line_id?: number | null;
+        };
+        AccountingInvoiceRequest: {
+            /** @description The customer: a contact marked as a customer. */
+            contact_id: number;
+            /** @description YYYY-MM-DD. */
+            issue_date?: string;
+            /** @description YYYY-MM-DD. */
+            supply_date?: string | null;
+            /** @description YYYY-MM-DD. */
+            due_date?: string | null;
+            /** @description Days from issue to due, 0 to 365. Default: the workspace's. */
+            payment_terms_days?: number;
+            /** @description Whether the prices typed include tax. Default: the workspace's setting. */
+            prices_include_tax?: boolean;
+            /** @description Printed on the invoice. Up to 2000 characters. */
+            notes?: string;
+            /** @description 1 to 300 lines. */
+            lines: {
+                /** @description An item. Its name, price, unit and tax category are used unless given. */
+                variant_id?: number | null;
+                /** @description What was sold. Needed for a line without an item. */
+                description?: string;
+                /** @description In normal units, such as "2.5". Default 1. */
+                quantity?: string;
+                /** @description An item's unit code (box, kg). Default: its base unit. */
+                unit?: string;
+                /** @description The price of one, in minor units. */
+                unit_price_minor?: number;
+                /** @description Discount in basis points, 0 to 10000 (1000 = 10%). */
+                discount_bp?: number;
+                /** @description A tax code by id or code (JO-GST-16). Default: from the tax category. */
+                tax_code?: number | string;
+                /** @description `standard`, `zero`, `exempt`, or a category a code the workspace added serves. Default: the item's, else standard. */
+                tax_category?: string;
+                /** @description An income account. Default: Sales, or Services for a service item. */
+                account_id?: number | null;
+                /** @description The income account by its code, instead of account_id. */
+                account_code?: string;
+                /** @description The branch (organisational unit) the sale belongs to. */
+                ou_id?: number | null;
+            }[];
+            /** @description Retrying with the same key returns the same draft. */
+            idempotency_key?: string;
+        };
+        AccountingInvoiceSettings: {
+            /** @description The route invoices travel before they are issued; null for none. */
+            invoice_route_template_id?: number | null;
+            /** @description Days from issue to due on a new invoice, 0 to 365. */
+            invoice_payment_terms_days?: number;
+            /** @description Whether a new invoice's prices include tax. */
+            prices_include_tax?: boolean;
+        };
+        AccountingJournal: {
+            id: number;
+            code: string;
+            name: string;
+            /** @description The name in each language, such as `{"en": "Rent", "ar": "الإيجار"}`. */
+            names: {
+                [key: string]: string;
+            };
+            /** @enum {string} */
+            kind: "sale" | "purchase" | "bank" | "cash" | "general" | "stock" | "opening" | "plugin";
+            default_account_id: number | null;
+            owner_plugin: string | null;
+            archived_at: string | null;
+        };
+        AccountingManualEntry: {
+            id: number;
+            journal_id: number;
+            journal_code: string;
+            journal_kind?: string;
+            date: string;
+            memo: string;
+            /** @enum {string} */
+            status: "draft" | "posting" | "posted" | "cancelled";
+            entry_id: number | null;
+            currency: string;
+            debit_minor: number;
+            credit_minor: number;
+            balanced: boolean;
+            created_by_profile_id?: number | null;
+            agent_id?: number | null;
+            on_behalf_of_profile_id?: number | null;
+            created_at?: string;
+            updated_at?: string;
+            lines?: {
+                id: number;
+                line_no: number;
+                account_id: number;
+                account_code: string;
+                account_name: string;
+                debit_minor: number;
+                credit_minor: number;
+                contact_id: number | null;
+                ou_id: number | null;
+                description: string;
+            }[];
+        };
+        AccountingManualEntryRequest: {
+            /** @description The journal's code: `GEN` (the default), `OPN` for opening balances, or a bank or cash journal. */
+            journal?: string;
+            /** @description The accounting date, YYYY-MM-DD. */
+            date: string;
+            /** @description What the entry is for. Up to 500 characters. */
+            memo?: string;
+            /** @description Two or more lines whose debits equal their credits. */
+            lines: {
+                /** @description An account from the chart, not a heading. */
+                account_id: number;
+                /** @description The debit in normal units, such as "12.500"; leave out on a credit line. */
+                debit?: string;
+                /** @description The credit in normal units; leave out on a debit line. */
+                credit?: string;
+                /** @description The customer or supplier this line is about. */
+                contact_id?: number | null;
+                /** @description The branch (organisational unit). */
+                ou_id?: number | null;
+                /** @description A note for the line. */
+                description?: string;
+            }[];
+        };
+        AccountingPayment: {
+            id: number;
+            /** @enum {string} */
+            direction: "in" | "out" | "transfer";
+            number: string;
+            contact_id?: number | null;
+            contact_name?: string | null;
+            paid_on: string;
+            amount_minor: number;
+            currency: string;
+            /** @enum {string} */
+            method: "cash" | "bank_transfer" | "cliq" | "card" | "cheque" | "whity_pay" | "other";
+            account_id?: number;
+            from_account_id?: number | null;
+            reference?: string;
+            cheque_number?: string | null;
+            cheque_bank?: string | null;
+            cheque_due_on?: string | null;
+            /** @enum {string|null} */
+            cheque_status?: "waiting" | "cleared" | "bounced" | null;
+            fee_minor?: number;
+            /** @enum {string} */
+            status: "posted" | "bounced";
+            allocated_minor?: number;
+            /** @description What it has not settled yet: the customer's credit. */
+            unallocated_minor: number;
+            notes?: string;
+            entry_id?: number | null;
+            deposit_entry_id?: number | null;
+            bounce_entry_id?: number | null;
+            external_ref?: string | null;
+            created_by_profile_id?: number | null;
+            agent_id?: number | null;
+            on_behalf_of_profile_id?: number | null;
+            owner_plugin?: string | null;
+            created_at?: string;
+            allocations?: {
+                id: number;
+                invoice_id: number;
+                invoice_number?: string | null;
+                amount_minor: number;
+                allocated_on: string;
+                /** @description True when a bounced cheque released it. */
+                released: boolean;
+            }[];
+        };
+        AccountingPaymentRequest: {
+            /** @description The customer who paid. */
+            contact_id: number;
+            /** @description YYYY-MM-DD. Default: today. */
+            paid_on?: string;
+            /** @description In normal units, such as "125.500". */
+            amount?: string;
+            /** @description Or the amount in minor units. */
+            amount_minor?: number;
+            /**
+             * @description Default: bank_transfer. It picks the account the money goes to.
+             * @enum {string}
+             */
+            method?: "cash" | "bank_transfer" | "cliq" | "card" | "cheque" | "whity_pay" | "other";
+            /** @description The bank or cash account it went to, instead of the method's. */
+            account_id?: number;
+            /** @description The bank's or provider's reference. */
+            reference?: string;
+            /** @description Needed for a cheque. */
+            cheque_number?: string;
+            /** @description The bank the cheque is drawn on. */
+            cheque_bank?: string;
+            /** @description YYYY-MM-DD. A later date keeps it on Cheques to collect until deposited. */
+            cheque_due_on?: string;
+            /** @description What a card or Whity Pay provider kept, in minor units. */
+            fee_minor?: number;
+            /** @description Settle this invoice with it. */
+            invoice_id?: number;
+            /** @description Or settle several invoices. */
+            allocations?: {
+                invoice_id: number;
+                /** @description Default: all that fits. */
+                amount_minor?: number;
+            }[];
+            /** @description Up to 2000 characters. */
+            notes?: string;
+            /** @description Retrying with the same key returns the same payment. */
+            idempotency_key?: string;
+        };
+        AccountingPeriod: {
+            id: number;
+            fiscal_year_id?: number;
+            starts_on: string;
+            ends_on: string;
+            /** @enum {string} */
+            status: "open" | "closed" | "locked";
+            closed_at?: string | null;
+            closed_by_profile_id?: number | null;
+            reopened_at?: string | null;
+            reopened_by_profile_id?: number | null;
+            reopen_reason?: string;
+            year_starts_on?: string;
+            year_ends_on?: string;
+        };
+        AccountingPettyCash: {
+            account_id: number;
+            code: string;
+            /** @description What is in petty cash, in minor units. */
+            balance_minor: number;
+            currency: string;
+        };
+        AccountingReimburseRequest: {
+            /** @description `bank_transfer` (default), `cliq`, `cash` or `cheque`. */
+            method?: string;
+            /** @description The bank or cash account it is paid from. */
+            account_id?: number;
+            /** @description YYYY-MM-DD. Default: today. */
+            paid_on?: string;
+            /** @description The bank's reference. */
+            reference?: string;
+        };
+        AccountingReopenRequest: {
+            /** @description Why the month is reopened, kept on the month. Up to 500 characters. */
+            reason: string;
+        };
+        AccountingReverseRequest: {
+            /** @description Why, shown as the memo. Up to 500 characters. */
+            note?: string;
+            /** @description The reversal's date, YYYY-MM-DD, in an open month. Optional. */
+            date?: string;
+        };
+        AccountingStatement: {
+            account: {
+                id: number;
+                code: string;
+                name: string;
+                /** @description The name in each language, such as `{"en": "Rent", "ar": "الإيجار"}`. */
+                names?: {
+                    [key: string]: string;
+                };
+                type: string;
+            };
+            from: string;
+            to: string;
+            currency: string;
+            opening_minor: number;
+            closing_minor: number;
+            lines: {
+                line_id: number;
+                entry_id: number;
+                number: string;
+                date: string;
+                memo?: string;
+                description?: string;
+                debit_minor: number;
+                credit_minor: number;
+                balance_minor: number;
+                contact_id?: number | null;
+                ou_id?: number | null;
+                source_type?: string;
+                source_id?: number | null;
+            }[];
+            next: {
+                after_date?: string;
+                after_line?: number;
+            } | null;
+        };
+        AccountingStockCost: {
+            /** @description The item variant whose stock has no cost yet (from Stock waiting for a cost). */
+            variant_id: number;
+            /** @description The cost of one base unit (a kilogram, a piece), in minor units of the workspace's currency. */
+            unit_cost_minor: number;
+            /** @description YYYY-MM-DD, in an open month. Default: today. */
+            date?: string;
+        };
+        AccountingStockOpening: {
+            /** @description YYYY-MM-DD, in an open month. Default: today. */
+            date?: string;
+        };
+        AccountingStockStatus: {
+            stock_in_books: boolean;
+            /** @description When stock first posted to the books since it was last turned on. */
+            since?: string | null;
+            currency: string;
+            /** @description The stock's value at its moving average cost. */
+            stock_value_minor: number;
+            /** @description What the Stock account says. */
+            stock_account_minor: number;
+            items_without_cost?: number;
+            /** @description Stock changes that posted nothing for want of a cost. */
+            waiting?: number;
+        };
+        AccountingStockSwitch: {
+            /** @description Whether stock posts to the books. */
+            stock_in_books: boolean;
+        };
+        AccountingTaxCode: {
+            id: number;
+            code: string;
+            name: string;
+            /** @description The name in each language, such as `{"en": "Rent", "ar": "الإيجار"}`. */
+            names?: {
+                [key: string]: string;
+            };
+            pack?: string;
+            /** @enum {string} */
+            direction: "output" | "input";
+            /** @description Basis points: 1600 is 16%. */
+            rate_bp: number;
+            treatment: string;
+            category: string;
+            account_id?: number | null;
+            return_box?: string;
+            einvoice_category?: string;
+            valid_from?: string | null;
+            valid_to?: string | null;
+            is_seeded?: boolean;
+            owner_plugin?: string | null;
+            archived?: boolean;
+        };
+        AccountingTaxCodeChanges: {
+            /** @description Text, or `{en, ar}`. */
+            name?: string | {
+                en?: string;
+                ar?: string;
+            };
+            /** @description Where its tax posts; null for the default account. */
+            account_id?: number | null;
+            /** @description The item tax category it serves. */
+            category?: string;
+            /** @description YYYY-MM-DD, the last day it applies; null for no end. */
+            valid_to?: string | null;
+        };
+        AccountingTaxCodeRequest: {
+            /** @description Up to 30 letters, digits, dots, dashes or underscores, such as JO-GST-8. */
+            code: string;
+            /** @description Text, or `{en, ar}`. */
+            name: string | {
+                en?: string;
+                ar?: string;
+            };
+            /**
+             * @description `output` for sales, `input` for purchases.
+             * @enum {string}
+             */
+            direction: "output" | "input";
+            /** @description Basis points, 0 to 10000: 1600 is 16%. Never changes once made. */
+            rate_bp: number;
+            /**
+             * @description Default: standard above 0, zero at 0.
+             * @enum {string}
+             */
+            treatment?: "standard" | "reduced" | "zero" | "exempt" | "out_of_scope" | "reverse_charge";
+            /** @description The item tax category it serves, such as reduced_8. */
+            category?: string;
+            /** @description Where its tax posts. Default: Sales tax we collected (output) or Sales tax we can reclaim (input). */
+            account_id?: number | null;
+            /** @description YYYY-MM-DD, the first day it applies. */
+            valid_from?: string | null;
+            /** @description YYYY-MM-DD, the last day it applies. */
+            valid_to?: string | null;
+        };
+        AccountingTransferRequest: {
+            /** @description Where the money left: cash, a bank, or Money at payment providers. */
+            from_account_id: number;
+            /** @description Where it arrived. */
+            to_account_id: number;
+            /** @description In normal units, such as "500.000". */
+            amount?: string;
+            /** @description Or the amount in minor units. */
+            amount_minor?: number;
+            /** @description YYYY-MM-DD. Default: today. */
+            paid_on?: string;
+            /** @description The bank's or provider's reference. */
+            reference?: string;
+            /** @description Up to 2000 characters. */
+            notes?: string;
+            /** @description Retrying with the same key returns the same transfer. */
+            idempotency_key?: string;
+        };
+        AccountingTrialBalance: {
+            from: string;
+            to: string;
+            currency: string;
+            ou_id?: number | null;
+            rows: {
+                account_id: number;
+                code: string;
+                name: string;
+                /** @description The name in each language, such as `{"en": "Rent", "ar": "الإيجار"}`. */
+                names?: {
+                    [key: string]: string;
+                };
+                type: string;
+                parent_id?: number | null;
+                opening_debit_minor: number;
+                opening_credit_minor: number;
+                debit_minor: number;
+                credit_minor: number;
+                closing_debit_minor: number;
+                closing_credit_minor: number;
+            }[];
+            totals: {
+                opening_debit_minor?: number;
+                opening_credit_minor?: number;
+                debit_minor: number;
+                credit_minor: number;
+                closing_debit_minor?: number;
+                closing_credit_minor?: number;
+            };
+            balanced: boolean;
+        };
         ActivateWorkspacePluginRequest: {
             /** @description Go ahead although the change is destructive (existing values stop being served). Nothing is deleted, so a rollback serves them again. */
             confirmDestructive?: boolean;
@@ -14366,6 +16471,13 @@ export interface components {
             builtOnWhity?: boolean;
             /** @description The workspace currency as an ISO 4217 code (billing.default_currency; USD by default). Amounts with a currency of their own show in that one. */
             currency?: string;
+            /** @description Where people land after signing in and where home links go: a path on this site (navigation.home_path, else WHITY_HOME_PATH, else /dashboard). */
+            homePath?: string;
+            /** @description A link at the top of the sidebar back to the product Whity runs beside (navigation.back_to_product_url and _label, else WHITY_BACK_TO_PRODUCT_URL and _LABEL), or null for none. */
+            backToProduct?: {
+                url: string;
+                label: string;
+            } | null;
         };
         BrandingHostReadResponse: {
             data: {
@@ -16312,6 +18424,8 @@ export interface components {
             pdf_pending?: {
                 reason: string;
                 fix: string | null;
+                code: string;
+                route_id: number | null;
             };
             /** @description Who signed the current version, in what capacity and when. Electronic signatures with an audit trail. */
             signatures?: components["schemas"]["DocumentSignature"][];
@@ -18790,6 +20904,14 @@ export interface components {
         HelloGreetingResponse: {
             data: components["schemas"]["HelloGreeting"];
         };
+        HiddenNavIdsResponse: {
+            data: {
+                /** @description Menu item ids, as on GET /api/navigation. */
+                nav: string[];
+                /** @description Settings page ids, without the settings. prefix. */
+                settings: string[];
+            };
+        };
         HomeCard: {
             key: string;
             label: string;
@@ -18879,6 +21001,87 @@ export interface components {
             scopes?: string;
             domain?: string | null;
             enabled?: boolean;
+        };
+        ImportKind: {
+            /** @description `contacts`, `inventory.items`, `inventory.opening_stock`, `inventory.supplier_prices`, … */
+            key: string;
+            label: {
+                en: string;
+                ar: string;
+            };
+            description: {
+                en: string;
+                ar: string;
+            };
+            /** @description The base of the endpoints of the kind, such as `/api/v1/inventory/imports/items`. */
+            path: string;
+            /** @description The list page it is opened from: `contacts` or `inventory`. */
+            area: string;
+            back: {
+                href: string;
+                label: {
+                    en: string;
+                    ar: string;
+                };
+            };
+            targets: {
+                key: string;
+                label: {
+                    en: string;
+                    ar: string;
+                };
+                hint: {
+                    en: string;
+                    ar: string;
+                } | null;
+            }[];
+            /** @description Targets the matching must include. */
+            required: string[];
+            options: {
+                /** @description The field it fills in the check request. */
+                key: string;
+                /** @enum {string} */
+                type: "select" | "text";
+                label: {
+                    en: string;
+                    ar: string;
+                };
+                hint: {
+                    en: string;
+                    ar: string;
+                } | null;
+                choices: {
+                    value: (string | number) | null;
+                    label: {
+                        en: string;
+                        ar: string;
+                    };
+                }[] | null;
+                default: (string | number) | null;
+                /** @description Required unless this target is matched; null when optional. */
+                required_unless: string | null;
+                /** @enum {string} */
+                value_type: "string" | "int";
+                placeholder: string | null;
+            }[];
+            words: {
+                title: {
+                    en: string;
+                    ar: string;
+                };
+                create: {
+                    en: string;
+                    ar: string;
+                };
+                update: {
+                    en: string;
+                    ar: string;
+                };
+                run: {
+                    en: string;
+                    ar: string;
+                };
+            };
         };
         /** @description A theme file (schemas/theme/v1.json): schemaVersion, id, version and name are required. Or {theme, source} with the file under theme. */
         ImportThemeRequest: {
@@ -22362,6 +24565,15 @@ export interface components {
             resource_id: number;
             revoked: number;
         };
+        RestoreThemeVersionResponse: {
+            data: {
+                id: string;
+                /** @description The new version number. */
+                version: string;
+                /** @description The version it was made from. */
+                restored_from: string;
+            };
+        };
         Role: {
             id: number;
             name: string;
@@ -22746,6 +24958,13 @@ export interface components {
             tax_bp?: number;
             /** @description The item's tax category, kept for the tax engine. */
             tax_category?: string;
+        };
+        SalesQuotePrintRequest: {
+            /**
+             * @description The language of the template: `en` (the default) or `ar`.
+             * @enum {string}
+             */
+            lang?: "en" | "ar";
         };
         SalesQuoteRequest: {
             /** @description The customer: a contact marked as a customer. */
@@ -24137,6 +26356,31 @@ export interface components {
                 content: string;
             };
         };
+        ThemeVersionFileResponse: {
+            data: {
+                /** @description The theme file (schemas/theme/v1.json). */
+                theme: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        ThemeVersionsResponse: {
+            data: {
+                theme_id: string;
+                /** @description The version in use. */
+                current: string;
+                /** @description Newest first. */
+                versions: {
+                    version: string;
+                    /** @description import, editor or restore. */
+                    source: string;
+                    saved_at: string;
+                    /** @description The name of the person who saved it, when known. */
+                    saved_by?: string | null;
+                    current: boolean;
+                }[];
+            };
+        };
         TimeWindow: {
             id: number;
             tenant_id: number;
@@ -24900,6 +27144,19 @@ export interface components {
                 }[];
                 is_owner: boolean;
             };
+        };
+        WorkspacePauseResponse: {
+            data: components["schemas"]["WorkspacePauseState"] | null;
+        };
+        WorkspacePauseState: {
+            /** @description expired or canceled */
+            status: string;
+            /** @description The wall refuses reads too, not only changes */
+            reads_refused: boolean;
+            /** @description The owners who can pay, by name */
+            owners: {
+                name: string;
+            }[];
         };
         WorkspacePlugin: {
             /** @description The name in lower case, used in routes */
@@ -26258,6 +28515,5888 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_accounts: {
+        parameters: {
+            query?: {
+                /** @description `true` to include archived accounts. */
+                archived?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Accounts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingAccount"][];
+                        currency: string;
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_accounts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingAccountRequest"];
+            };
+        };
+        responses: {
+            /** @description The account */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingAccount"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_accounts_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingAccount"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_accounting_accounts_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingAccountChanges"];
+            };
+        };
+        responses: {
+            /** @description The account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingAccount"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_accounts_id_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingAccount"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_accounts_id_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingAccount"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_accounts_id_statement: {
+        parameters: {
+            query?: {
+                /** @description First day, YYYY-MM-DD. Default: the first of this month. */
+                from?: string;
+                /** @description Last day, YYYY-MM-DD. Default: today. */
+                to?: string;
+                /** @description The date of the last line of the page before (from `next`). */
+                after_date?: string;
+                /** @description The line id of the last line of the page before (from `next`). */
+                after_line?: number;
+                /** @description Lines per page, at most 500. Default 200. */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The statement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingStatement"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_bill_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingBillSettings"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_accounting_bill_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingBillSettings"];
+            };
+        };
+        responses: {
+            /** @description The settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingBillSettings"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_bills: {
+        parameters: {
+            query?: {
+                /** @description `purchase` or `purchase_credit`. Default: both. */
+                kind?: string;
+                /** @description `draft`, `waiting_approval`, `issued` (posted), `partly_paid`, `paid`, `credited`, `cancelled`, or `overdue`. */
+                status?: string;
+                /** @description One supplier's bills. */
+                contact_id?: number;
+                /** @description Part of the number or the supplier's name. */
+                q?: string;
+                /** @description Dated on or after, YYYY-MM-DD. */
+                from?: string;
+                /** @description Dated on or before, YYYY-MM-DD. */
+                to?: string;
+                /** @description At most 200. Default 50. */
+                limit?: number;
+                /** @description Skip this many. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bills */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_bills: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingBillRequest"];
+            };
+        };
+        responses: {
+            /** @description The same draft, already made with this key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description The draft */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_bills_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bill */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_accounting_bills_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingBillChanges"];
+            };
+        };
+        responses: {
+            /** @description The draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_bills_id_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bill */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_bills_id_credits: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingCreditNoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The same credit, already made with this key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description The supplier credit */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_bills_id_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bill */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_books: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The books */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingBooks"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_customers_id_statement: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM-DD. Default: the first of January. */
+                from?: string;
+                /** @description YYYY-MM-DD. Default: today. */
+                to?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The statement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingCustomerStatement"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_entries: {
+        parameters: {
+            query?: {
+                /** @description Only entries in this journal. */
+                journal_id?: number;
+                /** @description Only entries with a line on this account. */
+                account_id?: number;
+                /** @description Only entries from this source, such as `manual` or `pos.sale`. */
+                source_type?: string;
+                /** @description Only entries from this source record. */
+                source_id?: number;
+                /** @description Dated on or after, YYYY-MM-DD. */
+                from?: string;
+                /** @description Dated on or before, YYYY-MM-DD. */
+                to?: string;
+                /** @description Entries older than this one. */
+                before_id?: number;
+                /** @description Entries per page, at most 200. Default 50. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingEntry"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_entries_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingEntry"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_entries_id_reverse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingReverseRequest"];
+            };
+        };
+        responses: {
+            /** @description The reversing entry */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingEntry"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_expense_claims: {
+        parameters: {
+            query?: {
+                /** @description `true` for everyone's claims (needs bills:read). */
+                all?: string;
+                /** @description At most 200. Default 50. */
+                limit?: number;
+                /** @description Skip this many. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Claims */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_expense_claims: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingExpenseClaimRequest"];
+            };
+        };
+        responses: {
+            /** @description The claim */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_expense_claims_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The claim */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_expense_claims_id_reimburse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingReimburseRequest"];
+            };
+        };
+        responses: {
+            /** @description The payment */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_invoice_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoiceSettings"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_accounting_invoice_settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingInvoiceSettings"];
+            };
+        };
+        responses: {
+            /** @description The settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoiceSettings"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_invoices: {
+        parameters: {
+            query?: {
+                /** @description `sale` or `sale_credit`. Default: both. */
+                kind?: string;
+                /** @description `draft`, `waiting_approval`, `issued`, `partly_paid`, `paid`, `credited`, `cancelled`, or `overdue`. */
+                status?: string;
+                /** @description One customer's invoices. */
+                contact_id?: number;
+                /** @description Part of the number or the customer's name. */
+                q?: string;
+                /** @description Issued on or after, YYYY-MM-DD. */
+                from?: string;
+                /** @description Issued on or before, YYYY-MM-DD. */
+                to?: string;
+                /** @description At most 200. Default 50. */
+                limit?: number;
+                /** @description Skip this many. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Invoices */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_invoices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingInvoiceRequest"];
+            };
+        };
+        responses: {
+            /** @description The same draft, already made with this key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description The draft */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_invoices_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_accounting_invoices_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingInvoiceChanges"];
+            };
+        };
+        responses: {
+            /** @description The draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_invoices_id_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_invoices_id_credit_notes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingCreditNoteRequest"];
+            };
+        };
+        responses: {
+            /** @description The same credit note, already made with this key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description The credit note */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_invoices_id_issue: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The invoice */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingInvoice"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_journals: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Journals */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingJournal"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_manual_entries: {
+        parameters: {
+            query?: {
+                /** @description `draft`, `posted` or `cancelled`. */
+                status?: string;
+                /** @description Entries older than this one. */
+                before_id?: number;
+                /** @description Entries per page, at most 200. Default 50. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Manual entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingManualEntry"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_manual_entries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingManualEntryRequest"];
+            };
+        };
+        responses: {
+            /** @description The draft */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingManualEntry"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_manual_entries_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingManualEntry"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_accounting_manual_entries_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingManualEntryRequest"];
+            };
+        };
+        responses: {
+            /** @description The draft */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingManualEntry"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_manual_entries_id_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The entry, cancelled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingManualEntry"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_manual_entries_id_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The entry, posted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingManualEntry"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_payments: {
+        parameters: {
+            query?: {
+                /** @description `in` (received) or `transfer`. */
+                direction?: string;
+                /** @description One customer's payments. */
+                contact_id?: number;
+                /** @description `cash`, `bank_transfer`, `cliq`, `card`, `cheque`, `whity_pay` or `other`. */
+                method?: string;
+                /** @description `waiting`, `cleared` or `bounced`. */
+                cheque_status?: string;
+                /** @description Paid on or after, YYYY-MM-DD. */
+                from?: string;
+                /** @description Paid on or before, YYYY-MM-DD. */
+                to?: string;
+                /** @description Part of the number, the reference or the customer's name. */
+                q?: string;
+                /** @description At most 200. Default 50. */
+                limit?: number;
+                /** @description Skip this many. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Payments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_payments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingPaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description The same payment, already recorded with this key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description The payment */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_payments_made: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingPaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description The same payment, already recorded with this key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description The payment */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_payments_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The payment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_payments_id_allocations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingAllocationRequest"];
+            };
+        };
+        responses: {
+            /** @description The payment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_payments_id_bounce: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingChequeBounceRequest"];
+            };
+        };
+        responses: {
+            /** @description The payment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_payments_id_deposit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingChequeDepositRequest"];
+            };
+        };
+        responses: {
+            /** @description The payment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_periods: {
+        parameters: {
+            query?: {
+                /** @description Only the months of this calendar year. */
+                year?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Months */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPeriod"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_periods_id_close: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The month */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPeriod"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_periods_id_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingReopenRequest"];
+            };
+        };
+        responses: {
+            /** @description The month */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPeriod"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_petty_cash: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM-DD. Default: today. */
+                as_of?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Petty cash */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPettyCash"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_petty_cash_spends: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingExpenseClaimRequest"];
+            };
+        };
+        responses: {
+            /** @description The bill and its payment */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            bill: components["schemas"]["AccountingInvoice"];
+                            payment: components["schemas"]["AccountingPayment"];
+                        };
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_reports_aged_payables: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM-DD. Default: today. */
+                as_of?: string;
+                /** @description One supplier only. */
+                contact_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Aged payables */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingAgedReceivables"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_reports_aged_receivables: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM-DD. Default: today. */
+                as_of?: string;
+                /** @description One customer only. */
+                contact_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Aged receivables */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingAgedReceivables"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_reports_trial_balance: {
+        parameters: {
+            query?: {
+                /** @description First day, YYYY-MM-DD. Default: the first of this month. */
+                from?: string;
+                /** @description Last day, YYYY-MM-DD. Default: today. */
+                to?: string;
+                /** @description Only lines of this branch (organisational unit). */
+                ou_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The trial balance */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingTrialBalance"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_stock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stock in the books */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingStockStatus"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_accounting_stock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingStockSwitch"];
+            };
+        };
+        responses: {
+            /** @description Stock in the books */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingStockStatus"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_stock_costs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingStockCost"];
+            };
+        };
+        responses: {
+            /** @description The cost given */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            variant_id: number;
+                            /** @description What the stock on hand is now worth. */
+                            value_minor: number;
+                            entry_id?: number | null;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_stock_opening: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingStockOpening"];
+            };
+        };
+        responses: {
+            /** @description What was posted */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            posted: boolean;
+                            entry_id?: number | null;
+                            /** @description What the Stock account was brought up (or down) by. */
+                            amount_minor: number;
+                            /** @description Variants with no cost yet, not valued. */
+                            unknown: number[];
+                        };
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_stock_waiting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Waiting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            items: {
+                                variant_id: number;
+                                item_id: number;
+                                item_name: string;
+                                /** @description In the unit's smallest steps. */
+                                quantity: number;
+                            }[];
+                            moves: {
+                                move_id: number;
+                                variant_id: number;
+                                item_name: string;
+                                quantity: number;
+                                source_type?: string;
+                                source_id?: number | null;
+                                occurred_at?: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_suppliers_id_statement: {
+        parameters: {
+            query?: {
+                /** @description YYYY-MM-DD. Default: the first of January. */
+                from?: string;
+                /** @description YYYY-MM-DD. Default: today. */
+                to?: string;
+            };
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The statement */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingCustomerStatement"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_tax_codes: {
+        parameters: {
+            query?: {
+                /** @description `output` (sales) or `input` (purchases). */
+                direction?: string;
+                /** @description `true` to include archived codes. */
+                archived?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tax codes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingTaxCode"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_tax_codes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingTaxCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description The tax code */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingTaxCode"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_accounting_tax_codes_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingTaxCodeChanges"];
+            };
+        };
+        responses: {
+            /** @description The tax code */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingTaxCode"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_tax_codes_id_archive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tax code */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingTaxCode"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_tax_codes_id_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tax code */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingTaxCode"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_transfers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingTransferRequest"];
+            };
+        };
+        responses: {
+            /** @description The same transfer, already recorded with this key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description The transfer */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingPayment"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -30137,6 +38276,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaymentMethodListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_billing_pause: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether this workspace is paused */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspacePauseResponse"];
                 };
             };
             /** @description Missing or invalid authentication */
@@ -56440,6 +64644,76 @@ export interface operations {
             };
         };
     };
+    get_api_v1_imports_kinds: {
+        parameters: {
+            query?: {
+                /** @description Only the kinds of one list page: `contacts` or `inventory`. */
+                area?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The kinds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ImportKind"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_instance_complete_setup: {
         parameters: {
             query?: never;
@@ -58194,6 +66468,19 @@ export interface operations {
                             item: components["schemas"]["InventoryItem"];
                             variant_id: number;
                             unit: string;
+                            /** @description Only for a GS1 barcode. */
+                            scanned?: {
+                                gtin: string;
+                                /** @description The batch (AI 10) or serial number (AI 21). */
+                                lot_code: string | null;
+                                /** @description That batch, when it is already known. */
+                                lot_id: number | null;
+                                /** @description From AI 17 (or 15), or the known batch. */
+                                expires_on: string | null;
+                                made_on: string | null;
+                                /** @description How many, from AI 30 or 37. */
+                                count: number | null;
+                            };
                         };
                     };
                 };
@@ -71687,6 +79974,53 @@ export interface operations {
             };
         };
     };
+    get_api_v1_navigation_hidden: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The hidden ids */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HiddenNavIdsResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_notification_metrics: {
         parameters: {
             query?: never;
@@ -83593,7 +91927,122 @@ export interface operations {
                 content: {
                     "application/json": {
                         link: string;
+                        document_id: number | null;
                     };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the quote's state, or a rule refused it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_sales_quotes_id_print: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesQuotePrintRequest"];
+            };
+        };
+        responses: {
+            /** @description The PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Issued, with no PDF here */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            document_id: number;
+                            number: string | null;
+                            title: string;
+                            pdf: boolean;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Missing or invalid authentication */
@@ -83772,6 +92221,7 @@ export interface operations {
                     "application/json": {
                         data: components["schemas"]["SalesQuote"];
                         link: string;
+                        document_id: number | null;
                         emailed: boolean;
                     };
                 };
@@ -90431,6 +98881,223 @@ export interface operations {
                 };
             };
             /** @description Not an imported theme */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_themes_themeid_versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The theme's id, like acme.harbour */
+                themeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The versions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeVersionsResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This workspace has no theme of its own with that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_themes_themeid_versions_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The theme's id, like acme.harbour */
+                themeId: string;
+                /** @description A version number like 1.2.0 */
+                version: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The theme file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeVersionFileResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such version */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_themes_themeid_versions_version_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The theme's id, like acme.harbour */
+                themeId: string;
+                /** @description A version number like 1.2.0 */
+                version: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Restored as a new version */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoreThemeVersionResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such version */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description That version is no longer a valid theme */
             422: {
                 headers: {
                     [name: string]: unknown;

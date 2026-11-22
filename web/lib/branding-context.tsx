@@ -25,6 +25,7 @@ import type { Branding } from '@/lib/branding';
 import { brandThemeCss } from '@/lib/brand-theme-css';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api/client';
+import { DEFAULT_HOME_PATH, parseBackToProduct, safeHomePath } from '@/lib/home-path';
 
 const FALLBACK: Branding = {
   siteName: 'Whity',
@@ -32,6 +33,8 @@ const FALLBACK: Branding = {
   logoSquareUrl: null,
   faviconUrl: null,
   builtOnWhity: true,
+  homePath: DEFAULT_HOME_PATH,
+  backToProduct: null,
 };
 
 const BrandingContext = createContext<Branding>(FALLBACK);
@@ -53,6 +56,8 @@ export function parseBrandingResponse(body: unknown): { branding: Branding; them
       // Shown unless the server says the plan removes it (WHIT-932).
       builtOnWhity: r.builtOnWhity !== false,
       currency: typeof r.currency === 'string' && /^[A-Z]{3}$/.test(r.currency) ? r.currency : undefined,
+      homePath: safeHomePath(r.homePath),
+      backToProduct: parseBackToProduct(r.backToProduct),
     },
     themeCss: brandThemeCss(r.theme, r.themeHigh),
   };
@@ -175,4 +180,12 @@ export function useWorkspaceCurrency(): string {
 /** Re-reads branding and the main colour's theme; a no-op outside BrandingProvider. */
 export function useRefreshBranding(): () => Promise<void> {
   return useContext(RefreshBrandingContext);
+}
+
+/**
+ * The instance's home page (#2386): where a sign-in lands and every home link
+ * goes. `/dashboard` unless the operator chose another.
+ */
+export function useHomePath(): string {
+  return safeHomePath(useBranding().homePath);
 }

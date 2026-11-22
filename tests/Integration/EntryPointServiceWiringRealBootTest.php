@@ -751,6 +751,16 @@ final class EntryPointServiceWiringRealBootTest extends TestCase
             \Whity\Sdk\Inventory\Locations::class,
             \Whity\Sdk\Inventory\Stock::class,
             \Whity\Sdk\Inventory\Units::class,
+            // Accounting (SDK 1.154, WHIT-1318): a job that posts to the books reaches the same services.
+            \Whity\Sdk\Accounting\Accounts::class,
+            \Whity\Sdk\Accounting\Ledger::class,
+            \Whity\Sdk\Accounting\Periods::class,
+            \Whity\Sdk\Accounting\Reports::class,
+            // Sales invoices and tax codes (SDK 1.155, WHIT-1318 A2a).
+            \Whity\Sdk\Accounting\Invoices::class,
+            \Whity\Sdk\Accounting\Taxes::class,
+            // Payments (SDK 1.156, WHIT-1318 A2b): Whity Pay records here.
+            \Whity\Sdk\Accounting\Payments::class,
         ];
         $list = var_export($services, true);
 

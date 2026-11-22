@@ -1130,6 +1130,11 @@ final class ToolsCallHandler implements MethodHandler
         if ($matched === null) {
             throw new McpException(ErrorCode::METHOD_NOT_FOUND, "Tool route not found: {$toolName}");
         }
+        // The grant, Ask first, the approval label and undo all follow the tool
+        // named, so the call must reach that tool's own route and no other (TM-6).
+        if (!$this->isOwnRoute($matched, $rawPath)) {
+            throw new McpException(ErrorCode::METHOD_NOT_FOUND, "Tool route not found: {$toolName}");
+        }
 
         // 6. Enforce access controls via RoleChecker — same component as HTTP.
         $tenantId = TenantContext::getTenantId();
@@ -1186,6 +1191,19 @@ final class ToolsCallHandler implements MethodHandler
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /**
+     * Whether the router matched the route the tool was derived from.
+     *
+     * @param array<string, mixed> $matched
+     */
+    private function isOwnRoute(array $matched, string $declaredPath): bool
+    {
+        $path = $matched['path'] ?? null;
+
+        return is_string($path)
+            && ($path === $declaredPath || $path === $this->router->versionedPath($declaredPath));
+    }
+
+    /**
      * Substitute {param} / {param:regex} placeholders in a route path with
      * concrete argument values.
      *
@@ -1201,7 +1219,12 @@ final class ToolsCallHandler implements MethodHandler
             function (array $matches) use ($arguments, &$pathParamNames): string {
                 $name             = $matches[1];
                 $pathParamNames[] = $name;
-                return isset($arguments[$name]) ? (string) $arguments[$name] : $matches[0];
+                // Encoded, so a value can't add path segments: `5/two-step-requirement`
+                // must not turn "delete user 5" into a different route
+                // (READINESS TM-6). The router decodes each value exactly once.
+                return isset($arguments[$name]) && is_scalar($arguments[$name])
+                    ? rawurlencode((string) $arguments[$name])
+                    : $matches[0];
             },
             $path,
         );

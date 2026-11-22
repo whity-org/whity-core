@@ -40,6 +40,7 @@ A form response prints as a record; with an approval route it is also the certif
 10. **Letterhead layouts:** centred, and bilingual (English and Arabic either side of the logo).
 11. **Two-column questions** per section, as a borderless table with hairlines.
 12. **Plan gate** on the theme's Form printouts tab (PlanGate on free workspaces).
+13. **Nothing taller than a page refuses the printout** (WHIT-1370): a question, list or approvals block that fits on a page moves to the next page whole; one taller than a page splits between its rows, options or items under the question's "continued" line (item 6), a table repeats its header row and a single tall row splits its cell text, and an image or drawing taller than a page is scaled to fit it.
 
 Everything else (headings, paragraphs, tables, facts grid, images, QR and barcodes, lists, callouts, dividers, page breaks) uses the blocks that exist.
 

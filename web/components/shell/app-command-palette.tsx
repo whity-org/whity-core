@@ -31,6 +31,7 @@ import { namedIcon } from '@/lib/named-icon';
 import type { Icon as TablerIcon } from '@tabler/icons-react';
 import { CommandPalette, type CommandPaletteItem } from '@whity/ui/command-palette';
 import { Icon } from '@whity/ui/icon';
+import { useSwitchRefusalMessage } from '@/lib/workspace-switch';
 import { useCurrentLanguage, useTranslation } from '@whity/features/i18n';
 import { useNavigation } from '@/lib/navigation-context';
 import { useNavItemLabels } from '@/lib/nav-item-labels';
@@ -55,6 +56,8 @@ import { localizedText } from '@whity/ui/localized-text';
 import { isInSettingsArea, useSettingsGroups } from '@/components/settings/settings-area';
 import { searchSettings, useSettingsIndex, type SettingEntry } from '@/components/settings/settings-index';
 import { SETTINGS_HOME_HREF } from '@/lib/settings/my-settings';
+
+const NEVER_HIDDEN = (): boolean => false;
 import { useCanOfferWorkspaceCreate } from '@/lib/use-workspace-create';
 import { useCurrentWorkspace } from '@/components/settings/scope';
 
@@ -75,10 +78,13 @@ const DEBOUNCE_MS = 200;
 
 export function AppCommandPalette() {
   const t = useTranslation('common');
+  const refusalMessage = useSwitchRefusalMessage();
   const commandT = useCommandTranslation();
   const router = useRouter();
   const { currentLanguage, availableLanguages, setLanguage } = useCurrentLanguage();
-  const { items: navItems, refresh: refreshNav } = useNavigation();
+  const { items: navItems, refresh: refreshNav, isHidden = NEVER_HIDDEN } = useNavigation();
+  // #2386: the operator may hide the Settings area itself (the `settings` id).
+  const settingsHidden = isHidden(SETTINGS_HOME_HREF);
   const navLabels = useNavItemLabels();
   const {
     resolved: theme,
@@ -206,7 +212,7 @@ export function AppCommandPalette() {
         ...navItems
           .filter((item) => item.href && !isInSettingsArea(item, isSystemTenant))
           .map((item) => ({ id: item.id, href: item.href, label: navLabels[item.id] ?? item.label })),
-        { id: 'settings', href: SETTINGS_HOME_HREF, label: settingsLabel },
+        ...(settingsHidden ? [] : [{ id: 'settings', href: SETTINGS_HOME_HREF, label: settingsLabel }]),
         ...settingsIndex
           .filter((entry) => !entry.id.includes('.'))
           .map((entry) => ({ id: `setting-${entry.id}`, href: entry.href, label: entry.label })),
@@ -220,13 +226,13 @@ export function AppCommandPalette() {
         void (async () => {
           try {
             await switchTenant(id);
-            await refreshNav();
           } catch (err) {
-            addToast(
-              err instanceof Error ? err.message : t('sidebar.tenantSwitcher.error', 'Couldn’t switch workspace'),
-              'error',
-            );
+            // Never silent (2026-11-22): the reason, in plain words.
+            addToast(refusalMessage(err), 'error');
+            return;
           }
+          // The switch happened; a menu that fails to reload is not a refusal.
+          await refreshNav().catch(() => undefined);
         })();
       },
       theme: themePreference,
@@ -247,11 +253,13 @@ export function AppCommandPalette() {
       agents: data.agents,
       connectAgentHref: aiPage?.href ?? null,
       canCreateWorkspace,
+      isHidden,
     };
     return buildCoreCommands(commandT, ctx);
   }, [
+    isHidden,
+    settingsHidden,
     canCreateWorkspace,
-    t,
     commandT,
     has,
     navItems,
@@ -265,6 +273,7 @@ export function AppCommandPalette() {
     switchTenant,
     refreshNav,
     addToast,
+    refusalMessage,
     themePreference,
     setThemePreference,
     availableLanguages,
@@ -362,7 +371,7 @@ export function AppCommandPalette() {
         };
       });
     // The Settings area is one place in Go to; its pages are in the Settings group below.
-    pages.push({
+    if (!settingsHidden) pages.push({
       id: 'page-settings',
       group: t('palette.group.pages', 'Go to'),
       label: settingsLabel,
@@ -436,7 +445,7 @@ export function AppCommandPalette() {
         icon: <Icon name="user" size={16} />,
         onSelect: () => router.push('/settings'),
       },
-    ];
+    ].filter((action) => action.id !== 'action-account' || !settingsHidden);
 
     // Typing "invite" without the slash still finds the command; its names
     // in both languages are what it matches on. Hidden on an empty box, which
@@ -511,7 +520,7 @@ export function AppCommandPalette() {
       : [];
 
     return [...recentRows, ...settingRows, ...records, ...pages, ...actions, ...commandRows, ...agent];
-  }, [groups, navItems, navLabels, settingsLabel, settingsIndex, isSystemTenant, ta, workspaceName, currentLanguage, theme, toggleTheme, router, t, query, commands, commandRow, recent, data.recentDocuments, data.agents, aiPage, openPlace]);
+  }, [groups, navItems, navLabels, settingsHidden, settingsLabel, settingsIndex, isSystemTenant, ta, workspaceName, currentLanguage, theme, toggleTheme, router, t, query, commands, commandRow, recent, data.recentDocuments, data.agents, aiPage, openPlace]);
 
   const commandMode = commandItems !== null;
 

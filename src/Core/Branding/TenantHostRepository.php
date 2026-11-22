@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Core\Branding;
 
 use PDO;
+use Whity\Core\Tenant\Handles;
 
 /**
  * Data access for host→tenant lookups + branding_host management (Tenant
@@ -27,13 +28,14 @@ final class TenantHostRepository
         return $id === false ? null : (int) $id;
     }
 
+    /**
+     * The workspace an @handle names: its current handle, or an old one still
+     * held after a change (design section 36, HD.4), so links shared before
+     * the change keep working. Returns an id only.
+     */
     public function findIdBySlug(string $slug): ?int
     {
-        // Tenants registry lookup by slug; returns an id only.
-        $stmt = $this->db->prepare('SELECT id FROM tenants WHERE LOWER(slug) = :s LIMIT 1');
-        $stmt->execute([':s' => strtolower($slug)]);
-        $id = $stmt->fetchColumn();
-        return $id === false ? null : (int) $id;
+        return (new Handles($this->db))->resolve($slug);
     }
 
     /** The workspace's slug, for a link to one of its public pages (E2: "Book another time"). */

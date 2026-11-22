@@ -185,6 +185,31 @@ final class ToolsCallRbacRealEngineTest extends TestCase
         self::assertFalse($r['result']['isError'], 'Router-sourced tool must be invocable end-to-end');
     }
 
+    // ── A value can't reach another route (TM-6) ────────────────────────────────
+
+    public function testAPathValueCannotAddSegmentsAndReachAnotherRoute(): void
+    {
+        $token = $this->mcpTokenFor('writer@a.test', self::TENANT_A);
+
+        $r = $this->callTool($token, 'delete_widgets', ['id' => '5/parts']);
+
+        self::assertArrayHasKey('result', $r, json_encode($r) ?: '');
+        $body = json_decode($r['result']['content'][0]['text'], true);
+        self::assertSame(
+            ['route' => 'delete', 'id' => '5/parts'],
+            $body,
+            'the value reached a different route than the tool named'
+        );
+    }
+
+    public function testAPlainValueStillReachesItsRoute(): void
+    {
+        $token = $this->mcpTokenFor('writer@a.test', self::TENANT_A);
+
+        $body = json_decode($this->callTool($token, 'delete_widget_parts', ['id' => '5'])['result']['content'][0]['text'], true);
+        self::assertSame(['route' => 'parts', 'id' => '5'], $body);
+    }
+
     // ── Capability filtering agrees with call-time enforcement ──────────────────
 
     public function testToolsList_isScopedToCallerEffectivePermissions(): void
@@ -416,6 +441,17 @@ final class ToolsCallRbacRealEngineTest extends TestCase
         $router->registerUnversioned('POST', '/api/widgets/session', $ok, null, null, null, [
             'operationId' => 'widgets_session',
             'summary'     => 'Session machinery an agent must not see',
+        ]);
+
+        // Two routes where one's path is the other's plus a segment (TM-6):
+        // each answers with its own name and the id it was handed.
+        $router->registerUnversioned('DELETE', '/api/widgets/{id}', static fn (SdkRequest $req, array $params): SdkResponse => SdkResponse::json(['route' => 'delete', 'id' => $params['id'] ?? null]), null, null, 'widgets:write', [
+            'operationId' => 'delete_widgets',
+            'summary'     => 'Delete a widget',
+        ]);
+        $router->registerUnversioned('DELETE', '/api/widgets/{id}/parts', static fn (SdkRequest $req, array $params): SdkResponse => SdkResponse::json(['route' => 'parts', 'id' => $params['id'] ?? null]), null, null, 'widgets:write', [
+            'operationId' => 'delete_widget_parts',
+            'summary'     => 'Remove the parts of a widget',
         ]);
 
         return $router;

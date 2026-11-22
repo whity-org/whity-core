@@ -408,6 +408,7 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         foreach (\Whity\Core\Inventory\Print\InventoryPrintFields::all($db->getPdo(), $settingsService) as $inventoryFieldProvider) {
             $documentFieldRegistry->add($inventoryFieldProvider);
         }
+        $documentFieldRegistry->add(new \Whity\Core\Sales\Print\QuoteFieldProvider($db->getPdo(), $settingsService));
         \Whity\register_service(\Whity\Core\Document\Fields\DocumentFieldRegistry::class, $documentFieldRegistry);
 
         $dataTypeLifecycle = new \Whity\Core\DataType\DataTypeLifecycleService(
@@ -712,6 +713,9 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         \Whity\register_service(\Whity\Core\Messaging\MessageChannelRegistry::class, $messageChannelRegistry);
         $pluginLoader->setInboxSources($inboxSourceRegistry);
         $pluginLoader->setMessageChannels($messageChannelRegistry);
+        // WHIT-1338: a killed plugin's code doesn't run in the CLI either.
+        $killList = new \Whity\Core\Plugin\Workspace\CodePluginActivation($db->getPdo());
+        $pluginLoader->setKillSwitch(static fn (string $name): bool => $killList->isKilled($name));
         $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry, $documentBlockRegistry);
         $pluginLoader->load();
 

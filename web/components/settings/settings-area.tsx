@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { useNavigation } from '@/lib/navigation-context';
+import { isPathHidden, NOTHING_HIDDEN } from '@/lib/routes/hidden';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { DOCUMENTS_STAMPS, LICENSING_VIEW } from '@/lib/capabilities';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
@@ -256,12 +257,14 @@ export function useSettingsGroups({ enabled = true }: { enabled?: boolean } = {}
   const { id: workspaceId, name: workspaceName } = useCurrentWorkspace();
   // The system tenant runs the install: its workspace-wide pages stay in Platform.
   const isSystemTenant = workspaceId === SYSTEM_TENANT_ID;
-  const { items: navItems } = useNavigation();
+  const { items: navItems, hidden = NOTHING_HIDDEN } = useNavigation();
   const navLabels = useNavItemLabels();
   const { has } = useCapabilities();
   const canSeeDevices = has(LICENSING_VIEW);
   // WHIT-955: the workspace's own fields on its records (A9).
   const canManageFields = has('fields:manage');
+  // WHIT-1326: Settings › Import, for anyone who may import some kind.
+  const canImport = has('contacts:import') || has('inventory:write');
   const canEditThemes = has(DOCUMENT_THEMES_PERMISSION);
   const canManageStamps = has(DOCUMENTS_STAMPS);
   const canManageBookings = has(CALENDAR_MANAGE);
@@ -329,6 +332,9 @@ export function useSettingsGroups({ enabled = true }: { enabled?: boolean } = {}
     if (canManageFields) {
       links.push({ id: 'fields', href: '/admin/settings/fields', label: t('settingsArea.fields', 'Fields'), group: 'data' });
     }
+    if (canImport && !isSystemTenant) {
+      links.push({ id: 'import', href: '/admin/settings/import', label: t('settingsArea.import', 'Import'), group: 'data' });
+    }
     if (canSeeDevices) {
       links.push({ id: 'devices', href: DEVICES_HREF, label: t('settingsArea.devices', 'Licensed devices'), group: 'security' });
     }
@@ -358,9 +364,13 @@ export function useSettingsGroups({ enabled = true }: { enabled?: boolean } = {}
     return GROUP_ORDER.map((group) => ({
       id: group,
       label: groupLabels[group],
-      links: links.filter((link) => link.group === group).sort((a, b) => rank(a.id) - rank(b.id)),
+      // #2386: a page the operator hid (settings.<id>, or the menu item it
+      // sits under) leaves the area, its search and the phone menu.
+      links: links
+        .filter((link) => link.group === group && !hidden.settings.includes(link.id) && !isPathHidden(link.href, hidden))
+        .sort((a, b) => rank(a.id) - rank(b.id)),
     })).filter((group) => group.links.length > 0);
-  }, [tabs, navItems, navLabels, canSeeDevices, canManageFields, canEditThemes, canManageStamps, canManageBookings, isSystemTenant, t, tc, ta, workspaceName]);
+  }, [tabs, navItems, hidden, navLabels, canSeeDevices, canManageFields, canImport, canEditThemes, canManageStamps, canManageBookings, isSystemTenant, t, tc, ta, workspaceName]);
 
   return groups;
 }

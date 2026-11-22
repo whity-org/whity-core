@@ -57,6 +57,9 @@ final class CoreTables
         'affiliates' => '154_create_affiliates.php',
         'app_settings' => '024_create_app_settings.php',
         'audit_log' => '016_create_audit_log.php',
+        // WHIT-1339: the audit trail's hash chain. Install-wide, like the chain it seals.
+        'audit_log_chain' => '348_make_audit_log_append_only.php',
+        'audit_log_seals' => '348_make_audit_log_append_only.php',
         'away_periods' => '251_add_two_admin_resets_and_away.php',
         'backup_codes' => '007_add_two_factor_support.php',
         'calendar_booking_services' => '302_create_calendar_booking_services.php',
@@ -129,6 +132,22 @@ final class CoreTables
         'agent_proposals' => '176_create_agent_proposals.php',
         // MCP idempotency keys (WHIT-931).
         'mcp_call_keys' => '308_create_mcp_call_keys.php',
+        // Accounting (WHIT-1318, design section 32).
+        'acc_accounts' => '344_create_accounting_chart.php',
+        'acc_allocations' => '350_create_accounting_invoices.php',
+        'acc_balances' => '345_create_accounting_ledger.php',
+        'acc_books' => '344_create_accounting_chart.php',
+        'acc_entries' => '345_create_accounting_ledger.php',
+        'acc_fiscal_years' => '344_create_accounting_chart.php',
+        'acc_invoice_lines' => '350_create_accounting_invoices.php',
+        'acc_invoices' => '350_create_accounting_invoices.php',
+        'acc_journals' => '344_create_accounting_chart.php',
+        'acc_lines' => '345_create_accounting_ledger.php',
+        'acc_manual_entries' => '345_create_accounting_ledger.php',
+        'acc_manual_entry_lines' => '345_create_accounting_ledger.php',
+        'acc_payments' => '351_create_accounting_payments.php',
+        'acc_periods' => '344_create_accounting_chart.php',
+        'acc_tax_codes' => '350_create_accounting_invoices.php',
         // Inventory (WHIT-1232, design section 31).
         'inv_barcodes' => '317_create_inventory_items.php',
         'inv_categories' => '317_create_inventory_items.php',
@@ -150,6 +169,7 @@ final class CoreTables
         'inv_reasons' => '320_create_inventory_operations.php',
         'inv_reorder_rules' => '320_create_inventory_operations.php',
         'inv_supplier_items' => '321_create_inventory_orders.php',
+        'inv_costs' => '354_add_stock_costs_and_stock_in_books.php',
         'inv_lots' => '337_create_inventory_lots.php',
         'inv_units' => '317_create_inventory_items.php',
         'inv_variants' => '317_create_inventory_items.php',
@@ -262,10 +282,14 @@ final class CoreTables
         'workspace_owners' => '300_create_workspace_owners.php',
         // Offers to hand a workspace over or co-own it (WHIT-1170).
         'workspace_ownership_offers' => '301_create_workspace_ownership_offers.php',
+        // A workspace's earlier @handles (WHIT-1363, design section 36).
+        'tenant_handle_history' => '356_create_tenant_handle_history.php',
         'workspace_template_items' => '305_create_workspace_templates.php',
         'workspace_template_runs' => '305_create_workspace_templates.php',
         // WHIT-1225: themes a workspace imported or installed from the store.
         'themes' => '323_create_themes.php',
+        // WHIT-1225 (TH.25): every version of a workspace's own theme.
+        'theme_versions' => '349_create_theme_versions.php',
         // Votes in chat polls (UC.5).
         'chat_poll_votes' => '280_create_chat_poll_votes.php',
         // Bots and blocked senders (UC.4, UC.12).

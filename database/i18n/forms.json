@@ -324,6 +324,8 @@
         "field.uploadFailed": "That file could not be uploaded. Please try again.",
         "field.uploading": "Uploading…",
         "field.yes": "Yes",
+        "fill.botFailed": "The check didn’t load. Refresh the page and try again.",
+        "fill.botPending": "Wait for the check beside the button to finish, then try again.",
         "fill.builtOn": "Built on Whity",
         "fill.changesAsked": "Changes asked for: {note}",
         "fill.closed": "This form is not accepting responses.",

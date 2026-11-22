@@ -19,6 +19,7 @@ import { MAIN_COLOUR_SWATCHES } from '@/components/branding-main-colour';
 import { moneyText } from '@whity/ui/money/currency';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
 import type { components } from '@whity/api-client';
+import { useHomePath } from '@/lib/branding-context';
 
 /**
  * Create a workspace while signed in (WHIT-1169).
@@ -101,6 +102,7 @@ function fieldErrorMessage(t: TranslateFn, code: FieldError): string | null {
 
 export default function NewWorkspacePage() {
   const t = useTranslation('common');
+  const homePath = useHomePath();
   const uiLanguage = useLanguageCode();
   const router = useRouter();
   const { switchTenant } = useAuth();
@@ -150,7 +152,7 @@ export default function NewWorkspacePage() {
 
       if (response.status === 201 && typeof body.data?.tenant_id === 'number') {
         // Into the new workspace, as its owner; the switch re-reads /me.
-        await switchTenant(body.data.tenant_id);
+        await switchTenant(body.data.tenant_id, { land: false });
         await refreshNav();
         // Read before the cache is dropped: whether this one starts a paid trial.
         const paid = (state?.next_plan ?? null) !== null;
@@ -159,7 +161,7 @@ export default function NewWorkspacePage() {
         // WHIT-1207: a further workspace asks for a card first (charged when the
         // trial ends; Not now keeps the trial). The step goes straight on when
         // no card can be taken. WHIT-1195: then a new workspace starts from a template.
-        router.push(paid ? PAYMENT_STEP_PATH : ((await templatePickerPath()) ?? '/dashboard'));
+        router.push(paid ? PAYMENT_STEP_PATH : ((await templatePickerPath()) ?? homePath));
         return;
       }
       if (response.status === 422) {
@@ -215,7 +217,7 @@ export default function NewWorkspacePage() {
           </AlertDescription>
         </Alert>
         <Button asChild variant="outline">
-          <Link href="/dashboard">{t('workspaceNew.back', 'Back to your workspace')}</Link>
+          <Link href={homePath}>{t('workspaceNew.back', 'Back to your workspace')}</Link>
         </Button>
       </div>
     );
@@ -317,7 +319,7 @@ export default function NewWorkspacePage() {
                 {submitting ? t('workspaceNew.creating', 'Creating…') : t('workspaceNew.create', 'Create workspace')}
               </Button>
               <Button asChild variant="outline" size="lg">
-                <Link href="/dashboard">{t('workspaceNew.cancel', 'Cancel')}</Link>
+                <Link href={homePath}>{t('workspaceNew.cancel', 'Cancel')}</Link>
               </Button>
             </div>
           </form>

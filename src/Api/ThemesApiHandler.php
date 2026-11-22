@@ -46,6 +46,10 @@ use Whity\Core\Theme\ThemeValidator;
  *                                                    and both previews (TH.25)
  *   POST   /api/v1/themes/package    settings:write  a theme as a store-ready plugin zip
  *                                                    for its publisher to submit (TH.25)
+ *   GET    /api/v1/themes/{themeId}/versions                    settings:read   a theme's history
+ *   GET    /api/v1/themes/{themeId}/versions/{version}          settings:read   one version's file
+ *   POST   /api/v1/themes/{themeId}/versions/{version}/restore  settings:write  bring it back as
+ *                                                    the next version (TH.25)
  *   DELETE /api/v1/themes/{themeId}  settings:write  remove an imported theme
  *
  * The free tweaks (TH.15: shape, density, font pair) are part of the
@@ -278,7 +282,7 @@ final class ThemesApiHandler
                     return Response::json(['data' => [
                         'theme' => $entry['theme'],
                         'source' => $entry['source'],
-                        'editable' => in_array($entry['source'], ['import', 'editor'], true),
+                        'editable' => in_array($entry['source'], ['import', 'editor', 'restore'], true),
                     ]], 200);
                 }
             }
@@ -398,6 +402,106 @@ final class ThemesApiHandler
             'fonts' => ['body' => ThemeFonts::name($compiled['fonts']['body']), 'heading' => ThemeFonts::name($compiled['fonts']['heading'])],
             'adjustments' => $compiled['adjustments'],
         ];
+    }
+
+    /**
+     * Versions (TH.25, 30-themes 11): the history of one of the workspace's
+     * own themes, newest first, with the version in use marked. Whity's and
+     * plugins' themes have no history here: their versions come with Whity or
+     * the plugin.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function versions(Request $request, array $params = []): Response
+    {
+        return $this->inWorkspace(function (int $tenantId) use ($params): Response {
+            $current = $this->ownTheme($tenantId, (string) ($params['themeId'] ?? ''));
+            if ($current === null) {
+                return Response::error('Theme not found', 404);
+            }
+            $versions = $this->repository->versions($tenantId, (string) $current['id']);
+
+            return Response::json(['data' => [
+                'theme_id' => $current['id'],
+                'current' => $current['version'],
+                'versions' => array_map(static fn (array $v): array => $v + ['current' => $v['version'] === $current['version']], $versions),
+            ]], 200);
+        });
+    }
+
+    /**
+     * One version's theme file, for the side-by-side diff.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function version(Request $request, array $params = []): Response
+    {
+        return $this->inWorkspace(function (int $tenantId) use ($params): Response {
+            $current = $this->ownTheme($tenantId, (string) ($params['themeId'] ?? ''));
+            $version = (string) ($params['version'] ?? '');
+            $theme = $current !== null && preg_match(ThemeValidator::VERSION_RE, $version) === 1
+                ? $this->repository->version($tenantId, (string) $current['id'], $version)
+                : null;
+            if ($theme === null) {
+                return Response::error('Version not found', 404);
+            }
+
+            return Response::json(['data' => ['theme' => $theme]], 200);
+        });
+    }
+
+    /**
+     * Restores an earlier version as the next one: its file, numbered past
+     * the newest, so the history only grows and nothing is lost. Workspaces
+     * using the theme see it at once, as after any save.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function restore(Request $request, array $params = []): Response
+    {
+        return $this->inWorkspace(function (int $tenantId) use ($request, $params): Response {
+            $current = $this->ownTheme($tenantId, (string) ($params['themeId'] ?? ''));
+            $version = (string) ($params['version'] ?? '');
+            $theme = $current !== null && preg_match(ThemeValidator::VERSION_RE, $version) === 1
+                ? $this->repository->version($tenantId, (string) $current['id'], $version)
+                : null;
+            if ($current === null || $theme === null) {
+                return Response::error('Version not found', 404);
+            }
+            $newest = array_reduce(
+                $this->repository->versions($tenantId, (string) $current['id']),
+                static fn (string $carry, array $v): string => version_compare($v['version'], $carry, '>') ? $v['version'] : $carry,
+                (string) $current['version']
+            );
+            [$major, $minor, $patch] = array_map('intval', explode('.', $newest));
+            $theme['version'] = "{$major}.{$minor}." . ($patch + 1);
+            if (ThemeValidator::validate($theme) !== []) {
+                return Response::error('This version can\'t be restored.', 422);
+            }
+            $this->repository->save($tenantId, $theme, 'restore', false, self::profileId($request));
+
+            return Response::json(['data' => ['id' => $theme['id'], 'version' => $theme['version'], 'restored_from' => $version]], 201);
+        });
+    }
+
+    /**
+     * One of the workspace's own themes (imported, made in the editor or
+     * restored), or null.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function ownTheme(int $tenantId, string $themeId): ?array
+    {
+        if (preg_match(ThemeValidator::ID_RE, $themeId) !== 1) {
+            return null;
+        }
+        foreach ($this->repository->forTenant($tenantId) as $row) {
+            if (($row['theme']['id'] ?? null) === $themeId) {
+                return $row['theme'];
+            }
+        }
+
+        return null;
     }
 
     /** @param array<string, mixed> $params */

@@ -1,0 +1,8 @@
+# Accepted image findings (READINESS CO-21). The image scan in
+# .github/workflows/images.yml fails on any HIGH or CRITICAL with a fix
+# available; a CVE listed here is skipped. Every entry needs a reason, who
+# accepted it, and an expiry date in the comment above it, for example:
+#
+#   # Not reachable: libfoo is only used by the build stage. Accepted by
+#   # the owner on 2026-11-22, review by 2027-02-22.
+#   CVE-2026-12345

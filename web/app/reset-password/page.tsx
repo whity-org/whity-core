@@ -11,6 +11,7 @@ import { Textarea } from '@whity/ui/textarea';
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useTranslation } from '@whity/features/i18n';
 import { api } from '@/lib/api/client';
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy';
 
 /**
  * Password-reset landing page (WC-password-reset-2fa-recovery). This is where
@@ -47,8 +48,8 @@ function ResetPasswordInner() {
       setStatus('no-token');
       return;
     }
-    if (password.length < 8) {
-      setError(t('resetPassword.error.tooShort', 'Password must be at least 8 characters'));
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      setError(t('resetPassword.error.tooShort', 'Password must be at least 12 characters'));
       return;
     }
     if (password !== confirmPassword) {

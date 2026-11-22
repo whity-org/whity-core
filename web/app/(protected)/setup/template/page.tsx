@@ -16,6 +16,7 @@ import { Icon } from '@whity/ui/icon';
 import { iconNames, type IconName } from '@whity/ui/icon-map';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
+import { useHomePath } from '@/lib/branding-context';
 
 type Template = components['schemas']['WorkspaceTemplateCard'];
 
@@ -34,6 +35,7 @@ type Template = components['schemas']['WorkspaceTemplateCard'];
 export default function TemplatePickerPage() {
   const t = useTranslation('admin');
   const router = useRouter();
+  const homePath = useHomePath();
   const { data, loading, error, refetch } = useFetch(async () => {
     const { data: body, error: failed } = await api.GET('/api/v1/workspace/templates');
     if (failed || !body) throw new Error(t('templates.loadError', 'The templates could not be loaded.'));
@@ -57,7 +59,7 @@ export default function TemplatePickerPage() {
         setApplyError(t('templates.applyError', 'The template could not be set up. Try again, or start blank.'));
         return;
       }
-      router.push(template.hasSetup || template.offer ? templateSetupPath(template.key) : '/dashboard');
+      router.push(template.hasSetup || template.offer ? templateSetupPath(template.key) : homePath);
       // The theme is drawn by the layout: fetch it again so the new look shows.
       if (template.theme && useTheme) router.refresh();
     } finally {

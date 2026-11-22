@@ -527,6 +527,29 @@ final class CorePermissions
     // the target's own permission; approving is the route, never a permission.
     public const QUOTES_READ = 'quotes:read';
     public const QUOTES_WRITE = 'quotes:write';
+    // ACCOUNTING (migrations 344-346, WHIT-1318, design section 32). Read goes
+    // to the roles that run the workspace; posting, closing and the settings
+    // to the roles holding settings:write, and to each workspace's Accountant
+    // role. Approving is never a permission (AC.24).
+    public const ACCOUNTING_READ = 'accounting:read';
+    public const ACCOUNTING_POST = 'accounting:post';
+    public const ACCOUNTING_CLOSE = 'accounting:close';
+    public const ACCOUNTING_SETTINGS = 'accounting:settings';
+    // Sales invoices and credit notes (migration 350, WHIT-1318 A2a): read to the
+    // roles that run the workspace or post to the books, write to the roles
+    // holding settings:write or accounting:post (the Accountant role).
+    public const INVOICES_READ = 'invoices:read';
+    public const INVOICES_WRITE = 'invoices:write';
+    // Payments received, allocations and cheques (migration 351, WHIT-1318 A2b),
+    // granted like the invoice slugs.
+    public const PAYMENTS_READ = 'payments:read';
+    public const PAYMENTS_WRITE = 'payments:write';
+    // Supplier bills and supplier credits (migration 352, WHIT-1318 A3a),
+    // granted like the invoice slugs.
+    public const BILLS_READ = 'bills:read';
+    public const BILLS_WRITE = 'bills:write';
+    // A person claims back money they spent (migration 353, WHIT-1318 A3b).
+    public const EXPENSES_SUBMIT = 'expenses:submit';
     // TASKS on Taskaat (A10, T.3). Tasks and boards live in the workspace's
     // Taskaat; these gate Whity's way into them. Read and write go to every
     // staff role (anchor documents:read); manage (connecting the workspace to
@@ -539,6 +562,32 @@ final class CorePermissions
     // workspace's own fields on its records; filling them in needs only the
     // record's own permissions.
     public const FIELDS_MANAGE = 'fields:manage';
+
+    /**
+     * Whether a plugin may own this permission: a `resource:action` slug that
+     * is not a core permission and not under a core resource
+     * (GHSA-r4hx-wj99-jw8m). The plugin role seeder, the catalogue step and the
+     * System operator's grant rule all ask this one question.
+     *
+     * @param string $permission The slug.
+     * @return bool
+     */
+    public static function isPluginOwnable(string $permission): bool
+    {
+        if (preg_match('/^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/', $permission) !== 1) {
+            return false;
+        }
+
+        static $coreResources = null;
+        if ($coreResources === null) {
+            $coreResources = [];
+            foreach (self::all() as $core) {
+                $coreResources[explode(':', $core, 2)[0]] = true;
+            }
+        }
+
+        return !isset($coreResources[explode(':', $permission, 2)[0]]);
+    }
 
     /**
      * Return the full list of core permission strings.
@@ -659,6 +708,17 @@ final class CorePermissions
             self::PURCHASES_WRITE,
             self::QUOTES_READ,
             self::QUOTES_WRITE,
+            self::ACCOUNTING_READ,
+            self::ACCOUNTING_POST,
+            self::ACCOUNTING_CLOSE,
+            self::ACCOUNTING_SETTINGS,
+            self::INVOICES_READ,
+            self::INVOICES_WRITE,
+            self::PAYMENTS_READ,
+            self::PAYMENTS_WRITE,
+            self::BILLS_READ,
+            self::BILLS_WRITE,
+            self::EXPENSES_SUBMIT,
             self::FIELDS_MANAGE,
             self::TASKS_READ,
             self::TASKS_WRITE,

@@ -13,7 +13,8 @@ import { useCurrentLanguage } from "./language"
 import { createFormsApi } from "./api"
 import { ResponsesSummaryCards } from "./responses-summary"
 import type { FieldDraft, FormsScreenEnv, ResponsesSummary, SubmissionDetail, SubmissionFile, SubmissionProgress, SubmissionRow } from "./types"
-import { localizedText } from "@whity/ui/localized-text"
+import { contentLanguage, localizedText } from "@whity/ui/localized-text"
+import { ContentDirection } from "@whity/ui/content-direction"
 
 /** Where a response is in its routing, in plain words. */
 export function useRoutingLabel() {
@@ -187,21 +188,24 @@ export function ResponseDialog({ env, submissionId, mine = false, onClose }: { e
         ) : detail === null ? (
           <p className="text-sm text-muted-foreground">{t("responses.loading", "Loading responses")}</p>
         ) : (
-          <dl className="space-y-4">
-            {asked.map((field) => (
-              <div key={field.field_key} className="space-y-0.5">
-                <dt className="text-sm font-medium">{localizedText(field.label, currentLanguage) || field.field_key}</dt>
-                <dd className="text-sm text-muted-foreground">
-                  {field.field_type === "file" && answers[field.field_key] ? (
-                    <AttachedFiles base={filesBase} files={(detail.files ?? []).filter((file) => file.field_key === field.field_key)} />
-                  ) : (
-                    answerText(field, answers[field.field_key], currentLanguage, t("responses.yes", "Yes"), t("responses.no", "No"), (value) => date(value) ?? "—") ||
-                    t("responses.noAnswer", "No answer")
-                  )}
-                </dd>
-              </div>
-            ))}
-          </dl>
+          // WHIT-1379: the answers read in the form's language and direction, not the interface's.
+          <ContentDirection content={contentLanguage(asked.map((field) => field.label), currentLanguage)}>
+            <dl className="space-y-4">
+              {asked.map((field) => (
+                <div key={field.field_key} className="space-y-0.5">
+                  <dt className="text-sm font-medium">{localizedText(field.label, currentLanguage) || field.field_key}</dt>
+                  <dd className="text-sm text-muted-foreground">
+                    {field.field_type === "file" && answers[field.field_key] ? (
+                      <AttachedFiles base={filesBase} files={(detail.files ?? []).filter((file) => file.field_key === field.field_key)} />
+                    ) : (
+                      answerText(field, answers[field.field_key], currentLanguage, t("responses.yes", "Yes"), t("responses.no", "No"), (value) => date(value) ?? "—") ||
+                      t("responses.noAnswer", "No answer")
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </ContentDirection>
         )}
         {mine && detail?.progress && <SubmissionProgressView progress={detail.progress} submissionId={submissionId} />}
         <div className="flex flex-wrap justify-end gap-2">

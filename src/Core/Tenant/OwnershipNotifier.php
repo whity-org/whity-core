@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Whity\Core\Tenant;
 
+use Whity\Core\Http\FrontendUrls;
 use Whity\Core\Identity\ProfileEmailRepository;
+use Whity\Core\Navigation\HomeLinks;
 use Whity\Core\Mail\BrandedEmailSender;
 use Whity\Core\Mail\EmailContent;
 use Whity\Core\Notification\NotificationDispatcher;
+use Whity\Core\Settings\SettingsService;
 
 /**
  * Tells both people about an ownership offer and what became of it
@@ -74,8 +77,10 @@ final class OwnershipNotifier
         private readonly ?NotificationDispatcher $dispatcher,
         private readonly ?BrandedEmailSender $mail,
         private readonly ?ProfileEmailRepository $emails,
-        /** The web app's base URL, for the buttons. */
-        private readonly string $appUrl,
+        /** Where the buttons lead (#2386: through FrontendUrls, not APP_URL plus a path). */
+        private readonly FrontendUrls $urls,
+        /** The instance settings, for the home page; null uses the environment only. */
+        private readonly ?SettingsService $settings = null,
     ) {
     }
 
@@ -113,7 +118,7 @@ final class OwnershipNotifier
             sprintf($w[$co ? 'accepted.to.co.subject' : 'accepted.to.subject'], $ws),
             [sprintf($w['accepted.to.body'], $ws)],
             $w['cta.app'],
-            $this->url('/dashboard'),
+            $this->home(),
             $offer,
         );
 
@@ -125,7 +130,7 @@ final class OwnershipNotifier
             sprintf($w['accepted.from.subject'], $to, $ws),
             [sprintf($w[$fromBody], $to, $ws)],
             $w['cta.app'],
-            $this->url('/dashboard'),
+            $this->home(),
             $offer,
             // After leaving, there is no workspace left to hold an in-app card.
             inApp: !$fromLeft,
@@ -164,7 +169,7 @@ final class OwnershipNotifier
             sprintf($w['cancelled.subject'], $ws),
             [sprintf($w['cancelled.body'], $by, $ws)],
             $w['cta.app'],
-            $this->url('/dashboard'),
+            $this->home(),
             $offer,
         );
     }
@@ -180,7 +185,7 @@ final class OwnershipNotifier
             sprintf($w['removed.subject'], $workspaceName),
             [sprintf($w['removed.body'], $byName, $workspaceName)],
             $w['cta.app'],
-            $this->url('/dashboard'),
+            $this->home(),
             ['tenant_id' => $tenantId],
         );
     }
@@ -253,6 +258,12 @@ final class OwnershipNotifier
 
     private function url(string $path): string
     {
-        return rtrim($this->appUrl, '/') . $path;
+        return $this->urls->base() . $path;
+    }
+
+    /** The instance's home page (#2386), where "Open Whity" leads. */
+    private function home(): string
+    {
+        return $this->urls->withHomePath(HomeLinks::homePath($this->settings))->link(FrontendUrls::HOME);
     }
 }

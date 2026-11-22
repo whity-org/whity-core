@@ -160,6 +160,12 @@ final class SettingsRegistry
     // '0' means no limit (the self-hosted default); app.whity.dev uses 3.
     public const WORKSPACES_MAX_OWNED_PER_PERSON = 'workspaces.max_owned_per_person';
 
+    // Handles no workspace may take, besides Whity's own reserved words
+    // (design section 36, HD.2; WHIT-1363). Global/operator-level: one
+    // handle per line or comma, for local brands and words the operator
+    // doesn't want used. Doesn't move a handle already in use.
+    public const HANDLES_RESERVED = 'handles.reserved';
+
     // The plan a person's second and later OWNED workspaces start on (WHIT-1203).
     // Global/operator-level. A person's first owned workspace starts on
     // `billing.default_plan` (Free on app.whity.dev); every further one they
@@ -907,6 +913,30 @@ final class SettingsRegistry
      */
     public const APP_INSTALLABLE = 'app.installable';
 
+    /**
+     * Menu items and Settings pages hidden on this instance (#2386): a
+     * comma-separated list of stable ids, `settings.<id>` for a Settings page.
+     * GLOBAL-ONLY: a product running Whity beside its own app decides this for
+     * the whole installation. Joined with the WHITY_HIDDEN_NAV_IDS environment
+     * variable; see {@see \Whity\Core\Navigation\HiddenNavIds}.
+     */
+    public const NAVIGATION_HIDDEN_IDS = 'navigation.hidden_ids';
+
+    /**
+     * Where people land after signing in and where every home link goes, a
+     * path on this site (#2386). Empty: WHITY_HOME_PATH, else /dashboard.
+     * GLOBAL-ONLY. See {@see \Whity\Core\Navigation\HomeLinks}.
+     */
+    public const NAVIGATION_HOME_PATH = 'navigation.home_path';
+
+    /**
+     * An optional link at the top of the sidebar back to the product Whity
+     * runs beside (#2386): a path on this site or an https address, and its
+     * label. Empty: WHITY_BACK_TO_PRODUCT_URL / _LABEL, else no link.
+     */
+    public const NAVIGATION_BACK_TO_PRODUCT_URL = 'navigation.back_to_product_url';
+    public const NAVIGATION_BACK_TO_PRODUCT_LABEL = 'navigation.back_to_product_label';
+
     // Customer sign-up for one workspace (WHIT-915, #1872), kept in the
     // workspace_signup_settings table until WHIT-1035 folded it in here. Set on
     // the workspace's own Customer sign-up screen (signup:manage), which checks
@@ -983,6 +1013,19 @@ final class SettingsRegistry
     public const SALES_EMAIL_RECEIPT = 'sales.email_receipt';
     public const SALES_EMAIL_REMINDER = 'sales.email_reminder';
 
+    // ---- Sales invoices (WHIT-1318 A2a, design section 32 §5.2, AC.11) ----
+    //   - invoice_route_template_id: the route an invoice travels before it is
+    //     issued; 0 means none, and a person with invoices:write issues it.
+    //   - invoice_payment_terms_days: days from issue to due on a new invoice,
+    //     0 to 365 (0: due on issue).
+    //   - prices_include_tax: whether a new invoice's prices include tax.
+    public const ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID = 'accounting.invoice_route_template_id';
+    public const ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS = 'accounting.invoice_payment_terms_days';
+    public const ACCOUNTING_PRICES_INCLUDE_TAX = 'accounting.prices_include_tax';
+    //   - bill_route_template_id: the route a supplier bill travels before it
+    //     is posted (WHIT-1318 A3a); 0 means none.
+    public const ACCOUNTING_BILL_ROUTE_TEMPLATE_ID = 'accounting.bill_route_template_id';
+
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
      * settings API cannot make (a customer-safe role, a permission other than
@@ -1016,6 +1059,10 @@ final class SettingsRegistry
         self::SALES_EMAIL_INVOICE,
         self::SALES_EMAIL_RECEIPT,
         self::SALES_EMAIL_REMINDER,
+        self::ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID,
+        self::ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS,
+        self::ACCOUNTING_PRICES_INCLUDE_TAX,
+        self::ACCOUNTING_BILL_ROUTE_TEMPLATE_ID,
     ];
 
     /**
@@ -1059,6 +1106,7 @@ final class SettingsRegistry
         self::SSO_SELF_PROVISION_WORKSPACE,
         self::WORKSPACES_SELF_CREATE_ENABLED,
         self::WORKSPACES_MAX_OWNED_PER_PERSON,
+        self::HANDLES_RESERVED,
         self::WORKSPACES_ADDITIONAL_PLAN,
         self::WORKSPACES_ADDITIONAL_TRIAL_DAYS,
         self::PASSWORD_SIGN_IN,
@@ -1121,6 +1169,12 @@ final class SettingsRegistry
         // Installing the web app is a property of the installation, and the
         // service worker it controls is per origin, not per workspace.
         self::APP_INSTALLABLE,
+        // Hidden pages are the installation's shape, not one workspace's (#2386).
+        self::NAVIGATION_HIDDEN_IDS,
+        // Where home is, and the way back to the product (#2386).
+        self::NAVIGATION_HOME_PATH,
+        self::NAVIGATION_BACK_TO_PRODUCT_URL,
+        self::NAVIGATION_BACK_TO_PRODUCT_LABEL,
         // The operator's own website; no workspace has one of these.
         self::WEBSITE_PLANS,
         self::WEBSITE_CONTACT_WORKSPACE,
@@ -1322,6 +1376,7 @@ final class SettingsRegistry
         self::SSO_SELF_PROVISION_WORKSPACE => 'false',
         self::WORKSPACES_SELF_CREATE_ENABLED => 'false',
         self::WORKSPACES_MAX_OWNED_PER_PERSON => '0',
+        self::HANDLES_RESERVED => '',
         self::WORKSPACES_ADDITIONAL_PLAN => '',
         self::WORKSPACES_ADDITIONAL_TRIAL_DAYS => '30',
         self::PASSWORD_SIGN_IN => 'true',
@@ -1527,6 +1582,12 @@ final class SettingsRegistry
         self::CALENDAR_WALKINS_ENABLED => 'false',
         // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
         self::APP_INSTALLABLE => 'true',
+        // Empty: every page is in the menus. See NAVIGATION_HIDDEN_IDS.
+        self::NAVIGATION_HIDDEN_IDS => '',
+        // Empty: the environment, else /dashboard and no back link. See HomeLinks.
+        self::NAVIGATION_HOME_PATH => '',
+        self::NAVIGATION_BACK_TO_PRODUCT_URL => '',
+        self::NAVIGATION_BACK_TO_PRODUCT_LABEL => '',
         // Empty: the plans page shows the active plans as they are, and the
         // contact form is off until a workspace is named.
         self::WEBSITE_PLANS => '',
@@ -1558,6 +1619,10 @@ final class SettingsRegistry
         self::SALES_EMAIL_INVOICE => 'true',
         self::SALES_EMAIL_RECEIPT => 'true',
         self::SALES_EMAIL_REMINDER => 'true',
+        self::ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID => '0',
+        self::ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS => '0',
+        self::ACCOUNTING_PRICES_INCLUDE_TAX => 'false',
+        self::ACCOUNTING_BILL_ROUTE_TEMPLATE_ID => '0',
     ];
 
     /**
@@ -1909,6 +1974,7 @@ final class SettingsRegistry
             self::SSO_SELF_PROVISION_WORKSPACE => self::validateBoolean($value, self::SSO_SELF_PROVISION_WORKSPACE),
             self::WORKSPACES_SELF_CREATE_ENABLED => self::validateBoolean($value, self::WORKSPACES_SELF_CREATE_ENABLED),
             self::WORKSPACES_MAX_OWNED_PER_PERSON => self::validateWholeNumberBetween($value, self::WORKSPACES_MAX_OWNED_PER_PERSON, 0, 1000),
+            self::HANDLES_RESERVED => self::validateReservedHandles($value),
             self::WORKSPACES_ADDITIONAL_PLAN => self::validatePlanKey($value),
             self::WORKSPACES_ADDITIONAL_TRIAL_DAYS => self::validateWholeNumberBetween($value, self::WORKSPACES_ADDITIONAL_TRIAL_DAYS, 0, 90),
             self::PASSWORD_SIGN_IN => self::validateBoolean($value, self::PASSWORD_SIGN_IN),
@@ -2026,6 +2092,10 @@ final class SettingsRegistry
             self::CALENDAR_MULTI_SERVICE_BOOKING => self::validateBoolean($value, self::CALENDAR_MULTI_SERVICE_BOOKING),
             self::CALENDAR_WALKINS_ENABLED => self::validateBoolean($value, self::CALENDAR_WALKINS_ENABLED),
             self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
+            self::NAVIGATION_HIDDEN_IDS => \Whity\Core\Navigation\HiddenNavIds::validate($value),
+            self::NAVIGATION_HOME_PATH => \Whity\Core\Navigation\HomeLinks::validateHomePath($value),
+            self::NAVIGATION_BACK_TO_PRODUCT_URL => \Whity\Core\Navigation\HomeLinks::validateBackUrl($value),
+            self::NAVIGATION_BACK_TO_PRODUCT_LABEL => \Whity\Core\Navigation\HomeLinks::validateBackLabel($value),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the
             // registry plainly knows were refused as "Unknown setting key" and
@@ -2083,6 +2153,11 @@ final class SettingsRegistry
                 ? null
                 : $key . ' must be a route template id, or 0 for none.',
             self::SALES_EMAIL_QUOTE, self::SALES_EMAIL_INVOICE, self::SALES_EMAIL_RECEIPT, self::SALES_EMAIL_REMINDER => self::validateBoolean($value, $key),
+            self::ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID, self::ACCOUNTING_BILL_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
+                ? null
+                : $key . ' must be a route template id, or 0 for none.',
+            self::ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS => self::validateWholeNumberBetween($value, $key, 0, 365),
+            self::ACCOUNTING_PRICES_INCLUDE_TAX => self::validateBoolean($value, $key),
             default => "Unknown setting key: {$key}",
         };
     }
@@ -2573,6 +2648,20 @@ final class SettingsRegistry
             $name = trim($name);
             if ($name === '' || strlen($name) > 128 || \Whity\Sdk\PluginNamespace::slug($name) === null) {
                 return "{$key} must be a comma-separated list of plugin names.";
+            }
+        }
+
+        return null;
+    }
+
+    private static function validateReservedHandles(string $value): ?string
+    {
+        if (strlen($value) > 10000) {
+            return self::HANDLES_RESERVED . ' is too long.';
+        }
+        foreach (\Whity\Core\Tenant\ReservedHandles::parseOperatorList($value) as $handle) {
+            if (preg_match('/^[a-z0-9-]{1,30}$/', $handle) !== 1) {
+                return self::HANDLES_RESERVED . ' must list handles (letters a to z, numbers and dashes), one per line.';
             }
         }
 

@@ -68,6 +68,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'auth.sso_self_provision_workspace',
             'workspaces.self_create_enabled',
             'workspaces.max_owned_per_person',
+            'handles.reserved',
             'workspaces.additional_plan',
             'workspaces.additional_trial_days',
             'auth.password_sign_in',
@@ -212,6 +213,11 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.walkins_enabled',
             // #1733. Whether the web app can be installed (instance-wide).
             'app.installable',
+            // #2386: menu items and Settings pages hidden on this instance.
+            'navigation.hidden_ids',
+            'navigation.home_path',
+            'navigation.back_to_product_url',
+            'navigation.back_to_product_label',
             // WS.5, WS.19: the operator's website (global-only).
             'website.plans',
             'website.contact_workspace',
@@ -246,6 +252,10 @@ final class SettingsRegistryCorePinTest extends TestCase
             'sales.email_invoice',
             'sales.email_receipt',
             'sales.email_reminder',
+            'accounting.invoice_route_template_id',
+            'accounting.invoice_payment_terms_days',
+            'accounting.prices_include_tax',
+            'accounting.bill_route_template_id',
         ];
     }
 
@@ -318,6 +328,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'auth.sso_self_provision_workspace' => 'false',
             'workspaces.self_create_enabled' => 'false',
             'workspaces.max_owned_per_person' => '0',
+            'handles.reserved' => '',
             'workspaces.additional_plan' => '',
             'workspaces.additional_trial_days' => '30',
             'auth.password_sign_in' => 'true',
@@ -480,6 +491,10 @@ final class SettingsRegistryCorePinTest extends TestCase
             // #1733: on, which is what app.whity.dev wants; an operator turns
             // it off here or with PWA_ENABLED.
             'app.installable' => 'true',
+            'navigation.hidden_ids' => '',
+            'navigation.home_path' => '',
+            'navigation.back_to_product_url' => '',
+            'navigation.back_to_product_label' => '',
             'website.plans' => '',
             'website.contact_workspace' => '',
             'signup.mode' => 'off',
@@ -506,6 +521,10 @@ final class SettingsRegistryCorePinTest extends TestCase
             'sales.email_invoice' => 'true',
             'sales.email_receipt' => 'true',
             'sales.email_reminder' => 'true',
+            'accounting.invoice_route_template_id' => '0',
+            'accounting.invoice_payment_terms_days' => '0',
+            'accounting.prices_include_tax' => 'false',
+            'accounting.bill_route_template_id' => '0',
         ];
     }
 
@@ -683,6 +702,22 @@ final class SettingsRegistryCorePinTest extends TestCase
             ['calendar.weekend_days', 'fri', false],
             ['app.installable', 'false', true],
             ['app.installable', '1', false],
+            ['navigation.hidden_ids', '', true],
+            ['navigation.hidden_ids', 'calendar, plugin-reports,settings.sso', true],
+            ['navigation.hidden_ids', 'calendar,../admin', false],
+            ['navigation.hidden_ids', 'website-settings', false],
+            ['navigation.hidden_ids', 'settings.general', false],
+            ['navigation.home_path', '', true],
+            ['navigation.home_path', '/admin/x/forms-catalog', true],
+            ['navigation.home_path', '//evil.example', false],
+            ['navigation.home_path', 'https://evil.example', false],
+            ['navigation.home_path', '/a b', false],
+            ['navigation.back_to_product_url', '/', true],
+            ['navigation.back_to_product_url', 'https://elmak.example/courses', true],
+            ['navigation.back_to_product_url', 'http://elmak.example', false],
+            ['navigation.back_to_product_url', 'javascript:alert(1)', false],
+            ['navigation.back_to_product_label', 'Back to Example Bakery', true],
+            ['navigation.back_to_product_label', '<b>x</b>', false],
             ['website.plans', '', true],
             ['website.plans', '{"plans":{"team":{"highlight":true}}}', true],
             ['website.plans', 'not json', false],

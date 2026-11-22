@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Auth\TenantConfinement;
 use Whity\Auth\TokenValidator;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -47,9 +48,16 @@ final class WorkspacesApiHandler
 
     public function create(Request $request): Response
     {
-        $profileId = $this->resolveProfileId($request);
+        $claims = $this->claims($request);
+        $profileId = self::profileId($claims);
         if ($profileId === null) {
             return Response::error('Authentication required', 401);
+        }
+        // A session from a workspace's own sign-in provider stays inside that
+        // workspace (TM-9). The middleware refuses this route too; this holds
+        // if the route is ever mounted outside it.
+        if ($claims !== null && TenantConfinement::of($claims) !== null) {
+            return Response::error(TenantConfinement::REFUSAL, 403);
         }
 
         $body = JsonBody::parsed($request);
@@ -119,6 +127,12 @@ final class WorkspacesApiHandler
     /** The caller's profile id from a valid access token (cookie or Bearer). */
     private function resolveProfileId(Request $request): ?int
     {
+        return self::profileId($this->claims($request));
+    }
+
+    /** @return array<string, mixed>|null the valid access token's claims (cookie or Bearer) */
+    private function claims(Request $request): ?array
+    {
         $claims = $this->tokenValidator->validateAccessToken();
         if ($claims === null) {
             $header = $request->getHeader('Authorization') ?? '';
@@ -126,6 +140,13 @@ final class WorkspacesApiHandler
                 $claims = $this->tokenValidator->validateAccessTokenFromBearer(substr($header, 7));
             }
         }
+
+        return $claims;
+    }
+
+    /** @param array<string, mixed>|null $claims */
+    private static function profileId(?array $claims): ?int
+    {
         if ($claims === null) {
             return null;
         }

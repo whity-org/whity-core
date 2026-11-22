@@ -106,6 +106,7 @@ final class WorkerDocumentServices
         foreach (\Whity\Core\Inventory\Print\InventoryPrintFields::all($pdo, $settings) as $inventoryFieldProvider) {
             $fields->add($inventoryFieldProvider);
         }
+        $fields->add(new \Whity\Core\Sales\Print\QuoteFieldProvider($pdo, $settings));
         $fields->addTenantSource(static fn (int $tenantId): array => TenantRecordFieldProvider::forManifests(
             $liveManifests($tenantId),
             $records,

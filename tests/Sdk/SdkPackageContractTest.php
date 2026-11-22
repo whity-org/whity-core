@@ -242,9 +242,16 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.153.0',
+            '1.160.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.153 ADDS the route.stamped event: a holder applied a company stamp on a stamp step (#1729). '
+            'SDK 1.160 ADDS the tenant.handle_changed event: workspace @handles (WHIT-1363). '
+            . 'SDK 1.159 ADDS Contribute\\WorkspaceAccountingExport and Inventory\\StockPosting: stock moves to the books at the moving average cost (WHIT-1318). '
+            . 'SDK 1.158 ADDS Invoice::$claimantProfileId and the accounting.expense.claimed event: expense claims (WHIT-1318). '
+            . 'SDK 1.157 ADDS supplier bills through Accounting\\Invoices (kind purchase) and Payments::recordMade(), and the bill events (WHIT-1318). '
+            . 'SDK 1.156 ADDS Accounting\\Payments: payments received, allocations and transfers for plugins; Whity Pay records its payments here (WHIT-1318). '
+            . 'SDK 1.155 ADDS Accounting\\Invoices and Taxes, and the WorkspaceEInvoicing point: sales invoices, credit notes and tax codes for plugins (WHIT-1318). '
+            . 'SDK 1.154 ADDS Accounting\\Accounts, Ledger, Periods and Reports: the chart of accounts, an append-only double-entry ledger and the trial balance for plugins (WHIT-1318). '
+            . 'SDK 1.153 ADDS the route.stamped event: a holder applied a company stamp on a stamp step (#1729). '
             . 'SDK 1.152 ADDS Log\PluginLog and Log\ErrorReporter (PluginScope::log(), errors()), route rateLimit and PluginInstallLifecycleInterface (#1686). '
             . 'SDK 1.151 ADDS Contribute\PluginCapabilitiesInterface and Database\WorkspaceTables (PluginScope::database()): plugins get only the services they declare, and their own tables held to the workspace (#1693). '
             . 'SDK 1.150 ADDS Frontend\FrameBridge: an embedded screen calls its own plugin routes through the app, with a short-lived token bound to them (#1688). '

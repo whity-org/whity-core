@@ -420,6 +420,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'The most workspaces one person may own, counting ones they co-own. 0 means no limit.'
       ),
     },
+    'handles.reserved': {
+      label: t('settings.meta.handles.reserved.label', 'Handles nobody may take'),
+      help: t(
+        'settings.meta.handles.reserved.help',
+        "One handle per line. Whity's own pages and words are already kept; add local brands or words you don't want used. A workspace already using one keeps it."
+      ),
+    },
     'workspaces.additional_plan': {
       label: t('settings.meta.workspaces.additional_plan.label', 'Plan for each further workspace'),
       help: t(
@@ -569,6 +576,34 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Let people add this site to their phone or computer as an app that opens in its own window and shows a page of its own when there is no connection. Off removes the option and uninstalls the app’s offline support from browsers the next time they open a page. Until this is saved here, the PWA_ENABLED setting of the server decides.'
       ),
     },
+    'navigation.hidden_ids': {
+      label: t('settings.meta.navigation.hidden_ids.label', 'Hidden pages'),
+      help: t(
+        'settings.meta.navigation.hidden_ids.help',
+        'Menu items and settings pages to remove from this installation, separated by commas: a menu item by its id, such as calendar or plugin-reports, and a settings page as settings.<id>, such as settings.sso. They leave every menu, and their pages open as not found. Permissions do not change. The WHITY_HIDDEN_NAV_IDS setting of the server hides more; it cannot be undone here.'
+      ),
+    },
+    'navigation.home_path': {
+      label: t('settings.meta.navigation.home_path.label', 'Home page'),
+      help: t(
+        'settings.meta.navigation.home_path.help',
+        'Where people land after signing in, and where the logo and every home link go: a path on this site, such as /dashboard or /admin/x/forms-catalog. Leave it empty for the WHITY_HOME_PATH setting of the server, or the dashboard.'
+      ),
+    },
+    'navigation.back_to_product_url': {
+      label: t('settings.meta.navigation.back_to_product_url.label', 'Back to your product: address'),
+      help: t(
+        'settings.meta.navigation.back_to_product_url.help',
+        'Adds a link at the top of the sidebar, for when Whity runs beside your own app: a path on this site, such as /, or an https:// address. Leave it empty for no link.'
+      ),
+    },
+    'navigation.back_to_product_label': {
+      label: t('settings.meta.navigation.back_to_product_label.label', 'Back to your product: label'),
+      help: t(
+        'settings.meta.navigation.back_to_product_label.help',
+        'The words on that link, such as Back to Example Bakery. Up to 60 characters.'
+      ),
+    },
     'website.plans': {
       label: t('settings.meta.website.plans.label', 'Plans on the website'),
       help: t(
@@ -667,6 +702,8 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         // Creating more workspaces while signed in (WHIT-1169).
         'workspaces.self_create_enabled',
         'workspaces.max_owned_per_person',
+        // Workspace @handles (WHIT-1363, design section 36).
+        'handles.reserved',
         // Each further owned workspace pays (WHIT-1203).
         'workspaces.additional_plan',
         'workspaces.additional_trial_days',
@@ -698,6 +735,17 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'Machine-facing endpoints and connected tooling.'
       ),
       keys: ['mcp.enabled'],
+    },
+    {
+      // #2386: a product that runs Whity beside its own app removes the pages
+      // it does not want. The ids are listed in docs/wiki/Hiding-Pages.md.
+      id: 'pages',
+      title: t('settings.section.pages.title', 'Pages'),
+      description: t(
+        'settings.section.pages.description',
+        'Where people land, the way back to your own app, and the pages this installation leaves out, for when Whity runs beside another app.'
+      ),
+      keys: ['navigation.home_path', 'navigation.back_to_product_url', 'navigation.back_to_product_label', 'navigation.hidden_ids'],
     },
     {
       id: 'plugin-store',

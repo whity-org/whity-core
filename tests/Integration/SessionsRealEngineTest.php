@@ -156,13 +156,30 @@ final class SessionsRealEngineTest extends TestCase
         );
     }
 
+    public function testEndingOtherSessionsIsAudited(): void
+    {
+        // READINESS CO-8.
+        $this->seedProfile('audited@example.com');
+        [$accessA] = $this->login('audited@example.com');
+        $this->login('audited@example.com');
+
+        $handler = new SessionsApiHandler($this->validator(), new SessionService($this->pdo), new \Whity\Core\Audit\AuditLogger($this->pdo));
+        self::assertSame(200, $handler->revokeOthers($this->bearer('DELETE', '/api/me/sessions', $accessA))->getStatusCode());
+
+        $meta = $this->pdo->query("SELECT metadata FROM audit_log WHERE action = 'auth.session.revoked_others'")->fetchColumn();
+        self::assertIsString($meta);
+        self::assertSame(1, json_decode($meta, true)['revoked']);
+    }
+
     public function testRevokeOthersKeepsCurrentAndKillsTheRest(): void
     {
         $this->seedProfile('a@example.com');
         [$accessA] = $this->login('a@example.com'); // session A
         [$accessB] = $this->login('a@example.com'); // session B (another browser)
 
-        self::assertSame(2, (int) $this->pdo->query('SELECT COUNT(*) FROM sessions')->fetchColumn());
+        $stmt = $this->pdo->query('SELECT COUNT(*) FROM sessions');
+        self::assertNotFalse($stmt);
+        self::assertSame(2, (int) $stmt->fetchColumn());
 
         // From session A, revoke all OTHERS.
         $res = $this->sessionsHandler()->revokeOthers($this->bearer('DELETE', '/api/me/sessions', $accessA));

@@ -192,6 +192,7 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `tenant.deleting` | `TENANT_DELETING` | veto |  |
 | `tenant.deleted` | `TENANT_DELETED` | veto |  |
 | `tenant.deleted.async` | `TENANT_DELETED_ASYNC` | queued |  |
+| `tenant.handle_changed` | `TENANT_HANDLE_CHANGED` | observe | A workspace's @handle changed (design section 36, HD.4); the old one still leads to the workspace for 90 days. Payload: `id`, `old_handle` (null when it had none), `new_handle`, `by_profile_id`. |
 
 ### Roles
 
@@ -400,6 +401,42 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `sales.quote.cancelled.async` | `SALES_QUOTE_CANCELLED_ASYNC` | queued |  |
 | `calendar.commission.closed` | `CALENDAR_COMMISSION_CLOSED` | observe | An owner closed a commission period (WHIT-1334). Carries `tenant_id`, `close_id`, `from`, `to`, `acting_profile_id` and `lines` (`profile_id`, `currency`, `bookings`, `sales_minor`, `commission_minor`). |
 | `calendar.commission.closed.async` | `CALENDAR_COMMISSION_CLOSED_ASYNC` | queued |  |
+
+### Accounting
+
+| Event | Constant | Kind | Notes |
+| --- | --- | --- | --- |
+| `accounting.entry.posting` | `ACCOUNTING_ENTRY_POSTING` | veto | Before a journal entry posts, inside its transaction (SDK 1.154). Payload: `tenant_id`, `journal`, `date`, `memo`, `source_type`, `source_id`, `acting_profile_id`, `reverses_entry_id`, `lines` (`account_id`, `debit_minor`, `credit_minor`, `contact_id`, `ou_id`). Throw `HookVetoException` to refuse the entry. |
+| `accounting.entry.posted` | `ACCOUNTING_ENTRY_POSTED` | observe | Inside the transaction, after the entry, its lines and the balances are written. Payload: `tenant_id`, `entry_id`, `number`, `journal`, `date`, `source_type`, `source_id`, `reverses_entry_id`, `total_minor`, `currency`, `acting_profile_id`. |
+| `accounting.entry.posted.async` | `ACCOUNTING_ENTRY_POSTED_ASYNC` | queued |  |
+| `accounting.entry.reversed` | `ACCOUNTING_ENTRY_REVERSED` | observe | Payload: `tenant_id`, `entry_id` (the original), `reversal_entry_id`, `acting_profile_id`. |
+| `accounting.entry.reversed.async` | `ACCOUNTING_ENTRY_REVERSED_ASYNC` | queued |  |
+| `accounting.period.closed` | `ACCOUNTING_PERIOD_CLOSED` | observe | A month was closed. Payload: `tenant_id`, `period_id`, `starts_on`, `ends_on`, `acting_profile_id`. |
+| `accounting.period.closed.async` | `ACCOUNTING_PERIOD_CLOSED_ASYNC` | queued |  |
+| `accounting.period.reopened` | `ACCOUNTING_PERIOD_REOPENED` | observe | A closed month was reopened. Payload as closed, plus `reason`. |
+| `accounting.period.reopened.async` | `ACCOUNTING_PERIOD_REOPENED_ASYNC` | queued |  |
+| `accounting.invoice.issuing` | `ACCOUNTING_INVOICE_ISSUING` | veto | Before an invoice or credit note is issued (numbered, frozen and posted) (SDK 1.155). Payload as `accounting.invoice.issued`, plus `lines` (`variant_id`, `description`, `quantity`, `unit_price_minor`, `net_minor`, `tax_code`, `tax_minor`, `total_minor`). Throw `HookVetoException` to refuse it (a credit limit). |
+| `accounting.invoice.issued` | `ACCOUNTING_INVOICE_ISSUED` | observe | An invoice or credit note was issued. Payload: `tenant_id`, `invoice_id`, `kind` (`sale`, `sale_credit`), `number`, `contact_id`, `status`, `issue_date`, `due_date`, `currency`, `total_minor`, `tax_minor`, `due_minor`, `credits_invoice_id`, `acting_profile_id`. |
+| `accounting.invoice.issued.async` | `ACCOUNTING_INVOICE_ISSUED_ASYNC` | queued |  |
+| `accounting.invoice.credited` | `ACCOUNTING_INVOICE_CREDITED` | observe | A credit note settled an invoice. Payload as issued (the invoice), plus `credit_note_id` and `amount_minor`. |
+| `accounting.invoice.credited.async` | `ACCOUNTING_INVOICE_CREDITED_ASYNC` | queued |  |
+| `accounting.invoice.paid` | `ACCOUNTING_INVOICE_PAID` | observe | Payments settled all of an invoice (SDK 1.156). Payload as `accounting.invoice.issued`. |
+| `accounting.invoice.paid.async` | `ACCOUNTING_INVOICE_PAID_ASYNC` | queued |  |
+| `accounting.invoice.partly_paid` | `ACCOUNTING_INVOICE_PARTLY_PAID` | observe | A payment settled part of an invoice. Payload as `accounting.invoice.issued`. |
+| `accounting.invoice.partly_paid.async` | `ACCOUNTING_INVOICE_PARTLY_PAID_ASYNC` | queued |  |
+| `accounting.payment.recorded` | `ACCOUNTING_PAYMENT_RECORDED` | observe | A payment was recorded and posted (money received or a transfer). Payload: `tenant_id`, `payment_id`, `direction`, `number`, `contact_id`, `paid_on`, `amount_minor`, `currency`, `method`, `status`, `cheque_status`, `unallocated_minor`, `acting_profile_id`. |
+| `accounting.payment.recorded.async` | `ACCOUNTING_PAYMENT_RECORDED_ASYNC` | queued |  |
+| `accounting.payment.allocated` | `ACCOUNTING_PAYMENT_ALLOCATED` | observe | A payment settled an invoice. Payload as recorded, plus `invoice_id` and `amount_minor` (the share). |
+| `accounting.payment.allocated.async` | `ACCOUNTING_PAYMENT_ALLOCATED_ASYNC` | queued |  |
+| `accounting.cheque.bounced` | `ACCOUNTING_CHEQUE_BOUNCED` | observe | A cheque bounced: its entries were reversed and the invoices it paid reopened. Payload as recorded, plus `fee_minor` and `reopened_invoice_ids`. |
+| `accounting.cheque.bounced.async` | `ACCOUNTING_CHEQUE_BOUNCED_ASYNC` | queued |  |
+| `accounting.bill.posting` | `ACCOUNTING_BILL_POSTING` | veto | Before a supplier bill or credit is posted (SDK 1.157). Payload as `accounting.invoice.issuing`, with `kind` `purchase` or `purchase_credit`. Throw `HookVetoException` to refuse it. |
+| `accounting.bill.posted` | `ACCOUNTING_BILL_POSTED` | observe | A supplier bill or credit was posted. Payload as `accounting.invoice.issued`. |
+| `accounting.bill.posted.async` | `ACCOUNTING_BILL_POSTED_ASYNC` | queued |  |
+| `accounting.bill.paid` | `ACCOUNTING_BILL_PAID` | observe | Payments settled all of a bill. Payload as `accounting.invoice.issued`. |
+| `accounting.bill.paid.async` | `ACCOUNTING_BILL_PAID_ASYNC` | queued |  |
+| `accounting.expense.claimed` | `ACCOUNTING_EXPENSE_CLAIMED` | observe | A person filed an expense claim (SDK 1.158). Payload as `accounting.invoice.issued` (a `purchase`), plus `claimant_profile_id`. |
+| `accounting.expense.claimed.async` | `ACCOUNTING_EXPENSE_CLAIMED_ASYNC` | queued |  |
 
 ### Deletion is transactional (WC-713)
 

@@ -1,13 +1,24 @@
-# Release pipeline (WC-172): pushing a tag `vX.Y.Z` publishes a core release.
+# Release pipeline (WC-172): main moving to a new CoreVersion publishes a core
+# release. Step 2 of 2: release-prepare.yml opens the release/X.Y.Z -> main PR
+# with auto-merge armed, and its merge starts this (WHIT-1340).
 #
 # Gates, in order:
-#   1. verify / postgres-integration / web — full parity with the PR gate
-#      (.github/workflows/automated-tests.yml): the tag name must equal
-#      `v` + CoreVersion::VERSION (a release can never ship with a lying
-#      version), the full backend suite + static analysis + plugin smoke must
-#      pass, migrations + seed must run on real PostgreSQL, and the frontend
-#      types/tests/generated-artifact drift checks must pass on the tagged
-#      commit. A release is never gated weaker than a PR.
+#   0. equivalence: has a green CI run already proved this exact code?
+#      scripts/release-equivalence.sh decides, and its header spells out what
+#      counts. Normally yes: the release PR's own pull_request run tested the
+#      merge of the release branch into main, which is this commit's tree,
+#      with every suite (a PR into main runs all of them, with coverage).
+#      Then the PHPUnit, PHPStan and plugin guard steps of `verify` and the
+#      whole `web` job are skipped, about seven minutes. It fails closed:
+#      when it cannot prove it, they run.
+#   1. verify / postgres-integration / web: the release must equal
+#      `v` + CoreVersion::VERSION (always: a release can never ship with a
+#      lying version), migrations + seed + idempotency must run on real
+#      PostgreSQL (always), and, unless step 0 proved them, the full backend
+#      suite + static analysis + plugin smoke and the frontend
+#      types/tests/generated-artifact drift checks must pass on this commit.
+#      A release is never gated weaker than a PR: either it reruns the PR
+#      gate's suites or it holds that gate's green result for the same tree.
 #   2. images (images.yml) — build ALL THREE production container images and push them to
 #      GHCR under the same tags (vX.Y.Z and latest): the backend
 #      (`ghcr.io/<repo>`, root Dockerfile `release` stage — code + no-dev
@@ -110,11 +121,46 @@ jobs:
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-  verify:
-    name: Verify tag + full suite
+  # Step 0 above. Reads the Actions API and git history; writes nothing.
+  equivalence:
+    name: Already proved by CI?
     runs-on: ubuntu-latest
     needs: [resolve]
     if: needs.resolve.outputs.go == 'true'
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+
+    outputs:
+      # 'true' only when a green run of the same tree was found. Anything
+      # else, including this job failing, means the suites run.
+      skip: ${{ steps.e.outputs.skip }}
+
+    steps:
+      - name: Checkout with history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Look for a green run of this tree
+        id: e
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.resolve.outputs.version }}
+        run: |
+          bash scripts/release-equivalence.sh --self-test
+          bash scripts/release-equivalence.sh "${GITHUB_SHA}" "${VERSION}"
+
+  verify:
+    name: Verify the version (+ full suite unless CI proved it)
+    runs-on: ubuntu-latest
+    needs: [resolve, equivalence]
+    # Runs even when `equivalence` failed: its answer is then empty, which
+    # means "not proved", and every suite below runs.
+    if: ${{ !cancelled() && needs.resolve.outputs.go == 'true' }}
     # Far more than the steps below need, so only a hung run reaches it, and it
     # is cut off within the hour instead of at the six-hour default.
     timeout-minutes: 60
@@ -163,24 +209,32 @@ jobs:
           fi
           echo "Releasing version ${VERSION}"
 
+      - name: Say why the suites are skipped
+        if: needs.equivalence.outputs.skip == 'true'
+        run: echo "::notice::PHPUnit, PHPStan and the plugin guards already passed on this tree in CI (see the 'Already proved by CI?' job), so they are not run again."
+
       # Parallel, as the suite runs on every PR. One process running all of it
       # took 53 minutes at v0.2.26, then 1h43m at v0.2.27, when the runner was
       # lost partway through with no test failing.
       - name: Run PHPUnit
+        if: needs.equivalence.outputs.skip != 'true'
         run: vendor/bin/paratest --processes "$(nproc)"
 
       # Same paths and memory limit as every PR (the composer script, #934):
       # this used to list its own paths, without `ops`.
       - name: Run PHPStan
+        if: needs.equivalence.outputs.skip != 'true'
         run: composer phpstan
 
       - name: Plugin-load smoke
+        if: needs.equivalence.outputs.skip != 'true'
         run: php scripts/ci-plugin-smoke.php
 
       # A release must not ship an in-tree plugin whose screens silently do not
       # register (#969) — loading successfully is not the same as contributing
       # the UI the plugin declares.
       - name: Plugin frontend-feature registration guard
+        if: needs.equivalence.outputs.skip != 'true'
         run: php scripts/ci-plugin-frontend-features.php
 
   postgres-integration:
@@ -269,11 +323,12 @@ jobs:
       - name: Permission-holder guard
         run: php scripts/ci-permission-holder-guard.php
 
+  # Skipped as a whole when CI already proved the same tree (step 0).
   web:
     name: Frontend types, tests & generated-artifact drift
     runs-on: ubuntu-latest
-    needs: [resolve]
-    if: needs.resolve.outputs.go == 'true'
+    needs: [resolve, equivalence]
+    if: ${{ !cancelled() && needs.resolve.outputs.go == 'true' && needs.equivalence.outputs.skip != 'true' }}
 
     permissions:
       contents: read
@@ -337,10 +392,21 @@ jobs:
   # Build, push and smoke-test the app, web and render images (vX.Y.Z + latest).
   # The jobs live in images.yml, shared with develop-images.yml, so the images
   # app.whity.dev deploys from develop are built and gated the same way.
+  #
+  # `web` may be SKIPPED (step 0), and a skipped job in `needs` skips every job
+  # after it, transitively, unless the condition says otherwise. So this and
+  # each job after it name the results they accept instead of relying on the
+  # default success(): every gate passed, and `web` either passed or was
+  # skipped because CI had already proved the tree.
   images:
     name: Images
-    needs: [resolve, verify, postgres-integration, web]
-    if: needs.resolve.outputs.go == 'true'
+    needs: [resolve, equivalence, verify, postgres-integration, web]
+    if: >-
+      ${{ !cancelled() && needs.resolve.outputs.go == 'true'
+          && needs.verify.result == 'success'
+          && needs.postgres-integration.result == 'success'
+          && (needs.web.result == 'success'
+              || (needs.web.result == 'skipped' && needs.equivalence.outputs.skip == 'true')) }}
     permissions:
       contents: read
       packages: write
@@ -358,8 +424,14 @@ jobs:
     # smoke is now a gate: a release image that does not boot and serve /api/health
     # can never become a published GitHub Release (and thus never be picked up by
     # sovereign deployments running `update:check`).
-    needs: [resolve, verify, postgres-integration, web, images]
-    if: needs.resolve.outputs.go == 'true'
+    needs: [resolve, equivalence, verify, postgres-integration, web, images]
+    if: >-
+      ${{ !cancelled() && needs.resolve.outputs.go == 'true'
+          && needs.verify.result == 'success'
+          && needs.postgres-integration.result == 'success'
+          && (needs.web.result == 'success'
+              || (needs.web.result == 'skipped' && needs.equivalence.outputs.skip == 'true'))
+          && needs.images.result == 'success' }}
 
     permissions:
       contents: write
@@ -391,6 +463,19 @@ jobs:
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git tag -a "${RELEASE_TAG}" -m "${RELEASE_TAG}"
           git push origin "${RELEASE_TAG}"
+
+      # READINESS CO-22: what this release is made of, as a CycloneDX SBOM
+      # of its composer and npm dependencies (from composer.lock and the npm
+      # lockfiles), attached to the GitHub Release. The images carry their own
+      # SBOM and provenance as attestations (images.yml).
+      - name: SBOM of the release's dependencies (CycloneDX)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: ${{ runner.temp }}/whity-core-sbom.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
 
       - name: Create the release, with the CHANGELOG section as its notes
         env:
@@ -481,7 +566,7 @@ jobs:
           COMPOSE_ASSET="${RUNNER_TEMP}/whity-compose.yml"
           cp docker/production/docker-compose.yml "$COMPOSE_ASSET"
 
-          gh release create "${RELEASE_TAG}" "$COMPOSE_ASSET" \
+          gh release create "${RELEASE_TAG}" "$COMPOSE_ASSET" "${RUNNER_TEMP}/whity-core-sbom.cdx.json" \
             --title "${RELEASE_TAG}" \
             --notes-file "$NOTES" \
             --verify-tag
@@ -493,7 +578,7 @@ jobs:
     # that failed to ship would carry a version bump onto develop describing
     # a release nobody can install.
     needs: [resolve, release]
-    if: needs.resolve.outputs.go == 'true'
+    if: ${{ !cancelled() && needs.resolve.outputs.go == 'true' && needs.release.result == 'success' }}
 
     permissions:
       # The back-merge is a branch this job pushes, not main itself.
@@ -551,28 +636,49 @@ jobs:
           EXISTING=$(gh pr list --base develop --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
           if [ -n "$EXISTING" ]; then
             echo "::notice::PR #${EXISTING} already back-merges ${RELEASE_TAG} into develop."
+            if [ "$TOKEN_KIND" != "builtin" ]; then
+              gh pr merge "$EXISTING" --auto || echo "::warning::Could not arm auto-merge on #${EXISTING}; it needs a person to add it to the merge queue."
+            fi
             exit 0
           fi
 
           # The merge is computed without a checkout: a conflict here means main
           # carries a change develop contradicts, which no bot should resolve.
-          if ! TREE=$(git merge-tree --write-tree "$DEVELOP" "$MAIN"); then
-            echo "::error::main and develop conflict, so the back-merge needs a person. Merge origin/main into a branch off develop by hand, resolve, and open the PR."
+          #
+          # Since WHIT-1340 the release bump reaches develop only through this
+          # PR, so a conflict is possible when develop changed a line right next
+          # to one the bump changed while the release was in flight; the likely
+          # one is "sdk_version" beside "core_version" in
+          # docs/sdk-coverage/coverage.json. The release is already published
+          # by now; only this housekeeping PR waits for the person.
+          if ! TREE=$(git merge-tree --write-tree --name-only "$DEVELOP" "$MAIN"); then
+            echo "::error::main and develop conflict in: $(printf '%s' "$TREE" | tail -n +2 | tr '\n' ' '). The release is published; the back-merge needs a person: merge origin/main into a branch off develop, resolve (keep develop's content and main's version stamps), and open the PR. Until it lands, release-prepare refuses to cut the next release."
             exit 1
           fi
+          TREE=$(printf '%s\n' "$TREE" | head -1)
 
-          # Normally the result is develop's own tree: the release merge commit
-          # adds nothing develop lacks. It differs only when something reached
-          # main without passing through develop (a hotfix cut from main), and
-          # then this PR is what carries it back -- so it is opened either way,
-          # but says which case it is.
+          # The result is develop plus what main has that develop does not. On
+          # the normal path that is exactly the release commit: the version
+          # bump, the dated CHANGELOG and the consumed changelog fragments and
+          # changesets, which went to main and not to develop. Anything else
+          # reached main without passing through develop (a hotfix cut from
+          # main), so the body says which files are not the bump's.
           CHANGED=$(git diff --name-only "$DEVELOP" "$TREE")
+          RELEASE_COMMIT=$(git rev-parse -q --verify "${MAIN}^2" || true)
+          BUMP=""
+          if [ -n "$RELEASE_COMMIT" ]; then
+            BUMP=$(git diff --name-only "${RELEASE_COMMIT}^" "$RELEASE_COMMIT" 2>/dev/null || true)
+          fi
+          OTHER=$(comm -23 <(printf '%s\n' "$CHANGED" | sed '/^$/d' | sort -u) <(printf '%s\n' "$BUMP" | sed '/^$/d' | sort -u))
+          COUNT=$(printf '%s\n' "$CHANGED" | sed '/^$/d' | wc -l | tr -d ' ')
           if [ -z "$CHANGED" ]; then
             CONTENT="Expect **zero file changes**: the merge tree is identical to develop's. This carries main's release merge commit back onto develop so git stops reporting develop as behind."
+          elif [ -z "$OTHER" ]; then
+            CONTENT="This carries the **release commit** (${COUNT} file(s)): the version bump, the dated CHANGELOG section, and the changelog fragments and changesets it consumed. Nothing else."
           else
-            COUNT=$(printf '%s\n' "$CHANGED" | wc -l | tr -d ' ')
-            CONTENT="This carries **${COUNT} changed file(s)** from main that never went through develop (a hotfix cut from main?). Review them like any other change before merging."
-            echo "::warning::The back-merge carries ${COUNT} file(s) develop does not have."
+            OTHER_COUNT=$(printf '%s\n' "$OTHER" | wc -l | tr -d ' ')
+            CONTENT="This carries the release commit and **${OTHER_COUNT} other file(s)** from main that never went through develop (a hotfix cut from main?): $(printf '%s' "$OTHER" | tr '\n' ' '). Review those like any other change."
+            echo "::warning::The back-merge carries ${OTHER_COUNT} file(s) that are not the release bump's."
           fi
 
           COMMIT=$(GIT_AUTHOR_NAME='github-actions[bot]' \
@@ -596,13 +702,9 @@ jobs:
 
           ${CONTENT}
 
-          ## Merge with a MERGE COMMIT
+          Auto-merge is armed: the develop merge queue merges this, with a merge commit, once its checks pass. A squash would drop main's release commit from develop's history, which is the one thing this PR exists to carry.
 
-          A squash would drop main's release commit from develop's history, which is the one thing this PR exists to carry.
-
-          ## If develop moves before you merge
-
-          The head is a branch off develop, so **Update branch** (or \`gh pr update-branch\`) brings it up to date and it stays mergeable. Nothing here ever pushes to main.
+          The head is a branch off develop, and the queue tests it on top of develop as it is then, so develop moving in the meantime needs nothing. Nothing here ever pushes to main.
           EOF
 
           URL=$(gh pr create \
@@ -616,8 +718,16 @@ jobs:
             {
               echo "### CI on ${URL} is waiting for approval"
               echo ""
-              echo "This PR was opened with github.token, and GitHub holds the workflow runs of such PRs until someone with write access approves them: open the PR and choose **Approve workflows to run**."
+              echo "This PR was opened with github.token, and GitHub holds the workflow runs of such PRs until someone with write access approves them: open the PR and choose **Approve workflows to run**, then add it to the merge queue."
               echo ""
               echo "Configure the release token (CONTRIBUTING.md, *The release token*) and release PRs start their CI on their own."
             } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
+
+          # WHIT-1340: no click left. develop's merge queue picks the method
+          # (MERGE), so no method flag. The title needs no WHIT id: the only
+          # check that reads PR titles is the no-AI-attribution one, and this
+          # title passed it on every back-merge so far (#2387 for v0.2.31).
+          gh pr merge "$URL" --auto
+          echo "Auto-merge armed on ${URL}."

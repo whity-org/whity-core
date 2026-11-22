@@ -42,20 +42,94 @@ its own semver.
    Pick the package(s) and the bump (patch / minor / major) and write a one-line
    summary. This adds a small markdown file under `.changeset/`. Commit it with
    your PR. (A change with no user-facing package impact needs no changeset.)
-3. **Apply the bumps** when you're ready to cut a release — from root:
-   ```bash
-   npm run version-packages
-   ```
-   This consumes the pending changesets, bumps each affected `package.json`, and
-   writes/updates its `CHANGELOG.md`. Commit the result.
-4. **Merge to `main`.** The `Publish @whity/ui` workflow runs on any push
-   touching `packages/ui`, but it is **version-gated**: it publishes only when
-   the `package.json` version isn't already in the registry, otherwise it skips
-   with a notice. So a merge with a fresh version publishes; a merge that didn't
-   bump the version is a clean no-op (never a red build).
+3. **The core release applies the bumps.** You don't run
+   `npm run version-packages` yourself: the **Release — prepare** workflow runs
+   `changeset version` on the release branch, which consumes the pending
+   changesets, bumps each affected `package.json` and writes its
+   `CHANGELOG.md`. It also gives `@whity/api-client` a minor bump when the API
+   changed since the last release and no changeset named it. See
+   [The core release](#the-core-release-one-dispatch) below.
+4. **They publish when `main` moves.** The release PR merges into `main` by
+   itself, and the `Publish @whity/ui` workflow (and its siblings) runs on any
+   push touching its package, but it is **version-gated**: it publishes only
+   when the `package.json` version isn't already in the registry, otherwise it
+   skips with a notice. So a release with a fresh version publishes; a merge
+   that didn't bump the version is a clean no-op (never a red build).
 
 > The `web` app is listed in `.changeset` `ignore` — it is private and deployed,
 > so it is never versioned or published.
+
+## The core release: one dispatch
+
+The packages ride on the core release, so this is how that release runs since
+WHIT-1340. Only a release into `main` needs the owner: their word is the
+approval, and the orchestrator runs one workflow. Everything after it is
+automatic.
+
+```
+  owner: "release X.Y.Z"  →  Actions → Release — prepare (version X.Y.Z)
+        │   cuts release/X.Y.Z from develop (the release is frozen there),
+        │   folds changelog.d/ into CHANGELOG.md, bumps CoreVersion,
+        │   regenerates openapi.json + the typed client, runs changeset version
+        ▼
+  release/X.Y.Z ──PR──▶ main        auto-merge armed, MERGE COMMIT
+        │   merges once main's required checks pass (CI gate, CodeQL,
+        │   Semgrep, E2E gate): the PR gate runs every suite on a PR into main
+        ▼
+  release.yml (push to main)
+        · already proved?   the release PR's run tested this exact tree, so
+                            PHPUnit, PHPStan, the plugin guards and the
+                            frontend suites are not run again
+        · always:           CoreVersion = tag, migrate + seed + idempotency on
+                            real PostgreSQL
+        · images            app, web, render: built with a registry layer
+                            cache, pushed, smoke-tested (Trivy scans beside)
+        · tag vX.Y.Z, GitHub Release, npm packages publish
+        · back-merge PR into develop, auto-merge armed (merge queue)
+```
+
+v0.2.31 took 56 minutes with three hand merges: prepare 1, the bump through
+develop's merge queue 20, the develop → main PR 8, `release.yml` 17, the
+back-merge 10. The new flow drops the first queue trip and the second PR, and
+`release.yml` no longer repeats suites that already passed on the same code.
+The release is tagged in about 25 minutes; the back-merge finishes in the
+background.
+
+**When are the suites skipped, exactly?** `scripts/release-equivalence.sh`
+decides, and its header is the specification. In short: a run of the
+Automated Tests workflow must have concluded `success`, with `CI gate`, every
+SQLite test shard, the static-analysis job and the three frontend jobs all
+`success` (a `skipped` job proves nothing), on a commit whose tested tree is
+the release commit's tree. The normal proof is the release PR's own run: the
+release commit is the merge of that PR, its head has the identical tree, and
+`main` before the merge is an ancestor of the head, so the run tested exactly
+this tree. A fallback accepts the develop commit the release was cut from when
+the only differences are the files the bump writes, each changed only as the
+bump changes it (the version value, `info.version`, the coverage stamp,
+workspace versions and `@whity/*` ranges, deleted fragments and changesets,
+release notes). Anything else, any API error, a renamed job, and the suites
+run. It never fails the release.
+
+**If something stops:**
+
+- *Prepare refuses with "main has commits that develop does not."* The last
+  release's back-merge hasn't landed (or a hotfix went to `main`). Merge that
+  PR into develop, then dispatch again.
+- *The release PR's checks fail.* Nothing is tagged or published. Close the
+  PR, delete its `release/X.Y.Z` branch, fix on develop, and dispatch again
+  with the same version.
+- *`release.yml` fails after the merge.* No tag exists until the very end, so
+  re-run the failed jobs.
+- *The back-merge job reports a conflict.* The release is already published.
+  develop changed a line next to one the bump changed while the release was in
+  flight (most likely `sdk_version` beside `core_version` in
+  `docs/sdk-coverage/coverage.json`). Merge `origin/main` into a branch off
+  develop, keep develop's content and main's version stamps, and open the PR.
+  The next prepare waits for it.
+- *No release token is configured.* The PRs then need their CI approved by
+  hand, and auto-merge is not armed on the release PR, because a merge made
+  with `github.token` would not start `release.yml`. See CONTRIBUTING.md,
+  "The release token".
 
 ## Why version-gating matters
 

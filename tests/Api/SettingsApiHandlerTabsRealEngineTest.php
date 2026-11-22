@@ -195,6 +195,22 @@ final class SettingsApiHandlerTabsRealEngineTest extends TestCase
         $this->assertSame(['general', 'branding', 'owners'], $tabs);
     }
 
+    public function testASettingsPageTheOperatorHidIsNotATab(): void
+    {
+        // #2386: settings.<id> hides a Settings page; a bare id is a menu item
+        // and leaves the tabs alone.
+        $profileId = $this->seedProfileWithPermissions($this->tenantId, [CorePermissions::SETTINGS_READ]);
+        $_ENV[\Whity\Core\Navigation\HiddenNavIds::ENV] = 'settings.owners,branding';
+
+        try {
+            $tabs = $this->tabIds($this->handler->tabs($this->requestAs($profileId, $this->tenantId)));
+        } finally {
+            unset($_ENV[\Whity\Core\Navigation\HiddenNavIds::ENV]);
+        }
+
+        $this->assertSame(['general', 'branding'], $tabs);
+    }
+
     public function testAuthProvidersManageAloneShowsOnlySsoEvenWithoutSettingsRead(): void
     {
         $profileId = $this->seedProfileWithPermissions($this->tenantId, [CorePermissions::AUTH_PROVIDERS_MANAGE]);

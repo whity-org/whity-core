@@ -283,6 +283,9 @@ final class TenantOwnedTables
         // WHIT-1225: themes a workspace imported or installed from the store
         // (migration 323). Every query binds tenant_id.
         'themes' => '323_create_themes.php',
+        // WHIT-1225 (TH.25): every version of those themes (migration 349).
+        // Every query binds tenant_id.
+        'theme_versions' => '349_create_theme_versions.php',
         'plugin_core_grants' => '325_create_plugin_core_grants.php',
         // WHIT-838: a plugin's secrets, per workspace (migration 187).
         'plugin_secrets' => '187_create_plugin_secrets.php',
@@ -674,9 +677,33 @@ final class TenantOwnedTables
         'inv_order_lines' => '321_create_inventory_orders.php',
         'inv_supplier_items' => '321_create_inventory_orders.php',
         'inv_lots' => '337_create_inventory_lots.php',
+        'inv_costs' => '354_add_stock_costs_and_stock_in_books.php',
         'sales_quotes' => '330_create_sales_quotes.php',
         'sales_quote_lines' => '330_create_sales_quotes.php',
         'sales_quote_conversions' => '330_create_sales_quotes.php',
+        // Accounting (WHIT-1318, design section 32). Every query binds tenant_id;
+        // acc_entries and acc_lines are append-only (a trigger refuses UPDATE and DELETE).
+        'acc_books' => '344_create_accounting_chart.php',
+        'acc_accounts' => '344_create_accounting_chart.php',
+        'acc_journals' => '344_create_accounting_chart.php',
+        'acc_fiscal_years' => '344_create_accounting_chart.php',
+        'acc_periods' => '344_create_accounting_chart.php',
+        'acc_entries' => '345_create_accounting_ledger.php',
+        'acc_lines' => '345_create_accounting_ledger.php',
+        'acc_balances' => '345_create_accounting_ledger.php',
+        'acc_manual_entries' => '345_create_accounting_ledger.php',
+        'acc_manual_entry_lines' => '345_create_accounting_ledger.php',
+        'acc_tax_codes' => '350_create_accounting_invoices.php',
+        'acc_invoices' => '350_create_accounting_invoices.php',
+        'acc_invoice_lines' => '350_create_accounting_invoices.php',
+        'acc_allocations' => '350_create_accounting_invoices.php',
+        'acc_payments' => '351_create_accounting_payments.php',
+        // A workspace's earlier @handles, held 90 days (design section 36,
+        // HD.4). ONE unpredicated read: Handles::heldBy() resolves an old
+        // handle to the workspace still holding it, the same shape as the
+        // tenants registry lookup by slug it extends, and returns an id only;
+        // it carries an explicit `@tenant-guard-ignore` annotation.
+        'tenant_handle_history' => '356_create_tenant_handle_history.php',
     ];
 
     /**

@@ -180,6 +180,13 @@ final class ContactImportService
             foreach ($this->imports->changes($tenantId, $id) as $change) {
                 $contactId = $change['contact_id'];
                 if ($change['action'] === 'created') {
+                    if ($this->inTheBooks($tenantId, $contactId)) {
+                        throw new ContactRejectedException(
+                            'A contact this import made is on an invoice or in the books now, so the import can no longer be undone. Archive the contacts you don\'t need instead.',
+                            409,
+                            ['code' => 'in_the_books', 'contact_id' => $contactId]
+                        );
+                    }
                     $this->contacts->delete($tenantId, $contactId);
                     continue;
                 }
@@ -200,6 +207,23 @@ final class ContactImportService
         }
 
         return $this->show($tenantId, $id);
+    }
+
+    /**
+     * Whether the books mention a contact: an invoice, or a posted line (WHIT-1318).
+     * The books keep what was posted, so such a contact is never deleted.
+     */
+    private function inTheBooks(int $tenantId, int $contactId): bool
+    {
+        $stmt = $this->db->prepare(
+            'SELECT 1 AS hit FROM acc_invoices WHERE tenant_id = :tenant_id AND contact_id = :contact_id
+             UNION ALL
+             SELECT 1 AS hit FROM acc_lines WHERE tenant_id = :tenant_id2 AND contact_id = :contact_id2
+             LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':contact_id' => $contactId, ':tenant_id2' => $tenantId, ':contact_id2' => $contactId]);
+
+        return $stmt->fetchColumn() !== false;
     }
 
     /**

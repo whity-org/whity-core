@@ -802,6 +802,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::INVENTORY_READ,
     ];
     $items[] = [
+        'id' => 'sales',
+        'label' => 'Sales',
+        'href' => '/sales',
+        'icon' => 'invoice',
+        // Quotes (WHIT-1341, design section 34 §3.8, owner answer Q4):
+        // Operations › Sales, for every workspace, inventory or not.
+        'group' => 'operations',
+        'order' => 3,
+        // Mirrors GET /api/sales/quotes.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::QUOTES_READ,
+    ];
+    $items[] = [
         'id' => 'users',
         'label' => 'Users',
         'href' => '/admin/users',
@@ -1620,6 +1632,18 @@ $pluginLoader = new PluginLoader(
 // Inject the shared $totpService (built at step 3b) so the login-path 2FA validation uses the
 // SAME encryption key as the setup/confirm path (WC-95).
 // WC-0abcc29f: brute-force throttle uses the shared DatabaseSharedStore.
+// READINESS CE-7: a new password that has been in a data breach or is too
+// common is refused. WHITY_BREACHED_PASSWORDS: `online` (default) asks the
+// Have I Been Pwned range API by k-anonymity and falls back to the built-in
+// list when it can't be reached; `offline` uses the built-in list only; `off`
+// turns the check off.
+$breachedPasswordsMode = strtolower((string) ($_ENV['WHITY_BREACHED_PASSWORDS'] ?? getenv('WHITY_BREACHED_PASSWORDS') ?: 'online'));
+\Whity\Core\PasswordPolicy::setBreachedPasswords(match ($breachedPasswordsMode) {
+    'off' => null,
+    'offline' => new \Whity\Core\Identity\BreachedPasswords(),
+    default => \Whity\Core\Identity\BreachedPasswords::online(),
+});
+
 // Brute-force login throttle thresholds are operator-configurable (like the HTTP
 // RATE_LIMIT_* rules); unset falls back to the service defaults (10/20/900s).
 $loginThrottle = new LoginThrottleService(
@@ -1825,7 +1849,7 @@ $accountSecurityMailer = new \Whity\Core\Mail\AccountSecurityMailer(
 );
 $authHandler->setSecurityMailer($accountSecurityMailer);
 
-$registerHandler = new RegisterApiHandler($db->getPdo(), $settingsService, $emailVerificationProvider, $hookManager);
+$registerHandler = new RegisterApiHandler($db->getPdo(), $settingsService, $emailVerificationProvider, $hookManager, store: new DatabaseSharedStore($db->getPdo()));
 $router->register('POST', '/api/register', $passwordRoute([$registerHandler, 'register']), null);
 
 // WC-235: public email verification — (re)send a link + confirm a token. Both are
@@ -1899,7 +1923,7 @@ $router->register('POST',   '/api/devices/token', [$authHandler, 'handleDeviceTo
 // 10a-ter. Interactive session management (WC-f-sessions-table). Session-gated
 // in-handler (cookie OR Bearer access token), scoped to the caller's own
 // profile. Interactive logins only — native devices are managed via /api/devices.
-$sessionsHandler = new \Whity\Api\SessionsApiHandler($tokenValidator, new \Whity\Auth\SessionService($db->getPdo()));
+$sessionsHandler = new \Whity\Api\SessionsApiHandler($tokenValidator, new \Whity\Auth\SessionService($db->getPdo()), $auditLogger);
 $router->register('GET',    '/api/me/sessions',      [$sessionsHandler, 'list'], null);
 $router->register('DELETE', '/api/me/sessions/{id}', [$sessionsHandler, 'revoke'], null);
 $router->register('DELETE', '/api/me/sessions',      [$sessionsHandler, 'revokeOthers'], null);
@@ -1914,6 +1938,8 @@ $twoFactorProofThrottle = new LoginThrottleService(
     'two_factor_proof',
 );
 $twoFactorHandler = new TwoFactorHandler($db->getPdo(), $totpService, $backupCodesService, $tokenValidator, $auditLogger, $twoFactorProofThrottle);
+// READINESS CE-6: the current password on PATCH /me counts against the same budget.
+$authHandler->setProofThrottle($twoFactorProofThrottle);
 $twoFactorHandler->setSecurityMailer($accountSecurityMailer);
 $router->register('POST', '/api/auth/2fa/setup', $passwordRoute([$twoFactorHandler, 'setup']), null);
 $router->register('POST', '/api/auth/2fa/confirm', $passwordRoute([$twoFactorHandler, 'confirm']), null);
@@ -2111,6 +2137,8 @@ $tenantManifestHost = new \Whity\Core\Plugin\Tenant\TenantManifestHost($tenantPl
 // WHIT-1122: installed code plugins, switched on per workspace.
 $codePluginActivation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($db->getPdo());
 $pluginLoader->setWorkspaceActivation($codePluginActivation);
+// WHIT-1338: a plugin a signed revocation list killed is never loaded into a worker.
+$pluginLoader->setKillSwitch(static fn (string $name): bool => $codePluginActivation->isKilled($name));
 
 $rolesHandler = new RolesApiHandler(
     $db->getPdo(),
@@ -2152,7 +2180,15 @@ $router->register('DELETE', '/api/roles/{id:\d+}/permissions', [$rolesHandler, '
 // grant migration reaching only the seeded admin role (#834).
 $router->register('GET', '/api/roles/{id:\d+}/assignments', [$rolesHandler, 'assignments'], null, null, \Whity\Core\RBAC\CorePermissions::ROLES_READ);
 
-$tenantsHandler = new TenantsApiHandler($db->getPdo(), $hookManager);
+// Workspace @handles (WHIT-1363, design section 36): checked against the
+// operator's own reserved list, audited, and announced as tenant.handle_changed.
+$workspaceHandles = new \Whity\Core\Tenant\Handles(
+    $db->getPdo(),
+    static fn (): string => (string) ($settingsService->getGlobal()[\Whity\Core\Settings\SettingsRegistry::HANDLES_RESERVED] ?? ''),
+    $auditLogger,
+    $hookManager,
+);
+$tenantsHandler = new TenantsApiHandler($db->getPdo(), $hookManager, $workspaceHandles);
 // Tenants are gated on PERMISSION SLUGS, not on the `admin` role name (#990),
 // for the reason the roles block above states: a role is a row a deployment may
 // rename or replace, a slug is a contract. `tenants:read/write/delete` have been
@@ -2197,8 +2233,12 @@ $navigationHandler = new NavigationApiHandler($hookManager, $roleChecker, [
     'messages-for-customer' => [new \Whity\Core\Messaging\MessagesNavConditions($db->getPdo()), 'isCustomerWithMessages'],
     // Team chat (CH.1): the people who work here.
     'chat-for-staff' => [new \Whity\Core\Chat\ChatNavConditions(new \Whity\Core\Chat\ChatRepository($db->getPdo())), 'isStaff'],
-]);
+], $settingsService);
 $router->register('GET', '/api/navigation', [$navigationHandler, 'list']);
+// #2386: which menu items and Settings pages the operator hid. Public (see
+// EnforceTenantIsolation): the web server's route guard asks before anyone
+// signs in.
+$router->register('GET', '/api/navigation/hidden', [$navigationHandler, 'hidden'], null);
 
 // Caller capabilities (WC-176, #205). Registered with NO required
 // role/permission — any authenticated caller may ask which permissions they
@@ -2961,6 +3001,8 @@ $pluginLimitPacks = new \Whity\Core\Plugin\Workspace\PluginLimitPacks(
 $entitlementService->usePluginPacks(static fn (int $tenantId): array => $pluginLimitPacks->packsFor($tenantId));
 // WHIT-1156: invitations ask the plan's staff limit first, as `seats.enforcement` says.
 $invitationsHandler->useSeats(new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService));
+// READINESS TM-14: adding a person directly holds to the same staff limit.
+$usersHandler->useSeats(new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService));
 // WHIT-1129 (SDK 1.108): packs set a workspace up through core's own routes,
 // as the person acting there, limited to WorkspaceSetup::ROUTES.
 $hostWorkspaceSetup = new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker);
@@ -3334,6 +3376,15 @@ $externalBillingHandler->useWorkspaceTrial(new \Whity\Core\Billing\WorkspaceTria
     ),
     $settingsService,
 ));
+// 2026-11-22: an expired or canceled workspace is paused; members who can't pay
+// are told so and who its owners are, instead of meeting a 402.
+$externalBillingHandler->useWorkspacePause(new \Whity\Core\Billing\WorkspacePause(
+    new \Whity\Core\Subscription\SubscriptionService(
+        new \Whity\Core\Subscription\SubscriptionRepository($db->getPdo()),
+        $settingsService
+    ),
+    new \Whity\Core\Tenant\WorkspaceOwners($db->getPdo()),
+));
 $cashPaymentsHandler = new \Whity\Api\CashPaymentsApiHandler($cashPayments, $auditLogger);
 $router->register('GET', '/api/billing/cash-payments', [$cashPaymentsHandler, 'list'], null, null, CorePermissions::PLANS_MANAGE);
 $router->register('POST', '/api/billing/cash-payments', [$cashPaymentsHandler, 'record'], null, null, CorePermissions::PLANS_MANAGE);
@@ -3358,6 +3409,9 @@ $router->register('GET',  '/api/billing/receipts', [$externalBillingHandler, 're
 // WHIT-1207: the plan's trial and how to pay, for every member (the banner tells
 // those who can't pay to ask an owner).
 $router->register('GET',  '/api/billing/trial',    [$externalBillingHandler, 'trial']);
+// 2026-11-22: whether the workspace is paused (expired or canceled) and who its
+// owners are, for every member: those who can't pay see a plain paused page.
+$router->register('GET',  '/api/billing/pause',    [$externalBillingHandler, 'pause']);
 
 // WHIT-1040: the plan limits the business model sells, and where a workspace
 // stands against them. Every one of them warns and none refuses: customers are
@@ -3881,6 +3935,8 @@ $documentFieldRegistry->add(new \Whity\Core\Contacts\ContactFieldProvider($db->g
 foreach (\Whity\Core\Inventory\Print\InventoryPrintFields::all($db->getPdo(), $settingsService, $documentFieldLabels) as $inventoryFieldProvider) {
     $documentFieldRegistry->add($inventoryFieldProvider);
 }
+// WHIT-1341: quotes print through the document themes.
+$documentFieldRegistry->add(new \Whity\Core\Sales\Print\QuoteFieldProvider($db->getPdo(), $settingsService, $documentFieldLabels));
 // WHIT-742: each workspace plugin's record types, in the workspaces where
 // the plugin is published and on (`CakeOrders.order`), so a template can be
 // written for them and a slot can be issued from them.
@@ -4975,7 +5031,9 @@ $publicFormsHandler = new \Whity\Api\PublicFormsApiHandler(
     // a reason for a second storage path.
     $formUploadStore,
     // WHIT-1040: whether the workspace's plan removes "Built on Whity".
-    new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService)
+    new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService),
+    // READINESS TM-20: the same bot check booking and chat use.
+    $publicFormBotCheck,
 );
 $publicFormKeysHandler = new \Whity\Api\PublicFormKeysApiHandler(
     $publicFormKeyRepository,
@@ -5755,7 +5813,10 @@ $inventoryLocations = new \Whity\Core\Inventory\LocationService($inventoryDb, $i
 $inventoryReasons = new \Whity\Core\Inventory\ReasonCatalog($inventoryDb, $inventoryWorkspace);
 // WHIT-1235: lots, serial numbers and expiry; FEFO and the warning window are workspace settings.
 $inventoryLots = new \Whity\Core\Inventory\LotService($inventoryDb, static fn (int $tenantId): array => $settingsService->effective($tenantId));
-$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager, $inventoryReasons, $inventoryLots);
+// WHIT-1318 A4a: the moving average cost (IV.18), kept with each stock batch;
+// the batch then goes to the bound accounting export (IV.22), core's books by default.
+$inventoryCosts = new \Whity\Core\Inventory\InventoryCosts($inventoryDb, $inventoryItems->currencyFor(...));
+$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager, $inventoryReasons, $inventoryLots, $inventoryCosts);
 $inventoryItems->useOpeningLots($inventoryLedger->moveIntoOpeningLots(...));
 // WHIT-1233: adjustments, counts and transfers as records. Above the
 // workspace's value an adjustment or a count's differences travel a route
@@ -5824,6 +5885,21 @@ $salesQuotesHandler = new \Whity\Api\SalesQuotesApiHandler(
     static fn (int $tenantId): string => (new \Whity\Core\Branding\TenantHostRepository($db->getPdo()))->findNameById($tenantId) ?? '',
     // WHIT-1323: sending a quote emails it to the customer (EM.1 "Money").
     new \Whity\Core\Sales\TradingEmails($brandedEmailSender, $settingsService),
+    // WHIT-1341: a quote prints through the document themes, its QR opening the public page.
+    new \Whity\Core\Sales\Print\QuoteDocuments(
+        $db->getPdo(),
+        $documentSourceRepository,
+        new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
+        static fn (): \Whity\Core\Document\Issuing\TemplateIssuing => \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
+        static function (int $tenantId, int $documentId) use ($documentArtifactRepository, $documentArtifactStore): ?array {
+            $artifact = $documentArtifactRepository->findLatestForDocument($documentId, $tenantId);
+
+            return $artifact !== null
+                ? ['bytes' => $documentArtifactStore->get((string) $artifact['storage_key']), 'content_type' => (string) $artifact['content_type']]
+                : null;
+        },
+    ),
+    $roleChecker,
 );
 $router->register('GET',    '/api/sales/quotes',                     [$salesQuotesHandler, 'list'],     null, null, CorePermissions::QUOTES_READ);
 $router->register('POST',   '/api/sales/quotes',                     [$salesQuotesHandler, 'create'],   null, null, CorePermissions::QUOTES_WRITE);
@@ -5835,6 +5911,7 @@ $router->register('POST',   '/api/sales/quotes/{id:\d+}/link',       [$salesQuot
 $router->register('POST',   '/api/sales/quotes/{id:\d+}/decision',   [$salesQuotesHandler, 'decide'],   null, null, CorePermissions::QUOTES_WRITE);
 $router->register('POST',   '/api/sales/quotes/{id:\d+}/revise',     [$salesQuotesHandler, 'revise'],   null, null, CorePermissions::QUOTES_WRITE);
 $router->register('POST',   '/api/sales/quotes/{id:\d+}/cancel',     [$salesQuotesHandler, 'cancel'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/print',      [$salesQuotesHandler, 'print'],    null, null, CorePermissions::QUOTES_READ);
 $router->register('GET',    '/api/sales/quotes/{id:\d+}/targets',    [$salesQuotesHandler, 'targets'],  null, null, CorePermissions::QUOTES_READ);
 $router->register('POST',   '/api/sales/quotes/{id:\d+}/convert',    [$salesQuotesHandler, 'convert'],  null, null, CorePermissions::QUOTES_WRITE);
 $router->register('GET',    '/api/sales/settings',                   [$salesQuotesHandler, 'showSettings'],   null, null, CorePermissions::QUOTES_READ);
@@ -5880,6 +5957,10 @@ $router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|su
 $router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/run',            [$inventoryImportHandler, 'runImport'],  null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/undo',           [$inventoryImportHandler, 'undo'],       null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/skipped.csv',    [$inventoryImportHandler, 'skippedCsv'], null, null, CorePermissions::INVENTORY_WRITE);
+// WHIT-1326: every kind the shared import screen offers (design section 34 §6.5).
+$importKinds = new \Whity\Core\Import\ImportKinds();
+\Whity\Core\Import\CoreImportKinds::register($importKinds, $inventoryLocations, $contactRepository);
+$router->register('GET',    '/api/imports/kinds',                                [new \Whity\Api\ImportKindsApiHandler($importKinds, $roleChecker), 'list']);
 $router->register('GET',    '/api/inventory/units',                            [$inventoryHandler, 'listUnits'],      null, null, CorePermissions::INVENTORY_READ);
 $router->register('POST',   '/api/inventory/units',                              [$inventoryHandler, 'createUnit'],     null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/categories',                         [$inventoryHandler, 'listCategories'], null, null, CorePermissions::INVENTORY_READ);
@@ -5957,6 +6038,168 @@ $router->register('POST',   '/api/inventory/purchase-orders/{id:\d+}/lines/{line
 $router->register('GET',    '/api/inventory/supplier-items',                     [$inventoryHandler, 'listSupplierItems'],      null, null, CorePermissions::PURCHASES_READ);
 $router->register('PUT',    '/api/inventory/supplier-items',                     [$inventoryHandler, 'setSupplierItem'],        null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('DELETE', '/api/inventory/supplier-items/{id:\d+}',            [$inventoryHandler, 'deleteSupplierItem'],     null, null, CorePermissions::INVENTORY_WRITE);
+
+// WHIT-1318: accounting, phase A1. The books, the chart of accounts, the
+// append-only double-entry ledger with its hash chain, months, manual entries
+// and the trial balance (design section 32). The books are set up on first use.
+$accountingDb = new \Whity\Core\Accounting\AccountingDb($db->getPdo());
+$accountingWorkspace = new \Whity\Core\Accounting\AccountingWorkspace(
+    $accountingDb,
+    static fn (int $tenantId): string => (string) ($settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? 'USD'),
+);
+$accountingPeriods = new \Whity\Core\Accounting\Periods($accountingDb, $accountingWorkspace, $hookManager);
+$accountingLedger = new \Whity\Core\Accounting\Ledger($accountingDb, $accountingWorkspace, $accountingPeriods, new \Whity\Database\SequenceCounters($db->getPdo()), $hookManager);
+$accountingChart = new \Whity\Core\Accounting\ChartOfAccounts($accountingDb, $accountingWorkspace);
+$accountingManual = new \Whity\Core\Accounting\ManualEntries($accountingDb, $accountingWorkspace, $accountingLedger);
+$accountingReports = new \Whity\Core\Accounting\AccountingReports($accountingDb, $accountingWorkspace, $accountingPeriods);
+$accountingGuard = new \Whity\Core\Accounting\Host\HostAccountingGuard(
+    $accountingDb,
+    static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+);
+\Whity\register_service(\Whity\Sdk\Accounting\Accounts::class, new \Whity\Core\Accounting\Host\HostAccounts($accountingChart, $accountingGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Accounting\Ledger::class, new \Whity\Core\Accounting\Host\HostLedger($accountingLedger, $accountingGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Accounting\Periods::class, new \Whity\Core\Accounting\Host\HostPeriods($accountingPeriods, $accountingWorkspace, $accountingGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Accounting\Reports::class, new \Whity\Core\Accounting\Host\HostReports($accountingReports, $accountingGuard)); // @phpstan-ignore-line
+$accountingHandler = new \Whity\Api\AccountingApiHandler($accountingWorkspace, $accountingChart, $accountingLedger, $accountingManual, $accountingPeriods, $accountingReports);
+$router->register('GET',    '/api/accounting/books',                              [$accountingHandler, 'showBooks'],         null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('GET',    '/api/accounting/accounts',                           [$accountingHandler, 'listAccounts'],      null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('POST',   '/api/accounting/accounts',                           [$accountingHandler, 'createAccount'],     null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('GET',    '/api/accounting/accounts/{id:\d+}',                  [$accountingHandler, 'showAccount'],       null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('PATCH',  '/api/accounting/accounts/{id:\d+}',                  [$accountingHandler, 'updateAccount'],     null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('POST',   '/api/accounting/accounts/{id:\d+}/archive',          [$accountingHandler, 'archiveAccount'],    null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('POST',   '/api/accounting/accounts/{id:\d+}/restore',          [$accountingHandler, 'restoreAccount'],    null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('GET',    '/api/accounting/accounts/{id:\d+}/statement',        [$accountingHandler, 'accountStatement'],  null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('GET',    '/api/accounting/journals',                           [$accountingHandler, 'listJournals'],      null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('GET',    '/api/accounting/entries',                            [$accountingHandler, 'listEntries'],       null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('GET',    '/api/accounting/entries/{id:\d+}',                   [$accountingHandler, 'showEntry'],         null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('POST',   '/api/accounting/entries/{id:\d+}/reverse',           [$accountingHandler, 'reverseEntry'],      null, null, CorePermissions::ACCOUNTING_POST);
+$router->register('GET',    '/api/accounting/manual-entries',                     [$accountingHandler, 'listManualEntries'], null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('POST',   '/api/accounting/manual-entries',                     [$accountingHandler, 'createManualEntry'], null, null, CorePermissions::ACCOUNTING_POST);
+$router->register('GET',    '/api/accounting/manual-entries/{id:\d+}',            [$accountingHandler, 'showManualEntry'],   null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('PATCH',  '/api/accounting/manual-entries/{id:\d+}',            [$accountingHandler, 'updateManualEntry'], null, null, CorePermissions::ACCOUNTING_POST);
+$router->register('POST',   '/api/accounting/manual-entries/{id:\d+}/post',       [$accountingHandler, 'postManualEntry'],   null, null, CorePermissions::ACCOUNTING_POST);
+$router->register('POST',   '/api/accounting/manual-entries/{id:\d+}/cancel',     [$accountingHandler, 'cancelManualEntry'], null, null, CorePermissions::ACCOUNTING_POST);
+$router->register('GET',    '/api/accounting/periods',                            [$accountingHandler, 'listPeriods'],       null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('POST',   '/api/accounting/periods/{id:\d+}/close',             [$accountingHandler, 'closePeriod'],       null, null, CorePermissions::ACCOUNTING_CLOSE);
+$router->register('POST',   '/api/accounting/periods/{id:\d+}/reopen',            [$accountingHandler, 'reopenPeriod'],      null, null, CorePermissions::ACCOUNTING_CLOSE);
+$router->register('GET',    '/api/accounting/reports/trial-balance',              [$accountingHandler, 'trialBalance'],      null, null, CorePermissions::ACCOUNTING_READ);
+// WHIT-1318 A2a: tax codes, sales invoices and credit notes. Issuing posts to
+// the books; the workspace's invoice route (accounting.invoice) approves first
+// when one is chosen. A WorkspaceEInvoicing connector bound to the container
+// (JoFotara, a paid integration plugin) reports issued invoices after commit.
+$accountingTaxes = new \Whity\Core\Accounting\Taxes($accountingDb, $accountingWorkspace);
+$accountingInvoices = new \Whity\Core\Accounting\Invoices(
+    $accountingDb,
+    $accountingWorkspace,
+    $accountingLedger,
+    $accountingTaxes,
+    $inventoryItems,
+    $inventoryUnits,
+    new \Whity\Database\SequenceCounters($db->getPdo()),
+    static fn (int $tenantId): array => $settingsService->effective($tenantId),
+    $hookManager,
+);
+$routeSubjectRegistry->register(new \Whity\Core\Accounting\InvoiceRouteSubject($accountingDb, $accountingInvoices));
+$accountingInvoices->useApprovals(new \Whity\Core\Accounting\InvoiceRoutes(
+    $documentRouter,
+    $routeTemplateRepository,
+    static fn (int $tenantId): array => $settingsService->effective($tenantId),
+));
+// An accepted quote turns into a draft invoice (QT.6).
+$salesQuoteConversions->register(new \Whity\Core\Accounting\InvoiceQuoteConversion($accountingInvoices, $inventoryUnits));
+// The invoices meter (invoices.per_month, BM.3) counts issued sales invoices.
+\Whity\register_service(\Whity\Core\Usage\InvoiceUsageCounter::class, new \Whity\Core\Accounting\InvoiceCounter($accountingInvoices)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Accounting\Invoices::class, new \Whity\Core\Accounting\Host\HostInvoices($accountingInvoices, $accountingGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Accounting\Taxes::class, new \Whity\Core\Accounting\Host\HostTaxes($accountingTaxes, $accountingGuard)); // @phpstan-ignore-line
+$accountingInvoicesHandler = new \Whity\Api\AccountingInvoicesApiHandler($accountingInvoices, $accountingTaxes, $settingsService);
+$router->register('GET',    '/api/accounting/tax-codes',                          [$accountingInvoicesHandler, 'listTaxCodes'],   null, null, CorePermissions::INVOICES_READ);
+$router->register('POST',   '/api/accounting/tax-codes',                          [$accountingInvoicesHandler, 'createTaxCode'],  null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('PATCH',  '/api/accounting/tax-codes/{id:\d+}',                 [$accountingInvoicesHandler, 'updateTaxCode'],  null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('POST',   '/api/accounting/tax-codes/{id:\d+}/archive',         [$accountingInvoicesHandler, 'archiveTaxCode'], null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('POST',   '/api/accounting/tax-codes/{id:\d+}/restore',         [$accountingInvoicesHandler, 'restoreTaxCode'], null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('GET',    '/api/accounting/invoices',                           [$accountingInvoicesHandler, 'list'],           null, null, CorePermissions::INVOICES_READ);
+$router->register('POST',   '/api/accounting/invoices',                           [$accountingInvoicesHandler, 'create'],         null, null, CorePermissions::INVOICES_WRITE);
+$router->register('GET',    '/api/accounting/invoices/{id:\d+}',                  [$accountingInvoicesHandler, 'show'],           null, null, CorePermissions::INVOICES_READ);
+$router->register('PATCH',  '/api/accounting/invoices/{id:\d+}',                  [$accountingInvoicesHandler, 'update'],         null, null, CorePermissions::INVOICES_WRITE);
+$router->register('POST',   '/api/accounting/invoices/{id:\d+}/issue',            [$accountingInvoicesHandler, 'issue'],          null, null, CorePermissions::INVOICES_WRITE);
+$router->register('POST',   '/api/accounting/invoices/{id:\d+}/cancel',           [$accountingInvoicesHandler, 'cancel'],         null, null, CorePermissions::INVOICES_WRITE);
+$router->register('POST',   '/api/accounting/invoices/{id:\d+}/credit-notes',     [$accountingInvoicesHandler, 'credit'],         null, null, CorePermissions::INVOICES_WRITE);
+$router->register('GET',    '/api/accounting/invoice-settings',                   [$accountingInvoicesHandler, 'showSettings'],   null, null, CorePermissions::INVOICES_READ);
+$router->register('PATCH',  '/api/accounting/invoice-settings',                   [$accountingInvoicesHandler, 'updateSettings'], null, null, CorePermissions::ACCOUNTING_SETTINGS);
+// WHIT-1318 A2b: payments received, allocations, cheques, transfers, aged
+// receivables and the customer statement. Whity Pay records its payments and
+// payouts through the SDK's Payments (recordReceived, recordTransfer).
+$accountingPayments = new \Whity\Core\Accounting\Payments($accountingDb, $accountingWorkspace, $accountingLedger, $accountingInvoices, new \Whity\Database\SequenceCounters($db->getPdo()), $hookManager);
+$accountingReceivables = new \Whity\Core\Accounting\Receivables($accountingDb, $accountingWorkspace);
+\Whity\register_service(\Whity\Sdk\Accounting\Payments::class, new \Whity\Core\Accounting\Host\HostPayments($accountingPayments, $accountingGuard)); // @phpstan-ignore-line
+$accountingPaymentsHandler = new \Whity\Api\AccountingPaymentsApiHandler($accountingPayments, $accountingReceivables);
+$router->register('GET',    '/api/accounting/payments',                           [$accountingPaymentsHandler, 'list'],      null, null, CorePermissions::PAYMENTS_READ);
+$router->register('POST',   '/api/accounting/payments',                           [$accountingPaymentsHandler, 'receive'],   null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('GET',    '/api/accounting/payments/{id:\d+}',                  [$accountingPaymentsHandler, 'show'],      null, null, CorePermissions::PAYMENTS_READ);
+$router->register('POST',   '/api/accounting/payments/{id:\d+}/allocations',      [$accountingPaymentsHandler, 'allocate'],  null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('POST',   '/api/accounting/payments/{id:\d+}/deposit',          [$accountingPaymentsHandler, 'deposit'],   null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('POST',   '/api/accounting/payments/{id:\d+}/bounce',           [$accountingPaymentsHandler, 'bounce'],    null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('POST',   '/api/accounting/transfers',                          [$accountingPaymentsHandler, 'transfer'],  null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('GET',    '/api/accounting/reports/aged-receivables',           [$accountingPaymentsHandler, 'aged'],      null, null, CorePermissions::INVOICES_READ);
+$router->register('GET',    '/api/accounting/customers/{id:\d+}/statement',       [$accountingPaymentsHandler, 'statement'], null, null, CorePermissions::INVOICES_READ);
+// WHIT-1318 A3a: supplier bills and credits (the invoice engine's purchase
+// side), payments made, aged payables and the supplier statement. A bill
+// travels the workspace's bill route (accounting.bill) when one is chosen.
+$routeSubjectRegistry->register(new \Whity\Core\Accounting\InvoiceRouteSubject($accountingDb, $accountingInvoices, \Whity\Core\Accounting\InvoiceRouteSubject::BILL));
+$accountingInvoices->useApprovals(new \Whity\Core\Accounting\InvoiceRoutes(
+    $documentRouter,
+    $routeTemplateRepository,
+    static fn (int $tenantId): array => $settingsService->effective($tenantId),
+    \Whity\Core\Settings\SettingsRegistry::ACCOUNTING_BILL_ROUTE_TEMPLATE_ID,
+    \Whity\Core\Accounting\InvoiceRouteSubject::BILL,
+), 'purchase');
+// Salon commission (SL.6): closing a period by hand books Staff commission
+// against Commission to pay.
+\Whity\register_service(\Whity\Sdk\Contribute\WorkspaceCommissionExpenses::class, new \Whity\Core\Accounting\CommissionBooks($accountingDb, $accountingWorkspace, $accountingLedger)); // @phpstan-ignore-line
+$accountingBillsHandler = new \Whity\Api\AccountingBillsApiHandler($accountingInvoices, $accountingPayments, $accountingReceivables, $settingsService);
+$router->register('GET',    '/api/accounting/bills',                              [$accountingBillsHandler, 'list'],           null, null, CorePermissions::BILLS_READ);
+$router->register('POST',   '/api/accounting/bills',                              [$accountingBillsHandler, 'create'],         null, null, CorePermissions::BILLS_WRITE);
+$router->register('GET',    '/api/accounting/bills/{id:\d+}',                     [$accountingBillsHandler, 'show'],           null, null, CorePermissions::BILLS_READ);
+$router->register('PATCH',  '/api/accounting/bills/{id:\d+}',                     [$accountingBillsHandler, 'update'],         null, null, CorePermissions::BILLS_WRITE);
+$router->register('POST',   '/api/accounting/bills/{id:\d+}/post',                [$accountingBillsHandler, 'post'],           null, null, CorePermissions::BILLS_WRITE);
+$router->register('POST',   '/api/accounting/bills/{id:\d+}/cancel',              [$accountingBillsHandler, 'cancel'],         null, null, CorePermissions::BILLS_WRITE);
+$router->register('POST',   '/api/accounting/bills/{id:\d+}/credits',             [$accountingBillsHandler, 'credit'],         null, null, CorePermissions::BILLS_WRITE);
+$router->register('POST',   '/api/accounting/payments-made',                      [$accountingBillsHandler, 'pay'],            null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('GET',    '/api/accounting/reports/aged-payables',              [$accountingBillsHandler, 'aged'],           null, null, CorePermissions::BILLS_READ);
+$router->register('GET',    '/api/accounting/suppliers/{id:\d+}/statement',       [$accountingBillsHandler, 'statement'],      null, null, CorePermissions::BILLS_READ);
+$router->register('GET',    '/api/accounting/bill-settings',                      [$accountingBillsHandler, 'showSettings'],   null, null, CorePermissions::BILLS_READ);
+$router->register('PATCH',  '/api/accounting/bill-settings',                      [$accountingBillsHandler, 'updateSettings'], null, null, CorePermissions::ACCOUNTING_SETTINGS);
+// WHIT-1318 A3b: expense claims (bills from the member of staff who paid,
+// on the bill route) and petty cash (bills paid at once from Petty cash).
+$accountingExpenses = new \Whity\Core\Accounting\Expenses($accountingDb, $accountingWorkspace, $accountingInvoices, $accountingPayments);
+$accountingExpensesHandler = new \Whity\Api\AccountingExpensesApiHandler(
+    $accountingExpenses,
+    static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+);
+$router->register('GET',    '/api/accounting/expense-claims',                     [$accountingExpensesHandler, 'listClaims'], null, null, CorePermissions::EXPENSES_SUBMIT);
+$router->register('POST',   '/api/accounting/expense-claims',                     [$accountingExpensesHandler, 'claim'],      null, null, CorePermissions::EXPENSES_SUBMIT);
+$router->register('GET',    '/api/accounting/expense-claims/{id:\d+}',            [$accountingExpensesHandler, 'showClaim'],  null, null, CorePermissions::EXPENSES_SUBMIT);
+$router->register('POST',   '/api/accounting/expense-claims/{id:\d+}/reimburse',  [$accountingExpensesHandler, 'reimburse'],  null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('GET',    '/api/accounting/petty-cash',                         [$accountingExpensesHandler, 'pettyCash'],  null, null, CorePermissions::PAYMENTS_READ);
+$router->register('POST',   '/api/accounting/petty-cash/spends',                  [$accountingExpensesHandler, 'spend'],      null, null, CorePermissions::PAYMENTS_WRITE);
+// WHIT-1318 A4a: stock in the books (Q3, on by default). Core accounting is
+// the default WorkspaceAccountingExport; an outside export binds over it.
+$accountingStock = new \Whity\Core\Accounting\StockBooks($accountingDb, $accountingWorkspace, $accountingLedger, $inventoryCosts);
+\Whity\register_service(\Whity\Sdk\Contribute\WorkspaceAccountingExport::class, $accountingStock); // @phpstan-ignore-line
+$accountingStockHandler = new \Whity\Api\AccountingStockApiHandler($accountingStock);
+$router->register('GET',    '/api/accounting/stock',                              [$accountingStockHandler, 'show'],    null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('PATCH',  '/api/accounting/stock',                              [$accountingStockHandler, 'update'],  null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('POST',   '/api/accounting/stock/opening',                      [$accountingStockHandler, 'open'],    null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('GET',    '/api/accounting/stock/waiting',                      [$accountingStockHandler, 'waiting'], null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('POST',   '/api/accounting/stock/costs',                        [$accountingStockHandler, 'cost'],    null, null, CorePermissions::ACCOUNTING_SETTINGS);
+// Stock with no cost waits in the Inbox for the people who set accounting up.
+$inboxSourceRegistry->registerCoreSource(
+    \Whity\Core\Accounting\StockCostInboxSource::KEY,
+    new \Whity\Core\Accounting\StockCostInboxSource(
+        $accountingDb,
+        static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+    )
+);
 
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,
@@ -6582,6 +6825,9 @@ $router->register('POST',   '/api/themes/preview',    [$themesHandler, 'preview'
 $router->register('POST',   '/api/themes/compare',    [$themesHandler, 'compare'], null, null, CorePermissions::SETTINGS_READ);
 $router->register('POST',   '/api/themes/package',    [$themesHandler, 'package'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('GET',    '/api/themes/{themeId}',  [$themesHandler, 'show'],   null, null, CorePermissions::SETTINGS_READ);
+$router->register('GET',    '/api/themes/{themeId}/versions', [$themesHandler, 'versions'], null, null, CorePermissions::SETTINGS_READ);
+$router->register('GET',    '/api/themes/{themeId}/versions/{version}', [$themesHandler, 'version'], null, null, CorePermissions::SETTINGS_READ);
+$router->register('POST',   '/api/themes/{themeId}/versions/{version}/restore', [$themesHandler, 'restore'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('DELETE', '/api/themes/{themeId}',  [$themesHandler, 'delete'], null, null, CorePermissions::SETTINGS_WRITE);
 
 // 13c-bis. Register the pending-registration review API (WC-235). Gated on
@@ -6618,7 +6864,8 @@ $router->register('DELETE', '/api/email-domains/{id:\d+}',     [$emailDomainHand
 // never returned in a response.
 $identityProvidersHandler = new IdentityProvidersApiHandler(
     $db->getPdo(),
-    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV)
+    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+    $auditLogger,
 );
 $router->register('GET',    '/api/identity-providers',          [$identityProvidersHandler, 'list'],   null, null, CorePermissions::AUTH_PROVIDERS_MANAGE);
 $router->register('POST',   '/api/identity-providers',          [$identityProvidersHandler, 'create'], null, null, CorePermissions::AUTH_PROVIDERS_MANAGE);
@@ -6717,7 +6964,7 @@ $workspaceOwnersHandler = new \Whity\Api\WorkspaceOwnersApiHandler(
         $db->getPdo(),
         $auditLogger,
         $hookManager,
-        new \Whity\Core\Tenant\OwnershipNotifier($notificationDispatcher, $brandedEmailSender, $profileEmailRepository, $frontendUrls->base()),
+        new \Whity\Core\Tenant\OwnershipNotifier($notificationDispatcher, $brandedEmailSender, $profileEmailRepository, $frontendUrls, $settingsService),
     ),
     $tokenValidator,
     $gatedApproval,
@@ -7018,7 +7265,7 @@ $mcpToolsCallHandler->setWorkspaceGate($pluginLoader);
 // an agent must not be able to approve its own proposal.
 // WHIT-816: a workspace agent's proposal runs under the person's assignment as it is now.
 $agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo(), $mcpConnectionEvents);
-$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue, $gatedApproval);
+$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue, $gatedApproval, $mcpTokenService);
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/identity-check', [$agentProposalsHandler, 'identityCheck'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
@@ -7522,6 +7769,8 @@ if ($isWorker) {
 
                 // Create request from PHP superglobals
                 $request = Request::fromGlobals();
+                // #2386 (CE-4): believe X-Whity-Client-Ip only from a trusted proxy.
+                \Whity\Core\RateLimit\ClientIp::authenticate($request, $_SERVER);
 
                 // Resolve CORS headers once per request from the allowlist (WC-53).
                 // A plugin's public form sets its own (WHIT-906): they never allow credentials.
@@ -7656,6 +7905,15 @@ if ($isWorker) {
             break;
         }
 
+        // WHIT-1338: a kill imported while this worker runs cannot unload code
+        // already in it. Recycle, so the fresh worker's discovery leaves the
+        // killed plugin out. Checked at most every 30 seconds per worker.
+        if ($pluginLoader->holdsKilledPlugin()) {
+            error_log("[FrankenPHP Worker] A loaded plugin was killed by the revocation list. Recycling worker.");
+            $db->disconnect();
+            break;
+        }
+
         if ($kernel->hasExceededMemoryLimit()) {
             error_log("[FrankenPHP Worker] Memory limit exceeded. Recycling worker gracefully.");
             // Release the worker's database connection eagerly on the memory-recycle
@@ -7677,6 +7935,8 @@ if ($isWorker) {
     try {
         // Create request from PHP superglobals
         $request = Request::fromGlobals();
+        // #2386 (CE-4): believe X-Whity-Client-Ip only from a trusted proxy.
+        \Whity\Core\RateLimit\ClientIp::authenticate($request, $_SERVER);
 
         // Resolve CORS headers once per request from the allowlist (WC-53).
         // A plugin's public form sets its own (WHIT-906): they never allow credentials.
