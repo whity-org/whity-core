@@ -78246,7 +78246,7 @@
                 "tags": [
                     "sales"
                 ],
-                "description": "The link before it stops working.",
+                "description": "The link before it stops working. A new printed copy carries the QR of the new link (`document_id`).",
                 "parameters": [
                     {
                         "name": "id",
@@ -78267,11 +78267,183 @@
                                     "properties": {
                                         "link": {
                                             "type": "string"
+                                        },
+                                        "document_id": {
+                                            "type": "integer",
+                                            "nullable": true
                                         }
                                     },
                                     "required": [
-                                        "link"
+                                        "link",
+                                        "document_id"
                                     ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Not possible in the quote's state, or a rule refused it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/sales/quotes/{id}/print": {
+            "post": {
+                "operationId": "post_api_v1_sales_quotes_id_print",
+                "summary": "Print a quote",
+                "tags": [
+                    "sales"
+                ],
+                "description": "Its PDF, `{lang: \"en\" | \"ar\"}`. A quote that went out prints the copy it went out as, with its QR; a draft prints a working copy without one. The id of the document is in `X-Document-Id`. When this instance cannot make PDFs, the answer is JSON naming the document, with 202.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SalesQuotePrintRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The PDF",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "202": {
+                        "description": "Issued, with no PDF here",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "document_id": {
+                                                    "type": "integer"
+                                                },
+                                                "number": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "title": {
+                                                    "type": "string"
+                                                },
+                                                "pdf": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "required": [
+                                                "document_id",
+                                                "number",
+                                                "title",
+                                                "pdf"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
                                 }
                             }
                         }
@@ -78476,7 +78648,7 @@
                 "tags": [
                     "sales"
                 ],
-                "description": "A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`). It is emailed to the customer unless `email` is false or the workspace turned the quote email off; `emailed` says whether it was.",
+                "description": "A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`). It is emailed to the customer unless `email` is false or the workspace turned the quote email off; `emailed` says whether it was. Its printed copy, with the QR of the link, is issued in the language of the workspace and named in `document_id` (null when it could not be made; the quote has gone out all the same).",
                 "parameters": [
                     {
                         "name": "id",
@@ -78511,6 +78683,10 @@
                                         "link": {
                                             "type": "string"
                                         },
+                                        "document_id": {
+                                            "type": "integer",
+                                            "nullable": true
+                                        },
                                         "emailed": {
                                             "type": "boolean"
                                         }
@@ -78518,6 +78694,7 @@
                                     "required": [
                                         "data",
                                         "link",
+                                        "document_id",
                                         "emailed"
                                     ]
                                 }
@@ -128550,6 +128727,19 @@
                 "required": [
                     "quantity"
                 ]
+            },
+            "SalesQuotePrintRequest": {
+                "type": "object",
+                "properties": {
+                    "lang": {
+                        "type": "string",
+                        "enum": [
+                            "en",
+                            "ar"
+                        ],
+                        "description": "The language of the template: `en` (the default) or `ar`."
+                    }
+                }
             },
             "SalesQuoteRequest": {
                 "type": "object",

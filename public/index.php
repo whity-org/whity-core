@@ -802,6 +802,18 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::INVENTORY_READ,
     ];
     $items[] = [
+        'id' => 'sales',
+        'label' => 'Sales',
+        'href' => '/sales',
+        'icon' => 'invoice',
+        // Quotes (WHIT-1341, design section 34 §3.8, owner answer Q4):
+        // Operations › Sales, for every workspace, inventory or not.
+        'group' => 'operations',
+        'order' => 3,
+        // Mirrors GET /api/sales/quotes.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::QUOTES_READ,
+    ];
+    $items[] = [
         'id' => 'users',
         'label' => 'Users',
         'href' => '/admin/users',
@@ -3881,6 +3893,8 @@ $documentFieldRegistry->add(new \Whity\Core\Contacts\ContactFieldProvider($db->g
 foreach (\Whity\Core\Inventory\Print\InventoryPrintFields::all($db->getPdo(), $settingsService, $documentFieldLabels) as $inventoryFieldProvider) {
     $documentFieldRegistry->add($inventoryFieldProvider);
 }
+// WHIT-1341: quotes print through the document themes.
+$documentFieldRegistry->add(new \Whity\Core\Sales\Print\QuoteFieldProvider($db->getPdo(), $settingsService, $documentFieldLabels));
 // WHIT-742: each workspace plugin's record types, in the workspaces where
 // the plugin is published and on (`CakeOrders.order`), so a template can be
 // written for them and a slot can be issued from them.
@@ -5824,6 +5838,21 @@ $salesQuotesHandler = new \Whity\Api\SalesQuotesApiHandler(
     static fn (int $tenantId): string => (new \Whity\Core\Branding\TenantHostRepository($db->getPdo()))->findNameById($tenantId) ?? '',
     // WHIT-1323: sending a quote emails it to the customer (EM.1 "Money").
     new \Whity\Core\Sales\TradingEmails($brandedEmailSender, $settingsService),
+    // WHIT-1341: a quote prints through the document themes, its QR opening the public page.
+    new \Whity\Core\Sales\Print\QuoteDocuments(
+        $db->getPdo(),
+        $documentSourceRepository,
+        new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
+        static fn (): \Whity\Core\Document\Issuing\TemplateIssuing => \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
+        static function (int $tenantId, int $documentId) use ($documentArtifactRepository, $documentArtifactStore): ?array {
+            $artifact = $documentArtifactRepository->findLatestForDocument($documentId, $tenantId);
+
+            return $artifact !== null
+                ? ['bytes' => $documentArtifactStore->get((string) $artifact['storage_key']), 'content_type' => (string) $artifact['content_type']]
+                : null;
+        },
+    ),
+    $roleChecker,
 );
 $router->register('GET',    '/api/sales/quotes',                     [$salesQuotesHandler, 'list'],     null, null, CorePermissions::QUOTES_READ);
 $router->register('POST',   '/api/sales/quotes',                     [$salesQuotesHandler, 'create'],   null, null, CorePermissions::QUOTES_WRITE);
@@ -5835,6 +5864,7 @@ $router->register('POST',   '/api/sales/quotes/{id:\d+}/link',       [$salesQuot
 $router->register('POST',   '/api/sales/quotes/{id:\d+}/decision',   [$salesQuotesHandler, 'decide'],   null, null, CorePermissions::QUOTES_WRITE);
 $router->register('POST',   '/api/sales/quotes/{id:\d+}/revise',     [$salesQuotesHandler, 'revise'],   null, null, CorePermissions::QUOTES_WRITE);
 $router->register('POST',   '/api/sales/quotes/{id:\d+}/cancel',     [$salesQuotesHandler, 'cancel'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/print',      [$salesQuotesHandler, 'print'],    null, null, CorePermissions::QUOTES_READ);
 $router->register('GET',    '/api/sales/quotes/{id:\d+}/targets',    [$salesQuotesHandler, 'targets'],  null, null, CorePermissions::QUOTES_READ);
 $router->register('POST',   '/api/sales/quotes/{id:\d+}/convert',    [$salesQuotesHandler, 'convert'],  null, null, CorePermissions::QUOTES_WRITE);
 $router->register('GET',    '/api/sales/settings',                   [$salesQuotesHandler, 'showSettings'],   null, null, CorePermissions::QUOTES_READ);
