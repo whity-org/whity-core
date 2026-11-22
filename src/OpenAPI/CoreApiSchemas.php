@@ -6335,6 +6335,19 @@ final class CoreApiSchemas
                 'pay_online' => self::bool() + ['description' => 'This deployment takes payments online'],
                 'card_step' => self::bool() + ['description' => 'A card can be added now and first charged when the trial ends'],
             ], ['plan_key', 'plan_name', 'status', 'trial_ends_at', 'days_left', 'read_only', 'card_added', 'price', 'pay_online', 'card_step']),
+            // 2026-11-22: a workspace paused because its plan expired or was canceled.
+            'WorkspacePauseState' => self::object([
+                'status' => self::str() + ['description' => 'expired or canceled'],
+                'reads_refused' => self::bool() + ['description' => 'The wall refuses reads too, not only changes'],
+                'owners' => [
+                    'type' => 'array',
+                    'description' => 'The owners who can pay, by name',
+                    'items' => self::object(['name' => self::str()], ['name']),
+                ],
+            ], ['status', 'reads_refused', 'owners']),
+            'WorkspacePauseResponse' => self::object([
+                'data' => ['allOf' => [['$ref' => '#/components/schemas/WorkspacePauseState']], 'nullable' => true],
+            ], ['data']),
             'WorkspaceTrialResponse' => self::object([
                 'data' => ['allOf' => [['$ref' => '#/components/schemas/WorkspaceTrialState']], 'nullable' => true],
             ], ['data']),
@@ -15637,6 +15650,18 @@ final class CoreApiSchemas
                 'tags' => ['billing'],
                 'responses' => [
                     200 => self::jsonResponse('The trial of this workspace','WorkspaceTrialResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/billing/pause', [
+                'summary' => 'Whether this workspace is paused because its plan lapsed, and who its owners are',
+                'description' =>
+                    'For every member: when the subscription of this workspace expired or was canceled '
+                    . 'and changes are refused, its status, whether reads are refused too, and the names of its '
+                    . 'owners, so people who cannot pay are told who can. `data` is null when the workspace '
+                    . 'is not paused. Not behind the payment wall.',
+                'tags' => ['billing'],
+                'responses' => [
+                    200 => self::jsonResponse('Whether this workspace is paused', 'WorkspacePauseResponse'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/billing/limits', 'billing:view', [

@@ -81,7 +81,7 @@ use Whity\Core\Settings\SettingsService;
  *    {@see WorkspaceFounder}.
  *  - THE PAYMENT GATE, in the same transaction, exactly as registration writes
  *    it: with `auth.registration_payment_required` on, the tenant starts
- *    `expired` / `block_all` and stays closed until billing says otherwise. A
+ *    `expired` / `block_writes` (read-only) until billing says otherwise. A
  *    listener can only open a workspace later, never be the thing that closes
  *    it, so a listener that fails cannot leave one unbilled.
  */

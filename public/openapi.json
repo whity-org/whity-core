@@ -13894,6 +13894,78 @@
                 ]
             }
         },
+        "/api/v1/billing/pause": {
+            "get": {
+                "operationId": "get_api_v1_billing_pause",
+                "summary": "Whether this workspace is paused because its plan lapsed, and who its owners are",
+                "tags": [
+                    "billing"
+                ],
+                "description": "For every member: when the subscription of this workspace expired or was canceled and changes are refused, its status, whether reads are refused too, and the names of its owners, so people who cannot pay are told who can. `data` is null when the workspace is not paused. Not behind the payment wall.",
+                "responses": {
+                    "200": {
+                        "description": "Whether this workspace is paused",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspacePauseResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/billing/plans": {
             "get": {
                 "operationId": "get_api_v1_billing_plans",
@@ -143784,6 +143856,55 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "WorkspacePauseResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/WorkspacePauseState"
+                            }
+                        ],
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "WorkspacePauseState": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "description": "expired or canceled"
+                    },
+                    "reads_refused": {
+                        "type": "boolean",
+                        "description": "The wall refuses reads too, not only changes"
+                    },
+                    "owners": {
+                        "type": "array",
+                        "description": "The owners who can pay, by name",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "name"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "status",
+                    "reads_refused",
+                    "owners"
                 ]
             },
             "WorkspacePlugin": {

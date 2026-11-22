@@ -3368,6 +3368,15 @@ $externalBillingHandler->useWorkspaceTrial(new \Whity\Core\Billing\WorkspaceTria
     ),
     $settingsService,
 ));
+// 2026-11-22: an expired or canceled workspace is paused; members who can't pay
+// are told so and who its owners are, instead of meeting a 402.
+$externalBillingHandler->useWorkspacePause(new \Whity\Core\Billing\WorkspacePause(
+    new \Whity\Core\Subscription\SubscriptionService(
+        new \Whity\Core\Subscription\SubscriptionRepository($db->getPdo()),
+        $settingsService
+    ),
+    new \Whity\Core\Tenant\WorkspaceOwners($db->getPdo()),
+));
 $cashPaymentsHandler = new \Whity\Api\CashPaymentsApiHandler($cashPayments, $auditLogger);
 $router->register('GET', '/api/billing/cash-payments', [$cashPaymentsHandler, 'list'], null, null, CorePermissions::PLANS_MANAGE);
 $router->register('POST', '/api/billing/cash-payments', [$cashPaymentsHandler, 'record'], null, null, CorePermissions::PLANS_MANAGE);
@@ -3392,6 +3401,9 @@ $router->register('GET',  '/api/billing/receipts', [$externalBillingHandler, 're
 // WHIT-1207: the plan's trial and how to pay, for every member (the banner tells
 // those who can't pay to ask an owner).
 $router->register('GET',  '/api/billing/trial',    [$externalBillingHandler, 'trial']);
+// 2026-11-22: whether the workspace is paused (expired or canceled) and who its
+// owners are, for every member: those who can't pay see a plain paused page.
+$router->register('GET',  '/api/billing/pause',    [$externalBillingHandler, 'pause']);
 
 // WHIT-1040: the plan limits the business model sells, and where a workspace
 // stands against them. Every one of them warns and none refuses: customers are

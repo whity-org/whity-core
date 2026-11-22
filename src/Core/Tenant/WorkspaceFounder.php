@@ -115,7 +115,9 @@ final class WorkspaceFounder
             )->execute([
                 ':tenant_id' => $tenantId,
                 ':status'    => 'expired',
-                ':mode'      => 'block_all',
+                // Read-only, like a trial that ended unpaid (2026-11-22): the owner
+                // can open it and pay. block_all walled the reads as well.
+                ':mode'      => 'block_writes',
             ]);
         }
 

@@ -136,7 +136,7 @@ final class DefaultPlanAssignerRealEngineTest extends TestCase
         self::assertIsArray($row);
         self::assertNull($row['plan_id']);
         self::assertSame('expired', $row['status']);
-        self::assertSame('block_all', $row['enforcement_mode']);
+        self::assertSame('block_writes', $row['enforcement_mode']);
     }
 
     public function testASingleSignOnWorkspaceLandsOnTheDefaultPlan(): void

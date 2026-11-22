@@ -26,6 +26,7 @@ import {
 } from '@whity/ui/dropdown-menu';
 import { TenantSwitcher as WorkspaceSwitcher } from '@whity/ui/tenant-switcher';
 import { AppSidebar, useForcedRail } from '@whity/ui/app-sidebar';
+import { useSwitchRefusalMessage } from '@/lib/workspace-switch';
 import { useCurrentLanguage, useLanguageCode, useI18nEnabled, useTranslation } from '@whity/features/i18n';
 import { roleLabel } from '@whity/features/roles/role-label';
 import { RoleSummary } from '@whity/ui/role-summary';
@@ -79,6 +80,7 @@ export function TenantSwitcher({ memberships, activeTenantId, collapsed }: Tenan
   const { refresh: refreshNav } = useNavigation();
   const { addToast } = useToast();
   const t = useTranslation('common');
+  const refusalMessage = useSwitchRefusalMessage();
   const currentLanguage = useLanguageCode();
   const [isSwitching, setIsSwitching] = useState(false);
   const roleSummaryLabels = useRoleSummaryLabels();
@@ -105,19 +107,23 @@ export function TenantSwitcher({ memberships, activeTenantId, collapsed }: Tenan
       void (async () => {
         try {
           await switchTenant(tenantId);
-          await refreshNav();
         } catch (err) {
-          const message =
-            err instanceof Error
-              ? err.message
-              : t('sidebar.tenantSwitcher.error', 'Couldn’t switch workspace');
-          addToast(message, 'error');
+          // Never silent (2026-11-22): the reason, in plain words.
+          addToast(refusalMessage(err), 'error');
+          setIsSwitching(false);
+          return;
+        }
+        try {
+          // The switch happened; a menu that fails to reload is not a refusal.
+          await refreshNav();
+        } catch {
+          // The menu catches up on the next navigation.
         } finally {
           setIsSwitching(false);
         }
       })();
     },
-    [activeTenantId, isSwitching, switchTenant, refreshNav, addToast, t],
+    [activeTenantId, isSwitching, switchTenant, refreshNav, addToast, refusalMessage],
   );
 
   if (workspaces.length === 0) return null;
