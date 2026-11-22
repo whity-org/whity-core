@@ -1,5 +1,13 @@
 # @whity/api-client
 
+## 0.4.1
+
+### Patch Changes
+
+- fd8e8ae: Token mode keeps the token pair `POST /api/v1/me/logout-others` re-issues, so
+  signing out other devices no longer signs out this one on its next request
+  (#2219).
+
 ## 0.4.0
 
 ### Minor Changes
