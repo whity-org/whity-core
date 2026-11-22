@@ -705,6 +705,9 @@ final class SettingsRegistry
     //             name, never its title), its revision letter and page count,
     //             and which revision replaced a revised one (#1627). Never a
     //             price, a name, a subject or the document's number.
+    //   signed  — adds the signatures and company stamps on it, as capacities
+    //             with dates (never names unless the next key says so), and
+    //             whether its trail's chain is intact (#1730).
     //
     // Tenant-overridable because #1036 is explicit that this is a tenant's
     // decision: some institutions want a holder to see where a document sits,
@@ -719,6 +722,12 @@ final class SettingsRegistry
     // turns it on. Tenant-overridable, because it is a decision about how an
     // organisation speaks to the people it serves.
     public const FORMS_SHOW_REVIEWER_NAMES = 'forms.show_reviewer_names';
+
+    // #1730. At the `signed` level of `documents.qr_public_detail`, whether the
+    // public check also names who signed. Off: a holder reads "Director, signed
+    // 21 Nov 2026", not the director's name. Tenant-overridable: the workspace
+    // decides what its paper says about its people.
+    public const DOCUMENTS_QR_PUBLIC_SIGNER_NAMES = 'documents.qr_public_signer_names';
 
     // How many people a USER GROUP preview SHOWS (#999). Not a ceiling on
     // resolution — the count a preview reports is always exact — but the size of
@@ -1156,6 +1165,7 @@ final class SettingsRegistry
         self::DOCUMENTS_PERSIST_ENABLED,
         self::DOCUMENTS_QR_ENABLED,
         self::FORMS_SHOW_REVIEWER_NAMES,
+        self::DOCUMENTS_QR_PUBLIC_SIGNER_NAMES,
         self::I18N_ENABLED,
         self::UI_HIDE_DATES,
         self::CALENDAR_BOOKING_PAGE_ENABLED,
@@ -1261,7 +1271,7 @@ final class SettingsRegistry
         // DEFAULT sits: `minimal` is the middle value and stays the default,
         // because it is what shipped and adding a quieter level must not change
         // what any existing tenant discloses.
-        self::DOCUMENTS_QR_PUBLIC_DETAIL => ['undated', 'minimal', 'stage', 'described'],
+        self::DOCUMENTS_QR_PUBLIC_DETAIL => ['undated', 'minimal', 'stage', 'described', 'signed'],
         // 'internal' stores errors in this deployment's own database (no extra
         // infrastructure); 'sentry' ships them to any Sentry-PROTOCOL backend —
         // hosted Sentry, or a self-hosted GlitchTip/Bugsink — via the encrypted
@@ -1475,6 +1485,7 @@ final class SettingsRegistry
         self::DOCUMENTS_QR_PUBLIC_DETAIL => 'minimal',
         // Off: applicants see stages and outcomes, not reviewers. See the constant.
         self::FORMS_SHOW_REVIEWER_NAMES => 'false',
+        self::DOCUMENTS_QR_PUBLIC_SIGNER_NAMES => 'false',
         // Ten faces. Enough to recognise a group at a glance — "yes, those are
         // the instructors" — and small enough that nobody mistakes the sample
         // for the list. The COUNT beside it is exact and unbounded, which is
@@ -1983,6 +1994,7 @@ final class SettingsRegistry
             self::DOCUMENTS_QR_ENABLED => self::validateBoolean($value, self::DOCUMENTS_QR_ENABLED),
             self::DOCUMENTS_QR_PUBLIC_DETAIL => self::validateEnum($key, $value),
             self::FORMS_SHOW_REVIEWER_NAMES => self::validateBoolean($value, self::FORMS_SHOW_REVIEWER_NAMES),
+            self::DOCUMENTS_QR_PUBLIC_SIGNER_NAMES => self::validateBoolean($value, self::DOCUMENTS_QR_PUBLIC_SIGNER_NAMES),
             self::GROUPS_PREVIEW_SAMPLE_SIZE => self::validateGroupsPreviewSampleSize($value),
             self::DATA_TYPES_BULK_MAX_IDS => self::validateBulkMaxIds($value),
             // Error tracking. These five were declared with defaults, types,

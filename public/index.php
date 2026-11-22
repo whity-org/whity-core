@@ -4265,6 +4265,7 @@ $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     $documentSourceRepository,
     $documentArtifactRepository,
     $brandingService,
+    $db->getPdo(),
 );
 
 // `/api/documents/views` is registered BEFORE the `{id:\d+}` routes and cannot
@@ -4327,6 +4328,8 @@ $router->register('DELETE', '/api/documents/{id:\d+}/qr',                       
 // unit's name — see DocumentVerificationApiHandler and VerificationPresenter for
 // what it discloses and why each field earns its place.
 $router->register('GET', '/api/document-verifications/{token}', [$documentVerificationHandler, 'verify'], null);
+// #1730: "Check a file". The browser sends only the SHA-256 of the PDF.
+$router->register('GET', '/api/document-verifications/{token}/files/{sha256:[0-9a-fA-F]{64}}', [$documentVerificationHandler, 'checkFile'], null);
 
 // 13a-nonies-ter. DOCUMENT ROUTING (#947 item 3) — routes, ordered steps, the
 // append-only trail, and recipients as the inbox.

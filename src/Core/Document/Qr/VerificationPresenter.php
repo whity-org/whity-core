@@ -98,7 +98,16 @@ use Whity\Core\Settings\SettingsRegistry;
  *               that replaced it and the date. Not its id, number or code.
  * Still never a price, a name, a subject or the number: the number can be
  * counted, and "INV-2026-0142" says how many invoices were issued this year.
- * Signatures aren't in core yet, so nothing is said about them.
+ *
+ * WHAT `signed` ADDS (#1730)
+ * --------------------------
+ * Everything `described` says, plus the signatures and company stamps on the
+ * document: each as its kind, its capacity (and on whose behalf) or the legal
+ * name of the stamp, the version it was made on and the DATE. Never who signed,
+ * unless the workspace turns `documents.qr_public_signer_names` on. And
+ * `trail_intact`: whether the trail's hash chain still holds, so a holder is
+ * told when the record behind the paper was tampered with. Off unless chosen,
+ * like every level above `minimal`.
  */
 final class VerificationPresenter
 {
@@ -128,6 +137,9 @@ final class VerificationPresenter
 
     /** Adds what kind of document it is, its revision and pages (#1627). Off unless chosen. */
     public const DETAIL_DESCRIBED = 'described';
+
+    /** Adds the signatures and stamps, as capacities with dates, and whether the trail is intact (#1730). */
+    public const DETAIL_SIGNED = 'signed';
 
     /**
      * The single answer every way a code can fail to verify collapses to at the
@@ -170,6 +182,7 @@ final class VerificationPresenter
         $level = $effectiveSettings[SettingsRegistry::DOCUMENTS_QR_PUBLIC_DETAIL] ?? self::DETAIL_MINIMAL;
 
         return match ($level) {
+            self::DETAIL_SIGNED => self::DETAIL_SIGNED,
             self::DETAIL_DESCRIBED => self::DETAIL_DESCRIBED,
             self::DETAIL_STAGE => self::DETAIL_STAGE,
             self::DETAIL_UNDATED => self::DETAIL_UNDATED,
@@ -180,7 +193,44 @@ final class VerificationPresenter
     /** Whether a level says where a document is, and tells a revoked code from an unknown one. */
     public static function showsStage(string $detailLevel): bool
     {
-        return $detailLevel === self::DETAIL_STAGE || $detailLevel === self::DETAIL_DESCRIBED;
+        return $detailLevel === self::DETAIL_STAGE || self::describes($detailLevel);
+    }
+
+    /** Whether a level says what the document is: `described` and the `signed` level above it. */
+    public static function describes(string $detailLevel): bool
+    {
+        return $detailLevel === self::DETAIL_DESCRIBED || $detailLevel === self::DETAIL_SIGNED;
+    }
+
+    /**
+     * The signatures and stamps as the public check shows them at `signed`
+     * (#1730): kind, capacity or the stamp's legal name, on whose behalf, the
+     * version and the date. The name only when the workspace chose to show it.
+     *
+     * @param list<array<string, mixed>> $rows From {@see \Whity\Core\Document\Signing\SignatureRepository}.
+     * @return list<array{kind: string, capacity: ?string, on_behalf_of: ?string, version: int, signed_on: ?string, name?: string}>
+     */
+    public static function signatures(array $rows, bool $withNames): array
+    {
+        $out = [];
+        foreach ($rows as $row) {
+            $isStamp = ($row['kind'] ?? 'signature') === 'stamp';
+            $entry = [
+                'kind' => $isStamp ? 'stamp' : 'signature',
+                'capacity' => $isStamp
+                    ? (isset($row['stamp_legal_name']) ? (string) $row['stamp_legal_name'] : null)
+                    : (isset($row['capacity']) ? (string) $row['capacity'] : null),
+                'on_behalf_of' => $isStamp ? null : (isset($row['on_behalf_of']) ? (string) $row['on_behalf_of'] : null),
+                'version' => (int) $row['subject_version'],
+                'signed_on' => self::dateOnly($row['signed_at'] ?? null),
+            ];
+            if ($withNames) {
+                $entry['name'] = (string) $row['signer_name'];
+            }
+            $out[] = $entry;
+        }
+
+        return $out;
     }
 
     /**
@@ -191,6 +241,8 @@ final class VerificationPresenter
      * @param array<string, mixed>|null $lastEvent The newest trail row, or null.
      * @param string|null               $kind      The template's public name, read only at `described`.
      * @param int|null                  $pages     The newest artifact's page count, read only at `described`.
+     * @param array{signatures: list<array<string, mixed>>, trail_intact: bool}|null $signing
+     *        Read only at `signed` (#1730): from {@see signatures()}, and the chain check.
      * @return array<string, mixed>
      */
     public static function verified(
@@ -201,6 +253,7 @@ final class VerificationPresenter
         ?array $lastEvent,
         ?string $kind = null,
         ?int $pages = null,
+        ?array $signing = null,
     ): array {
         $body = [
             'verified' => true,
@@ -233,7 +286,7 @@ final class VerificationPresenter
             ? self::dateOnly($lastEvent['occurred_at'] ?? null)
             : $body['issued_on'];
 
-        if ($detailLevel !== self::DETAIL_DESCRIBED) {
+        if (!self::describes($detailLevel)) {
             return $body;
         }
 
@@ -245,6 +298,11 @@ final class VerificationPresenter
         $body['revision'] = DocumentState::revisionLetter((int) ($document['revision'] ?? 1));
         if ($pages !== null && $pages > 0) {
             $body['pages'] = $pages;
+        }
+
+        if ($detailLevel === self::DETAIL_SIGNED && $signing !== null) {
+            $body['signatures'] = $signing['signatures'];
+            $body['trail_intact'] = $signing['trail_intact'];
         }
 
         return $body;
@@ -307,7 +365,7 @@ final class VerificationPresenter
             'revoked_on' => self::dateOnly($tokenRow['revoked_at']),
         ];
 
-        if ($detailLevel === self::DETAIL_DESCRIBED
+        if (self::describes($detailLevel)
             && $document !== null
             && isset($document['superseded_by_revision'])) {
             $body['replaced_by'] = [

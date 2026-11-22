@@ -87,7 +87,71 @@ final class DocumentVerificationApiHandler
         // verified, which already names the issuer: a refused code must not
         // reveal whose code it was.
         private readonly ?BrandingService $branding = null,
+        // #1730: the signatures and the trail's chain, read only at `signed`.
+        // Without them that level answers as `described` does.
+        private readonly ?\PDO $db = null,
     ) {
+    }
+
+    /**
+     * `GET /api/v1/document-verifications/{token}/files/{sha256}` — is the PDF
+     * in my hand the one the issuer stored? (#1730, "Check a file".)
+     *
+     * The browser hashes the file and sends only the SHA-256; the file never
+     * leaves the visitor's device. The answer is `current` (the newest PDF of
+     * this document), `earlier` (an older PDF of it, such as a previous
+     * revision) or `none`. Every code that does not verify answers `none`, with
+     * the same 200, so this cannot be asked whether a code exists. Throttled
+     * with the check itself, before the code is looked at.
+     *
+     * @param array<string, string> $params
+     */
+    public function checkFile(Request $request, array $params): Response
+    {
+        $throttled = $this->throttle($request);
+        if ($throttled instanceof Response) {
+            return $throttled;
+        }
+        $hash = strtolower($params['sha256'] ?? '');
+        if (preg_match('/^[0-9a-f]{64}$/', $hash) !== 1) {
+            return Response::error('Send the SHA-256 of the file, as 64 hexadecimal characters.', 422);
+        }
+
+        try {
+            return Response::json(['data' => ['match' => $this->fileMatch((string) ($params['token'] ?? ''), $hash)]], 200);
+        } catch (\Throwable $e) {
+            error_log('[DocumentVerificationApiHandler] file check failed: ' . $e->getMessage());
+
+            return Response::error('Verification is temporarily unavailable', 503);
+        }
+    }
+
+    /** `current`, `earlier` or `none`. */
+    private function fileMatch(string $token, string $hash): string
+    {
+        $tokenRow = $this->qr->resolve($token);
+        if ($tokenRow === null || $this->artifacts === null || ($tokenRow['revoked_at'] ?? null) !== null) {
+            return 'none';
+        }
+        $tenantId = (int) $tokenRow['tenant_id'];
+        if (!DocumentQrPolicy::enabledForTenant($this->settings->effective($tenantId))) {
+            return 'none';
+        }
+        $documentId = (int) $tokenRow['document_id'];
+        $document = $this->documents->findById($documentId, $tenantId);
+        if ($document === null || ($document['withdrawn_at'] ?? null) !== null) {
+            return 'none';
+        }
+
+        $artifacts = $this->artifacts->listForDocument($documentId, $tenantId);
+        $latest = $this->artifacts->findLatestForDocument($documentId, $tenantId);
+        foreach ($artifacts as $artifact) {
+            if (hash_equals(strtolower((string) $artifact['checksum_sha256']), $hash)) {
+                return $latest !== null && (int) $latest['id'] === (int) $artifact['id'] ? 'current' : 'earlier';
+            }
+        }
+
+        return 'none';
     }
 
     /**
@@ -192,7 +256,7 @@ final class DocumentVerificationApiHandler
 
         $this->qr->recordScan($tokenRow, null);
 
-        $described = $detail === VerificationPresenter::DETAIL_DESCRIBED;
+        $described = VerificationPresenter::describes($detail);
 
         $data = VerificationPresenter::verified(
                 $tokenRow,
@@ -204,6 +268,9 @@ final class DocumentVerificationApiHandler
                     : null,
                 $described ? $this->publicKind($document, $tenantId) : null,
                 $described ? $this->pages((int) $tokenRow['document_id'], $tenantId) : null,
+                $detail === VerificationPresenter::DETAIL_SIGNED
+                    ? $this->signing($tenantId, (int) $tokenRow['document_id'], $effective)
+                    : null,
         );
         // Only where the answer already names the issuer, so the logo tells a
         // reader nothing the page does not.
@@ -260,6 +327,27 @@ final class DocumentVerificationApiHandler
         }
 
         return $this->sources->publicName($sourceId, $tenantId);
+    }
+
+    /**
+     * The signatures and stamps on a document and whether its trail's chain is
+     * intact, for the `signed` level (#1730).
+     *
+     * @param array<string, string> $effective
+     * @return array{signatures: list<array<string, mixed>>, trail_intact: bool}|null
+     */
+    private function signing(int $tenantId, int $documentId, array $effective): ?array
+    {
+        if ($this->db === null) {
+            return null;
+        }
+        $rows = (new \Whity\Core\Document\Signing\SignatureRepository($this->db))->listForDocument($tenantId, $documentId);
+        $withNames = ($effective[\Whity\Core\Settings\SettingsRegistry::DOCUMENTS_QR_PUBLIC_SIGNER_NAMES] ?? 'false') === 'true';
+
+        return [
+            'signatures' => VerificationPresenter::signatures($rows, $withNames),
+            'trail_intact' => \Whity\Core\Document\Routing\RouteTrailChain::verify($this->db, $tenantId, $documentId)['intact'],
+        ];
     }
 
     private function pages(int $documentId, int $tenantId): ?int

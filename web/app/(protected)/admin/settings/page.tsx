@@ -23,6 +23,8 @@ import {
   SYSTEM_TENANT_ID,
   COMPANY_SETTING_KEYS,
   DISPLAY_SETTING_KEYS,
+  DOCUMENT_CHECK_SETTING_KEYS,
+  qrDetailLevelCopy,
   GENERAL_SETTING_KEYS,
   generalFieldLabels,
   RegistrySettingControl,
@@ -189,6 +191,13 @@ function TenantSettingsSection({
     [data]
   );
 
+  // #1730: what the public check of a document's QR code tells a holder.
+  const documentCheckEntries = useMemo(
+    () =>
+      DOCUMENT_CHECK_SETTING_KEYS.flatMap((key) => (data?.registry ?? []).filter((entry) => entry.key === key)),
+    [data]
+  );
+
   const setField = (key: SettingKey, value: string) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
   };
@@ -225,7 +234,7 @@ function TenantSettingsSection({
     // of an untouched toggle would write a per-tenant override for something
     // nobody chose, and the difference between "inherited" and "overridden" is
     // the whole of what the badge beside it reports.
-    for (const entry of [...displayEntries, ...companyEntries]) {
+    for (const entry of [...displayEntries, ...companyEntries, ...documentCheckEntries]) {
       const edited = draft[entry.key as keyof typeof draft];
       if (edited !== undefined) {
         settings[entry.key] = edited;
@@ -381,6 +390,49 @@ function TenantSettingsSection({
                     status={overridden.has(entry.key) ? 'overridden' : 'inherited'}
                   />
                 ))}
+              </div>
+            )}
+            {documentCheckEntries.length > 0 && (
+              <div className="space-y-6 border-t border-border pt-6" data-testid="tenant-document-check-settings">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground">
+                    {t('settings.documentCheck.title', 'Checking a document')}
+                  </h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {t(
+                      'settings.documentCheck.description',
+                      'What anyone who scans the code printed on your documents is told.'
+                    )}
+                  </p>
+                </div>
+                {documentCheckEntries.map((entry) => {
+                  const value = valueOf(entry.key as SettingKey);
+                  if (entry.key === 'documents.qr_public_signer_names') {
+                    // Names are only ever shown at the `signed` level, so the
+                    // switch appears only once that level is chosen.
+                    if (valueOf('documents.qr_public_detail' as SettingKey) !== 'signed') return null;
+                  }
+                  const level = entry.key === 'documents.qr_public_detail' ? qrDetailLevelCopy(t, value) : null;
+
+                  return (
+                    <div key={entry.key} className="space-y-1.5">
+                      <RegistrySettingControl
+                        entry={entry}
+                        idPrefix="tenant"
+                        value={value}
+                        disabled={!canWrite}
+                        optionLabel={(option) => qrDetailLevelCopy(t, option)?.label ?? option}
+                        onChange={(next) => setField(entry.key as SettingKey, next)}
+                        status={overridden.has(entry.key) ? 'overridden' : 'inherited'}
+                      />
+                      {level && (
+                        <p className="text-xs text-muted-foreground" data-testid="qr-detail-level-help">
+                          {level.help}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
             {(canWrite || canRename) && (

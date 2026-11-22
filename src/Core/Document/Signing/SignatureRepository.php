@@ -140,6 +140,28 @@ final class SignatureRepository
     }
 
     /**
+     * Every signature and stamp made on one route, oldest first (#1730).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listForRoute(int $tenantId, int $routeId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT ' . self::COLUMNS . '
+               FROM route_signatures s
+               JOIN document_route_events e ON e.id = s.event_id AND e.tenant_id = s.tenant_id
+              WHERE s.tenant_id = :tenant_id AND s.route_id = :route_id
+              ORDER BY s.id ASC'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':route_id' => $routeId]);
+
+        /** @var list<array<string, mixed>> $rows */
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return array_map(self::normalize(...), $rows);
+    }
+
+    /**
      * The signatures that stand on the subject's content as it is now: those
      * bound to `$contentHash`, the hash of its current snapshot. A signature
      * on other content is not carried over.
