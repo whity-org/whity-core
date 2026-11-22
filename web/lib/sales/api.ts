@@ -176,7 +176,7 @@ export function percentText(bp: number): string {
 
 /** A typed percent as basis points: "16" as 1600; null when it isn't 0 to 100. */
 export function percentToBp(text: string): number | null {
-  const clean = text.trim().replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace('٫', '.').replace('%', '');
+  const clean = text.trim().replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/٫/g, '.').replace(/%/g, '');
   if (clean === '') return 0;
   if (!/^\d+(\.\d{1,2})?$/.test(clean)) return null;
   const bp = Math.round(Number(clean) * 100);
