@@ -68,10 +68,13 @@ export function AppInstall({
   state,
   name,
   iconUrl,
+  scope = '/',
 }: {
   state: AppInstallState;
   name?: string;
   iconUrl?: string | null;
+  /** #2386: where the worker reaches, `/` or WHITY_PWA_SCOPE (lib/pwa/scope.ts). */
+  scope?: string;
 }) {
   // Catch the browser's install prompt early; More offers it later.
   useEffect(() => {
@@ -117,8 +120,15 @@ export function AppInstall({
     };
     document.addEventListener('visibilitychange', onVisible);
 
+    // #2386: a worker registered for another scope (the operator narrowed it
+    // since) is ours but in the wrong place: remove it so it stops answering
+    // pages outside the new scope.
+    const wanted = new URL(scope, window.location.origin).href;
     navigator.serviceWorker
-      .register(SW_URL, { scope: '/', updateViaCache: 'none' })
+      .getRegistrations()
+      .then((regs) => Promise.all(regs.filter((reg) => isOurWorker(reg) && reg.scope !== wanted).map((reg) => reg.unregister())))
+      .catch(() => {})
+      .then(() => navigator.serviceWorker.register(SW_URL, { scope, updateViaCache: 'none' }))
       .then((reg) => {
         registration = reg;
         offer(reg.waiting);
@@ -139,7 +149,7 @@ export function AppInstall({
       navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, [state]);
+  }, [state, scope]);
 
   const reload = useCallback(() => {
     if (!waiting) return;

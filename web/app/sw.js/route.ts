@@ -1,6 +1,7 @@
 import { buildInfo } from '@/lib/build-info';
 import { getAppInstall } from '@/lib/pwa/app-install';
 import { installName, killSwitchWorkerSource, serviceWorkerSource } from '@/lib/pwa/shared';
+import { ownTopLevelPaths } from '@/lib/pwa/scope';
 
 /**
  * `GET /sw.js` — the app's service worker (#1733), served from the root so its
@@ -40,6 +41,7 @@ export async function GET(): Promise<Response> {
     cacheStatic: process.env.NODE_ENV === 'production',
     name: { en: installName(install.siteName, 'en'), ar: installName(install.siteName, 'ar') },
     themeColor: install.themeColor,
+    ownPaths: ownTopLevelPaths(),
   });
 
   return new Response(source, { headers: HEADERS });

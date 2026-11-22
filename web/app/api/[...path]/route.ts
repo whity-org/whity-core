@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { backendUrl } from '@/lib/backend-url';
-import { CLIENT_IP_HEADER, stripClientIpHeaders, trustedClientIp, trustedForwardedHost } from '@/lib/trusted-client-ip';
+import { setClientIpHeaders, stripClientIpHeaders, trustedClientIp, trustedForwardedHost } from '@/lib/trusted-client-ip';
 
 /**
  * HTTP statuses that, per the Fetch spec, MUST NOT carry a response body.
@@ -63,9 +63,9 @@ async function proxyRequest(request: Request, method: string): Promise<Response>
     const clientIp = trustedClientIp(request);
     const forwardedHost = trustedForwardedHost(request);
     stripClientIpHeaders(headers);
-    if (clientIp) {
-      headers.set(CLIENT_IP_HEADER, clientIp);
-    }
+    // #2386 (CE-4): signed when WHITY_CLIENT_IP_SECRET is set, so the backend
+    // can tell this proxy from any other caller.
+    setClientIpHeaders(headers, clientIp);
     // WHIT-1287 (#2195): the host the browser asked for, never one it claimed.
     // The backend picks the workspace from it (custom domains, branding).
     if (forwardedHost) {

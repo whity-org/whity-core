@@ -77,7 +77,7 @@ const DESCRIPTION = {
 } as const;
 
 /** The web app manifest for this host in one language. */
-export function buildManifest(install: AppInstall, lang: 'en' | 'ar'): Record<string, unknown> {
+export function buildManifest(install: AppInstall, lang: 'en' | 'ar', scope: string = '/'): Record<string, unknown> {
   const name = installName(install.siteName, lang);
   const icon = (n: AppIconName, purpose: 'any' | 'maskable') => ({
     src: appIconUrl(n, install.version),
@@ -87,7 +87,8 @@ export function buildManifest(install: AppInstall, lang: 'en' | 'ar'): Record<st
   });
 
   return {
-    id: '/',
+    // #2386: the whole origin, or the prefix WHITY_PWA_SCOPE narrows it to.
+    id: scope,
     name,
     // A home-screen label is cut at about 12 characters; a longer workspace
     // name is still the right one, so it is kept whole rather than guessed at.
@@ -95,8 +96,8 @@ export function buildManifest(install: AppInstall, lang: 'en' | 'ar'): Record<st
     description: DESCRIPTION[lang],
     lang,
     dir: lang === 'ar' ? 'rtl' : 'ltr',
-    start_url: '/',
-    scope: '/',
+    start_url: scope,
+    scope,
     display: 'standalone',
     orientation: 'any',
     background_color: LAUNCH_BACKGROUND,
@@ -135,6 +136,8 @@ export function serviceWorkerSource(opts: {
   cacheStatic: boolean;
   name: { en: string; ar: string };
   themeColor: string;
+  /** #2386: Whity's top-level paths; navigations anywhere else are left alone. Empty: every path. */
+  ownPaths?: string[];
 }): string {
   const config = JSON.stringify({
     version: opts.version || 'dev',
@@ -142,6 +145,7 @@ export function serviceWorkerSource(opts: {
     prefix: CACHE_PREFIX,
     name: opts.name,
     color: opts.themeColor,
+    own: opts.ownPaths ?? [],
   });
 
   return `/* Whity app worker (#1733). Generated per host; do not cache. */
@@ -174,6 +178,9 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (req.mode === 'navigate') {
+    // #2386: on a shared origin, another app's pages are not ours to answer.
+    const first = url.pathname.split('/')[1] || '';
+    if (CONFIG.own.length > 0 && !CONFIG.own.includes(first)) return;
     // Pages are never stored: always the network, else the offline page.
     event.respondWith(fetch(req).catch(() => offlinePage()));
     return;

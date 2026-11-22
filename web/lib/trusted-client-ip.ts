@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto';
+
 /**
  * Trusted client-IP derivation for the API proxy (WC-b19ff21a).
  *
@@ -36,6 +38,32 @@
  * `proxy_add_x_forwarded_for`, AWS ALB, …); with nothing in front, keep `0`.
  */
 export const CLIENT_IP_HEADER = 'x-whity-client-ip';
+
+/**
+ * Proves to the backend that this proxy set {@link CLIENT_IP_HEADER}
+ * (#2386, READINESS CE-4). `v1=<unix time>.<hex HMAC-SHA256 of "v1\n<time>\n<ip>">`
+ * under `WHITY_CLIENT_IP_SECRET`, the same secret the backend holds; see
+ * src/Core/RateLimit/ClientIp.php. Without the secret nothing is signed.
+ */
+export const CLIENT_IP_SIGNATURE_HEADER = 'x-whity-client-ip-signature';
+
+/** Shorter than this and the backend treats the secret as unset, so this does too. */
+const MIN_SECRET_LENGTH = 32;
+
+/** The signature header value for an IP at a time, or null without a usable secret. */
+export function signClientIp(ip: string, secret: string | undefined = process.env.WHITY_CLIENT_IP_SECRET, time: number = Math.floor(Date.now() / 1000)): string | null {
+  const key = secret?.trim() ?? '';
+  if (key.length < MIN_SECRET_LENGTH) return null;
+  return `v1=${time}.${createHmac('sha256', key).update(`v1\n${time}\n${ip}`).digest('hex')}`;
+}
+
+/** Set the trusted client IP on a forwarded request, signed when the secret is set. */
+export function setClientIpHeaders(headers: Headers, ip: string | null): void {
+  if (!ip) return;
+  headers.set(CLIENT_IP_HEADER, ip);
+  const signature = signClientIp(ip);
+  if (signature !== null) headers.set(CLIENT_IP_SIGNATURE_HEADER, signature);
+}
 
 /** IPv6 textual maximum; also the backend audit column width. */
 const MAX_IP_LENGTH = 45;
@@ -81,6 +109,7 @@ export function stripClientIpHeaders(headers: Headers): void {
     }
   }
   headers.delete(CLIENT_IP_HEADER);
+  headers.delete(CLIENT_IP_SIGNATURE_HEADER);
   headers.delete('x-forwarded-for');
   headers.delete('x-real-ip');
   headers.delete('forwarded');
