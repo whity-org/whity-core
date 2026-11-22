@@ -98,7 +98,7 @@ keyring = { version = "3", features = ["windows-native"] }
 # RunEvent::ExitRequested cannot catch. Standard pattern (Chrome, VS Code,
 # Docker Desktop use it for helper processes).
 win32job = "2"
-windows = { version = "0.61", features = ["Win32_Foundation", "Win32_System_Threading"] }
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Threading"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 keyring = { version = "3", features = ["apple-native"] }
