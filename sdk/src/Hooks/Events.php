@@ -144,6 +144,15 @@ final class Events
     public const TENANT_DELETING = 'tenant.deleting';
     public const TENANT_DELETED = 'tenant.deleted';
     public const TENANT_DELETED_ASYNC = 'tenant.deleted.async';
+    /**
+     * A workspace's @handle changed (design section 36, HD.4). The old one
+     * still leads to the workspace for 90 days; a plugin that stored the
+     * handle (in a link, a webhook address) should update it.
+     *
+     * Payload: `id` (the workspace), `old_handle` (null when it had none),
+     * `new_handle`, `by_profile_id` (null for an operator script).
+     */
+    public const TENANT_HANDLE_CHANGED = 'tenant.handle_changed';
 
     // ---- roles ----
     public const ROLE_CREATING = 'role.creating';

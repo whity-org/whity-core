@@ -160,6 +160,12 @@ final class SettingsRegistry
     // '0' means no limit (the self-hosted default); app.whity.dev uses 3.
     public const WORKSPACES_MAX_OWNED_PER_PERSON = 'workspaces.max_owned_per_person';
 
+    // Handles no workspace may take, besides Whity's own reserved words
+    // (design section 36, HD.2; WHIT-1363). Global/operator-level: one
+    // handle per line or comma, for local brands and words the operator
+    // doesn't want used. Doesn't move a handle already in use.
+    public const HANDLES_RESERVED = 'handles.reserved';
+
     // The plan a person's second and later OWNED workspaces start on (WHIT-1203).
     // Global/operator-level. A person's first owned workspace starts on
     // `billing.default_plan` (Free on app.whity.dev); every further one they
@@ -1100,6 +1106,7 @@ final class SettingsRegistry
         self::SSO_SELF_PROVISION_WORKSPACE,
         self::WORKSPACES_SELF_CREATE_ENABLED,
         self::WORKSPACES_MAX_OWNED_PER_PERSON,
+        self::HANDLES_RESERVED,
         self::WORKSPACES_ADDITIONAL_PLAN,
         self::WORKSPACES_ADDITIONAL_TRIAL_DAYS,
         self::PASSWORD_SIGN_IN,
@@ -1369,6 +1376,7 @@ final class SettingsRegistry
         self::SSO_SELF_PROVISION_WORKSPACE => 'false',
         self::WORKSPACES_SELF_CREATE_ENABLED => 'false',
         self::WORKSPACES_MAX_OWNED_PER_PERSON => '0',
+        self::HANDLES_RESERVED => '',
         self::WORKSPACES_ADDITIONAL_PLAN => '',
         self::WORKSPACES_ADDITIONAL_TRIAL_DAYS => '30',
         self::PASSWORD_SIGN_IN => 'true',
@@ -1966,6 +1974,7 @@ final class SettingsRegistry
             self::SSO_SELF_PROVISION_WORKSPACE => self::validateBoolean($value, self::SSO_SELF_PROVISION_WORKSPACE),
             self::WORKSPACES_SELF_CREATE_ENABLED => self::validateBoolean($value, self::WORKSPACES_SELF_CREATE_ENABLED),
             self::WORKSPACES_MAX_OWNED_PER_PERSON => self::validateWholeNumberBetween($value, self::WORKSPACES_MAX_OWNED_PER_PERSON, 0, 1000),
+            self::HANDLES_RESERVED => self::validateReservedHandles($value),
             self::WORKSPACES_ADDITIONAL_PLAN => self::validatePlanKey($value),
             self::WORKSPACES_ADDITIONAL_TRIAL_DAYS => self::validateWholeNumberBetween($value, self::WORKSPACES_ADDITIONAL_TRIAL_DAYS, 0, 90),
             self::PASSWORD_SIGN_IN => self::validateBoolean($value, self::PASSWORD_SIGN_IN),
@@ -2639,6 +2648,20 @@ final class SettingsRegistry
             $name = trim($name);
             if ($name === '' || strlen($name) > 128 || \Whity\Sdk\PluginNamespace::slug($name) === null) {
                 return "{$key} must be a comma-separated list of plugin names.";
+            }
+        }
+
+        return null;
+    }
+
+    private static function validateReservedHandles(string $value): ?string
+    {
+        if (strlen($value) > 10000) {
+            return self::HANDLES_RESERVED . ' is too long.';
+        }
+        foreach (\Whity\Core\Tenant\ReservedHandles::parseOperatorList($value) as $handle) {
+            if (preg_match('/^[a-z0-9-]{1,30}$/', $handle) !== 1) {
+                return self::HANDLES_RESERVED . ' must list handles (letters a to z, numbers and dashes), one per line.';
             }
         }
 

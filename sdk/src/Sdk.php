@@ -1644,12 +1644,19 @@ namespace Whity\Sdk;
  * 32 §5.3, Q5).
  *
  * Purely additive: one new optional constructor argument on Accounting\Invoice.)
+ *
+ * 1.159 (WORKSPACE HANDLES: a workspace's `slug` is now its public @handle, unique on the installation, and an
+ * owner may change it; the old one still leads to the workspace for 90 days. New event `tenant.handle_changed`
+ * (`id`, `old_handle`, `new_handle`, `by_profile_id`) so a plugin that stored a handle can update it (WHIT-1363,
+ * design section 36 §3, HD.4).
+ *
+ * Purely additive: one new event.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.158.0';
+    public const VERSION = '1.159.0';
 
     /**
      * Static identity only — never instantiated.

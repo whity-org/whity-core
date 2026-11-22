@@ -270,6 +270,7 @@ final class AuditSentences
         'taxonomy.tag_group.deleted' => '{actor} deleted a tag group',
         'tenant.created' => '{actor} created workspace {target}',
         'tenant.deleted' => '{actor} deleted workspace {target}',
+        'tenant.handle_changed' => '{actor} changed the workspace handle',
         'tenant.invitation.accept_failed' => 'An invitation could not be accepted',
         'tenant.invitation.accepted' => '{actor} accepted an invitation',
         'tenant.invitation.created' => '{actor} invited someone',

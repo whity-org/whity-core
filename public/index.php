@@ -2180,7 +2180,15 @@ $router->register('DELETE', '/api/roles/{id:\d+}/permissions', [$rolesHandler, '
 // grant migration reaching only the seeded admin role (#834).
 $router->register('GET', '/api/roles/{id:\d+}/assignments', [$rolesHandler, 'assignments'], null, null, \Whity\Core\RBAC\CorePermissions::ROLES_READ);
 
-$tenantsHandler = new TenantsApiHandler($db->getPdo(), $hookManager);
+// Workspace @handles (WHIT-1363, design section 36): checked against the
+// operator's own reserved list, audited, and announced as tenant.handle_changed.
+$workspaceHandles = new \Whity\Core\Tenant\Handles(
+    $db->getPdo(),
+    static fn (): string => (string) ($settingsService->getGlobal()[\Whity\Core\Settings\SettingsRegistry::HANDLES_RESERVED] ?? ''),
+    $auditLogger,
+    $hookManager,
+);
+$tenantsHandler = new TenantsApiHandler($db->getPdo(), $hookManager, $workspaceHandles);
 // Tenants are gated on PERMISSION SLUGS, not on the `admin` role name (#990),
 // for the reason the roles block above states: a role is a row a deployment may
 // rename or replace, a slug is a contract. `tenants:read/write/delete` have been

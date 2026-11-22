@@ -715,19 +715,81 @@ final class TenantsApiHandlerRealEngineTest extends TestCase
     }
 
     /**
-     * Regression: a non-system user updating their OWN tenant still succeeds.
+     * Regression: an OWNER changing their own workspace's @handle succeeds
+     * (design section 36, HD.4), and the old handle is held for 90 days.
      */
-    public function testNonSystemUserCanUpdateOwnTenant(): void
+    public function testAnOwnerCanChangeTheirOwnWorkspacesHandle(): void
     {
         MockRequestFactory::setTestTenant(1);
+        $this->seedUser(501, 1, 'owner@example.test');
+        $this->pdo->exec('INSERT INTO workspace_owners (tenant_id, profile_id, created_at) VALUES (1, 501, CURRENT_TIMESTAMP)');
+        $this->pdo->exec("UPDATE tenants SET slug = 'tenant-a' WHERE id = 1");
+
+        $response = $this->handler()->update($this->asProfile(
+            new Request('PATCH', '/api/tenants/1', [], (string) json_encode(['slug' => '@Tenant-A-New'])),
+            501
+        ), ['id' => 1]);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame('tenant-a-new', $this->pdo->query('SELECT slug FROM tenants WHERE id = 1')->fetchColumn());
+        $this->assertSame('tenant-a', $this->pdo->query('SELECT handle FROM tenant_handle_history WHERE tenant_id = 1')->fetchColumn());
+    }
+
+    /** Only an owner changes the handle; an admin who isn't one is told so (HD.4). */
+    public function testAnAdminWhoIsNotAnOwnerCannotChangeTheHandle(): void
+    {
+        MockRequestFactory::setTestTenant(1);
+        $this->seedUser(502, 1, 'admin@example.test');
+        $this->pdo->exec("UPDATE tenants SET slug = 'tenant-a' WHERE id = 1");
+
+        $response = $this->handler()->update($this->asProfile(
+            new Request('PATCH', '/api/tenants/1', [], (string) json_encode(['slug' => 'tenant-a-new'])),
+            502
+        ), ['id' => 1]);
+
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertSame('handle_owner_only', json_decode($response->getBody(), true)['details']['code']);
+        $this->assertSame('tenant-a', $this->pdo->query('SELECT slug FROM tenants WHERE id = 1')->fetchColumn());
+    }
+
+    /** A reserved handle is refused with its code and an Arabic sentence (HD.2). */
+    public function testAReservedHandleIsRefusedInPlainWords(): void
+    {
+        MockRequestFactory::setTestTenant(1);
+        $this->seedUser(503, 1, 'owner@example.test');
+        $this->pdo->exec('INSERT INTO workspace_owners (tenant_id, profile_id, created_at) VALUES (1, 503, CURRENT_TIMESTAMP)');
+
+        $response = $this->handler()->update($this->asProfile(
+            new Request('PATCH', '/api/tenants/1', [], (string) json_encode(['slug' => 'admin'])),
+            503
+        ), ['id' => 1]);
+
+        $body = json_decode($response->getBody(), true);
+        $this->assertSame(409, $response->getStatusCode());
+        $this->assertSame('handle_reserved', $body['details']['code']);
+        $this->assertNotSame('', $body['details']['fields_ar']['slug']);
+    }
+
+    /** Renaming still works for any admin, and leaves the handle alone. */
+    public function testNonSystemUserCanRenameOwnTenant(): void
+    {
+        MockRequestFactory::setTestTenant(1);
+        $this->pdo->exec("UPDATE tenants SET slug = 'tenant-a' WHERE id = 1");
 
         $response = $this->handler()->update(
-            new Request('PATCH', '/api/tenants/1', [], (string) json_encode(['slug' => 'tenant-a-new'])),
+            new Request('PATCH', '/api/tenants/1', [], (string) json_encode(['name' => 'Tenant A renamed', 'slug' => 'tenant-a'])),
             ['id' => 1]
         );
 
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame('tenant-a-new', $this->pdo->query('SELECT slug FROM tenants WHERE id = 1')->fetchColumn());
+        $this->assertSame('tenant-a', $this->pdo->query('SELECT slug FROM tenants WHERE id = 1')->fetchColumn());
+    }
+
+    private function asProfile(Request $request, int $profileId): Request
+    {
+        $request->user = (object) ['profile_id' => $profileId];
+
+        return $request;
     }
 
     /**

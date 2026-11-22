@@ -697,6 +697,12 @@ final class TenantOwnedTables
         'acc_invoice_lines' => '350_create_accounting_invoices.php',
         'acc_allocations' => '350_create_accounting_invoices.php',
         'acc_payments' => '351_create_accounting_payments.php',
+        // A workspace's earlier @handles, held 90 days (design section 36,
+        // HD.4). ONE unpredicated read: Handles::heldBy() resolves an old
+        // handle to the workspace still holding it, the same shape as the
+        // tenants registry lookup by slug it extends, and returns an id only;
+        // it carries an explicit `@tenant-guard-ignore` annotation.
+        'tenant_handle_history' => '354_create_tenant_handle_history.php',
     ];
 
     /**
