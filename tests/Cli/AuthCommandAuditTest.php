@@ -15,6 +15,17 @@ use Whity\Cli\Commands\AuthCommand;
  */
 final class AuthCommandAuditTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        // A context left by an earlier test would put a person on the row.
+        \Whity\Core\Audit\AuditContext::reset();
+    }
+
+    protected function tearDown(): void
+    {
+        \Whity\Core\Audit\AuditContext::reset();
+    }
+
     public function testTheBreakGlassSwitchIsAuditedFromTheCommandLine(): void
     {
         $pdo = SchemaFromMigrations::make();
