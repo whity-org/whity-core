@@ -23,7 +23,7 @@ final class ReservedHandles
     /** @var list<string> */
     public const PAGES = [
         'accept-invitation', 'account', 'account-recovery', 'admin', 'api', 'app-icon', 'billing',
-        'boards', 'book', 'booking', 'calendar', 'chat', 'contacts', 'dashboard', 'forgot-password',
+        'boards', 'book', 'booking', 'calendar', 'chat', 'contacts', 'csp-report', 'dashboard', 'forgot-password',
         'forms', 'inventory', 'join', 'licensing', 'login', 'logout', 'mcp', 'messages', 'more',
         'onboarding', 'ownership-offers', 'push-icon', 'quote', 'register', 'reset-password', 'sales',
         'settings', 'setup', 'status', 'tasks', 'verify', 'verify-email', 'web-build', 'welcome',

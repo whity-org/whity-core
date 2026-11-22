@@ -11,6 +11,7 @@ import { useToast } from '@/lib/toast-context';
 import { Avatar } from '@whity/ui/avatar';
 import { Lockup } from '@whity/ui/lockup';
 import { Mark } from '@whity/ui/mark';
+import { RailTooltip } from '@whity/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -244,26 +245,29 @@ export function Sidebar() {
   const backLabel = back ? back.label : '';
   const header = (
     <div className={`flex flex-col gap-2 ${collapsed ? 'items-center' : ''}`}>
+      <RailTooltip label={branding.siteName} show={collapsed}>
       <Link
         href={homePath}
-        className="rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+        className={`rounded-md focus-visible:outline-2 focus-visible:outline-ring ${collapsed ? 'flex size-10 items-center justify-center' : ''}`}
         aria-label={t('sidebar.homeLink', '{name}: home').replace('{name}', branding.siteName)}
         data-testid="sidebar-home-link"
         onClick={() => setIsMobileOpen(false)}
       >
         {brand}
       </Link>
+      </RailTooltip>
       {back && (
+        <RailTooltip label={backLabel} show={collapsed}>
         <a
           href={back.url}
           className={`inline-flex min-h-8 items-center gap-1 rounded-md text-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring ${collapsed ? 'justify-center' : ''}`}
           aria-label={collapsed ? backLabel : undefined}
-          title={collapsed ? backLabel : undefined}
           data-testid="sidebar-back-to-product"
         >
           <IconArrowLeft size={16} className="shrink-0 rtl:rotate-180" aria-hidden="true" />
           {!collapsed && <span className="truncate">{backLabel}</span>}
         </a>
+        </RailTooltip>
       )}
     </div>
   );
@@ -282,10 +286,16 @@ export function Sidebar() {
   const roleSummaryLabels = useRoleSummaryLabels();
   const footer = (
     <DropdownMenu>
+      {/* In the rail: a 40px square on the icons' column, like the workspace
+          chip above, named by a tooltip (AppShellCollapsed). */}
+      <RailTooltip label={displayName} show={collapsed}>
       <DropdownMenuTrigger
-        className={`flex min-h-12 w-full items-center gap-3 rounded-lg px-2 py-2 text-start transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring ${collapsed ? 'justify-center' : ''}`}
+        className={
+          collapsed
+            ? 'flex size-10 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring'
+            : 'flex min-h-12 w-full items-center gap-3 rounded-lg px-2 py-2 text-start transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring'
+        }
         aria-label={t('sidebar.accountMenu', 'Account menu')}
-        title={collapsed ? displayName : undefined}
         data-testid="account-menu"
       >
         <Avatar name={displayName} size={32} />
@@ -305,6 +315,7 @@ export function Sidebar() {
           </>
         )}
       </DropdownMenuTrigger>
+      </RailTooltip>
       <DropdownMenuContent side="top" align="start" className="w-72">
         <DropdownMenuLabel className="font-normal">
           <span className="block truncate text-sm font-medium text-foreground">{displayName}</span>

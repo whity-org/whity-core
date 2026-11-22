@@ -245,6 +245,7 @@ final class SdkPackageContractTest extends TestCase
             '1.160.0',
             \Whity\Sdk\Sdk::VERSION,
             'SDK 1.160 ADDS the tenant.handle_changed event: workspace @handles (WHIT-1363). '
+            . 'SDK 1.159 ADDS Contribute\\WorkspaceAccountingExport and Inventory\\StockPosting: stock moves to the books at the moving average cost (WHIT-1318). '
             . 'SDK 1.158 ADDS Invoice::$claimantProfileId and the accounting.expense.claimed event: expense claims (WHIT-1318). '
             . 'SDK 1.157 ADDS supplier bills through Accounting\\Invoices (kind purchase) and Payments::recordMade(), and the bill events (WHIT-1318). '
             . 'SDK 1.156 ADDS Accounting\\Payments: payments received, allocations and transfers for plugins; Whity Pay records its payments here (WHIT-1318). '

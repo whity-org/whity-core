@@ -1645,6 +1645,15 @@ namespace Whity\Sdk;
  *
  * Purely additive: one new optional constructor argument on Accounting\Invoice.)
  *
+ * 1.159 (STOCK IN THE BOOKS: extension point {@see Contribute\WorkspaceAccountingExport} (IV.22): core hands
+ * each posted stock batch, as an {@see Inventory\StockPosting} of {@see Inventory\StockPostingMove}s with their
+ * places, virtual roles, branches and values, to the one export bound in the container, inside the stock
+ * transaction, for each workspace whose `keepsStock()` answers true; throwing refuses the batch. Values come from core's moving average cost (IV.18). Core
+ * accounting is the default export and posts each batch to the stock journal (WHIT-1318 A4a, design section 31
+ * §6.3, section 32 §6).
+ *
+ * Purely additive: one new extension point and two value objects.)
+ *
  * 1.160 (WORKSPACE HANDLES: a workspace's `slug` is now its public @handle, unique on the installation, and an
  * owner may change it; the old one still leads to the workspace for 90 days. New event `tenant.handle_changed`
  * (`id`, `old_handle`, `new_handle`, `by_profile_id`) so a plugin that stored a handle can update it (WHIT-1363,

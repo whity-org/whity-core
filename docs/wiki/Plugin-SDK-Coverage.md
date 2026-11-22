@@ -444,12 +444,12 @@ Planned: later.
 - Supplier bills and supplier credits through Accounting\Invoices (kind purchase, acting with bills:write) and Accounting\Payments::recordMade() for money paid to suppliers (SDK 1.157)
 - Events accounting.bill.posting (filter, can veto), accounting.bill.posted and accounting.bill.paid (SDK 1.157)
 - Expense claims: Invoice::$claimantProfileId on a claim (a bill from the person who paid) and the accounting.expense.claimed event (SDK 1.158)
+- Stock in the books: core accounting implements Contribute\WorkspaceAccountingExport and posts each stock batch to the stock journal, on by default with a switch (SDK 1.159)
 
 **Missing**
 
 - Filing expense claims and petty cash spends through the SDK (API-only); bills matched to stock receipts (A4); cheques through the SDK (deposit and bounce are API-only)
 - Aged receivables and the customer statement through Reports (API-only until A5)
-- Stock in the books through the accounting-export point (A4)
 - Profit and loss, balance sheet and aged reports (A5)
 - Tax packs, bank feeds, currency rates and reports as extension points (A6, A7)
 
@@ -478,13 +478,14 @@ Planned: later.
 - Events stock.lot.expiring and stock.lot.expired, once per batch (SDK 1.137)
 - Contribute\WorkspaceQuoteConversion: what an accepted quote turns into (a sales order, an invoice), read as a Sales\QuoteSnapshot; core's inventory and accounting implement it (SDK 1.132)
 - Events sales.quote.sending (filter, can veto) and sales.quote.created, sent, accepted, declined, expired, converted and cancelled (SDK 1.132)
+- Contribute\WorkspaceAccountingExport: each posted stock batch, as an Inventory\StockPosting with its moves, places, branches and values at core's moving average cost, goes to the one export bound in the container, inside the stock transaction (core accounting is the default) (SDK 1.159)
 
 **Missing**
 
 - Reorder levels and reasons as SDK services (they are on the API and MCP)
 - Sales orders and reservations (P5); supplier prices as an SDK service (they are on the API and MCP)
 - Scanning GS1 barcodes and batch labels (P4b)
-- Costing, accounting export, operation kinds, item fields, barcode parsers and price lists as extension points (P7)
+- A costing-method extension point (FIFO, standard cost): core keeps the moving average only
 
 **Needs a design.** Reads are trusted to the plugin. Writes check the acting person's permissions like the routes do, and a plugin's moves are named by the host, never by the plugin.
 

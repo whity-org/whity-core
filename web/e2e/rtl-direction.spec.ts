@@ -48,3 +48,46 @@ test.describe('Interface direction follows the language', () => {
     await expect(page.getByLabel('Toggle interface direction')).toHaveCount(0);
   });
 });
+
+/**
+ * WHIT-1379: a form keeps its own direction. An English-only form inside the
+ * Arabic interface reads left to right; the page around it stays right to left.
+ */
+test.describe('A form reads in its own direction', () => {
+  let formId: number | null = null;
+
+  test.afterEach(async ({ page }) => {
+    const headers = { 'X-Requested-With': 'XMLHttpRequest' };
+    if (formId !== null) await page.request.delete(`/api/v1/forms/${formId}`, { headers });
+    formId = null;
+    await page.request.patch('/api/v1/settings/language', { data: { language_code: 'en' }, headers });
+  });
+
+  test('an English form stays left to right in the Arabic interface', async ({ page }) => {
+    const headers = { 'X-Requested-With': 'XMLHttpRequest' };
+    const suffix = Date.now().toString(36);
+    const created = await page.request.post('/api/v1/forms', {
+      data: { form_key: `dir_${suffix}`, name: { en: `Supplier request ${suffix}` } },
+      headers,
+    });
+    expect(created.status()).toBe(201);
+    formId = (await created.json()).data.id as number;
+    const field = await page.request.post(`/api/v1/forms/${formId}/fields`, {
+      data: { field_key: 'supplier', field_type: 'text', label: { en: 'Supplier' } },
+      headers,
+    });
+    expect(field.status()).toBe(201);
+
+    const chosen = await page.request.patch('/api/v1/settings/language', { data: { language_code: 'ar' }, headers });
+    expect(chosen.ok()).toBe(true);
+
+    await page.goto(`/forms/${formId}/preview`);
+    await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
+    const form = page.locator('[data-content-direction]');
+    await expect(form).toHaveAttribute('dir', 'ltr');
+    await expect(form).toHaveAttribute('lang', 'en');
+    await expect(form.getByLabel(/Supplier/)).toBeVisible();
+    // Its text starts on the left, as English does.
+    expect(await form.getByLabel(/Supplier/).evaluate((el) => getComputedStyle(el).direction)).toBe('ltr');
+  });
+});

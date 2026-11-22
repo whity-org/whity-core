@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { CardDescription, CardHeader, CardTitle } from "@whity/ui/card"
 import { cn } from "@whity/ui/utils"
+import type { ContentLanguage } from "@whity/ui/localized-text"
 
 import { bannerArt, hexToRgb, svgUrl, type BannerStyle, type Rgb } from "./banner-art"
 import type { FormBannerValue } from "./types"
@@ -80,23 +81,28 @@ export function FormHeader({
   description,
   banner,
   titleAs = "h1",
+  content,
 }: {
   title: string
   description?: string | null
   banner?: FormBannerValue | null
   titleAs?: "h1" | "h2" | "h3"
+  /** WHIT-1379: the form's own language and direction; without it each line finds its own. */
+  content?: ContentLanguage
 }) {
   const look = useBannerLook(banner)
   const Heading = titleAs
   const hasDescription = description != null && description !== ""
+  const dir = content?.dir ?? "auto"
+  const lang = content?.lang
 
   if (look === null) {
     return (
-      <CardHeader>
+      <CardHeader dir={content?.dir} lang={lang}>
         <CardTitle>
-          <Heading dir="auto" className="text-lg font-semibold">{title}</Heading>
+          <Heading dir={dir} className="text-lg font-semibold">{title}</Heading>
         </CardTitle>
-        {hasDescription && <CardDescription dir="auto" className="text-sm">{description}</CardDescription>}
+        {hasDescription && <CardDescription dir={dir} className="text-sm">{description}</CardDescription>}
       </CardHeader>
     )
   }
@@ -106,6 +112,8 @@ export function FormHeader({
       <div
         data-slot="card-banner"
         data-testid="form-banner"
+        dir={content?.dir}
+        lang={lang}
         className="relative flex min-h-32 items-end bg-cover bg-center sm:min-h-44"
         style={{ backgroundImage: look.background }}
       >
@@ -116,13 +124,13 @@ export function FormHeader({
             style={{ backgroundImage: "linear-gradient(to bottom, rgb(0 0 0 / 0.2), rgb(0 0 0 / 0.55) 40%, rgb(0 0 0 / 0.75))" }}
           />
         )}
-        <Heading dir="auto" className="relative px-4 pt-8 pb-4 text-xl font-semibold text-balance sm:text-2xl" style={{ color: look.text }}>
+        <Heading dir={dir} className="relative px-4 pt-8 pb-4 text-xl font-semibold text-balance sm:text-2xl" style={{ color: look.text }}>
           {title}
         </Heading>
       </div>
       {hasDescription && (
-        <CardHeader>
-          <CardDescription dir="auto" className={cn("text-sm")}>{description}</CardDescription>
+        <CardHeader dir={content?.dir} lang={lang}>
+          <CardDescription dir={dir} className={cn("text-sm")}>{description}</CardDescription>
         </CardHeader>
       )}
     </>

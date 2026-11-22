@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { isPathHidden } from '@/lib/routes/hidden';
 import { hiddenIdsForGuard } from '@/lib/routes/hidden-cache';
+import { buildCsp, cspNonce } from '@/lib/csp';
 
 /**
  * The route guard for hidden pages (whity-org/whity-core#2386).
@@ -13,11 +14,23 @@ import { hiddenIdsForGuard } from '@/lib/routes/hidden-cache';
  * cached (lib/routes/hidden-cache.ts).
  */
 export async function proxy(request: NextRequest): Promise<NextResponse> {
-  if (isPathHidden(request.nextUrl.pathname, await hiddenIdsForGuard())) {
+  // READINESS CE-12: a fresh nonce for every page, and the policy that names
+  // it. Next reads the policy from the REQUEST to put the nonce on its own
+  // scripts (it reads the Report-Only header too); the layout reads `x-nonce`
+  // for the three blocking bootstraps. Report-Only for now (lib/csp.ts).
+  const nonce = cspNonce();
+  const policy = buildCsp(nonce, process.env.NODE_ENV === 'development');
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('content-security-policy-report-only', policy);
+
+  const response = isPathHidden(request.nextUrl.pathname, await hiddenIdsForGuard())
     // A path no route answers: Next renders the app's not-found page.
-    return NextResponse.rewrite(new URL('/_whity/hidden', request.url), { status: 404 });
-  }
-  return NextResponse.next();
+    ? NextResponse.rewrite(new URL('/_whity/hidden', request.url), { status: 404, request: { headers: requestHeaders } })
+    : NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set('Content-Security-Policy-Report-Only', policy);
+
+  return response;
 }
 
 export const config = {

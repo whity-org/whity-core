@@ -250,7 +250,8 @@ describe('AppSidebar — search', () => {
 
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
     // Collapsed hides the headings, so disclosure cannot apply — every item
-    // stays reachable as an icon, with its label as the tooltip.
-    expect(screen.getByRole('link', { name: 'Dashboard' })).toHaveAttribute('title', 'Dashboard');
+    // stays reachable as an icon, named by its off-screen label (the tooltip
+    // shows the same name; app-sidebar-rail.test.tsx).
+    expect(screen.getByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
   });
 });

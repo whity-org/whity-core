@@ -475,7 +475,7 @@ function ChatList({
       <header className="grid gap-3 px-4 pt-4 pb-3">
         <div className="flex items-center gap-2">
           <h1 className="flex-1 text-xl font-semibold">{t('title', 'Chat')}</h1>
-          <IconButton icon="edit" label={t('new.action', 'New chat')} onClick={onNew} />
+          <IconButton tooltip="bottom" icon="edit" label={t('new.action', 'New chat')} onClick={onNew} />
         </div>
         <SearchField
           value={query}
@@ -899,15 +899,16 @@ function OpenChat({
     <>
       <section aria-label={chat.title} className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-2.5 border-b border-border px-4 py-2.5">
-          <IconButton icon="chevron-left" label={t('action.back', 'Back to chats')} className="md:hidden rtl:rotate-180" onClick={onBack} />
+          <IconButton tooltip="bottom" icon="chevron-left" label={t('action.back', 'Back to chats')} className="md:hidden rtl:rotate-180" onClick={onBack} />
           <ChatIcon chat={chat} size={36} />
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-base font-semibold">{chat.title}</h1>
             <p className="truncate text-sm text-muted-foreground">{subtitle(chat, t)}</p>
           </div>
           {/* On a phone the header keeps Back, the chat and its details (UC.13); search and pin stay on the computer. */}
-          <IconButton icon="search" label={t('search.open', 'Search in this chat')} className="max-sm:hidden" pressed={side?.kind === 'search'} onClick={() => toggleSide('search')} />
+          <IconButton tooltip="bottom" icon="search" label={t('search.open', 'Search in this chat')} className="max-sm:hidden" pressed={side?.kind === 'search'} onClick={() => toggleSide('search')} />
           <IconButton
+            tooltip="bottom"
             className="max-sm:hidden"
             icon="star"
             label={pinned ? t('pin.off', 'Unpin this chat') : t('pin.on', 'Pin this chat to the top')}
@@ -915,6 +916,7 @@ function OpenChat({
             onClick={() => onPin(!pinned)}
           />
           <IconButton
+            tooltip="bottom"
             icon="users"
             label={side?.kind === 'details' ? t('details.hide', 'Hide details') : t('details.show', 'Show details')}
             pressed={side?.kind === 'details'}
