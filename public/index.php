@@ -1837,7 +1837,7 @@ $accountSecurityMailer = new \Whity\Core\Mail\AccountSecurityMailer(
 );
 $authHandler->setSecurityMailer($accountSecurityMailer);
 
-$registerHandler = new RegisterApiHandler($db->getPdo(), $settingsService, $emailVerificationProvider, $hookManager);
+$registerHandler = new RegisterApiHandler($db->getPdo(), $settingsService, $emailVerificationProvider, $hookManager, store: new DatabaseSharedStore($db->getPdo()));
 $router->register('POST', '/api/register', $passwordRoute([$registerHandler, 'register']), null);
 
 // WC-235: public email verification — (re)send a link + confirm a token. Both are
@@ -1911,7 +1911,7 @@ $router->register('POST',   '/api/devices/token', [$authHandler, 'handleDeviceTo
 // 10a-ter. Interactive session management (WC-f-sessions-table). Session-gated
 // in-handler (cookie OR Bearer access token), scoped to the caller's own
 // profile. Interactive logins only — native devices are managed via /api/devices.
-$sessionsHandler = new \Whity\Api\SessionsApiHandler($tokenValidator, new \Whity\Auth\SessionService($db->getPdo()));
+$sessionsHandler = new \Whity\Api\SessionsApiHandler($tokenValidator, new \Whity\Auth\SessionService($db->getPdo()), $auditLogger);
 $router->register('GET',    '/api/me/sessions',      [$sessionsHandler, 'list'], null);
 $router->register('DELETE', '/api/me/sessions/{id}', [$sessionsHandler, 'revoke'], null);
 $router->register('DELETE', '/api/me/sessions',      [$sessionsHandler, 'revokeOthers'], null);
@@ -1926,6 +1926,8 @@ $twoFactorProofThrottle = new LoginThrottleService(
     'two_factor_proof',
 );
 $twoFactorHandler = new TwoFactorHandler($db->getPdo(), $totpService, $backupCodesService, $tokenValidator, $auditLogger, $twoFactorProofThrottle);
+// READINESS CE-6: the current password on PATCH /me counts against the same budget.
+$authHandler->setProofThrottle($twoFactorProofThrottle);
 $twoFactorHandler->setSecurityMailer($accountSecurityMailer);
 $router->register('POST', '/api/auth/2fa/setup', $passwordRoute([$twoFactorHandler, 'setup']), null);
 $router->register('POST', '/api/auth/2fa/confirm', $passwordRoute([$twoFactorHandler, 'confirm']), null);
@@ -2979,6 +2981,8 @@ $pluginLimitPacks = new \Whity\Core\Plugin\Workspace\PluginLimitPacks(
 $entitlementService->usePluginPacks(static fn (int $tenantId): array => $pluginLimitPacks->packsFor($tenantId));
 // WHIT-1156: invitations ask the plan's staff limit first, as `seats.enforcement` says.
 $invitationsHandler->useSeats(new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService));
+// READINESS TM-14: adding a person directly holds to the same staff limit.
+$usersHandler->useSeats(new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService));
 // WHIT-1129 (SDK 1.108): packs set a workspace up through core's own routes,
 // as the person acting there, limited to WorkspaceSetup::ROUTES.
 $hostWorkspaceSetup = new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker);
@@ -4995,7 +4999,9 @@ $publicFormsHandler = new \Whity\Api\PublicFormsApiHandler(
     // a reason for a second storage path.
     $formUploadStore,
     // WHIT-1040: whether the workspace's plan removes "Built on Whity".
-    new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService)
+    new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService),
+    // READINESS TM-20: the same bot check booking and chat use.
+    $publicFormBotCheck,
 );
 $publicFormKeysHandler = new \Whity\Api\PublicFormKeysApiHandler(
     $publicFormKeyRepository,
@@ -6805,7 +6811,8 @@ $router->register('DELETE', '/api/email-domains/{id:\d+}',     [$emailDomainHand
 // never returned in a response.
 $identityProvidersHandler = new IdentityProvidersApiHandler(
     $db->getPdo(),
-    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV)
+    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+    $auditLogger,
 );
 $router->register('GET',    '/api/identity-providers',          [$identityProvidersHandler, 'list'],   null, null, CorePermissions::AUTH_PROVIDERS_MANAGE);
 $router->register('POST',   '/api/identity-providers',          [$identityProvidersHandler, 'create'], null, null, CorePermissions::AUTH_PROVIDERS_MANAGE);
@@ -7205,7 +7212,7 @@ $mcpToolsCallHandler->setWorkspaceGate($pluginLoader);
 // an agent must not be able to approve its own proposal.
 // WHIT-816: a workspace agent's proposal runs under the person's assignment as it is now.
 $agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo(), $mcpConnectionEvents);
-$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue, $gatedApproval);
+$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue, $gatedApproval, $mcpTokenService);
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/identity-check', [$agentProposalsHandler, 'identityCheck'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);

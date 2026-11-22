@@ -495,6 +495,32 @@ final class SettingsApiRealEngineTest extends TestCase
         self::assertSame(['plugin.store_unsigned.turned_on', 'plugin.store_unsigned.turned_off'], $actions);
     }
 
+    /** READINESS CO-7: a sign-in policy change says who changed what, from and to. */
+    public function testASignInPolicyChangeIsAuditedWithItsOldAndNewValue(): void
+    {
+        TenantContext::setTenantId(self::SYSTEM_TENANT);
+        foreach ([['auth.self_registration_enabled' => 'true'], ['auth.self_registration_enabled' => 'true']] as $settings) {
+            $response = $this->handler->patchGlobal(
+                $this->req('PATCH', '/api/settings/global', ['settings' => $settings], self::USER_FULL, self::SYSTEM_TENANT)
+            );
+            self::assertSame(200, $response->getStatusCode(), $response->getBody());
+        }
+
+        $stmt = $this->pdo->query("SELECT tenant_id, metadata FROM audit_log WHERE action = 'settings.changed' ORDER BY id");
+        self::assertNotFalse($stmt);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        self::assertCount(1, $rows, 'a write that changes nothing adds nothing');
+        self::assertSame(0, (int) $rows[0]['tenant_id']);
+        $changes = json_decode((string) $rows[0]['metadata'], true)['changes'];
+        self::assertContains('auth.self_registration_enabled', array_column($changes, 'key'));
+        foreach ($changes as $change) {
+            if ($change['key'] === 'auth.self_registration_enabled') {
+                self::assertSame('true', $change['to']);
+                self::assertNotSame('true', $change['from']);
+            }
+        }
+    }
+
     public function testPatchGlobalRejectsManageCallerWithBadValue(): void
     {
         TenantContext::setTenantId(self::SYSTEM_TENANT);

@@ -38,7 +38,9 @@ final class ClientIpAuthenticationTest extends TestCase
     public function testUnconfiguredKeepsTheOldBehaviour(): void
     {
         self::assertSame('203.0.113.7', $this->resolved(['X-Whity-Client-Ip' => '203.0.113.7'], '198.51.100.9', []));
-        self::assertNull($this->resolved([], '198.51.100.9', []));
+        // TM-19: no header means a direct caller, counted as itself rather than
+        // as nobody (which skipped the per-IP limits).
+        self::assertSame('198.51.100.9', $this->resolved([], '198.51.100.9', []));
     }
 
     public function testAProxyAddressIsBelieved(): void

@@ -363,10 +363,16 @@ final class ChatService
                 throw new ChatException('They are already in this chat.');
             }
         }
+        // A 1:1 chat's history belongs to its two people: whoever turns it into
+        // a group by adding someone can't hand that person the private history
+        // too (READINESS TM-18). The newcomer reads from now on. A chat that
+        // was already a group keeps sharing its history, as before.
+        $readsAfter = 0;
         if ((string) $chat['type'] === 'direct') {
+            $readsAfter = $this->repo->maxMessageId($tenantId, $chatId);
             $this->repo->makeGroup($tenantId, $chatId);
         }
-        $memberId = $this->repo->addPerson($tenantId, $chatId, $profileId, $viewer->profileId);
+        $memberId = $this->repo->addPerson($tenantId, $chatId, $profileId, $viewer->profileId, $readsAfter);
         $by = $this->who($viewer->profileId);
         $person = $this->who($profileId);
         $this->system($tenantId, $chatId, $viewer->profileId, ['event' => 'person_added', 'by' => $by, 'person' => $person], "{$by['name']} added {$person['name']}.");

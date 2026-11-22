@@ -6,6 +6,7 @@ namespace Whity\Core\Log;
 
 use Psr\Log\AbstractLogger;
 use Stringable;
+use Whity\Core\Observability\ErrorScrubber;
 
 /**
  * Minimal PSR-3 logger that writes structured records to PHP's `error_log`.
@@ -20,6 +21,11 @@ use Stringable;
  * Records are emitted as a single line: `[level] message {json-context}`. The
  * PSR-3 `{placeholder}` interpolation contract is honoured so message templates
  * referencing context keys are expanded.
+ *
+ * Every record is scrubbed first (READINESS CO-1): a context key that names a
+ * secret loses its value, and emails, JWTs, DSNs and long keys are redacted
+ * from the message and the context, with the {@see ErrorScrubber} the error
+ * tracker uses. stderr is shipped to log aggregation, so it gets no raw path.
  */
 final class ErrorLogLogger extends AbstractLogger
 {
@@ -35,7 +41,9 @@ final class ErrorLogLogger extends AbstractLogger
     public function log($level, string|Stringable $message, array $context = []): void
     {
         $levelLabel = is_string($level) ? $level : (string) json_encode($level);
-        $interpolated = $this->interpolate((string) $message, $context);
+        $scrubber = new ErrorScrubber();
+        $context = $scrubber->context($context);
+        $interpolated = $scrubber->text($this->interpolate((string) $message, $context));
 
         $line = sprintf('[%s] %s', $levelLabel, $interpolated);
 

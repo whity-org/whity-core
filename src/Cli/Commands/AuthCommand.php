@@ -56,6 +56,7 @@ class AuthCommand extends BaseCommand implements CliCommand
 
             case 'on':
                 $settings->set(PasswordSignIn::SETTING, 'true');
+                self::audited($pdo, true);
                 echo "Password sign-in is on. People can sign in with their email and password again.\n";
                 echo "Turn it off again from Settings > Sign-in & SSO once the identity provider is back.\n";
 
@@ -69,6 +70,7 @@ class AuthCommand extends BaseCommand implements CliCommand
                     return 1;
                 }
                 $settings->set(PasswordSignIn::SETTING, 'false');
+                self::audited($pdo, false);
                 echo "Password sign-in is off. People sign in only with the identity provider.\n";
                 echo "To turn it back on: whity-cli auth password-sign-in on\n";
                 if (PasswordSignIn::forcedOn()) {
@@ -82,6 +84,21 @@ class AuthCommand extends BaseCommand implements CliCommand
         $this->showHelp();
 
         return 1;
+    }
+
+    /**
+     * The break-glass switch is on the trail like the Settings screen's
+     * (READINESS CO-7), recorded as coming from the command line: no person
+     * is named, because a shell has none.
+     */
+    private static function audited(\PDO $pdo, bool $on): void
+    {
+        (new \Whity\Core\Audit\AuditLogger($pdo, null, \Whity\Core\Audit\AuditOrigin::cli('auth password-sign-in ' . ($on ? 'on' : 'off'))))
+            ->record('settings.changed', [
+                'tenant_id'   => 0,
+                'target_type' => 'setting',
+                'metadata'    => ['changes' => [['key' => PasswordSignIn::SETTING, 'to' => $on ? 'true' : 'false']], 'break_glass' => true],
+            ]);
     }
 
     private function printStatus(bool $setting): void

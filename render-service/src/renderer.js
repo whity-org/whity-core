@@ -73,8 +73,9 @@ const DEFAULT_CHROMIUM_PATH = '/usr/bin/chromium';
  * Naming them changes nothing about how `launchBrowser()` behaves.
  */
 const CHROMIUM_LAUNCH_ARGS = [
-  // Standard, well-documented flags for running Chromium as root inside
-  // a container without a working sandbox namespace.
+  // Chromium's namespace sandbox needs privileges a default container doesn't
+  // grant, so it is off. The image runs as the unprivileged `node` user and
+  // every page is locked to data: and about: (lockDownPage) instead (CO-25).
   '--no-sandbox',
   '--disable-setuid-sandbox',
   // /dev/shm is small by default in Docker; Chromium falls back to
@@ -117,6 +118,35 @@ function getBrowser() {
   return launchBrowser();
 }
 
+/**
+ * Lock a page to the document it was handed (READINESS CO-25, TM-21).
+ *
+ * Everything a render needs travels inside the HTML: fonts and images are
+ * `data:` URIs (src/flow/fonts.js, and src/flow/document.js refuses any other
+ * image source). So the page may load `data:` and `about:` and nothing else.
+ * A request anywhere else, to the internal network, a cloud metadata address
+ * or the internet, can only come from content that escaped the HTML builder,
+ * and it is refused before it leaves the browser.
+ *
+ * Call it before `setContent`. The capability probe calls it too, so the
+ * probe measures the browser exactly as renders use it.
+ */
+const ALLOWED_URL = /^(?:data|about):/i;
+
+async function lockDownPage(page) {
+  await page.setRequestInterception(true);
+  page.on('request', (request) => {
+    if (request.isInterceptResolutionHandled && request.isInterceptResolutionHandled()) {
+      return;
+    }
+    if (ALLOWED_URL.test(request.url())) {
+      request.continue();
+    } else {
+      request.abort('blockedbyclient');
+    }
+  });
+}
+
 async function shutdown() {
   if (browserPromise) {
     const browser = await browserPromise.catch(() => null);
@@ -129,6 +159,7 @@ async function shutdown() {
 
 module.exports = {
   getBrowser,
+  lockDownPage,
   shutdown,
   CHROMIUM_LAUNCH_ARGS,
   chromiumExecutablePath,

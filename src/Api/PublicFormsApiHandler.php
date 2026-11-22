@@ -14,6 +14,7 @@ use Whity\Core\Form\FormUploadStore;
 use Whity\Core\Form\PublicFormLink;
 use Whity\Core\Form\PublicFormView;
 use Whity\Core\Form\SubmissionIssuer;
+use Whity\Core\Plugin\PublicForm\BotCheck;
 use Whity\Core\RateLimit\ClientIp;
 use Whity\Core\RateLimit\RateLimitRule;
 use Whity\Core\RateLimit\RateLimits;
@@ -215,6 +216,9 @@ final class PublicFormsApiHandler
         // WHIT-932: whether the workspace's plan removes "Built on Whity".
         // Null: the page shows it, as it always has.
         private readonly ?BrandingService $branding = null,
+        // READINESS TM-20: the instance's bot check, the one booking and chat
+        // use. Null (tests, a host that wires none): the trap field only.
+        private readonly ?BotCheck $bot = null,
     ) {
     }
 
@@ -258,6 +262,11 @@ final class PublicFormsApiHandler
 
             return Response::json(['data' => PublicFormView::form($form, $fields) + [
                 'built_on_whity' => $this->branding?->showsBuiltOnWhity((int) $form['tenant_id']) ?? true,
+                // The page shows the check above the send button only when
+                // the submit will ask for its token.
+                'bot_check' => $this->bot !== null && $this->bot->isRequired() && $this->bot->isReady()
+                    ? ['provider' => $this->bot->provider(), 'site_key' => $this->bot->siteKey()]
+                    : null,
             ]]);
         } catch (\Throwable $e) {
             // The generic sentence, never the exception's. A public endpoint that
@@ -385,7 +394,9 @@ final class PublicFormsApiHandler
      * `POST /api/v1/public/forms/{slug}/submissions` — record an answer from
      * somebody with no account.
      *
-     * The body is `{"data": {...}}` and NOTHING ELSE IS READ. Not
+     * The body is `{"data": {...}}` and nothing else that shapes the
+     * submission is read; `website` (the trap) and `bot_token` only decide
+     * whether it is taken at all ({@see self::botRefusal()}). Not
      * `submitted_by_profile_id`, not `form_version`, not `tenant_id`, not
      * `route_template_id` — the same rule {@see FormSubmissionsApiHandler::submit()}
      * states for authenticated callers, and it matters more here: a body that
@@ -442,12 +453,19 @@ final class PublicFormsApiHandler
                 return Response::error('This form is not accepting submissions right now', 422);
             }
 
+            // Before the per-form ceiling, so a flood that can't pass the
+            // check can't use up the form's hour for the people who can (TM-20).
+            $body = JsonBody::parsed($request);
+            $notAPerson = $this->botRefusal($request, $body);
+            if ($notAPerson instanceof Response) {
+                return $notAPerson;
+            }
+
             $ceiling = $this->throttleForm($tenantId, $formId);
             if ($ceiling instanceof Response) {
                 return $ceiling;
             }
 
-            $body = JsonBody::parsed($request);
             $data = $body['data'] ?? [];
             if (!is_array($data)) {
                 return Response::error('data must be an object of answers keyed by field key', 422);
@@ -586,6 +604,41 @@ final class PublicFormsApiHandler
     private static function signInRequired(): Response
     {
         return Response::error('Sign in to send this form', 401, ['reason' => 'sign_in_required']);
+    }
+
+    /**
+     * Whether this submission comes from a person (READINESS TM-20).
+     *
+     * People never see the `website` field, so anything in it is a bot. When
+     * the instance has a bot check set up, the submission must also carry a
+     * token the provider confirms; a provider chosen but not fully set up
+     * refuses rather than skips (#2203). With no provider chosen at all the
+     * form keeps working on the trap alone, as forms always have: refusing
+     * there would close every form on an instance that never set one up.
+     *
+     * @param array<string, mixed> $body
+     */
+    private function botRefusal(Request $request, array $body): ?Response
+    {
+        $trap = $body['website'] ?? '';
+        if (!is_string($trap) || $trap !== '') {
+            return Response::error('We could not take this form. Please try again.', 422);
+        }
+        if ($this->bot === null || !$this->bot->isRequired()) {
+            return null;
+        }
+        if (!$this->bot->isReady()) {
+            return Response::error('This form is temporarily unavailable', 503);
+        }
+        $verdict = $this->bot->verify(is_string($body['bot_token'] ?? null) ? $body['bot_token'] : '', ClientIp::fromRequest($request));
+        if ($verdict === BotCheck::UNREACHABLE) {
+            return Response::error('This form is temporarily unavailable', 503);
+        }
+        if ($verdict !== BotCheck::PASSED) {
+            return Response::error("We couldn't confirm you are a person. Try again.", 422, ['bot_token' => 'failed']);
+        }
+
+        return null;
     }
 
     private static function refuse(): Response

@@ -21,7 +21,7 @@
 # and copies in that one file + the server source, so neither the PHP file nor
 # the build script ships in the image.
 
-FROM node:22-bookworm-slim AS build
+FROM node:22.23.5-bookworm-slim AS build
 WORKDIR /workspace/render-service
 
 COPY render-service/package.json ./
@@ -43,7 +43,7 @@ ENV WHITY_BUILD_COMMIT=$WHITY_BUILD_COMMIT
 COPY src/Core/CoreVersion.php /workspace/src/Core/CoreVersion.php
 RUN npm run build:info
 
-FROM node:22-bookworm-slim AS runtime
+FROM node:22.23.5-bookworm-slim AS runtime
 
 # System Chromium + fonts baked into the image, including Arabic (Noto Naskh /
 # Noto Sans Arabic — hard cross-cutting RTL requirement across this app;
@@ -123,5 +123,14 @@ RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack 
     /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 EXPOSE 8130
+
+# READINESS CO-25: Chromium no longer runs as root. The image's own `node`
+# user owns nothing it can change here (the app is root-owned and read-only to
+# it), and the service writes nothing to disk. Chromium still runs with
+# --no-sandbox: its namespace sandbox needs privileges a default container
+# doesn't grant. What stands in for it is this user, every page locked to
+# `data:` and `about:` (lockDownPage in src/renderer.js), and no capabilities
+# or privilege gain in the compose files.
+USER node
 
 CMD ["node", "src/server.js"]

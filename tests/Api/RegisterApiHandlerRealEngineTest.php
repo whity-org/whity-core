@@ -281,6 +281,36 @@ final class RegisterApiHandlerRealEngineTest extends TestCase
         self::assertSame(0, (int) $this->pdo->query("SELECT COUNT(*) FROM profile_emails WHERE email = 'b@acme.test'")->fetchColumn());
     }
 
+    public function testOneAddressCanTryOnlySoOftenAnHour(): void
+    {
+        // READINESS CE-8: every attempt counts, valid or not.
+        $handler = new RegisterApiHandler($this->pdo, $this->settings, store: new \Whity\Core\Store\ArraySharedStore());
+        $attempt = static fn (): \Whity\Sdk\Http\Response => $handler->register(new Request(
+            'POST',
+            '/api/register',
+            ['X-Whity-Client-Ip' => '203.0.113.9'],
+            (string) json_encode(['email' => 'not-an-address', 'password' => 'x', 'tenant_name' => 'X'])
+        ));
+
+        for ($i = 0; $i < 10; $i++) {
+            self::assertSame(422, $attempt()->getStatusCode());
+        }
+        self::assertSame(429, $attempt()->getStatusCode());
+    }
+
+    public function testOneEmailCanBeTriedOnlySoOftenAnHour(): void
+    {
+        $handler = new RegisterApiHandler($this->pdo, $this->settings, store: new \Whity\Core\Store\ArraySharedStore());
+        $codes = [];
+        for ($i = 0; $i < 4; $i++) {
+            $codes[] = $handler->register(new Request('POST', '/api/register', ['X-Whity-Client-Ip' => '198.51.100.' . $i], (string) json_encode([
+                'email' => 'Owner@Bakery.test', 'password' => 'correct-horse-battery', 'tenant_name' => 'Example Bakery ' . $i,
+            ])))->getStatusCode();
+        }
+
+        self::assertSame(429, $codes[3], 'statuses: ' . implode(',', $codes));
+    }
+
     public function testWeakPasswordIsRejected(): void
     {
         $res = $this->register([

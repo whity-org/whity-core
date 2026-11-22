@@ -193,6 +193,27 @@ final class IdentityProvidersApiHandlerRealEngineTest extends TestCase
         self::assertSame(404, $res->getStatusCode());
     }
 
+    public function testAddingChangingAndRemovingAProviderIsAuditedWithoutTheSecret(): void
+    {
+        // READINESS CO-8: a sign-in provider decides who gets in.
+        $handler = new IdentityProvidersApiHandler($this->pdo, $this->secrets, new \Whity\Core\Audit\AuditLogger($this->pdo));
+        $body = $this->validBody();
+        $created = $handler->create(new Request('POST', '/api/identity-providers', [], (string) json_encode($body)));
+        self::assertSame(201, $created->getStatusCode(), $created->getBody());
+        $id = (int) $this->decode($created)['data']['id'];
+        $handler->update(new Request('PATCH', '/api/identity-providers/' . $id, [], (string) json_encode(['display_name' => 'Staff sign-in'])), ['id' => (string) $id]);
+        $handler->delete(new Request('DELETE', '/api/identity-providers/' . $id, [], ''), ['id' => (string) $id]);
+
+        $stmt = $this->pdo->query("SELECT action, target_id, metadata FROM audit_log WHERE action LIKE 'auth.identity_provider.%' ORDER BY id");
+        self::assertNotFalse($stmt);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        self::assertSame(['auth.identity_provider.created', 'auth.identity_provider.updated', 'auth.identity_provider.deleted'], array_column($rows, 'action'));
+        foreach ($rows as $row) {
+            self::assertSame($id, (int) $row['target_id']);
+            self::assertStringNotContainsString('super-secret-value', (string) $row['metadata']);
+        }
+    }
+
     public function testDeleteRemovesProviderThen404(): void
     {
         $id = (int) $this->decode($this->post($this->validBody()))['data']['id'];

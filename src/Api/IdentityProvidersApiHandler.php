@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use PDO;
+use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Core\Identity\IdentityProviderRepository;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -49,8 +50,13 @@ final class IdentityProvidersApiHandler
 
     private IdentityProviderRepository $repo;
 
-    public function __construct(PDO $db, private readonly EncryptedSecretStore $secrets)
-    {
+    public function __construct(
+        PDO $db,
+        private readonly EncryptedSecretStore $secrets,
+        // READINESS CO-8: who added, changed or removed a sign-in provider.
+        // Null in tests that don't look at the trail.
+        private readonly ?AuditLoggerInterface $audit = null,
+    ) {
         $this->repo = new IdentityProviderRepository($db);
     }
 
@@ -114,11 +120,14 @@ final class IdentityProvidersApiHandler
             if (stripos($e->getMessage(), 'unique') !== false) {
                 return Response::error('This provider is already configured for your tenant', 409);
             }
-            error_log('[identity-providers] create failed: ' . $e->getMessage());
+            \Whity\Core\Log\ScrubbedErrorLog::failure('[identity-providers] create failed', $e);
             return Response::error('Failed to create identity provider', 500);
         }
 
-        return Response::json(['data' => $this->repo->findById($id, $tenantId)], 201);
+        $row = $this->repo->findById($id, $tenantId);
+        $this->audited('auth.identity_provider.created', $tenantId, $id, $row, $data);
+
+        return Response::json(['data' => $row], 201);
     }
 
     /**
@@ -192,15 +201,17 @@ final class IdentityProvidersApiHandler
             if (stripos($e->getMessage(), 'unique') !== false) {
                 return Response::error('This provider is already configured for your tenant', 409);
             }
-            error_log('[identity-providers] update failed: ' . $e->getMessage());
+            \Whity\Core\Log\ScrubbedErrorLog::failure('[identity-providers] update failed', $e);
             return Response::error('Failed to update identity provider', 500);
         }
 
         if ($affected === 0) {
             return Response::error('Identity provider not found', 404);
         }
+        $row = $this->repo->findById($id, $tenantId);
+        $this->audited('auth.identity_provider.updated', $tenantId, $id, $row, $data);
 
-        return Response::json(['data' => $this->repo->findById($id, $tenantId)]);
+        return Response::json(['data' => $row]);
     }
 
     /**
@@ -217,10 +228,33 @@ final class IdentityProvidersApiHandler
             return Response::error('Invalid id', 400);
         }
 
+        $row = $this->repo->findById($id, $tenantId);
         if ($this->repo->delete($id, $tenantId) === 0) {
             return Response::error('Identity provider not found', 404);
         }
+        $this->audited('auth.identity_provider.deleted', $tenantId, $id, $row, []);
+
         return Response::json([], 204);
+    }
+
+    /**
+     * Which provider and which fields changed; never a value, so a client
+     * secret can't reach the trail.
+     *
+     * @param array<string, mixed>|null $row
+     * @param array<string, mixed>      $data
+     */
+    private function audited(string $action, int $tenantId, int $id, ?array $row, array $data): void
+    {
+        $this->audit?->record($action, [
+            'tenant_id'   => $tenantId,
+            'target_type' => 'identity_provider',
+            'target_id'   => $id,
+            'metadata'    => [
+                'provider' => is_array($row) ? ($row['provider'] ?? null) : null,
+                'fields'   => array_map('strval', array_keys($data)),
+            ],
+        ]);
     }
 
     /**

@@ -165,6 +165,42 @@ class UsersApiHandler
         $this->logger = $logger;
     }
 
+    /** READINESS TM-14: the plan's staff limit, as invitations already use it. */
+    private ?\Whity\Core\Seat\SeatService $seats = null;
+
+    public function useSeats(\Whity\Core\Seat\SeatService $seats): void
+    {
+        $this->seats = $seats;
+    }
+
+    /**
+     * READINESS TM-14: `seats.enforcement = block` held only at invitation, so
+     * adding a person here went past the plan's staff limit. Somebody who
+     * already holds a seat in the workspace takes no second one. Inside a
+     * transaction on PostgreSQL the workspace row is locked first, so two adds
+     * at once can't both take the last seat.
+     */
+    private function seatRefusal(int $tenantId, int $profileId): ?Response
+    {
+        if ($this->seats === null) {
+            return null;
+        }
+        if ($this->db->inTransaction() && $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
+            $this->db->prepare('SELECT id FROM tenants WHERE id = ? FOR UPDATE')->execute([$tenantId]);
+        }
+        $seat = $this->seats->decide($tenantId, $profileId);
+        if ($seat->allowed) {
+            return null;
+        }
+
+        return Response::error(
+            "Your workspace's plan includes {$seat->limit} staff, and all of them are taken. "
+            . 'To add more people, move the workspace to a larger plan on Billing. Nobody already here is removed.',
+            409,
+            ['code' => 'seat_limit', 'limit' => $seat->limit, 'used' => $seat->used],
+        );
+    }
+
     /**
      * #2235: the 403 when the caller is giving somebody a role with permissions
      * the caller does not hold in the tenant they act in, or null to go ahead.
@@ -762,6 +798,12 @@ class UsersApiHandler
                         $this->db->rollBack();
                     }
                     return Response::error('User already exists for this tenant', 409);
+                }
+                if (($noSeat = $this->seatRefusal($tenantId, $profileId)) !== null) {
+                    if ($ownTx && $this->db->inTransaction()) {
+                        $this->db->rollBack();
+                    }
+                    return $noSeat;
                 }
 
                 // Which shape this act took, for the audit payload below (#889).
@@ -1736,6 +1778,9 @@ class UsersApiHandler
             // happily — the class of divergence that only shows up in CI's
             // PostgreSQL shard.
             $primaryLiteral = $isPrimary ? 'true' : 'false';
+            if (($noSeat = $this->seatRefusal($ownerTenantId, $profileId)) !== null) {
+                return $noSeat;
+            }
             $insert = $this->db->prepare(
                 "INSERT INTO memberships (profile_id, tenant_id, role_id, ou_id, is_primary, status, created_at)
                  VALUES (?, ?, ?, ?, {$primaryLiteral}, 'active', NOW())"

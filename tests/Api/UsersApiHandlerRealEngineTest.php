@@ -55,6 +55,33 @@ final class UsersApiHandlerRealEngineTest extends TestCase
      * a profile + verified primary email + an ACTIVE membership carrying THAT
      * role — not the `user` default.
      */
+    /**
+     * READINESS TM-14: with `seats.enforcement = block`, adding a person here
+     * holds to the plan's staff limit, as an invitation already does.
+     */
+    public function testAddingAPersonDirectlyHoldsToTheStaffLimit(): void
+    {
+        $settings = new \Whity\Core\Settings\SettingsService(
+            new \Whity\Core\Settings\GlobalSettingsRepository($this->pdo),
+            new \Whity\Core\Settings\TenantSettingsRepository($this->pdo),
+        );
+        $settings->setGlobal(\Whity\Core\Settings\SettingsRegistry::SEATS_ENFORCEMENT, 'block');
+        $entitlements = new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($this->pdo));
+        $entitlements->set(1, 'members.max', '1');
+        $handler = $this->handler();
+        $handler->useSeats(new \Whity\Core\Seat\SeatService($this->pdo, $entitlements, $settings));
+
+        $first = $handler->create($this->authedRequest('POST', '/api/users', ['email' => 'first-seat@example.com', 'password' => 'first-seat-password', 'role' => 'user', 'tenantId' => 1]));
+        $second = $handler->create($this->authedRequest('POST', '/api/users', ['email' => 'second-seat@example.com', 'password' => 'second-seat-password', 'role' => 'user', 'tenantId' => 1]));
+
+        $this->assertSame(201, $first->getStatusCode(), $first->getBody());
+        $this->assertSame(409, $second->getStatusCode(), $second->getBody());
+        $this->assertStringContainsString('seat_limit', $second->getBody());
+        $stmt = $this->pdo->query("SELECT COUNT(*) FROM memberships m JOIN profile_emails e ON e.profile_id = m.profile_id WHERE e.email = 'second-seat@example.com' AND m.tenant_id = 1");
+        $this->assertNotFalse($stmt);
+        $this->assertSame(0, (int) $stmt->fetchColumn(), 'no membership was added past the limit');
+    }
+
     public function testCreatePersistsChosenRoleByNameAsMembership(): void
     {
         $handler = $this->handler();
