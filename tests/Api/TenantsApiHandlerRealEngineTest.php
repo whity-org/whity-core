@@ -731,8 +731,8 @@ final class TenantsApiHandlerRealEngineTest extends TestCase
         ), ['id' => 1]);
 
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame('tenant-a-new', $this->pdo->query('SELECT slug FROM tenants WHERE id = 1')->fetchColumn());
-        $this->assertSame('tenant-a', $this->pdo->query('SELECT handle FROM tenant_handle_history WHERE tenant_id = 1')->fetchColumn());
+        $this->assertSame('tenant-a-new', $this->scalarOf('SELECT slug FROM tenants WHERE id = 1'));
+        $this->assertSame('tenant-a', $this->scalarOf('SELECT handle FROM tenant_handle_history WHERE tenant_id = 1'));
     }
 
     /** Only an owner changes the handle; an admin who isn't one is told so (HD.4). */
@@ -749,7 +749,7 @@ final class TenantsApiHandlerRealEngineTest extends TestCase
 
         $this->assertSame(403, $response->getStatusCode());
         $this->assertSame('handle_owner_only', json_decode($response->getBody(), true)['details']['code']);
-        $this->assertSame('tenant-a', $this->pdo->query('SELECT slug FROM tenants WHERE id = 1')->fetchColumn());
+        $this->assertSame('tenant-a', $this->scalarOf('SELECT slug FROM tenants WHERE id = 1'));
     }
 
     /** A reserved handle is refused with its code and an Arabic sentence (HD.2). */
@@ -782,7 +782,15 @@ final class TenantsApiHandlerRealEngineTest extends TestCase
         );
 
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame('tenant-a', $this->pdo->query('SELECT slug FROM tenants WHERE id = 1')->fetchColumn());
+        $this->assertSame('tenant-a', $this->scalarOf('SELECT slug FROM tenants WHERE id = 1'));
+    }
+
+    private function scalarOf(string $sql): mixed
+    {
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute();
+
+        return $stmt->fetchColumn();
     }
 
     private function asProfile(Request $request, int $profileId): Request

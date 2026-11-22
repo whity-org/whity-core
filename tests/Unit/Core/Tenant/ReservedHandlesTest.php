@@ -23,7 +23,7 @@ final class ReservedHandlesTest extends TestCase
 
         $missing = [];
         foreach ($this->paths($manifest) as $path) {
-            $segment = strtolower(explode('/', ltrim($path, '/'))[0] ?? '');
+            $segment = strtolower(explode('/', ltrim($path, '/'))[0]);
             $segment = preg_replace('/\.[a-z]+$/', '', ltrim($segment, '.')) ?? '';
             if ($segment === '' || str_starts_with($segment, ':') || strlen($segment) < HandleRules::MIN) {
                 continue;
