@@ -277,6 +277,15 @@ it calls the plugin's own routes through the app with
 works only on this plugin's routes, never with the person's cookies. See
 "An embedded screen that calls its own API" in `docs/wiki/Plugin-Development.md`.
 
+### Declaring the services and tables you use (1.151)
+
+`Contribute\PluginCapabilitiesInterface` lists the `PluginContext` services a
+plugin uses (`Context\Service`) and its own workspace tables. A declaring
+plugin gets only those from its context, and `$ctx->database()` gives
+`Database\WorkspaceTables`, which holds every select, insert, update and delete
+to the context's workspace. See "Declare what you use" in
+`docs/wiki/Plugin-Development.md`.
+
 ### Declaring requirements
 
 ```php

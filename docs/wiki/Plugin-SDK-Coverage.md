@@ -1033,13 +1033,14 @@ Planned: 0.2.28.
 - Upsert and SequenceAllocator (SDK 1.25)
 - Undeclared-reference linter (SDK 1.26)
 - Offline-host conformance kit (SDK 1.27)
+- $ctx->database(): the plugin's declared tables, every call held to the workspace by the host (WorkspaceTables) (SDK 1.151)
+- PluginCapabilitiesInterface: a plugin declares the context services and tables it uses and gets only those (SDK 1.151)
 
 **Missing**
 
-- A runtime connection handle from the SDK
 - Read-only views of core tables
 
-**Needs a design.** Workspace isolation is checked by lint and tests, not enforced. A connection bound to the workspace is a design question.
+**Needs a design.** Since SDK 1.151 a plugin's own tables can be reached through a handle the host binds to the workspace, and a plugin that declares its services gets only those from its context. Plugin SQL written by hand is still checked by lint and tests, and plugin PHP runs in the host's process, so the declaration is least privilege, not a sandbox.
 
 Planned: later.
 

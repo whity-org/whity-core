@@ -1225,13 +1225,20 @@
                 {
                     "what": "Offline-host conformance kit",
                     "since": "1.27"
+                },
+                {
+                    "what": "$ctx->database(): the plugin's declared tables, every call held to the workspace by the host (WorkspaceTables)",
+                    "since": "1.151"
+                },
+                {
+                    "what": "PluginCapabilitiesInterface: a plugin declares the context services and tables it uses and gets only those",
+                    "since": "1.151"
                 }
             ],
             "missing": [
-                "A runtime connection handle from the SDK",
                 "Read-only views of core tables"
             ],
-            "security": "Workspace isolation is checked by lint and tests, not enforced. A connection bound to the workspace is a design question.",
+            "security": "Since SDK 1.151 a plugin's own tables can be reached through a handle the host binds to the workspace, and a plugin that declares its services gets only those from its context. Plugin SQL written by hand is still checked by lint and tests, and plugin PHP runs in the host's process, so the declaration is least privilege, not a sandbox.",
             "plan": "later"
         },
         {
