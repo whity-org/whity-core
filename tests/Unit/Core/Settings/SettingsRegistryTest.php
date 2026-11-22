@@ -156,7 +156,8 @@ final class SettingsRegistryTest extends TestCase
              // WHIT-1321: quotes.
              'sales.quote_valid_days', 'sales.quote_route_template_id',
              // WHIT-1323: the trading emails' switches.
-             'sales.email_quote', 'sales.email_invoice', 'sales.email_receipt', 'sales.email_reminder'],
+             'sales.email_quote', 'sales.email_invoice', 'sales.email_receipt', 'sales.email_reminder',
+             'accounting.invoice_route_template_id', 'accounting.invoice_payment_terms_days', 'accounting.prices_include_tax'],
             SettingsRegistry::keys()
         );
     }
@@ -511,7 +512,8 @@ final class SettingsRegistryTest extends TestCase
         // 154 since WHIT-1235: inventory.fefo and inventory.expiry_warning_days.
         // 155 since WHIT-1334: calendar.walkins_enabled.
         // 156 since #1730: documents.qr_public_signer_names.
-        self::assertCount(156, $describe);
+        // 159 since WHIT-1318 A2a: accounting.invoice_route_template_id, _payment_terms_days and prices_include_tax.
+        self::assertCount(159, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
