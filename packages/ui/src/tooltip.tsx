@@ -70,4 +70,32 @@ function TooltipContent({
   )
 }
 
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
+/**
+ * The icon rail's tooltip (AppShellCollapsed): the item's name beside the
+ * rail, towards the page. The rail sits on the right in Arabic, so the side
+ * follows the document's direction (Radix sides are physical). With `show`
+ * false the child renders on its own, so the expanded sidebar has no tooltips
+ * over labels it already shows.
+ */
+function RailTooltip({
+  label,
+  show = true,
+  children,
+}: {
+  label: React.ReactNode
+  show?: boolean
+  children: React.ReactElement
+}) {
+  if (!show) return children
+  const rtl = typeof document !== "undefined" && document.documentElement.dir === "rtl"
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side={rtl ? "left" : "right"} data-slot="rail-tooltip">
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider, RailTooltip }

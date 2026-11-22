@@ -6,6 +6,7 @@ import { IconCheck, IconPlus, IconSearch, IconSelector } from "@tabler/icons-rea
 import { Popover, PopoverContent, PopoverTrigger } from "./popover"
 import { RoleSummary, type RoleSummaryLabels } from "./role-summary"
 import { TenantLogo } from "./tenant-logo"
+import { RailTooltip } from "./tooltip"
 import { cn } from "./utils"
 
 /**
@@ -87,26 +88,29 @@ function TenantSwitcher({
 
   return (
     <Popover open={open} onOpenChange={(next) => { setOpen(next); if (!next) setQuery("") }}>
+      {/* In the rail the chip is a 40px square on the icons' column, its
+          logo the same 24px as an icon's box, named by a tooltip. */}
+      <RailTooltip label={name} show={collapsed}>
       <PopoverTrigger asChild>
         <button
           type="button"
           data-slot="tenant-switcher"
           disabled={disabled}
           aria-label={triggerLabel}
-          title={collapsed ? name : undefined}
           className={cn(
             "flex min-h-10 w-full items-center gap-2 rounded-control-lg border border-border bg-card px-2 py-1.5 text-start text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
-            collapsed && "w-10 justify-center px-0",
+            collapsed && "size-10 shrink-0 justify-center rounded-lg p-0",
             className
           )}
         >
-          <TenantLogo name={name} src={current?.logoUrl} size={22} showName={!collapsed} className="flex-1" />
+          <TenantLogo name={name} src={current?.logoUrl} size={collapsed ? 24 : 22} showName={!collapsed} className={collapsed ? undefined : "flex-1"} />
           {!collapsed && <IconSelector aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />}
         </button>
       </PopoverTrigger>
+      </RailTooltip>
       <PopoverContent
         align="start"
-        side={collapsed ? "right" : "bottom"}
+        side={collapsed ? (typeof document !== "undefined" && document.documentElement.dir === "rtl" ? "left" : "right") : "bottom"}
         className="w-72 gap-0 p-1"
       >
         {workspaces.length >= SEARCH_FROM && (

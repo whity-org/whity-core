@@ -8,6 +8,7 @@ import {
   IconX,
 } from "@tabler/icons-react"
 
+import { RailTooltip } from "./tooltip"
 import { cn } from "./utils"
 
 /**
@@ -329,23 +330,29 @@ export function AppSidebar({
   const renderItem = (item: AppSidebarNavItem) => {
     const count = item.count && item.count > 0 ? item.count : 0
     const countText = item.countLabel ?? String(count)
+    // In the rail (AppShellCollapsed) each link is a 40px square on one
+    // centred column, named by its tooltip and, for screen readers, by the
+    // label it keeps off screen.
     return (
+      <RailTooltip key={item.id} label={item.label} show={collapsed}>
       <Link
-        key={item.id}
         href={item.href}
         aria-current={item.active ? "page" : undefined}
-        title={collapsed ? item.label : undefined}
-        aria-label={collapsed && count > 0 ? `${item.label}, ${countText}` : undefined}
+        data-slot="app-sidebar-link"
         className={cn(
           "relative flex items-center gap-2.5 rounded-md px-2 py-[7px] text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:min-h-11",
           item.active
             ? "bg-sidebar-primary text-sidebar-primary-foreground"
             : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-          collapsed && "mx-auto h-9 w-10 justify-center px-0 py-0"
+          collapsed && "mx-auto size-10 shrink-0 justify-center rounded-lg p-0 max-md:min-h-10"
         )}
       >
-        {item.icon && <span className="shrink-0 [&_svg]:size-5">{item.icon}</span>}
-        {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
+        {item.icon && <span className="shrink-0 [&_svg]:size-5" aria-hidden={collapsed || undefined}>{item.icon}</span>}
+        {collapsed ? (
+          <span className="sr-only">{count > 0 ? `${item.label}, ${countText}` : item.label}</span>
+        ) : (
+          <span className="min-w-0 flex-1 truncate">{item.label}</span>
+        )}
         {count > 0 && !collapsed && (
           <span
             data-slot="app-sidebar-count"
@@ -359,10 +366,11 @@ export function AppSidebar({
           <span
             data-slot="app-sidebar-count-dot"
             aria-hidden="true"
-            className="absolute end-2 top-[7px] size-[7px] rounded-full bg-primary ring-2 ring-sidebar"
+            className="absolute end-1.5 top-1.5 size-2 rounded-full bg-primary ring-2 ring-sidebar"
           />
         )}
       </Link>
+      </RailTooltip>
     )
   }
 
@@ -402,7 +410,14 @@ export function AppSidebar({
       onScroll={measure}
       data-slot="app-sidebar-nav"
       aria-label={navLabel}
-      className={cn("min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3", collapsed && "px-2")}
+      className={cn(
+        "min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 [scrollbar-width:thin]",
+        // The rail is 56px: a native scrollbar would take a third of it and
+        // push the icons off-centre. It still scrolls by wheel, touch and
+        // keyboard (focus moves the link into view), and the fades at either
+        // end say there is more.
+        collapsed && "space-y-2 px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      )}
     >
       {rendered.map(({ group, items }, index) => {
         const open = isGroupOpen(group)
@@ -414,7 +429,7 @@ export function AppSidebar({
           <div
             key={group.id}
             data-slot="app-sidebar-group"
-            className={cn("grid gap-px", collapsed && index > 0 && "border-t border-sidebar-border pt-2")}
+            className={cn("grid gap-px", collapsed && "justify-items-center gap-1", collapsed && index > 0 && "border-t border-sidebar-border pt-2")}
           >
             {showHeading && isDisclosure && (
               <button
@@ -455,7 +470,7 @@ export function AppSidebar({
               permission filtering would keep passing after that filtering
               broke. Either query by CSS or open the group first.
             */}
-            <div id={bodyId} hidden={!open} className="grid gap-px">
+            <div id={bodyId} hidden={!open} className={cn("grid gap-px", collapsed && "justify-items-center gap-1")}>
               {items.map(renderItem)}
             </div>
           </div>
@@ -477,7 +492,7 @@ export function AppSidebar({
   )
 
   const pinnedSection = pinned.length > 0 && (
-    <div data-slot="app-sidebar-pinned" className={cn("grid shrink-0 gap-px border-t border-sidebar-border px-3 py-2", collapsed && "px-2")}>
+    <div data-slot="app-sidebar-pinned" className={cn("grid shrink-0 gap-px border-t border-sidebar-border px-3 py-2", collapsed && "justify-items-center gap-1 px-2")}>
       {pinned.flatMap((group) => group.items).map(renderItem)}
     </div>
   )
@@ -561,8 +576,8 @@ export function AppSidebar({
         </button>
 
         {(header || tenantSwitcher || teamSwitcher) && (
-          <div className={cn("flex shrink-0 flex-col gap-3 px-3 pt-4 pe-14 md:pe-3", collapsed && "items-center md:px-2")}>
-            {header && <div className="px-1.5 pt-0.5 pb-1.5">{header}</div>}
+          <div className={cn("flex shrink-0 flex-col gap-3 px-3 pt-4 pe-14 md:pe-3", collapsed && "items-center md:px-2 md:pe-2 md:pt-3 md:pb-2")}>
+            {header && <div className={cn("px-1.5 pt-0.5 pb-1.5", collapsed && "flex w-10 justify-center px-0 pb-0")}>{header}</div>}
             {(tenantSwitcher || teamSwitcher) && (
               <div className="flex flex-col gap-1.5">
                 {tenantSwitcher}
@@ -581,9 +596,10 @@ export function AppSidebar({
         <button
           type="button"
           aria-label={collapsed ? expandAriaLabel : collapseAriaLabel}
+          data-slot="app-sidebar-collapse"
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "hidden shrink-0 items-center justify-center gap-1.5 border-t border-sidebar-border px-3 py-2 text-xs text-muted-foreground outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring",
+            "hidden min-h-10 shrink-0 items-center justify-center gap-1.5 border-t border-sidebar-border px-3 py-2 text-xs text-muted-foreground outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring",
             !forcedRail && "md:flex"
           )}
         >
@@ -597,7 +613,14 @@ export function AppSidebar({
           )}
         </button>
 
-        {footer && <div className="shrink-0 border-t border-sidebar-border px-3 py-3">{footer}</div>}
+        {footer && (
+          <div
+            data-slot="app-sidebar-footer"
+            className={cn("shrink-0 border-t border-sidebar-border px-3 py-3", collapsed && "flex justify-center px-2 py-2")}
+          >
+            {footer}
+          </div>
+        )}
       </aside>
     </>
   )
