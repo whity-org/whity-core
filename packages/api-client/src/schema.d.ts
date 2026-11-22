@@ -371,7 +371,7 @@ export interface paths {
         put?: never;
         /**
          * Enter a supplier bill
-         * @description A draft posts nothing. Lines are costs or things bought (an expense or an asset account; default Other costs), each with the tax to reclaim from its tax category. `supplier_number` is the supplier's own invoice number.
+         * @description A draft posts nothing. Lines are costs or things bought (an expense or an asset account; default Other costs), each with the tax to reclaim from its tax category. `supplier_number` is the supplier's own invoice number. Bills are not matched to stock receipts yet; that comes with stock in the books.
          */
         post: operations["post_api_v1_accounting_bills"];
         delete?: never;

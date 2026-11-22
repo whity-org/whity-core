@@ -226,7 +226,7 @@ final class AccountingApiSchemas
             ]),
             self::route('POST', '/api/accounting/bills', 'bills:write', [
                 'summary' => 'Enter a supplier bill',
-                'description' => 'A draft posts nothing. Lines are costs or things bought (an expense or an asset account; default Other costs), each with the tax to reclaim from its tax category. `supplier_number` is the supplier\'s own invoice number.',
+                'description' => 'A draft posts nothing. Lines are costs or things bought (an expense or an asset account; default Other costs), each with the tax to reclaim from its tax category. `supplier_number` is the supplier\'s own invoice number. Bills are not matched to stock receipts yet; that comes with stock in the books.',
                 'tags' => $tags,
                 'request' => 'AccountingBillRequest',
                 'responses' => [201 => self::json('The draft', $bill), 200 => self::json('The same draft, already made with this key', $bill)] + $refused + self::auth(),
