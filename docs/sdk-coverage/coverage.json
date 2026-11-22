@@ -1375,13 +1375,17 @@
                 {
                     "what": "referenceSelect multiple: several rows from an API-backed source, shown as chips",
                     "since": "1.121"
+                },
+                {
+                    "what": "Embedded screens call their own plugin's API through a message bridge (FrameBridge), with a five-minute token bound to the plugin's routes",
+                    "since": "1.150"
                 }
             ],
             "missing": [
                 "Native screens for store plugins (custom screens need a change in this repository)",
                 "Blocks outside /admin/x pages"
             ],
-            "security": "Embedded screens run in a sandboxed frame with no origin of their own (0.2.30). A message bridge and a scoped token are still needed before an embedded screen can call the API.",
+            "security": "Embedded screens run in a sandboxed frame with no origin of their own (0.2.30). Since SDK 1.150 they reach the API only through the app's message bridge, with a short-lived token that works on their own plugin's routes alone. Native screens for store plugins still need a design.",
             "plan": "later"
         },
         {

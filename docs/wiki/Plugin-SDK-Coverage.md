@@ -863,13 +863,14 @@ Planned: 0.2.28.
 - PluginOnboardingInterface: a guided, step-by-step setup drawn by core as a stepper (SDK 1.109)
 - Setup inputs: time, weekly hours, checkbox group, colour swatches, prefilled repeating rows (SDK 1.113)
 - referenceSelect multiple: several rows from an API-backed source, shown as chips (SDK 1.121)
+- Embedded screens call their own plugin's API through a message bridge (FrameBridge), with a five-minute token bound to the plugin's routes (SDK 1.150)
 
 **Missing**
 
 - Native screens for store plugins (custom screens need a change in this repository)
 - Blocks outside /admin/x pages
 
-**Needs a design.** Embedded screens run in a sandboxed frame with no origin of their own (0.2.30). A message bridge and a scoped token are still needed before an embedded screen can call the API.
+**Needs a design.** Embedded screens run in a sandboxed frame with no origin of their own (0.2.30). Since SDK 1.150 they reach the API only through the app's message bridge, with a short-lived token that works on their own plugin's routes alone. Native screens for store plugins still need a design.
 
 Planned: later.
 

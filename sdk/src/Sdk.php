@@ -1551,6 +1551,14 @@ namespace Whity\Sdk;
  *
  * Purely additive.)
  *
+ * 1.150 (EMBEDDED SCREENS CALL THEIR OWN API (#1688): an `embed` screen's page talks to the app over a
+ * postMessage bridge, protocol {@see Frontend\FrameBridge::PROTOCOL}; {@see Frontend\FrameBridge::script()}
+ * is the page side (`whity.ready()`, `request()`, `resize()`, `navigate()`, `toast()`). The app makes the
+ * page's API calls with a five-minute token bound to the routes of the plugin that registered the screen,
+ * never with the person's cookies, and the route's permission is checked against the person as usual.
+ * A core route or another plugin's route refuses the token (WHIT-1329).
+ *
+ * Purely additive: one new class; an embed page that does not use the bridge works as before.)
  * 1.153 (COMPANY STAMPS: {@see Hooks\Events::ROUTE_STAMPED} (`route.stamped`, with its `.async` twin)
  * fires after a holder applied a company stamp on a route's stamp step, with ids only and the
  * `stamp_id` (#1729).
