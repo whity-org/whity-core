@@ -646,15 +646,22 @@ final class DocumentsApiHandlerRealEngineTest extends TestCase
         // The renderer is reachable again; the print was refused, not missed.
         $this->fakeRender->readiness = RenderReadiness::ready('0.2.27', '0.2.27');
 
-        $this->pdo->exec('PRAGMA foreign_keys = OFF');
+        // A real route and step (both foreign keys are enforced on PostgreSQL),
+        // whose finalisation made this document and was refused.
+        $this->pdo->prepare('INSERT INTO document_routes (tenant_id, document_id, title, created_by) VALUES (:tenant, :document, :title, :by)')
+            ->execute([':tenant' => self::TENANT, ':document' => $documentId, ':title' => 'Ethics application', ':by' => self::OWNER]);
+        $routeId = (int) $this->pdo->query('SELECT MAX(id) FROM document_routes')->fetchColumn();
+        $this->pdo->prepare("INSERT INTO document_route_steps (tenant_id, route_id, position, rule_kind) VALUES (:tenant, :route, 1, 'role')")
+            ->execute([':tenant' => self::TENANT, ':route' => $routeId]);
+        $stepId = (int) $this->pdo->query('SELECT MAX(id) FROM document_route_steps')->fetchColumn();
         $this->pdo->prepare(
             "INSERT INTO route_finalisations (tenant_id, route_id, step_id, subject_type, subject_id, status, reason, document_id, attempts)
-             VALUES (:tenant, 3, 18, 'form_submission', 4, 'failed', 'render_refused', :document, 1)"
-        )->execute([':tenant' => self::TENANT, ':document' => $documentId]);
+             VALUES (:tenant, :route, :step, 'form_submission', 4, 'failed', 'render_refused', :document, 1)"
+        )->execute([':tenant' => self::TENANT, ':route' => $routeId, ':step' => $stepId, ':document' => $documentId]);
 
         $shown = self::data($this->call('show', self::OWNER, ['id' => (string) $documentId]));
         self::assertSame(
-            ['reason' => 'The PDF could not be laid out', 'fix' => null, 'code' => 'render_refused', 'route_id' => 3],
+            ['reason' => 'The PDF could not be laid out', 'fix' => null, 'code' => 'render_refused', 'route_id' => $routeId],
             $shown['pdf_pending']
         );
     }
