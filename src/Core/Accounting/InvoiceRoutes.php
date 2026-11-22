@@ -22,12 +22,14 @@ final class InvoiceRoutes implements InvoiceApprovals
         private readonly DocumentRouter $router,
         private readonly RouteTemplateRepository $templates,
         private readonly \Closure $settings,
+        private readonly string $settingKey = SettingsRegistry::ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID,
+        private readonly string $subjectType = InvoiceRouteSubject::TYPE,
     ) {
     }
 
     public function issue(int $tenantId, ?int $actor, array $invoice): ?int
     {
-        $templateId = (int) (($this->settings)($tenantId)[SettingsRegistry::ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID] ?? 0);
+        $templateId = (int) (($this->settings)($tenantId)[$this->settingKey] ?? 0);
         $template = $templateId > 0 ? $this->templates->findById($templateId, $tenantId) : null;
         if ($template === null) {
             return null;
@@ -37,11 +39,13 @@ final class InvoiceRoutes implements InvoiceApprovals
             $this->templates->edgesFor((int) $template['id'], $tenantId),
         );
         $name = is_string($invoice['contact_name'] ?? null) ? $invoice['contact_name'] : '';
-        $title = 'Invoice for ' . ($name !== '' ? $name : 'a customer');
+        $title = $this->subjectType === InvoiceRouteSubject::BILL
+            ? 'Bill from ' . ($name !== '' ? $name : 'a supplier')
+            : 'Invoice for ' . ($name !== '' ? $name : 'a customer');
         $issued = $this->router->issueOnSubject(
             $tenantId,
             $actor,
-            InvoiceRouteSubject::TYPE,
+            $this->subjectType,
             (int) $invoice['id'],
             null,
             trim(preg_replace('/\s+/', ' ', $title) ?? $title),

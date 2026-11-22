@@ -21,7 +21,8 @@ namespace Whity\Sdk\Accounting;
 interface Invoices
 {
     /**
-     * Newest first. `filter`: `kind` (`sale`, `sale_credit`), `status` (or
+     * Newest first. `filter`: `kind` (`sale`, `sale_credit`, or `purchase`,
+     * `purchase_credit` for bills, SDK 1.157), `status` (or
      * `overdue`), `contactId`, `from`, `to` (issue dates).
      *
      * @param array{kind?: string, status?: string, contactId?: int, from?: string, to?: string} $filter
@@ -34,7 +35,10 @@ interface Invoices
     public function get(int $invoiceId): Invoice;
 
     /**
-     * A draft sales invoice. `data`: `contactId` (a customer), `issueDate`,
+     * A draft sales invoice, or a supplier bill with `kind` `purchase` (SDK
+     * 1.157: then `contactId` is a supplier, `supplierNumber` their own
+     * number, lines take input tax codes and cost accounts, and `issue()`
+     * posts it). `data`: `contactId` (a customer), `issueDate`,
      * `dueDate` or `paymentTermsDays`, `pricesIncludeTax`, `notes`, `lines`
      * (each `variantId` or `description`, `quantity` as text such as "2.5",
      * `unit`, `unitPriceMinor`, `discountBp`, `taxCode` or `taxCategory`,

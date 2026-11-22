@@ -251,6 +251,27 @@ final class PluginAccountingRealEngineTest extends TestCase
         $this->refused(AccountingRejected::FORBIDDEN, fn () => $payments->recordReceived(new PaymentRequest(12, 41, 100)), 'without payments:write');
     }
 
+    public function testAPurchasingPluginEntersABillAndPaysIt(): void
+    {
+        $this->pdo->exec("INSERT INTO contacts (id, tenant_id, name, is_customer, is_supplier) VALUES (42, 1, 'Jordan Flour Mills', false, true)");
+        $buyer = self::bound('Buyer');
+        $invoices = $this->invoices->for($buyer);
+        $payments = $this->payments->for($buyer);
+
+        $draft = $invoices->createDraft([
+            'kind' => 'purchase', 'contactId' => 42, 'supplierNumber' => 'FM-9',
+            'lines' => [['description' => 'Flour', 'unitPriceMinor' => 10000]],
+        ], 11, 'po-9');
+        self::assertSame('purchase', $draft->kind);
+        $bill = $invoices->issue($draft->id, 11);
+        self::assertSame('BIL-' . substr($this->today, 0, 4) . '-0001', $bill->number);
+
+        $paid = $payments->recordMade(new PaymentRequest(11, 42, 11600, 'bank_transfer', invoiceId: $bill->id));
+        self::assertSame('out', $paid->direction);
+        self::assertSame('paid', $this->invoices->get($bill->id)->status);
+        self::assertCount(1, $this->invoices->list(['kind' => 'purchase']));
+    }
+
     private static function bound(string $name): PluginInterface
     {
         $plugin = self::plugin($name);

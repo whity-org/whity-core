@@ -24,7 +24,7 @@ use Whity\Sdk\PluginInterface;
 final class HostInvoices implements Invoices
 {
     private const KEYS = [
-        'contactId' => 'contact_id', 'issueDate' => 'issue_date', 'supplyDate' => 'supply_date', 'dueDate' => 'due_date',
+        'kind' => 'kind', 'supplierNumber' => 'supplier_number', 'contactId' => 'contact_id', 'issueDate' => 'issue_date', 'supplyDate' => 'supply_date', 'dueDate' => 'due_date',
         'paymentTermsDays' => 'payment_terms_days', 'pricesIncludeTax' => 'prices_include_tax', 'notes' => 'notes',
     ];
 
@@ -51,6 +51,7 @@ final class HostInvoices implements Invoices
     {
         $tenantId = $this->guard->workspace();
         $rows = HostAccountingGuard::run(fn (): array => $this->invoices->list($tenantId, array_filter([
+            'side' => isset($filter['kind']) && str_starts_with((string) $filter['kind'], 'purchase') ? 'purchase' : null,
             'kind' => $filter['kind'] ?? null,
             'status' => $filter['status'] ?? null,
             'contact_id' => $filter['contactId'] ?? null,
@@ -72,7 +73,7 @@ final class HostInvoices implements Invoices
     {
         $owner = $this->owner();
         $tenantId = $this->guard->workspace();
-        $this->guard->writer($tenantId, $actingProfileId, CorePermissions::INVOICES_WRITE);
+        $this->guard->writer($tenantId, $actingProfileId, ($data['kind'] ?? 'sale') === 'purchase' ? CorePermissions::BILLS_WRITE : CorePermissions::INVOICES_WRITE);
         $body = [];
         foreach (self::KEYS as $from => $to) {
             if (array_key_exists($from, $data)) {
@@ -106,7 +107,7 @@ final class HostInvoices implements Invoices
     {
         $this->owner();
         $tenantId = $this->guard->workspace();
-        $this->guard->writer($tenantId, $actingProfileId, CorePermissions::INVOICES_WRITE);
+        $this->guard->writer($tenantId, $actingProfileId, $this->permissionFor($tenantId, $invoiceId));
 
         return Invoice::fromArray(HostAccountingGuard::run(fn (): array => $this->invoices->issue($tenantId, $invoiceId, $actingProfileId)));
     }
@@ -115,7 +116,7 @@ final class HostInvoices implements Invoices
     {
         $owner = $this->owner();
         $tenantId = $this->guard->workspace();
-        $this->guard->writer($tenantId, $actingProfileId, CorePermissions::INVOICES_WRITE);
+        $this->guard->writer($tenantId, $actingProfileId, $this->permissionFor($tenantId, $invoiceId));
         $data = ['reason' => $reason];
         if ($lines !== null) {
             $data['lines'] = array_map(static fn (array $l): array => array_filter(
@@ -135,9 +136,17 @@ final class HostInvoices implements Invoices
     {
         $this->owner();
         $tenantId = $this->guard->workspace();
-        $this->guard->writer($tenantId, $actingProfileId, CorePermissions::INVOICES_WRITE);
+        $this->guard->writer($tenantId, $actingProfileId, $this->permissionFor($tenantId, $invoiceId));
 
         return Invoice::fromArray(HostAccountingGuard::run(fn (): array => $this->invoices->cancel($tenantId, $invoiceId, $actingProfileId)));
+    }
+
+    /** A bill is written with bills:write, an invoice with invoices:write. */
+    private function permissionFor(int $tenantId, int $invoiceId): string
+    {
+        $kind = (string) ($this->invoices->row($tenantId, $invoiceId)['kind'] ?? 'sale');
+
+        return CoreInvoices::sideOf($kind) === 'purchase' ? CorePermissions::BILLS_WRITE : CorePermissions::INVOICES_WRITE;
     }
 
     private function owner(): string

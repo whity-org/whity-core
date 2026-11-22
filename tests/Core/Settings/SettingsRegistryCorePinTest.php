@@ -251,6 +251,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'accounting.invoice_route_template_id',
             'accounting.invoice_payment_terms_days',
             'accounting.prices_include_tax',
+            'accounting.bill_route_template_id',
         ];
     }
 
@@ -515,6 +516,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'accounting.invoice_route_template_id' => '0',
             'accounting.invoice_payment_terms_days' => '0',
             'accounting.prices_include_tax' => 'false',
+            'accounting.bill_route_template_id' => '0',
         ];
     }
 

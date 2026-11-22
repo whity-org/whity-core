@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.156.0",
+    "sdk_version": "1.157.0",
     "core_version": "0.2.31",
     "updated": "2026-11-22",
     "ratings": {
@@ -156,10 +156,18 @@
                 {
                     "what": "Events accounting.payment.recorded, accounting.payment.allocated, accounting.invoice.paid, accounting.invoice.partly_paid and accounting.cheque.bounced",
                     "since": "1.156"
+                },
+                {
+                    "what": "Supplier bills and supplier credits through Accounting\\Invoices (kind purchase, acting with bills:write) and Accounting\\Payments::recordMade() for money paid to suppliers",
+                    "since": "1.157"
+                },
+                {
+                    "what": "Events accounting.bill.posting (filter, can veto), accounting.bill.posted and accounting.bill.paid",
+                    "since": "1.157"
                 }
             ],
             "missing": [
-                "Payments out and supplier bills (A3); cheques through the SDK (deposit and bounce are API-only)",
+                "Expense claims and petty cash (A3b); bills matched to stock receipts (A4); cheques through the SDK (deposit and bounce are API-only)",
                 "Aged receivables and the customer statement through Reports (API-only until A5)",
                 "Stock in the books through the accounting-export point (A4)",
                 "Profit and loss, balance sheet and aged reports (A5)",

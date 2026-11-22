@@ -1001,6 +1001,9 @@ final class SettingsRegistry
     public const ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID = 'accounting.invoice_route_template_id';
     public const ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS = 'accounting.invoice_payment_terms_days';
     public const ACCOUNTING_PRICES_INCLUDE_TAX = 'accounting.prices_include_tax';
+    //   - bill_route_template_id: the route a supplier bill travels before it
+    //     is posted (WHIT-1318 A3a); 0 means none.
+    public const ACCOUNTING_BILL_ROUTE_TEMPLATE_ID = 'accounting.bill_route_template_id';
 
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
@@ -1038,6 +1041,7 @@ final class SettingsRegistry
         self::ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID,
         self::ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS,
         self::ACCOUNTING_PRICES_INCLUDE_TAX,
+        self::ACCOUNTING_BILL_ROUTE_TEMPLATE_ID,
     ];
 
     /**
@@ -1587,6 +1591,7 @@ final class SettingsRegistry
         self::ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID => '0',
         self::ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS => '0',
         self::ACCOUNTING_PRICES_INCLUDE_TAX => 'false',
+        self::ACCOUNTING_BILL_ROUTE_TEMPLATE_ID => '0',
     ];
 
     /**
@@ -2113,7 +2118,7 @@ final class SettingsRegistry
                 ? null
                 : $key . ' must be a route template id, or 0 for none.',
             self::SALES_EMAIL_QUOTE, self::SALES_EMAIL_INVOICE, self::SALES_EMAIL_RECEIPT, self::SALES_EMAIL_REMINDER => self::validateBoolean($value, $key),
-            self::ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
+            self::ACCOUNTING_INVOICE_ROUTE_TEMPLATE_ID, self::ACCOUNTING_BILL_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
                 ? null
                 : $key . ' must be a route template id, or 0 for none.',
             self::ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS => self::validateWholeNumberBetween($value, $key, 0, 365),
