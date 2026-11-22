@@ -19,6 +19,8 @@ docs/*
 !docs/design/
 # Operator docs (docs/ops/migrations.md: how migrations run and are written)
 !docs/ops/
+# Security readiness for the pen test and ISO 27001 (docs/security/READINESS.md)
+!docs/security/
 # The plugin SDK coverage matrix data (scripts/sdk-coverage.php renders it into the wiki)
 !docs/sdk-coverage/
 .worktrees/
