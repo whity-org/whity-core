@@ -127,6 +127,12 @@ export function createFrameBridge(options: FrameBridgeOptions): (event: MessageE
   };
 
   const reply = (message: Message): void => {
+    // '*' is required: the frame is sandboxed with an opaque origin ("null"),
+    // which cannot be named as a postMessage target. The message still goes to
+    // one window only, this iframe's own contentWindow, and carries nothing
+    // secret: `init` is locale, direction, theme and API base; `response` is
+    // the status and body of the plugin's own route. The frame token stays in
+    // this page (the closure above) and is never posted; a test pins that.
     options.frameWindow()?.postMessage({ whity: FRAME_PROTOCOL, ...message }, '*');
   };
 
