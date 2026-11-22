@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.153.0',
+            '1.154.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.153 ADDS the route.stamped event: a holder applied a company stamp on a stamp step (#1729). '
+            'SDK 1.154 ADDS Accounting\\Accounts, Ledger, Periods and Reports: the chart of accounts, an append-only double-entry ledger and the trial balance for plugins (WHIT-1318). '
+            . 'SDK 1.153 ADDS the route.stamped event: a holder applied a company stamp on a stamp step (#1729). '
             . 'SDK 1.152 ADDS Log\PluginLog and Log\ErrorReporter (PluginScope::log(), errors()), route rateLimit and PluginInstallLifecycleInterface (#1686). '
             . 'SDK 1.151 ADDS Contribute\PluginCapabilitiesInterface and Database\WorkspaceTables (PluginScope::database()): plugins get only the services they declare, and their own tables held to the workspace (#1693). '
             . 'SDK 1.150 ADDS Frontend\FrameBridge: an embedded screen calls its own plugin routes through the app, with a short-lived token bound to them (#1688). '

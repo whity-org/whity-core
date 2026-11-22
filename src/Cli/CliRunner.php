@@ -28,6 +28,9 @@ class CliRunner
         'usage:storage-rebuild' => 'Whity\Cli\Commands\UsageCommand',
         'usage:snapshot' => 'Whity\Cli\Commands\UsageCommand',
         'calendar:copy-salons' => 'Whity\Cli\Commands\CalendarCopySalonsCommand',
+        // WHIT-1318: account balances recomputed from the ledger, and its hash chain checked.
+        'accounting:rebuild-balances' => 'Whity\Cli\Commands\AccountingRebuildBalancesCommand',
+        'accounting:verify-chain' => 'Whity\Cli\Commands\AccountingVerifyChainCommand',
         // WHIT-1168: the break-glass for a server that signs in only with its identity provider.
         'auth'       => 'Whity\Cli\Commands\AuthCommand',
         // WHIT-1047: every stored secret onto the current key after a rotation.

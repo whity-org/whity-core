@@ -1,0 +1,482 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Whity\OpenAPI;
+
+/**
+ * Route and component schemas for accounting, phase A1 (WHIT-1318, design
+ * section 32). Kept apart from {@see CoreApiSchemas}, which merges these in.
+ *
+ * MCP: every route is a tool in the `core.accounting` toolset. No write
+ * declares an undo, so an agent's change is always a proposal its person
+ * approves (register AC.25).
+ */
+final class AccountingApiSchemas
+{
+    /** @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}> */
+    public static function routes(): array
+    {
+        $tags = ['accounting'];
+        $account = self::data(SchemaBuilder::ref('AccountingAccount'));
+        $entry = self::data(SchemaBuilder::ref('AccountingEntry'));
+        $manual = self::data(SchemaBuilder::ref('AccountingManualEntry'));
+        $period = self::data(SchemaBuilder::ref('AccountingPeriod'));
+        $notFound = [404 => self::error('Not found')];
+        $refused = [409 => self::error('Refused: a duplicate code, a closed month, or already done'), 422 => self::error('A value that doesn\'t look right')];
+        $range = [
+            self::param('from', 'string', 'First day, YYYY-MM-DD. Default: the first of this month.'),
+            self::param('to', 'string', 'Last day, YYYY-MM-DD. Default: today.'),
+        ];
+
+        return [
+            self::route('GET', '/api/accounting/books', 'accounting:read', [
+                'summary' => 'Show the workspace\'s books: base currency, tax pack and lock date',
+                'description' => 'The books are set up the first time accounting is opened, with the Jordan chart of accounts. The base currency is fixed at the first posting.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The books', self::data(SchemaBuilder::ref('AccountingBooks')))] + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/accounts', 'accounting:read', [
+                'summary' => 'List the chart of accounts',
+                'description' => 'In tree order, each with its depth and its balance to date (debits minus credits, minor units). Headings carry their children\'s balances.',
+                'tags' => $tags,
+                'parameters' => [self::param('archived', 'string', '`true` to include archived accounts.')],
+                'responses' => [200 => self::json('Accounts', self::object([
+                    'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('AccountingAccount')],
+                    'currency' => self::str(),
+                ], ['data', 'currency']))] + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/accounts', 'accounting:settings', [
+                'summary' => 'Add an account to the chart',
+                'description' => 'Under a heading (its type is taken), or at the top with a `type`.',
+                'tags' => $tags,
+                'request' => 'AccountingAccountRequest',
+                'responses' => [201 => self::json('The account', $account)] + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/accounts/{id:\d+}', 'accounting:read', [
+                'summary' => 'Show one account',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The account', $account)] + $notFound + self::auth(),
+            ]),
+            self::route('PATCH', '/api/accounting/accounts/{id:\d+}', 'accounting:settings', [
+                'summary' => 'Rename, recode or move an account',
+                'description' => 'The code can change only until the account has entries. It stays under a heading of its own type.',
+                'tags' => $tags,
+                'request' => 'AccountingAccountChanges',
+                'responses' => [200 => self::json('The account', $account)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/accounts/{id:\d+}/archive', 'accounting:settings', [
+                'summary' => 'Archive an account',
+                'description' => 'Refused for an account the books use (receivable, sales tax...), one with a balance, or a heading with open accounts under it.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The account', $account)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/accounts/{id:\d+}/restore', 'accounting:settings', [
+                'summary' => 'Bring an archived account back',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The account', $account)] + $notFound + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/accounts/{id:\d+}/statement', 'accounting:read', [
+                'summary' => 'An account\'s lines with a running balance',
+                'description' => 'Oldest first, with the opening and closing balance. For income and costs the opening counts only this fiscal year. Page on with `after_date` and `after_line` from `next`.',
+                'tags' => $tags,
+                'parameters' => [...$range,
+                    self::param('after_date', 'string', 'The date of the last line of the page before (from `next`).'),
+                    self::param('after_line', 'integer', 'The line id of the last line of the page before (from `next`).'),
+                    self::param('limit', 'integer', 'Lines per page, at most 500. Default 200.'),
+                ],
+                'responses' => [200 => self::json('The statement', self::data(SchemaBuilder::ref('AccountingStatement')))] + $notFound + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/journals', 'accounting:read', [
+                'summary' => 'List the journals',
+                'description' => 'Sales, purchases, bank, cash, general, stock and opening balances, and any a plugin added.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('Journals', self::list('AccountingJournal'))] + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/entries', 'accounting:read', [
+                'summary' => 'List posted journal entries',
+                'description' => 'Newest first, without their lines. Page back with `before_id`.',
+                'tags' => $tags,
+                'parameters' => [
+                    self::param('journal_id', 'integer', 'Only entries in this journal.'),
+                    self::param('account_id', 'integer', 'Only entries with a line on this account.'),
+                    self::param('source_type', 'string', 'Only entries from this source, such as `manual` or `pos.sale`.'),
+                    self::param('source_id', 'integer', 'Only entries from this source record.'),
+                    self::param('from', 'string', 'Dated on or after, YYYY-MM-DD.'),
+                    self::param('to', 'string', 'Dated on or before, YYYY-MM-DD.'),
+                    self::param('before_id', 'integer', 'Entries older than this one.'),
+                    self::param('limit', 'integer', 'Entries per page, at most 200. Default 50.'),
+                ],
+                'responses' => [200 => self::json('Entries', self::list('AccountingEntry'))] + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/entries/{id:\d+}', 'accounting:read', [
+                'summary' => 'Show one posted entry with its lines',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The entry', $entry)] + $notFound + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/entries/{id:\d+}/reverse', 'accounting:post', [
+                'summary' => 'Reverse a posted entry',
+                'description' => 'Posts its mirror, every debit a credit, linked to it. An entry is reversed once. Dated `date` when given, else the original date while its month is open, else today.',
+                'tags' => $tags,
+                'request' => 'AccountingReverseRequest',
+                'responses' => [201 => self::json('The reversing entry', $entry)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/manual-entries', 'accounting:read', [
+                'summary' => 'List journal entries people wrote',
+                'description' => 'Drafts, posted and cancelled, newest first.',
+                'tags' => $tags,
+                'parameters' => [
+                    self::param('status', 'string', '`draft`, `posted` or `cancelled`.'),
+                    self::param('before_id', 'integer', 'Entries older than this one.'),
+                    self::param('limit', 'integer', 'Entries per page, at most 200. Default 50.'),
+                ],
+                'responses' => [200 => self::json('Manual entries', self::list('AccountingManualEntry'))] + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/manual-entries', 'accounting:post', [
+                'summary' => 'Draft a journal entry',
+                'description' => 'Amounts in the base currency\'s normal units ("12.500"). A draft is not in the books until it is posted. Accounts kept by documents (receivables, payables, stock, tax) take lines only in the opening journal.',
+                'tags' => $tags,
+                'request' => 'AccountingManualEntryRequest',
+                'responses' => [201 => self::json('The draft', $manual)] + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/manual-entries/{id:\d+}', 'accounting:read', [
+                'summary' => 'Show one manual entry with its lines',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The entry', $manual)] + $notFound + self::auth(),
+            ]),
+            self::route('PATCH', '/api/accounting/manual-entries/{id:\d+}', 'accounting:post', [
+                'summary' => 'Change a draft journal entry',
+                'description' => 'Sending `lines` replaces them all.',
+                'tags' => $tags,
+                'request' => 'AccountingManualEntryRequest',
+                'responses' => [200 => self::json('The draft', $manual)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/manual-entries/{id:\d+}/post', 'accounting:post', [
+                'summary' => 'Post a draft journal entry to the books',
+                'description' => 'Refused when debits and credits differ, or the date is in a closed month.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The entry, posted', $manual)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/manual-entries/{id:\d+}/cancel', 'accounting:post', [
+                'summary' => 'Cancel a draft journal entry',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The entry, cancelled', $manual)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/periods', 'accounting:read', [
+                'summary' => 'List the months of the books',
+                'description' => 'Newest first: open, closed or locked.',
+                'tags' => $tags,
+                'parameters' => [self::param('year', 'integer', 'Only the months of this calendar year.')],
+                'responses' => [200 => self::json('Months', self::list('AccountingPeriod'))] + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/periods/{id:\d+}/close', 'accounting:close', [
+                'summary' => 'Close a month',
+                'description' => 'Nothing more can be posted with a date in it until it is reopened.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The month', $period)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/periods/{id:\d+}/reopen', 'accounting:close', [
+                'summary' => 'Reopen a closed month, saying why',
+                'tags' => $tags,
+                'request' => 'AccountingReopenRequest',
+                'responses' => [200 => self::json('The month', $period)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/reports/trial-balance', 'accounting:read', [
+                'summary' => 'The trial balance',
+                'description' => 'Every account with an opening balance or lines: opening, debits and credits in the range, closing, in minor units. `balanced` is true when debits equal credits.',
+                'tags' => $tags,
+                'parameters' => [...$range, self::param('ou_id', 'integer', 'Only lines of this branch (organisational unit).')],
+                'responses' => [200 => self::json('The trial balance', self::data(SchemaBuilder::ref('AccountingTrialBalance')))] + self::auth(),
+            ]),
+        ];
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    public static function components(): array
+    {
+        $names = ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'The name in each language, such as `{"en": "Rent", "ar": "الإيجار"}`.'];
+        $name = ['oneOf' => [self::str(), self::object(['en' => self::str(), 'ar' => self::str()], [])], 'description' => 'Text, or `{en, ar}`.'];
+        $minor = static fn (string $what): array => self::int() + ['description' => $what . ' In minor units of the base currency.'];
+        $line = self::object([
+            'id' => self::int(),
+            'line_no' => self::int(),
+            'account_id' => self::int(),
+            'account_code' => self::str(),
+            'account_name' => self::str(),
+            'debit_minor' => self::int(),
+            'credit_minor' => self::int(),
+            'contact_id' => self::int(true),
+            'ou_id' => self::int(true),
+            'description' => self::str(),
+        ], ['id', 'line_no', 'account_id', 'account_code', 'account_name', 'debit_minor', 'credit_minor', 'contact_id', 'ou_id', 'description']);
+
+        return [
+            'AccountingBooks' => self::object([
+                'base_currency' => self::str(),
+                'currency_fixed' => self::bool(),
+                'tax_pack' => self::str(),
+                'year_start_month' => self::int(),
+                'lock_date' => self::str(true),
+            ], ['base_currency', 'currency_fixed', 'tax_pack', 'year_start_month', 'lock_date']),
+            'AccountingAccount' => self::object([
+                'id' => self::int(),
+                'parent_id' => self::int(true),
+                'code' => self::str(),
+                'name' => self::str(),
+                'names' => $names,
+                'type' => self::str() + ['enum' => ['asset', 'liability', 'equity', 'income', 'expense']],
+                'subtype' => self::str(),
+                'is_group' => self::bool(),
+                'role' => self::str(true),
+                'allows_manual' => self::bool(),
+                'ou_id' => self::int(true),
+                'currency' => self::str(true),
+                'is_seeded' => self::bool(),
+                'owner_plugin' => self::str(true),
+                'archived_at' => self::str(true),
+                'balance_minor' => $minor('Debits minus credits to date.'),
+                'depth' => self::int(),
+                'has_lines' => self::bool(),
+            ], ['id', 'parent_id', 'code', 'name', 'names', 'type', 'subtype', 'is_group', 'role', 'allows_manual', 'archived_at', 'balance_minor']),
+            'AccountingAccountRequest' => self::object([
+                'code' => self::str() + ['description' => 'Up to 20 letters, digits, dots or dashes, unique in the chart, such as `6150`.'],
+                'name' => $name,
+                'parent_id' => self::int(true) + ['description' => 'The heading it sits under; its type is taken from it.'],
+                'type' => self::str() + ['enum' => ['asset', 'liability', 'equity', 'income', 'expense'], 'description' => 'Needed only for an account at the top of the chart.'],
+                'subtype' => self::str() + ['description' => '`bank`, `cash`, `receivable`, `payable`, `tax`, `inventory`, `cost_of_sales`, `fixed_asset`, `current_asset`, `current_liability`, `long_term_liability` or `other` (the default).'],
+                'is_group' => self::bool() + ['description' => 'True for a heading that holds other accounts and no lines.'],
+                'allows_manual' => self::bool() + ['description' => 'False when only documents (invoices, bills) may post to it. Default true.'],
+            ], ['code', 'name']),
+            'AccountingAccountChanges' => self::object([
+                'code' => self::str() + ['description' => 'A new code, while the account has no entries.'],
+                'name' => $name,
+                'parent_id' => self::int(true) + ['description' => 'Another heading of the same type, or null for the top.'],
+                'subtype' => self::str() + ['description' => 'See AccountingAccountRequest.'],
+                'allows_manual' => self::bool() + ['description' => 'Whether people may write lines on it by hand.'],
+            ], []),
+            'AccountingJournal' => self::object([
+                'id' => self::int(),
+                'code' => self::str(),
+                'name' => self::str(),
+                'names' => $names,
+                'kind' => self::str() + ['enum' => ['sale', 'purchase', 'bank', 'cash', 'general', 'stock', 'opening', 'plugin']],
+                'default_account_id' => self::int(true),
+                'owner_plugin' => self::str(true),
+                'archived_at' => self::str(true),
+            ], ['id', 'code', 'name', 'names', 'kind', 'default_account_id', 'owner_plugin', 'archived_at']),
+            'AccountingEntry' => self::object([
+                'id' => self::int(),
+                'journal_id' => self::int(),
+                'journal_code' => self::str(),
+                'period_id' => self::int(),
+                'number' => self::str() + ['description' => 'Such as `GEN-2026-0042`.'],
+                'date' => self::str(),
+                'memo' => self::str(),
+                'source_type' => self::str() + ['description' => '`manual`, `opening`, `reversal`, or a plugin\'s `<plugin>.<kind>`.'],
+                'source_id' => self::int(true),
+                'reverses_entry_id' => self::int(true),
+                'reversed_by_entry_id' => self::int(true),
+                'currency' => self::str(),
+                'total_minor' => $minor('The sum of the debits.'),
+                'posted_by_profile_id' => self::int(true),
+                'agent_id' => self::int(true),
+                'on_behalf_of_profile_id' => self::int(true),
+                'hash' => self::str() + ['description' => 'SHA-256 over the entry and the hash of the entry before it in the workspace.'],
+                'prev_hash' => self::str(),
+                'posted_at' => self::str(),
+                'lines' => ['type' => 'array', 'items' => $line],
+            ], ['id', 'journal_id', 'journal_code', 'number', 'date', 'memo', 'source_type', 'currency', 'total_minor', 'hash']),
+            'AccountingReverseRequest' => self::object([
+                'note' => self::str() + ['description' => 'Why, shown as the memo. Up to 500 characters.'],
+                'date' => self::str() + ['description' => 'The reversal\'s date, YYYY-MM-DD, in an open month. Optional.'],
+            ], []),
+            'AccountingManualEntry' => self::object([
+                'id' => self::int(),
+                'journal_id' => self::int(),
+                'journal_code' => self::str(),
+                'journal_kind' => self::str(),
+                'date' => self::str(),
+                'memo' => self::str(),
+                'status' => self::str() + ['enum' => ['draft', 'posting', 'posted', 'cancelled']],
+                'entry_id' => self::int(true),
+                'currency' => self::str(),
+                'debit_minor' => self::int(),
+                'credit_minor' => self::int(),
+                'balanced' => self::bool(),
+                'created_by_profile_id' => self::int(true),
+                'agent_id' => self::int(true),
+                'on_behalf_of_profile_id' => self::int(true),
+                'created_at' => self::str(),
+                'updated_at' => self::str(),
+                'lines' => ['type' => 'array', 'items' => $line],
+            ], ['id', 'journal_id', 'journal_code', 'date', 'memo', 'status', 'entry_id', 'currency', 'debit_minor', 'credit_minor', 'balanced']),
+            'AccountingManualEntryRequest' => self::object([
+                'journal' => self::str() + ['description' => 'The journal\'s code: `GEN` (the default), `OPN` for opening balances, or a bank or cash journal.'],
+                'date' => self::str() + ['description' => 'The accounting date, YYYY-MM-DD.'],
+                'memo' => self::str() + ['description' => 'What the entry is for. Up to 500 characters.'],
+                'lines' => ['type' => 'array', 'minItems' => 2, 'items' => self::object([
+                    'account_id' => self::int() + ['description' => 'An account from the chart, not a heading.'],
+                    'debit' => self::str() + ['description' => 'The debit in normal units, such as "12.500"; leave out on a credit line.'],
+                    'credit' => self::str() + ['description' => 'The credit in normal units; leave out on a debit line.'],
+                    'contact_id' => self::int(true) + ['description' => 'The customer or supplier this line is about.'],
+                    'ou_id' => self::int(true) + ['description' => 'The branch (organisational unit).'],
+                    'description' => self::str() + ['description' => 'A note for the line.'],
+                ], ['account_id']), 'description' => 'Two or more lines whose debits equal their credits.'],
+            ], ['date', 'lines']),
+            'AccountingPeriod' => self::object([
+                'id' => self::int(),
+                'fiscal_year_id' => self::int(),
+                'starts_on' => self::str(),
+                'ends_on' => self::str(),
+                'status' => self::str() + ['enum' => ['open', 'closed', 'locked']],
+                'closed_at' => self::str(true),
+                'closed_by_profile_id' => self::int(true),
+                'reopened_at' => self::str(true),
+                'reopened_by_profile_id' => self::int(true),
+                'reopen_reason' => self::str(),
+                'year_starts_on' => self::str(),
+                'year_ends_on' => self::str(),
+            ], ['id', 'starts_on', 'ends_on', 'status']),
+            'AccountingReopenRequest' => self::object([
+                'reason' => self::str() + ['description' => 'Why the month is reopened, kept on the month. Up to 500 characters.'],
+            ], ['reason']),
+            'AccountingTrialBalance' => self::object([
+                'from' => self::str(),
+                'to' => self::str(),
+                'currency' => self::str(),
+                'ou_id' => self::int(true),
+                'rows' => ['type' => 'array', 'items' => self::object([
+                    'account_id' => self::int(),
+                    'code' => self::str(),
+                    'name' => self::str(),
+                    'names' => $names,
+                    'type' => self::str(),
+                    'parent_id' => self::int(true),
+                    'opening_debit_minor' => self::int(),
+                    'opening_credit_minor' => self::int(),
+                    'debit_minor' => self::int(),
+                    'credit_minor' => self::int(),
+                    'closing_debit_minor' => self::int(),
+                    'closing_credit_minor' => self::int(),
+                ], ['account_id', 'code', 'name', 'type', 'opening_debit_minor', 'opening_credit_minor', 'debit_minor', 'credit_minor', 'closing_debit_minor', 'closing_credit_minor'])],
+                'totals' => self::object([
+                    'opening_debit_minor' => self::int(),
+                    'opening_credit_minor' => self::int(),
+                    'debit_minor' => self::int(),
+                    'credit_minor' => self::int(),
+                    'closing_debit_minor' => self::int(),
+                    'closing_credit_minor' => self::int(),
+                ], ['debit_minor', 'credit_minor']),
+                'balanced' => self::bool(),
+            ], ['from', 'to', 'currency', 'rows', 'totals', 'balanced']),
+            'AccountingStatement' => self::object([
+                'account' => self::object(['id' => self::int(), 'code' => self::str(), 'name' => self::str(), 'names' => $names, 'type' => self::str()], ['id', 'code', 'name', 'type']),
+                'from' => self::str(),
+                'to' => self::str(),
+                'currency' => self::str(),
+                'opening_minor' => self::int(),
+                'closing_minor' => self::int(),
+                'lines' => ['type' => 'array', 'items' => self::object([
+                    'line_id' => self::int(),
+                    'entry_id' => self::int(),
+                    'number' => self::str(),
+                    'date' => self::str(),
+                    'memo' => self::str(),
+                    'description' => self::str(),
+                    'debit_minor' => self::int(),
+                    'credit_minor' => self::int(),
+                    'balance_minor' => self::int(),
+                    'contact_id' => self::int(true),
+                    'ou_id' => self::int(true),
+                    'source_type' => self::str(),
+                    'source_id' => self::int(true),
+                ], ['line_id', 'entry_id', 'number', 'date', 'debit_minor', 'credit_minor', 'balance_minor'])],
+                'next' => ['type' => 'object', 'nullable' => true, 'properties' => ['after_date' => self::str(), 'after_line' => self::int()]],
+            ], ['account', 'from', 'to', 'currency', 'opening_minor', 'closing_minor', 'lines', 'next']),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private static function list(string $ref): array
+    {
+        return self::object(['data' => ['type' => 'array', 'items' => SchemaBuilder::ref($ref)]], ['data']);
+    }
+
+    /**
+     * @param array<string, mixed> $schema
+     * @return array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}
+     */
+    private static function route(string $method, string $path, string $permission, array $schema): array
+    {
+        return ['method' => $method, 'path' => $path, 'requiredRole' => null, 'requiredPermission' => $permission, 'schema' => $schema];
+    }
+
+    /** @return array<string, mixed> */
+    private static function param(string $name, string $type, string $description): array
+    {
+        return ['name' => $name, 'in' => 'query', 'required' => false, 'description' => $description, 'schema' => ['type' => $type]];
+    }
+
+    /**
+     * @param array<string, mixed> $schema
+     * @return array<string, mixed>
+     */
+    private static function json(string $description, array $schema): array
+    {
+        return ['description' => $description, 'content' => ['application/json' => ['schema' => $schema]]];
+    }
+
+    /** @return array<string, mixed> */
+    private static function error(string $description): array
+    {
+        return ['description' => $description, 'content' => ['application/json' => ['schema' => SchemaBuilder::ref('Error')]]];
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    private static function auth(): array
+    {
+        return [401 => self::error('Missing or invalid authentication'), 403 => self::error('Insufficient permissions')];
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     * @return array<string, mixed>
+     */
+    private static function data(array $item): array
+    {
+        return self::object(['data' => $item], ['data']);
+    }
+
+    /**
+     * @param array<string, mixed> $properties
+     * @param list<string> $required
+     * @return array<string, mixed>
+     */
+    private static function object(array $properties, array $required): array
+    {
+        $schema = ['type' => 'object', 'properties' => $properties];
+        if ($required !== []) {
+            $schema['required'] = $required;
+        }
+
+        return $schema;
+    }
+
+    /** @return array<string, mixed> */
+    private static function int(bool $nullable = false): array
+    {
+        return $nullable ? ['type' => 'integer', 'nullable' => true] : ['type' => 'integer'];
+    }
+
+    /** @return array<string, mixed> */
+    private static function str(bool $nullable = false): array
+    {
+        return $nullable ? ['type' => 'string', 'nullable' => true] : ['type' => 'string'];
+    }
+
+    /** @return array<string, mixed> */
+    private static function bool(): array
+    {
+        return ['type' => 'boolean'];
+    }
+}

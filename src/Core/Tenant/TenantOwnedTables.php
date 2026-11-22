@@ -677,6 +677,18 @@ final class TenantOwnedTables
         'sales_quotes' => '330_create_sales_quotes.php',
         'sales_quote_lines' => '330_create_sales_quotes.php',
         'sales_quote_conversions' => '330_create_sales_quotes.php',
+        // Accounting (WHIT-1318, design section 32). Every query binds tenant_id;
+        // acc_entries and acc_lines are append-only (a trigger refuses UPDATE and DELETE).
+        'acc_books' => '344_create_accounting_chart.php',
+        'acc_accounts' => '344_create_accounting_chart.php',
+        'acc_journals' => '344_create_accounting_chart.php',
+        'acc_fiscal_years' => '344_create_accounting_chart.php',
+        'acc_periods' => '344_create_accounting_chart.php',
+        'acc_entries' => '345_create_accounting_ledger.php',
+        'acc_lines' => '345_create_accounting_ledger.php',
+        'acc_balances' => '345_create_accounting_ledger.php',
+        'acc_manual_entries' => '345_create_accounting_ledger.php',
+        'acc_manual_entry_lines' => '345_create_accounting_ledger.php',
     ];
 
     /**

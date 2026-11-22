@@ -59,6 +59,7 @@ final class PermissionAreas
         'stock' => ['stock', 'Stock', self::GROUP_WORKSPACE],
         'purchases' => ['purchases', 'Purchases', self::GROUP_WORKSPACE],
         'quotes' => ['quotes', 'Quotes', self::GROUP_WORKSPACE],
+        'accounting' => ['accounting', 'Accounting', self::GROUP_WORKSPACE],
         'fields' => ['fields', 'Your own fields', self::GROUP_PEOPLE],
         'tasks' => ['tasks', 'Tasks and boards', self::GROUP_PEOPLE],
         'time_windows' => ['time_windows', 'Time windows', self::GROUP_DOCUMENTS],

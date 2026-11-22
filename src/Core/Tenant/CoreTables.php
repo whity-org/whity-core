@@ -129,6 +129,17 @@ final class CoreTables
         'agent_proposals' => '176_create_agent_proposals.php',
         // MCP idempotency keys (WHIT-931).
         'mcp_call_keys' => '308_create_mcp_call_keys.php',
+        // Accounting (WHIT-1318, design section 32).
+        'acc_accounts' => '344_create_accounting_chart.php',
+        'acc_balances' => '345_create_accounting_ledger.php',
+        'acc_books' => '344_create_accounting_chart.php',
+        'acc_entries' => '345_create_accounting_ledger.php',
+        'acc_fiscal_years' => '344_create_accounting_chart.php',
+        'acc_journals' => '344_create_accounting_chart.php',
+        'acc_lines' => '345_create_accounting_ledger.php',
+        'acc_manual_entries' => '345_create_accounting_ledger.php',
+        'acc_manual_entry_lines' => '345_create_accounting_ledger.php',
+        'acc_periods' => '344_create_accounting_chart.php',
         // Inventory (WHIT-1232, design section 31).
         'inv_barcodes' => '317_create_inventory_items.php',
         'inv_categories' => '317_create_inventory_items.php',
