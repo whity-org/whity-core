@@ -71,7 +71,8 @@ final class DocumentIssuingEntryPointWiringTest extends TestCase
     {
         $worker = $this->read('src/Cli/Commands/QueueWorkCommand.php');
         self::assertMatchesRegularExpression('/\$documentRegistries = \\\\?Whity\\\\Core\\\\Document\\\\Issuing\\\\WorkerDocumentServices::register\(/', $worker);
-        self::assertMatchesRegularExpression('/PluginJobs::register\([^;]*\$documentRegistries(, \$messageChannels)?\);/', $worker);
+        // The kill switch (WHIT-1338) may follow the registries.
+        self::assertMatchesRegularExpression('/PluginJobs::register\([^;]*\$documentRegistries(, \$messageChannels)?(, static fn \(string \$name\): bool => \$killList->isKilled\(\$name\))?\);/', $worker);
         self::assertStringContainsString(
             "\$loader->setDocumentRegistries(\$documentRegistries['slots'], \$documentRegistries['fields']);",
             $this->read('src/Core/Queue/PluginJobs.php'),

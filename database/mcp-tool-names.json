@@ -1128,6 +1128,14 @@
     "en": "Get one theme's file",
     "ar": "عرض ملف مظهر"
   },
+  "get_api_themes_themeid_versions": {
+    "en": "List a theme's versions",
+    "ar": "عرض إصدارات مظهر"
+  },
+  "get_api_themes_themeid_versions_version": {
+    "en": "Get one version of a theme",
+    "ar": "عرض إصدار من مظهر"
+  },
   "get_api_time_window_types": {
     "en": "List the kinds of period in your workspace",
     "ar": "عرض أنواع الفترات"
@@ -2163,6 +2171,10 @@
   "post_api_themes_preview": {
     "en": "Preview a draft theme",
     "ar": "معاينة مسودة مظهر"
+  },
+  "post_api_themes_themeid_versions_version_restore": {
+    "en": "Restore an earlier version of a theme",
+    "ar": "استعادة إصدار سابق من مظهر"
   },
   "post_api_themes_tokens": {
     "en": "Export a draft theme for another tool",

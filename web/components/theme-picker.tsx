@@ -54,6 +54,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { api } from '@/lib/api/client';
 import { ThemeDiff } from '@/components/theme-diff';
+import { ThemeHistory } from '@/components/theme-history';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 import { useRefreshBranding } from '@/lib/branding-context';
@@ -61,8 +62,8 @@ import { useThemeMode } from '@/lib/theme-mode-context';
 
 type Swatch = Record<string, string>;
 
-/** The workspace's own themes: imported from a file or made in the editor (TH.25). */
-const OWN = ['import', 'editor'];
+/** The workspace's own themes: imported from a file, made in the editor or restored (TH.25). */
+const OWN = ['import', 'editor', 'restore'];
 
 export interface ThemeListItem {
   id: string;
@@ -630,6 +631,7 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
     return saveImport(theme);
   };
   const [converting, setConverting] = useState(false);
+  const [historyFor, setHistoryFor] = useState<{ id: string; name: string } | null>(null);
 
   const apply = async (id: string) => {
     setBusy(id);
@@ -796,7 +798,7 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
                   {item.source === 'import' && (
                     <p className="text-xs text-muted-foreground">{t('theme.imported', 'Added by this workspace')}</p>
                   )}
-                  {item.source === 'editor' && (
+                  {(item.source === 'editor' || item.source === 'restore') && (
                     <p className="text-xs text-muted-foreground">{t('theme.made', 'Made in this workspace')}</p>
                   )}
                 </div>
@@ -814,6 +816,16 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
                             ? t('theme.edit', 'Edit')
                             : t('theme.copy', 'Make a copy')}
                         </Link>
+                      </Button>
+                    )}
+                    {OWN.includes(item.source) && scope === 'tenant' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setHistoryFor({ id: item.id, name })}
+                        aria-label={t('theme.history.title', 'Versions of {name}', { name })}
+                      >
+                        {t('theme.history.open', 'Versions')}
                       </Button>
                     )}
                     {OWN.includes(item.source) && scope === 'tenant' && (
@@ -908,6 +920,20 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
           {t('theme.personal', 'Everyone can still choose Larger text, Higher contrast and Calm animations for themselves.')}
         </p>
       </CardContent>
+      {historyFor && (
+        <ThemeHistory
+          themeId={historyFor.id}
+          name={historyFor.name}
+          open
+          onOpenChange={(open) => !open && setHistoryFor(null)}
+          canWrite={canWrite}
+          onRestored={() => {
+            refetch();
+            void refreshAppBranding();
+          }}
+          describe={changeText}
+        />
+      )}
       <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
         <AlertDialogContent data-testid="theme-import-changes" className={pending?.installed ? 'sm:max-w-3xl' : undefined}>
           <AlertDialogHeader>

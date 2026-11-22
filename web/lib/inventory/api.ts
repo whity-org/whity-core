@@ -38,6 +38,9 @@ export type InventoryPurchaseOrder = Schemas['InventoryPurchaseOrder'];
 export type InventoryPurchaseOrderLine = Schemas['InventoryPurchaseOrderLine'];
 export type InventoryPurchaseOrderRequest = Schemas['InventoryPurchaseOrderRequest'];
 export type InventorySupplierItem = Schemas['InventorySupplierItem'];
+export type InventoryLot = Schemas['InventoryLot'];
+/** What arrived on one purchase order line, with its batch when the item keeps batches (WHIT-1235). */
+export type ReceiveLine = { line_id: number; quantity: string; lot_code?: string; expires_on?: string };
 export type PurchaseOrderStatus = InventoryPurchaseOrder['status'];
 export type OperationKind = InventoryOperation['kind'];
 export type OperationStatus = InventoryOperation['status'];
@@ -364,7 +367,7 @@ export const inventoryApi = {
       await api.POST('/api/v1/inventory/purchase-orders/{id}/lines/{line}/close', { params: { path: { id, line } }, body: {} as never }),
       'The line could not be closed'
     ),
-  receivePurchaseOrder: async (id: number, lines: { line_id: number; quantity: string }[], allowOver = false, note?: string) =>
+  receivePurchaseOrder: async (id: number, lines: ReceiveLine[], allowOver = false, note?: string) =>
     send<InventoryPurchaseOrder>(
       await api.POST('/api/v1/inventory/purchase-orders/{id}/receive', {
         params: { path: { id } },
@@ -416,6 +419,36 @@ export const inventoryApi = {
     return data as Blob;
   },
 
+  // ── batches and expiry (WHIT-1235) ──
+  lots: async (itemId: number, withEmpty = false) =>
+    read<InventoryLot[]>(
+      await api.GET('/api/v1/inventory/lots', { params: { query: query({ item_id: itemId, with_empty: withEmpty ? 'true' : null }) } }),
+      'The batches could not be loaded'
+    ),
+  expiringLots: async (days?: number) =>
+    read<InventoryLot[]>(
+      await api.GET('/api/v1/inventory/lots/expiring', { params: { query: query({ days }) } }),
+      'What is expiring could not be loaded'
+    ),
+  updateLot: async (id: number, body: { expires_on?: string | null; made_on?: string | null; notes?: string }) =>
+    send<InventoryLot>(await api.PATCH('/api/v1/inventory/lots/{id}', { params: { path: { id } }, body }), 'The batch could not be saved'),
+  /** A sheet of labels, one per batch, from the workspace's batch label sheet. */
+  printBatchLabels: async (lotIds: number[], lang: PrintLanguage): Promise<Blob> => {
+    const templates = await inventoryApi.printTemplates();
+    const id = templates['inventory.batch-labels']?.[lang];
+    if (id === undefined) throw new InventoryRequestError('The label sheet could not be found', 404, null);
+    const { data, error, response } = await api.POST('/api/v1/document-sources/{id}/print-labels', {
+      params: { path: { id } },
+      body: { records: lotIds.map((l) => `inventory.lot:${l}`) },
+      parseAs: 'blob',
+    });
+    if (response.status === 403) throw new ForbiddenError();
+    if (data === undefined || !response.ok) {
+      throw new InventoryRequestError('The labels could not be printed', response.status, serverText(error), serverCode(error));
+    }
+    return data as Blob;
+  },
+
   deleteSupplierItem: async (id: number) =>
     send<{ deleted: boolean }>(
       await api.DELETE('/api/v1/inventory/supplier-items/{id}', { params: { path: { id } } }),
@@ -438,6 +471,18 @@ export function nameIn(names: Record<string, string> | undefined, original: stri
   if (original !== '') return original;
   const any = Object.values(names ?? {}).find((v) => v !== '');
   return any ?? '';
+}
+
+/**
+ * How near a batch is to its expiry, for its badge: past it, inside the
+ * workspace's warning window (7 days unless changed), or fine (WHIT-1235).
+ */
+export function expiryState(expiresOn: string | null | undefined, windowDays = 7, today: Date = new Date()): 'expired' | 'soon' | 'ok' | 'none' {
+  if (!expiresOn) return 'none';
+  const day = today.toISOString().slice(0, 10);
+  if (expiresOn < day) return 'expired';
+  const limit = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + windowDays)).toISOString().slice(0, 10);
+  return expiresOn <= limit ? 'soon' : 'ok';
 }
 
 /** "24.000" as "24" and "2.500" as "2.5": quantities read best without trailing zeros. */

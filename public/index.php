@@ -2111,6 +2111,8 @@ $tenantManifestHost = new \Whity\Core\Plugin\Tenant\TenantManifestHost($tenantPl
 // WHIT-1122: installed code plugins, switched on per workspace.
 $codePluginActivation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($db->getPdo());
 $pluginLoader->setWorkspaceActivation($codePluginActivation);
+// WHIT-1338: a plugin a signed revocation list killed is never loaded into a worker.
+$pluginLoader->setKillSwitch(static fn (string $name): bool => $codePluginActivation->isKilled($name));
 
 $rolesHandler = new RolesApiHandler(
     $db->getPdo(),
@@ -6627,6 +6629,9 @@ $router->register('POST',   '/api/themes/preview',    [$themesHandler, 'preview'
 $router->register('POST',   '/api/themes/compare',    [$themesHandler, 'compare'], null, null, CorePermissions::SETTINGS_READ);
 $router->register('POST',   '/api/themes/package',    [$themesHandler, 'package'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('GET',    '/api/themes/{themeId}',  [$themesHandler, 'show'],   null, null, CorePermissions::SETTINGS_READ);
+$router->register('GET',    '/api/themes/{themeId}/versions', [$themesHandler, 'versions'], null, null, CorePermissions::SETTINGS_READ);
+$router->register('GET',    '/api/themes/{themeId}/versions/{version}', [$themesHandler, 'version'], null, null, CorePermissions::SETTINGS_READ);
+$router->register('POST',   '/api/themes/{themeId}/versions/{version}/restore', [$themesHandler, 'restore'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('DELETE', '/api/themes/{themeId}',  [$themesHandler, 'delete'], null, null, CorePermissions::SETTINGS_WRITE);
 
 // 13c-bis. Register the pending-registration review API (WC-235). Gated on
@@ -7697,6 +7702,15 @@ if ($isWorker) {
             && $pluginLoader->consumePendingWorkerRecycle()
         ) {
             error_log("[FrankenPHP Worker] Recycling worker to load modified plugin code.");
+            $db->disconnect();
+            break;
+        }
+
+        // WHIT-1338: a kill imported while this worker runs cannot unload code
+        // already in it. Recycle, so the fresh worker's discovery leaves the
+        // killed plugin out. Checked at most every 30 seconds per worker.
+        if ($pluginLoader->holdsKilledPlugin()) {
+            error_log("[FrankenPHP Worker] A loaded plugin was killed by the revocation list. Recycling worker.");
             $db->disconnect();
             break;
         }
