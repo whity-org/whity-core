@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Noto_Sans, Noto_Sans_Arabic, Geist_Mono, Readex_Pro, IBM_Plex_Sans, IBM_Plex_Sans_Arabic, Cairo, Noto_Kufi_Arabic, Rubik, Alexandria, Noto_Naskh_Arabic, Noto_Serif } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -177,6 +178,9 @@ export default async function RootLayout({
   // resolves them (see BrandingProvider, which takes over in the browser).
   const brandCss = await getBrandThemeCss();
   const appInstall = await getAppInstall();
+  // READINESS CE-12: the nonce proxy.ts put in this request's CSP, for the
+  // three blocking bootstraps below (Next puts it on its own scripts).
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const overrideCss = Object.entries(themeOverrides)
     .map(([key, value]) => `--${key}:${value};`)
     .join("");
@@ -220,14 +224,14 @@ export default async function RootLayout({
           color scheme (see lib/theme-mode-context.tsx) — rendered here, ahead
           of globals.css, rather than left to ThemeModeProvider's own effects.
         */}
-        <ThemeModeInitScript />
-        <DisplayPreferencesInitScript />
+        <ThemeModeInitScript nonce={nonce} />
+        <DisplayPreferencesInitScript nonce={nonce} />
         {/*
           Blocking for the same reason, and a louder one: `dir` decides where
           everything on the page IS. Applied after the theme script only because
           both are synchronous and the order between them does not matter.
         */}
-        <DirectionInitScript />
+        <DirectionInitScript nonce={nonce} />
       </head>
       {/*
         suppressHydrationWarning (one level deep, body attributes only): browser
