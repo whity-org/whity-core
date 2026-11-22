@@ -3918,6 +3918,476 @@
                 ]
             }
         },
+        "/api/v1/accounting/expense-claims": {
+            "get": {
+                "operationId": "get_api_v1_accounting_expense_claims",
+                "summary": "List expense claims",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Your own claims, newest first. With `all=true`, people who can read bills see everyone's.",
+                "parameters": [
+                    {
+                        "name": "all",
+                        "in": "query",
+                        "required": false,
+                        "description": "`true` for everyone's claims (needs bills:read).",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "At most 200. Default 50.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "description": "Skip this many.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Claims",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AccountingInvoice"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_accounting_expense_claims",
+                "summary": "Claim back money you spent",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Each line is what you paid, tax included. The claim is a bill from you: it posts the costs and the tax to reclaim against what the workspace owes you, after the bill route when the workspace has one, and is paid back as a payment made.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingExpenseClaimRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The claim",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingInvoice"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/expense-claims/{id}": {
+            "get": {
+                "operationId": "get_api_v1_accounting_expense_claims_id",
+                "summary": "Show an expense claim",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Your own, or anyone's when you can read bills.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The claim",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingInvoice"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/expense-claims/{id}/reimburse": {
+            "post": {
+                "operationId": "post_api_v1_accounting_expense_claims_id_reimburse",
+                "summary": "Pay back an expense claim",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Pays the person what the claim is still owed, from the bank by default.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingReimburseRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The payment",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingPayment"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/accounting/invoice-settings": {
             "get": {
                 "operationId": "get_api_v1_accounting_invoice_settings",
@@ -7029,6 +7499,239 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/components/schemas/AccountingPeriod"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/petty-cash": {
+            "get": {
+                "operationId": "get_api_v1_accounting_petty_cash",
+                "summary": "Show petty cash",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "The Petty cash account and what is in it. Its history is the account's statement; top it up with a transfer from the bank.",
+                "parameters": [
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "required": false,
+                        "description": "YYYY-MM-DD. Default: today.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Petty cash",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingPettyCash"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/petty-cash/spends": {
+            "post": {
+                "operationId": "post_api_v1_accounting_petty_cash_spends",
+                "summary": "Record money spent from petty cash",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "A bill from Cash purchases, posted and paid at once from Petty cash, so its costs and reclaimable tax reach the books. Amounts are what was paid, tax included.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingExpenseClaimRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The bill and its payment",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "bill": {
+                                                    "$ref": "#/components/schemas/AccountingInvoice"
+                                                },
+                                                "payment": {
+                                                    "$ref": "#/components/schemas/AccountingPayment"
+                                                }
+                                            },
+                                            "required": [
+                                                "bill",
+                                                "payment"
+                                            ]
                                         }
                                     },
                                     "required": [
@@ -101620,6 +102323,77 @@
                     "hash"
                 ]
             },
+            "AccountingExpenseClaimRequest": {
+                "type": "object",
+                "properties": {
+                    "date": {
+                        "type": "string",
+                        "description": "When it was paid, YYYY-MM-DD. Default: today."
+                    },
+                    "lines": {
+                        "type": "array",
+                        "description": "1 to 50 lines.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "description": {
+                                    "type": "string",
+                                    "description": "What it was: \"Taxi to the bank\"."
+                                },
+                                "amount": {
+                                    "type": "string",
+                                    "description": "What was paid, tax included, such as \"12.500\"."
+                                },
+                                "amount_minor": {
+                                    "type": "integer",
+                                    "description": "Or the amount in minor units."
+                                },
+                                "tax_category": {
+                                    "type": "string",
+                                    "description": "`standard` (default), `zero` or `exempt`."
+                                },
+                                "tax_code": {
+                                    "oneOf": [
+                                        {
+                                            "type": "integer"
+                                        },
+                                        {
+                                            "type": "string"
+                                        }
+                                    ],
+                                    "description": "An input tax code instead of the category."
+                                },
+                                "account_id": {
+                                    "type": "integer",
+                                    "description": "The cost it was. Default: Other costs."
+                                },
+                                "account_code": {
+                                    "type": "string",
+                                    "description": "The cost by its code, instead of account_id."
+                                }
+                            },
+                            "required": [
+                                "description"
+                            ]
+                        }
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Where and why. Up to 2000 characters."
+                    },
+                    "receipt_stored_file_id": {
+                        "type": "integer",
+                        "description": "The photo of the receipt, a file uploaded to the workspace."
+                    },
+                    "idempotency_key": {
+                        "type": "string",
+                        "description": "Retrying with the same key returns the same record."
+                    }
+                },
+                "required": [
+                    "lines"
+                ]
+            },
             "AccountingInvoice": {
                 "type": "object",
                 "properties": {
@@ -101780,6 +102554,16 @@
                     "owner_plugin": {
                         "type": "string",
                         "nullable": true
+                    },
+                    "claimant_profile_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "On an expense claim: the person who paid and is owed it."
+                    },
+                    "receipt_stored_file_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The photo of the receipt."
                     },
                     "created_at": {
                         "type": "string"
@@ -102723,6 +103507,51 @@
                     "ends_on",
                     "status"
                 ]
+            },
+            "AccountingPettyCash": {
+                "type": "object",
+                "properties": {
+                    "account_id": {
+                        "type": "integer"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "balance_minor": {
+                        "type": "integer",
+                        "description": "What is in petty cash, in minor units."
+                    },
+                    "currency": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "account_id",
+                    "code",
+                    "balance_minor",
+                    "currency"
+                ]
+            },
+            "AccountingReimburseRequest": {
+                "type": "object",
+                "properties": {
+                    "method": {
+                        "type": "string",
+                        "description": "`bank_transfer` (default), `cliq`, `cash` or `cheque`."
+                    },
+                    "account_id": {
+                        "type": "integer",
+                        "description": "The bank or cash account it is paid from."
+                    },
+                    "paid_on": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD. Default: today."
+                    },
+                    "reference": {
+                        "type": "string",
+                        "description": "The bank's reference."
+                    }
+                }
             },
             "AccountingReopenRequest": {
                 "type": "object",

@@ -6128,6 +6128,19 @@ $router->register('GET',    '/api/accounting/reports/aged-payables',            
 $router->register('GET',    '/api/accounting/suppliers/{id:\d+}/statement',       [$accountingBillsHandler, 'statement'],      null, null, CorePermissions::BILLS_READ);
 $router->register('GET',    '/api/accounting/bill-settings',                      [$accountingBillsHandler, 'showSettings'],   null, null, CorePermissions::BILLS_READ);
 $router->register('PATCH',  '/api/accounting/bill-settings',                      [$accountingBillsHandler, 'updateSettings'], null, null, CorePermissions::ACCOUNTING_SETTINGS);
+// WHIT-1318 A3b: expense claims (bills from the member of staff who paid,
+// on the bill route) and petty cash (bills paid at once from Petty cash).
+$accountingExpenses = new \Whity\Core\Accounting\Expenses($accountingDb, $accountingWorkspace, $accountingInvoices, $accountingPayments);
+$accountingExpensesHandler = new \Whity\Api\AccountingExpensesApiHandler(
+    $accountingExpenses,
+    static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+);
+$router->register('GET',    '/api/accounting/expense-claims',                     [$accountingExpensesHandler, 'listClaims'], null, null, CorePermissions::EXPENSES_SUBMIT);
+$router->register('POST',   '/api/accounting/expense-claims',                     [$accountingExpensesHandler, 'claim'],      null, null, CorePermissions::EXPENSES_SUBMIT);
+$router->register('GET',    '/api/accounting/expense-claims/{id:\d+}',            [$accountingExpensesHandler, 'showClaim'],  null, null, CorePermissions::EXPENSES_SUBMIT);
+$router->register('POST',   '/api/accounting/expense-claims/{id:\d+}/reimburse',  [$accountingExpensesHandler, 'reimburse'],  null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('GET',    '/api/accounting/petty-cash',                         [$accountingExpensesHandler, 'pettyCash'],  null, null, CorePermissions::PAYMENTS_READ);
+$router->register('POST',   '/api/accounting/petty-cash/spends',                  [$accountingExpensesHandler, 'spend'],      null, null, CorePermissions::PAYMENTS_WRITE);
 
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,

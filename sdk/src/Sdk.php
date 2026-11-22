@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.157).
+ * SDK identity (v1.158).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1637,12 +1637,19 @@ namespace Whity\Sdk;
  * Commission to pay (WHIT-1318 A3a, design section 32 §5.3, §5.4).
  *
  * Purely additive: one new method on Accounting\Payments, which only the host implements.)
+ *
+ * 1.158 (EXPENSE CLAIMS: {@see Accounting\Invoice} carries `claimantProfileId`, set on an expense claim (a
+ * supplier bill from the member of staff who paid, through their own contact). New event
+ * `accounting.expense.claimed`, with an `.async` twin, when a person files one (WHIT-1318 A3b, design section
+ * 32 §5.3, Q5).
+ *
+ * Purely additive: one new optional constructor argument on Accounting\Invoice.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.157.0';
+    public const VERSION = '1.158.0';
 
     /**
      * Static identity only — never instantiated.

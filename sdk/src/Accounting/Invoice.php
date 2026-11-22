@@ -8,13 +8,15 @@ namespace Whity\Sdk\Accounting;
  * A sales invoice or credit note (SDK 1.155, WHIT-1318, design section 32
  * §5.2, register AC.11).
  *
- * `kind` is `sale` or `sale_credit` (bills arrive with purchases, A3).
+ * `kind` is `sale` or `sale_credit`, or `purchase` or `purchase_credit` for a
+ * supplier bill and its credit (SDK 1.157).
  * `status` is `draft`, `waiting_approval`, `issued`, `partly_paid`, `paid`,
  * `credited` or `cancelled`. `number` is given when issued and never changes;
  * an issued invoice is never edited, only credited. Amounts are minor units of
  * `currency`; `dueMinor` is what is still owed (total less paid and credited).
  * `einvoiceStatus` is `none`, `pending`, `accepted`, `rejected` or
- * `not_required`.
+ * `not_required`. An expense claim (SDK 1.158) is a `purchase` whose
+ * `claimantProfileId` is the person who paid and is owed it.
  */
 final class Invoice
 {
@@ -40,6 +42,7 @@ final class Invoice
         public readonly string $einvoiceStatus,
         public readonly ?string $externalRef,
         public readonly array $lines,
+        public readonly ?int $claimantProfileId = null,
     ) {
     }
 
@@ -77,6 +80,7 @@ final class Invoice
             einvoiceStatus: $text('einvoice_status'),
             externalRef: is_string($data['external_ref'] ?? null) ? $data['external_ref'] : null,
             lines: $lines,
+            claimantProfileId: is_int($data['claimant_profile_id'] ?? null) ? $data['claimant_profile_id'] : null,
         );
     }
 }

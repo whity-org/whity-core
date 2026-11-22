@@ -3084,6 +3084,37 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
             self::assertSame('contact_id', $e->extra['field'] ?? null);
         }
+
+        // ---- expense claims (WHIT-1318 A3b, migration 353) ----
+        $expenses = new \Whity\Core\Accounting\Expenses($db, $books, $invoices, $payments);
+        // A person only in workspace A.
+        $memberA = 9901;
+        $this->pdo->exec(
+            "INSERT INTO profiles (id, display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
+             VALUES (9901, 'Emad Nasser', 'x', false, 0, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+        );
+        $roleA = $this->pdo->query('SELECT role_id FROM memberships WHERE tenant_id = 1 ORDER BY id LIMIT 1');
+        self::assertNotFalse($roleA);
+        $this->pdo->exec("INSERT INTO memberships (profile_id, tenant_id, role_id, status, kind, created_at) VALUES (9901, 1, " . (int) $roleA->fetchColumn() . ", 'active', 'member', CURRENT_TIMESTAMP)");
+        $claimA = $expenses->claim(self::TENANT_A, $memberA, ['lines' => [['description' => 'Taxi', 'amount_minor' => 1000]]]);
+        self::assertSame([], $expenses->claims(self::TENANT_B, null));
+        foreach ([
+            'read a claim' => fn () => $expenses->get(self::TENANT_B, $claimA['id']),
+            'pay back a claim' => fn () => $expenses->reimburse(self::TENANT_B, $claimA['id'], null, []),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} of Tenant A");
+            } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+                self::assertSame(404, $e->status, "a foreign record answers 404 to {$what}");
+            }
+        }
+        try {
+            $expenses->claim(self::TENANT_B, $memberA, ['lines' => [['description' => 'Taxi', 'amount_minor' => 1000]]]);
+            self::fail('a member of A claimed in B');
+        } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+            self::assertSame(403, $e->status);
+        }
     }
 
     private function contactService(): \Whity\Core\Contacts\ContactService
