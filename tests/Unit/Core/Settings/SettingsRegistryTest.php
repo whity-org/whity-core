@@ -140,6 +140,7 @@ final class SettingsRegistryTest extends TestCase
              'calendar.multi_service_booking',
              'calendar.walkins_enabled',
              'app.installable',
+            'navigation.hidden_ids',
              'website.plans',
              'website.contact_workspace',
              // WHIT-1035: customer sign-up, moved from workspace_signup_settings.
@@ -513,7 +514,8 @@ final class SettingsRegistryTest extends TestCase
         // 155 since WHIT-1334: calendar.walkins_enabled.
         // 156 since #1730: documents.qr_public_signer_names.
         // 159 since WHIT-1318 A2a: accounting.invoice_route_template_id, _payment_terms_days and prices_include_tax.
-        self::assertCount(159, $describe);
+        // 160 since #2386: navigation.hidden_ids.
+        self::assertCount(160, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
