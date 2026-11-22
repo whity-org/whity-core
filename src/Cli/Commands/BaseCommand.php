@@ -713,6 +713,9 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $pluginLoader->setInboxSources($inboxSourceRegistry);
         $pluginLoader->setMessageChannels($messageChannelRegistry);
         $pluginLoader->setDocumentRegistries($templateSlotRegistry, $documentFieldRegistry, $documentBlockRegistry);
+        // WHIT-1338: a killed plugin's code doesn't run in the CLI either.
+        $killList = new \Whity\Core\Plugin\Workspace\CodePluginActivation($db->getPdo());
+        $pluginLoader->setKillSwitch(static fn (string $name): bool => $killList->isKilled($name));
         $pluginLoader->load();
 
 

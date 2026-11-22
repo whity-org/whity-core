@@ -413,6 +413,26 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     private bool $pendingWorkerRecycle = false;
 
     /**
+     * Whether a signed revocation list killed a plugin, by its name (WHIT-1338).
+     * Null until a host wires it; then discovery never `require`s a killed
+     * plugin's code. See {@see setKillSwitch()}.
+     *
+     * @var (\Closure(string): bool)|null
+     */
+    private ?\Closure $killSwitch = null;
+
+    /**
+     * Killed plugins found by the last discovery, by FQCN. They are listed like
+     * disabled ones but never materialised, so no enable path runs their code.
+     *
+     * @var array<string, true>
+     */
+    private array $killedPlugins = [];
+
+    /** When {@see holdsKilledPlugin()} last asked the kill switch (unix seconds). */
+    private int $killCheckedAt = 0;
+
+    /**
      * Snapshot of the plugin-tree fingerprint captured at the last load/reload.
      *
      * Maps each plugin PHP file path to a "mtime:size" signature. Comparing this
@@ -533,6 +553,81 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     public function setLicenceSales(HostLicenceSales $licenceSales): void
     {
         $this->licenceSales = $licenceSales;
+    }
+
+    /**
+     * Tell discovery which plugins a signed revocation list killed (WHIT-1338).
+     *
+     * Killing a plugin already turns it off at every request surface
+     * (CodePluginActivation, WHIT-1277). That is not enough on its own: a
+     * worker that `require`s the plugin still runs its file-level code, its
+     * constructor and anything it attaches outside the gated surfaces. With
+     * this set, discovery lists a killed directory plugin the way it lists a
+     * disabled one, without ever loading its code, so every worker, CLI run
+     * and queue worker that starts after the kill leaves it out.
+     *
+     * A kill switch that fails (no database yet, a broken query) answers "not
+     * killed": the request-time gate still applies, and refusing to load every
+     * plugin because the list could not be read would take the host down.
+     *
+     * @param \Closure(string): bool $isKilled Plugin name to killed or not.
+     */
+    public function setKillSwitch(\Closure $isKilled): void
+    {
+        $this->killSwitch = $isKilled;
+    }
+
+    /**
+     * Whether this worker has a killed plugin's code loaded (WHIT-1338).
+     *
+     * A kill imported while a worker runs cannot unload code already in it, so
+     * the worker loop asks this after each response and recycles the worker
+     * when it answers true; the fresh worker's discovery then skips the plugin.
+     * Asks the kill switch at most once per $everySeconds, so the read costs
+     * one query per worker per interval, not per request.
+     */
+    public function holdsKilledPlugin(int $everySeconds = 30, ?int $now = null): bool
+    {
+        if ($this->killSwitch === null) {
+            return false;
+        }
+        $now ??= time();
+        if ($now - $this->killCheckedAt < $everySeconds) {
+            return false;
+        }
+        $this->killCheckedAt = $now;
+        foreach ($this->registeredPlugins as $entry) {
+            if ($this->isKilledName($entry['plugin']->getName())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** The kill switch's answer for a plugin name; false when none is set or it fails. */
+    private function isKilledName(string $pluginName): bool
+    {
+        if ($this->killSwitch === null || $pluginName === '') {
+            return false;
+        }
+        try {
+            return ($this->killSwitch)($pluginName) === true;
+        } catch (\Throwable $e) {
+            error_log('[PluginLoader] kill switch unreadable, loading plugins as usual: ' . $e::class);
+
+            return false;
+        }
+    }
+
+    /**
+     * The plugin name a directory plugin's FQCN stands for, without running it:
+     * the namespace root is the directory name, which the installer requires to
+     * equal getName() (the same convention as registerDisabledPlaceholder()).
+     */
+    private static function pluginNameFromFqcn(string $fqcn): string
+    {
+        return explode('\\', ltrim($fqcn, '\\'))[0];
     }
 
     /** Switch plugins on and off per workspace (WHIT-1122). */
@@ -1827,6 +1922,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // disk now, not on a stale snapshot.
         $this->discoveredDisabledByDisk = [];
         $this->disabledDirectoryPlugins = [];
+        $this->killedPlugins = [];
 
         // 1. Initialize namespaces for all direct subdirectories of pluginDir
         $this->registerPluginNamespaces();
@@ -1843,6 +1939,12 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                     // for lazy loading on enable and never `require` it here.
                     if ($this->hasDirectoryDisableSentinel($filePath)) {
                         $this->disabledDirectoryPlugins[$fqcn] = $filePath;
+                        continue;
+                    }
+                    // A killed plugin is listed the same way and never run (WHIT-1338).
+                    if ($this->isKilledName(self::pluginNameFromFqcn($fqcn))) {
+                        $this->disabledDirectoryPlugins[$fqcn] = $filePath;
+                        $this->killedPlugins[$fqcn] = true;
                         continue;
                     }
                     // A refused file is SKIPPED rather than treated as a cache
@@ -1878,6 +1980,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             // and let the full scan below rebuild it from scratch.
             $this->discoveredDisabledByDisk = [];
             $this->disabledDirectoryPlugins = [];
+            $this->killedPlugins = [];
         }
 
         // 3. Scan the plugins directory
@@ -1935,13 +2038,20 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                 // (source tokenizer, no `require`) and recorded for lazy loading
                 // on enable.
                 $dirDisabled = file_exists($itemPath . '/' . self::DIR_DISABLED_SENTINEL);
+                // A plugin a signed revocation list killed is treated the same
+                // way: listed, never executed (WHIT-1338). The directory name is
+                // the plugin's name (the installer enforces it).
+                $dirKilled = !$dirDisabled && $this->isKilledName($item);
 
-                if ($dirDisabled) {
+                if ($dirDisabled || $dirKilled) {
                     $entryFile = $this->detectPluginEntryFile($phpFiles);
                     if ($entryFile !== null) {
                         $fqcn = $this->resolveClassFromFile($entryFile);
                         if ($fqcn !== null) {
                             $this->disabledDirectoryPlugins[$fqcn] = $entryFile;
+                            if ($dirKilled) {
+                                $this->killedPlugins[$fqcn] = true;
+                            }
                             $foundValidPluginInDir = true;
                         }
                     }
@@ -2874,6 +2984,11 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     {
         if (isset($this->registeredPlugins[$pluginKey])) {
             return true;
+        }
+        // A killed plugin's code never runs here, not even to read its metadata
+        // for an enable flow (WHIT-1338).
+        if (isset($this->killedPlugins[$pluginKey])) {
+            return false;
         }
         $entryFile = $this->disabledDirectoryPlugins[$pluginKey] ?? null;
         if ($entryFile === null) {
