@@ -12219,6 +12219,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/themes/{themeId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List a theme's versions
+         * @description The history of one of this workspace's own themes (imported, made in the editor or restored), newest first: each version, how it came in, when and who saved it, and which is in use. Whity's and plugins' themes have no history here.
+         */
+        get: operations["get_api_v1_themes_themeid_versions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/themes/{themeId}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one version of a theme
+         * @description That version's theme file, for comparing it with another (POST /api/themes/compare).
+         */
+        get: operations["get_api_v1_themes_themeid_versions_version"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/themes/{themeId}/versions/{version}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an earlier version of a theme
+         * @description Saves that version's file as the next version, numbered past the newest, so the history only grows. Workspaces using the theme see it at once.
+         */
+        post: operations["post_api_v1_themes_themeid_versions_version_restore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/time-window-types": {
         parameters: {
             query?: never;
@@ -22362,6 +22422,15 @@ export interface components {
             resource_id: number;
             revoked: number;
         };
+        RestoreThemeVersionResponse: {
+            data: {
+                id: string;
+                /** @description The new version number. */
+                version: string;
+                /** @description The version it was made from. */
+                restored_from: string;
+            };
+        };
         Role: {
             id: number;
             name: string;
@@ -24135,6 +24204,31 @@ export interface components {
                 media_type: string;
                 /** @description The file's text. */
                 content: string;
+            };
+        };
+        ThemeVersionFileResponse: {
+            data: {
+                /** @description The theme file (schemas/theme/v1.json). */
+                theme: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        ThemeVersionsResponse: {
+            data: {
+                theme_id: string;
+                /** @description The version in use. */
+                current: string;
+                /** @description Newest first. */
+                versions: {
+                    version: string;
+                    /** @description import, editor or restore. */
+                    source: string;
+                    saved_at: string;
+                    /** @description The name of the person who saved it, when known. */
+                    saved_by?: string | null;
+                    current: boolean;
+                }[];
             };
         };
         TimeWindow: {
@@ -90431,6 +90525,223 @@ export interface operations {
                 };
             };
             /** @description Not an imported theme */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_themes_themeid_versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The theme's id, like acme.harbour */
+                themeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The versions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeVersionsResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This workspace has no theme of its own with that id */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_themes_themeid_versions_version: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The theme's id, like acme.harbour */
+                themeId: string;
+                /** @description A version number like 1.2.0 */
+                version: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The theme file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeVersionFileResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such version */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_themes_themeid_versions_version_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The theme's id, like acme.harbour */
+                themeId: string;
+                /** @description A version number like 1.2.0 */
+                version: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Restored as a new version */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoreThemeVersionResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such version */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description That version is no longer a valid theme */
             422: {
                 headers: {
                     [name: string]: unknown;

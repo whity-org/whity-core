@@ -283,6 +283,9 @@ final class TenantOwnedTables
         // WHIT-1225: themes a workspace imported or installed from the store
         // (migration 323). Every query binds tenant_id.
         'themes' => '323_create_themes.php',
+        // WHIT-1225 (TH.25): every version of those themes (migration 347).
+        // Every query binds tenant_id.
+        'theme_versions' => '347_create_theme_versions.php',
         'plugin_core_grants' => '325_create_plugin_core_grants.php',
         // WHIT-838: a plugin's secrets, per workspace (migration 187).
         'plugin_secrets' => '187_create_plugin_secrets.php',

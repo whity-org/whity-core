@@ -16,8 +16,7 @@ use Whity\Core\Theme\ThemeRepository;
 
 /**
  * TH.25 (30-themes 11): the live editor's preview, opening a theme to edit,
- * and saving what the editor made. The themes table is SQLite in memory with
- * the columns migration 323 creates.
+ * and saving what the editor made, on the migrations' own schema.
  */
 final class ThemeEditorApiTest extends TestCase
 {
@@ -28,14 +27,10 @@ final class ThemeEditorApiTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->db = new PDO('sqlite::memory:');
-        $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $this->db->exec('CREATE TABLE themes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id INTEGER NOT NULL, theme_id VARCHAR(100) NOT NULL,
-            version VARCHAR(32) NOT NULL, source VARCHAR(16) NOT NULL DEFAULT \'import\', document TEXT NOT NULL,
-            signature_verified BOOLEAN NOT NULL DEFAULT 0, created_by_profile_id INTEGER NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE (tenant_id, theme_id))');
+        // The migrations' own schema (themes 323, theme_versions 347), so this can't drift from them.
+        $this->db = \Tests\Support\SchemaFromMigrations::make();
+        $this->db->exec('DELETE FROM theme_versions');
+        $this->db->exec('DELETE FROM themes');
         // Preview, show and import read no settings.
         $settings = (new ReflectionClass(SettingsService::class))->newInstanceWithoutConstructor();
         $this->handler = new ThemesApiHandler(new ThemeRepository($this->db), $settings);
