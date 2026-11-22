@@ -14,6 +14,10 @@ link goes there. Choose another page with:
 - the environment variable `WHITY_HOME_PATH` on the backend container, used
   while the setting is empty.
 
+From a script, signed in as the operator: `PATCH /api/v1/settings/global` with
+`{"settings": {"navigation.home_path": "/tasks"}}`. An address on another site
+is refused with a validation error.
+
 The value is a path on this site, such as `/admin/x/forms-catalog` or
 `/tasks`. Addresses on other sites are refused, so a sign-in can never be
 redirected off the site.

@@ -18,8 +18,9 @@ Use either of these, or both. A page hidden by either one is hidden.
   Restart the backend to apply a change.
 - **The instance setting** `navigation.hidden_ids`: Settings › General
   (`/admin/settings`) in the system workspace, section **Pages**, or the
-  settings API (`PATCH /api/v1/settings` in the system workspace, key
-  `navigation.hidden_ids`).
+  settings API, signed in as the operator:
+  `PATCH /api/v1/settings/global` with
+  `{"settings": {"navigation.hidden_ids": "calendar,settings.sso"}}`.
   It applies without a restart; the web server's route guard sees it within 30
   seconds.
 

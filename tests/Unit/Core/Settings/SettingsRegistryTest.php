@@ -161,7 +161,8 @@ final class SettingsRegistryTest extends TestCase
              'sales.quote_valid_days', 'sales.quote_route_template_id',
              // WHIT-1323: the trading emails' switches.
              'sales.email_quote', 'sales.email_invoice', 'sales.email_receipt', 'sales.email_reminder',
-             'accounting.invoice_route_template_id', 'accounting.invoice_payment_terms_days', 'accounting.prices_include_tax'],
+             'accounting.invoice_route_template_id', 'accounting.invoice_payment_terms_days', 'accounting.prices_include_tax',
+             'accounting.bill_route_template_id'],
             SettingsRegistry::keys()
         );
     }
@@ -517,9 +518,10 @@ final class SettingsRegistryTest extends TestCase
         // 155 since WHIT-1334: calendar.walkins_enabled.
         // 156 since #1730: documents.qr_public_signer_names.
         // 159 since WHIT-1318 A2a: accounting.invoice_route_template_id, _payment_terms_days and prices_include_tax.
-        // 160 since #2386: navigation.hidden_ids.
-        // 163 since #2386: navigation.home_path and the back-to-product link.
-        self::assertCount(163, $describe);
+        // 160 since WHIT-1318 A3a: accounting.bill_route_template_id.
+        // 161 since #2386: navigation.hidden_ids.
+        // 164 since #2386: navigation.home_path and the back-to-product link.
+        self::assertCount(164, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

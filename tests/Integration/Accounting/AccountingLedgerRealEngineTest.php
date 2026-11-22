@@ -93,7 +93,7 @@ final class AccountingLedgerRealEngineTest extends TestCase
         // A second workspace gets its own, and opening it again adds nothing.
         $this->chart->list(2);
         $this->chart->list(1);
-        self::assertSame(2 * 50, $this->scalar('SELECT COUNT(*) FROM acc_accounts'));
+        self::assertSame(2 * 52, $this->scalar('SELECT COUNT(*) FROM acc_accounts'));
         self::assertSame(1, $this->scalar("SELECT COUNT(*) FROM roles WHERE tenant_id = 1 AND name = 'Accountant'"));
     }
 

@@ -49,6 +49,25 @@ use Whity\Sdk\Sql\SequenceAllocator;
 final class Invoices
 {
     public const SALE_KINDS = ['sale', 'sale_credit'];
+    public const PURCHASE_KINDS = ['purchase', 'purchase_credit'];
+
+    /**
+     * What differs between a sales invoice and a supplier bill: the tax
+     * direction, the contact's flag, the account the counterpart owes on, the
+     * journal and the number series. Credits are the mirror of their side.
+     *
+     * @var array<string, array{kinds: list<string>, direction: string, flag: string, who: string, counter: string, tax: string, journal: string, prefix: array{0: string, 1: string}, noun: string}>
+     */
+    private const SIDES = [
+        'sale' => [
+            'kinds' => ['sale', 'sale_credit'], 'direction' => 'output', 'flag' => 'is_customer', 'who' => 'customer',
+            'counter' => 'receivable', 'tax' => 'sales_tax_output', 'journal' => 'SAL', 'prefix' => ['INV', 'CRN'], 'noun' => 'invoice',
+        ],
+        'purchase' => [
+            'kinds' => ['purchase', 'purchase_credit'], 'direction' => 'input', 'flag' => 'is_supplier', 'who' => 'supplier',
+            'counter' => 'payable', 'tax' => 'sales_tax_input', 'journal' => 'PUR', 'prefix' => ['BIL', 'SCR'], 'noun' => 'bill',
+        ],
+    ];
     public const STATUSES = ['draft', 'waiting_approval', 'issued', 'partly_paid', 'paid', 'credited', 'cancelled'];
     public const OPEN = ['issued', 'partly_paid'];
     public const MAX_LINES = 300;
@@ -56,7 +75,7 @@ final class Invoices
     /** Free lines keep up to three decimals ("2.5 hours"). */
     private const FREE_DECIMALS = 3;
 
-    private const COLUMNS = 'i.id, i.kind, i.number, i.contact_id, i.issue_date, i.supply_date, i.due_date, i.payment_terms_days, i.status,
+    private const COLUMNS = 'i.id, i.kind, i.number, i.supplier_number, i.contact_id, i.issue_date, i.supply_date, i.due_date, i.payment_terms_days, i.status,
         i.currency, i.rate_num, i.rate_den, i.prices_include_tax, i.subtotal_minor, i.discount_minor, i.tax_minor, i.total_minor,
         i.paid_minor, i.credited_minor, i.credits_invoice_id, i.entry_id, i.document_id, i.route_id, i.payment_link_ref,
         i.einvoice_status, i.einvoice_uuid, i.einvoice_ref, i.einvoice_qr, i.einvoice_counter, i.einvoice_message, i.notes,
@@ -64,6 +83,8 @@ final class Invoices
         i.on_behalf_of_profile_id, i.owner_plugin, i.created_at, i.updated_at';
 
     private ?InvoiceApprovals $approvals = null;
+
+    private ?InvoiceApprovals $billApprovals = null;
 
     /** @var \Closure(): ?WorkspaceEInvoicing */
     private readonly \Closure $einvoicing;
@@ -94,9 +115,19 @@ final class Invoices
     }
 
     /** Wired after construction: the routes need the route subject, which needs this. */
-    public function useApprovals(InvoiceApprovals $approvals): void
+    public function useApprovals(InvoiceApprovals $approvals, string $side = 'sale'): void
     {
-        $this->approvals = $approvals;
+        if ($side === 'purchase') {
+            $this->billApprovals = $approvals;
+        } else {
+            $this->approvals = $approvals;
+        }
+    }
+
+    /** `sale` or `purchase`, from a document's kind. */
+    public static function sideOf(string $kind): string
+    {
+        return str_starts_with($kind, 'purchase') ? 'purchase' : 'sale';
     }
 
     // ── drafting ─────────────────────────────────────────────────────────
@@ -117,18 +148,24 @@ final class Invoices
         if ($external !== null && ($done = $this->idByExternal($tenantId, $external)) !== null) {
             return ['invoice' => $this->get($tenantId, $done), 'repeated' => true];
         }
-        $head = $this->head($tenantId, $data, null);
-        $lines = $this->lines($tenantId, $data['lines'] ?? null, $head['issue_date'], $head['prices_include_tax']);
+        $kind = $data['kind'] ?? 'sale';
+        if (!in_array($kind, ['sale', 'purchase'], true)) {
+            throw AccountingRejectedException::field('kind', 'kind is sale or purchase; credits are made from an issued document');
+        }
+        $head = $this->head($tenantId, $data, null, $kind);
+        $lines = $this->lines($tenantId, $data['lines'] ?? null, $head['issue_date'], $head['prices_include_tax'], $kind);
+        $supplierNumber = $kind === 'purchase' ? self::supplierNumber($data['supplier_number'] ?? null) : null;
 
         try {
-            $id = $this->db->transaction(function () use ($tenantId, $actor, $head, $lines, $meta, $external): int {
+            $id = $this->db->transaction(function () use ($tenantId, $actor, $head, $lines, $meta, $external, $kind, $supplierNumber): int {
                 $id = $this->db->insert(
-                    'INSERT INTO acc_invoices (tenant_id, kind, contact_id, issue_date, supply_date, due_date, payment_terms_days, status,
+                    'INSERT INTO acc_invoices (tenant_id, kind, supplier_number, contact_id, issue_date, supply_date, due_date, payment_terms_days, status,
                             currency, prices_include_tax, notes, external_ref, quote_id, created_by_profile_id, agent_id,
                             on_behalf_of_profile_id, owner_plugin)
-                     VALUES (:tenant_id, \'sale\', :contact_id, :issue_date, :supply_date, :due_date, :terms, \'draft\',
+                     VALUES (:tenant_id, :kind, :supplier_number, :contact_id, :issue_date, :supply_date, :due_date, :terms, \'draft\',
                             :currency, :inclusive, :notes, :external, :quote_id, :actor, :agent, :on_behalf, :owner)',
                     [
+                        ':kind' => $kind, ':supplier_number' => $supplierNumber,
                         ':tenant_id' => $tenantId, ':contact_id' => $head['contact_id'], ':issue_date' => $head['issue_date'],
                         ':supply_date' => $head['supply_date'], ':due_date' => $head['due_date'], ':terms' => $head['payment_terms_days'],
                         ':currency' => $head['currency'], ':inclusive' => $head['prices_include_tax'], ':notes' => $head['notes'],
@@ -160,7 +197,7 @@ final class Invoices
     public function update(int $tenantId, int $id, array $changes): array
     {
         $invoice = $this->row($tenantId, $id) ?? throw AccountingRejectedException::notFound('Invoice');
-        if ($invoice['status'] !== 'draft' || $invoice['kind'] !== 'sale') {
+        if ($invoice['status'] !== 'draft' || !in_array($invoice['kind'], ['sale', 'purchase'], true)) {
             throw new AccountingRejectedException(
                 $invoice['status'] === 'waiting_approval' ? 'This invoice is waiting for approval' : 'Only a draft invoice can be changed; credit an issued one instead',
                 409
@@ -175,20 +212,25 @@ final class Invoices
         if (array_key_exists('payment_terms_days', $changes) && !array_key_exists('due_date', $changes)) {
             $current['due_date'] = null;
         }
-        $head = $this->head($tenantId, $changes + $current, $invoice);
+        $kind = (string) $invoice['kind'];
+        $head = $this->head($tenantId, $changes + $current, $invoice, $kind);
         $lines = array_key_exists('lines', $changes)
-            ? $this->lines($tenantId, $changes['lines'], $head['issue_date'], $head['prices_include_tax'])
+            ? $this->lines($tenantId, $changes['lines'], $head['issue_date'], $head['prices_include_tax'], $kind)
             : $this->linesAgain($tenantId, $id, $head['issue_date'], $head['prices_include_tax']);
+        $supplierNumber = $kind === 'purchase'
+            ? (array_key_exists('supplier_number', $changes) ? self::supplierNumber($changes['supplier_number']) : (is_string($invoice['supplier_number']) ? $invoice['supplier_number'] : null))
+            : null;
 
-        $this->db->transaction(function () use ($tenantId, $id, $head, $lines): void {
+        $this->db->transaction(function () use ($tenantId, $id, $head, $lines, $supplierNumber): void {
             $this->db->run(
                 'UPDATE acc_invoices SET contact_id = :contact_id, issue_date = :issue_date, supply_date = :supply_date, due_date = :due_date,
-                        payment_terms_days = :terms, prices_include_tax = :inclusive, notes = :notes, updated_at = CURRENT_TIMESTAMP
+                        payment_terms_days = :terms, prices_include_tax = :inclusive, notes = :notes, supplier_number = :supplier_number,
+                        updated_at = CURRENT_TIMESTAMP
                   WHERE tenant_id = :tenant_id AND id = :id AND status = \'draft\'',
                 [
                     ':contact_id' => $head['contact_id'], ':issue_date' => $head['issue_date'], ':supply_date' => $head['supply_date'],
                     ':due_date' => $head['due_date'], ':terms' => $head['payment_terms_days'], ':inclusive' => $head['prices_include_tax'],
-                    ':notes' => $head['notes'], ':tenant_id' => $tenantId, ':id' => $id,
+                    ':notes' => $head['notes'], ':supplier_number' => $supplierNumber, ':tenant_id' => $tenantId, ':id' => $id,
                 ]
             );
             $this->db->run('DELETE FROM acc_invoice_lines WHERE tenant_id = :tenant_id AND invoice_id = :id', [':tenant_id' => $tenantId, ':id' => $id]);
@@ -240,9 +282,10 @@ final class Invoices
             }, 409);
         }
         $this->ready($tenantId, $id);
-        if ($this->approvals !== null) {
+        $approvals = self::sideOf((string) $invoice['kind']) === 'purchase' ? $this->billApprovals : $this->approvals;
+        if ($approvals !== null) {
             $view = $this->get($tenantId, $id);
-            $routeId = $this->approvals->issue($tenantId, $actor, $view);
+            $routeId = $approvals->issue($tenantId, $actor, $view);
             if ($routeId !== null) {
                 $this->db->run(
                     'UPDATE acc_invoices SET status = \'waiting_approval\', route_id = :route_id, updated_at = CURRENT_TIMESTAMP
@@ -292,12 +335,13 @@ final class Invoices
             return ['invoice' => $this->get($tenantId, $done), 'repeated' => true];
         }
         $original = $this->row($tenantId, $invoiceId) ?? throw AccountingRejectedException::notFound('Invoice');
-        if ($original['kind'] !== 'sale' || !in_array($original['status'], ['issued', 'partly_paid', 'paid'], true)) {
+        if (!in_array($original['kind'], ['sale', 'purchase'], true) || !in_array($original['status'], ['issued', 'partly_paid', 'paid'], true)) {
             throw new AccountingRejectedException(
-                $original['kind'] !== 'sale' ? 'Only a sales invoice can be credited' : 'Only an issued invoice can be credited; change or cancel a draft instead',
+                !in_array($original['kind'], ['sale', 'purchase'], true) ? 'A credit is made from an invoice or a bill, not from another credit' : 'Only an issued invoice or a posted bill can be credited; change or cancel a draft instead',
                 409
             );
         }
+        $creditKind = $original['kind'] . '_credit';
         $date = isset($data['issue_date']) ? Periods::date($data['issue_date'], 'issue_date') : $this->today();
         if ($date < substr((string) $original['issue_date'], 0, 10)) {
             throw AccountingRejectedException::field('issue_date', 'A credit note cannot be dated before its invoice (' . substr((string) $original['issue_date'], 0, 10) . ')');
@@ -305,15 +349,15 @@ final class Invoices
         $reason = is_string($data['reason'] ?? null) ? mb_substr(trim($data['reason']), 0, 2000) : '';
         $lines = $this->creditLines($tenantId, $invoiceId, $data['lines'] ?? null, DbBool::of($original['prices_include_tax']));
 
-        $id = $this->db->transaction(function () use ($tenantId, $actor, $original, $invoiceId, $date, $reason, $lines, $meta, $external): int {
+        $id = $this->db->transaction(function () use ($tenantId, $actor, $original, $invoiceId, $date, $reason, $lines, $meta, $external, $creditKind): int {
             $id = $this->db->insert(
                 'INSERT INTO acc_invoices (tenant_id, kind, contact_id, issue_date, supply_date, due_date, status, currency,
                         prices_include_tax, credits_invoice_id, notes, external_ref, created_by_profile_id, agent_id,
                         on_behalf_of_profile_id, owner_plugin)
-                 VALUES (:tenant_id, \'sale_credit\', :contact_id, :issue_date, :supply_date, :issue_date2, \'draft\', :currency,
+                 VALUES (:tenant_id, :kind, :contact_id, :issue_date, :supply_date, :issue_date2, \'draft\', :currency,
                         :inclusive, :credits, :notes, :external, :actor, :agent, :on_behalf, :owner)',
                 [
-                    ':tenant_id' => $tenantId, ':contact_id' => (int) $original['contact_id'], ':issue_date' => $date,
+                    ':tenant_id' => $tenantId, ':kind' => $creditKind, ':contact_id' => (int) $original['contact_id'], ':issue_date' => $date,
                     ':supply_date' => $date, ':issue_date2' => $date, ':currency' => (string) $original['currency'],
                     ':inclusive' => DbBool::of($original['prices_include_tax']), ':credits' => $invoiceId, ':notes' => $reason,
                     ':external' => $external, ':actor' => $actor, ':agent' => AccountingDb::int($meta['agent_id'] ?? null),
@@ -341,9 +385,10 @@ final class Invoices
     {
         $this->ready($tenantId, $id);
         $view = $this->get($tenantId, $id);
-        $credit = $view['kind'] === 'sale_credit';
+        $credit = str_ends_with((string) $view['kind'], '_credit');
+        $side = self::SIDES[self::sideOf((string) $view['kind'])];
         try {
-            $this->hooks?->dispatch(Events::ACCOUNTING_INVOICE_ISSUING, $this->payload($tenantId, $view, $actor) + [
+            $this->hooks?->dispatch($side['noun'] === 'bill' ? Events::ACCOUNTING_BILL_POSTING : Events::ACCOUNTING_INVOICE_ISSUING, $this->payload($tenantId, $view, $actor) + [
                 'lines' => array_map(static fn (array $l): array => [
                     'variant_id' => $l['variant_id'], 'description' => $l['description'], 'quantity' => $l['quantity'],
                     'unit_price_minor' => $l['unit_price_minor'], 'net_minor' => $l['net_minor'], 'tax_code' => $l['tax_code'],
@@ -355,9 +400,9 @@ final class Invoices
         }
 
         $outer = $this->db->inTransaction();
-        $this->db->transaction(function () use ($tenantId, $id, $actor, $view, $credit): void {
+        $this->db->transaction(function () use ($tenantId, $id, $actor, $view, $credit, $side): void {
             $year = substr((string) $view['issue_date'], 0, 4);
-            $number = sprintf(($credit ? 'CRN' : 'INV') . '-%s-%04d', $year, $this->sequences->next($tenantId, 'acc_invoices:' . $view['kind'] . ':' . $year));
+            $number = sprintf($side['prefix'][$credit ? 1 : 0] . '-%s-%04d', $year, $this->sequences->next($tenantId, 'acc_invoices:' . $view['kind'] . ':' . $year));
             $claimed = $this->db->run(
                 'UPDATE acc_invoices SET status = \'issued\', number = :number, issued_at = CURRENT_TIMESTAMP, issued_by_profile_id = :actor,
                         updated_at = CURRENT_TIMESTAMP
@@ -368,15 +413,20 @@ final class Invoices
                 throw new AccountingRejectedException('This invoice was issued or changed at the same moment; open it again', 409, ['code' => 'conflict']);
             }
             $posted = $this->ledger->post($tenantId, $actor, [
-                'journal' => 'SAL',
+                'journal' => $side['journal'],
                 'date' => (string) $view['issue_date'],
-                'memo' => ($credit ? 'Credit note ' : 'Invoice ') . $number . ' · ' . $view['contact_name'],
-                'source_type' => $credit ? 'credit_note' : 'invoice',
+                'memo' => match (true) {
+                    $side['noun'] === 'bill' && $credit => 'Supplier credit ',
+                    $side['noun'] === 'bill' => 'Bill ',
+                    $credit => 'Credit note ',
+                    default => 'Invoice ',
+                } . $number . ($view['supplier_number'] !== null ? ' (' . $view['supplier_number'] . ')' : '') . ' · ' . $view['contact_name'],
+                'source_type' => $side['noun'] === 'bill' ? ($credit ? 'supplier_credit' : 'bill') : ($credit ? 'credit_note' : 'invoice'),
                 'source_id' => $id,
                 'idempotency_key' => 'invoice:' . $id,
                 'agent_id' => $view['agent_id'],
                 'on_behalf_of' => $view['on_behalf_of_profile_id'],
-                'lines' => $this->entryLines($tenantId, $view, $credit),
+                'lines' => $this->entryLines($tenantId, $view, $credit, $side),
             ]);
             $this->db->run(
                 'UPDATE acc_invoices SET entry_id = :entry_id WHERE tenant_id = :tenant_id AND id = :id',
@@ -386,7 +436,7 @@ final class Invoices
             if ($credit && $view['credits_invoice_id'] !== null) {
                 $this->settleWithCredit($tenantId, (int) $view['credits_invoice_id'], $id, (string) $view['issue_date'], $actor);
             }
-            $this->notify(Events::ACCOUNTING_INVOICE_ISSUED, $tenantId, $id, $actor);
+            $this->notify($side['noun'] === 'bill' ? Events::ACCOUNTING_BILL_POSTED : Events::ACCOUNTING_INVOICE_ISSUED, $tenantId, $id, $actor);
         });
         if (!$outer) {
             $this->afterIssue($tenantId, $id);
@@ -398,21 +448,29 @@ final class Invoices
     /**
      * The entry's lines: the receivable, each line's income, each code's tax.
      *
+     * A sale debits the customer and credits income and tax; a bill
+     * credits the supplier and debits costs and the tax to reclaim. Credits
+     * mirror both.
+     *
      * @param array<string, mixed> $view
+     * @param array{counter: string, tax: string, noun: string} $doc
      * @return list<array<string, mixed>>
      */
-    private function entryLines(int $tenantId, array $view, bool $credit): array
+    private function entryLines(int $tenantId, array $view, bool $credit, array $doc): array
     {
         $side = static fn (int $amount, bool $debit): array => $debit
             ? ['debit_minor' => $amount, 'credit_minor' => 0]
             : ['debit_minor' => 0, 'credit_minor' => $amount];
+        $purchase = $doc['noun'] === 'bill';
+        // The counterpart (who owes or is owed) is debited on a sale and on a supplier credit.
+        $counterDebit = $purchase ? $credit : !$credit;
         $sign = $credit ? -1 : 1;
         $contactId = (int) $view['contact_id'];
         $lines = [[
-            'account_id' => $this->workspace->roleAccountId($tenantId, 'receivable'),
+            'account_id' => $this->workspace->roleAccountId($tenantId, $doc['counter']),
             'contact_id' => $contactId,
             'description' => (string) $view['contact_name'],
-        ] + $side((int) $view['total_minor'], !$credit)];
+        ] + $side((int) $view['total_minor'], $counterDebit)];
         $taxByCode = [];
         foreach ($view['lines'] as $l) {
             if ((int) $l['net_minor'] > 0) {
@@ -425,7 +483,7 @@ final class Invoices
                     'tax_base_minor' => $sign * (int) $l['net_minor'],
                     'source_line_type' => 'invoice_line',
                     'source_line_id' => (int) $l['id'],
-                ] + $side((int) $l['net_minor'], $credit);
+                ] + $side((int) $l['net_minor'], !$counterDebit);
             }
             if ((int) $l['tax_minor'] > 0) {
                 $taxByCode[(int) $l['tax_code_id']] = ($taxByCode[(int) $l['tax_code_id']] ?? 0) + (int) $l['tax_minor'];
@@ -435,11 +493,11 @@ final class Invoices
         foreach ($taxByCode as $codeId => $tax) {
             $code = $this->taxes->get($tenantId, $codeId);
             $lines[] = [
-                'account_id' => $code['account_id'] ?? $this->workspace->roleAccountId($tenantId, 'sales_tax_output'),
+                'account_id' => $code['account_id'] ?? $this->workspace->roleAccountId($tenantId, $doc['tax']),
                 'contact_id' => $contactId,
                 'description' => $code['name'],
                 'tax_code_id' => $codeId,
-            ] + $side($tax, $credit);
+            ] + $side($tax, !$counterDebit);
         }
 
         return $lines;
@@ -474,7 +532,7 @@ final class Invoices
         if ($row === null || !in_array($row['status'], ['issued', 'partly_paid', 'paid', 'credited'], true)) {
             return;
         }
-        if ($row['kind'] === 'sale_credit') {
+        if (str_ends_with((string) $row['kind'], '_credit')) {
             $used = (int) ($this->db->one(
                 'SELECT COALESCE(SUM(amount_minor), 0) AS used FROM acc_allocations
                   WHERE tenant_id = :tenant_id AND credit_invoice_id = :id AND reversed_at IS NULL',
@@ -513,7 +571,7 @@ final class Invoices
     private function afterIssue(int $tenantId, int $id): void
     {
         $row = $this->row($tenantId, $id);
-        if ($row === null || $row['number'] === null || $row['einvoice_status'] !== 'none') {
+        if ($row === null || $row['number'] === null || $row['einvoice_status'] !== 'none' || self::sideOf((string) $row['kind']) !== 'sale') {
             return;
         }
         $connector = ($this->einvoicing)();
@@ -553,7 +611,7 @@ final class Invoices
     // ── reading ──────────────────────────────────────────────────────────
 
     /**
-     * @param array{kind?: string, status?: string, contact_id?: int, q?: string, from?: string, to?: string} $filter
+     * @param array{side?: string, kind?: string, status?: string, contact_id?: int, q?: string, from?: string, to?: string} $filter
      * @return list<array<string, mixed>>
      */
     public function list(int $tenantId, array $filter = [], int $limit = 50, int $offset = 0): array
@@ -563,13 +621,13 @@ final class Invoices
         $params = [':tenant_id' => $tenantId];
         $kind = $filter['kind'] ?? null;
         if ($kind !== null) {
-            if (!in_array($kind, self::SALE_KINDS, true)) {
-                throw AccountingRejectedException::field('kind', 'kind is sale or sale_credit');
+            if (!in_array($kind, [...self::SALE_KINDS, ...self::PURCHASE_KINDS], true)) {
+                throw AccountingRejectedException::field('kind', 'kind is sale, sale_credit, purchase or purchase_credit');
             }
             $where[] = 'i.kind = :kind';
             $params[':kind'] = $kind;
         } else {
-            $where[] = 'i.kind IN (\'sale\', \'sale_credit\')';
+            $where[] = ($filter['side'] ?? 'sale') === 'purchase' ? 'i.kind IN (\'purchase\', \'purchase_credit\')' : 'i.kind IN (\'sale\', \'sale_credit\')';
         }
         if (isset($filter['status'])) {
             if ($filter['status'] === 'overdue') {
@@ -618,7 +676,7 @@ final class Invoices
         $row = $this->db->one(
             'SELECT ' . self::COLUMNS . ', c.name AS contact_name
                FROM acc_invoices i JOIN contacts c ON c.id = i.contact_id AND c.tenant_id = i.tenant_id
-              WHERE i.tenant_id = :tenant_id AND i.id = :id AND i.kind IN (\'sale\', \'sale_credit\')',
+              WHERE i.tenant_id = :tenant_id AND i.id = :id',
             [':tenant_id' => $tenantId, ':id' => $id]
         ) ?? throw AccountingRejectedException::notFound('Invoice');
         $lines = $this->db->all(
@@ -719,18 +777,19 @@ final class Invoices
      * @param array<string, mixed>|null $existing
      * @return array{contact_id: int, issue_date: string, supply_date: ?string, due_date: ?string, payment_terms_days: int, currency: string, prices_include_tax: bool, notes: string}
      */
-    private function head(int $tenantId, array $data, ?array $existing): array
+    private function head(int $tenantId, array $data, ?array $existing, string $kind = 'sale'): array
     {
+        $side = self::SIDES[self::sideOf($kind)];
         $contactId = $data['contact_id'] ?? null;
         $contact = is_int($contactId) ? $this->db->one(
-            'SELECT id, name, is_customer, archived_at FROM contacts WHERE tenant_id = :tenant_id AND id = :id',
+            'SELECT id, name, is_customer, is_supplier, archived_at FROM contacts WHERE tenant_id = :tenant_id AND id = :id',
             [':tenant_id' => $tenantId, ':id' => $contactId]
         ) : null;
         if ($contact === null || $contact['archived_at'] !== null) {
-            throw AccountingRejectedException::field('contact_id', 'contact_id is a customer here');
+            throw AccountingRejectedException::field('contact_id', 'contact_id is a ' . $side['who'] . ' here');
         }
-        if (!DbBool::of($contact['is_customer'])) {
-            throw AccountingRejectedException::field('contact_id', $contact['name'] . ' is not marked as a customer; mark them as one on their contact page first');
+        if (!DbBool::of($contact[$side['flag']])) {
+            throw AccountingRejectedException::field('contact_id', $contact['name'] . ' is not marked as a ' . $side['who'] . '; mark them as one on their contact page first');
         }
         $settings = ($this->settings)($tenantId);
         $issue = isset($data['issue_date']) && $data['issue_date'] !== '' ? Periods::date($data['issue_date'], 'issue_date') : $this->today();
@@ -771,7 +830,7 @@ final class Invoices
      *
      * @return list<array<string, mixed>>
      */
-    private function lines(int $tenantId, mixed $raw, string $date, bool $inclusive): array
+    private function lines(int $tenantId, mixed $raw, string $date, bool $inclusive, string $kind = 'sale'): array
     {
         if (!is_array($raw) || !array_is_list($raw) || $raw === [] || count($raw) > self::MAX_LINES) {
             throw AccountingRejectedException::field('lines', 'lines is a list of 1 to ' . self::MAX_LINES . ' {variant_id or description, quantity, unit_price_minor}');
@@ -783,7 +842,7 @@ final class Invoices
                 throw AccountingRejectedException::field($field, $field . ' must be an object');
             }
             /** @var array<string, mixed> $line */
-            $out[] = $this->line($tenantId, $field, $line, $date, $inclusive);
+            $out[] = $this->line($tenantId, $field, $line, $date, $inclusive, self::sideOf($kind));
         }
 
         return $out;
@@ -793,8 +852,9 @@ final class Invoices
      * @param array<string, mixed> $line
      * @return array<string, mixed>
      */
-    private function line(int $tenantId, string $field, array $line, string $date, bool $inclusive): array
+    private function line(int $tenantId, string $field, array $line, string $date, bool $inclusive, string $sideName = 'sale'): array
     {
+        $side = self::SIDES[$sideName];
         $quantity = is_string($line['quantity'] ?? null) || is_int($line['quantity'] ?? null) ? trim((string) $line['quantity']) : '1';
         $description = is_string($line['description'] ?? null) ? mb_substr(trim($line['description']), 0, 500) : '';
         $price = $line['unit_price_minor'] ?? $line['price_minor'] ?? null;
@@ -802,7 +862,7 @@ final class Invoices
         $variantId = $line['variant_id'] ?? null;
         $serviceItem = false;
         if ($variantId !== null) {
-            $item = $this->itemLine($tenantId, $field, $variantId, $line, $quantity);
+            $item = $this->itemLine($tenantId, $field, $variantId, $line, $quantity, $sideName);
             $description = $description !== '' ? $description : $item['description'];
             $price ??= $item['price_minor'];
             $category = isset($line['tax_category']) ? $category : $item['tax_category'];
@@ -835,10 +895,12 @@ final class Invoices
             throw AccountingRejectedException::field($field, $field . '.discount_bp is basis points, 0 to 10000');
         }
         $code = isset($line['tax_code']) && $line['tax_code'] !== ''
-            ? $this->taxes->usable($tenantId, $line['tax_code'], 'output', $date, $field . '.tax_code')
-            : ($this->taxes->codeFor($tenantId, $category, 'output', $date)
-                ?? throw AccountingRejectedException::field($field, $field . ': no sales tax code fits the tax category "' . $category . '"; choose a tax_code'));
-        $accountId = $this->incomeAccount($tenantId, $line['account_id'] ?? null, $line['account_code'] ?? null, $serviceItem, $field);
+            ? $this->taxes->usable($tenantId, $line['tax_code'], $side['direction'], $date, $field . '.tax_code')
+            : ($this->taxes->codeFor($tenantId, $category, $side['direction'], $date)
+                ?? throw AccountingRejectedException::field($field, $field . ': no tax code fits the tax category "' . $category . '"; choose a tax_code'));
+        $accountId = $sideName === 'purchase'
+            ? $this->costAccount($tenantId, $line['account_id'] ?? null, $line['account_code'] ?? null, $field)
+            : $this->incomeAccount($tenantId, $line['account_id'] ?? null, $line['account_code'] ?? null, $serviceItem, $field);
         $ouId = $line['ou_id'] ?? null;
         if ($ouId !== null && (!is_int($ouId) || $this->db->one(
             'SELECT 1 AS hit FROM organizational_units WHERE tenant_id = :tenant_id AND id = :id',
@@ -871,7 +933,7 @@ final class Invoices
      * @param array<string, mixed> $line
      * @return array{description: string, price_minor: int, tax_category: string, service: bool, quantity: int, decimals: int, unit_id: int}
      */
-    private function itemLine(int $tenantId, string $field, mixed $variantId, array $line, string $quantity): array
+    private function itemLine(int $tenantId, string $field, mixed $variantId, array $line, string $quantity, string $sideName = 'sale'): array
     {
         $found = is_int($variantId) ? $this->items->variantForStock($tenantId, $variantId) : null;
         if ($found === null || $found['item']['archived_at'] !== null || $found['variant']['archived_at'] !== null) {
@@ -887,12 +949,13 @@ final class Invoices
         if ($steps['steps'] <= 0) {
             throw AccountingRejectedException::field($field, $field . '.quantity must be more than 0');
         }
+        $priceColumn = $sideName === 'purchase' ? 'purchase_price_minor' : 'sale_price_minor';
         $variantPrice = AccountingDb::int($this->db->one(
-            'SELECT sale_price_minor FROM inv_variants WHERE tenant_id = :tenant_id AND id = :id',
+            'SELECT ' . $priceColumn . ' AS price FROM inv_variants WHERE tenant_id = :tenant_id AND id = :id',
             [':tenant_id' => $tenantId, ':id' => (int) $variantId]
-        )['sale_price_minor'] ?? null);
+        )['price'] ?? null);
         $default = $steps['unit_id'] === (int) $found['unit']['id']
-            ? ($variantPrice ?? AccountingDb::int($found['item']['sale_price_minor']) ?? 0)
+            ? ($variantPrice ?? AccountingDb::int($found['item'][$priceColumn] ?? null) ?? 0)
             : 0;
 
         return [
@@ -904,6 +967,50 @@ final class Invoices
             'decimals' => (int) ($this->units->row($tenantId, $steps['unit_id'])['decimals'] ?? 0),
             'unit_id' => $steps['unit_id'],
         ];
+    }
+
+    /**
+     * A bill line's account: the one given (an expense, or an asset such as
+     * equipment or stock), else Other costs. Matching bills to stock
+     * receipts arrives with stock in the books (A4).
+     */
+    private function costAccount(int $tenantId, mixed $id, mixed $code, string $field): int
+    {
+        if ($id !== null || ($code !== null && $code !== '')) {
+            $row = is_int($id)
+                ? $this->db->one('SELECT id, type, role, is_group, archived_at FROM acc_accounts WHERE tenant_id = :tenant_id AND id = :id', [':tenant_id' => $tenantId, ':id' => $id])
+                : (is_string($code) ? $this->db->one('SELECT id, type, role, is_group, archived_at FROM acc_accounts WHERE tenant_id = :tenant_id AND code = :code', [':tenant_id' => $tenantId, ':code' => $code]) : null);
+            if ($row === null || $row['archived_at'] !== null || DbBool::of($row['is_group'])) {
+                throw AccountingRejectedException::field($field, $field . '.account is not an account here that takes lines');
+            }
+            if (!in_array($row['type'], ['expense', 'asset'], true) || in_array($row['role'], ['receivable', 'bank', 'cash', 'sales_tax_input', 'cheques_to_collect', 'provider_clearing'], true)) {
+                throw AccountingRejectedException::field($field, $field . '.account must be a cost or an asset bought, such as equipment');
+            }
+
+            return (int) $row['id'];
+        }
+
+        return AccountingDb::int($this->db->one(
+            'SELECT id FROM acc_accounts WHERE tenant_id = :tenant_id AND code = \'6900\' AND type = \'expense\' AND is_group = FALSE AND archived_at IS NULL',
+            [':tenant_id' => $tenantId]
+        )['id'] ?? null) ?? AccountingDb::int($this->db->one(
+            'SELECT id FROM acc_accounts WHERE tenant_id = :tenant_id AND type = \'expense\' AND is_group = FALSE AND archived_at IS NULL AND role IS NULL
+              ORDER BY sort_order, code LIMIT 1',
+            [':tenant_id' => $tenantId]
+        )['id'] ?? null) ?? throw AccountingRejectedException::field($field, 'The chart has no expense account to put this on; add one first');
+    }
+
+    /** A supplier's own number for a bill, as printed on their paper. */
+    private static function supplierNumber(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (!is_string($value) || mb_strlen(trim($value)) > 80) {
+            throw AccountingRejectedException::field('supplier_number', 'supplier_number is the supplier\'s invoice number, up to 80 characters');
+        }
+
+        return trim($value);
     }
 
     /**
@@ -1101,7 +1208,7 @@ final class Invoices
             [':tenant_id' => $tenantId, ':id' => (int) $row['contact_id']]
         );
         if ($contact === null || $contact['archived_at'] !== null) {
-            throw AccountingRejectedException::field('contact_id', 'The customer on this invoice was archived; choose another');
+            throw AccountingRejectedException::field('contact_id', 'The contact on this document was archived; choose another');
         }
     }
 
@@ -1184,6 +1291,7 @@ final class Invoices
             'id' => (int) $r['id'],
             'kind' => (string) $r['kind'],
             'number' => is_string($r['number']) ? $r['number'] : null,
+            'supplier_number' => is_string($r['supplier_number'] ?? null) ? $r['supplier_number'] : null,
             'status' => (string) $r['status'],
             'contact_id' => (int) $r['contact_id'],
             'contact_name' => (string) ($r['contact_name'] ?? ''),

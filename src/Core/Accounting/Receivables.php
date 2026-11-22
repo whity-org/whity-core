@@ -34,8 +34,9 @@ final class Receivables
     /**
      * @return array{as_of: string, currency: string, rows: list<array<string, mixed>>, totals: array<string, int>}
      */
-    public function aged(int $tenantId, string $asOf, ?int $contactId = null): array
+    public function aged(int $tenantId, string $asOf, ?int $contactId = null, string $side = 'sale'): array
     {
+        $purchase = $side === 'purchase';
         $asOf = Periods::date($asOf, 'as_of');
         $this->workspace->ensure($tenantId);
         $params = [':tenant_id' => $tenantId, ':as_of' => $asOf, ':after' => self::dayAfter($asOf)];
@@ -50,9 +51,9 @@ final class Receivables
                        WHERE a.tenant_id = i.tenant_id AND a.invoice_id = i.id AND a.allocated_on <= :as_of
                          AND (a.reversed_at IS NULL OR a.reversed_at >= :after)), 0) AS owed
                FROM acc_invoices i JOIN contacts c ON c.id = i.contact_id AND c.tenant_id = i.tenant_id
-              WHERE i.tenant_id = :tenant_id AND i.kind = \'sale\' AND i.issued_at IS NOT NULL
+              WHERE i.tenant_id = :tenant_id AND i.kind = :kind AND i.issued_at IS NOT NULL
                 AND i.status IN (\'issued\', \'partly_paid\', \'paid\', \'credited\') AND i.issue_date <= :as_of3' . $onlyOne,
-            $params + [':as_of3' => $asOf]
+            $params + [':as_of3' => $asOf, ':kind' => $purchase ? 'purchase' : 'sale']
         );
         $rows = [];
         foreach ($invoices as $inv) {
@@ -73,7 +74,7 @@ final class Receivables
             };
             $rows[$cid][$bucket] += $owed;
         }
-        foreach ($this->credits($tenantId, $asOf, $contactId) as $cid => [$name, $credit]) {
+        foreach ($this->credits($tenantId, $asOf, $contactId, $purchase) as $cid => [$name, $credit]) {
             $rows[$cid] ??= ['contact_id' => $cid, 'contact_name' => $name] + array_fill_keys(self::BUCKETS, 0) + ['credit_minor' => 0];
             $rows[$cid]['credit_minor'] = $credit;
         }
@@ -96,7 +97,7 @@ final class Receivables
      *
      * @return array<int, array{0: string, 1: int}> contact => [name, credit]
      */
-    private function credits(int $tenantId, string $asOf, ?int $contactId): array
+    private function credits(int $tenantId, string $asOf, ?int $contactId, bool $purchase = false): array
     {
         $params = [':tenant_id' => $tenantId, ':as_of' => $asOf, ':after' => self::dayAfter($asOf), ':as_of3' => $asOf];
         $onlyOne = '';
@@ -111,9 +112,9 @@ final class Receivables
                        WHERE a.tenant_id = p.tenant_id AND a.payment_id = p.id AND a.allocated_on <= :as_of
                          AND (a.reversed_at IS NULL OR a.reversed_at >= :after)), 0)) AS credit
                FROM acc_payments p JOIN contacts c ON c.id = p.contact_id AND c.tenant_id = p.tenant_id
-              WHERE p.tenant_id = :tenant_id AND p.direction = \'in\' AND p.status = \'posted\' AND p.paid_on <= :as_of3' . $onlyOne . '
+              WHERE p.tenant_id = :tenant_id AND p.direction = :direction AND p.status = \'posted\' AND p.paid_on <= :as_of3' . $onlyOne . '
               GROUP BY p.contact_id, c.name',
-            $params
+            $params + [':direction' => $purchase ? 'out' : 'in']
         ) as $r) {
             $out[(int) $r['contact_id']] = [(string) $r['contact_name'], (int) $r['credit']];
         }
@@ -124,9 +125,9 @@ final class Receivables
                        WHERE a.tenant_id = n.tenant_id AND a.credit_invoice_id = n.id AND a.allocated_on <= :as_of
                          AND (a.reversed_at IS NULL OR a.reversed_at >= :after)), 0)) AS credit
                FROM acc_invoices n JOIN contacts c ON c.id = n.contact_id AND c.tenant_id = n.tenant_id
-              WHERE n.tenant_id = :tenant_id AND n.kind = \'sale_credit\' AND n.issued_at IS NOT NULL AND n.issue_date <= :as_of3' . $onlyOne . '
+              WHERE n.tenant_id = :tenant_id AND n.kind = :kind AND n.issued_at IS NOT NULL AND n.issue_date <= :as_of3' . $onlyOne . '
               GROUP BY n.contact_id, c.name',
-            $params
+            $params + [':kind' => $purchase ? 'purchase_credit' : 'sale_credit']
         ) as $r) {
             $cid = (int) $r['contact_id'];
             $out[$cid] = [(string) $r['contact_name'], ($out[$cid][1] ?? 0) + (int) $r['credit']];
@@ -147,7 +148,7 @@ final class Receivables
      *
      * @return array<string, mixed>
      */
-    public function statement(int $tenantId, int $contactId, string $from, string $to): array
+    public function statement(int $tenantId, int $contactId, string $from, string $to, string $side = 'sale'): array
     {
         $from = Periods::date($from, 'from');
         $to = Periods::date($to, 'to');
@@ -158,8 +159,10 @@ final class Receivables
             'SELECT id, name FROM contacts WHERE tenant_id = :tenant_id AND id = :id',
             [':tenant_id' => $tenantId, ':id' => $contactId]
         ) ?? throw AccountingRejectedException::notFound('Customer');
-        $receivable = $this->workspace->roleAccountId($tenantId, 'receivable');
-        $opening = (int) ($this->db->one(
+        // A supplier's statement reads We owe suppliers, credit-positive: what we owe them.
+        $receivable = $this->workspace->roleAccountId($tenantId, $side === 'purchase' ? 'payable' : 'receivable');
+        $sign = $side === 'purchase' ? -1 : 1;
+        $opening = $sign * (int) ($this->db->one(
             'SELECT COALESCE(SUM(debit_minor - credit_minor), 0) AS bal FROM acc_lines
               WHERE tenant_id = :tenant_id AND account_id = :account_id AND contact_id = :contact_id AND entry_date < :from',
             [':tenant_id' => $tenantId, ':account_id' => $receivable, ':contact_id' => $contactId, ':from' => $from]
@@ -177,7 +180,7 @@ final class Receivables
         $balance = $opening;
         $out = [];
         foreach ($lines as $l) {
-            $balance += (int) $l['debit_minor'] - (int) $l['credit_minor'];
+            $balance += $sign * ((int) $l['debit_minor'] - (int) $l['credit_minor']);
             $out[] = [
                 'line_id' => (int) $l['id'],
                 'entry_id' => (int) $l['entry_id'],
