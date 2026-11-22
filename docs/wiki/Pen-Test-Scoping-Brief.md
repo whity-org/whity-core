@@ -4,6 +4,8 @@ Scoping material for an **external, professional** penetration-testing engagemen
 
 **This document does not substitute for a professional penetration test.** It was produced by an internal, code-level (plus limited dynamic) review; it has not been reviewed by an independent third party, and several items below are explicitly flagged as needing exactly that.
 
+The current gap list against OWASP ASVS 4.0 Level 2 and ISO 27001 Annex A.8, across whity-core, whity-id, whity-plugins and whity-builder, with what is fixed and what is open, is [docs/security/READINESS.md](../security/READINESS.md) (2026-11-22). Give it to the testers with this brief.
+
 See [Threat-Model](Threat-Model.md) for the full STRIDE analysis this brief summarizes, and [TENANT_ISOLATION](TENANT_ISOLATION.md) / [Architecture](Architecture.md) / [PERMISSION_SYSTEM](PERMISSION_SYSTEM.md) for the underlying architecture docs.
 
 ## Architecture summary

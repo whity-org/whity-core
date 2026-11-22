@@ -2,6 +2,8 @@
 
 A trust-boundary-driven threat model for Whity Core, grounded in the current source — every claim below cites the file that enforces (or fails to enforce) it. Written as part of an adversarial internal security audit (WC-security-audit); see [Pen-Test-Scoping-Brief](Pen-Test-Scoping-Brief.md) for the external-facing companion document (what still needs professional testing, and what this pass already found/fixed).
 
+**Refreshed 2026-11-22 (WHIT-1335)** against develop `2a7247613` for the security readiness audit: Whity ID SSO, plugin signing and the kill switch, plugin UI frames, MCP approvals, usage meters, chat and the public surfaces are new sections; the open gaps they found (TM-1 to TM-25) are tracked in [READINESS](../security/READINESS.md#b3-whity-core-threat-model-gaps).
+
 Related: [Architecture](Architecture.md) · [TENANT_ISOLATION](TENANT_ISOLATION.md) · [PERMISSION_SYSTEM](PERMISSION_SYSTEM.md) · [Plugin-Development](Plugin-Development.md) · [AUDIT_TRAIL](AUDIT_TRAIL.md).
 
 ## How to read this document
@@ -12,18 +14,23 @@ STRIDE classifies threats by the property they violate: **S**poofing (identity),
 
 ```mermaid
 flowchart LR
-    Browser["Browser<br/>(tenant users)"] -->|httpOnly cookies| Next["Next.js UI (web/)"]
-    NativeClient["Native/desktop client<br/>(device credential)"] -->|Bearer JWT| Proxy
-    Next -->|"/api/* proxy<br/>web/app/api/[...path]/route.ts"| Proxy["Reverse proxy boundary"]
-    Proxy --> FP["FrankenPHP workers<br/>(public/index.php)"]
+    Browser["Browser (staff)"] -->|httpOnly cookies| Next["Next.js UI (web/)"]
+    Visitor["Anonymous visitor<br/>(public forms, booking, web chat)"] -->|no session| Next
+    NativeClient["Native/desktop client<br/>(device credential)"] -->|Bearer JWT| FP
+    Next -->|"/api/* proxy<br/>web/app/api/[...path]/route.ts"| FP["FrankenPHP workers<br/>(public/index.php)"]
+    Next -. "postMessage bridge (frame/1)" .- Frame["Plugin embed iframe<br/>(sandbox: allow-scripts allow-forms, opaque origin)"]
+    AI["MCP clients / agents"] -->|"Bearer: MCP key or Whity ID OAuth token"| FP
     subgraph Core["Whity Core (trusted compute)"]
         FP --> Kernel["HttpKernel + middleware pipeline"]
-        Kernel --> Plugins["Loaded plugins<br/>(in-process, full trust)"]
+        Kernel --> Plugins["Code plugins<br/>(in-process, full trust)"]
+        Kernel --> WsPlugins["Workspace plugins<br/>(declarative manifests)"]
         Kernel --> DB[("PostgreSQL<br/>shared, all tenants")]
     end
-    FP -->|"internal HTTP,<br/>shared-secret"| Render["whity_render<br/>(headless Chromium)"]
-    FP -->|"SSRF-guarded HTTPS<br/>(operator allowlist)"| Store["Plugin marketplace<br/>(whity-plugins)"]
-    FP -->|"SSRF-guarded HTTPS<br/>(per-tenant config)"| IdP["Tenant/operator<br/>SSO / OIDC IdPs"]
+    FP <-->|"OIDC (PKCE, nonce), JWKS"| WID["Whity ID<br/>(operator IdP, OAuth server for MCP)"]
+    FP -->|"SSRF-guarded OIDC"| TIdP["Workspace-owned IdPs"]
+    Pay["Whity Pay / Polar"] -->|"HMAC-signed webhooks"| FP
+    FP -->|"internal HTTP,<br/>shared secret"| Render["whity_render<br/>(headless Chromium)"]
+    FP -->|"allowlisted host +<br/>Ed25519 attestation"| Store["Plugin store"]
     Mailer["SMTP / mail transport"] --- FP
 ```
 
@@ -33,13 +40,19 @@ flowchart LR
 
 | Asset | Why it matters | Primary control |
 | --- | --- | --- |
-| Tenant business data (users, documents, notifications, taxonomy, …) | Confidentiality/integrity across ~35 tenant-owned tables in one shared DB | `TenantContext` + per-query `tenant_id` predicate ([TENANT_ISOLATION](TENANT_ISOLATION.md)) |
+| Tenant business data (users, documents, notifications, taxonomy, …) | Confidentiality/integrity across 185 tenant-owned tables in one shared DB | `TenantContext` + per-query `tenant_id` predicate ([TENANT_ISOLATION](TENANT_ISOLATION.md)) |
 | Identity/credentials (`profiles.password_hash`, TOTP secrets, backup codes) | Account takeover if disclosed or forged | bcrypt hashing, AES-256 authenticated encryption at rest, single-use backup codes |
 | Session material (JWT access/refresh, `token_epoch`, `revoked_tokens`) | Impersonation if forged or replayed | HS256 HMAC signing, per-token + per-profile revocation ([Auth boundary](#3-the-authsession-boundary)) |
 | Admin approval queues (password-reset, 2FA-recovery) | Account-takeover-adjacent — approving one clears a second factor or applies a password | `permission_delegations`-style RBAC gate + re-verified tenant membership JOIN at approve/reject time |
-| Plugin marketplace packages | Supply-chain: a malicious package runs as fully-trusted core code once installed | SSRF-guarded fetch + host allowlist + `PluginInstaller` validation (signing is **not yet implemented** — see residual risks) |
+| Plugin marketplace packages | Supply-chain: a malicious package runs as fully-trusted core code once installed | SSRF-guarded fetch + host allowlist + `PluginInstaller` validation + Ed25519 attestation (built, **inactive until a key is pinned**, TM-1) |
 | Rendered documents (PDF via `whity_render`) | Tenant content confidentiality; render service is a second compute surface | Shared-secret auth, no public exposure, size/time bounds |
-| Audit log | Forensic record of security-relevant events | `AuditLogger`, append-only, `audit_log` is itself tenant-owned |
+| Audit log | Forensic record of security-relevant events | `AuditLogger` is the only writer and no code path updates or deletes rows; the table itself is not tamper-evident and is deleted with its workspace (CO-5, CO-6) |
+| Plugin trust root (pinned Ed25519 keys, revocation list) | Decides which code runs as fully trusted core | `src/Core/Plugin/Trust/TrustedKeys.php`, `PluginTrust::checkAttestation` |
+| Agent grants and pending proposals | Decide what an AI can do without a person | `AgentScopeGrant`, `AgentProposalRepository` (atomic decide) |
+| Frame tokens (`plugin_frame`) | A person's authority, scoped to one plugin's routes | `PluginFrameTokens::admits()`, Bearer only, 300 s |
+| Usage ledger and meter counters | Drive the bill and the plan limits | `UsageLedger` (atomic upserts), `MeterService` |
+| Billing webhook secret and event ledger | Plan and access changes | `WebhookVerifier`, `EventLedger` |
+| Chat history and attachments | Private staff and customer conversations | `ChatService` membership checks |
 
 ## Attackers considered
 
@@ -51,6 +64,11 @@ flowchart LR
 | Malicious plugin author | Can get a package installed (self-hosted store, or a mis-scoped `plugins:upload` grant) | Full host compromise — see [Plugin boundary](#4-the-plugin-boundary-e---elevation-of-privilege-first) |
 | Network-position attacker (MITM, compromised proxy, shared network) | Can observe/replay traffic that isn't protected by TLS end-to-end, or intercept a displayed/typed code | TOTP replay, cookie theft if TLS is misconfigured at the edge |
 | Operator/insider with deploy access | Can set environment variables, read secrets at rest | Weak secrets, disabled guards — this is why secret-strength is *enforced in code*, not left to operational discipline alone |
+| Prompt-injection author (customer, form submitter, chat visitor) | Puts text into data an AI client later reads | Get an MCP client to send, delete or leak data |
+| Plugin page script (embed frame) | Runs JS in a sandboxed, opaque-origin iframe | Reach core APIs or the person's session through the bridge |
+| Workspace admin with their own IdP | Controls a workspace's OIDC issuer | Use members' global accounts outside the workspace |
+| Anonymous public submitter | Uses public form, booking and web-chat routes | Spam, enumeration, filling quotas |
+| Forged billing caller | Can reach `/api/billing/*webhook` | Upgrade a workspace without paying |
 
 ---
 
@@ -178,11 +196,30 @@ What **does** exist is *error* isolation, not *security* isolation: `PluginLoade
 
 **This is an accepted architectural reality, not a bug** — no code or documentation prior to this audit claimed plugins were sandboxed, so there is nothing to "fix" here without a genuine sandboxing feature (separate process/runtime, capability-scoped DB handles, egress allowlisting), which is a substantial undertaking out of scope for this pass. The actual, and currently the **only**, control on this boundary is **what gets installed**:
 
-- **Manual upload** (`PluginsApiHandler`, `plugins:upload` permission) — `PluginInstaller` validates zip-slip/zip-bomb, a filesystem-safe name allowlist, and runs isolated introspection before committing.
-- **Marketplace install** (`InstallFromStoreApiHandler`) — gated by the `plugins.store_enabled` master switch (WC-feature-flags-audit) plus an **exact-host allowlist** (`plugins.store_allowed_hosts`, empty by default = feature off) as the primary SSRF control, with `HttpFetcher`'s public-IP-only guard as documented defense-in-depth (its own docblock names the DNS-rebind TOCTOU as an accepted limitation given the URL is operator-configured, not arbitrary user input).
-- **What is *not yet* in place**: package **signing/provenance verification** (tracked separately, per project status, as a pending marketplace PR) — today, install-time validation checks that a package is *well-formed and safe to unzip*, not that it came from a trusted publisher. Until signing lands, "what gets installed" is only as trustworthy as the allowlisted store host and whoever can reach `plugins:upload`/store-admin permissions.
+- **Who can install.** Every code-plugin install, upload, enable, update and kill route also calls `PluginOperatorGate::refusal()`, which only lets the system workspace through (`src/Core/Plugin/PluginOperatorGate.php`). A workspace admin can only switch on code plugins the operator already installed, through `code_plugin_access`. Workspace plugins are declarative manifests (`TenantManifestPolicy`; `AutomationRunner` actions limited to set_fields, create_record, move and notify) and cannot reach SQL or HTTP.
+- **Manual upload** (`plugins:upload`, operator only): `PluginInstaller` validates zip-slip and zip-bomb limits and a filesystem-safe name allowlist, then runs introspection before committing. No signature is checked, and introspection runs the package's PHP as the same OS user (TM-4).
+- **Store install** (`InstallFromStoreApiHandler`): master switch `plugins.store_enabled`, exact-host allowlist, `HttpFetcher` (public IPs only, connects to the IP it checked). The package is hashed and its Ed25519 attestation (plugin, version, sha256, expiry, revocation list with a sequence number) is checked before it is unpacked (`PluginTrust`). **The pinned key list `TrustedKeys::PINNED` is empty today**, so every package fails with `no_keys`, and store installs work only while the operator's global override `plugins.store_allow_unsigned` is on (TM-1). The "Verified" badge (`StoreMarks::PINNED_KEYS`) is a separate trust root that labels plugins; it does not gate installs.
+- **Kill switch.** An operator imports a signed revocation list through `POST /api/plugins/revocations`. A killed workspace plugin is turned off; a killed code plugin is off for every workspace at every request surface (`CodePluginActivation::stateFor`, reason `withdrawn`). Its code is still `require`d and booted when a worker starts (TM-3).
+
+Until TM-1 is closed, treat the plugin boundary as **High**: unsigned code with full trust. Once a key is pinned and the override is off, operator-only signed installs are the accepted control, and the missing runtime sandbox stays a documented risk (TM-2).
 
 **Recommendation for the external pen-test**: attempt an actual malicious-plugin load against a throwaway instance (a route handler that calls `TenantContext::reset()`/`setTenantId()` and reads another tenant's rows, or one that exfiltrates `$_ENV`) to convert this static analysis into a live proof, and treat plugin-install permission grants (`plugins:upload`, marketplace admin) as equivalent to full host compromise when scoping who may hold them.
+
+## 4a. Plugin UI frames (the SDK frame bridge)
+
+**Boundary.** An `embed` screen loads the plugin's own GET route in `<iframe sandbox="allow-scripts allow-forms" referrerpolicy="no-referrer">` (`web/components/plugin/embed-screen.tsx`). The backend sends the same sandbox in the page's CSP (`SecurityHeaders::respectingHandlerCsp`). Without `allow-same-origin` the page has an opaque origin: it cannot read the app's DOM, cookies or storage, and its own fetches carry no session.
+
+**Bridge** (`web/lib/plugin-frame-bridge.ts`, page side `sdk/src/Frontend/FrameBridge.php`), protocol `whity: 'frame/1'`. The host accepts a message only when `event.source === iframe.contentWindow` (an origin check is impossible, the origin is `null`) and only five types:
+
+- `ready`: the host replies with locale, direction, theme and API base.
+- `request`: GET, POST, PUT, PATCH, DELETE to paths under `/api/` only, with no `//`, `..`, `%2e`, backslash or control characters.
+- `resize`: clamped to 120 to 8000 px.
+- `navigate`: in-app paths only, no `//` and no `/api/`.
+- `toast`: at most 300 characters, fixed tones.
+
+**Tokens.** The host makes the request with a 300-second `plugin_frame` JWT and `credentials: 'omit'`; the token never enters the frame. It is issued only from a session access token, for an embed screen that is on for the workspace and whose permission the person holds; it is accepted only as a Bearer header on routes under the plugin's own namespace (`PluginFrameTokens::admits`, `EnforceTenantIsolation`); it falls with the parent session, and RBAC re-checks the person's live permission.
+
+**Residual risks.** No `frame-src` in the web CSP, so a frame that navigates to another site keeps the bridge (TM-12). `navigate` accepts any in-app path (TM-13). Toasts put plugin-written text in the app's chrome. The first frame load is an ordinary cookie-authenticated GET, so the plugin's server code sees the full session, consistent with full-trust code plugins.
 
 ## 5. External network boundaries
 
@@ -190,9 +227,12 @@ What **does** exist is *error* isolation, not *security* isolation: `PluginLoade
 | --- | --- | --- | --- |
 | Browser ↔ Next.js ↔ core API | Inbound | httpOnly cookies, CORS allowlist (`src/Http/Cors.php` — origin reflected only when it matches `CORS_ALLOWED_ORIGINS`, never a wildcard with credentials), `X-Requested-With` CSRF guard (see below) | The Next.js proxy (`web/app/api/[...path]/route.ts`) forwards upstream redirects by default; OAuth/SSO redirect routes must opt into `redirect: 'manual'` (documented gotcha, not itself a vulnerability in the audited routes) |
 | Core → tenant/operator SSO IdPs | Outbound (server-initiated) | `HttpFetcher` SSRF guard (https-only, public-IP-only resolution, no redirects, TLS verified) + PKCE + `iss`/`aud`/`nonce` validation on the returned ID token (`OidcEngine`) | DNS-rebind TOCTOU between the guard's resolution and the fetch's own resolution — documented in `HttpFetcher`'s docblock as an accepted limitation given the target is admin-configured, not attacker-supplied |
-| Core → plugin marketplace | Outbound (server-initiated) | Master switch + exact-host allowlist (primary) + `HttpFetcher` guard (defense-in-depth); fetched bytes never trusted (`PluginInstaller`'s full validation pipeline) | Same DNS-rebind caveat as above; **no package signing yet** (see [plugin boundary](#4-the-plugin-boundary-e---elevation-of-privilege-first)) |
-| Core → `whity_render` (headless Chromium) | Outbound (server-initiated, internal-only) | Shared-secret header (`X-Render-Secret`, constant-time comparison, ≥32 chars enforced on *both* sides), no public exposure, size/time bounds, own rate limiter | `RenderServiceClient` deliberately applies **no** SSRF/public-IP guard — by design, since the target is the operator-configured, internal-network `RENDER_SERVICE_URL`, not user input; this is the correct trust level for a same-compose-network internal service, not an oversight |
-| MCP clients (AI principals) | Inbound | Separate token type (`type: 'mcp'`, `aud: 'mcp'`), registered-jti check against `mcp_tokens` (defeats a validly-signed-but-never-issued token), membership guard, epoch check skipped by design (revocation is explicit via `DELETE /api/mcp/tokens/{jti}`) | Standard token-scope review recommended for the external pen-test — see the scoping brief |
+| Core → plugin marketplace | Outbound (server-initiated) | Master switch + exact-host allowlist (primary) + `HttpFetcher` guard (defense-in-depth); fetched bytes never trusted (`PluginInstaller`'s full validation pipeline) | DNS rebinding closed (`HttpFetcher` connects to the IP it checked, #2320); attestation built but inactive until a key is pinned (TM-1) |
+| Core → `whity_render` (headless Chromium) | Outbound (server-initiated, internal-only) | Shared-secret header (`X-Render-Secret`, constant-time comparison, ≥32 chars enforced on *both* sides), no public exposure, size/time bounds, own rate limiter | `RenderServiceClient` deliberately applies **no** SSRF/public-IP guard — by design, since the target is the operator-configured, internal-network `RENDER_SERVICE_URL`, not user input; this is the correct trust level for a same-compose-network internal service, not an oversight. Chromium runs with `--no-sandbox`, JavaScript on, no request interception and no CSP, so escaping in the HTML builder is the only barrier to SSRF from document content (TM-21) |
+| MCP clients and agents | Inbound | Three token kinds on `/mcp` (`TokenValidator`): a minted MCP key (registered jti, revocation, `token_epoch`, membership); a session token; a Whity ID OAuth token (signature, iss, aud, exp; system workspace refused; active membership; `OAuthAccessTokenVerifier`). MCP tokens are refused on REST. Rate limits 300/min per workspace and 60/min per person (`McpRateLimiter`). See [section 9](#9-mcp-agents-and-approvals). | OAuth tokens are not revocable from core before they expire (TM-8); self-registered clients act as the person with no approval step (TM-5) |
+| Core <-> Whity ID (OIDC client) | Outbound + redirect | State (`hash_equals`), PKCE S256, nonce, exact iss, aud, exp, nbf, iat, asymmetric algorithms only (`JwtParser`, `SsoAuthHandler`); signed flow cookie; `HttpFetcher` SSRF guard | No `azp` check, no back-channel logout (TM-10, TM-11) |
+| Whity Pay / Polar -> core webhooks | Inbound | HMAC-SHA256 over `timestamp.rawBody`, constant time, 300-second window, refused when no secret is set (`WebhookVerifier`); single-claim event ledger (`EventLedger`); access is re-read from the billing service, never taken from the payload (`ExternalBillingApiHandler`) | Event id header outside the signature (TM-22) |
+| Anonymous -> public forms, booking, web chat | Inbound | 256-bit form slug or host-checked workspace slug; the same 404 for every refusal; per-IP, per-workspace and per-email limits; BotCheck on booking and chat; per-staff and per-room locks against double booking | Client IP comes from a trusted header (TM-19); forms have no BotCheck (TM-20) |
 
 ### CSRF
 
@@ -207,6 +247,9 @@ State-changing (`POST`/`PUT`/`PATCH`/`DELETE`) requests that authenticate **ambi
 - **Worker recycling**: `MAX_REQUESTS` bounds how many requests a FrankenPHP worker serves before recycling, limiting the blast radius of a slow memory leak.
 - **Render service**: its own `express-rate-limit` window (each render drives a full headless-Chromium page load — expensive), plus a 50 MiB PDF read cap on the client side (`RenderServiceClient::$maxBytes`).
 - **Plugin error isolation**: 3 consecutive errors trips a plugin to `failed` and short-circuits further invocations, bounding the cost of a plugin stuck in a crash loop.
+- **MCP**: 300 calls/min per workspace and 60/min per person; a batch counts once per item and is capped at 20 items.
+- **Render quotas**: spent before rendering and given back on failure (`MeterService::consume/refund`).
+- **Public endpoints**: per-IP, per-workspace per-day and per-email caps, plus BotCheck on booking and web chat.
 
 ## 7. Secrets management
 
@@ -224,13 +267,57 @@ Three operator-supplied secrets share a documented "≥32 chars outside developm
 
 **Lower-confidence observation (not fixed, flagged for the external pen-test / operator hygiene)**: `.env.example`/`docker-compose.yml` ship well-known placeholder values (`dev_secret_key_change_in_production`, `dev_encryption_key_change_in_production`) that happen to be ≥32 characters — long enough to pass the strength guards above. An operator who copies the example file into a real deployment **verbatim** would pass every automated check while using a publicly-known secret. This is a generic "don't ship real config from an example file" operational risk common to most frameworks with example env files (Rails, Django, etc. have the identical shape of risk), not a defect in the guards themselves; recommended follow-up (not implemented here, to keep this pass's fix scoped to the concrete enforcement gap) is a deploy-time check that rejects the specific known example-secret literals.
 
+## 8. Whity ID SSO and workspace confinement
+
+**Identity linking** (`FederatedIdentityLinker`): no decision is made on an email without a strictly true `email_verified`; the operator's IdP links only to confirmed addresses; a workspace's own IdP reaches only that workspace's confirmed members, and non-members only through a DNS-verified domain with auto-provision on.
+
+**Confinement.** A workspace-IdP sign-in mints a signed `confined_tenant_id` claim that survives refresh; a malformed value confines to -1 (fail closed). `EnforceTenantIsolation` refuses any other active workspace and the global routes listed in `src/Auth/TenantConfinement.php`. Workspace switching, email and password changes and "sign out others" are refused.
+
+**Password sign-in** is a global-only setting; the break-glass `force` value comes only from the environment (`PasswordSignIn`).
+
+**Threats.** E: a workspace IdP's session creating workspaces in the member's name (TM-9). S: signing out at Whity ID does not end core sessions (TM-10). Accepted by design: a workspace admin's own IdP can sign in as any member of that workspace, inside that workspace only.
+
+## 9. MCP, agents and approvals
+
+**Authority.** An agent's authority is the intersection of the person's live role permissions on the resolved route and its grant (`AgentScopeGrant`); both are re-read on every call.
+
+**Ask first.** The call is stored as a proposal with its exact arguments and their hash (`ToolsCallHandler`). Approval is one atomic update (`AgentProposalRepository`), limited to the person asked, and re-runs every check (`AgentProposalsApiHandler`). The approval routes are not MCP tools, so an agent cannot approve itself.
+
+**OAuth.** The OAuth server for MCP is Whity ID: exact redirect_uri (loopback exception only), PKCE S256, and a consent screen for self-registered clients.
+
+**Threats.** E: prompt injection driving writes through clients not marked as agents (TM-5). T/E: tool-to-route confusion through unencoded path values (TM-6). E: a revoked key's waiting proposals can still be approved (TM-7). S: OAuth token lifetime after revocation (TM-8). D: no cap on waiting proposals per agent (TM-25).
+
+## 10. Usage meters and quotas
+
+**Two mechanisms.** `MeterService` holds spendable quotas: a calendar-aligned counter per workspace and window in `shared_store`, an atomic `INSERT ... ON CONFLICT` increment, and claim-and-give-back across windows; renders and printouts use it. `UsageLedger` is the billing history: an atomic upsert per workspace, meter, month and dimension; it never refuses and swallows its own errors.
+
+**Server-side only.** No count comes from the client. Counted meters are incremented at the point of work (messages, MCP calls); snapshot meters (seats, customers, items, invoices, storage) are read from the database by a daily job and when the usage screen opens.
+
+**Settings.** `meters.enforcement` and `seats.enforcement` are global-only, so a workspace cannot turn its own limit off. Both default to `warn`.
+
+**Residual risks** (they matter in `block` mode): the seat limit is checked only on invitations (TM-14); quota windows follow the workspace-editable time zone (TM-15); REST calls are not counted and snapshot meters are sampled, not peak-tracked (TM-16); the ledger fails open by design.
+
+## 11. Team chat
+
+Every `/api/chat/*` route goes through `ChatApiHandler::guard()`: staff of the workspace, and agents only in chats they belong to. Queries bind `tenant_id`; a non-member gets "not found"; message-id access re-checks membership and the read-from point; only the author edits or deletes. Attachments are checked by their leading bytes against an allow-list with no SVG or HTML, 25 MB maximum, served `nosniff`. Messages render through `web/lib/safe-markdown.tsx` (no raw HTML). Clients poll through the same guard.
+
+**Threats.** I: adding someone to a 1:1 chat shows them the whole history (TM-18). S: the customer payment block accepts any https URL (TM-23).
+
+## 12. Public forms and booking
+
+The workspace comes only from a 256-bit slug or token, or a host-checked workspace slug; the Host header is never trusted alone. Every refusal is the same 404. Limits per IP, per workspace per day and per email; BotCheck on booking and web chat. See the section 5 row.
+
+**Threats.** S/D: the client IP comes from a header the backend trusts if it is reachable directly (TM-19). D: public form submit and upload have no BotCheck (TM-20).
+
 ## Summary — confirmed findings from this audit pass
 
 | # | Finding | STRIDE | Severity | Status |
 | --- | --- | --- | --- | --- |
 | 1 | TOTP codes were replayable within their validity window (no anti-replay floor) | Spoofing / Elevation of Privilege | Medium | **Fixed** — migration 080 + `AuthHandler::consumeTotpStep()`, TDD real-engine regression test |
 | 2 | `ENCRYPTION_KEY`'s documented ≥32-char convention was never enforced in code | Information Disclosure (weak encryption at rest) | Medium | **Fixed** — `EncryptionKeyGuard`, wired into both consumers |
-| 3 | Plugin execution has no runtime sandbox — full trust once loaded | Elevation of Privilege | Informational / architectural (accepted, now explicitly documented) | Not a code fix in this pass; documented as the top item for the external pen-test |
+| 3 | Plugin execution has no runtime sandbox — full trust once loaded | Elevation of Privilege | **High while package signing is inactive (TM-1)**; accepted architectural risk once operator-only signed installs are live | Tracked as TM-1 to TM-3 in [READINESS](../security/READINESS.md) |
 | 4 | Known committed example secrets are long enough to pass strength guards if copied verbatim into production | Information Disclosure | Low (operational hygiene) | Not fixed — flagged as lower-confidence observation |
 
-Everything else checked in this pass (tenant isolation across all tables including new ones, JWT alg-pinning, CORS/CSRF enforcement, IDOR spot-checks, backup-code single-use, generic-error convention, parameterized queries) held up under adversarial review with no exploitable gap found. See the [Pen-Test-Scoping-Brief](Pen-Test-Scoping-Brief.md) for what was and wasn't dynamically exercised, and what still warrants independent professional testing.
+The 2026-11-22 refresh added TM-1 to TM-25; see [READINESS, section B.3](../security/READINESS.md#b3-whity-core-threat-model-gaps).
+
+Everything else checked in the original pass (tenant isolation across all tables including new ones, JWT alg-pinning, CORS/CSRF enforcement, IDOR spot-checks, backup-code single-use, generic-error convention, parameterized queries) held up under adversarial review with no exploitable gap found. See the [Pen-Test-Scoping-Brief](Pen-Test-Scoping-Brief.md) for what was and wasn't dynamically exercised, and what still warrants independent professional testing.
