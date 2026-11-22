@@ -434,6 +434,8 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `accounting.bill.posted.async` | `ACCOUNTING_BILL_POSTED_ASYNC` | queued |  |
 | `accounting.bill.paid` | `ACCOUNTING_BILL_PAID` | observe | Payments settled all of a bill. Payload as `accounting.invoice.issued`. |
 | `accounting.bill.paid.async` | `ACCOUNTING_BILL_PAID_ASYNC` | queued |  |
+| `accounting.expense.claimed` | `ACCOUNTING_EXPENSE_CLAIMED` | observe | A person filed an expense claim (SDK 1.158). Payload as `accounting.invoice.issued` (a `purchase`), plus `claimant_profile_id`. |
+| `accounting.expense.claimed.async` | `ACCOUNTING_EXPENSE_CLAIMED_ASYNC` | queued |  |
 
 ### Deletion is transactional (WC-713)
 

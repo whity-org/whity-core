@@ -290,6 +290,14 @@
     "en": "Show a journal entry",
     "ar": "عرض قيد"
   },
+  "get_api_accounting_expense_claims": {
+    "en": "List expense claims",
+    "ar": "عرض مطالبات المصاريف"
+  },
+  "get_api_accounting_expense_claims_id": {
+    "en": "Show an expense claim",
+    "ar": "عرض مطالبة مصاريف"
+  },
   "get_api_accounting_invoice_settings": {
     "en": "Show the invoice settings",
     "ar": "عرض إعدادات الفواتير"
@@ -325,6 +333,10 @@
   "get_api_accounting_periods": {
     "en": "List the months of the books",
     "ar": "عرض الفترات المحاسبية"
+  },
+  "get_api_accounting_petty_cash": {
+    "en": "Show petty cash",
+    "ar": "عرض النثرية"
   },
   "get_api_accounting_reports_aged_payables": {
     "en": "Aged payables",
@@ -1535,6 +1547,14 @@
     "en": "Reverse a journal entry",
     "ar": "عكس قيد"
   },
+  "post_api_accounting_expense_claims": {
+    "en": "Claim back money spent",
+    "ar": "تقديم مطالبة مصاريف"
+  },
+  "post_api_accounting_expense_claims_id_reimburse": {
+    "en": "Pay back an expense claim",
+    "ar": "سداد مطالبة مصاريف"
+  },
   "post_api_accounting_invoices": {
     "en": "Draft a sales invoice",
     "ar": "إنشاء مسودة فاتورة مبيعات"
@@ -1590,6 +1610,10 @@
   "post_api_accounting_periods_id_reopen": {
     "en": "Reopen a month",
     "ar": "إعادة فتح شهر"
+  },
+  "post_api_accounting_petty_cash_spends": {
+    "en": "Record a petty cash spend",
+    "ar": "تسجيل مصروف من النثرية"
   },
   "post_api_accounting_tax_codes": {
     "en": "Add a tax code",
