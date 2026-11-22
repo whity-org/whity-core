@@ -190,6 +190,116 @@ final class AccountingApiSchemas
             ]),
             ...self::invoiceRoutes($notFound, $refused),
             ...self::paymentRoutes($notFound, $refused),
+            ...self::billRoutes($notFound, $refused),
+        ];
+    }
+
+    /**
+     * Phase A3a: supplier bills and credits, payments made, aged payables and
+     * the supplier statement.
+     *
+     * @param array<int, array<string, mixed>> $notFound
+     * @param array<int, array<string, mixed>> $refused
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function billRoutes(array $notFound, array $refused): array
+    {
+        $tags = ['accounting'];
+        $bill = self::data(SchemaBuilder::ref('AccountingInvoice'));
+
+        return [
+            self::route('GET', '/api/accounting/bills', 'bills:read', [
+                'summary' => 'List supplier bills and supplier credits',
+                'description' => 'Newest first. `due_minor` is what is still owed to the supplier.',
+                'tags' => $tags,
+                'parameters' => [
+                    self::param('kind', 'string', '`purchase` or `purchase_credit`. Default: both.'),
+                    self::param('status', 'string', '`draft`, `waiting_approval`, `issued` (posted), `partly_paid`, `paid`, `credited`, `cancelled`, or `overdue`.'),
+                    self::param('contact_id', 'integer', 'One supplier\'s bills.'),
+                    self::param('q', 'string', 'Part of the number or the supplier\'s name.'),
+                    self::param('from', 'string', 'Dated on or after, YYYY-MM-DD.'),
+                    self::param('to', 'string', 'Dated on or before, YYYY-MM-DD.'),
+                    self::param('limit', 'integer', 'At most 200. Default 50.'),
+                    self::param('offset', 'integer', 'Skip this many.'),
+                ],
+                'responses' => [200 => self::json('Bills', self::list('AccountingInvoice'))] + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/bills', 'bills:write', [
+                'summary' => 'Enter a supplier bill',
+                'description' => 'A draft posts nothing. Lines are costs or things bought (an expense or an asset account; default Other costs), each with the tax to reclaim from its tax category. `supplier_number` is the supplier\'s own invoice number. Bills are not matched to stock receipts yet; that comes with stock in the books.',
+                'tags' => $tags,
+                'request' => 'AccountingBillRequest',
+                'responses' => [201 => self::json('The draft', $bill), 200 => self::json('The same draft, already made with this key', $bill)] + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/bills/{id:\d+}', 'bills:read', [
+                'summary' => 'Show a supplier bill or credit',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The bill', $bill)] + $notFound + self::auth(),
+            ]),
+            self::route('PATCH', '/api/accounting/bills/{id:\d+}', 'bills:write', [
+                'summary' => 'Change a draft bill',
+                'description' => 'Only a draft changes; `lines`, when given, replace every line.',
+                'tags' => $tags,
+                'request' => 'AccountingBillChanges',
+                'responses' => [200 => self::json('The draft', $bill)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/bills/{id:\d+}/post', 'bills:write', [
+                'summary' => 'Post a supplier bill',
+                'description' => 'Numbers it (BIL-2026-0001), freezes it and posts it: each line\'s cost and the tax to reclaim are debited, We owe suppliers credited. With a bill route it goes for approval first.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The bill', $bill)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/bills/{id:\d+}/cancel', 'bills:write', [
+                'summary' => 'Cancel a draft bill',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The bill', $bill)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/bills/{id:\d+}/credits', 'bills:write', [
+                'summary' => 'Record a supplier credit for a bill',
+                'description' => 'Posts the mirror of all or some lines (SCR-2026-0001) and settles what the bill still owes.',
+                'tags' => $tags,
+                'request' => 'AccountingCreditNoteRequest',
+                'responses' => [201 => self::json('The supplier credit', $bill), 200 => self::json('The same credit, already made with this key', $bill)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/payments-made', 'payments:write', [
+                'summary' => 'Record money paid to a supplier',
+                'description' => 'Posts it at once: We owe suppliers is debited, the bank or cash credited, or Cheques we wrote for a cheque dated later until it clears (`/payments/{id}/deposit`). It settles the bills given.',
+                'tags' => $tags,
+                'request' => 'AccountingPaymentRequest',
+                'responses' => [201 => self::json('The payment', self::data(SchemaBuilder::ref('AccountingPayment'))), 200 => self::json('The same payment, already recorded with this key', self::data(SchemaBuilder::ref('AccountingPayment')))] + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/reports/aged-payables', 'bills:read', [
+                'summary' => 'Aged payables',
+                'description' => 'What is owed to each supplier on a date, by days past due, with what they owe back beside it. Minor units.',
+                'tags' => $tags,
+                'parameters' => [
+                    self::param('as_of', 'string', 'YYYY-MM-DD. Default: today.'),
+                    self::param('contact_id', 'integer', 'One supplier only.'),
+                ],
+                'responses' => [200 => self::json('Aged payables', self::data(SchemaBuilder::ref('AccountingAgedReceivables')))] + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/suppliers/{id:\d+}/statement', 'bills:read', [
+                'summary' => 'A supplier\'s statement',
+                'description' => 'From the books: what was owed to them before `from`, every bill, credit and payment, a running balance and what is owed at `to`.',
+                'tags' => $tags,
+                'parameters' => [
+                    self::param('from', 'string', 'YYYY-MM-DD. Default: the first of January.'),
+                    self::param('to', 'string', 'YYYY-MM-DD. Default: today.'),
+                ],
+                'responses' => [200 => self::json('The statement', self::data(SchemaBuilder::ref('AccountingCustomerStatement')))] + $notFound + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/bill-settings', 'bills:read', [
+                'summary' => 'Show the bill settings',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The settings', self::data(SchemaBuilder::ref('AccountingBillSettings')))] + self::auth(),
+            ]),
+            self::route('PATCH', '/api/accounting/bill-settings', 'accounting:settings', [
+                'summary' => 'Change the bill settings',
+                'description' => 'The approval route bills travel before they are posted; null for none.',
+                'tags' => $tags,
+                'request' => 'AccountingBillSettings',
+                'responses' => [200 => self::json('The settings', self::data(SchemaBuilder::ref('AccountingBillSettings')))] + $refused + self::auth(),
+            ]),
         ];
     }
 
@@ -608,7 +718,7 @@ final class AccountingApiSchemas
                 ], ['line_id', 'entry_id', 'number', 'date', 'debit_minor', 'credit_minor', 'balance_minor'])],
                 'next' => ['type' => 'object', 'nullable' => true, 'properties' => ['after_date' => self::str(), 'after_line' => self::int()]],
             ], ['account', 'from', 'to', 'currency', 'opening_minor', 'closing_minor', 'lines', 'next']),
-        ] + self::invoiceComponents($names) + self::paymentComponents();
+        ] + self::invoiceComponents($names) + self::paymentComponents() + self::billComponents();
     }
 
     /**
@@ -703,8 +813,9 @@ final class AccountingApiSchemas
             ], ['id', 'line_no', 'description', 'quantity', 'quantity_decimals', 'unit_price_minor', 'net_minor', 'tax_code_id', 'tax_minor', 'total_minor', 'account_id']),
             'AccountingInvoice' => self::object([
                 'id' => self::int(),
-                'kind' => self::str() + ['enum' => ['sale', 'sale_credit']],
+                'kind' => self::str() + ['enum' => ['sale', 'sale_credit', 'purchase', 'purchase_credit']],
                 'number' => self::str(true),
+                'supplier_number' => self::str(true) + ['description' => 'On a bill: the supplier\'s own invoice number.'],
                 'status' => self::str() + ['enum' => ['draft', 'waiting_approval', 'issued', 'partly_paid', 'paid', 'credited', 'cancelled']],
                 'contact_id' => self::int(),
                 'contact_name' => self::str(),
@@ -898,6 +1009,44 @@ final class AccountingApiSchemas
                     'balance_minor' => self::int(),
                 ], ['line_id', 'entry_id', 'number', 'date', 'debit_minor', 'credit_minor', 'balance_minor'])],
             ], ['contact', 'from', 'to', 'currency', 'opening_minor', 'closing_minor', 'lines']),
+        ];
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private static function billComponents(): array
+    {
+        $line = self::object([
+            'variant_id' => self::int(true) + ['description' => 'An item bought. Its name, purchase price and tax category are used unless given.'],
+            'description' => self::str() + ['description' => 'What was bought. Needed for a line without an item.'],
+            'quantity' => self::str() + ['description' => 'In normal units, such as "2.5". Default 1.'],
+            'unit' => self::str() + ['description' => 'An item\'s unit code. Default: its base unit.'],
+            'unit_price_minor' => self::int() + ['description' => 'The price of one, in minor units.'],
+            'discount_bp' => self::int() + ['description' => 'Discount in basis points, 0 to 10000.'],
+            'tax_code' => ['oneOf' => [self::int(), self::str()], 'description' => 'An input tax code by id or code (JO-GST-IN-16). Default: from the tax category.'],
+            'tax_category' => self::str() + ['description' => '`standard`, `zero`, `exempt`, or a category a code the workspace added serves.'],
+            'account_id' => self::int(true) + ['description' => 'A cost or an asset bought, such as Equipment. Default: Other costs.'],
+            'account_code' => self::str() + ['description' => 'The account by its code, instead of account_id.'],
+            'ou_id' => self::int(true) + ['description' => 'The branch the cost belongs to.'],
+        ], []);
+        $head = [
+            'contact_id' => self::int() + ['description' => 'The supplier: a contact marked as a supplier.'],
+            'supplier_number' => self::str() + ['description' => 'The supplier\'s own invoice number.'],
+            'issue_date' => self::str() + ['description' => 'The bill\'s date, YYYY-MM-DD. Default: today.'],
+            'due_date' => self::str(true) + ['description' => 'YYYY-MM-DD. Default: the date plus the payment terms.'],
+            'payment_terms_days' => self::int() + ['description' => 'Days from the bill\'s date to due, 0 to 365.'],
+            'prices_include_tax' => self::bool() + ['description' => 'Whether the prices typed include tax.'],
+            'notes' => self::str() + ['description' => 'Up to 2000 characters.'],
+            'lines' => ['type' => 'array', 'items' => $line, 'description' => '1 to 300 lines.'],
+        ];
+
+        return [
+            'AccountingBillRequest' => self::object($head + [
+                'idempotency_key' => self::str() + ['description' => 'Retrying with the same key returns the same draft.'],
+            ], ['contact_id', 'lines']),
+            'AccountingBillChanges' => self::object($head, []),
+            'AccountingBillSettings' => self::object([
+                'bill_route_template_id' => self::int(true) + ['description' => 'The route bills travel before they are posted; null for none.'],
+            ], []),
         ];
     }
 

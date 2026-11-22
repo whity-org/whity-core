@@ -109,7 +109,7 @@ final class AccountingInvoicesApiHandler
         return $this->run($request, 'create invoice', function (int $tenantId, ?int $actor) use ($request): Response {
             $body = JsonBody::parsed($request);
             $key = $body['idempotency_key'] ?? null;
-            $result = $this->invoices->create($tenantId, $actor, $body, [
+            $result = $this->invoices->create($tenantId, $actor, ['kind' => 'sale'] + $body, [
                 'external_ref' => is_string($key) && $key !== '' ? 'api:' . $key : null,
             ]);
 
@@ -120,37 +120,46 @@ final class AccountingInvoicesApiHandler
     /** @param array<string, string> $params */
     public function show(Request $request, array $params): Response
     {
-        return $this->run($request, 'invoice', fn (int $tenantId): Response => Response::json(['data' => $this->invoices->get($tenantId, (int) $params['id'])]));
+        return $this->run($request, 'invoice', fn (int $tenantId): Response => Response::json(['data' => $this->sale($tenantId, (int) $params['id'])]));
     }
 
     /** @param array<string, string> $params */
     public function update(Request $request, array $params): Response
     {
-        return $this->run($request, 'update invoice', fn (int $tenantId): Response => Response::json([
-            'data' => $this->invoices->update($tenantId, (int) $params['id'], JsonBody::parsed($request)),
-        ]));
+        return $this->run($request, 'update invoice', function (int $tenantId) use ($request, $params): Response {
+            $this->sale($tenantId, (int) $params['id']);
+            $changes = JsonBody::parsed($request);
+            unset($changes['kind']);
+
+            return Response::json(['data' => $this->invoices->update($tenantId, (int) $params['id'], $changes)]);
+        });
     }
 
     /** @param array<string, string> $params */
     public function issue(Request $request, array $params): Response
     {
-        return $this->run($request, 'issue invoice', fn (int $tenantId, ?int $actor): Response => Response::json([
-            'data' => $this->invoices->issue($tenantId, (int) $params['id'], $actor),
-        ]));
+        return $this->run($request, 'issue invoice', function (int $tenantId, ?int $actor) use ($params): Response {
+            $this->sale($tenantId, (int) $params['id']);
+
+            return Response::json(['data' => $this->invoices->issue($tenantId, (int) $params['id'], $actor)]);
+        });
     }
 
     /** @param array<string, string> $params */
     public function cancel(Request $request, array $params): Response
     {
-        return $this->run($request, 'cancel invoice', fn (int $tenantId, ?int $actor): Response => Response::json([
-            'data' => $this->invoices->cancel($tenantId, (int) $params['id'], $actor),
-        ]));
+        return $this->run($request, 'cancel invoice', function (int $tenantId, ?int $actor) use ($params): Response {
+            $this->sale($tenantId, (int) $params['id']);
+
+            return Response::json(['data' => $this->invoices->cancel($tenantId, (int) $params['id'], $actor)]);
+        });
     }
 
     /** @param array<string, string> $params */
     public function credit(Request $request, array $params): Response
     {
         return $this->run($request, 'credit note', function (int $tenantId, ?int $actor) use ($request, $params): Response {
+            $this->sale($tenantId, (int) $params['id']);
             $body = JsonBody::parsed($request);
             $key = $body['idempotency_key'] ?? null;
             $result = $this->invoices->credit($tenantId, (int) $params['id'], $actor, $body, [
@@ -191,6 +200,17 @@ final class AccountingInvoicesApiHandler
 
             return Response::json(['data' => $this->settingsFor($tenantId)]);
         });
+    }
+
+    /** @return array<string, mixed> a sales invoice or credit note; a bill is not found here */
+    private function sale(int $tenantId, int $id): array
+    {
+        $doc = $this->invoices->get($tenantId, $id);
+        if (!in_array($doc['kind'], Invoices::SALE_KINDS, true)) {
+            throw AccountingRejectedException::notFound('Invoice');
+        }
+
+        return $doc;
     }
 
     /** @return array{invoice_route_template_id: ?int, invoice_payment_terms_days: int, prices_include_tax: bool} */
