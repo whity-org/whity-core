@@ -50,7 +50,7 @@ final class Ledger
     public const MAX_PAGE = 200;
 
     /** Core's own source types. A plugin's are `<plugin>.<kind>`. */
-    public const CORE_SOURCES = ['manual', 'opening', 'reversal'];
+    public const CORE_SOURCES = ['manual', 'opening', 'reversal', 'invoice', 'credit_note'];
 
     public function __construct(
         private readonly AccountingDb $db,
@@ -144,11 +144,13 @@ final class Ledger
                 'account_id' => (int) $line['account_id'],
                 'debit_minor' => (int) $line['credit_minor'],
                 'credit_minor' => (int) $line['debit_minor'],
-                'contact_id' => $line['contact_id'],
-                'ou_id' => $line['ou_id'],
+                'contact_id' => AccountingDb::int($line['contact_id']),
+                'ou_id' => AccountingDb::int($line['ou_id']),
                 'description' => (string) $line['description'],
-                'source_line_type' => $line['source_line_type'],
-                'source_line_id' => $line['source_line_id'],
+                'source_line_type' => is_string($line['source_line_type']) ? $line['source_line_type'] : null,
+                'source_line_id' => AccountingDb::int($line['source_line_id']),
+                'tax_code_id' => AccountingDb::int($line['tax_code_id']),
+                'tax_base_minor' => ($base = AccountingDb::int($line['tax_base_minor'])) === null ? null : -$base,
             ];
         }
         $memo = trim($note) !== '' ? mb_substr(trim($note), 0, 500) : 'Reverses ' . $original['number'];
@@ -174,7 +176,7 @@ final class Ledger
 
     /**
      * @param array{id: int, code: string, kind: string} $journal
-     * @param list<array{account_id: int, debit_minor: int, credit_minor: int, contact_id: ?int, ou_id: ?int, description: string, source_line_type: ?string, source_line_id: ?int}> $lines
+     * @param list<array{account_id: int, debit_minor: int, credit_minor: int, contact_id: ?int, ou_id: ?int, description: string, source_line_type: ?string, source_line_id: ?int, tax_code_id?: ?int, tax_base_minor?: ?int}> $lines
      * @param array{source_type: string, source_id: ?int, idempotency_key: ?string, agent_id: ?int, on_behalf_of: ?int, reverses_entry_id: ?int} $meta
      * @return array{entry: array<string, mixed>, repeated: bool}
      */
@@ -238,15 +240,18 @@ final class Ledger
                     $amount = $line['debit_minor'] - $line['credit_minor'];
                     $lineId = $this->db->insert(
                         'INSERT INTO acc_lines (tenant_id, entry_id, line_no, account_id, period_id, entry_date, debit_minor, credit_minor,
-                                currency, amount_minor, rate_num, rate_den, contact_id, ou_id, description, source_line_type, source_line_id)
+                                currency, amount_minor, rate_num, rate_den, contact_id, ou_id, description, source_line_type, source_line_id,
+                                tax_code_id, tax_base_minor)
                          VALUES (:tenant_id, :entry_id, :line_no, :account_id, :period_id, :entry_date, :debit, :credit,
-                                :currency, :amount, 1, 1, :contact_id, :ou_id, :description, :source_line_type, :source_line_id)',
+                                :currency, :amount, 1, 1, :contact_id, :ou_id, :description, :source_line_type, :source_line_id,
+                                :tax_code_id, :tax_base)',
                         [
                             ':tenant_id' => $tenantId, ':entry_id' => $entryId, ':line_no' => $i + 1, ':account_id' => $line['account_id'],
                             ':period_id' => $period['id'], ':entry_date' => $date, ':debit' => $line['debit_minor'], ':credit' => $line['credit_minor'],
                             ':currency' => $currency, ':amount' => $amount, ':contact_id' => $line['contact_id'], ':ou_id' => $line['ou_id'],
                             ':description' => $line['description'], ':source_line_type' => $line['source_line_type'],
-                            ':source_line_id' => $line['source_line_id'],
+                            ':source_line_id' => $line['source_line_id'], ':tax_code_id' => $line['tax_code_id'] ?? null,
+                            ':tax_base' => $line['tax_base_minor'] ?? null,
                         ]
                     );
                     $k = sprintf('%010d:%010d', $line['account_id'], $line['ou_id'] ?? 0);
@@ -356,6 +361,19 @@ final class Ledger
         }
         $sourceLineType = $raw['source_line_type'] ?? null;
         $sourceLineId = $raw['source_line_id'] ?? null;
+        $taxCodeId = $raw['tax_code_id'] ?? null;
+        $taxBase = $raw['tax_base_minor'] ?? null;
+        if ($taxCodeId !== null) {
+            if (!is_int($taxCodeId) || $this->db->one(
+                'SELECT 1 AS hit FROM acc_tax_codes WHERE tenant_id = :tenant_id AND id = :id',
+                [':tenant_id' => $tenantId, ':id' => $taxCodeId]
+            ) === null) {
+                throw AccountingRejectedException::field($field, $field . '.tax_code_id is not a tax code here');
+            }
+        }
+        if ($taxBase !== null && ($taxCodeId === null || !is_int($taxBase))) {
+            throw AccountingRejectedException::field($field, $field . '.tax_base_minor is a whole number of minor units, with a tax_code_id');
+        }
 
         return [
             'account_id' => $account['id'],
@@ -366,6 +384,8 @@ final class Ledger
             'description' => is_string($raw['description'] ?? null) ? mb_substr(trim($raw['description']), 0, 500) : '',
             'source_line_type' => is_string($sourceLineType) && $sourceLineType !== '' ? mb_substr($sourceLineType, 0, 60) : null,
             'source_line_id' => is_int($sourceLineId) ? $sourceLineId : null,
+            'tax_code_id' => $taxCodeId,
+            'tax_base_minor' => $taxBase,
         ];
     }
 
@@ -449,7 +469,8 @@ final class Ledger
         }
         $lines = $this->db->all(
             'SELECT l.id, l.line_no, l.account_id, a.code AS account_code, a.name AS account_name, a.names AS account_names,
-                    l.debit_minor, l.credit_minor, l.contact_id, l.ou_id, l.description, l.source_line_type, l.source_line_id
+                    l.debit_minor, l.credit_minor, l.contact_id, l.ou_id, l.description, l.source_line_type, l.source_line_id,
+                    l.tax_code_id, l.tax_base_minor
                FROM acc_lines l JOIN acc_accounts a ON a.id = l.account_id AND a.tenant_id = l.tenant_id
               WHERE l.tenant_id = :tenant_id AND l.entry_id = :entry_id
               ORDER BY l.line_no',
@@ -470,6 +491,8 @@ final class Ledger
             'description' => (string) $l['description'],
             'source_line_type' => is_string($l['source_line_type']) ? $l['source_line_type'] : null,
             'source_line_id' => AccountingDb::int($l['source_line_id']),
+            'tax_code_id' => AccountingDb::int($l['tax_code_id']),
+            'tax_base_minor' => AccountingDb::int($l['tax_base_minor']),
         ], $lines)];
     }
 
@@ -623,7 +646,8 @@ final class Ledger
                     return ['entries' => $count, 'intact' => false, 'broken_at' => $after, 'reason' => 'prev_hash does not match the entry before'];
                 }
                 $lines = $this->db->all(
-                    'SELECT account_id, debit_minor, credit_minor, contact_id, ou_id, description, source_line_type, source_line_id
+                    'SELECT account_id, debit_minor, credit_minor, contact_id, ou_id, description, source_line_type, source_line_id,
+                            tax_code_id, tax_base_minor
                        FROM acc_lines WHERE tenant_id = :tenant_id AND entry_id = :entry_id ORDER BY line_no',
                     [':tenant_id' => $tenantId, ':entry_id' => $after]
                 );
@@ -640,6 +664,7 @@ final class Ledger
                         'description' => (string) $l['description'],
                         'source_line_type' => is_string($l['source_line_type']) ? $l['source_line_type'] : null,
                         'source_line_id' => AccountingDb::int($l['source_line_id']),
+                        'tax_code_id' => AccountingDb::int($l['tax_code_id']), 'tax_base_minor' => AccountingDb::int($l['tax_base_minor']),
                     ], $lines)),
                 ]);
                 if (!hash_equals($expected, (string) $e['hash'])) {
@@ -667,15 +692,17 @@ final class Ledger
     }
 
     /**
-     * @param list<array{account_id: int, debit_minor: int, credit_minor: int, contact_id: ?int, ou_id: ?int, description: string, source_line_type: ?string, source_line_id: ?int}> $lines
-     * @return list<list<int|string|null>>
+     * @param list<array{account_id: int, debit_minor: int, credit_minor: int, contact_id: ?int, ou_id: ?int, description: string, source_line_type: ?string, source_line_id: ?int, tax_code_id?: ?int, tax_base_minor?: ?int}> $lines
+     * @return list<array<int, int|string|null>>
      */
     private static function canonicalLines(array $lines): array
     {
+        // The tax fields join the hash only when set, so entries posted before
+        // lines carried tax (A1) keep the hash they were chained with.
         return array_map(static fn (array $l): array => [
             $l['account_id'], $l['debit_minor'], $l['credit_minor'], $l['contact_id'], $l['ou_id'], $l['description'],
             $l['source_line_type'], $l['source_line_id'],
-        ], $lines);
+        ] + (($l['tax_code_id'] ?? null) !== null ? [8 => $l['tax_code_id'], 9 => $l['tax_base_minor'] ?? null] : []), $lines);
     }
 
     private function entryIdByKey(int $tenantId, string $key): ?int

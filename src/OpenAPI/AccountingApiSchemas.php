@@ -188,6 +188,125 @@ final class AccountingApiSchemas
                 'parameters' => [...$range, self::param('ou_id', 'integer', 'Only lines of this branch (organisational unit).')],
                 'responses' => [200 => self::json('The trial balance', self::data(SchemaBuilder::ref('AccountingTrialBalance')))] + self::auth(),
             ]),
+            ...self::invoiceRoutes($notFound, $refused),
+        ];
+    }
+
+    /**
+     * Phase A2a: tax codes, sales invoices and credit notes.
+     *
+     * @param array<int, array<string, mixed>> $notFound
+     * @param array<int, array<string, mixed>> $refused
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function invoiceRoutes(array $notFound, array $refused): array
+    {
+        $tags = ['accounting'];
+        $invoice = self::data(SchemaBuilder::ref('AccountingInvoice'));
+
+        return [
+            self::route('GET', '/api/accounting/tax-codes', 'invoices:read', [
+                'summary' => 'List the tax codes',
+                'description' => 'The workspace\'s sales tax codes: `output` codes go on sales, `input` codes on purchases. An item\'s tax category picks the code.',
+                'tags' => $tags,
+                'parameters' => [
+                    self::param('direction', 'string', '`output` (sales) or `input` (purchases).'),
+                    self::param('archived', 'string', '`true` to include archived codes.'),
+                ],
+                'responses' => [200 => self::json('Tax codes', self::list('AccountingTaxCode'))] + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/tax-codes', 'accounting:settings', [
+                'summary' => 'Add a tax code',
+                'description' => 'The Jordan codes come with the books and can be renamed, pointed at another account or archived. A rate never changes: a new rate is a new code from the date it starts, and the old one ends with valid_to.',
+                'tags' => $tags,
+                'request' => 'AccountingTaxCodeRequest',
+                'responses' => [201 => self::json('The tax code', self::data(SchemaBuilder::ref('AccountingTaxCode')))] + $refused + self::auth(),
+            ]),
+            self::route('PATCH', '/api/accounting/tax-codes/{id:\d+}', 'accounting:settings', [
+                'summary' => 'Change a tax code',
+                'description' => 'Its name, its account, its tax category and when it stops. Not its rate, direction or treatment.',
+                'tags' => $tags,
+                'request' => 'AccountingTaxCodeChanges',
+                'responses' => [200 => self::json('The tax code', self::data(SchemaBuilder::ref('AccountingTaxCode')))] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/tax-codes/{id:\d+}/archive', 'accounting:settings', [
+                'summary' => 'Archive a tax code',
+                'description' => 'New lines can no longer use it; invoices that did keep it.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The tax code', self::data(SchemaBuilder::ref('AccountingTaxCode')))] + $notFound + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/tax-codes/{id:\d+}/restore', 'accounting:settings', [
+                'summary' => 'Restore an archived tax code',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The tax code', self::data(SchemaBuilder::ref('AccountingTaxCode')))] + $notFound + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/invoices', 'invoices:read', [
+                'summary' => 'List sales invoices and credit notes',
+                'description' => 'Newest first. `due_minor` is what the customer still owes; `overdue` is true past the due date.',
+                'tags' => $tags,
+                'parameters' => [
+                    self::param('kind', 'string', '`sale` or `sale_credit`. Default: both.'),
+                    self::param('status', 'string', '`draft`, `waiting_approval`, `issued`, `partly_paid`, `paid`, `credited`, `cancelled`, or `overdue`.'),
+                    self::param('contact_id', 'integer', 'One customer\'s invoices.'),
+                    self::param('q', 'string', 'Part of the number or the customer\'s name.'),
+                    self::param('from', 'string', 'Issued on or after, YYYY-MM-DD.'),
+                    self::param('to', 'string', 'Issued on or before, YYYY-MM-DD.'),
+                    self::param('limit', 'integer', 'At most 200. Default 50.'),
+                    self::param('offset', 'integer', 'Skip this many.'),
+                ],
+                'responses' => [200 => self::json('Invoices', self::list('AccountingInvoice'))] + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/invoices', 'invoices:write', [
+                'summary' => 'Draft a sales invoice',
+                'description' => 'A draft posts nothing. Lines come from items (price, unit and tax category from the item) or are free text. Each line gets the tax code its tax category maps to unless one is given, and the Sales (or Services) account unless an income account is given. `idempotency_key` returns the same draft on a retry.',
+                'tags' => $tags,
+                'request' => 'AccountingInvoiceRequest',
+                'responses' => [201 => self::json('The draft', $invoice), 200 => self::json('The same draft, already made with this key', $invoice)] + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/invoices/{id:\d+}', 'invoices:read', [
+                'summary' => 'Show an invoice or credit note',
+                'description' => 'With its lines and what has settled it (credit notes now, payments later).',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The invoice', $invoice)] + $notFound + self::auth(),
+            ]),
+            self::route('PATCH', '/api/accounting/invoices/{id:\d+}', 'invoices:write', [
+                'summary' => 'Change a draft invoice',
+                'description' => 'Only a draft changes. `lines`, when given, replace every line. An issued invoice is credited instead.',
+                'tags' => $tags,
+                'request' => 'AccountingInvoiceChanges',
+                'responses' => [200 => self::json('The draft', $invoice)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/invoices/{id:\d+}/issue', 'invoices:write', [
+                'summary' => 'Issue an invoice',
+                'description' => 'Gives it the next number (INV-2026-0001), freezes it and posts it to the books: the customer owes the total, sales and the sales tax collected are credited. When the workspace has an invoice route it goes for approval first and comes back `waiting_approval`. A plugin may refuse it (409).',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The invoice', $invoice)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/invoices/{id:\d+}/cancel', 'invoices:write', [
+                'summary' => 'Cancel a draft invoice',
+                'description' => 'A draft, or one waiting for approval. An issued invoice is never cancelled; credit it.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The invoice', $invoice)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/invoices/{id:\d+}/credit-notes', 'invoices:write', [
+                'summary' => 'Credit an issued invoice',
+                'description' => 'Issues a credit note at once for every line still not credited, or for the `lines` given, and posts the mirror of those lines. It settles what the invoice still owes; anything beyond stays as the customer\'s credit.',
+                'tags' => $tags,
+                'request' => 'AccountingCreditNoteRequest',
+                'responses' => [201 => self::json('The credit note', $invoice), 200 => self::json('The same credit note, already made with this key', $invoice)] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/invoice-settings', 'invoices:read', [
+                'summary' => 'Show the invoice settings',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The settings', self::data(SchemaBuilder::ref('AccountingInvoiceSettings')))] + self::auth(),
+            ]),
+            self::route('PATCH', '/api/accounting/invoice-settings', 'accounting:settings', [
+                'summary' => 'Change the invoice settings',
+                'description' => 'The approval route invoices travel before they are issued (null for none), the default payment terms in days, and whether prices include tax by default.',
+                'tags' => $tags,
+                'request' => 'AccountingInvoiceSettings',
+                'responses' => [200 => self::json('The settings', self::data(SchemaBuilder::ref('AccountingInvoiceSettings')))] + $refused + self::auth(),
+            ]),
         ];
     }
 
@@ -393,6 +512,167 @@ final class AccountingApiSchemas
                 ], ['line_id', 'entry_id', 'number', 'date', 'debit_minor', 'credit_minor', 'balance_minor'])],
                 'next' => ['type' => 'object', 'nullable' => true, 'properties' => ['after_date' => self::str(), 'after_line' => self::int()]],
             ], ['account', 'from', 'to', 'currency', 'opening_minor', 'closing_minor', 'lines', 'next']),
+        ] + self::invoiceComponents($names);
+    }
+
+    /**
+     * @param array<string, mixed> $names
+     * @return array<string, array<string, mixed>>
+     */
+    private static function invoiceComponents(array $names): array
+    {
+        $date = static fn (bool $nullable = false): array => self::str($nullable) + ['description' => 'YYYY-MM-DD.'];
+        $lineIn = self::object([
+            'variant_id' => self::int(true) + ['description' => 'An item. Its name, price, unit and tax category are used unless given.'],
+            'description' => self::str() + ['description' => 'What was sold. Needed for a line without an item.'],
+            'quantity' => self::str() + ['description' => 'In normal units, such as "2.5". Default 1.'],
+            'unit' => self::str() + ['description' => 'An item\'s unit code (box, kg). Default: its base unit.'],
+            'unit_price_minor' => self::int() + ['description' => 'The price of one, in minor units.'],
+            'discount_bp' => self::int() + ['description' => 'Discount in basis points, 0 to 10000 (1000 = 10%).'],
+            'tax_code' => ['oneOf' => [self::int(), self::str()], 'description' => 'A tax code by id or code (JO-GST-16). Default: from the tax category.'],
+            'tax_category' => self::str() + ['description' => '`standard`, `zero`, `exempt`, or a category a code the workspace added serves. Default: the item\'s, else standard.'],
+            'account_id' => self::int(true) + ['description' => 'An income account. Default: Sales, or Services for a service item.'],
+            'account_code' => self::str() + ['description' => 'The income account by its code, instead of account_id.'],
+            'ou_id' => self::int(true) + ['description' => 'The branch (organisational unit) the sale belongs to.'],
+        ], []);
+        $head = [
+            'contact_id' => self::int() + ['description' => 'The customer: a contact marked as a customer.'],
+            'issue_date' => $date() + ['description' => 'YYYY-MM-DD. Default: today.'],
+            'supply_date' => $date(true),
+            'due_date' => $date(true) + ['description' => 'YYYY-MM-DD. Default: the issue date plus the payment terms.'],
+            'payment_terms_days' => self::int() + ['description' => 'Days from issue to due, 0 to 365. Default: the workspace\'s.'],
+            'prices_include_tax' => self::bool() + ['description' => 'Whether the prices typed include tax. Default: the workspace\'s setting.'],
+            'notes' => self::str() + ['description' => 'Printed on the invoice. Up to 2000 characters.'],
+            'lines' => ['type' => 'array', 'items' => $lineIn, 'description' => '1 to 300 lines.'],
+        ];
+
+        return [
+            'AccountingTaxCode' => self::object([
+                'id' => self::int(),
+                'code' => self::str(),
+                'name' => self::str(),
+                'names' => $names,
+                'pack' => self::str(),
+                'direction' => self::str() + ['enum' => ['output', 'input']],
+                'rate_bp' => self::int() + ['description' => 'Basis points: 1600 is 16%.'],
+                'treatment' => self::str(),
+                'category' => self::str(),
+                'account_id' => self::int(true),
+                'return_box' => self::str(),
+                'einvoice_category' => self::str(),
+                'valid_from' => self::str(true),
+                'valid_to' => self::str(true),
+                'is_seeded' => self::bool(),
+                'owner_plugin' => self::str(true),
+                'archived' => self::bool(),
+            ], ['id', 'code', 'name', 'direction', 'rate_bp', 'treatment', 'category']),
+            'AccountingTaxCodeRequest' => self::object([
+                'code' => self::str() + ['description' => 'Up to 30 letters, digits, dots, dashes or underscores, such as JO-GST-8.'],
+                'name' => ['oneOf' => [self::str(), self::object(['en' => self::str(), 'ar' => self::str()], [])], 'description' => 'Text, or `{en, ar}`.'],
+                'direction' => self::str() + ['enum' => ['output', 'input'], 'description' => '`output` for sales, `input` for purchases.'],
+                'rate_bp' => self::int() + ['description' => 'Basis points, 0 to 10000: 1600 is 16%. Never changes once made.'],
+                'treatment' => self::str() + ['enum' => ['standard', 'reduced', 'zero', 'exempt', 'out_of_scope', 'reverse_charge'], 'description' => 'Default: standard above 0, zero at 0.'],
+                'category' => self::str() + ['description' => 'The item tax category it serves, such as reduced_8.'],
+                'account_id' => self::int(true) + ['description' => 'Where its tax posts. Default: Sales tax we collected (output) or Sales tax we can reclaim (input).'],
+                'valid_from' => self::str(true) + ['description' => 'YYYY-MM-DD, the first day it applies.'],
+                'valid_to' => self::str(true) + ['description' => 'YYYY-MM-DD, the last day it applies.'],
+            ], ['code', 'name', 'direction', 'rate_bp']),
+            'AccountingTaxCodeChanges' => self::object([
+                'name' => ['oneOf' => [self::str(), self::object(['en' => self::str(), 'ar' => self::str()], [])], 'description' => 'Text, or `{en, ar}`.'],
+                'account_id' => self::int(true) + ['description' => 'Where its tax posts; null for the default account.'],
+                'category' => self::str() + ['description' => 'The item tax category it serves.'],
+                'valid_to' => self::str(true) + ['description' => 'YYYY-MM-DD, the last day it applies; null for no end.'],
+            ], []),
+            'AccountingInvoiceLine' => self::object([
+                'id' => self::int(),
+                'line_no' => self::int(),
+                'variant_id' => self::int(true),
+                'unit_id' => self::int(true),
+                'description' => self::str(),
+                'quantity' => self::int() + ['description' => 'In steps of quantity_decimals: 25 with one decimal is 2.5.'],
+                'quantity_decimals' => self::int(),
+                'unit_price_minor' => self::int(),
+                'discount_bp' => self::int(),
+                'net_minor' => self::int(),
+                'tax_code_id' => self::int(),
+                'tax_code' => self::str(),
+                'tax_rate_bp' => self::int(),
+                'tax_minor' => self::int(),
+                'total_minor' => self::int(),
+                'account_id' => self::int(),
+                'account_code' => self::str(),
+                'account_name' => self::str(),
+                'ou_id' => self::int(true),
+                'credits_line_id' => self::int(true),
+            ], ['id', 'line_no', 'description', 'quantity', 'quantity_decimals', 'unit_price_minor', 'net_minor', 'tax_code_id', 'tax_minor', 'total_minor', 'account_id']),
+            'AccountingInvoice' => self::object([
+                'id' => self::int(),
+                'kind' => self::str() + ['enum' => ['sale', 'sale_credit']],
+                'number' => self::str(true),
+                'status' => self::str() + ['enum' => ['draft', 'waiting_approval', 'issued', 'partly_paid', 'paid', 'credited', 'cancelled']],
+                'contact_id' => self::int(),
+                'contact_name' => self::str(),
+                'issue_date' => self::str(),
+                'supply_date' => self::str(true),
+                'due_date' => self::str(true),
+                'payment_terms_days' => self::int(),
+                'overdue' => self::bool(),
+                'currency' => self::str(),
+                'prices_include_tax' => self::bool(),
+                'subtotal_minor' => self::int(),
+                'discount_minor' => self::int(),
+                'tax_minor' => self::int(),
+                'total_minor' => self::int(),
+                'paid_minor' => self::int(),
+                'credited_minor' => self::int(),
+                'due_minor' => self::int() + ['description' => 'What is still owed.'],
+                'credits_invoice_id' => self::int(true) + ['description' => 'On a credit note: the invoice it credits.'],
+                'entry_id' => self::int(true) + ['description' => 'The journal entry it posted, once issued.'],
+                'route_id' => self::int(true),
+                'einvoice_status' => self::str() + ['enum' => ['none', 'pending', 'accepted', 'rejected', 'not_required']],
+                'einvoice_uuid' => self::str(true),
+                'einvoice_ref' => self::str(true),
+                'einvoice_qr' => self::str(true),
+                'einvoice_message' => self::str(),
+                'notes' => self::str(),
+                'external_ref' => self::str(true),
+                'quote_id' => self::int(true),
+                'issued_at' => self::str(true),
+                'issued_by_profile_id' => self::int(true),
+                'created_by_profile_id' => self::int(true),
+                'agent_id' => self::int(true),
+                'on_behalf_of_profile_id' => self::int(true),
+                'owner_plugin' => self::str(true),
+                'created_at' => self::str(),
+                'lines' => ['type' => 'array', 'items' => SchemaBuilder::ref('AccountingInvoiceLine')],
+                'allocations' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::int(),
+                    'invoice_id' => self::int(),
+                    'credit_invoice_id' => self::int(true),
+                    'credit_number' => self::str(true),
+                    'payment_id' => self::int(true),
+                    'amount_minor' => self::int(),
+                    'allocated_on' => self::str(),
+                ], ['id', 'invoice_id', 'amount_minor', 'allocated_on'])],
+            ], ['id', 'kind', 'number', 'status', 'contact_id', 'issue_date', 'currency', 'subtotal_minor', 'tax_minor', 'total_minor', 'due_minor']),
+            'AccountingInvoiceRequest' => self::object($head + [
+                'idempotency_key' => self::str() + ['description' => 'Retrying with the same key returns the same draft.'],
+            ], ['contact_id', 'lines']),
+            'AccountingInvoiceChanges' => self::object($head, []),
+            'AccountingCreditNoteRequest' => self::object([
+                'lines' => ['type' => 'array', 'items' => self::object([
+                    'line_id' => self::int(),
+                    'quantity' => self::str() + ['description' => 'How much to credit, in normal units. Default: all that is left.'],
+                ], ['line_id']), 'description' => 'Leave out to credit everything still not credited.'],
+                'reason' => self::str() + ['description' => 'Why, printed on the credit note. Up to 2000 characters.'],
+                'issue_date' => $date() + ['description' => 'YYYY-MM-DD. Default: today.'],
+                'idempotency_key' => self::str() + ['description' => 'Retrying with the same key returns the same credit note.'],
+            ], []),
+            'AccountingInvoiceSettings' => self::object([
+                'invoice_route_template_id' => self::int(true) + ['description' => 'The route invoices travel before they are issued; null for none.'],
+                'invoice_payment_terms_days' => self::int() + ['description' => 'Days from issue to due on a new invoice, 0 to 365.'],
+                'prices_include_tax' => self::bool() + ['description' => 'Whether a new invoice\'s prices include tax.'],
+            ], []),
         ];
     }
 

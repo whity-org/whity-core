@@ -414,6 +414,11 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `accounting.period.closed.async` | `ACCOUNTING_PERIOD_CLOSED_ASYNC` | queued |  |
 | `accounting.period.reopened` | `ACCOUNTING_PERIOD_REOPENED` | observe | A closed month was reopened. Payload as closed, plus `reason`. |
 | `accounting.period.reopened.async` | `ACCOUNTING_PERIOD_REOPENED_ASYNC` | queued |  |
+| `accounting.invoice.issuing` | `ACCOUNTING_INVOICE_ISSUING` | veto | Before an invoice or credit note is issued (numbered, frozen and posted) (SDK 1.155). Payload as `accounting.invoice.issued`, plus `lines` (`variant_id`, `description`, `quantity`, `unit_price_minor`, `net_minor`, `tax_code`, `tax_minor`, `total_minor`). Throw `HookVetoException` to refuse it (a credit limit). |
+| `accounting.invoice.issued` | `ACCOUNTING_INVOICE_ISSUED` | observe | An invoice or credit note was issued. Payload: `tenant_id`, `invoice_id`, `kind` (`sale`, `sale_credit`), `number`, `contact_id`, `status`, `issue_date`, `due_date`, `currency`, `total_minor`, `tax_minor`, `due_minor`, `credits_invoice_id`, `acting_profile_id`. |
+| `accounting.invoice.issued.async` | `ACCOUNTING_INVOICE_ISSUED_ASYNC` | queued |  |
+| `accounting.invoice.credited` | `ACCOUNTING_INVOICE_CREDITED` | observe | A credit note settled an invoice. Payload as issued (the invoice), plus `credit_note_id` and `amount_minor`. |
+| `accounting.invoice.credited.async` | `ACCOUNTING_INVOICE_CREDITED_ASYNC` | queued |  |
 
 ### Deletion is transactional (WC-713)
 

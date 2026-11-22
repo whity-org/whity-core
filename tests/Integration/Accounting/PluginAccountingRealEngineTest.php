@@ -13,9 +13,17 @@ use Whity\Core\Accounting\AccountingWorkspace;
 use Whity\Core\Accounting\ChartOfAccounts;
 use Whity\Core\Accounting\Host\HostAccountingGuard;
 use Whity\Core\Accounting\Host\HostAccounts;
+use Whity\Core\Accounting\Host\HostInvoices;
 use Whity\Core\Accounting\Host\HostLedger;
 use Whity\Core\Accounting\Host\HostPeriods;
 use Whity\Core\Accounting\Host\HostReports;
+use Whity\Core\Accounting\Host\HostTaxes;
+use Whity\Core\Accounting\Invoices;
+use Whity\Core\Accounting\Taxes;
+use Whity\Core\Inventory\InventoryDb;
+use Whity\Core\Inventory\InventoryWorkspace;
+use Whity\Core\Inventory\ItemService;
+use Whity\Core\Inventory\UnitCatalog;
 use Whity\Core\Accounting\Ledger;
 use Whity\Core\Accounting\Periods;
 use Whity\Core\Plugin\PluginIdentity;
@@ -45,6 +53,8 @@ final class PluginAccountingRealEngineTest extends TestCase
     private HostLedger $ledger;
     private HostPeriods $periods;
     private HostReports $reports;
+    private HostInvoices $invoices;
+    private HostTaxes $taxes;
     private Periods $corePeriods;
     private ?int $workspace = 1;
     private string $today;
@@ -74,6 +84,24 @@ final class PluginAccountingRealEngineTest extends TestCase
         $this->ledger = new HostLedger($ledger, $guard);
         $this->periods = new HostPeriods($this->corePeriods, $books, $guard);
         $this->reports = new HostReports(new AccountingReports($db, $books, $this->corePeriods), $guard);
+        $coreTaxes = new Taxes($db, $books);
+        $invDb = new InventoryDb($this->pdo);
+        $invWorkspace = new InventoryWorkspace($invDb);
+        $units = new UnitCatalog($invDb, $invWorkspace);
+        $this->invoices = new HostInvoices(new Invoices(
+            $db,
+            $books,
+            $ledger,
+            $coreTaxes,
+            new ItemService($invDb, $invWorkspace, $units, static fn (int $t): string => 'JOD'),
+            $units,
+            new SequenceCounters($this->pdo),
+            static fn (int $t): array => [],
+            null,
+            static fn (): ?\Whity\Sdk\Contribute\WorkspaceEInvoicing => null,
+        ), $guard);
+        $this->taxes = new HostTaxes($coreTaxes, $guard);
+        $this->pdo->exec("INSERT INTO contacts (id, tenant_id, name, is_customer, is_supplier) VALUES (41, 1, 'Example Cafe', true, false)");
         $this->today = gmdate('Y-m-d');
     }
 
@@ -148,6 +176,43 @@ final class PluginAccountingRealEngineTest extends TestCase
         $this->refused(AccountingRejected::NO_WORKSPACE, fn () => $this->accounts->list());
         $this->workspace = 2;
         $this->refused(AccountingRejected::NOT_FOUND, fn () => $this->accounts->get($salaries->id), 'another workspace\'s account');
+    }
+
+    public function testARentalsPluginInvoicesItsBookingsAndCreditsThem(): void
+    {
+        $rentals = self::plugin('Rentals');
+        PluginIdentity::bind($rentals, 'Rentals');
+        $invoices = $this->invoices->for($rentals);
+
+        $standard = $this->taxes->codeFor('', 'output', $this->today);
+        self::assertNotNull($standard);
+        self::assertSame(1600, $standard->rateBp);
+        self::assertSame(['net' => 10000, 'tax' => 1600, 'total' => 11600], $this->taxes->compute(10000, 1600));
+        self::assertCount(3, $this->taxes->codes('output'));
+
+        $draft = $invoices->createDraft([
+            'contactId' => 41,
+            'lines' => [['description' => 'Tent, 3 days', 'quantity' => '3', 'unitPriceMinor' => 20000]],
+        ], 11, 'booking-9');
+        $again = $invoices->createDraft(['contactId' => 41, 'lines' => [['description' => 'Tent', 'unitPriceMinor' => 1]]], 11, 'booking-9');
+        self::assertSame($draft->id, $again->id, 'the same reference makes one draft');
+        self::assertSame('rentals:booking-9', $draft->externalRef, 'kept under the plugin\'s name');
+        self::assertSame(69600, $draft->totalMinor);
+
+        $issued = $invoices->issue($draft->id, 11);
+        self::assertSame('issued', $issued->status);
+        self::assertSame('INV-' . substr($this->today, 0, 4) . '-0001', $issued->number);
+        self::assertNotNull($issued->entryId);
+        self::assertSame(69600, $issued->dueMinor);
+
+        $credit = $invoices->credit($issued->id, 11, [['lineId' => $issued->lines[0]->id, 'quantity' => '1']], 'Returned a day early');
+        self::assertSame('sale_credit', $credit->kind);
+        self::assertSame(23200, $credit->totalMinor);
+        self::assertSame(46400, $this->invoices->get($issued->id)->dueMinor);
+        self::assertCount(2, $this->invoices->list());
+
+        $this->refused(AccountingRejected::USE_PLUGIN_CONTEXT, fn () => $this->invoices->createDraft(['contactId' => 41], 11));
+        $this->refused(AccountingRejected::FORBIDDEN, fn () => $invoices->issue($draft->id, 12), 'without invoices:write');
     }
 
     private function refused(string $reason, callable $work, string $why = ''): void

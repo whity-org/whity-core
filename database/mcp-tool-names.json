@@ -274,6 +274,18 @@
     "en": "Show a journal entry",
     "ar": "عرض قيد"
   },
+  "get_api_accounting_invoice_settings": {
+    "en": "Show the invoice settings",
+    "ar": "عرض إعدادات الفواتير"
+  },
+  "get_api_accounting_invoices": {
+    "en": "List invoices and credit notes",
+    "ar": "عرض الفواتير والإشعارات الدائنة"
+  },
+  "get_api_accounting_invoices_id": {
+    "en": "Show an invoice",
+    "ar": "عرض فاتورة"
+  },
   "get_api_accounting_journals": {
     "en": "List the journals",
     "ar": "عرض دفاتر اليومية"
@@ -293,6 +305,10 @@
   "get_api_accounting_reports_trial_balance": {
     "en": "Show the trial balance",
     "ar": "عرض ميزان المراجعة"
+  },
+  "get_api_accounting_tax_codes": {
+    "en": "List the tax codes",
+    "ar": "عرض رموز الضريبة"
   },
   "get_api_admin_languages": {
     "en": "List every language, including switched-off ones",
@@ -1239,9 +1255,21 @@
     "en": "Change an account",
     "ar": "تعديل حساب"
   },
+  "patch_api_accounting_invoice_settings": {
+    "en": "Change the invoice settings",
+    "ar": "تعديل إعدادات الفواتير"
+  },
+  "patch_api_accounting_invoices_id": {
+    "en": "Change a draft invoice",
+    "ar": "تعديل مسودة فاتورة"
+  },
   "patch_api_accounting_manual_entries_id": {
     "en": "Change a draft journal entry",
     "ar": "تعديل مسودة قيد"
+  },
+  "patch_api_accounting_tax_codes_id": {
+    "en": "Change a tax code",
+    "ar": "تعديل رمز ضريبة"
   },
   "patch_api_affiliate_payouts_id": {
     "en": "Record that a payout was transferred",
@@ -1447,6 +1475,22 @@
     "en": "Reverse a journal entry",
     "ar": "عكس قيد"
   },
+  "post_api_accounting_invoices": {
+    "en": "Draft a sales invoice",
+    "ar": "إنشاء مسودة فاتورة مبيعات"
+  },
+  "post_api_accounting_invoices_id_cancel": {
+    "en": "Cancel a draft invoice",
+    "ar": "إلغاء مسودة فاتورة"
+  },
+  "post_api_accounting_invoices_id_credit_notes": {
+    "en": "Credit an invoice",
+    "ar": "إصدار إشعار دائن لفاتورة"
+  },
+  "post_api_accounting_invoices_id_issue": {
+    "en": "Issue an invoice",
+    "ar": "إصدار فاتورة"
+  },
   "post_api_accounting_manual_entries": {
     "en": "Draft a journal entry",
     "ar": "إنشاء مسودة قيد"
@@ -1466,6 +1510,18 @@
   "post_api_accounting_periods_id_reopen": {
     "en": "Reopen a month",
     "ar": "إعادة فتح شهر"
+  },
+  "post_api_accounting_tax_codes": {
+    "en": "Add a tax code",
+    "ar": "إضافة رمز ضريبة"
+  },
+  "post_api_accounting_tax_codes_id_archive": {
+    "en": "Archive a tax code",
+    "ar": "أرشفة رمز ضريبة"
+  },
+  "post_api_accounting_tax_codes_id_restore": {
+    "en": "Restore a tax code",
+    "ar": "استعادة رمز ضريبة"
   },
   "post_api_affiliates": {
     "en": "Create an affiliate",

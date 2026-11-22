@@ -2951,6 +2951,82 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         self::assertSame(1000, $ledger->balance(self::TENANT_A, $rent, $today));
     }
 
+    // ==================== accounting invoices (WHIT-1318 A2a, migration 350) ====================
+
+    public function testInvoicesAreTenantScopedAndForeignInvoicesCannotBeTouched(): void
+    {
+        $db = new \Whity\Core\Accounting\AccountingDb($this->pdo);
+        $books = new \Whity\Core\Accounting\AccountingWorkspace($db, static fn (int $t): string => 'USD');
+        $periods = new \Whity\Core\Accounting\Periods($db, $books);
+        $ledger = new \Whity\Core\Accounting\Ledger($db, $books, $periods, new \Whity\Database\SequenceCounters($this->pdo));
+        $taxes = new \Whity\Core\Accounting\Taxes($db, $books);
+        $invDb = new \Whity\Core\Inventory\InventoryDb($this->pdo);
+        $invWorkspace = new \Whity\Core\Inventory\InventoryWorkspace($invDb);
+        $units = new \Whity\Core\Inventory\UnitCatalog($invDb, $invWorkspace);
+        $invoices = new \Whity\Core\Accounting\Invoices(
+            $db,
+            $books,
+            $ledger,
+            $taxes,
+            new \Whity\Core\Inventory\ItemService($invDb, $invWorkspace, $units, static fn (int $t): string => 'USD'),
+            $units,
+            new \Whity\Database\SequenceCounters($this->pdo),
+            static fn (int $t): array => [],
+            null,
+            static fn (): ?\Whity\Sdk\Contribute\WorkspaceEInvoicing => null,
+        );
+        $this->pdo->exec("INSERT INTO contacts (tenant_id, name, is_customer, is_supplier) VALUES (1, 'Example Cafe', true, false), (2, 'Other Cafe', true, false)");
+        $contactIds = [];
+        foreach ([1 => 'Example Cafe', 2 => 'Other Cafe'] as $tenant => $name) {
+            $found = $this->pdo->prepare('SELECT id FROM contacts WHERE tenant_id = :tenant AND name = :name');
+            $found->execute([':tenant' => $tenant, ':name' => $name]);
+            $contactIds[$tenant] = (int) $found->fetchColumn();
+        }
+        $customerA = $contactIds[1];
+        $issued = $invoices->issue(self::TENANT_A, $invoices->create(self::TENANT_A, null, [
+            'contact_id' => $customerA, 'lines' => [['description' => 'Catering', 'unit_price_minor' => 1000]],
+        ])['invoice']['id'], null);
+        $draft = $invoices->create(self::TENANT_A, null, ['contact_id' => $customerA, 'lines' => [['description' => 'Cake', 'unit_price_minor' => 500]]])['invoice'];
+
+        self::assertSame([], $invoices->list(self::TENANT_B));
+        self::assertNotContains($issued['lines'][0]['tax_code_id'], array_column($taxes->list(self::TENANT_B), 'id'));
+
+        foreach ([
+            'read an invoice' => fn () => $invoices->get(self::TENANT_B, $issued['id']),
+            'change a draft' => fn () => $invoices->update(self::TENANT_B, $draft['id'], ['notes' => 'Taken']),
+            'issue a draft' => fn () => $invoices->issue(self::TENANT_B, $draft['id'], null),
+            'cancel a draft' => fn () => $invoices->cancel(self::TENANT_B, $draft['id'], null),
+            'credit an invoice' => fn () => $invoices->credit(self::TENANT_B, $issued['id'], null, []),
+            'read a tax code' => fn () => $taxes->get(self::TENANT_B, $issued['lines'][0]['tax_code_id']),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} of Tenant A");
+            } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+                self::assertSame(404, $e->status, "a foreign record answers 404 to {$what}");
+            }
+        }
+        try {
+            $invoices->create(self::TENANT_B, null, ['contact_id' => $customerA, 'lines' => [['description' => 'X', 'unit_price_minor' => 1]]]);
+            self::fail('Tenant B invoiced Tenant A\'s customer');
+        } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+            self::assertSame('contact_id', $e->extra['field'] ?? null);
+        }
+        try {
+            $invoices->create(self::TENANT_B, null, [
+                'contact_id' => $contactIds[2],
+                'lines' => [['description' => 'X', 'unit_price_minor' => 1, 'tax_code' => $issued['lines'][0]['tax_code_id']]],
+            ]);
+            self::fail('Tenant B used Tenant A\'s tax code');
+        } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+            self::assertSame('lines[0].tax_code', $e->extra['field'] ?? null);
+        }
+
+        self::assertSame('draft', $invoices->get(self::TENANT_A, $draft['id'])['status']);
+        self::assertSame('issued', $invoices->get(self::TENANT_A, $issued['id'])['status']);
+        self::assertSame(0, $invoices->get(self::TENANT_A, $issued['id'])['credited_minor']);
+    }
+
     private function contactService(): \Whity\Core\Contacts\ContactService
     {
         return new \Whity\Core\Contacts\ContactService(

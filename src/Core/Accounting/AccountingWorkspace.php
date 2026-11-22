@@ -37,6 +37,8 @@ final class AccountingWorkspace
         CorePermissions::ACCOUNTING_READ,
         CorePermissions::ACCOUNTING_POST,
         CorePermissions::ACCOUNTING_CLOSE,
+        CorePermissions::INVOICES_READ,
+        CorePermissions::INVOICES_WRITE,
         CorePermissions::CONTACTS_READ,
     ];
 
@@ -74,6 +76,7 @@ final class AccountingWorkspace
 
         $this->chart($tenantId);
         $this->journals($tenantId);
+        $this->taxCodes($tenantId);
         $this->ready[$tenantId] = true;
     }
 
@@ -185,6 +188,32 @@ final class AccountingWorkspace
                     ':tenant_id' => $tenantId, ':parent_id' => $parentId, ':code' => $free, ':name' => $en,
                     ':names' => LocalizedText::encode(['en' => $en, 'ar' => $ar]), ':type' => $type, ':subtype' => $subtype,
                     ':role' => $role, ':manual' => $manual,
+                ]
+            ));
+        }
+    }
+
+    /** The pack's tax codes a workspace lacks are added; one it changed or archived stays as it is. */
+    private function taxCodes(int $tenantId): void
+    {
+        $codes = array_column($this->db->all('SELECT code FROM acc_tax_codes WHERE tenant_id = :tenant_id', [':tenant_id' => $tenantId]), 'code');
+        foreach (JordanChart::TAX_CODES as $code => [$direction, $rate, $treatment, $category, $role, $box, $einvoice, $en, $ar]) {
+            if (in_array($code, $codes, true)) {
+                continue;
+            }
+            $accountId = AccountingDb::int($this->db->one(
+                'SELECT id FROM acc_accounts WHERE tenant_id = :tenant_id AND role = :role',
+                [':tenant_id' => $tenantId, ':role' => $role]
+            )['id'] ?? null);
+            $this->quietly(fn () => $this->db->run(
+                'INSERT INTO acc_tax_codes (tenant_id, code, name, names, pack, direction, rate_bp, treatment, category, account_id,
+                        return_box, einvoice_category, is_seeded)
+                 VALUES (:tenant_id, :code, :name, :names, :pack, :direction, :rate, :treatment, :category, :account_id,
+                        :box, :einvoice, TRUE)',
+                [
+                    ':tenant_id' => $tenantId, ':code' => $code, ':name' => $en, ':names' => LocalizedText::encode(['en' => $en, 'ar' => $ar]),
+                    ':pack' => JordanChart::PACK, ':direction' => $direction, ':rate' => $rate, ':treatment' => $treatment,
+                    ':category' => $category, ':account_id' => $accountId, ':box' => $box, ':einvoice' => $einvoice,
                 ]
             ));
         }

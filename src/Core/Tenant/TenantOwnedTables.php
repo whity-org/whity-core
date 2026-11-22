@@ -692,6 +692,10 @@ final class TenantOwnedTables
         'acc_balances' => '345_create_accounting_ledger.php',
         'acc_manual_entries' => '345_create_accounting_ledger.php',
         'acc_manual_entry_lines' => '345_create_accounting_ledger.php',
+        'acc_tax_codes' => '350_create_accounting_invoices.php',
+        'acc_invoices' => '350_create_accounting_invoices.php',
+        'acc_invoice_lines' => '350_create_accounting_invoices.php',
+        'acc_allocations' => '350_create_accounting_invoices.php',
     ];
 
     /**

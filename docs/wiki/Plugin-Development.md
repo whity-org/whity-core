@@ -2208,6 +2208,7 @@ What to know:
 - **Writes act as a person.** `post()` and `reverse()` need `accounting:post`; `accounts()->create()` needs `accounting:settings`.
 - **Refusals** throw `AccountingRejected` with a stable `reason` (`no_workspace`, `forbidden`, `not_found`, `invalid`, `unbalanced`, `period_closed`, `conflict`, `vetoed`, `use_plugin_context`).
 - **Listen or refuse.** `accounting.entry.posted` (and `.async` after commit) tells you what posted; `accounting.entry.posting` runs before, inside the transaction; throw `HookVetoException` to refuse.
+- **Invoice instead of posting by hand (SDK 1.155).** A plugin that sells (rentals, bookings, subscriptions) drafts a sales invoice with `$books->invoices()->createDraft([...], $profileId, 'booking-' . $id)` and issues it with `issue()`: core numbers it, taxes each line from its tax category (`$books->taxes()`), posts it and shows it in the customer's invoices. Credit it with `credit()`; an issued invoice is never edited. `accounting.invoice.issuing` lets a plugin refuse one (a credit limit).
 
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 

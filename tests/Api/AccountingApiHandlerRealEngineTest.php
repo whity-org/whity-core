@@ -62,6 +62,9 @@ final class AccountingApiHandlerRealEngineTest extends TestCase
     {
         $byRoute = [];
         foreach (AccountingApiSchemas::routes() as $route) {
+            if (self::isInvoiceRoute($route['path'])) {
+                continue;
+            }
             $byRoute[$route['method'] . ' ' . $route['path']] = $route['requiredPermission'];
         }
         self::assertCount(22, $byRoute);
@@ -85,6 +88,35 @@ final class AccountingApiHandlerRealEngineTest extends TestCase
             [$method, $path] = explode(' ', $route, 2);
             self::assertMatchesRegularExpression(
                 '#\$router->register\(\'' . $method . '\',\s+\'' . preg_quote($path, '#') . '\',\s+\[\$accountingHandler, \'\w+\'\],\s+null, null, CorePermissions::' . $constants[$expected] . '\);#',
+                $index,
+                $route . ' is registered with its permission'
+            );
+        }
+    }
+
+    public function testEveryInvoiceRouteDeclaresTheDesignsPermission(): void
+    {
+        $byRoute = [];
+        foreach (AccountingApiSchemas::routes() as $route) {
+            if (self::isInvoiceRoute($route['path'])) {
+                $byRoute[$route['method'] . ' ' . $route['path']] = $route['requiredPermission'];
+            }
+        }
+        self::assertCount(14, $byRoute);
+        $constants = ['invoices:read' => 'INVOICES_READ', 'invoices:write' => 'INVOICES_WRITE', 'accounting:settings' => 'ACCOUNTING_SETTINGS'];
+        $index = (string) file_get_contents(dirname(__DIR__, 2) . '/public/index.php');
+        foreach ($byRoute as $route => $permission) {
+            // Design 32 §9.1: reading invoices is invoices:read, changing them
+            // invoices:write, and the invoice settings accounting:settings.
+            $expected = match (true) {
+                str_starts_with($route, 'GET ') => 'invoices:read',
+                str_contains($route, '/invoice-settings'), str_contains($route, '/tax-codes') => 'accounting:settings',
+                default => 'invoices:write',
+            };
+            self::assertSame($expected, $permission, $route);
+            [$method, $path] = explode(' ', $route, 2);
+            self::assertMatchesRegularExpression(
+                '#\$router->register\(\'' . $method . '\',\s+\'' . preg_quote($path, '#') . '\',\s+\[\$accountingInvoicesHandler, \'\w+\'\],\s+null, null, CorePermissions::' . $constants[$expected] . '\);#',
                 $index,
                 $route . ' is registered with its permission'
             );
@@ -134,6 +166,11 @@ final class AccountingApiHandlerRealEngineTest extends TestCase
         TenantContext::setTenantId(2);
         self::assertSame(404, $this->call('showEntry', 'GET', '/api/accounting/entries/x', null, ['id' => $entryId])['status']);
         self::assertSame(404, $this->call('showAccount', 'GET', '/api/accounting/accounts/x', null, ['id' => (string) $accounts['6200']])['status']);
+    }
+
+    private static function isInvoiceRoute(string $path): bool
+    {
+        return str_contains($path, '/invoices') || str_contains($path, '/tax-codes') || str_contains($path, '/invoice-settings');
     }
 
     /**

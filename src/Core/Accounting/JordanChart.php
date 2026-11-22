@@ -9,10 +9,12 @@ namespace Whity\Core\Accounting;
  * 32 §4, register AC.8). The default for every workspace until other tax packs
  * exist.
  *
- * REVIEW GATE: a Jordanian accountant named by the owner reviews this chart
- * before phase A1 merges (owner, 21 Nov 2026, Q11). Change it here, in one
- * place; a workspace that already opened accounting keeps the chart it got and
- * edits it itself.
+ * REVIEW: Bader Ahmad Tamimi, the Jordanian accountant the owner named,
+ * reviews this chart and tunes it after A1 merged (owner, 22 Nov 2026: "yes
+ * merge tuning can come later"); the tax codes below wait for his review
+ * before the sales tax return ships (A6). Change them here, in one place; a
+ * workspace that already opened accounting keeps what it got and edits it
+ * itself.
  *
  * Four-digit codes; the first digit is the type. Names are plain words first
  * (AC.27), English and Arabic.
@@ -94,5 +96,25 @@ final class JordanChart
         'GEN' => ['general', null, 'General', 'القيود العامة'],
         'STK' => ['stock', null, 'Stock', 'المخزون'],
         'OPN' => ['opening', null, 'Opening balances', 'الأرصدة الافتتاحية'],
+    ];
+
+    /**
+     * The Jordan pack's tax codes (design section 32 §7.2, AC.20), made with
+     * the chart. Output codes go on sales, input codes on purchases. An item's
+     * `tax_category` picks the code: empty or `standard` is the general 16%.
+     * Jordan's reduced rates are added once the accountant confirms them
+     * (owner, 22 Nov 2026); until then a workspace adds a dated code itself.
+     *
+     * code => [direction, rate in basis points, treatment, category, account role, return box, e-invoice category, en, ar]
+     *
+     * @var array<string, array{0: string, 1: int, 2: string, 3: string, 4: string, 5: string, 6: string, 7: string, 8: string}>
+     */
+    public const TAX_CODES = [
+        'JO-GST-16' => ['output', 1600, 'standard', 'standard', 'sales_tax_output', 'sales_16', 'S', 'Sales tax 16%', 'ضريبة المبيعات 16%'],
+        'JO-GST-0' => ['output', 0, 'zero', 'zero', 'sales_tax_output', 'sales_zero', 'Z', 'Zero-rated', 'خاضع بنسبة صفر'],
+        'JO-EXEMPT' => ['output', 0, 'exempt', 'exempt', 'sales_tax_output', 'sales_exempt', 'E', 'Exempt', 'معفى'],
+        'JO-GST-IN-16' => ['input', 1600, 'standard', 'standard', 'sales_tax_input', 'purchases_16', 'S', 'Sales tax on purchases 16%', 'ضريبة المشتريات 16%'],
+        'JO-GST-IN-0' => ['input', 0, 'zero', 'zero', 'sales_tax_input', 'purchases_zero', 'Z', 'Zero-rated purchases', 'مشتريات خاضعة بنسبة صفر'],
+        'JO-EXEMPT-IN' => ['input', 0, 'exempt', 'exempt', 'sales_tax_input', 'purchases_exempt', 'E', 'Exempt purchases', 'مشتريات معفاة'],
     ];
 }

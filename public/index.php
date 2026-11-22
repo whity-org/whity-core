@@ -6008,6 +6008,49 @@ $router->register('GET',    '/api/accounting/periods',                          
 $router->register('POST',   '/api/accounting/periods/{id:\d+}/close',             [$accountingHandler, 'closePeriod'],       null, null, CorePermissions::ACCOUNTING_CLOSE);
 $router->register('POST',   '/api/accounting/periods/{id:\d+}/reopen',            [$accountingHandler, 'reopenPeriod'],      null, null, CorePermissions::ACCOUNTING_CLOSE);
 $router->register('GET',    '/api/accounting/reports/trial-balance',              [$accountingHandler, 'trialBalance'],      null, null, CorePermissions::ACCOUNTING_READ);
+// WHIT-1318 A2a: tax codes, sales invoices and credit notes. Issuing posts to
+// the books; the workspace's invoice route (accounting.invoice) approves first
+// when one is chosen. A WorkspaceEInvoicing connector bound to the container
+// (JoFotara, a paid integration plugin) reports issued invoices after commit.
+$accountingTaxes = new \Whity\Core\Accounting\Taxes($accountingDb, $accountingWorkspace);
+$accountingInvoices = new \Whity\Core\Accounting\Invoices(
+    $accountingDb,
+    $accountingWorkspace,
+    $accountingLedger,
+    $accountingTaxes,
+    $inventoryItems,
+    $inventoryUnits,
+    new \Whity\Database\SequenceCounters($db->getPdo()),
+    static fn (int $tenantId): array => $settingsService->effective($tenantId),
+    $hookManager,
+);
+$routeSubjectRegistry->register(new \Whity\Core\Accounting\InvoiceRouteSubject($accountingDb, $accountingInvoices));
+$accountingInvoices->useApprovals(new \Whity\Core\Accounting\InvoiceRoutes(
+    $documentRouter,
+    $routeTemplateRepository,
+    static fn (int $tenantId): array => $settingsService->effective($tenantId),
+));
+// An accepted quote turns into a draft invoice (QT.6).
+$salesQuoteConversions->register(new \Whity\Core\Accounting\InvoiceQuoteConversion($accountingInvoices, $inventoryUnits));
+// The invoices meter (invoices.per_month, BM.3) counts issued sales invoices.
+\Whity\register_service(\Whity\Core\Usage\InvoiceUsageCounter::class, new \Whity\Core\Accounting\InvoiceCounter($accountingInvoices)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Accounting\Invoices::class, new \Whity\Core\Accounting\Host\HostInvoices($accountingInvoices, $accountingGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Accounting\Taxes::class, new \Whity\Core\Accounting\Host\HostTaxes($accountingTaxes, $accountingGuard)); // @phpstan-ignore-line
+$accountingInvoicesHandler = new \Whity\Api\AccountingInvoicesApiHandler($accountingInvoices, $accountingTaxes, $settingsService);
+$router->register('GET',    '/api/accounting/tax-codes',                          [$accountingInvoicesHandler, 'listTaxCodes'],   null, null, CorePermissions::INVOICES_READ);
+$router->register('POST',   '/api/accounting/tax-codes',                          [$accountingInvoicesHandler, 'createTaxCode'],  null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('PATCH',  '/api/accounting/tax-codes/{id:\d+}',                 [$accountingInvoicesHandler, 'updateTaxCode'],  null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('POST',   '/api/accounting/tax-codes/{id:\d+}/archive',         [$accountingInvoicesHandler, 'archiveTaxCode'], null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('POST',   '/api/accounting/tax-codes/{id:\d+}/restore',         [$accountingInvoicesHandler, 'restoreTaxCode'], null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('GET',    '/api/accounting/invoices',                           [$accountingInvoicesHandler, 'list'],           null, null, CorePermissions::INVOICES_READ);
+$router->register('POST',   '/api/accounting/invoices',                           [$accountingInvoicesHandler, 'create'],         null, null, CorePermissions::INVOICES_WRITE);
+$router->register('GET',    '/api/accounting/invoices/{id:\d+}',                  [$accountingInvoicesHandler, 'show'],           null, null, CorePermissions::INVOICES_READ);
+$router->register('PATCH',  '/api/accounting/invoices/{id:\d+}',                  [$accountingInvoicesHandler, 'update'],         null, null, CorePermissions::INVOICES_WRITE);
+$router->register('POST',   '/api/accounting/invoices/{id:\d+}/issue',            [$accountingInvoicesHandler, 'issue'],          null, null, CorePermissions::INVOICES_WRITE);
+$router->register('POST',   '/api/accounting/invoices/{id:\d+}/cancel',           [$accountingInvoicesHandler, 'cancel'],         null, null, CorePermissions::INVOICES_WRITE);
+$router->register('POST',   '/api/accounting/invoices/{id:\d+}/credit-notes',     [$accountingInvoicesHandler, 'credit'],         null, null, CorePermissions::INVOICES_WRITE);
+$router->register('GET',    '/api/accounting/invoice-settings',                   [$accountingInvoicesHandler, 'showSettings'],   null, null, CorePermissions::INVOICES_READ);
+$router->register('PATCH',  '/api/accounting/invoice-settings',                   [$accountingInvoicesHandler, 'updateSettings'], null, null, CorePermissions::ACCOUNTING_SETTINGS);
 
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,

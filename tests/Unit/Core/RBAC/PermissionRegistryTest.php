@@ -176,11 +176,12 @@ class PermissionRegistryTest extends TestCase
      */
     public function testRegisterSurfacesPermissionAcrossAllViews(): void
     {
-        $this->registry->register('billing', ['invoices:read']);
+        // A plugin's own slug: invoices:read became a core permission (WHIT-1318 A2a).
+        $this->registry->register('billing', ['loyalty:read']);
 
-        $this->assertTrue($this->registry->exists('invoices:read'));
-        $this->assertSame(['invoices:read'], $this->registry->getBySource('billing'));
-        $this->assertSame('billing', $this->registry->getAll()['invoices:read']);
+        $this->assertTrue($this->registry->exists('loyalty:read'));
+        $this->assertSame(['loyalty:read'], $this->registry->getBySource('billing'));
+        $this->assertSame('billing', $this->registry->getAll()['loyalty:read']);
     }
 
     /**

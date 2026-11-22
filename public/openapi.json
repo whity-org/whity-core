@@ -2686,6 +2686,1127 @@
                 ]
             }
         },
+        "/api/v1/accounting/invoice-settings": {
+            "get": {
+                "operationId": "get_api_v1_accounting_invoice_settings",
+                "summary": "Show the invoice settings",
+                "tags": [
+                    "accounting"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The settings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingInvoiceSettings"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "patch_api_v1_accounting_invoice_settings",
+                "summary": "Change the invoice settings",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "The approval route invoices travel before they are issued (null for none), the default payment terms in days, and whether prices include tax by default.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingInvoiceSettings"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The settings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingInvoiceSettings"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/invoices": {
+            "get": {
+                "operationId": "get_api_v1_accounting_invoices",
+                "summary": "List sales invoices and credit notes",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Newest first. `due_minor` is what the customer still owes; `overdue` is true past the due date.",
+                "parameters": [
+                    {
+                        "name": "kind",
+                        "in": "query",
+                        "required": false,
+                        "description": "`sale` or `sale_credit`. Default: both.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "description": "`draft`, `waiting_approval`, `issued`, `partly_paid`, `paid`, `credited`, `cancelled`, or `overdue`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "contact_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "One customer's invoices.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": false,
+                        "description": "Part of the number or the customer's name.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": false,
+                        "description": "Issued on or after, YYYY-MM-DD.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": false,
+                        "description": "Issued on or before, YYYY-MM-DD.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "At most 200. Default 50.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "description": "Skip this many.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Invoices",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AccountingInvoice"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_accounting_invoices",
+                "summary": "Draft a sales invoice",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "A draft posts nothing. Lines come from items (price, unit and tax category from the item) or are free text. Each line gets the tax code its tax category maps to unless one is given, and the Sales (or Services) account unless an income account is given. `idempotency_key` returns the same draft on a retry.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingInvoiceRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The same draft, already made with this key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingInvoice"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "The draft",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingInvoice"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/invoices/{id}": {
+            "get": {
+                "operationId": "get_api_v1_accounting_invoices_id",
+                "summary": "Show an invoice or credit note",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "With its lines and what has settled it (credit notes now, payments later).",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The invoice",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingInvoice"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "patch_api_v1_accounting_invoices_id",
+                "summary": "Change a draft invoice",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Only a draft changes. `lines`, when given, replace every line. An issued invoice is credited instead.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingInvoiceChanges"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The draft",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingInvoice"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/invoices/{id}/cancel": {
+            "post": {
+                "operationId": "post_api_v1_accounting_invoices_id_cancel",
+                "summary": "Cancel a draft invoice",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "A draft, or one waiting for approval. An issued invoice is never cancelled; credit it.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The invoice",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingInvoice"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/invoices/{id}/credit-notes": {
+            "post": {
+                "operationId": "post_api_v1_accounting_invoices_id_credit_notes",
+                "summary": "Credit an issued invoice",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Issues a credit note at once for every line still not credited, or for the `lines` given, and posts the mirror of those lines. It settles what the invoice still owes; anything beyond stays as the customer's credit.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingCreditNoteRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The same credit note, already made with this key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingInvoice"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "The credit note",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingInvoice"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/invoices/{id}/issue": {
+            "post": {
+                "operationId": "post_api_v1_accounting_invoices_id_issue",
+                "summary": "Issue an invoice",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Gives it the next number (INV-2026-0001), freezes it and posts it to the books: the customer owes the total, sales and the sales tax collected are credited. When the workspace has an invoice route it goes for approval first and comes back `waiting_approval`. A plugin may refuse it (409).",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The invoice",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingInvoice"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/accounting/journals": {
             "get": {
                 "operationId": "get_api_v1_accounting_journals",
@@ -3865,6 +4986,561 @@
                                     "properties": {
                                         "data": {
                                             "$ref": "#/components/schemas/AccountingTrialBalance"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/tax-codes": {
+            "get": {
+                "operationId": "get_api_v1_accounting_tax_codes",
+                "summary": "List the tax codes",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "The workspace's sales tax codes: `output` codes go on sales, `input` codes on purchases. An item's tax category picks the code.",
+                "parameters": [
+                    {
+                        "name": "direction",
+                        "in": "query",
+                        "required": false,
+                        "description": "`output` (sales) or `input` (purchases).",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "archived",
+                        "in": "query",
+                        "required": false,
+                        "description": "`true` to include archived codes.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tax codes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AccountingTaxCode"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_accounting_tax_codes",
+                "summary": "Add a tax code",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "The Jordan codes come with the books and can be renamed, pointed at another account or archived. A rate never changes: a new rate is a new code from the date it starts, and the old one ends with valid_to.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingTaxCodeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The tax code",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingTaxCode"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/tax-codes/{id}": {
+            "patch": {
+                "operationId": "patch_api_v1_accounting_tax_codes_id",
+                "summary": "Change a tax code",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Its name, its account, its tax category and when it stops. Not its rate, direction or treatment.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingTaxCodeChanges"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The tax code",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingTaxCode"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/tax-codes/{id}/archive": {
+            "post": {
+                "operationId": "post_api_v1_accounting_tax_codes_id_archive",
+                "summary": "Archive a tax code",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "New lines can no longer use it; invoices that did keep it.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The tax code",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingTaxCode"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/tax-codes/{id}/restore": {
+            "post": {
+                "operationId": "post_api_v1_accounting_tax_codes_id_restore",
+                "summary": "Restore an archived tax code",
+                "tags": [
+                    "accounting"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The tax code",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingTaxCode"
                                         }
                                     },
                                     "required": [
@@ -96447,6 +98123,42 @@
                     "lock_date"
                 ]
             },
+            "AccountingCreditNoteRequest": {
+                "type": "object",
+                "properties": {
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "line_id": {
+                                    "type": "integer"
+                                },
+                                "quantity": {
+                                    "type": "string",
+                                    "description": "How much to credit, in normal units. Default: all that is left."
+                                }
+                            },
+                            "required": [
+                                "line_id"
+                            ]
+                        },
+                        "description": "Leave out to credit everything still not credited."
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Why, printed on the credit note. Up to 2000 characters."
+                    },
+                    "issue_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD."
+                    },
+                    "idempotency_key": {
+                        "type": "string",
+                        "description": "Retrying with the same key returns the same credit note."
+                    }
+                }
+            },
             "AccountingEntry": {
                 "type": "object",
                 "properties": {
@@ -96582,6 +98294,527 @@
                     "total_minor",
                     "hash"
                 ]
+            },
+            "AccountingInvoice": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "sale",
+                            "sale_credit"
+                        ]
+                    },
+                    "number": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "draft",
+                            "waiting_approval",
+                            "issued",
+                            "partly_paid",
+                            "paid",
+                            "credited",
+                            "cancelled"
+                        ]
+                    },
+                    "contact_id": {
+                        "type": "integer"
+                    },
+                    "contact_name": {
+                        "type": "string"
+                    },
+                    "issue_date": {
+                        "type": "string"
+                    },
+                    "supply_date": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "due_date": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "payment_terms_days": {
+                        "type": "integer"
+                    },
+                    "overdue": {
+                        "type": "boolean"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "prices_include_tax": {
+                        "type": "boolean"
+                    },
+                    "subtotal_minor": {
+                        "type": "integer"
+                    },
+                    "discount_minor": {
+                        "type": "integer"
+                    },
+                    "tax_minor": {
+                        "type": "integer"
+                    },
+                    "total_minor": {
+                        "type": "integer"
+                    },
+                    "paid_minor": {
+                        "type": "integer"
+                    },
+                    "credited_minor": {
+                        "type": "integer"
+                    },
+                    "due_minor": {
+                        "type": "integer",
+                        "description": "What is still owed."
+                    },
+                    "credits_invoice_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "On a credit note: the invoice it credits."
+                    },
+                    "entry_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The journal entry it posted, once issued."
+                    },
+                    "route_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "einvoice_status": {
+                        "type": "string",
+                        "enum": [
+                            "none",
+                            "pending",
+                            "accepted",
+                            "rejected",
+                            "not_required"
+                        ]
+                    },
+                    "einvoice_uuid": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "einvoice_ref": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "einvoice_qr": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "einvoice_message": {
+                        "type": "string"
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "external_ref": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "quote_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "issued_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "issued_by_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "created_by_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "agent_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "on_behalf_of_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "owner_plugin": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AccountingInvoiceLine"
+                        }
+                    },
+                    "allocations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "invoice_id": {
+                                    "type": "integer"
+                                },
+                                "credit_invoice_id": {
+                                    "type": "integer",
+                                    "nullable": true
+                                },
+                                "credit_number": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "payment_id": {
+                                    "type": "integer",
+                                    "nullable": true
+                                },
+                                "amount_minor": {
+                                    "type": "integer"
+                                },
+                                "allocated_on": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "invoice_id",
+                                "amount_minor",
+                                "allocated_on"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "kind",
+                    "number",
+                    "status",
+                    "contact_id",
+                    "issue_date",
+                    "currency",
+                    "subtotal_minor",
+                    "tax_minor",
+                    "total_minor",
+                    "due_minor"
+                ]
+            },
+            "AccountingInvoiceChanges": {
+                "type": "object",
+                "properties": {
+                    "contact_id": {
+                        "type": "integer",
+                        "description": "The customer: a contact marked as a customer."
+                    },
+                    "issue_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD."
+                    },
+                    "supply_date": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "YYYY-MM-DD."
+                    },
+                    "due_date": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "YYYY-MM-DD."
+                    },
+                    "payment_terms_days": {
+                        "type": "integer",
+                        "description": "Days from issue to due, 0 to 365. Default: the workspace's."
+                    },
+                    "prices_include_tax": {
+                        "type": "boolean",
+                        "description": "Whether the prices typed include tax. Default: the workspace's setting."
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Printed on the invoice. Up to 2000 characters."
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "variant_id": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "An item. Its name, price, unit and tax category are used unless given."
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "What was sold. Needed for a line without an item."
+                                },
+                                "quantity": {
+                                    "type": "string",
+                                    "description": "In normal units, such as \"2.5\". Default 1."
+                                },
+                                "unit": {
+                                    "type": "string",
+                                    "description": "An item's unit code (box, kg). Default: its base unit."
+                                },
+                                "unit_price_minor": {
+                                    "type": "integer",
+                                    "description": "The price of one, in minor units."
+                                },
+                                "discount_bp": {
+                                    "type": "integer",
+                                    "description": "Discount in basis points, 0 to 10000 (1000 = 10%)."
+                                },
+                                "tax_code": {
+                                    "oneOf": [
+                                        {
+                                            "type": "integer"
+                                        },
+                                        {
+                                            "type": "string"
+                                        }
+                                    ],
+                                    "description": "A tax code by id or code (JO-GST-16). Default: from the tax category."
+                                },
+                                "tax_category": {
+                                    "type": "string",
+                                    "description": "`standard`, `zero`, `exempt`, or a category a code the workspace added serves. Default: the item's, else standard."
+                                },
+                                "account_id": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "An income account. Default: Sales, or Services for a service item."
+                                },
+                                "account_code": {
+                                    "type": "string",
+                                    "description": "The income account by its code, instead of account_id."
+                                },
+                                "ou_id": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "The branch (organisational unit) the sale belongs to."
+                                }
+                            }
+                        },
+                        "description": "1 to 300 lines."
+                    }
+                }
+            },
+            "AccountingInvoiceLine": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "line_no": {
+                        "type": "integer"
+                    },
+                    "variant_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "unit_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "quantity": {
+                        "type": "integer",
+                        "description": "In steps of quantity_decimals: 25 with one decimal is 2.5."
+                    },
+                    "quantity_decimals": {
+                        "type": "integer"
+                    },
+                    "unit_price_minor": {
+                        "type": "integer"
+                    },
+                    "discount_bp": {
+                        "type": "integer"
+                    },
+                    "net_minor": {
+                        "type": "integer"
+                    },
+                    "tax_code_id": {
+                        "type": "integer"
+                    },
+                    "tax_code": {
+                        "type": "string"
+                    },
+                    "tax_rate_bp": {
+                        "type": "integer"
+                    },
+                    "tax_minor": {
+                        "type": "integer"
+                    },
+                    "total_minor": {
+                        "type": "integer"
+                    },
+                    "account_id": {
+                        "type": "integer"
+                    },
+                    "account_code": {
+                        "type": "string"
+                    },
+                    "account_name": {
+                        "type": "string"
+                    },
+                    "ou_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "credits_line_id": {
+                        "type": "integer",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "line_no",
+                    "description",
+                    "quantity",
+                    "quantity_decimals",
+                    "unit_price_minor",
+                    "net_minor",
+                    "tax_code_id",
+                    "tax_minor",
+                    "total_minor",
+                    "account_id"
+                ]
+            },
+            "AccountingInvoiceRequest": {
+                "type": "object",
+                "properties": {
+                    "contact_id": {
+                        "type": "integer",
+                        "description": "The customer: a contact marked as a customer."
+                    },
+                    "issue_date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD."
+                    },
+                    "supply_date": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "YYYY-MM-DD."
+                    },
+                    "due_date": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "YYYY-MM-DD."
+                    },
+                    "payment_terms_days": {
+                        "type": "integer",
+                        "description": "Days from issue to due, 0 to 365. Default: the workspace's."
+                    },
+                    "prices_include_tax": {
+                        "type": "boolean",
+                        "description": "Whether the prices typed include tax. Default: the workspace's setting."
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Printed on the invoice. Up to 2000 characters."
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "variant_id": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "An item. Its name, price, unit and tax category are used unless given."
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "description": "What was sold. Needed for a line without an item."
+                                },
+                                "quantity": {
+                                    "type": "string",
+                                    "description": "In normal units, such as \"2.5\". Default 1."
+                                },
+                                "unit": {
+                                    "type": "string",
+                                    "description": "An item's unit code (box, kg). Default: its base unit."
+                                },
+                                "unit_price_minor": {
+                                    "type": "integer",
+                                    "description": "The price of one, in minor units."
+                                },
+                                "discount_bp": {
+                                    "type": "integer",
+                                    "description": "Discount in basis points, 0 to 10000 (1000 = 10%)."
+                                },
+                                "tax_code": {
+                                    "oneOf": [
+                                        {
+                                            "type": "integer"
+                                        },
+                                        {
+                                            "type": "string"
+                                        }
+                                    ],
+                                    "description": "A tax code by id or code (JO-GST-16). Default: from the tax category."
+                                },
+                                "tax_category": {
+                                    "type": "string",
+                                    "description": "`standard`, `zero`, `exempt`, or a category a code the workspace added serves. Default: the item's, else standard."
+                                },
+                                "account_id": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "An income account. Default: Sales, or Services for a service item."
+                                },
+                                "account_code": {
+                                    "type": "string",
+                                    "description": "The income account by its code, instead of account_id."
+                                },
+                                "ou_id": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "The branch (organisational unit) the sale belongs to."
+                                }
+                            }
+                        },
+                        "description": "1 to 300 lines."
+                    },
+                    "idempotency_key": {
+                        "type": "string",
+                        "description": "Retrying with the same key returns the same draft."
+                    }
+                },
+                "required": [
+                    "contact_id",
+                    "lines"
+                ]
+            },
+            "AccountingInvoiceSettings": {
+                "type": "object",
+                "properties": {
+                    "invoice_route_template_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The route invoices travel before they are issued; null for none."
+                    },
+                    "invoice_payment_terms_days": {
+                        "type": "integer",
+                        "description": "Days from issue to due on a new invoice, 0 to 365."
+                    },
+                    "prices_include_tax": {
+                        "type": "boolean",
+                        "description": "Whether a new invoice's prices include tax."
+                    }
+                }
             },
             "AccountingJournal": {
                 "type": "object",
@@ -97040,6 +99273,199 @@
                     "closing_minor",
                     "lines",
                     "next"
+                ]
+            },
+            "AccountingTaxCode": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "code": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "names": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "The name in each language, such as `{\"en\": \"Rent\", \"ar\": \"\u0627\u0644\u0625\u064a\u062c\u0627\u0631\"}`."
+                    },
+                    "pack": {
+                        "type": "string"
+                    },
+                    "direction": {
+                        "type": "string",
+                        "enum": [
+                            "output",
+                            "input"
+                        ]
+                    },
+                    "rate_bp": {
+                        "type": "integer",
+                        "description": "Basis points: 1600 is 16%."
+                    },
+                    "treatment": {
+                        "type": "string"
+                    },
+                    "category": {
+                        "type": "string"
+                    },
+                    "account_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "return_box": {
+                        "type": "string"
+                    },
+                    "einvoice_category": {
+                        "type": "string"
+                    },
+                    "valid_from": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "valid_to": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "is_seeded": {
+                        "type": "boolean"
+                    },
+                    "owner_plugin": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "archived": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "id",
+                    "code",
+                    "name",
+                    "direction",
+                    "rate_bp",
+                    "treatment",
+                    "category"
+                ]
+            },
+            "AccountingTaxCodeChanges": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "en": {
+                                        "type": "string"
+                                    },
+                                    "ar": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        ],
+                        "description": "Text, or `{en, ar}`."
+                    },
+                    "account_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Where its tax posts; null for the default account."
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "The item tax category it serves."
+                    },
+                    "valid_to": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "YYYY-MM-DD, the last day it applies; null for no end."
+                    }
+                }
+            },
+            "AccountingTaxCodeRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string",
+                        "description": "Up to 30 letters, digits, dots, dashes or underscores, such as JO-GST-8."
+                    },
+                    "name": {
+                        "oneOf": [
+                            {
+                                "type": "string"
+                            },
+                            {
+                                "type": "object",
+                                "properties": {
+                                    "en": {
+                                        "type": "string"
+                                    },
+                                    "ar": {
+                                        "type": "string"
+                                    }
+                                }
+                            }
+                        ],
+                        "description": "Text, or `{en, ar}`."
+                    },
+                    "direction": {
+                        "type": "string",
+                        "enum": [
+                            "output",
+                            "input"
+                        ],
+                        "description": "`output` for sales, `input` for purchases."
+                    },
+                    "rate_bp": {
+                        "type": "integer",
+                        "description": "Basis points, 0 to 10000: 1600 is 16%. Never changes once made."
+                    },
+                    "treatment": {
+                        "type": "string",
+                        "enum": [
+                            "standard",
+                            "reduced",
+                            "zero",
+                            "exempt",
+                            "out_of_scope",
+                            "reverse_charge"
+                        ],
+                        "description": "Default: standard above 0, zero at 0."
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "The item tax category it serves, such as reduced_8."
+                    },
+                    "account_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Where its tax posts. Default: Sales tax we collected (output) or Sales tax we can reclaim (input)."
+                    },
+                    "valid_from": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "YYYY-MM-DD, the first day it applies."
+                    },
+                    "valid_to": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "YYYY-MM-DD, the last day it applies."
+                    }
+                },
+                "required": [
+                    "code",
+                    "name",
+                    "direction",
+                    "rate_bp"
                 ]
             },
             "AccountingTrialBalance": {

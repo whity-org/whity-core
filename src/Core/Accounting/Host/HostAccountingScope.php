@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Whity\Core\Accounting\Host;
 
 use Whity\Sdk\Accounting\Accounts;
+use Whity\Sdk\Accounting\Invoices;
 use Whity\Sdk\Accounting\Ledger;
 use Whity\Sdk\Accounting\Periods;
 use Whity\Sdk\Accounting\Reports;
+use Whity\Sdk\Accounting\Taxes;
 use Whity\Sdk\Context\AccountingScope;
 use Whity\Sdk\Context\ServiceUnavailable;
 use Whity\Sdk\PluginInterface;
@@ -23,6 +25,8 @@ final class HostAccountingScope implements AccountingScope
 {
     private ?Ledger $ledger = null;
     private ?Accounts $accounts = null;
+
+    private ?Invoices $invoices = null;
 
     public function __construct(private readonly PluginInterface $plugin)
     {
@@ -62,6 +66,24 @@ final class HostAccountingScope implements AccountingScope
     public function reports(): Reports
     {
         return self::resolve(Reports::class);
+    }
+
+    public function invoices(): Invoices
+    {
+        if ($this->invoices === null) {
+            $host = self::resolve(Invoices::class);
+            if (!$host instanceof HostInvoices) {
+                throw ServiceUnavailable::named(Invoices::class);
+            }
+            $this->invoices = $host->for($this->plugin);
+        }
+
+        return $this->invoices;
+    }
+
+    public function taxes(): Taxes
+    {
+        return self::resolve(Taxes::class);
     }
 
     /**
