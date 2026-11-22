@@ -542,6 +542,24 @@ jobs:
           fi
           echo "Bundle identity check passed."
 
+      # whity-org/whity-core#2386: a product that shares an origin with this
+      # image reads the route list from it, so the image must serve one, for
+      # the same core version it reports above.
+      - name: The served bundle must list its routes
+        run: |
+          BODY=$(curl -s --max-time 10 http://localhost:3000/web-build/routes.json)
+          python3 - "$BODY" <<'PY'
+          import json, sys
+          d = json.loads(sys.argv[1])
+          routes = d.get("routes") or []
+          paths = {r["path"] for r in routes}
+          missing = [p for p in ("/login", "/dashboard", "/web-build/routes.json") if p not in paths]
+          if d.get("schema") != 1 or not d.get("core_version") or missing:
+              print(f"::error::/web-build/routes.json is not a usable manifest: schema={d.get('schema')} core_version={d.get('core_version')} missing={missing}")
+              sys.exit(1)
+          print(f"Route manifest check passed: {len(routes)} routes for {d['core_version']}.")
+          PY
+
       # On the same bridge and under the container name `render`, because that
       # is the hostname RENDER_SERVICE_URL defaults to in every compose file —
       # the image is started the way a deployment starts it, not in a shape
