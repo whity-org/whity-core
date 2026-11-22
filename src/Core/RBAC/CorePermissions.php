@@ -548,6 +548,8 @@ final class CorePermissions
     // granted like the invoice slugs.
     public const BILLS_READ = 'bills:read';
     public const BILLS_WRITE = 'bills:write';
+    // A person claims back money they spent (migration 353, WHIT-1318 A3b).
+    public const EXPENSES_SUBMIT = 'expenses:submit';
     // TASKS on Taskaat (A10, T.3). Tasks and boards live in the workspace's
     // Taskaat; these gate Whity's way into them. Read and write go to every
     // staff role (anchor documents:read); manage (connecting the workspace to
@@ -690,6 +692,7 @@ final class CorePermissions
             self::PAYMENTS_WRITE,
             self::BILLS_READ,
             self::BILLS_WRITE,
+            self::EXPENSES_SUBMIT,
             self::FIELDS_MANAGE,
             self::TASKS_READ,
             self::TASKS_WRITE,

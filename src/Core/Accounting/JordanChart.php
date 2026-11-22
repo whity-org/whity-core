@@ -34,6 +34,7 @@ final class JordanChart
         '1000' => [null, 'asset', 'other', true, null, true, 'What we own', 'الأصول'],
         '1100' => ['1000', 'asset', 'cash', false, 'cash', true, 'Cash', 'الصندوق'],
         '1110' => ['1000', 'asset', 'bank', false, 'bank', true, 'Bank', 'البنك'],
+        '1120' => ['1000', 'asset', 'cash', false, 'petty_cash', true, 'Petty cash', 'النثرية'],
         '1150' => ['1000', 'asset', 'current_asset', false, 'cheques_to_collect', true, 'Cheques to collect', 'شيكات برسم التحصيل'],
         '1160' => ['1000', 'asset', 'current_asset', false, 'provider_clearing', true, 'Money at payment providers', 'أموال لدى مزودي الدفع'],
         '1200' => ['1000', 'asset', 'receivable', false, 'receivable', false, 'Customers owe us', 'الذمم المدينة'],

@@ -63,6 +63,7 @@ final class PermissionAreas
         'invoices' => ['invoices', 'Invoices', self::GROUP_WORKSPACE],
         'payments' => ['payments', 'Payments', self::GROUP_WORKSPACE],
         'bills' => ['bills', 'Supplier bills', self::GROUP_WORKSPACE],
+        'expenses' => ['expenses', 'Expense claims', self::GROUP_WORKSPACE],
         'fields' => ['fields', 'Your own fields', self::GROUP_PEOPLE],
         'tasks' => ['tasks', 'Tasks and boards', self::GROUP_PEOPLE],
         'time_windows' => ['time_windows', 'Time windows', self::GROUP_DOCUMENTS],
