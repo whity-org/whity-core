@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.158.0",
+    "sdk_version": "1.159.0",
     "core_version": "0.2.31",
     "updated": "2026-11-22",
     "ratings": {
@@ -168,12 +168,15 @@
                 {
                     "what": "Expense claims: Invoice::$claimantProfileId on a claim (a bill from the person who paid) and the accounting.expense.claimed event",
                     "since": "1.158"
+                },
+                {
+                    "what": "Stock in the books: core accounting implements Contribute\\WorkspaceAccountingExport and posts each stock batch to the stock journal, on by default with a switch",
+                    "since": "1.159"
                 }
             ],
             "missing": [
                 "Filing expense claims and petty cash spends through the SDK (API-only); bills matched to stock receipts (A4); cheques through the SDK (deposit and bounce are API-only)",
                 "Aged receivables and the customer statement through Reports (API-only until A5)",
-                "Stock in the books through the accounting-export point (A4)",
                 "Profit and loss, balance sheet and aged reports (A5)",
                 "Tax packs, bank feeds, currency rates and reports as extension points (A6, A7)"
             ],
@@ -245,13 +248,17 @@
                 {
                     "what": "Events sales.quote.sending (filter, can veto) and sales.quote.created, sent, accepted, declined, expired, converted and cancelled",
                     "since": "1.132"
+                },
+                {
+                    "what": "Contribute\\WorkspaceAccountingExport: each posted stock batch, as an Inventory\\StockPosting with its moves, places, branches and values at core's moving average cost, goes to the one export bound in the container, inside the stock transaction (core accounting is the default)",
+                    "since": "1.159"
                 }
             ],
             "missing": [
                 "Reorder levels and reasons as SDK services (they are on the API and MCP)",
                 "Sales orders and reservations (P5); supplier prices as an SDK service (they are on the API and MCP)",
                 "Scanning GS1 barcodes and batch labels (P4b)",
-                "Costing, accounting export, operation kinds, item fields, barcode parsers and price lists as extension points (P7)"
+                "A costing-method extension point (FIFO, standard cost): core keeps the moving average only"
             ],
             "security": "Reads are trusted to the plugin. Writes check the acting person's permissions like the routes do, and a plugin's moves are named by the host, never by the plugin.",
             "plan": "later"

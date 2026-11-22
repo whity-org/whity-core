@@ -62,7 +62,7 @@ final class AccountingApiHandlerRealEngineTest extends TestCase
     {
         $byRoute = [];
         foreach (AccountingApiSchemas::routes() as $route) {
-            if (self::isInvoiceRoute($route['path']) || self::isPaymentRoute($route['path']) || self::isBillRoute($route['path']) || self::isExpenseRoute($route['path'])) {
+            if (self::isInvoiceRoute($route['path']) || self::isPaymentRoute($route['path']) || self::isBillRoute($route['path']) || self::isExpenseRoute($route['path']) || self::isStockRoute($route['path'])) {
                 continue;
             }
             $byRoute[$route['method'] . ' ' . $route['path']] = $route['requiredPermission'];
@@ -211,6 +211,28 @@ final class AccountingApiHandlerRealEngineTest extends TestCase
         }
     }
 
+    public function testEveryStockRouteDeclaresItsPermission(): void
+    {
+        $byRoute = [];
+        foreach (AccountingApiSchemas::routes() as $route) {
+            if (self::isStockRoute($route['path'])) {
+                $byRoute[$route['method'] . ' ' . $route['path']] = $route['requiredPermission'];
+            }
+        }
+        self::assertCount(4, $byRoute);
+        $index = (string) file_get_contents(dirname(__DIR__, 2) . '/public/index.php');
+        foreach ($byRoute as $route => $permission) {
+            $expected = str_starts_with($route, 'GET ') ? 'accounting:read' : 'accounting:settings';
+            self::assertSame($expected, $permission, $route);
+            [$method, $path] = explode(' ', $route, 2);
+            self::assertMatchesRegularExpression(
+                '#\$router->register\(\'' . $method . '\',\s+\'' . preg_quote($path, '#') . '\',\s+\[\$accountingStockHandler, \'\w+\'\],\s+null, null, CorePermissions::' . ($expected === 'accounting:read' ? 'ACCOUNTING_READ' : 'ACCOUNTING_SETTINGS') . '\);#',
+                $index,
+                $route . ' is registered with its permission'
+            );
+        }
+    }
+
     public function testAManualEntryFromDraftToTheTrialBalance(): void
     {
         TenantContext::setTenantId(1);
@@ -265,6 +287,11 @@ final class AccountingApiHandlerRealEngineTest extends TestCase
     {
         return !self::isBillRoute($path)
             && (str_contains($path, '/payments') || str_contains($path, '/transfers') || str_contains($path, '/aged-receivables') || str_contains($path, '/customers/'));
+    }
+
+    private static function isStockRoute(string $path): bool
+    {
+        return str_contains($path, '/accounting/stock');
     }
 
     private static function isExpenseRoute(string $path): bool

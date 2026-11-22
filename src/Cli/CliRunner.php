@@ -34,6 +34,8 @@ class CliRunner
         // WHIT-1318: account balances recomputed from the ledger, and its hash chain checked.
         'accounting:rebuild-balances' => 'Whity\Cli\Commands\AccountingRebuildBalancesCommand',
         'accounting:verify-chain' => 'Whity\Cli\Commands\AccountingVerifyChainCommand',
+        // WHIT-1318 A4a: stock brought into the books once, at its current cost.
+        'accounting:stock-opening' => 'Whity\Cli\Commands\AccountingStockOpeningCommand',
         // WHIT-1168: the break-glass for a server that signs in only with its identity provider.
         'auth'       => 'Whity\Cli\Commands\AuthCommand',
         // WHIT-1047: every stored secret onto the current key after a rotation.

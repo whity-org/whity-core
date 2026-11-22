@@ -350,6 +350,14 @@
     "en": "Show the trial balance",
     "ar": "عرض ميزان المراجعة"
   },
+  "get_api_accounting_stock": {
+    "en": "Show stock in the books",
+    "ar": "عرض المخزون في الدفاتر"
+  },
+  "get_api_accounting_stock_waiting": {
+    "en": "Stock changes waiting for a cost",
+    "ar": "حركات مخزون بانتظار التكلفة"
+  },
   "get_api_accounting_suppliers_id_statement": {
     "en": "A supplier's statement",
     "ar": "كشف حساب مورد"
@@ -1323,6 +1331,10 @@
     "en": "Change a draft journal entry",
     "ar": "تعديل مسودة قيد"
   },
+  "patch_api_accounting_stock": {
+    "en": "Turn stock in the books on or off",
+    "ar": "تشغيل أو إيقاف المخزون في الدفاتر"
+  },
   "patch_api_accounting_tax_codes_id": {
     "en": "Change a tax code",
     "ar": "تعديل رمز ضريبة"
@@ -1614,6 +1626,10 @@
   "post_api_accounting_petty_cash_spends": {
     "en": "Record a petty cash spend",
     "ar": "تسجيل مصروف من النثرية"
+  },
+  "post_api_accounting_stock_opening": {
+    "en": "Bring stock into the books",
+    "ar": "إدخال المخزون إلى الدفاتر"
   },
   "post_api_accounting_tax_codes": {
     "en": "Add a tax code",

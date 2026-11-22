@@ -192,6 +192,62 @@ final class AccountingApiSchemas
             ...self::paymentRoutes($notFound, $refused),
             ...self::billRoutes($notFound, $refused),
             ...self::expenseRoutes($notFound, $refused),
+            ...self::stockRoutes($notFound, $refused),
+        ];
+    }
+
+    /**
+     * Phase A4a: stock in the books.
+     *
+     * @param array<int, array<string, mixed>> $notFound
+     * @param array<int, array<string, mixed>> $refused
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function stockRoutes(array $notFound, array $refused): array
+    {
+        $tags = ['accounting'];
+        $status = self::data(SchemaBuilder::ref('AccountingStockStatus'));
+
+        return [
+            self::route('GET', '/api/accounting/stock', 'accounting:read', [
+                'summary' => 'Show stock in the books',
+                'description' => 'Whether stock posts to the books, since when, what the stock is worth at its moving average cost and what the Stock account says. Minor units.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('Stock in the books', $status)] + self::auth(),
+            ]),
+            self::route('PATCH', '/api/accounting/stock', 'accounting:settings', [
+                'summary' => 'Turn stock in the books on or off',
+                'description' => 'On by default. Off stops posting stock; on again brings the Stock account to the stock\'s value with the next stock change, or at once with `/stock/opening`.',
+                'tags' => $tags,
+                'request' => 'AccountingStockSwitch',
+                'responses' => [200 => self::json('Stock in the books', $status)] + $refused + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/stock/opening', 'accounting:settings', [
+                'summary' => 'Bring stock into the books now',
+                'description' => 'Values all stock at its current cost and posts what the Stock account lacks against Opening balances, once. Otherwise it happens with the first stock change.',
+                'tags' => $tags,
+                'request' => 'AccountingStockOpening',
+                'responses' => [201 => self::json('What was posted', self::data(self::object([
+                    'posted' => self::bool(),
+                    'entry_id' => self::int(true),
+                    'amount_minor' => self::int() + ['description' => 'What the Stock account was brought up (or down) by.'],
+                    'unknown' => ['type' => 'array', 'items' => self::int(), 'description' => 'Variants with no cost yet, not valued.'],
+                ], ['posted', 'amount_minor', 'unknown'])))] + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/stock/waiting', 'accounting:read', [
+                'summary' => 'Stock changes waiting for a cost',
+                'description' => 'Moves since stock went into the books whose cost is unknown, so they posted nothing.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('Waiting', ['type' => 'object', 'properties' => ['data' => ['type' => 'array', 'items' => self::object([
+                    'move_id' => self::int(),
+                    'variant_id' => self::int(),
+                    'item_name' => self::str(),
+                    'quantity' => self::int(),
+                    'source_type' => self::str(),
+                    'source_id' => self::int(true),
+                    'occurred_at' => self::str(),
+                ], ['move_id', 'variant_id', 'item_name', 'quantity'])]], 'required' => ['data']])] + self::auth(),
+            ]),
         ];
     }
 
@@ -783,7 +839,7 @@ final class AccountingApiSchemas
                 ], ['line_id', 'entry_id', 'number', 'date', 'debit_minor', 'credit_minor', 'balance_minor'])],
                 'next' => ['type' => 'object', 'nullable' => true, 'properties' => ['after_date' => self::str(), 'after_line' => self::int()]],
             ], ['account', 'from', 'to', 'currency', 'opening_minor', 'closing_minor', 'lines', 'next']),
-        ] + self::invoiceComponents($names) + self::paymentComponents() + self::billComponents() + self::expenseComponents();
+        ] + self::invoiceComponents($names) + self::paymentComponents() + self::billComponents() + self::expenseComponents() + self::stockComponents();
     }
 
     /**
@@ -1148,6 +1204,28 @@ final class AccountingApiSchemas
                 'balance_minor' => self::int() + ['description' => 'What is in petty cash, in minor units.'],
                 'currency' => self::str(),
             ], ['account_id', 'code', 'balance_minor', 'currency']),
+        ];
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private static function stockComponents(): array
+    {
+        return [
+            'AccountingStockStatus' => self::object([
+                'stock_in_books' => self::bool(),
+                'since' => self::str(true) + ['description' => 'When stock first posted to the books since it was last turned on.'],
+                'currency' => self::str(),
+                'stock_value_minor' => self::int() + ['description' => 'The stock\'s value at its moving average cost.'],
+                'stock_account_minor' => self::int() + ['description' => 'What the Stock account says.'],
+                'items_without_cost' => self::int(),
+                'waiting' => self::int() + ['description' => 'Stock changes that posted nothing for want of a cost.'],
+            ], ['stock_in_books', 'currency', 'stock_value_minor', 'stock_account_minor']),
+            'AccountingStockSwitch' => self::object([
+                'stock_in_books' => self::bool() + ['description' => 'Whether stock posts to the books.'],
+            ], ['stock_in_books']),
+            'AccountingStockOpening' => self::object([
+                'date' => self::str() + ['description' => 'YYYY-MM-DD, in an open month. Default: today.'],
+            ], []),
         ];
     }
 

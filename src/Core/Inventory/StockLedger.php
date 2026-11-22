@@ -6,9 +6,13 @@ namespace Whity\Core\Inventory;
 
 use Whity\Core\Db\DbBool;
 use Whity\Core\Hooks\HookManager;
+use Whity\Sdk\Contribute\WorkspaceAccountingExport;
 use Whity\Sdk\Hooks\Events;
 use Whity\Sdk\Hooks\HookVetoException;
 use Whity\Sdk\Inventory\Quantity;
+use Whity\Sdk\Inventory\StockPosting;
+use Whity\Sdk\Inventory\StockPostingMove;
+use Whity\Sdk\SdkException;
 
 /**
  * The stock ledger and the levels it adds up to (WHIT-1232, design 31 §3.3,
@@ -59,11 +63,21 @@ final class StockLedger
         private readonly ?HookManager $hooks = null,
         private readonly ?ReasonCatalog $reasons = null,
         ?LotService $lots = null,
+        private readonly ?InventoryCosts $costs = null,
+        ?\Closure $export = null,
     ) {
         $this->lots = $lots ?? new LotService($db);
+        $this->export = $export ?? static function (): ?WorkspaceAccountingExport {
+            $bound = $GLOBALS['whity_services'][WorkspaceAccountingExport::class] ?? null;
+
+            return $bound instanceof WorkspaceAccountingExport ? $bound : null;
+        };
     }
 
     private readonly LotService $lots;
+
+    /** @var \Closure(): ?WorkspaceAccountingExport the bound export to the books (IV.22); none by default */
+    private readonly \Closure $export;
 
     public function lots(): LotService
     {
@@ -170,7 +184,7 @@ final class StockLedger
     {
         $original = $this->db->all(
             'SELECT id, variant_id, lot_id, from_location_id, to_location_id, quantity, entered_unit_id, entered_quantity,
-                    unit_cost_minor, currency, source_type, reverses_move_id
+                    unit_cost_minor, currency, value_minor, source_type, reverses_move_id
                FROM inv_moves WHERE tenant_id = :tenant_id AND batch_key = :batch_key ORDER BY id',
             [':tenant_id' => $tenantId, ':batch_key' => $batchKey]
         );
@@ -200,6 +214,7 @@ final class StockLedger
             'entered_quantity' => InventoryDb::int($m['entered_quantity']),
             'unit_cost_minor' => InventoryDb::int($m['unit_cost_minor']),
             'currency' => is_string($m['currency']) ? $m['currency'] : null,
+            'value_minor' => InventoryDb::int($m['value_minor']),
             'note' => '',
             'reverses_move_id' => (int) $m['id'],
         ], $original);
@@ -329,15 +344,19 @@ final class StockLedger
 
                 $ids = [];
                 $deltas = [];
+                $virtual = $this->virtualIds($tenantId);
+                // IV.18: what each move is worth, from the moving average, before it is written.
+                $values = $this->costs?->value($tenantId, $lines, $virtual) ?? array_fill(0, count($lines), null);
                 foreach ($lines as $i => $line) {
                     $id = $this->db->insert(
                         'INSERT INTO inv_moves (tenant_id, variant_id, lot_id, from_location_id, to_location_id, quantity, entered_unit_id,
-                                entered_quantity, unit_cost_minor, currency, source_type, source_id, source_line_id, reason_code, note, batch_key,
+                                entered_quantity, unit_cost_minor, currency, value_minor, source_type, source_id, source_line_id, reason_code, note, batch_key,
                                 idempotency_key, reverses_move_id, posted_by_profile_id, agent_id, on_behalf_of_profile_id, occurred_at, posted_at)
                          VALUES (:tenant_id, :variant_id, :lot_id, :from_id, :to_id, :quantity, :entered_unit_id,
-                                :entered_quantity, :unit_cost, :currency, :source_type, :source_id, :source_line_id, :reason, :note, :batch_key,
+                                :entered_quantity, :unit_cost, :currency, :value, :source_type, :source_id, :source_line_id, :reason, :note, :batch_key,
                                 :idempotency_key, :reverses, :actor, :agent_id, :on_behalf_of, :occurred_at, CURRENT_TIMESTAMP)',
                         [
+                            ':value' => $values[$i] ?? null,
                             ':tenant_id' => $tenantId, ':variant_id' => $line['variant_id'], ':lot_id' => $line['lot_id'] ?? null,
                             ':from_id' => $line['from_location_id'], ':to_id' => $line['to_location_id'], ':quantity' => $line['steps'],
                             ':entered_unit_id' => $line['entered_unit_id'], ':entered_quantity' => $line['entered_quantity'],
@@ -361,7 +380,6 @@ final class StockLedger
                     }
                 }
 
-                $virtual = $this->virtualIds($tenantId);
                 ksort($deltas, SORT_NATURAL);
                 foreach ($deltas as $d) {
                     if (isset($virtual[$d['location_id']]) || $d['delta'] === 0) {
@@ -378,11 +396,15 @@ final class StockLedger
                 }
 
                 $this->hooks?->dispatch(Events::STOCK_MOVED, $this->movedPayload($tenantId, $actor, $batchKey, $sourceType, $sourceId, $ids));
+                $this->toBooks($tenantId, $actor, $batchKey, $sourceType, $sourceId, $occurredAt);
 
                 return $ids;
             });
         } catch (HookVetoException $e) {
             throw new InventoryRejectedException($e->reason(), 409, ['code' => 'vetoed']);
+        } catch (SdkException $e) {
+            // The books refused the batch (a closed month): the stock move is refused with it.
+            throw new InventoryRejectedException($e->getMessage(), 409, ['code' => 'books']);
         } catch (\PDOException $e) {
             $key = $meta['idempotency_key'] ?? null;
             if (is_string($key) && InventoryDb::isUniqueViolation($e) && ($done = $this->batchByKey($tenantId, $key)) !== null) {
@@ -698,6 +720,53 @@ final class StockLedger
     }
 
     // ── helpers ──────────────────────────────────────────────────────────
+
+    /**
+     * Hands the batch to the export bound to the books (IV.22), inside the
+     * transaction: it throws to refuse the batch.
+     */
+    private function toBooks(int $tenantId, ?int $actor, string $batchKey, string $sourceType, ?int $sourceId, string $occurredAt): void
+    {
+        $export = ($this->export)();
+        if ($export === null) {
+            return;
+        }
+        $moves = $this->db->all(
+            'SELECT m.id, m.variant_id, v.item_id, m.lot_id, m.from_location_id, m.to_location_id, m.quantity, m.value_minor, m.reverses_move_id,
+                    f.virtual_role AS from_role, f.kind AS from_kind, f.ou_id AS from_ou, t.virtual_role AS to_role, t.kind AS to_kind, t.ou_id AS to_ou
+               FROM inv_moves m
+               JOIN inv_variants v ON v.id = m.variant_id AND v.tenant_id = m.tenant_id
+               JOIN inv_locations f ON f.id = m.from_location_id AND f.tenant_id = m.tenant_id
+               JOIN inv_locations t ON t.id = m.to_location_id AND t.tenant_id = m.tenant_id
+              WHERE m.tenant_id = :tenant_id AND m.batch_key = :batch_key ORDER BY m.id',
+            [':tenant_id' => $tenantId, ':batch_key' => $batchKey]
+        );
+        $currency = $this->items->currencyFor($tenantId);
+        $export->record(new StockPosting(
+            $tenantId,
+            $batchKey,
+            $sourceType,
+            $sourceId,
+            substr($occurredAt, 0, 10),
+            $actor,
+            $currency,
+            array_map(static fn (array $m): StockPostingMove => new StockPostingMove(
+                (int) $m['id'],
+                (int) $m['variant_id'],
+                (int) $m['item_id'],
+                InventoryDb::int($m['lot_id']),
+                (int) $m['from_location_id'],
+                (int) $m['to_location_id'],
+                $m['from_kind'] === 'virtual' ? (string) $m['from_role'] : null,
+                $m['to_kind'] === 'virtual' ? (string) $m['to_role'] : null,
+                InventoryDb::int($m['from_ou']),
+                InventoryDb::int($m['to_ou']),
+                (int) $m['quantity'],
+                InventoryDb::int($m['value_minor']),
+                InventoryDb::int($m['reverses_move_id']),
+            ), $moves),
+        ));
+    }
 
     /** @return array<int, true> */
     private function virtualIds(int $tenantId): array
