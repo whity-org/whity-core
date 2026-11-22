@@ -141,6 +141,9 @@ final class SettingsRegistryTest extends TestCase
              'calendar.walkins_enabled',
              'app.installable',
             'navigation.hidden_ids',
+            'navigation.home_path',
+            'navigation.back_to_product_url',
+            'navigation.back_to_product_label',
              'website.plans',
              'website.contact_workspace',
              // WHIT-1035: customer sign-up, moved from workspace_signup_settings.
@@ -517,7 +520,8 @@ final class SettingsRegistryTest extends TestCase
         // 159 since WHIT-1318 A2a: accounting.invoice_route_template_id, _payment_terms_days and prices_include_tax.
         // 160 since WHIT-1318 A3a: accounting.bill_route_template_id.
         // 161 since #2386: navigation.hidden_ids.
-        self::assertCount(161, $describe);
+        // 164 since #2386: navigation.home_path and the back-to-product link.
+        self::assertCount(164, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

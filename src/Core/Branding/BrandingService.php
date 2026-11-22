@@ -91,6 +91,8 @@ final class BrandingService
             ),
             builtOnWhity: $this->showsBuiltOnWhity($tenantId),
             currency: self::currencyFrom($values[SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? ''),
+            homePath: \Whity\Core\Navigation\HomeLinks::homePath($this->settings),
+            backToProduct: \Whity\Core\Navigation\HomeLinks::backToProduct($this->settings),
         );
     }
 

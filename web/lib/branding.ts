@@ -4,6 +4,7 @@ import { cookies, headers } from 'next/headers';
 import { backendUrl } from '@/lib/backend-url';
 import { trustedForwardedHostFrom } from '@/lib/trusted-client-ip';
 import { brandThemeCss } from '@/lib/brand-theme-css';
+import { DEFAULT_HOME_PATH, parseBackToProduct, safeHomePath, type BackToProduct } from '@/lib/home-path';
 
 export type Branding = {
   siteName: string;
@@ -17,6 +18,10 @@ export type Branding = {
    * amounts start in when a screen has no row of its own. Absent means USD.
    */
   currency?: string;
+  /** #2386: where people land after signing in and where home links go. */
+  homePath?: string;
+  /** #2386: the sidebar's link back to the product Whity runs beside. */
+  backToProduct?: BackToProduct | null;
 };
 
 const FALLBACK: Branding = {
@@ -25,6 +30,8 @@ const FALLBACK: Branding = {
   logoSquareUrl: null,
   faviconUrl: null,
   builtOnWhity: true,
+  homePath: DEFAULT_HOME_PATH,
+  backToProduct: null,
 };
 
 /**
@@ -71,6 +78,8 @@ export const getBranding = cache(async (): Promise<Branding> => {
     faviconUrl: typeof d.faviconUrl === 'string' ? d.faviconUrl : null,
     builtOnWhity: d.builtOnWhity !== false,
     currency: typeof d.currency === 'string' && /^[A-Z]{3}$/.test(d.currency) ? d.currency : undefined,
+    homePath: safeHomePath(d.homePath),
+    backToProduct: parseBackToProduct(d.backToProduct),
   };
 });
 

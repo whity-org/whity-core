@@ -18,11 +18,10 @@ import { Icon, type IconName } from '@whity/ui/icon';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@whity/ui/sheet';
 import { useTranslation } from '@whity/features/i18n';
 import { useShellNav } from '@/components/shell/use-shell-nav';
+import { useHomePath } from '@/lib/branding-context';
 
 /** The More page: the sidebar's groups as a list (PW.2). */
 export const MORE_PATH = '/more';
-
-const HOME_PATH = '/dashboard';
 
 interface CreateTile {
   id: string;
@@ -39,12 +38,14 @@ export function PhoneNav() {
   const pathname = usePathname() ?? '';
   const t = useTranslation('common');
   const { counts, hrefOf } = useShellNav();
+  // #2386: Home is the instance's home page, the dashboard unless the operator chose another.
+  const homePath = useHomePath();
   const [createOpen, setCreateOpen] = useState(false);
 
   const countLabel = (count: number) =>
     t('sidebar.count.waiting', '{count} waiting').replace('{count}', String(count));
 
-  const homeHref = hrefOf('dashboard') ?? HOME_PATH;
+  const homeHref = homePath;
   const inboxHref = hrefOf('inbox');
   const chatHref = hrefOf('chat');
 

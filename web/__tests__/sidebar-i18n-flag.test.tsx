@@ -36,12 +36,16 @@ jest.mock('@/lib/navigation-context', () => ({
   useNavigation: () => ({ items: [], refresh: jest.fn() }),
 }));
 
+let mockHomePath = '/dashboard';
+let mockBack: { url: string; label: string } | null = null;
 jest.mock('@/lib/branding-context', () => ({
+  useHomePath: () => mockHomePath,
   useBranding: () => ({
     siteName: 'Test',
     logoWideUrl: null,
     logoSquareUrl: null,
     faviconUrl: null,
+    backToProduct: mockBack,
   }),
 }));
 
@@ -153,5 +157,40 @@ describe('sidebar language affordance follows the i18n feature flag', () => {
     // Let the provider settle so its state updates land inside the test.
     await act(async () => {});
     expect(screen.queryByTestId('language-switcher')).not.toBeInTheDocument();
+  });
+});
+
+describe('sidebar home and back-to-product links (#2386)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    global.fetch = jest.fn();
+    mockBackend({ i18nEnabled: false });
+  });
+
+  afterEach(() => {
+    mockHomePath = '/dashboard';
+    mockBack = null;
+  });
+
+  it('makes the logo a link to the instance home page', async () => {
+    mockHomePath = '/admin/x/forms-catalog';
+
+    renderSidebar();
+
+    const home = await screen.findByTestId('sidebar-home-link');
+    expect(home).toHaveAttribute('href', '/admin/x/forms-catalog');
+    expect(home).toHaveAccessibleName('Test: home');
+    expect(screen.queryByTestId('sidebar-back-to-product')).not.toBeInTheDocument();
+  });
+
+  it('adds the back-to-product link when the operator set one', async () => {
+    mockBack = { url: 'https://bakery.example/courses', label: 'Back to Example Bakery' };
+
+    renderSidebar();
+
+    const back = await screen.findByTestId('sidebar-back-to-product');
+    expect(back).toHaveAttribute('href', 'https://bakery.example/courses');
+    expect(back).toHaveTextContent('Back to Example Bakery');
   });
 });

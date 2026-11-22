@@ -32,6 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@whity/ui/card';
 import { Skeleton } from '@whity/ui/skeleton';
 import { useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
+import { useHomePath } from '@/lib/branding-context';
 
 interface Offer {
   id: number;
@@ -50,6 +51,7 @@ export default function OwnershipOfferPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const router = useRouter();
+  const homePath = useHomePath();
   const { addToast } = useToast();
   const { user, switchTenant } = useAuth();
   const dates = useDateDisplay();
@@ -144,7 +146,7 @@ export default function OwnershipOfferPage() {
 
   const back = (
     <Button asChild variant="outline">
-      <Link href="/dashboard">{t('ownershipOffer.back', 'Back to your workspace')}</Link>
+      <Link href={homePath}>{t('ownershipOffer.back', 'Back to your workspace')}</Link>
     </Button>
   );
 

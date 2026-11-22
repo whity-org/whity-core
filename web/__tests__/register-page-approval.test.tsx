@@ -26,6 +26,7 @@ jest.mock('@/lib/toast-context', () => ({
 
 jest.mock('@/lib/branding-context', () => ({
   useBranding: () => ({ siteName: 'Whity', logoWideUrl: null, logoSquareUrl: null, faviconUrl: null }),
+  useHomePath: () => '/dashboard',
 }));
 
 const mockPost = jest.fn();

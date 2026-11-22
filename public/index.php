@@ -6904,7 +6904,7 @@ $workspaceOwnersHandler = new \Whity\Api\WorkspaceOwnersApiHandler(
         $db->getPdo(),
         $auditLogger,
         $hookManager,
-        new \Whity\Core\Tenant\OwnershipNotifier($notificationDispatcher, $brandedEmailSender, $profileEmailRepository, $frontendUrls->base()),
+        new \Whity\Core\Tenant\OwnershipNotifier($notificationDispatcher, $brandedEmailSender, $profileEmailRepository, $frontendUrls, $settingsService),
     ),
     $tokenValidator,
     $gatedApproval,

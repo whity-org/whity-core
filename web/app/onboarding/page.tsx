@@ -30,6 +30,7 @@ import {
   type RegistryEntry,
   type SettingsMap,
 } from '../(protected)/admin/settings/settings-shared';
+import { useHomePath } from '@/lib/branding-context';
 
 /**
  * First-run onboarding wizard (WC-2b9d4f6a, WC-onboarding-full-setup).
@@ -387,6 +388,7 @@ const STEP_GUIDES: Record<string, StepGuideContent> = {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const homePath = useHomePath();
   const { isLoading: authLoading, user } = useAuth();
   const { hasPermission, loading: capsLoading } = useCapabilities();
   const t = useTranslation('onboarding');
@@ -436,7 +438,7 @@ export default function OnboardingPage() {
             )}
           </p>
           <Button asChild variant="outline">
-            <Link href="/dashboard">{t('denied.dashboard', 'Go to dashboard')}</Link>
+            <Link href={homePath}>{t('denied.dashboard', 'Go to dashboard')}</Link>
           </Button>
         </div>
       </div>

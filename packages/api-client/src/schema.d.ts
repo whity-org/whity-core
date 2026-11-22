@@ -16338,6 +16338,13 @@ export interface components {
             builtOnWhity?: boolean;
             /** @description The workspace currency as an ISO 4217 code (billing.default_currency; USD by default). Amounts with a currency of their own show in that one. */
             currency?: string;
+            /** @description Where people land after signing in and where home links go: a path on this site (navigation.home_path, else WHITY_HOME_PATH, else /dashboard). */
+            homePath?: string;
+            /** @description A link at the top of the sidebar back to the product Whity runs beside (navigation.back_to_product_url and _label, else WHITY_BACK_TO_PRODUCT_URL and _LABEL), or null for none. */
+            backToProduct?: {
+                url: string;
+                label: string;
+            } | null;
         };
         BrandingHostReadResponse: {
             data: {

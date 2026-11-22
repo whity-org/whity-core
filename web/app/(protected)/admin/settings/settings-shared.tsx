@@ -576,6 +576,27 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Menu items and settings pages to remove from this installation, separated by commas: a menu item by its id, such as calendar or plugin-reports, and a settings page as settings.<id>, such as settings.sso. They leave every menu, and their pages open as not found. Permissions do not change. The WHITY_HIDDEN_NAV_IDS setting of the server hides more; it cannot be undone here.'
       ),
     },
+    'navigation.home_path': {
+      label: t('settings.meta.navigation.home_path.label', 'Home page'),
+      help: t(
+        'settings.meta.navigation.home_path.help',
+        'Where people land after signing in, and where the logo and every home link go: a path on this site, such as /dashboard or /admin/x/forms-catalog. Leave it empty for the WHITY_HOME_PATH setting of the server, or the dashboard.'
+      ),
+    },
+    'navigation.back_to_product_url': {
+      label: t('settings.meta.navigation.back_to_product_url.label', 'Back to your product: address'),
+      help: t(
+        'settings.meta.navigation.back_to_product_url.help',
+        'Adds a link at the top of the sidebar, for when Whity runs beside your own app: a path on this site, such as /, or an https:// address. Leave it empty for no link.'
+      ),
+    },
+    'navigation.back_to_product_label': {
+      label: t('settings.meta.navigation.back_to_product_label.label', 'Back to your product: label'),
+      help: t(
+        'settings.meta.navigation.back_to_product_label.help',
+        'The words on that link, such as Back to Example Bakery. Up to 60 characters.'
+      ),
+    },
     'website.plans': {
       label: t('settings.meta.website.plans.label', 'Plans on the website'),
       help: t(
@@ -713,9 +734,9 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
       title: t('settings.section.pages.title', 'Pages'),
       description: t(
         'settings.section.pages.description',
-        'Remove pages from this installation, for example when Whity runs beside another app that does the same job.'
+        'Where people land, the way back to your own app, and the pages this installation leaves out, for when Whity runs beside another app.'
       ),
-      keys: ['navigation.hidden_ids'],
+      keys: ['navigation.home_path', 'navigation.back_to_product_url', 'navigation.back_to_product_label', 'navigation.hidden_ids'],
     },
     {
       id: 'plugin-store',

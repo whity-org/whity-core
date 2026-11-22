@@ -916,6 +916,21 @@ final class SettingsRegistry
      */
     public const NAVIGATION_HIDDEN_IDS = 'navigation.hidden_ids';
 
+    /**
+     * Where people land after signing in and where every home link goes, a
+     * path on this site (#2386). Empty: WHITY_HOME_PATH, else /dashboard.
+     * GLOBAL-ONLY. See {@see \Whity\Core\Navigation\HomeLinks}.
+     */
+    public const NAVIGATION_HOME_PATH = 'navigation.home_path';
+
+    /**
+     * An optional link at the top of the sidebar back to the product Whity
+     * runs beside (#2386): a path on this site or an https address, and its
+     * label. Empty: WHITY_BACK_TO_PRODUCT_URL / _LABEL, else no link.
+     */
+    public const NAVIGATION_BACK_TO_PRODUCT_URL = 'navigation.back_to_product_url';
+    public const NAVIGATION_BACK_TO_PRODUCT_LABEL = 'navigation.back_to_product_label';
+
     // Customer sign-up for one workspace (WHIT-915, #1872), kept in the
     // workspace_signup_settings table until WHIT-1035 folded it in here. Set on
     // the workspace's own Customer sign-up screen (signup:manage), which checks
@@ -1149,6 +1164,10 @@ final class SettingsRegistry
         self::APP_INSTALLABLE,
         // Hidden pages are the installation's shape, not one workspace's (#2386).
         self::NAVIGATION_HIDDEN_IDS,
+        // Where home is, and the way back to the product (#2386).
+        self::NAVIGATION_HOME_PATH,
+        self::NAVIGATION_BACK_TO_PRODUCT_URL,
+        self::NAVIGATION_BACK_TO_PRODUCT_LABEL,
         // The operator's own website; no workspace has one of these.
         self::WEBSITE_PLANS,
         self::WEBSITE_CONTACT_WORKSPACE,
@@ -1557,6 +1576,10 @@ final class SettingsRegistry
         self::APP_INSTALLABLE => 'true',
         // Empty: every page is in the menus. See NAVIGATION_HIDDEN_IDS.
         self::NAVIGATION_HIDDEN_IDS => '',
+        // Empty: the environment, else /dashboard and no back link. See HomeLinks.
+        self::NAVIGATION_HOME_PATH => '',
+        self::NAVIGATION_BACK_TO_PRODUCT_URL => '',
+        self::NAVIGATION_BACK_TO_PRODUCT_LABEL => '',
         // Empty: the plans page shows the active plans as they are, and the
         // contact form is off until a workspace is named.
         self::WEBSITE_PLANS => '',
@@ -2061,6 +2084,9 @@ final class SettingsRegistry
             self::CALENDAR_WALKINS_ENABLED => self::validateBoolean($value, self::CALENDAR_WALKINS_ENABLED),
             self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
             self::NAVIGATION_HIDDEN_IDS => \Whity\Core\Navigation\HiddenNavIds::validate($value),
+            self::NAVIGATION_HOME_PATH => \Whity\Core\Navigation\HomeLinks::validateHomePath($value),
+            self::NAVIGATION_BACK_TO_PRODUCT_URL => \Whity\Core\Navigation\HomeLinks::validateBackUrl($value),
+            self::NAVIGATION_BACK_TO_PRODUCT_LABEL => \Whity\Core\Navigation\HomeLinks::validateBackLabel($value),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the
             // registry plainly knows were refused as "Unknown setting key" and

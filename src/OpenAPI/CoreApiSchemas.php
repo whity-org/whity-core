@@ -12468,6 +12468,15 @@ final class CoreApiSchemas
                 'builtOnWhity' => ['type' => 'boolean', 'description' => 'Whether this workspace\'s public pages show "Built on Whity". False when its plan removes the credit.'],
                 // CU.4: the workspace currency, so the app writes money in it.
                 'currency' => ['type' => 'string', 'description' => 'The workspace currency as an ISO 4217 code (billing.default_currency; USD by default). Amounts with a currency of their own show in that one.'],
+                // #2386: an instance's home and its way back to the product beside it.
+                'homePath' => ['type' => 'string', 'description' => 'Where people land after signing in and where home links go: a path on this site (navigation.home_path, else WHITY_HOME_PATH, else /dashboard).'],
+                'backToProduct' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'description' => 'A link at the top of the sidebar back to the product Whity runs beside (navigation.back_to_product_url and _label, else WHITY_BACK_TO_PRODUCT_URL and _LABEL), or null for none.',
+                    'properties' => ['url' => self::str(), 'label' => self::str()],
+                    'required' => ['url', 'label'],
+                ],
             ], ['siteName', 'logoWideUrl', 'logoSquareUrl', 'faviconUrl', 'mainColor', 'theme', 'installable']),
             // GET /api/branding — the standard data envelope around Branding.
             'BrandingResponse' => self::dataEnvelope(SchemaBuilder::ref('Branding')),

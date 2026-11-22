@@ -35,6 +35,7 @@ import { SETTINGS_AREA_NAV_IDS, WORKSPACE_PAGE_NAV_IDS } from '@/components/sett
 import { MY_SETTINGS_HREF, WORKSPACE_SETTINGS_MENU_HREF } from '@/lib/settings/my-settings';
 import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
 import { localizedText } from '@whity/ui/localized-text';
+import { useBranding } from '@/lib/branding-context';
 
 /** Nav items the tab bar already holds, and the Settings entry, which More splits in two. */
 const NEVER_HIDDEN = (): boolean => false;
@@ -81,6 +82,7 @@ export default function MorePage() {
   const t = useTranslation('common');
   const ta = useTranslation('auth');
   const router = useRouter();
+  const back = useBranding().backToProduct ?? null;
   const { user, memberships, logout } = useAuth();
   const { items: navItems, isHidden = NEVER_HIDDEN } = useNavigation();
   const { groups: allGroups } = useShellNav();
@@ -110,6 +112,14 @@ export default function MorePage() {
   return (
     <div className="mx-auto flex max-w-xl flex-col gap-5 pb-4">
       <h1 className="text-2xl font-semibold">{t('phoneNav.more', 'More')}</h1>
+
+      {/* #2386: the way back to the product Whity runs beside, as in the sidebar. */}
+      {back && (
+        <a href={back.url} className={`${LIST} ${ROW}`} data-testid="more-back-to-product">
+          <Icon name="chevron-left" size={20} mirror className="text-muted-foreground" />
+          <span className="min-w-0 flex-1 truncate">{back.label}</span>
+        </a>
+      )}
 
       {memberships.length > 1 && (
         <TenantSwitcher memberships={memberships} activeTenantId={user?.tenant_id} collapsed={false} />
