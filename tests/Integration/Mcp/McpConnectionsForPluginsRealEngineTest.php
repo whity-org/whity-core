@@ -98,7 +98,7 @@ final class McpConnectionsForPluginsRealEngineTest extends TestCase
             self::assertStringNotContainsString($jti, (string) $row['metadata']);
             self::assertStringNotContainsString($token, (string) $row['metadata']);
         }
-        self::assertStringContainsString('"by":"owner"', (string) $rows[1]['metadata']);
+        self::assertSame('owner', json_decode((string) $rows[1]['metadata'], true)['by'] ?? null);
     }
 
     public function testEventsNameTheConnectionByIdAndNeverCarryTheToken(): void
