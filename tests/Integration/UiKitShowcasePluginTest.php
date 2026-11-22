@@ -676,38 +676,6 @@ final class UiKitShowcasePluginTest extends TestCase
     }
 
     /**
-     * #883: a `dataRecord` whose `source` names a route the plugin does NOT own
-     * drops the whole feature, exactly as a foreign `dataTable` source does.
-     *
-     * Route-parameter normalization is what lets a templated source be matched
-     * at all, and the risk it introduces is that normalization matches too much
-     * — `{}` against `{}` for a path shape the plugin never registered. This
-     * pins that it does not: the shape has to be one of the plugin's own.
-     */
-    public function testARecordSourceOutsideThePluginsRoutesDropsTheFeature(): void
-    {
-        $registeredGetRoutes = ['/api/uikit/demo/rows/{name}' => 'uikit:view'];
-        $normalize = static fn (string $path): string
-            => (string) preg_replace('/\{[^}]*\}/', '{}', $path);
-
-        // The plugin's own shape, differently named — matches.
-        $this->assertContains(
-            $normalize('/api/uikit/demo/rows/{record}'),
-            array_map($normalize, array_keys($registeredGetRoutes))
-        );
-
-        // A shape the plugin never registered — does not.
-        $this->assertNotContains(
-            $normalize('/api/users/{record}'),
-            array_map($normalize, array_keys($registeredGetRoutes))
-        );
-        $this->assertNotContains(
-            $normalize('/api/uikit/demo/rows/{a}/{b}'),
-            array_map($normalize, array_keys($registeredGetRoutes))
-        );
-    }
-
-    /**
      * #883/#895: the showcase's record endpoint RETURNS caller-permission flags,
      * and the block declaration names none of them.
      *

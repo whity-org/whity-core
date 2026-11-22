@@ -35,3 +35,72 @@ describe('brandThemeCss', () => {
     expect(css).toBe(':root{--primary:#b74c05;}');
   });
 });
+
+describe('brandThemeCss with a theme (WHIT-1225)', () => {
+  it('writes type, shape, density and motion on :root and Higher contrast under data-contrast', () => {
+    const css = brandThemeCss(
+      {
+        light: { primary: '#0b6e74', 'plane-rest': '0 2px 6px 0 #0b6e7440' },
+        dark: { primary: '#5baeb4' },
+        vars: {
+          'font-sans': 'var(--font-ibm-plex-sans), var(--font-ibm-plex-sans-arabic), ui-sans-serif, system-ui, sans-serif',
+          'text-sm': '1rem',
+          'control-h': '44px',
+          'wy-radius-card': '16px',
+          'dur-base': '260ms',
+          'ease-out': 'linear(0, 0.5, 1.012, 1)',
+        },
+      },
+      { light: { 'muted-foreground': '#484848' }, dark: { 'muted-foreground': '#c8c8c8' } },
+    );
+    expect(css).toBe(
+      ':root{--primary:#0b6e74;--plane-rest:0 2px 6px 0 #0b6e7440;' +
+        '--font-sans:var(--font-ibm-plex-sans), var(--font-ibm-plex-sans-arabic), ui-sans-serif, system-ui, sans-serif;' +
+        '--text-sm:1rem;--control-h:44px;--wy-radius-card:16px;--dur-base:260ms;--ease-out:linear(0, 0.5, 1.012, 1);}' +
+        '.dark{--primary:#5baeb4;}' +
+        ':root[data-contrast="high"]{--muted-foreground:#484848;}' +
+        '.dark[data-contrast="high"]{--muted-foreground:#c8c8c8;}',
+    );
+  });
+
+  it('drops unknown variables and values outside their pattern', () => {
+    const css = brandThemeCss({
+      light: {},
+      dark: {},
+      vars: {
+        'font-sans': 'Comic Sans; } body { display:none',
+        'text-sm': '1rem;}',
+        'control-h': '44px',
+        'radius': '0',
+        'ease-out': 'url(x)',
+        'wy-radius-card': 'calc(100%)',
+      },
+    });
+    expect(css).toBe(':root{--control-h:44px;}');
+  });
+
+  it('writes the Cut and morph values only in their own shape (TH.17, TH.18)', () => {
+    const css = brandThemeCss({
+      light: {},
+      dark: {},
+      vars: { 'wy-corner-shape': 'bevel', 'wy-radius-control-pressed': '10px', 'wy-radius-control-selected': 'squircle' },
+    });
+    expect(css).toBe(':root{--wy-corner-shape:bevel;--wy-radius-control-pressed:10px;}');
+    expect(brandThemeCss({ light: {}, dark: {}, vars: { 'wy-corner-shape': 'bevel;}body{x:y' } })).not.toContain('bevel');
+  });
+
+  it('writes a component family’s own corners only for the seven families (TH.21)', () => {
+    const css = brandThemeCss({
+      light: {},
+      dark: {},
+      vars: {
+        'wy-buttons-radius-control': '20px',
+        'wy-cards-corner-shape': 'bevel',
+        'wy-avatars-radius-control': '0px',
+        'wy-tables-radius-card': '1em',
+        'wy-navigation-radius-control-selected': '8px',
+      },
+    });
+    expect(css).toBe(':root{--wy-buttons-radius-control:20px;--wy-cards-corner-shape:bevel;--wy-navigation-radius-control-selected:8px;}');
+  });
+});

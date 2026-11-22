@@ -9,6 +9,7 @@ use Whity\Auth\TotpService;
 use Whity\Auth\TotpStepFloor;
 use Whity\Core\Db\DbBool;
 use Whity\Core\Identity\AuthMethod;
+use Whity\Core\Document\Signing\SigningAttemptLimiter;
 use Whity\Core\Document\Signing\SigningChallengeRepository;
 
 /**
@@ -29,6 +30,12 @@ use Whity\Core\Document\Signing\SigningChallengeRepository;
  * hash of what is being approved instead of a route, with route 0: a code sent
  * to approve one request can't approve another, and the send and try limits
  * are the signing ones.
+ *
+ * Tries are limited per person (#2223) with the signing limiter, so the two
+ * "confirm it's you" checks share one budget: a wrong code holds its slot for
+ * the window, a right one gives it back. Without it, someone holding a stolen
+ * session could guess authenticator codes against a gated approval as fast as
+ * the general API limit allowed.
  */
 class IdentityCheck
 {
@@ -45,6 +52,7 @@ class IdentityCheck
         private readonly SigningChallengeRepository $challenges,
         private readonly ?TotpService $totp = null,
         private readonly ?IdentityCheckMailer $mailer = null,
+        private readonly ?SigningAttemptLimiter $limiter = null,
     ) {
     }
 
@@ -130,6 +138,9 @@ class IdentityCheck
     /**
      * Make the check, using up the code. Returns the method that proved it,
      * or null when the code is wrong, used or expired.
+     *
+     * @throws IdentityCheckThrottledException when this person has tried too many
+     *   codes lately; the code is not checked then.
      */
     public function verify(int $tenantId, int $profileId, string $purpose, ?string $code): ?string
     {
@@ -143,11 +154,21 @@ class IdentityCheck
             return null;
         }
 
+        if ($this->limiter !== null && !$this->limiter->reserve($profileId, null)) {
+            throw new IdentityCheckThrottledException('Too many tries');
+        }
+
         $ok = $method === self::TOTP
             ? $this->totpProves($profileId, $code)
             : $this->challenges->consumeEmailCode($tenantId, $profileId, $code, self::NO_ROUTE, self::key($purpose));
 
-        return $ok ? $method : null;
+        if (!$ok) {
+            // The slot stays taken: a wrong code counts until the window ends.
+            return null;
+        }
+        $this->limiter?->release($profileId, null);
+
+        return $method;
     }
 
     /** The key a purpose's codes and fresh sign-ins are bound to. */

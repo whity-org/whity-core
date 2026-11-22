@@ -59,6 +59,18 @@ final class QueueWorkCommand implements CliCommand
     private \Closure $sleeper;
 
     /**
+     * #2205: the worker's services hold the raw PDO, so `Database`'s own
+     * connection lifetime never rotates it. The worker recycles instead once it
+     * has run that long. Null: never, as when a test injects its own deps.
+     */
+    private ?int $connectionMaxAge = null;
+
+    public function recycleAfterConnectionAge(?int $seconds): void
+    {
+        $this->connectionMaxAge = $seconds;
+    }
+
+    /**
      * @param \Closure(int): void|null $sleeper Idle sleeper (seconds); default sleep(), a no-op in tests.
      */
     public function __construct(
@@ -69,8 +81,16 @@ final class QueueWorkCommand implements CliCommand
     ) {
         $this->logger = $logger ?? new NullLogger();
         if ($repo === null || $runner === null) {
-            $database = Database::connect();
+            // WHIT-1247: every host service a request has, a plugin's job has
+            // too: the web kernel's wiring runs first, and what the worker
+            // builds below is added on top (its own loader, job registry,
+            // hook manager and document services replace the kernel's where
+            // it registers them).
+            // One connection for both, as in a request.
+            $kernel = \Whity\Core\Kernel\HostKernel::boot();
+            $database = $kernel['db'];
             $pdo = $database->getPdo();
+            $this->connectionMaxAge = $database->getMaxLifetimeSeconds() > 0 ? $database->getMaxLifetimeSeconds() : null;
             // A plugin builds its own job handlers and resolves what they need
             // from the host service container — the documented data-access seam.
             // The worker is a bare CLI process that registers nothing, so without
@@ -149,6 +169,19 @@ final class QueueWorkCommand implements CliCommand
                 new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
                 new \Whity\Core\Settings\TenantSettingsRepository($pdo)
             );
+            // WHIT-1243: a plugin's job reads its own secrets and settings here
+            // exactly as its routes do. The worker isn't a BaseCommand, so the
+            // CLI kernel's bindings never reached it, and a job that read a
+            // provider key (Whity Pay's daily renewals) found no store at all.
+            \Whity\register_service(\Whity\Sdk\Secrets\PluginSecrets::class, new \Whity\Core\Plugin\HostPluginSecrets(
+                $pdo,
+                static fn (): \Whity\Core\Security\EncryptedSecretStore => $workerSecrets,
+                $auditLogger,
+            ));
+            \Whity\register_service(\Whity\Sdk\Settings\PluginSettings::class, new \Whity\Core\Plugin\HostPluginSettings(
+                $workerSettings,
+                static fn (): array => $loaded->loader instanceof \Whity\Core\PluginLoader ? $loaded->loader->getPlugins() : [],
+            ));
             $workerLogger = $this->logger;
             $workerMailer = new \Whity\Core\Mail\LazyMailer(static fn (): \Whity\Core\Mail\Mailer => \Whity\Core\Mail\MailerFactory::fromSettings(
                 $workerSettings,
@@ -191,6 +224,7 @@ final class QueueWorkCommand implements CliCommand
                 null,
                 (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
                 $workerSender,
+                \Whity\Core\Usage\UsageLedger::forDatabase($pdo),
             );
             \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messaging);
             \Whity\register_service(\Whity\Sdk\Messaging\CustomerMessages::class, new \Whity\Core\Messaging\HostCustomerMessages(static fn (): \Whity\Core\Messaging\MessagingService => $messaging));
@@ -227,6 +261,18 @@ final class QueueWorkCommand implements CliCommand
             $registry->register(
                 \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob::NAME,
                 new \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob($pdo, static fn (): ?\Whity\Core\PluginLoader => $loaded->loader, $auditLogger, $this->logger),
+                false
+            );
+            // WHIT-1235: batches expiring and expired, told once each. Internal.
+            $registry->register(
+                \Whity\Core\Inventory\LotExpiryJob::NAME,
+                new \Whity\Core\Inventory\LotExpiryJob(
+                    new \Whity\Core\Inventory\LotService(
+                        new \Whity\Core\Inventory\InventoryDb($pdo),
+                        static fn (int $tenantId): array => $workerSettings->effective($tenantId),
+                    ),
+                    $hookManager,
+                ),
                 false
             );
             // WHIT-1153: reminders before a cash payment's cover ends. Internal.
@@ -284,6 +330,7 @@ final class QueueWorkCommand implements CliCommand
                     }
                 });
                 $runner->setWorkspaceActivation($activation);
+                $runner->setAfterJob($kernel['resetRequest']);
             }
         }
         $this->repo = $repo;
@@ -338,6 +385,10 @@ final class QueueWorkCommand implements CliCommand
 
             if ($opts['maxRuntime'] > 0 && (time() - $startedAt) >= $opts['maxRuntime']) {
                 $this->logger->info('[queue:work] recycling (max-runtime reached)', ['seconds' => time() - $startedAt]);
+                break;
+            }
+            if ($this->connectionMaxAge !== null && (time() - $startedAt) >= $this->connectionMaxAge) {
+                $this->logger->info('[queue:work] recycling (database connection lifetime reached)', ['seconds' => time() - $startedAt]);
                 break;
             }
         }

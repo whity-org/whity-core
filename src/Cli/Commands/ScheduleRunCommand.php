@@ -56,6 +56,19 @@ final class ScheduleRunCommand implements CliCommand
     private ?\Closure $syncPluginSchedules;
     private bool $pluginSchedulesSynced = false;
     private ?SchedulerHeartbeat $heartbeat;
+    private ?GlobalSettingsRepository $globals;
+
+    /**
+     * #2205: the scheduler's repositories hold the raw PDO, so `Database`'s
+     * own connection lifetime never rotates it; the scheduler recycles once it
+     * has run that long. Null: never, as when a test injects its own deps.
+     */
+    private ?int $connectionMaxAge = null;
+
+    public function recycleAfterConnectionAge(?int $seconds): void
+    {
+        $this->connectionMaxAge = $seconds;
+    }
 
     /**
      * @param \Closure(int): void|null $sleeper Idle sleeper (seconds); default sleep(), a no-op in tests.
@@ -71,20 +84,25 @@ final class ScheduleRunCommand implements CliCommand
         ?\Closure $sleeper = null,
         private ?\Whity\Core\Plugin\PluginRecords $pluginRecords = null,
         ?\Closure $syncPluginSchedules = null,
-        ?SchedulerHeartbeat $heartbeat = null
+        ?SchedulerHeartbeat $heartbeat = null,
+        ?GlobalSettingsRepository $globals = null
     ) {
         $this->logger = $logger ?? new NullLogger();
         if ($schedules === null || $queue === null || $store === null || $jobs === null) {
-            $pdo = Database::connect()->getPdo();
+            $database = Database::connect();
+            $pdo = $database->getPdo();
+            $this->connectionMaxAge = $database->getMaxLifetimeSeconds() > 0 ? $database->getMaxLifetimeSeconds() : null;
             $this->pluginRecords ??= new \Whity\Core\Plugin\PluginRecords($pdo);
             $schedules ??= new ScheduledJobRepository($pdo);
             $syncPluginSchedules ??= $this->pluginScheduleSync($schedules);
             $queue ??= new QueueService(new JobRepository($pdo));
             $store ??= new DatabaseSharedStore($pdo);
             $jobs ??= new JobRepository($pdo);
-            $heartbeat ??= new SchedulerHeartbeat(new GlobalSettingsRepository($pdo));
+            $globals ??= new GlobalSettingsRepository($pdo);
+            $heartbeat ??= new SchedulerHeartbeat($globals);
         }
         $this->heartbeat = $heartbeat;
+        $this->globals = $globals;
         $this->syncPluginSchedules = $syncPluginSchedules;
         $this->schedules = $schedules;
         $this->queue = $queue;
@@ -109,6 +127,8 @@ final class ScheduleRunCommand implements CliCommand
 
         while (true) {
             $this->tick($opts['lockTtl'], $opts['retention']);
+            // #2205: nothing resolved during one tick is trusted in the next.
+            \Whity\Auth\RoleChecker::clearCache();
 
             if ($opts['once']) {
                 break;
@@ -117,6 +137,10 @@ final class ScheduleRunCommand implements CliCommand
 
             if ($opts['maxRuntime'] > 0 && (time() - $startedAt) >= $opts['maxRuntime']) {
                 $this->logger->info('[schedule:run] recycling (max-runtime reached)', ['seconds' => time() - $startedAt]);
+                break;
+            }
+            if ($this->connectionMaxAge !== null && (time() - $startedAt) >= $this->connectionMaxAge) {
+                $this->logger->info('[schedule:run] recycling (database connection lifetime reached)', ['seconds' => time() - $startedAt]);
                 break;
             }
         }
@@ -184,6 +208,18 @@ final class ScheduleRunCommand implements CliCommand
         // Built-in retention GC for the durable queue's retained completed jobs.
         $pruned = $this->jobs->pruneCompleted($retentionSeconds);
 
+        // WHIT-1229 (WHIT-315): expired shared-store rows. prune() existed but
+        // nothing called it, and several counters are keyed by the minute, hour
+        // or day (push budgets, alert and summary e-mails), so every elapsed
+        // window stayed in the table for good. One indexed range delete per
+        // tick; a failure must not fail the tick.
+        $storeExpired = 0;
+        try {
+            $storeExpired = $this->store->prune();
+        } catch (\Throwable $e) {
+            $this->logger->error('[schedule:run] shared store prune failed', ['error' => $e->getMessage()]);
+        }
+
         // S.7: uninstalled plugins whose 30 days are over. Once an hour is plenty,
         // and the queue worker does it because that's where plugin code is loaded.
         if ($this->pluginRecords !== null && $this->pluginRecords->dueRemovals() !== []) {
@@ -202,12 +238,37 @@ final class ScheduleRunCommand implements CliCommand
             ]);
         }
 
+        // #2206: core's own subscription billing (once an hour) and dunning
+        // (once a day), only where the operator turned local billing on. Off by
+        // default: workspace subscriptions belong to Whity Pay, and these runs
+        // issue invoices and lock tenants. Both runs are safe to repeat; the
+        // keys keep it to one job per hour and per day.
+        if ($this->localBillingEnabled()) {
+            $this->queue->dispatch(\Whity\Core\Billing\Jobs\RunSubscriptionBillingJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'billing-run-' . $now->format('YmdH'),
+            ]);
+            $this->queue->dispatch(\Whity\Core\Billing\Jobs\RunDunningJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'billing-dunning-' . $now->format('Ymd'),
+            ]);
+        }
+
         // WHIT-1153: cash payments about to end, once an hour; each payment's
         // reminder goes out once.
         if ((int) $now->format('i') === 0) {
             $this->queue->dispatch(\Whity\Core\Billing\Cash\CashRemindersJob::NAME, [], [
                 'tenant_id' => 0,
                 'idempotency_key' => 'billing-cash-reminders-' . $bucket,
+            ]);
+        }
+
+        // WHIT-1235: batches expiring and expired, once a day at 05:00 UTC;
+        // each batch is told once.
+        if ($now->format('H:i') === '05:00') {
+            $this->queue->dispatch(\Whity\Core\Inventory\LotExpiryJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'inventory-lot-expiry-' . $now->format('Ymd'),
             ]);
         }
 
@@ -228,6 +289,23 @@ final class ScheduleRunCommand implements CliCommand
             ]);
         }
 
+        // Section 33 §5: the usage ledger's snapshot meters, once a day. Every
+        // hour tries, and the day's key keeps it to one run.
+        if ((int) $now->format('i') === 0) {
+            $this->queue->dispatch(\Whity\Core\Usage\UsageSnapshotJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'usage-snapshot-' . $now->format('Ymd'),
+            ]);
+        }
+
+        // WHIT-1321: sent quotes past their valid-until date, once an hour.
+        if ((int) $now->format('i') === 0) {
+            $this->queue->dispatch(\Whity\Core\Sales\QuoteExpiryJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'sales-quote-expiry-' . $bucket,
+            ]);
+        }
+
         // WHIT-1013: proof of life, due or not. A failed write must not fail the tick.
         try {
             $this->heartbeat?->beat($now->getTimestamp());
@@ -239,9 +317,25 @@ final class ScheduleRunCommand implements CliCommand
             'bucket'     => $bucket,
             'dispatched' => $dispatched,
             'pruned'     => $pruned,
+            'store_expired' => $storeExpired,
         ]);
 
         return $dispatched;
+    }
+
+    /** #2206: a failed read counts as off, and must not fail the tick. */
+    private function localBillingEnabled(): bool
+    {
+        if ($this->globals === null) {
+            return false;
+        }
+        try {
+            return $this->globals->get(\Whity\Core\Settings\SettingsRegistry::BILLING_LOCAL_RUNS_ENABLED) === 'true';
+        } catch (\Throwable $e) {
+            $this->logger->error('[schedule:run] could not read the local billing setting', ['error' => $e->getMessage()]);
+
+            return false;
+        }
     }
 
     /**

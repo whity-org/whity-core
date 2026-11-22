@@ -7,6 +7,8 @@ use Whity\Core\i18n\TranslationRefresh;
 use Whity\Core\PluginLoader;
 use Whity\Core\Router;
 use Whity\Database\Database;
+use Whity\Database\Migration\Baseline;
+use Whity\Database\Migration\MigrationLint;
 use Whity\Sdk\MigrationInterface;
 use PDO;
 
@@ -54,6 +56,7 @@ use PDO;
  * Usage:
  *   php public/index.php migrate status  - Show migration status
  *   php public/index.php migrate run     - Run pending migrations
+ *   php public/index.php migrate plan    - Show what `run` would do, change nothing
  *   php public/index.php migrate rollback - Rollback last migration
  */
 class MigrationsCommand implements CommandHelp, CliCommand
@@ -124,7 +127,10 @@ class MigrationsCommand implements CommandHelp, CliCommand
 
             return match ($action) {
                 'status' => $this->status(),
-                'run' => $this->run(),
+                'run' => in_array('--dry-run', $argv, true)
+                    ? $this->plan()
+                    : $this->run(in_array('--no-baseline', $argv, true)),
+                'plan' => $this->plan(),
                 'rollback' => $this->dispatchRollback($argv),
                 '--help', '-h', 'help' => $this->showHelp(),
                 default => $this->unknownAction($action),
@@ -285,13 +291,33 @@ class MigrationsCommand implements CommandHelp, CliCommand
         }
     }
 
-    private function run(): int
+    private function run(bool $noBaseline = false): int
     {
         // WC-214: reset the malformed-plugin flag per action (see status()),
         // so it reflects only the plugins collected during THIS run.
         $this->malformedPluginEncountered = false;
 
+        $runStart = microtime(true);
+        $current = null;
+        $currentStart = $runStart;
+        $count = 0;
+
         try {
+            $this->applySessionTimeouts();
+
+            echo "\n\033[1;33mRunning migrations...\033[0m\n";
+
+            // A fresh database takes the schema baseline: every migration up
+            // to its number in one step (see Baseline). Checked BEFORE the
+            // tracking table is made, and only on an empty database, so an
+            // existing install never gets here.
+            $baselined = 0;
+            if (!$noBaseline) {
+                $current = 'the schema baseline';
+                $currentStart = microtime(true);
+                $baselined = $this->loadBaselineIfFresh();
+            }
+
             // Ensure the migration tracking table exists BEFORE running any
             // migration. Without this, the earliest migrations (which run before
             // the table-creating migration) execute successfully but their
@@ -301,16 +327,15 @@ class MigrationsCommand implements CommandHelp, CliCommand
 
             $executed = $this->getExecutedMigrations();
             $files = $this->getMigrationFiles();
-            $count = 0;
-
-            echo "\n\033[1;33mRunning migrations...\033[0m\n";
 
             foreach ($files as $file) {
                 $name = pathinfo($file, PATHINFO_FILENAME);
                 if (!isset($executed[$name])) {
+                    $current = $name;
+                    $currentStart = microtime(true);
                     echo "  Running: $name... ";
-                    $this->executeMigration($file, 'up');
-                    echo "\033[0;32m✓\033[0m\n";
+                    $this->withLockRetry(fn() => $this->executeMigration($file, 'up'));
+                    echo "\033[0;32m✓\033[0m " . self::elapsed($currentStart) . "\n";
                     $count++;
                 }
             }
@@ -319,18 +344,28 @@ class MigrationsCommand implements CommandHelp, CliCommand
             // in plugin load order, each inside its own transaction.
             foreach ($this->pluginMigrations() as $entry) {
                 if (!isset($executed[$entry['record']])) {
+                    $current = $entry['record'];
+                    $currentStart = microtime(true);
                     echo "  Running: {$entry['record']}... ";
-                    $this->executePluginMigration($entry, 'up');
-                    echo "\033[0;32m✓\033[0m\n";
+                    $this->withLockRetry(fn() => $this->executePluginMigration($entry, 'up'));
+                    echo "\033[0;32m✓\033[0m " . self::elapsed($currentStart) . "\n";
                     $count++;
                 }
             }
+            $current = null;
+
+            // SDK 1.152 (#1686): each plugin's installed or upgraded callback,
+            // once per version, now that its migrations have run.
+            $this->runInstallCallbacks();
 
             echo "\n";
-            if ($count === 0) {
+            if ($count === 0 && $baselined === 0) {
                 echo "\033[0;32m✓ All migrations already executed\033[0m\n";
+            } elseif ($baselined > 0) {
+                echo "\033[0;32m✓ Loaded the baseline ({$baselined} migrations) and ran $count more migration(s) in "
+                    . self::elapsed($runStart) . "\033[0m\n";
             } else {
-                echo "\033[0;32m✓ Successfully ran $count migration(s)\033[0m\n";
+                echo "\033[0;32m✓ Successfully ran $count migration(s) in " . self::elapsed($runStart) . "\033[0m\n";
             }
 
             $this->refreshTranslations();
@@ -344,10 +379,267 @@ class MigrationsCommand implements CommandHelp, CliCommand
             }
 
             return 0;
-        } catch (\Exception $e) {
-            echo "\033[0;31m✗ Migration failed: " . $e->getMessage() . "\033[0m\n";
+        } catch (\Throwable $e) {
+            if ($current !== null) {
+                echo "\033[0;31m✗\033[0m " . self::elapsed($currentStart) . "\n";
+            }
+            $this->reportFailure($e, $current, $currentStart, $count, $runStart);
             return 1;
         }
+    }
+
+    /** Tell each loaded plugin it was installed or upgraded; a failure is printed, not fatal. */
+    private function runInstallCallbacks(): void
+    {
+        $callbacks = new \Whity\Core\Plugin\PluginInstallCallbacks($this->db->getPdo());
+        foreach ($this->pluginLoader()->getPlugins() as $plugin) {
+            try {
+                $outcome = $callbacks->run($plugin);
+            } catch (\Throwable) {
+                $outcome = \Whity\Core\Plugin\PluginInstallCallbacks::FAILED;
+            }
+            if ($outcome === \Whity\Core\Plugin\PluginInstallCallbacks::FAILED) {
+                echo "  \033[0;33m! {$plugin->getName()}: its install or upgrade callback failed; it runs again next time\033[0m\n";
+            } elseif ($outcome !== \Whity\Core\Plugin\PluginInstallCallbacks::UNCHANGED) {
+                echo "  {$plugin->getName()} {$plugin->getVersion()}: {$outcome}\n";
+            }
+        }
+    }
+
+    /**
+     * What `run` would do, without changing anything: whether a fresh database
+     * would take the baseline, which migrations would run, and what the
+     * migration lint says about each core one.
+     */
+    private function plan(): int
+    {
+        $this->malformedPluginEncountered = false;
+
+        try {
+            echo "\n\033[1;33mMigration plan (nothing is changed)\033[0m\n";
+
+            $pdo = $this->db->getPdo();
+            $executed = $this->getExecutedMigrations();
+            $baseline = Baseline::fromDirectory($this->baselineDir());
+            $fromBaseline = [];
+
+            if ($baseline !== null && Baseline::isFreshDatabase($pdo)) {
+                $reason = $baseline->unusableBecause($pdo, $this->migrationDir);
+                if ($reason === null) {
+                    echo "  Fresh database: the baseline would create migrations 001 to " . sprintf("%03d", $baseline->through()) . " in one step.\n";
+                    $fromBaseline = array_flip($baseline->migrations());
+                } else {
+                    echo "  Fresh database, but the baseline would not be used: {$reason}.\n";
+                }
+            }
+
+            $lint = MigrationLint::forRepository(dirname(__DIR__, 3));
+            $pending = 0;
+            foreach ($this->getMigrationFiles() as $file) {
+                $name = pathinfo($file, PATHINFO_FILENAME);
+                if (isset($executed[$name]) || isset($fromBaseline[$name])) {
+                    continue;
+                }
+                $pending++;
+                echo "  Would run: {$name}\n";
+                foreach ($lint->lintFile($file) as $finding) {
+                    $colour = $finding['severity'] === 'error' ? '0;31' : '1;33';
+                    echo "    \033[{$colour}m{$finding['severity']}\033[0m [{$finding['rule']}] line {$finding['line']}: {$finding['sql']}\n";
+                }
+            }
+
+            foreach ($this->pluginMigrations() as $entry) {
+                if (!isset($executed[$entry['record']])) {
+                    $pending++;
+                    echo "  Would run: {$entry['record']}\n";
+                }
+            }
+
+            echo "\n";
+            if ($pending === 0 && $fromBaseline === []) {
+                echo "\033[0;32m✓ Nothing to run\033[0m\n";
+            } else {
+                echo "\033[1;33m{$pending} migration(s) would run"
+                    . ($fromBaseline !== [] ? ' after the baseline' : '') . "\033[0m\n";
+            }
+
+            if ($this->sawMalformedPlugin()) {
+                echo "\033[0;31m✗ One or more plugins were malformed (see warnings above)\033[0m\n";
+                return 1;
+            }
+
+            return 0;
+        } catch (\Throwable $e) {
+            echo "\033[0;31m✗ Could not work out the plan: " . $e->getMessage() . "\033[0m\n";
+            return 1;
+        }
+    }
+
+    /** Read through a method: the flag is set inside pluginMigrations(). */
+    private function sawMalformedPlugin(): bool
+    {
+        return $this->malformedPluginEncountered;
+    }
+
+    private function baselineDir(): string
+    {
+        // A test that injects its own migrations gets no baseline unless it
+        // puts one next to them.
+        return $this->injectedMigrationDir !== null
+            ? dirname($this->migrationDir) . '/baseline'
+            : Baseline::defaultDirectory();
+    }
+
+    /**
+     * Load the schema baseline when the database is empty and the baseline
+     * still matches the migrations. Returns how many migrations it stands for
+     * (0 when it wasn't loaded).
+     */
+    private function loadBaselineIfFresh(): int
+    {
+        $baseline = Baseline::fromDirectory($this->baselineDir());
+        $pdo = $this->db->getPdo();
+        if ($baseline === null || !Baseline::isFreshDatabase($pdo)) {
+            return 0;
+        }
+
+        $reason = $baseline->unusableBecause($pdo, $this->migrationDir);
+        if ($reason !== null) {
+            echo "  Fresh database; not using the baseline because {$reason}. Running every migration.\n";
+            return 0;
+        }
+
+        $start = microtime(true);
+        echo "  Fresh database: loading the schema baseline (migrations 001 to " . sprintf("%03d", $baseline->through()) . ")... ";
+        $baseline->apply($this->db, true, $this->migrationDir);
+        echo "\033[0;32m✓\033[0m " . self::elapsed($start) . "\n";
+
+        return count($baseline->migrations());
+    }
+
+    /**
+     * PostgreSQL only: give up on a lock after MIGRATION_LOCK_TIMEOUT (5s)
+     * instead of queueing behind a long transaction — while a DDL statement
+     * waits for its lock, every query on that table waits behind IT — and stop
+     * any one statement after MIGRATION_STATEMENT_TIMEOUT (30min). "0" turns
+     * either off. Each is a PostgreSQL duration: 5s, 500ms, 30min.
+     */
+    private function applySessionTimeouts(): void
+    {
+        $pdo = $this->db->getPdo();
+        if ((string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'pgsql') {
+            return;
+        }
+
+        foreach (['lock_timeout' => ['MIGRATION_LOCK_TIMEOUT', '5s'], 'statement_timeout' => ['MIGRATION_STATEMENT_TIMEOUT', '30min']] as $setting => [$env, $default]) {
+            $value = $_ENV[$env] ?? getenv($env);
+            $value = is_string($value) && trim($value) !== '' ? trim($value) : $default;
+            if (preg_match('/^\d+\s*(ms|s|min|h)?$/', $value) !== 1) {
+                throw new \RuntimeException("{$env} must be a duration such as 5s, 500ms or 30min; got '{$value}'.");
+            }
+            $this->db->exec("SET {$setting} = " . $pdo->quote($value));
+        }
+    }
+
+    /**
+     * Run one migration, retrying it when it gave up waiting for a lock
+     * (SQLSTATE 55P03). Migrations are idempotent, so running one again after
+     * a lock timeout is safe; MIGRATION_LOCK_RETRIES (3) sets how often, with
+     * a growing pause (2s, 4s, 8s) for the other transaction to finish.
+     *
+     * @param callable(): void $migration
+     */
+    private function withLockRetry(callable $migration): void
+    {
+        $retries = (int) ($_ENV['MIGRATION_LOCK_RETRIES'] ?? getenv('MIGRATION_LOCK_RETRIES') ?: 3);
+        for ($attempt = 0; ; $attempt++) {
+            try {
+                $migration();
+                return;
+            } catch (\Throwable $e) {
+                if ($attempt >= $retries || self::sqlState($e) !== '55P03') {
+                    throw $e;
+                }
+                $pause = 2 ** ($attempt + 1);
+                echo "\n    \033[1;33m! Waited too long for a lock; trying again in {$pause}s (attempt "
+                    . ($attempt + 2) . ' of ' . ($retries + 1) . ")\033[0m\n    ";
+                sleep($pause);
+            }
+        }
+    }
+
+    /**
+     * Say what failed, where, after how long, why in plain words where we
+     * know, what state that leaves, and what to do next.
+     */
+    private function reportFailure(\Throwable $e, ?string $migration, float $migrationStart, int $done, float $runStart): void
+    {
+        $state = self::sqlState($e);
+        echo "\n\033[0;31m✗ Migration failed\033[0m\n";
+        if ($migration !== null) {
+            echo "  Migration:  {$migration}\n";
+            echo "  After:      " . self::elapsed($migrationStart) . " (run total " . self::elapsed($runStart) . ")\n";
+        }
+        echo "  Error:      " . self::rootMessage($e) . "\n";
+        if ($state !== null) {
+            echo "  SQLSTATE:   {$state}\n";
+        }
+
+        $hint = match ($state) {
+            '55P03' => 'It waited longer than MIGRATION_LOCK_TIMEOUT for a lock another transaction held, '
+                . 'and kept failing after the retries. Find the long transaction (pg_stat_activity), or run again when it is quieter.',
+            '57014' => 'A statement ran longer than MIGRATION_STATEMENT_TIMEOUT. Batch the change (Backfill::inBatches) '
+                . 'or build the index with SafeIndex::create, or raise the timeout for this run.',
+            '40P01' => 'It deadlocked with another transaction. Running it again usually works.',
+            '42P07', '42701', '42710' => 'Something it creates already exists: the migration is not idempotent. '
+                . 'Use IF NOT EXISTS / ADD COLUMN IF NOT EXISTS (see docs/ops/migrations.md).',
+            '23505' => 'A unique index or constraint found duplicate rows. Clean the data first, in the migration, then add it.',
+            '23502' => 'A NOT NULL column got a NULL. Give the column a DEFAULT, or fill it before setting NOT NULL.',
+            default => null,
+        };
+        if ($hint !== null) {
+            echo "  Why:        {$hint}\n";
+        }
+
+        if ($migration !== null && str_starts_with($migration, self::PLUGIN_PREFIX)) {
+            echo "  State:      plugin migrations run in a transaction, so this one left nothing behind.\n";
+        } elseif ($migration === 'the schema baseline') {
+            echo "  State:      the baseline loads in one transaction; the database is still empty.\n";
+        } elseif ($migration !== null) {
+            echo "  State:      core migrations don't run in one transaction: part of this one may have applied.\n"
+                . "              It is not recorded as run, and migrations are idempotent, so running again is safe.\n";
+        }
+        echo "  Done:       {$done} migration(s) ran and are recorded before this one.\n";
+        echo "  Next:       fix the cause and run `php public/index.php migrate run` again; "
+            . "`migrate plan` shows what is left.\n";
+    }
+
+    private static function sqlState(\Throwable $e): ?string
+    {
+        for ($cur = $e; $cur !== null; $cur = $cur->getPrevious()) {
+            if ($cur instanceof \PDOException) {
+                $code = $cur->errorInfo[0] ?? $cur->getCode();
+                if (is_string($code) && preg_match('/^[0-9A-Z]{5}$/', $code) === 1 && $code !== '00000') {
+                    return $code;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static function rootMessage(\Throwable $e): string
+    {
+        $message = $e->getMessage();
+
+        return trim((string) preg_replace('/\s+/', ' ', $message));
+    }
+
+    private static function elapsed(float $start): string
+    {
+        $ms = (int) round((microtime(true) - $start) * 1000);
+
+        return $ms < 1000 ? "{$ms} ms" : sprintf('%.1f s', $ms / 1000);
     }
 
     /**
@@ -1036,7 +1328,9 @@ class MigrationsCommand implements CommandHelp, CliCommand
         echo "  php public/index.php migrate <action>\n\n";
         echo "\033[1mActions:\033[0m\n";
         echo "  status                              Show migration status (default)\n";
-        echo "  run                                 Run pending migrations\n";
+        echo "  run                                 Run pending migrations (a fresh database loads the baseline)\n";
+        echo "  run --no-baseline                   Replay every migration, even on a fresh database\n";
+        echo "  plan  (or run --dry-run)            Show what run would do, with lint findings; change nothing\n";
         echo "  rollback                            Rollback last migration (LIFO)\n";
         echo "  rollback <MigrationName>            Rollback exactly one named migration\n";
         echo "  rollback --plugin <PluginName>      Rollback all migrations for a plugin\n";

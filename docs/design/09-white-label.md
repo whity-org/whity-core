@@ -9,10 +9,17 @@ A partner sells its own product; Whity stays underneath. The tenant's brand lead
 - The tokens a tenant theme sets: `primary`, `brand`, `ring`, `chart-1`, `primary-tint`, `primary-tint-foreground`, `sidebar-primary`, `sidebar-primary-foreground`, the four plane shadows and `doc-accent` (the colour on printed titles, the same in light and dark), plus `primary-foreground` (white or near-black, whichever reaches 4.5:1). `Whity.tenantTheme(colour, 'light' | 'dark')` returns all of them from one colour; `.wy-theme-partner` in `bundle.css` is the same set written out for the demo tenant (burnt orange `#b74c05`).
 - **Sign-in, emails and documents** carry the tenant's logo and name (`TplAuthSignIn`, the document templates).
 
+## Themes (TH.1–TH.14, 19 Nov 2026)
+
+- **A workspace can apply a theme** from Whity, a plugin or the store, free on every plan. A theme changes colour (one to three seed colours, with overrides), type (a Latin and Arabic pair from the allowed list, for headings and body), shape, density, elevation and motion. See `30-themes.md`.
+- The main colour above is the theme's primary seed, so a workspace that sets only its colour keeps working as before.
+- Making themes, in the live editor, is part of core since 21 Nov 2026 (BM.15, "All into core"); it was planned as paid Whity Studio. Section 30 has the details.
+
 ## What stays
 
-- Greys, status colours, type, shape, layout and components.
-- The plane rules, approvals, scopes and attribution for agents. A partner can't remove them: they protect the partner's own customers.
+- Status colours, layout, components and icons.
+- The rules that protect people: contrast (4.5:1 for text, with automatic fallback), the minimum sizes (A.1, M.5), Arabic and RTL, and print under E.44.
+- The plane rules, approvals, scopes and attribution for agents: a waiting proposal always looks different from approved work, whatever the theme. A partner can't remove them: they protect the partner's own customers.
 
 ## Built on Whity
 

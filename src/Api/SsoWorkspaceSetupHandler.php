@@ -148,7 +148,7 @@ final class SsoWorkspaceSetupHandler
             // moment ago, they now hold an active membership: sign them into it.
             // Otherwise a gate closed (switched off, deactivated, placed
             // somewhere in the meantime) and there is nothing to sign into.
-            $session = $this->auth->completeFederatedLogin($profileId, $email, $request, null);
+            $session = $this->auth->completeFederatedLogin($profileId, $email, $request, null, false);
             if ($session->getStatusCode() === 200) {
                 CookieManager::clearWorkspaceSetupToken();
                 return $session->withHeaders(['Cache-Control' => 'no-store']);
@@ -170,7 +170,7 @@ final class SsoWorkspaceSetupHandler
         }
 
         CookieManager::clearWorkspaceSetupToken();
-        $session = $this->auth->completeFederatedLogin($profileId, $email, $request, null);
+        $session = $this->auth->completeFederatedLogin($profileId, $email, $request, null, false);
 
         return $session->withHeaders(['Cache-Control' => 'no-store']);
     }

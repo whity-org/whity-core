@@ -6,6 +6,7 @@ namespace Tests\Support;
 
 use PDO;
 use Whity\Database\Database;
+use Whity\Database\Migration\Baseline;
 
 /**
  * Loads and runs every production migration file against an in-memory SQLite
@@ -512,6 +513,10 @@ final class SchemaFromMigrations
         $files = $migrations;
         $files = array_merge($files, glob($root . '/database/i18n/*.json') ?: []);
         $files = array_merge($files, glob($root . '/database/i18n/*/*.json') ?: []);
+        // The SQLite path loads the schema baseline instead of replaying the
+        // migrations it stands for, so its files shape the result too.
+        $files = array_merge($files, glob($root . '/database/baseline/*') ?: []);
+        $files[] = $root . '/src/Database/Migration/Baseline.php';
 
         foreach ($migrations as $migration) {
             $code = (string) file_get_contents($migration);
@@ -1388,7 +1393,7 @@ final class SchemaFromMigrations
      * @param PDO $pdo The translating PDO
      * @param Database|null $db Pre-built wrapper; null means build one from $pdo
      */
-    private static function runMigrations(PDO $pdo, ?Database $db = null): void
+    private static function runMigrations(PDO $pdo, ?Database $db = null, bool $useBaseline = true, ?int $through = null): void
     {
         if ($db === null) {
             $db = self::databaseWrapper($pdo);
@@ -1400,7 +1405,22 @@ final class SchemaFromMigrations
         // PHPUnit treats any test-time stdout output as a failure, so silence it.
         ob_start();
         try {
+            // The schema baseline stands for every migration up to its number,
+            // and MigrationBaselineEquivalenceTest proves the two agree, so the
+            // suite runs on the database a fresh install really gets. Its
+            // migrations are NOT recorded as applied, as the replay records none.
+            $after = 0;
+            $baseline = $useBaseline && $through === null ? self::usableSqliteBaseline($pdo) : null;
+            if ($baseline !== null) {
+                $baseline->apply($db, record: false);
+                $after = $baseline->through();
+            }
+
             foreach (self::migrationFiles() as $file) {
+                $number = (int) basename($file);
+                if ($number <= $after || ($through !== null && $number > $through)) {
+                    continue;
+                }
                 $class = self::resolveMigrationClass($file);
                 try {
                     $class::up($db);
@@ -1418,6 +1438,78 @@ final class SchemaFromMigrations
         } finally {
             ob_end_clean();
         }
+    }
+
+    /**
+     * The SQLite schema baseline, when this database may take it: an empty
+     * SQLite database, a baseline whose migrations are unchanged, and no
+     * PHPUNIT_SQLITE_NO_BASELINE=1.
+     */
+    private static function usableSqliteBaseline(PDO $pdo): ?Baseline
+    {
+        $optOut = $_ENV['PHPUNIT_SQLITE_NO_BASELINE'] ?? getenv('PHPUNIT_SQLITE_NO_BASELINE') ?: null;
+        if (is_string($optOut) || (string) $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) !== 'sqlite') {
+            return null;
+        }
+
+        $baseline = Baseline::fromDirectory(dirname(__DIR__, 2) . '/database/baseline');
+        if ($baseline === null || !Baseline::isFreshDatabase($pdo)) {
+            return null;
+        }
+
+        return $baseline->unusableBecause($pdo, dirname(__DIR__, 2) . '/database/migrations') === null
+            ? $baseline
+            : null;
+    }
+
+    /**
+     * A fresh SQLite database with the PostgreSQL-to-SQLite translation, built
+     * by REPLAYING the migrations (no baseline), optionally only up to
+     * `$through`. The baseline generator and the equivalence test use it.
+     */
+    public static function replaySqlite(?int $through = null): PDO
+    {
+        $pdo = self::buildTranslatingPdo(false);
+        self::runMigrations($pdo, null, false, $through);
+
+        return $pdo;
+    }
+
+    /** An empty SQLite database with the translation, and nothing in it. */
+    public static function emptyTranslatingSqlite(): PDO
+    {
+        return self::buildTranslatingPdo(false);
+    }
+
+    /**
+     * An empty PostgreSQL database of its own (dropped like a clone), or null
+     * when PHPUNIT_PG_DSN is not set or databases can't be created.
+     */
+    public static function emptyPostgres(): ?PDO
+    {
+        $dsn = $_ENV['PHPUNIT_PG_DSN'] ?? getenv('PHPUNIT_PG_DSN') ?: null;
+        if (!is_string($dsn)) {
+            return null;
+        }
+        $user     = (string) ($_ENV['PHPUNIT_PG_USER']     ?? getenv('PHPUNIT_PG_USER')     ?: 'whity');
+        $password = (string) ($_ENV['PHPUNIT_PG_PASSWORD'] ?? getenv('PHPUNIT_PG_PASSWORD') ?: 'whity_dev');
+
+        $adminDsn = self::dsnWithDatabase($dsn, 'postgres');
+        if ($adminDsn === null) {
+            return null;
+        }
+
+        $admin = self::pgAdminConnection($adminDsn, $user, $password);
+        self::pruneClones($admin);
+        $name = self::PG_CLONE_PREFIX . bin2hex(random_bytes(8));
+        $admin->exec("CREATE DATABASE \"{$name}\" TEMPLATE template0");
+        self::$pgClones[] = $name;
+        self::registerCloneCleanup();
+
+        return new PDO((string) self::dsnWithDatabase($dsn, $name), $user, $password, [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
     }
 
     /**

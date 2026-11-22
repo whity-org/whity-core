@@ -121,6 +121,15 @@ final class WhityStoreConnectorRealEngineTest extends TestCase
     private function connect(): WhityStoreConnector
     {
         [$connector, $query] = $this->startedConnect();
+        $this->queueToken($query);
+        $connector->complete('the-code', $query['state'], 7);
+
+        return $connector;
+    }
+
+    /** @param array<string, string> $query */
+    private function queueToken(array $query): void
+    {
         $this->replies[self::ISSUER . '/oauth/token'][] = [
             'access_token' => 'access-1',
             'refresh_token' => 'refresh-1',
@@ -134,9 +143,6 @@ final class WhityStoreConnectorRealEngineTest extends TestCase
                 'email' => 'rania@example-bakery.test',
             ]),
         ];
-        $connector->complete('the-code', $query['state'], 7);
-
-        return $connector;
     }
 
     public function testStartRegistersOnceAndAsksForTheStoreResource(): void
@@ -189,6 +195,10 @@ final class WhityStoreConnectorRealEngineTest extends TestCase
             self::assertSame(422, $e->status);
         }
 
+        // WHIT-1304 (#2222): the wrong state did not cancel the connect in
+        // progress; the right one finishes it, and only once.
+        $this->queueToken($query);
+        $connector->complete('the-code', $query['state'], 7);
         $this->expectException(WhityStoreConnectException::class);
         $connector->complete('the-code', $query['state'], 7);
     }
@@ -197,8 +207,19 @@ final class WhityStoreConnectorRealEngineTest extends TestCase
     {
         [$connector, $query] = $this->startedConnect();
 
-        $this->expectException(WhityStoreConnectException::class);
-        $connector->complete('the-code', $query['state'], 8);
+        // WHIT-1304 (#2222): nor can a caller with no person behind it, and
+        // neither refusal cancels the operator's own connect.
+        foreach ([8, null] as $actor) {
+            try {
+                $connector->complete('the-code', $query['state'], $actor);
+                self::fail('only the operator who started may finish');
+            } catch (WhityStoreConnectException $e) {
+                self::assertSame(403, $e->status);
+            }
+        }
+        $this->queueToken($query);
+        $connector->complete('the-code', $query['state'], 7);
+        self::assertNotEmpty(array_filter($this->calls, static fn (array $c): bool => $c[1] === self::ISSUER . '/oauth/token'));
     }
 
     public function testAnExpiredConnectIsRefused(): void
@@ -327,6 +348,52 @@ final class WhityStoreConnectorRealEngineTest extends TestCase
             $allowed = json_decode($handler->allowedStores(new \Whity\Core\Request('GET', '/x', [], ''))->getBody(), true);
             self::assertTrue($allowed['data']['connection']['connected']);
             self::assertStringNotContainsString('access-1', (string) json_encode($allowed));
+        } finally {
+            \Whity\Core\Tenant\TenantContext::reset();
+        }
+    }
+
+    /**
+     * WHIT-1275 (#2242): the connection is the operator's own Whity ID account.
+     * A workspace with plugins:read learns whether the installation is
+     * connected and to which store, never the account; and an installation's
+     * licences are the operator's to read.
+     */
+    public function testAWorkspaceSeesThatTheStoreIsConnectedButNotTheOperatorsAccount(): void
+    {
+        $connector = $this->connect();
+        $pdo = SchemaFromMigrations::make(true);
+        $settings = new \Whity\Core\Settings\SettingsService(
+            new GlobalSettingsRepository($pdo),
+            new \Whity\Core\Settings\TenantSettingsRepository($pdo),
+        );
+        $settings->setGlobal(\Whity\Core\Settings\SettingsRegistry::PLUGINS_STORE_ALLOWED_HOSTS, 'store.whity.test');
+        $handler = new \Whity\Api\InstallFromStoreApiHandler(
+            sys_get_temp_dir() . '/whity_store_connect_' . uniqid(),
+            $settings,
+            null, null, null, null, null, null, null, null,
+            $connector,
+        );
+        $get = static fn (\Whity\Core\Response $r): array => json_decode($r->getBody(), true);
+
+        \Whity\Core\Tenant\TenantContext::reset();
+        try {
+            \Whity\Core\Tenant\TenantContext::setTenantId(7);
+            $connection = $get($handler->connection(new \Whity\Core\Request('GET', '/x', [], '')))['data'];
+            $allowed = $get($handler->allowedStores(new \Whity\Core\Request('GET', '/x', [], '')))['data']['connection'];
+            self::assertSame(['connected' => true, 'store_host' => 'store.whity.test', 'needs_reconnect' => false], $connection);
+            self::assertSame($connection, $allowed);
+            foreach ([$connection, $allowed] as $seen) {
+                self::assertStringNotContainsString('rania', (string) json_encode($seen));
+                self::assertStringNotContainsString(self::ISSUER, (string) json_encode($seen));
+            }
+            self::assertSame(403, $handler->licenceStatus(new \Whity\Core\Request('GET', '/x', [], ''), ['slug' => 'demo'])->getStatusCode());
+
+            \Whity\Core\Tenant\TenantContext::reset();
+            \Whity\Core\Tenant\TenantContext::setTenantId(0);
+            $operator = $get($handler->connection(new \Whity\Core\Request('GET', '/x', [], '')))['data'];
+            self::assertSame('rania@example-bakery.test', $operator['account']['email'], 'the operator sees which account');
+            self::assertSame(200, $handler->licenceStatus(new \Whity\Core\Request('GET', '/x', [], ''), ['slug' => 'demo'])->getStatusCode());
         } finally {
             \Whity\Core\Tenant\TenantContext::reset();
         }

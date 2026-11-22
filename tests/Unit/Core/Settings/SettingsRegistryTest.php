@@ -22,6 +22,7 @@ final class SettingsRegistryTest extends TestCase
             ['site_name', 'timezone', 'locale', 'support_email',
              'branding_logo_wide', 'branding_logo_square', 'branding_favicon',
              'branding_main_color',
+             'branding_theme', 'branding_theme_overrides',
              'mcp.enabled',
              'mcp.always_on_plugin_tools',
              'auth.self_registration_enabled', 'auth.registration_approval_required',
@@ -69,12 +70,12 @@ final class SettingsRegistryTest extends TestCase
              // escalation. The dunning policy is per-tenant, because a
              // deployment chases its enterprise customers differently from its
              // self-service ones.
-             'payments.mock_enabled',
+             'payments.mock_enabled', 'billing.local_runs_enabled',
              // Affiliate clawback is global-only for the same reason: the money
              // goes to somebody outside the company, so no tenant decides it.
              'affiliate.clawback_on_refund', 'affiliate.withholding_bp',
              'dunning.retry_schedule_days', 'dunning.lock_after_days',
-             'plugins.store_allowed_hosts', 'plugins.store_enabled', 'plugins.mcp_prompts_require_mark', 'plugins.billing_email_senders',
+             'plugins.store_allowed_hosts', 'plugins.store_enabled', 'plugins.mcp_prompts_require_mark', 'plugins.store_allow_unsigned', 'plugins.billing_email_senders',
              'documents.render_enabled', 'documents.theme', 'documents.theme_by_kind', 'documents.slot_bindings', 'documents.background_issuing', 'documents.render_max_rows',
              'documents.render_max_pages', 'documents.render_max_template_bytes',
              'documents.flow_max_blocks', 'documents.flow_max_table_rows',
@@ -99,6 +100,8 @@ final class SettingsRegistryTest extends TestCase
              'documents.qr_enabled', 'documents.qr_public_detail',
              // WHIT-920: whether applicants see who reviewed their form.
              'forms.show_reviewer_names',
+             // #1730: whether the public check names who signed. Off.
+             'documents.qr_public_signer_names',
              // #999: how many people a USER GROUP preview SHOWS beside its
              // (always exact) count. Tenant-overridable — see the governance
              // test below for why this one is not operator-only.
@@ -135,13 +138,25 @@ final class SettingsRegistryTest extends TestCase
              'calendar.weekend_days',
              'calendar.instant_booking',
              'calendar.multi_service_booking',
+             'calendar.walkins_enabled',
              'app.installable',
              'website.plans',
              'website.contact_workspace',
              // WHIT-1035: customer sign-up, moved from workspace_signup_settings.
              'signup.mode', 'signup.role_id', 'signup.allowed_domains', 'signup.customer_invites',
              // WHIT-1043.
-             'signup.invites_per_customer', 'signup.route_template_id', 'messaging.webchat_enabled', 'messaging.webchat_greeting', 'messaging.inbound_email_address'],
+             'signup.invites_per_customer', 'signup.route_template_id', 'messaging.webchat_enabled', 'messaging.webchat_greeting', 'messaging.inbound_email_address',
+             // WHIT-1233: inventory approvals and transfers.
+             'inventory.approve_adjustments_above', 'inventory.approve_counts_above', 'inventory.adjustment_route_template_id',
+             'inventory.count_route_template_id', 'inventory.transfers_one_step',
+             // WHIT-1234: purchasing.
+             'inventory.purchase_route_template_id', 'inventory.over_receipt_percent',
+             // WHIT-1235: batches and expiry.
+             'inventory.fefo', 'inventory.expiry_warning_days',
+             // WHIT-1321: quotes.
+             'sales.quote_valid_days', 'sales.quote_route_template_id',
+             // WHIT-1323: the trading emails' switches.
+             'sales.email_quote', 'sales.email_invoice', 'sales.email_receipt', 'sales.email_reminder'],
             SettingsRegistry::keys()
         );
     }
@@ -257,7 +272,7 @@ final class SettingsRegistryTest extends TestCase
         // quieter level must not change what an existing tenant discloses.
         self::assertNull(SettingsRegistry::validate('documents.qr_public_detail', 'undated'));
         self::assertSame(
-            ['undated', 'minimal', 'stage', 'described'],
+            ['undated', 'minimal', 'stage', 'described', 'signed'],
             SettingsRegistry::optionsFor('documents.qr_public_detail')
         );
         // 18: 16 on develop (#1014's quorum was the sixteenth) plus these two.
@@ -310,7 +325,11 @@ final class SettingsRegistryTest extends TestCase
         // 52 since WHIT-966: calendar.instant_booking.
         // 54 since design 3.4 (P1): company.name_ar and company.address_ar.
         // 55 since WHIT-1173: calendar.multi_service_booking.
-        self::assertCount(55, SettingsRegistry::tenantTextKeys());
+        // 57 since WHIT-1225: branding_theme and branding_theme_overrides,
+        // each workspace's own theme (TH.1).
+        // 58 since WHIT-1334: calendar.walkins_enabled.
+        // 59 since #1730: documents.qr_public_signer_names.
+        self::assertCount(59, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -482,7 +501,17 @@ final class SettingsRegistryTest extends TestCase
         // 132 since WHIT-1173: calendar.multi_service_booking.
         // 133 since WHIT-1168: auth.password_sign_in.
         // 135 since WHIT-1203: workspaces.additional_plan and additional_trial_days.
-        self::assertCount(135, $describe);
+        // 137 since WHIT-1225: branding_theme and branding_theme_overrides.
+        // 142 since WHIT-1233: five inventory.* keys.
+        // 144 since WHIT-1234: purchase route and over-receipt.
+        // 145 since WHIT-1308: plugins.store_allow_unsigned.
+        // 146 since #2206: billing.local_runs_enabled.
+        // 148 since WHIT-1321: sales.quote_valid_days and sales.quote_route_template_id.
+        // 152 since WHIT-1323: sales.email_quote, _invoice, _receipt and _reminder.
+        // 154 since WHIT-1235: inventory.fefo and inventory.expiry_warning_days.
+        // 155 since WHIT-1334: calendar.walkins_enabled.
+        // 156 since #1730: documents.qr_public_signer_names.
+        self::assertCount(156, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
@@ -679,6 +708,9 @@ final class SettingsRegistryTest extends TestCase
         self::assertSame('false', SettingsRegistry::defaultFor('plugins.mcp_prompts_require_mark'));
         self::assertNull(SettingsRegistry::validate('plugins.mcp_prompts_require_mark', 'true'));
         self::assertNotNull(SettingsRegistry::validate('plugins.mcp_prompts_require_mark', 'yes'));
+        // WHIT-1308: unsigned store packages stay refused until the operator says otherwise.
+        self::assertSame('false', SettingsRegistry::defaultFor('plugins.store_allow_unsigned'));
+        self::assertNotNull(SettingsRegistry::validate('plugins.store_allow_unsigned', 'yes'));
     }
 
     public function testPluginsStoreAllowedHostsIsGlobalOnlyFreeformDefaultWhityStore(): void

@@ -27,6 +27,9 @@ final class DisplayPreferencesApiHandler
 
     private const ANIMATIONS = ['full', 'calm', 'off'];
 
+    /** WHIT-1225 (TH.12): Higher contrast, whatever the workspace's theme. */
+    private const CONTRASTS = ['standard', 'high'];
+
     public function __construct(
         private readonly TokenValidator $tokenValidator,
         private readonly PDO $db,
@@ -68,7 +71,8 @@ final class DisplayPreferencesApiHandler
         $textSize = $body['textSize'] ?? null;
         $technical = $body['showTechnicalDetails'] ?? null;
         $animations = $body['animations'] ?? null;
-        if ($textSize === null && $technical === null && $animations === null) {
+        $contrast = $body['contrast'] ?? null;
+        if ($textSize === null && $technical === null && $animations === null && $contrast === null) {
             return Response::error('Nothing to change', 422);
         }
         if ($textSize !== null && !in_array($textSize, self::TEXT_SIZES, true)) {
@@ -79,6 +83,9 @@ final class DisplayPreferencesApiHandler
         }
         if ($animations !== null && !in_array($animations, self::ANIMATIONS, true)) {
             return Response::error('animations must be full, calm or off', 422);
+        }
+        if ($contrast !== null && !in_array($contrast, self::CONTRASTS, true)) {
+            return Response::error('contrast must be standard or high', 422);
         }
 
         // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
@@ -98,17 +105,22 @@ final class DisplayPreferencesApiHandler
             $stmt = $this->db->prepare('UPDATE profiles SET animations = ? WHERE id = ?');
             $stmt->execute([$animations, $profileId]);
         }
+        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+        if ($contrast !== null) {
+            $stmt = $this->db->prepare('UPDATE profiles SET contrast = ? WHERE id = ?');
+            $stmt->execute([$contrast, $profileId]);
+        }
 
         return Response::json(['data' => $this->read($profileId)], 200);
     }
 
     /**
-     * @return array{textSize: string, showTechnicalDetails: bool, animations: string}|null
+     * @return array{textSize: string, showTechnicalDetails: bool, animations: string, contrast: string}|null
      */
     private function read(int $profileId): ?array
     {
         // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
-        $stmt = $this->db->prepare('SELECT text_size, show_technical_details, animations FROM profiles WHERE id = ? LIMIT 1');
+        $stmt = $this->db->prepare('SELECT text_size, show_technical_details, animations, contrast FROM profiles WHERE id = ? LIMIT 1');
         $stmt->execute([$profileId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!is_array($row)) {
@@ -119,6 +131,7 @@ final class DisplayPreferencesApiHandler
             'textSize'             => in_array($row['text_size'], self::TEXT_SIZES, true) ? (string) $row['text_size'] : 'standard',
             'showTechnicalDetails' => filter_var($row['show_technical_details'], FILTER_VALIDATE_BOOLEAN),
             'animations'           => in_array($row['animations'], self::ANIMATIONS, true) ? (string) $row['animations'] : 'full',
+            'contrast'             => in_array($row['contrast'] ?? null, self::CONTRASTS, true) ? (string) $row['contrast'] : 'standard',
         ];
     }
 

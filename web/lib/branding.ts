@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { backendUrl } from '@/lib/backend-url';
+import { trustedForwardedHostFrom } from '@/lib/trusted-client-ip';
 import { brandThemeCss } from '@/lib/brand-theme-css';
 
 export type Branding = {
@@ -40,12 +41,13 @@ export const fetchBranding = cache(async (): Promise<Record<string, unknown> | n
       .getAll()
       .map((c) => `${c.name}=${c.value}`)
       .join('; ');
-    const host = h.get('x-forwarded-host') ?? h.get('host') ?? '';
+    // Never the browser's own X-Forwarded-Host (WHIT-1295, #2195).
+    const host = trustedForwardedHostFrom(h);
 
     const res = await fetch(`${backendUrl()}/api/v1/branding`, {
       headers: {
         cookie: cookieHeader,
-        'X-Forwarded-Host': host,
+        ...(host !== null ? { 'X-Forwarded-Host': host } : {}),
       },
       cache: 'no-store',
     });
@@ -75,5 +77,5 @@ export const getBranding = cache(async (): Promise<Branding> => {
 /** The main colour's CSS for this request's workspace (see brandThemeCss). */
 export const getBrandThemeCss = cache(async (): Promise<string> => {
   const d = await fetchBranding();
-  return d ? brandThemeCss(d.theme) : '';
+  return d ? brandThemeCss(d.theme, d.themeHigh) : '';
 });

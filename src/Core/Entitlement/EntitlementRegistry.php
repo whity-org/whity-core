@@ -126,7 +126,10 @@ final class EntitlementRegistry
 
     // -- Agents (WHIT-932) ---------------------------------------------------
     /**
-     * Agent tool calls included each calendar month.
+     * Agent runs included each calendar month (BM.3, BM.17). A run is what one
+     * agent does in the 30 minutes from its first call
+     * ({@see \Whity\Core\Usage\McpUsage}); its tool calls are kept beside it in
+     * the usage ledger.
      *
      * An ALLOWANCE, not a cap: work past it is counted as usage and goes ahead.
      * {@see \Whity\Core\Entitlement\MeterService::record()} never refuses, whatever
@@ -143,6 +146,35 @@ final class EntitlementRegistry
      */
     public const MESSAGES_OUTBOUND_PER_MONTH = 'messages.outbound.per_month';
 
+    // -- Inventory (WHIT-1232, register IV.24) -------------------------------
+    /**
+     * Items a workspace may keep in inventory, each variant counted on its
+     * own; archived ones don't count. Free keeps 100 ("Free up to 100 items",
+     * 19 November 2026). Only warns, by the owner's decision of the same day
+     * ("Warn, never block"): items are always added, and Billing and the plan
+     * banner show the count past the limit (SC.14).
+     */
+    public const INVENTORY_ITEMS_MAX = 'inventory.items.max';
+
+    // -- Usage (business model, BM.3, BM.17) ---------------------------------
+    /**
+     * Invoices a workspace issues each calendar month. Accounting counts them
+     * through {@see \Whity\Core\Usage\InvoiceUsageCounter}; until accounting
+     * issues invoices none are counted. Only warns: an invoice is never held back.
+     */
+    public const INVOICES_PER_MONTH = 'invoices.per_month';
+
+    /**
+     * MCP tool calls from a person's own AI, and calls from any outside caller
+     * that is not one of Whity's own apps, each calendar month (bring-your-own
+     * AI counts here, BM.17 Q8). Whity's web, phone and desktop apps are never
+     * counted, and neither is an agent's work, which `agents.runs.per_month`
+     * counts. Today only MCP calls are told apart; core has no separate API key
+     * for an outside caller yet. Only warns: a call
+     * past it still runs. The per-minute rate limit is `ratelimit.rpm`.
+     */
+    public const API_CALLS_PER_MONTH = 'api.calls.per_month';
+
     /**
      * Limits that only ever warn: passing one is recorded and shown, never
      * refused, whatever an enforcement setting says. The business model's
@@ -158,6 +190,11 @@ final class EntitlementRegistry
         self::BRAND_OWN_APP,
         self::AGENTS_RUNS_PER_MONTH,
         self::MESSAGES_OUTBOUND_PER_MONTH,
+        self::INVENTORY_ITEMS_MAX,
+        self::INVOICES_PER_MONTH,
+        self::API_CALLS_PER_MONTH,
+        // Nothing refuses a file for it either (BM.17).
+        self::STORAGE_QUOTA_BYTES,
     ];
 
     /**
@@ -175,6 +212,8 @@ final class EntitlementRegistry
         self::CUSTOMERS_PER_MONTH        => EntitlementDefinition::PERIOD_MONTH,
         self::AGENTS_RUNS_PER_MONTH      => EntitlementDefinition::PERIOD_MONTH,
         self::MESSAGES_OUTBOUND_PER_MONTH => EntitlementDefinition::PERIOD_MONTH,
+        self::INVOICES_PER_MONTH         => EntitlementDefinition::PERIOD_MONTH,
+        self::API_CALLS_PER_MONTH        => EntitlementDefinition::PERIOD_MONTH,
     ];
 
     /**
@@ -213,6 +252,11 @@ final class EntitlementRegistry
         self::BRAND_OWN_APP          => 'true',
         self::AGENTS_RUNS_PER_MONTH  => '-1',
         self::MESSAGES_OUTBOUND_PER_MONTH => '-1',
+        self::INVENTORY_ITEMS_MAX    => '-1',
+        // Unlimited like the rest: a self-hosted install has no plan limits
+        // (BM.3 Q14). The Free base, 100 and 10,000, is set on the free plan.
+        self::INVOICES_PER_MONTH     => '-1',
+        self::API_CALLS_PER_MONTH    => '-1',
     ];
 
     /**
@@ -239,6 +283,9 @@ final class EntitlementRegistry
         self::BRAND_OWN_APP          => 'bool',
         self::AGENTS_RUNS_PER_MONTH  => 'int',
         self::MESSAGES_OUTBOUND_PER_MONTH => 'int',
+        self::INVENTORY_ITEMS_MAX    => 'int',
+        self::INVOICES_PER_MONTH     => 'int',
+        self::API_CALLS_PER_MONTH    => 'int',
     ];
 
     /**
@@ -262,8 +309,11 @@ final class EntitlementRegistry
         self::BRAND_REMOVE_BADGE     => 'Leave "Built on Whity" off this workspace\'s public pages.',
         self::BRAND_OWN_EMAIL_SENDER => 'Allow this workspace to send email from its own address. Its own sign-in is "sso.tenant_idp".',
         self::BRAND_OWN_APP          => 'Allow this workspace to publish its own app in the app stores.',
-        self::AGENTS_RUNS_PER_MONTH  => 'Agent tool calls included each calendar month. Work past it is counted as usage and goes ahead (-1 for unlimited).',
+        self::AGENTS_RUNS_PER_MONTH  => 'Agent runs included each calendar month; a run is what one agent does in the 30 minutes from its first call, and its tool calls are counted beside it. Work past it is counted as usage and goes ahead (-1 for unlimited).',
         self::MESSAGES_OUTBOUND_PER_MONTH => 'Messages this workspace sends to customers each calendar month, on every channel. Sending past it is counted as usage and goes ahead (-1 for unlimited).',
+        self::INVENTORY_ITEMS_MAX    => 'Items this workspace may keep in inventory, each variant counted on its own (-1 for unlimited). Passing it warns and never refuses an item.',
+        self::INVOICES_PER_MONTH     => 'Invoices this workspace issues each calendar month (-1 for unlimited). Issuing past it is counted as usage and goes ahead.',
+        self::API_CALLS_PER_MONTH    => 'MCP calls from a person\'s own AI and calls from any outside caller that is not one of Whity\'s apps, each calendar month (-1 for unlimited). Calls past it are counted as usage and go ahead.',
     ];
 
     /**

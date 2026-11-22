@@ -52,6 +52,15 @@ final class SettingsRegistry
     // (TenantTheme). Tenant-overridable: each workspace is its own brand.
     public const BRANDING_MAIN_COLOR = 'branding_main_color';
 
+    // WHIT-1225 (TH.1-TH.14): the workspace's chosen theme, by id ('' for the
+    // installation's, which is Whity's own unless the operator chose one), and
+    // the colour roles it set by hand on top, as JSON
+    // `{"light": {role: "#rrggbb"}, "dark": {...}}`. The main colour above is
+    // the theme's primary seed. Tenant-overridable; the global value is the
+    // installation theme (30-themes.md section 5).
+    public const BRANDING_THEME = 'branding_theme';
+    public const BRANDING_THEME_OVERRIDES = 'branding_theme_overrides';
+
     // MCP feature flag (WC-149b2fc9). Value is the literal string 'true' or
     // 'false'; an admin sets it per-tenant to enable the MCP endpoint.
     public const MCP_ENABLED = 'mcp.enabled';
@@ -276,9 +285,10 @@ final class SettingsRegistry
     public const SEATS_ENFORCEMENT = 'seats.enforcement';
     public const SEATS_COUNT_INVITED = 'seats.count_invited';
 
-    // METERED LIMITS (documents rendered per day or month). 'block' refuses past
-    // the limit, as metering always has; 'warn' counts and lets the action go
-    // ahead. Global-only for the same reason as seats.enforcement.
+    // METERED LIMITS (documents rendered per day or month). 'warn', the
+    // default since the business model (BM.17), counts and lets the action go
+    // ahead; 'block' refuses past the limit, for an operator who opts in.
+    // Global-only for the same reason as seats.enforcement.
     public const METERS_ENFORCEMENT = 'meters.enforcement';
 
     // INVOICING (#billing). Every one of these differs per deployment, which
@@ -385,6 +395,13 @@ final class SettingsRegistry
     // invoices for free is the sharpest possible privilege escalation.
     public const PAYMENTS_MOCK_ENABLED = 'payments.mock_enabled';
 
+    // #2206: whether `schedule:run` starts the local billing run (issues
+    // invoices for subscriptions core bills itself) and the dunning sweep
+    // (locks tenants with overdue invoices). OFF and global-only: a
+    // deployment whose subscriptions belong to the billing service (Whity
+    // Pay) must not start invoicing or locking anyone because it upgraded.
+    public const BILLING_LOCAL_RUNS_ENABLED = 'billing.local_runs_enabled';
+
     // DUNNING (#billing). One setting says the whole retry policy: a list of
     // day offsets FROM THE DUE DATE, so "1,3,7" is three attempts on days 1,
     // 3 and 7 rather than 1, 4 and 11. Locking is separate from the last
@@ -453,6 +470,13 @@ final class SettingsRegistry
     // their prompts stop with it on. GLOBAL-ONLY: code plugins are install-wide. Tools are not
     // gated by this; they keep their own permission checks.
     public const PLUGINS_MCP_PROMPTS_REQUIRE_MARK = 'plugins.mcp_prompts_require_mark';
+
+    // WHIT-1308 (#2189): let a code plugin from a trusted store install without a valid
+    // Whity attestation. OFF by default, so an unsigned package is refused. A temporary
+    // override, owner decision 2026-11-20, until Whity signs store packages; turning it on
+    // or off and every unsigned install it lets through are in the audit log. GLOBAL-ONLY:
+    // code plugins are install-wide, and only the operator installs them.
+    public const PLUGINS_STORE_ALLOW_UNSIGNED = 'plugins.store_allow_unsigned';
 
     // SDK 1.102 (WHIT-985): the code plugins the operator lets send Whity's own billing
     // emails (receipts, failed payments) to a workspace's payers, in the INSTANCE's brand
@@ -681,6 +705,9 @@ final class SettingsRegistry
     //             name, never its title), its revision letter and page count,
     //             and which revision replaced a revised one (#1627). Never a
     //             price, a name, a subject or the document's number.
+    //   signed  — adds the signatures and company stamps on it, as capacities
+    //             with dates (never names unless the next key says so), and
+    //             whether its trail's chain is intact (#1730).
     //
     // Tenant-overridable because #1036 is explicit that this is a tenant's
     // decision: some institutions want a holder to see where a document sits,
@@ -695,6 +722,12 @@ final class SettingsRegistry
     // turns it on. Tenant-overridable, because it is a decision about how an
     // organisation speaks to the people it serves.
     public const FORMS_SHOW_REVIEWER_NAMES = 'forms.show_reviewer_names';
+
+    // #1730. At the `signed` level of `documents.qr_public_detail`, whether the
+    // public check also names who signed. Off: a holder reads "Director, signed
+    // 21 Nov 2026", not the director's name. Tenant-overridable: the workspace
+    // decides what its paper says about its people.
+    public const DOCUMENTS_QR_PUBLIC_SIGNER_NAMES = 'documents.qr_public_signer_names';
 
     // How many people a USER GROUP preview SHOWS (#999). Not a ceiling on
     // resolution — the count a preview reports is always exact — but the size of
@@ -854,6 +887,11 @@ final class SettingsRegistry
      * desk. Off by default; the Salons plugin turns it on.
      */
     public const CALENDAR_MULTI_SERVICE_BOOKING = 'calendar.multi_service_booking';
+    /**
+     * WHIT-1334 (design section 35, SL.3): the walk-in queue at the front
+     * desk. Off by default; the salon workspace template turns it on.
+     */
+    public const CALENDAR_WALKINS_ENABLED = 'calendar.walkins_enabled';
 
     /**
      * Whether the web app offers itself as an installable app (#1733): the web
@@ -903,6 +941,48 @@ final class SettingsRegistry
     public const MESSAGING_WEBCHAT_GREETING = 'messaging.webchat_greeting';
     public const MESSAGING_INBOUND_EMAIL_ADDRESS = 'messaging.inbound_email_address';
 
+    // A workspace's inventory settings (WHIT-1233, design 31 §3.2, register
+    // IV.14-IV.16). Set on Inventory's own settings with inventory:settings, so
+    // these are OWN-SCREEN keys. Per workspace only.
+    //   - approve_adjustments_above: an adjustment line worth more than this, in
+    //     the item's currency at its buying price, waits for approval (N5: 25
+    //     a line). Empty never asks.
+    //   - approve_counts_above: the same for a count's differences (IV.15).
+    //   - adjustment_route_template_id / count_route_template_id: the route
+    //     they travel on; 0 is one step for everyone with inventory:settings.
+    //   - transfers_one_step: a transfer arrives as it is sent, with no time
+    //     "on the way" (IV.16).
+    public const INVENTORY_APPROVE_ADJUSTMENTS_ABOVE = 'inventory.approve_adjustments_above';
+    public const INVENTORY_APPROVE_COUNTS_ABOVE = 'inventory.approve_counts_above';
+    public const INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID = 'inventory.adjustment_route_template_id';
+    public const INVENTORY_COUNT_ROUTE_TEMPLATE_ID = 'inventory.count_route_template_id';
+    public const INVENTORY_TRANSFERS_ONE_STEP = 'inventory.transfers_one_step';
+    //   - purchase_route_template_id: the route a purchase order travels before
+    //     it is approved (WHIT-1234, IV.12); 0 approves on sending.
+    //   - over_receipt_percent: how far past the order a receipt may go before
+    //     it asks (IV.12: 0 by default, so anything over asks).
+    public const INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID = 'inventory.purchase_route_template_id';
+    public const INVENTORY_OVER_RECEIPT_PERCENT = 'inventory.over_receipt_percent';
+    //   - fefo: stock leaving a place takes the batch that expires first
+    //     (IN.1, design 31 §3.5); off takes the oldest batch (WHIT-1235).
+    //   - expiry_warning_days: how many days before its expiry a batch is
+    //     "expiring soon" (IN.1: 7).
+    public const INVENTORY_FEFO = 'inventory.fefo';
+    public const INVENTORY_EXPIRY_WARNING_DAYS = 'inventory.expiry_warning_days';
+
+    // ---- Quotes to customers (WHIT-1321, design section 34 §3, QT.4) ----
+    //   - quote_valid_days: how long a new quote is valid, 1 to 365 days (30).
+    //   - quote_route_template_id: the route a quote travels before it can be
+    //     sent; 0 means none, and a person with quotes:write marks it ready.
+    public const SALES_QUOTE_VALID_DAYS = 'sales.quote_valid_days';
+    public const SALES_QUOTE_ROUTE_TEMPLATE_ID = 'sales.quote_route_template_id';
+    //   - email_*: whether the workspace emails its customers a quote, an
+    //     invoice, a receipt or a payment reminder (WHIT-1323, TR.3); all on.
+    public const SALES_EMAIL_QUOTE = 'sales.email_quote';
+    public const SALES_EMAIL_INVOICE = 'sales.email_invoice';
+    public const SALES_EMAIL_RECEIPT = 'sales.email_receipt';
+    public const SALES_EMAIL_REMINDER = 'sales.email_reminder';
+
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
      * settings API cannot make (a customer-safe role, a permission other than
@@ -921,6 +1001,21 @@ final class SettingsRegistry
         self::MESSAGING_WEBCHAT_ENABLED,
         self::MESSAGING_WEBCHAT_GREETING,
         self::MESSAGING_INBOUND_EMAIL_ADDRESS,
+        self::INVENTORY_APPROVE_ADJUSTMENTS_ABOVE,
+        self::INVENTORY_APPROVE_COUNTS_ABOVE,
+        self::INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID,
+        self::INVENTORY_COUNT_ROUTE_TEMPLATE_ID,
+        self::INVENTORY_TRANSFERS_ONE_STEP,
+        self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID,
+        self::INVENTORY_OVER_RECEIPT_PERCENT,
+        self::INVENTORY_FEFO,
+        self::INVENTORY_EXPIRY_WARNING_DAYS,
+        self::SALES_QUOTE_VALID_DAYS,
+        self::SALES_QUOTE_ROUTE_TEMPLATE_ID,
+        self::SALES_EMAIL_QUOTE,
+        self::SALES_EMAIL_INVOICE,
+        self::SALES_EMAIL_RECEIPT,
+        self::SALES_EMAIL_REMINDER,
     ];
 
     /**
@@ -999,6 +1094,7 @@ final class SettingsRegistry
         self::BILLING_INVOICE_NUMBER_SCOPE,
         self::BILLING_INVOICE_NUMBER_RESET,
         self::PAYMENTS_MOCK_ENABLED,
+        self::BILLING_LOCAL_RUNS_ENABLED,
         self::AFFILIATE_CLAWBACK_ON_REFUND,
         self::AFFILIATE_WITHHOLDING_BP,
         self::LICENSING_BILLING_BASIS,
@@ -1009,6 +1105,7 @@ final class SettingsRegistry
         self::PLUGINS_STORE_ALLOWED_HOSTS,
         self::PLUGINS_STORE_ENABLED,
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK,
+        self::PLUGINS_STORE_ALLOW_UNSIGNED,
         self::PLUGINS_BILLING_EMAIL_SENDERS,
         // Master on/off switch for the render tier: infrastructure-level (is the
         // whole optional subsystem available on this instance), not a per-tenant
@@ -1038,6 +1135,8 @@ final class SettingsRegistry
     private const BOOL_KEYS = [
         self::SIGNUP_CUSTOMER_INVITES,
         self::MESSAGING_WEBCHAT_ENABLED,
+        self::INVENTORY_TRANSFERS_ONE_STEP,
+        self::INVENTORY_FEFO,
         self::MAINTENANCE_ACTIVE,
         self::ERROR_TRACKING_ENABLED,
         self::ERROR_TRACKING_NOTIFY_ADMINS,
@@ -1061,17 +1160,21 @@ final class SettingsRegistry
         self::MAIL_EVENT_PASSWORD_RESET,
         self::PLUGINS_STORE_ENABLED,
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK,
+        self::PLUGINS_STORE_ALLOW_UNSIGNED,
         self::DOCUMENTS_RENDER_ENABLED,
         self::DOCUMENTS_PERSIST_ENABLED,
         self::DOCUMENTS_QR_ENABLED,
         self::FORMS_SHOW_REVIEWER_NAMES,
+        self::DOCUMENTS_QR_PUBLIC_SIGNER_NAMES,
         self::I18N_ENABLED,
         self::UI_HIDE_DATES,
         self::CALENDAR_BOOKING_PAGE_ENABLED,
         self::CALENDAR_INSTANT_BOOKING,
         self::CALENDAR_MULTI_SERVICE_BOOKING,
+        self::CALENDAR_WALKINS_ENABLED,
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
+        self::BILLING_LOCAL_RUNS_ENABLED,
         self::AFFILIATE_CLAWBACK_ON_REFUND,
         self::APP_INSTALLABLE,
     ];
@@ -1168,7 +1271,7 @@ final class SettingsRegistry
         // DEFAULT sits: `minimal` is the middle value and stays the default,
         // because it is what shipped and adding a quieter level must not change
         // what any existing tenant discloses.
-        self::DOCUMENTS_QR_PUBLIC_DETAIL => ['undated', 'minimal', 'stage', 'described'],
+        self::DOCUMENTS_QR_PUBLIC_DETAIL => ['undated', 'minimal', 'stage', 'described', 'signed'],
         // 'internal' stores errors in this deployment's own database (no extra
         // infrastructure); 'sentry' ships them to any Sentry-PROTOCOL backend —
         // hosted Sentry, or a self-hosted GlitchTip/Bugsink — via the encrypted
@@ -1196,6 +1299,8 @@ final class SettingsRegistry
         self::BRANDING_LOGO_SQUARE => '',
         self::BRANDING_FAVICON => '',
         self::BRANDING_MAIN_COLOR => '',
+        self::BRANDING_THEME => '',
+        self::BRANDING_THEME_OVERRIDES => '',
         self::MCP_ENABLED => 'false',
         self::MCP_ALWAYS_ON_PLUGIN_TOOLS => '',
         // Secure-by-default: signup CLOSED, approval REQUIRED when opened.
@@ -1267,7 +1372,10 @@ final class SettingsRegistry
         self::LICENSING_BILLING_BASIS => 'activated',
         self::SEATS_ENFORCEMENT => 'warn',
         self::SEATS_COUNT_INVITED => 'true',
-        self::METERS_ENFORCEMENT => 'block',
+        // Warn by default (BM.4, BM.17): a limit counts and tells the people
+        // who can change the plan, and nobody is ever locked out. 'block' is
+        // still there for an operator who chooses it.
+        self::METERS_ENFORCEMENT => 'warn',
         // Zero tax until an operator says otherwise — see the constant.
         self::BILLING_DEFAULT_CURRENCY => 'USD',
         self::BILLING_DEFAULT_PLAN => '',
@@ -1290,6 +1398,8 @@ final class SettingsRegistry
         // that is on by default is one that can take money before anybody
         // decided it should.
         self::PAYMENTS_MOCK_ENABLED => 'false',
+        // Off until the operator decides core bills its own subscriptions.
+        self::BILLING_LOCAL_RUNS_ENABLED => 'false',
         // Claws back by default. See the constant for why absorbing a refund
         // is a decision rather than a default.
         self::AFFILIATE_CLAWBACK_ON_REFUND => 'true',
@@ -1308,6 +1418,7 @@ final class SettingsRegistry
         // before this flag existed.
         self::PLUGINS_STORE_ENABLED => 'true',
         self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => 'false',
+        self::PLUGINS_STORE_ALLOW_UNSIGNED => 'false',
         self::PLUGINS_BILLING_EMAIL_SENDERS => '',
         // Heavyweight optional add-on (a whole separate Chromium-bearing
         // container) — opt-in, not opt-out. A sovereign deploy that never runs
@@ -1374,6 +1485,7 @@ final class SettingsRegistry
         self::DOCUMENTS_QR_PUBLIC_DETAIL => 'minimal',
         // Off: applicants see stages and outcomes, not reviewers. See the constant.
         self::FORMS_SHOW_REVIEWER_NAMES => 'false',
+        self::DOCUMENTS_QR_PUBLIC_SIGNER_NAMES => 'false',
         // Ten faces. Enough to recognise a group at a glance — "yes, those are
         // the instructors" — and small enough that nobody mistakes the sample
         // for the list. The COUNT beside it is exact and unbounded, which is
@@ -1412,6 +1524,7 @@ final class SettingsRegistry
         self::CALENDAR_WEEKEND_DAYS => 'friday,saturday',
         self::CALENDAR_INSTANT_BOOKING => 'true',
         self::CALENDAR_MULTI_SERVICE_BOOKING => 'false',
+        self::CALENDAR_WALKINS_ENABLED => 'false',
         // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
         self::APP_INSTALLABLE => 'true',
         // Empty: the plans page shows the active plans as they are, and the
@@ -1430,6 +1543,21 @@ final class SettingsRegistry
         self::MESSAGING_WEBCHAT_ENABLED => 'false',
         self::MESSAGING_WEBCHAT_GREETING => '',
         self::MESSAGING_INBOUND_EMAIL_ADDRESS => '',
+        self::INVENTORY_APPROVE_ADJUSTMENTS_ABOVE => '25',
+        self::INVENTORY_APPROVE_COUNTS_ABOVE => '25',
+        self::INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID => '0',
+        self::INVENTORY_COUNT_ROUTE_TEMPLATE_ID => '0',
+        self::INVENTORY_TRANSFERS_ONE_STEP => 'false',
+        self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID => '0',
+        self::INVENTORY_OVER_RECEIPT_PERCENT => '0',
+        self::INVENTORY_FEFO => 'true',
+        self::INVENTORY_EXPIRY_WARNING_DAYS => '7',
+        self::SALES_QUOTE_VALID_DAYS => '30',
+        self::SALES_QUOTE_ROUTE_TEMPLATE_ID => '0',
+        self::SALES_EMAIL_QUOTE => 'true',
+        self::SALES_EMAIL_INVOICE => 'true',
+        self::SALES_EMAIL_RECEIPT => 'true',
+        self::SALES_EMAIL_REMINDER => 'true',
     ];
 
     /**
@@ -1763,6 +1891,10 @@ final class SettingsRegistry
             self::LOCALE => self::validateLocale($value),
             self::SUPPORT_EMAIL => self::validateSupportEmail($value),
             self::BRANDING_MAIN_COLOR => $value === '' ? null : self::validateHexColor($value, self::BRANDING_MAIN_COLOR),
+            self::BRANDING_THEME => $value === '' || preg_match(\Whity\Core\Theme\ThemeValidator::ID_RE, $value) === 1
+                ? null
+                : 'branding_theme must be a theme id like vendor.name, or empty for the installation\'s theme.',
+            self::BRANDING_THEME_OVERRIDES => self::validateThemeOverrides($value),
             self::MCP_ENABLED => self::validateMcpEnabled($value),
             self::MCP_ALWAYS_ON_PLUGIN_TOOLS => self::validateToolNameList($value, self::MCP_ALWAYS_ON_PLUGIN_TOOLS),
             self::SELF_REGISTRATION_ENABLED => self::validateBoolean($value, self::SELF_REGISTRATION_ENABLED),
@@ -1819,6 +1951,7 @@ final class SettingsRegistry
             self::BILLING_INVOICE_NUMBER_SCOPE => self::validateEnum($key, $value),
             self::BILLING_INVOICE_NUMBER_RESET => self::validateEnum($key, $value),
             self::PAYMENTS_MOCK_ENABLED => self::validateBoolean($value, self::PAYMENTS_MOCK_ENABLED),
+            self::BILLING_LOCAL_RUNS_ENABLED => self::validateBoolean($value, self::BILLING_LOCAL_RUNS_ENABLED),
             self::DUNNING_RETRY_SCHEDULE_DAYS => \Whity\Core\Billing\DunningSchedule::parseProblem($value),
             self::DUNNING_LOCK_AFTER_DAYS => self::validateLockAfterDays($value),
             self::AFFILIATE_CLAWBACK_ON_REFUND => self::validateBoolean($value, self::AFFILIATE_CLAWBACK_ON_REFUND),
@@ -1838,6 +1971,7 @@ final class SettingsRegistry
             self::PLUGINS_STORE_ALLOWED_HOSTS => null, // free-form strings
             self::PLUGINS_STORE_ENABLED => self::validateBoolean($value, self::PLUGINS_STORE_ENABLED),
             self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK => self::validateBoolean($value, self::PLUGINS_MCP_PROMPTS_REQUIRE_MARK),
+            self::PLUGINS_STORE_ALLOW_UNSIGNED => self::validateBoolean($value, self::PLUGINS_STORE_ALLOW_UNSIGNED),
             self::PLUGINS_BILLING_EMAIL_SENDERS => self::validatePluginNameList($value, self::PLUGINS_BILLING_EMAIL_SENDERS),
             self::DOCUMENTS_RENDER_ENABLED => self::validateBoolean($value, self::DOCUMENTS_RENDER_ENABLED),
             self::DOCUMENTS_RENDER_MAX_ROWS => self::validateRenderMaxRows($value),
@@ -1860,6 +1994,7 @@ final class SettingsRegistry
             self::DOCUMENTS_QR_ENABLED => self::validateBoolean($value, self::DOCUMENTS_QR_ENABLED),
             self::DOCUMENTS_QR_PUBLIC_DETAIL => self::validateEnum($key, $value),
             self::FORMS_SHOW_REVIEWER_NAMES => self::validateBoolean($value, self::FORMS_SHOW_REVIEWER_NAMES),
+            self::DOCUMENTS_QR_PUBLIC_SIGNER_NAMES => self::validateBoolean($value, self::DOCUMENTS_QR_PUBLIC_SIGNER_NAMES),
             self::GROUPS_PREVIEW_SAMPLE_SIZE => self::validateGroupsPreviewSampleSize($value),
             self::DATA_TYPES_BULK_MAX_IDS => self::validateBulkMaxIds($value),
             // Error tracking. These five were declared with defaults, types,
@@ -1889,6 +2024,7 @@ final class SettingsRegistry
             self::CALENDAR_WEEKEND_DAYS => self::validateWeekdayList($value),
             self::CALENDAR_INSTANT_BOOKING => self::validateBoolean($value, self::CALENDAR_INSTANT_BOOKING),
             self::CALENDAR_MULTI_SERVICE_BOOKING => self::validateBoolean($value, self::CALENDAR_MULTI_SERVICE_BOOKING),
+            self::CALENDAR_WALKINS_ENABLED => self::validateBoolean($value, self::CALENDAR_WALKINS_ENABLED),
             self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the
@@ -1932,6 +2068,21 @@ final class SettingsRegistry
             self::MESSAGING_INBOUND_EMAIL_ADDRESS => $value === '' || (strlen($value) <= 320 && filter_var($value, FILTER_VALIDATE_EMAIL) !== false)
                 ? null
                 : self::MESSAGING_INBOUND_EMAIL_ADDRESS . ' must be an email address, or empty for none.',
+            self::INVENTORY_APPROVE_ADJUSTMENTS_ABOVE, self::INVENTORY_APPROVE_COUNTS_ABOVE => $value === '' || preg_match('/^\d{1,12}(\.\d{1,3})?$/', $value) === 1
+                ? null
+                : $key . ' must be an amount such as 25 or 25.500, or empty to never ask.',
+            self::INVENTORY_ADJUSTMENT_ROUTE_TEMPLATE_ID, self::INVENTORY_COUNT_ROUTE_TEMPLATE_ID, self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
+                ? null
+                : $key . ' must be a route template id, or 0 for the default.',
+            self::INVENTORY_TRANSFERS_ONE_STEP => self::validateBoolean($value, self::INVENTORY_TRANSFERS_ONE_STEP),
+            self::INVENTORY_OVER_RECEIPT_PERCENT => self::validateWholeNumberBetween($value, self::INVENTORY_OVER_RECEIPT_PERCENT, 0, 100),
+            self::INVENTORY_FEFO => self::validateBoolean($value, self::INVENTORY_FEFO),
+            self::INVENTORY_EXPIRY_WARNING_DAYS => self::validateWholeNumberBetween($value, self::INVENTORY_EXPIRY_WARNING_DAYS, 1, 365),
+            self::SALES_QUOTE_VALID_DAYS => self::validateWholeNumberBetween($value, self::SALES_QUOTE_VALID_DAYS, 1, 365),
+            self::SALES_QUOTE_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
+                ? null
+                : $key . ' must be a route template id, or 0 for none.',
+            self::SALES_EMAIL_QUOTE, self::SALES_EMAIL_INVOICE, self::SALES_EMAIL_RECEIPT, self::SALES_EMAIL_REMINDER => self::validateBoolean($value, $key),
             default => "Unknown setting key: {$key}",
         };
     }
@@ -2332,6 +2483,25 @@ final class SettingsRegistry
             self::SITE_NAME => trim($value),
             default => $value,
         };
+    }
+
+    /** WHIT-1225: empty, or the JSON of a workspace's colour overrides (ThemeValidator). */
+    private static function validateThemeOverrides(string $value): ?string
+    {
+        if (trim($value) === '') {
+            return null;
+        }
+        if (strlen($value) > 8000) {
+            return 'branding_theme_overrides is too long.';
+        }
+        try {
+            $decoded = json_decode($value, true, 8, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return 'branding_theme_overrides must be JSON.';
+        }
+        $errors = \Whity\Core\Theme\ThemeValidator::validateOverrides($decoded);
+
+        return $errors === [] ? null : $errors[0];
     }
 
     private static function validateSiteName(string $value): ?string

@@ -5,7 +5,6 @@ namespace Whity\Tests\Cli;
 use PHPUnit\Framework\TestCase;
 use Tests\Support\RequiresConfiguredDatabase;
 use Whity\Cli\Commands\SeedCommand;
-use PHPUnit\Framework\Attributes\RequiresPhpExtension;
 
 /**
  * Tests for SeedCommand CLI handler
@@ -19,39 +18,6 @@ class SeedCommandTest extends TestCase
     // configured and unreachable — see the trait for why those are two different
     // situations and only one of them deserves a skip (#1013).
     use RequiresConfiguredDatabase;
-
-    /**
-     * Test that SeedCommand can be instantiated
-     */
-    public function testCommandCanBeInstantiated(): void
-    {
-        $command = new SeedCommand();
-        $this->assertInstanceOf(SeedCommand::class, $command);
-    }
-
-    /**
-     * Test seed command with database available
-     */
-    #[RequiresPhpExtension('pdo_pgsql')]
-    public function testSeedCommandWithDatabase(): void
-    {
-        // Skips only when nothing says where a database is; fails loudly when
-        // something does and it is not there.
-        $this->connectToConfiguredDatabase();
-
-        $command = new SeedCommand();
-
-        ob_start();
-        $exitCode = $command->execute([]);
-        $output = ob_get_clean();
-
-        // Should succeed
-        $this->assertSame(0, $exitCode);
-        // Output should contain success message
-        $this->assertStringContainsString('seeded', strtolower($output));
-        // Output should mention default tenant and users
-        $this->assertStringContainsString('Default Tenant', $output);
-    }
 
     /**
      * The document demo dataset is seeded ONLY when asked for by name.

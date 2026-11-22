@@ -129,6 +129,11 @@ final class TenantOwnedTables
         'calendar_bookings' => '248_create_calendar_bookings.php',
         // WHIT-1173: the services of a booking of several, back to back.
         'calendar_booking_services' => '302_create_calendar_booking_services.php',
+        // WHIT-1334: the walk-in queue at the front desk (design section 35).
+        'calendar_walkins' => '338_create_calendar_walkins.php',
+        'calendar_commission_rates' => '340_create_calendar_commission_rates.php',
+        'calendar_commission_closes' => '342_create_calendar_commission_closes.php',
+        'calendar_commission_close_lines' => '342_create_calendar_commission_closes.php',
         // Design 3.3: rooms a service needs, filtered by branch.
         'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
         // Design 3.5: each person's own calendar view choices (CV.2, CV.4).
@@ -138,8 +143,8 @@ final class TenantOwnedTables
         // WHIT-953 — contacts and their spreadsheet imports (design 3.3 A8).
         // Every query binds tenant_id.
         'contacts' => '261_create_contacts.php',
-        'contact_imports' => '261_create_contacts.php',
-        'contact_import_changes' => '261_create_contacts.php',
+        'import_jobs' => '331_create_import_jobs.php',
+        'import_job_changes' => '331_create_import_jobs.php',
 
         // WHIT-954 — the workspace's own fields and their values (A9).
         'custom_field_definitions' => '263_create_custom_fields.php',
@@ -162,6 +167,9 @@ final class TenantOwnedTables
         // Files, photos and voice sent in Chat (UC.10).
         'chat_attachments' => '279_create_chat_attachments.php',
         'stored_files' => '298_create_stored_files.php',
+        // The usage ledger and stored bytes (section 33 §5, WHIT-1325).
+        'usage_ledger' => '332_create_usage_ledger.php',
+        'tenant_storage_usage' => '333_create_tenant_storage_usage.php',
         // Who owns each workspace (WHIT-1169).
         'workspace_owners' => '300_create_workspace_owners.php',
         // Offers to hand a workspace over or co-own it (WHIT-1170).
@@ -272,6 +280,10 @@ final class TenantOwnedTables
         // it made, examples marked (migration 305).
         'workspace_template_runs' => '305_create_workspace_templates.php',
         'workspace_template_items' => '305_create_workspace_templates.php',
+        // WHIT-1225: themes a workspace imported or installed from the store
+        // (migration 323). Every query binds tenant_id.
+        'themes' => '323_create_themes.php',
+        'plugin_core_grants' => '325_create_plugin_core_grants.php',
         // WHIT-838: a plugin's secrets, per workspace (migration 187).
         'plugin_secrets' => '187_create_plugin_secrets.php',
 
@@ -338,6 +350,9 @@ final class TenantOwnedTables
         'route_signatures'           => '232_add_route_signatures.php',
         'saved_signatures'           => '232_add_route_signatures.php',
         'signing_challenges'         => '232_add_route_signatures.php',
+        // #1729: company stamps and who holds them.
+        'company_stamps'             => '336_create_company_stamps.php',
+        'company_stamp_holders'      => '336_create_company_stamps.php',
         // WHIT-921: what the engine did when a route reached its finalise step.
         'route_finalisations'        => '234_add_route_finalise.php',
 
@@ -640,6 +655,28 @@ final class TenantOwnedTables
         // MCP idempotency keys (WHIT-931). Its one cross-tenant statement is
         // the retention prune, marked for the guard.
         'mcp_call_keys' => '308_create_mcp_call_keys.php',
+        // Inventory (WHIT-1232, design section 31). Every query binds tenant_id;
+        // inv_moves is append-only (a trigger refuses UPDATE and DELETE).
+        'inv_units' => '317_create_inventory_items.php',
+        'inv_categories' => '317_create_inventory_items.php',
+        'inv_items' => '317_create_inventory_items.php',
+        'inv_variants' => '317_create_inventory_items.php',
+        'inv_item_units' => '317_create_inventory_items.php',
+        'inv_barcodes' => '317_create_inventory_items.php',
+        'inv_locations' => '318_create_inventory_stock_ledger.php',
+        'inv_moves' => '318_create_inventory_stock_ledger.php',
+        'inv_levels' => '318_create_inventory_stock_ledger.php',
+        'inv_reasons' => '320_create_inventory_operations.php',
+        'inv_operations' => '320_create_inventory_operations.php',
+        'inv_operation_lines' => '320_create_inventory_operations.php',
+        'inv_reorder_rules' => '320_create_inventory_operations.php',
+        'inv_orders' => '321_create_inventory_orders.php',
+        'inv_order_lines' => '321_create_inventory_orders.php',
+        'inv_supplier_items' => '321_create_inventory_orders.php',
+        'inv_lots' => '337_create_inventory_lots.php',
+        'sales_quotes' => '330_create_sales_quotes.php',
+        'sales_quote_lines' => '330_create_sales_quotes.php',
+        'sales_quote_conversions' => '330_create_sales_quotes.php',
     ];
 
     /**

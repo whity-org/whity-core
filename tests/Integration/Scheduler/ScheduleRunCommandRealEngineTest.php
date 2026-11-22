@@ -73,6 +73,18 @@ final class ScheduleRunCommandRealEngineTest extends TestCase
         self::assertNotNull($row['last_run_at']);
     }
 
+    /**
+     * #2205: the scheduler holds the raw connection, so it recycles once it has
+     * run as long as a connection may live. Without --once this loop would
+     * otherwise never return.
+     */
+    public function testRecyclesWhenTheDatabaseConnectionLifetimeIsReached(): void
+    {
+        $this->command->recycleAfterConnectionAge(0);
+
+        self::assertSame(0, $this->command->execute([]));
+    }
+
     public function testATickWithNothingDueStillRecordsTheHeartbeat(): void
     {
         // WHIT-1013: no schedules at all, yet the tick is alive and must say so.
@@ -98,6 +110,45 @@ final class ScheduleRunCommandRealEngineTest extends TestCase
         self::assertGreaterThanOrEqual($before, $last);
     }
 
+    /**
+     * #2206: core's billing and dunning runs are started by the tick, but only
+     * where the operator turned local billing on; off by default.
+     */
+    public function testTheLocalBillingRunsStartOnlyWhenTheOperatorTurnsThemOn(): void
+    {
+        $globals = new GlobalSettingsRepository($this->pdo);
+        $tick = function () use ($globals): void {
+            (new ScheduleRunCommand(
+                $this->schedules,
+                new QueueService($this->jobs),
+                new ArraySharedStore(),
+                $this->jobs,
+                null,
+                static function (int $seconds): void {},
+                null,
+                null,
+                null,
+                $globals
+            ))->tick(300, 86400);
+        };
+        $billingJobs = function (): array {
+            $stmt = $this->pdo->query("SELECT name, tenant_id FROM jobs WHERE name IN ('core.billing.run', 'core.billing.dunning') ORDER BY name");
+            self::assertNotFalse($stmt);
+
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        };
+
+        $tick();
+        self::assertSame([], $billingJobs(), 'off by default: nobody is invoiced or locked');
+
+        $globals->set(\Whity\Core\Settings\SettingsRegistry::BILLING_LOCAL_RUNS_ENABLED, 'true');
+        $tick();
+        $tick();
+        $jobs = $billingJobs();
+        self::assertSame(['core.billing.dunning', 'core.billing.run'], array_column($jobs, 'name'), 'one of each, however many ticks');
+        self::assertSame([0, 0], array_map('intval', array_column($jobs, 'tenant_id')));
+    }
+
     public function testExactlyOnceLockStopsASecondWorkerFromDoubleFiring(): void
     {
         $id = $this->schedules->register(self::TENANT, 'demo.job', '*/5 * * * *');
@@ -110,6 +161,18 @@ final class ScheduleRunCommandRealEngineTest extends TestCase
         $dispatched = $this->command->tick(300, 86400);
         self::assertSame(0, $dispatched, 'this worker lost the exactly-once lock and must not fire');
         self::assertSame(0, $this->countJobs(), 'no job enqueued when the tick is not owned');
+    }
+
+    public function testTickPrunesExpiredSharedStoreRows(): void
+    {
+        // WHIT-1229: elapsed windows used to stay in shared_store forever.
+        $this->store->increment('push:minute:elapsed', -1);
+        $this->store->increment('push:minute:live', 600);
+
+        $this->command->tick(300, 86400);
+
+        self::assertSame(0, $this->store->prune(), 'the tick already removed the elapsed row');
+        self::assertSame(1, $this->store->count('push:minute:live'), 'a live window is kept');
     }
 
     public function testTickPrunesOldCompletedJobs(): void

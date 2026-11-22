@@ -7,7 +7,9 @@ namespace Whity\Mcp\Prompts;
 use Whity\Auth\RoleChecker;
 use Whity\Auth\TokenValidator;
 use Whity\Core\Tenant\TenantContext;
+use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpPrincipal;
+use Whity\Mcp\Auth\OAuth\OAuthTokenRefusedException;
 use Whity\Mcp\JsonRpc\MethodHandler;
 use Whity\Mcp\Auth\McpScope;
 
@@ -37,9 +39,7 @@ final class PromptsListHandler implements MethodHandler
     /** @param array<string, mixed>|null $params */
     public function __invoke(?array $params, ?string $bearerToken): mixed
     {
-        $principal = $bearerToken !== null
-            ? $this->tokenValidator->validateMcpToken($bearerToken)
-            : null;
+        $principal = $this->principalOf($bearerToken);
         $tenantId = TenantContext::getTenantId();
 
         $result = [];
@@ -67,6 +67,23 @@ final class PromptsListHandler implements MethodHandler
         return ['prompts' => $result];
     }
 
+    /**
+     * The caller, validated the way the Dispatcher validated it (an MCP token,
+     * a session bearer or an OAuth access token, #2202), or null. Soft: a bad
+     * token only narrows what is listed.
+     */
+    private function principalOf(?string $bearerToken): ?McpPrincipal
+    {
+        if ($bearerToken === null) {
+            return null;
+        }
+        try {
+            return $this->tokenValidator->validateBearerForMcp($bearerToken);
+        } catch (OAuthTokenRefusedException) {
+            return null;
+        }
+    }
+
     private function callerCanSee(Prompt $prompt, ?McpPrincipal $principal, ?int $tenantId): bool
     {
         if ($prompt->isOpen()) {
@@ -78,6 +95,10 @@ final class PromptsListHandler implements MethodHandler
         // WHIT-695: narrowing covers protected prompts. Open ones are fixed
         // text and return no data, so they stay listed.
         if (!McpScope::of($principal)->allowsPermission($prompt->requiredPermission)) {
+            return false;
+        }
+        // #2266: an agent's grant holds here as on tools/call.
+        if (!AgentScopeGrant::permitsRead($principal, $prompt->requiredPermission)) {
             return false;
         }
         if ($prompt->requiredPermission !== null) {

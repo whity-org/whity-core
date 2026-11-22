@@ -87,6 +87,7 @@ final class Plugin implements PluginInterface, PluginWorkspaceTemplatesInterface
     {
         $bakery = ExampleBakeryTemplate::manifest();
         $bakery['offer']['plugin'] = 'WsCounter';
+        $bakery['theme'] = 'templates.market';
         $broken = ['key' => 'clinic', 'version' => 1, 'name' => ['en' => 'Clinic']];
         $blank = ['key' => 'blank'] + $bakery;
 
@@ -121,6 +122,8 @@ final class Plugin implements PluginInterface, PluginAccessInterface, PluginDisp
 }
 PHP);
     }
+
+    private bool $themeInstalled = true;
 
     protected function setUp(): void
     {
@@ -161,6 +164,15 @@ PHP);
         self::assertNull($data['templates'][1]['offer']);
         self::assertSame([], $data['chosen']);
         self::assertTrue($data['offerPicker'], 'A new workspace with no template goes to the picker');
+    }
+
+    public function testATemplatesThemeIsOfferedOnlyWhenTheWorkspaceHasIt(): void
+    {
+        self::assertSame(['id' => 'templates.market', 'name' => 'السوق'], $this->list('ar')['templates'][0]['theme']);
+
+        $this->themeInstalled = false;
+        self::assertNull($this->list('en')['templates'][0]['theme'], 'A theme the workspace does not have is not offered');
+        self::assertNull($this->list('en')['templates'][1]['theme'], 'Blank has none');
     }
 
     public function testATemplateIsOnlyOfferedWhereItsPluginIsOn(): void
@@ -331,6 +343,9 @@ PHP);
             static fn (): TemplateSetup => new TemplateSetup(new FakeSetup()),
         );
         $handler->useDisplayNames(fn (): array => $this->loader->getDisplayNames());
+        $handler->useThemes(fn (int $tenantId, string $id): ?array => $this->themeInstalled && $id === 'templates.market'
+            ? ['id' => $id, 'name' => ['en' => 'Market', 'ar' => 'السوق']]
+            : null);
 
         return $handler;
     }

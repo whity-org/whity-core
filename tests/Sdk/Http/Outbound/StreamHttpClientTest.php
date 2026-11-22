@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Sdk\Http\Outbound;
 
 use PHPUnit\Framework\TestCase;
+use Whity\Sdk\Http\Outbound\AddressPolicy;
 use Whity\Sdk\Http\Outbound\HttpFailure;
 use Whity\Sdk\Http\Outbound\StreamHttpClient;
 
@@ -134,6 +135,80 @@ final class StreamHttpClientTest extends TestCase
                 self::assertStringNotContainsString($leak, $e->getMessage());
             }
         }
+    }
+
+    public function testTheAnswersHeadersComeBackByAnySpelling(): void
+    {
+        $answer = (new StreamHttpClient(allowHttp: true))->send('GET', $this->base . '/headers', []);
+
+        self::assertSame(429, $answer->status);
+        self::assertSame('30', $answer->header('Retry-After'));
+        self::assertSame('30', $answer->header('retry-after'));
+        self::assertSame('one, two', $answer->header('X-Twice'));
+        self::assertNull($answer->header('X-Absent'));
+        self::assertArrayHasKey('content-type', $answer->headers);
+    }
+
+    public function testARedirectsLocationIsThereForTheCallerToJudge(): void
+    {
+        $answer = (new StreamHttpClient(allowHttp: true))->send('GET', $this->base . '/redirect', []);
+
+        self::assertSame(302, $answer->status);
+        self::assertSame('/echo', $answer->header('Location'));
+    }
+
+    public function testThePolicyRefusesTheServersOwnNetwork(): void
+    {
+        $resolver = static fn (string $host): array => match ($host) {
+            'intranet.example.com' => ['10.0.0.5'],
+            'rebind.example.com' => ['93.184.216.34', '127.0.0.1'],
+            default => [],
+        };
+        $client = new StreamHttpClient(allowHttp: true, addressPolicy: AddressPolicy::publicOnly($resolver));
+        $port = parse_url($this->base, PHP_URL_PORT);
+
+        foreach ([
+            $this->base . '/echo',
+            "http://localhost:{$port}/echo",
+            'http://169.254.169.254/latest/meta-data/',
+            'http://[::1]/x',
+            'http://[::ffff:127.0.0.1]/x',
+            'http://2130706433/x',
+            'http://0x7f.1/x',
+            'http://0177.0.0.1/x',
+            'http://127.1/x',
+            'https://intranet.example.com/x',
+            'https://rebind.example.com/x',
+            'https://nowhere.example.com/x',
+            'https://bäckerei.example/x',
+        ] as $url) {
+            try {
+                $client->send('GET', $url, []);
+                self::fail("{$url} was allowed");
+            } catch (HttpFailure $e) {
+                self::assertStringNotContainsString('/x', $e->getMessage(), 'a refusal names the host only');
+                self::assertStringNotContainsString('meta-data', $e->getMessage());
+            }
+        }
+    }
+
+    public function testThePolicyConnectsToTheAddressItCheckedAndKeepsTheHostName(): void
+    {
+        $port = (int) parse_url($this->base, PHP_URL_PORT);
+        $lookups = 0;
+        $resolver = static function (string $host) use (&$lookups): array {
+            $lookups++;
+
+            return $host === 'bakery.example.com' ? ['127.0.0.1'] : [];
+        };
+        $policy = AddressPolicy::publicOnly($resolver)->allowing('127.0.0.1/32');
+
+        $answer = (new StreamHttpClient(allowHttp: true, addressPolicy: $policy))
+            ->send('GET', "http://bakery.example.com:{$port}/host", ['Host' => 'evil.example.com']);
+
+        self::assertSame(200, $answer->status);
+        self::assertSame("bakery.example.com:{$port}", $answer->body);
+        self::assertSame(1, $lookups, 'resolved once');
     }
 
     private function serverIs(string $id): bool

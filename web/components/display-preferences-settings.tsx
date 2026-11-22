@@ -12,7 +12,7 @@ import { useThemeMode } from '@/lib/theme-mode-context';
 /** Text size, Show technical details (W.3) and Animations (LT.4). Moves into the Preferences tab with U04. */
 export function DisplayPreferencesSettings() {
   const t = useTranslation('auth');
-  const { textSize, showTechnicalDetails, animations, update } = useDisplayPreferences();
+  const { textSize, showTechnicalDetails, animations, contrast, update } = useDisplayPreferences();
   // Light or dark lives in this browser (lib/theme-mode-context.tsx), unlike the
   // rest of this card, which is stored on the account; the card says so.
   const { preference: theme, setPreference: setTheme } = useThemeMode();
@@ -76,6 +76,18 @@ export function DisplayPreferencesSettings() {
             ]}
           />
         </div>
+        <label className="flex items-start justify-between gap-4">
+          <span className="grid gap-0.5">
+            <span className="text-sm font-medium">{t('settings.display.contrast', 'Higher contrast')}</span>
+            <span className="text-xs text-muted-foreground">
+              {t('settings.display.contrast.help', 'Darker text and clearer edges, whatever the workspace’s theme.')}
+            </span>
+          </span>
+          <Switch
+            checked={contrast === 'high'}
+            onCheckedChange={(checked) => update({ contrast: checked ? 'high' : 'standard' })}
+          />
+        </label>
         <label className="flex items-start justify-between gap-4">
           <span className="grid gap-0.5">
             <span className="text-sm font-medium">{t('settings.display.technical', 'Show technical details')}</span>

@@ -18,6 +18,8 @@ use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 use Whity\Core\Store\SharedStoreInterface;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\Field;
+use Whity\Http\Validation\FieldValidator;
 
 /**
  * Public "I lost my 2FA device" recovery-request endpoints
@@ -64,12 +66,14 @@ final class TwoFactorRecoveryHandler
      */
     public function request(Request $request): Response
     {
-        $body  = JsonBody::parsed($request);
-        $email = strtolower(trim((string) ($body['email'] ?? '')));
-
-        if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false || strlen($email) > 255) {
-            return Response::error('A valid email address is required', 422);
+        // #2174: the shared field validator; the sentence and status are unchanged.
+        $checked = FieldValidator::check(JsonBody::parsed($request), [
+            'email' => Field::email()->required()->maxBytes(255),
+        ]);
+        if (!$checked->ok()) {
+            return $checked->refusal('A valid email address is required');
         }
+        $email = $checked->value('email');
 
         $ip       = ClientIp::fromRequest($request);
         $emailKey = '2farecovery:req:email:' . hash('sha256', $email);
@@ -93,7 +97,10 @@ final class TwoFactorRecoveryHandler
 
         if ($this->selfServiceEnabled()) {
             $row = $this->emails->findByEmail($email);
-            if ($row !== null) {
+            // #2245: only a CONFIRMED address may receive a credential link. An
+            // unconfirmed one may be a typo or somebody else's address, and the
+            // link would hand them this account. The answer stays the same.
+            if ($row !== null && ($row['verified'] ?? false) === true) {
                 try {
                     $profileId = (int) $row['profile_id'];
                     // AG.1: the admins see where the request came from.
@@ -129,12 +136,22 @@ final class TwoFactorRecoveryHandler
      */
     public function confirm(Request $request): Response
     {
-        $body  = JsonBody::parsed($request);
-        $token = (string) ($body['token'] ?? '');
-
-        if (trim($token) === '') {
-            return Response::error('A confirmation token is required', 422);
+        // #2190: every failed try writes an audit row, so each address gets a
+        // limit of its own before the token is looked at.
+        $ip = ClientIp::fromRequest($request);
+        if ($ip !== null
+            && ($limited = RateLimits::twoFactorRecoveryConfirmPerAddress()->take($this->store, '2farecovery:confirm:ip:' . $ip)) !== null
+        ) {
+            return $limited;
         }
+
+        // #2174: the token is read exactly as sent; the sentence and status are unchanged.
+        $body    = JsonBody::parsed($request);
+        $checked = FieldValidator::check($body, ['token' => Field::secret()->required()]);
+        if (!$checked->ok()) {
+            return $checked->refusal('A confirmation token is required');
+        }
+        $token = $checked->value('token');
 
         $result = $this->service->confirm($token, RequestReason::from($body['reason'] ?? null));
 

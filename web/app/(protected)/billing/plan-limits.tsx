@@ -3,6 +3,7 @@
 import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
 import { meterPercent, overBy, shownRows, stateOf, type PlanLimit } from '@/lib/billing/plan-limits';
+import { formatBytes } from '@/lib/billing/usage';
 import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';
 import { cn } from '@whity/ui/utils';
@@ -28,6 +29,9 @@ import { useTranslation } from '@whity/features/i18n';
  */
 
 const NUMBER = new Intl.NumberFormat('en-US');
+
+/** Storage is written in bytes, 2 GB; everything else is a count. */
+const amount = (key: string, n: number): string => (key === 'storage.quota_bytes' ? formatBytes(n) : NUMBER.format(n));
 
 export function PlanLimits() {
   const t = useTranslation('admin');
@@ -57,6 +61,14 @@ export function PlanLimits() {
         return t('billing.limits.documentsToday', 'Documents made today');
       case 'documents.render.per_month':
         return t('billing.limits.documentsMonth', 'Documents made this month');
+      case 'inventory.items.max':
+        return t('billing.limits.items', 'Items in inventory');
+      case 'invoices.per_month':
+        return t('billing.limits.invoicesMonth', 'Invoices issued this month');
+      case 'api.calls.per_month':
+        return t('billing.limits.apiCallsMonth', 'API and MCP calls this month');
+      case 'storage.quota_bytes':
+        return t('billing.limits.storage', 'Storage');
       default:
         return t('billing.limits.ownWebAddress', 'Your own web address');
     }
@@ -68,6 +80,9 @@ export function PlanLimits() {
     }
     if (row.key === 'members.max') {
       return t('billing.limits.staffHelp', 'People who work in the workspace. Agents don’t count.');
+    }
+    if (row.key === 'inventory.items.max') {
+      return t('billing.limits.itemsHelp', 'Each size or colour counts. Archived items don’t.');
     }
     if (row.key === 'documents.render.per_day') {
       return t('billing.limits.resetsTomorrow', 'Starts again tomorrow');
@@ -146,8 +161,8 @@ export function PlanLimits() {
                   </div>
                   <span dir="ltr" className="justify-self-start text-xs text-muted-foreground tabular-nums">
                     {t('billing.limits.usedOf', '{used} of {limit}', {
-                      used: NUMBER.format(row.used),
-                      limit: NUMBER.format(row.limit),
+                      used: amount(row.key, row.used),
+                      limit: amount(row.key, row.limit),
                     })}
                   </span>
                 </div>
@@ -158,7 +173,7 @@ export function PlanLimits() {
                 {state === 'over' &&
                   (row.kind === 'count' ? (
                     <Badge variant="warning" icon="alert">
-                      {t('billing.limits.overBy', '{n} over', { n: NUMBER.format(overBy(row)) })}
+                      {t('billing.limits.overBy', '{n} over', { n: amount(row.key, overBy(row)) })}
                     </Badge>
                   ) : (
                     <Badge variant="warning">{t('billing.limits.notInPlan', 'Not in plan')}</Badge>

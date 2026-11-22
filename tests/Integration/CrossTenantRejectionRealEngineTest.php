@@ -2821,6 +2821,72 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         self::assertSame(['preferred_branch' => 'Abdoun'], $contacts->show(self::TENANT_A, $a['id'])['fields']);
     }
 
+    // ==================== inventory (WHIT-1232, migrations 317-318) ====================
+
+    public function testInventoryIsTenantScopedAndForeignItemsPlacesAndStockCannotBeTouched(): void
+    {
+        $db = new \Whity\Core\Inventory\InventoryDb($this->pdo);
+        $workspace = new \Whity\Core\Inventory\InventoryWorkspace($db);
+        $units = new \Whity\Core\Inventory\UnitCatalog($db, $workspace);
+        $items = new \Whity\Core\Inventory\ItemService($db, $workspace, $units, static fn (int $t): string => 'USD');
+        $places = new \Whity\Core\Inventory\LocationService($db, $workspace);
+        $ledger = new \Whity\Core\Inventory\StockLedger($db, $workspace, $items, $units);
+
+        $category = $items->createCategory(self::TENANT_A, ['name' => 'Ingredients']);
+        $flour = $items->create(self::TENANT_A, ['name' => 'Flour', 'unit' => 'kg', 'sku' => 'FLR', 'barcodes' => ['6251234567890'],
+            'units' => [['unit' => 'bag', 'per' => '25']], 'category_id' => $category['id']], null);
+        $kitchen = $places->create(self::TENANT_A, ['name' => 'Central kitchen']);
+        $opening = $ledger->adjust(self::TENANT_A, null, 'opening', [['variant_id' => $flour['variants'][0]['id'], 'location_id' => $kitchen['id'], 'change' => '2', 'unit' => 'bag']], '', '', null, null);
+        $units->create(self::TENANT_A, ['code' => 'tray', 'name' => 'Tray']);
+        $b = $items->create(self::TENANT_B, ['name' => 'Flour', 'sku' => 'FLR'], null);
+
+        self::assertSame(['Flour'], array_column($items->list(self::TENANT_B, [], 50, 0)['data'], 'name'));
+        self::assertSame([], $ledger->levels(self::TENANT_B));
+        self::assertSame([], $ledger->history(self::TENANT_B));
+        self::assertSame([], $items->categories(self::TENANT_B));
+        self::assertNull($items->lookup(self::TENANT_B, '6251234567890'));
+        self::assertNotContains('tray', array_column($units->list(self::TENANT_B), 'code'));
+        self::assertNotContains($kitchen['id'], array_column($places->list(self::TENANT_B, true), 'id'));
+
+        foreach ([
+            'read an item' => fn () => $items->show(self::TENANT_B, $flour['id']),
+            'change an item' => fn () => $items->update(self::TENANT_B, $flour['id'], ['name' => 'Taken'], null),
+            'archive an item' => fn () => $items->archive(self::TENANT_B, $flour['id'], true, null),
+            'read a place' => fn () => $places->show(self::TENANT_B, $kitchen['id']),
+            'change a place' => fn () => $places->update(self::TENANT_B, $kitchen['id'], ['name' => 'Taken']),
+            'undo a stock change' => fn () => $ledger->reverse(self::TENANT_B, $opening['batch_key'], null),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} of Tenant A");
+            } catch (\Whity\Core\Inventory\InventoryRejectedException $e) {
+                self::assertSame(404, $e->status, "a foreign record answers 404 to {$what}");
+            }
+        }
+        foreach ([
+            'move a foreign variant' => [$flour['variants'][0]['id'], $places->create(self::TENANT_B, ['name' => 'Shop'])['id']],
+            'move into a foreign place' => [$b['variants'][0]['id'], $kitchen['id']],
+            'use a foreign category' => null,
+        ] as $what => $pair) {
+            try {
+                if ($pair === null) {
+                    $items->update(self::TENANT_B, $b['id'], ['category_id' => $category['id']], null);
+                } else {
+                    $ledger->adjust(self::TENANT_B, null, 'opening', [['variant_id' => $pair[0], 'location_id' => $pair[1], 'change' => '1']], '', '', null, null);
+                }
+                self::fail("Tenant B could {$what}");
+            } catch (\Whity\Core\Inventory\InventoryRejectedException $e) {
+                self::assertSame(422, $e->status, $what);
+            }
+        }
+
+        $after = $items->show(self::TENANT_A, $flour['id']);
+        self::assertSame('Flour', $after['name']);
+        self::assertFalse($after['archived']);
+        self::assertSame('50.000', $after['on_hand']);
+        self::assertCount(1, $ledger->history(self::TENANT_A));
+    }
+
     private function contactService(): \Whity\Core\Contacts\ContactService
     {
         return new \Whity\Core\Contacts\ContactService(

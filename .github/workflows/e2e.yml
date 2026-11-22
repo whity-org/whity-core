@@ -27,6 +27,11 @@ concurrency:
   group: e2e-${{ github.event_name == 'schedule' && 'nightly' || github.ref }}
   cancel-in-progress: true
 
+# Least privilege (WHIT-1223): every job here only reads the repository, so
+# the token gets nothing more, whatever the repository default becomes.
+permissions:
+  contents: read
+
 jobs:
   # Path filtering lives HERE rather than on the workflow triggers.
   #
@@ -68,7 +73,7 @@ jobs:
 
       - name: Filter changed paths
         if: steps.mode.outputs.all != 'true'
-        uses: dorny/paths-filter@v4
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: filter
         with:
           filters: |
@@ -125,7 +130,7 @@ jobs:
       # checkout carries vendor/ into the containers (the suite's TOTP helper
       # also requires /app/vendor/autoload.php via docker exec).
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pgsql, pdo_pgsql
@@ -163,6 +168,10 @@ jobs:
       - name: Start the backend stack (in the background)
         env:
           MCP_ENABLED: 'true'
+          # One browser is one client IP here, and against the production
+          # build the suite passes the default 2000 requests a minute
+          # (WHIT-1222). The limiter itself stays on.
+          RATE_LIMIT_IP_LIMIT: '20000'
         run: |
           nohup bash -c '
             for i in 1 2 3; do
@@ -195,20 +204,35 @@ jobs:
 
       # Setup Node, npm ci and the Playwright browser/deps steps sit between
       # the background start above and the join below.
-      - name: Setup Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '22'
-          cache: npm
-          # Single lockfile at the workspace root (npm workspaces).
-          cache-dependency-path: package-lock.json
+      # Node plus the npm workspace from the root lockfile, with node_modules
+      # restored from the cache when the lockfile is unchanged (CI-0231; npm ci
+      # took 55-67 s a shard). The Playwright steps below still run with
+      # working-directory: web (bins resolve from the hoisted root node_modules
+      # and the config is loaded from web/).
+      - name: Setup Node and install the workspace
+        uses: ./.github/actions/setup-node-deps
 
-      # npm workspaces install from the root lockfile; the Playwright steps below
-      # still run with working-directory: web (bins resolve from the hoisted root
-      # node_modules and the config is loaded from web/).
-      - name: Install dependencies
-        working-directory: .
-        run: npm ci
+      # The suite runs against a production build of the app (`next start`,
+      # see webServer in web/playwright.config.ts), not `next dev`, which
+      # compiled each route on its first visit inside the timed run
+      # (WHIT-1222). The build starts in the background here and is joined
+      # just before the suite, so it overlaps the Playwright install and the
+      # backend start. Its compiler cache is the one the frontend build job in
+      # automated-tests.yml keeps, under the same key.
+      - name: Restore the Next.js build cache
+        uses: actions/cache@v6
+        with:
+          path: web/.next/cache
+          key: nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('web/**/*.[jt]s', 'web/**/*.[jt]sx') }}
+          restore-keys: |
+            nextjs-${{ hashFiles('package-lock.json') }}-
+            nextjs-
+
+      - name: Build the web app (in the background)
+        working-directory: web
+        run: |
+          nohup bash -c 'npm run build; echo $? > "$RUNNER_TEMP/web-build.exit"'             > "$RUNNER_TEMP/web-build.log" 2>&1 &
+          echo "web build started in the background (pid $!)"
 
       # Playwright browser binaries are versioned by the @playwright/test
       # release and live in ~/.cache/ms-playwright. Cache them keyed on that
@@ -375,6 +399,19 @@ jobs:
           docker compose -f docker-compose.yml logs --tail 100
           exit 1
 
+      - name: Wait for the web build
+        run: |
+          for _ in $(seq 1 600); do
+            [ -f "$RUNNER_TEMP/web-build.exit" ] && break
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/web-build.log"
+          code=$(cat "$RUNNER_TEMP/web-build.exit" 2>/dev/null || echo timeout)
+          if [ "$code" != 0 ]; then
+            echo "::error::The production build of web/ failed (exit $code); the E2E suite needs it."
+            exit 1
+          fi
+
       # Balanced on recorded seconds per spec file (scripts/e2e-shard.mjs,
       # scripts/e2e-timings.json) instead of Playwright's --shard, which splits
       # by test count. The planner fails the job when the shards do not cover
@@ -382,12 +419,14 @@ jobs:
       # fails on "No tests found". The `setup` project is a dependency and runs
       # in every shard, as it did with --shard.
       #
-      # The Playwright config starts the Next dev server itself (webServer on
-      # port 3010) and proxies /api/* to the stack at localhost:8000.
+      # The Playwright config starts the Next production server itself
+      # (webServer on port 3010, `next start` because E2E_NEXT_START is set)
+      # and proxies /api/* to the stack at localhost:8000.
       - name: Run the E2E suite (shard ${{ matrix.shard }}/4)
         working-directory: web
         env:
           PLAYWRIGHT_JSON_OUTPUT_FILE: playwright-json/shard-${{ matrix.shard }}.json
+          E2E_NEXT_START: '1'
         run: |
           node ../scripts/e2e-shard.mjs plan ${{ matrix.shard }} ${{ strategy.job-total }} > "$RUNNER_TEMP/specs.txt"
           mapfile -t specs < "$RUNNER_TEMP/specs.txt"

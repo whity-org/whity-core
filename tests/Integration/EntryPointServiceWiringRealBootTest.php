@@ -725,6 +725,98 @@ final class EntryPointServiceWiringRealBootTest extends TestCase
         }
     }
 
+    /**
+     * WHIT-1247: a plugin's job reaches every SDK service its routes do. The
+     * worker boots the web kernel's wiring, then adds its own; before, it had
+     * no plugin secrets, settings, contacts, time off, workspace setup, …
+     */
+    public function testTheQueueWorkerResolvesEverySdkServiceTheWebDoes(): void
+    {
+        $services = [
+            \Whity\Sdk\PluginContext::class,
+            \Whity\Sdk\Secrets\PluginSecrets::class,
+            \Whity\Sdk\Settings\PluginSettings::class,
+            \Whity\Sdk\Contacts\Contacts::class,
+            \Whity\Sdk\Calendar\TimeOff::class,
+            \Whity\Sdk\Delegation\Away::class,
+            \Whity\Sdk\Agents\Agents::class,
+            \Whity\Sdk\Setup\WorkspaceSetup::class,
+            \Whity\Sdk\Billing\WorkspaceAddons::class,
+            \Whity\Sdk\Mail\BillingEmails::class,
+            \Whity\Sdk\Identity\LinkedPeople::class,
+            \Whity\Sdk\Sql\SequenceAllocator::class,
+            \Whity\Sdk\Messaging\CustomerMessages::class,
+            // Inventory (SDK 1.127, WHIT-1232): a job that moves stock reaches the same services.
+            \Whity\Sdk\Inventory\Items::class,
+            \Whity\Sdk\Inventory\Locations::class,
+            \Whity\Sdk\Inventory\Stock::class,
+            \Whity\Sdk\Inventory\Units::class,
+        ];
+        $list = var_export($services, true);
+
+        $result = $this->runProbe(<<<PHP
+            require __DIR__ . '/vendor/autoload.php';
+            require __DIR__ . '/src/helpers.php';
+
+            new \Whity\Cli\Commands\QueueWorkCommand();
+
+            \$resolved = [];
+            foreach ({$list} as \$service) {
+                try {
+                    \$resolved[\$service] = \Whity\app(\$service) instanceof \$service;
+                } catch (\Throwable \$e) {
+                    \$resolved[\$service] = \$e->getMessage();
+                }
+            }
+            whity_probe_emit(['resolved' => \$resolved]);
+            PHP);
+
+        foreach ($services as $service) {
+            self::assertTrue($result['resolved'][$service] ?? null, "queue:work must resolve {$service}");
+        }
+    }
+
+    /**
+     * WHIT-1247: the relay delivers into the web kernel's hook manager, with the
+     * plugins loaded. It used to build an empty one, so no plugin `*.async`
+     * listener ever ran.
+     */
+    public function testTheEventRelayDeliversWhereThePluginsListen(): void
+    {
+        $result = $this->runProbe(<<<'PHP'
+            require __DIR__ . '/vendor/autoload.php';
+            require __DIR__ . '/src/helpers.php';
+
+            $command = new \Whity\Cli\Commands\EventRelayCommand();
+            $relay = (new \ReflectionMethod($command, 'relay'))->invoke($command);
+            $hooks = (new \ReflectionProperty($relay, 'hooks'))->getValue($relay);
+            $kernel = \Whity\Core\Kernel\HostKernel::boot();
+
+            $declared = [];
+            foreach ($kernel['pluginLoader']->getPlugins() as $plugin) {
+                foreach (array_keys($plugin->getHooks()) as $event) {
+                    $declared[] = $event;
+                }
+            }
+            $heard = array_values(array_filter($declared, static fn (string $e): bool => $hooks->getListeners($e) !== []));
+
+            whity_probe_emit([
+                'same_manager' => $hooks === $kernel['hookManager'],
+                'registered'   => \Whity\app(\Whity\Core\Hooks\HookManager::class) === $hooks,
+                'plugins'      => count($kernel['pluginLoader']->getPlugins()),
+                'declared'     => $declared,
+                'heard'        => $heard,
+                'kernel_wired' => $hooks->getListeners('navigation.register') !== [],
+            ]);
+            PHP);
+
+        self::assertTrue($result['same_manager'], 'the relay dispatches into the kernel\'s hook manager');
+        self::assertTrue($result['registered'], 'and that is the one the container hands out');
+        self::assertTrue($result['kernel_wired'], 'which carries the listeners the web kernel subscribes');
+        self::assertGreaterThan(0, $result['plugins'], 'with the plugins loaded');
+        self::assertSame($result['declared'], $result['heard'], 'and every hook a loaded plugin declares has its listener there');
+    }
+
     // ─── probe plumbing ──────────────────────────────────────────────────────
 
     /**

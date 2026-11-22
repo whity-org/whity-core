@@ -15,8 +15,8 @@ namespace Whity\Sdk\Mail;
  * The email goes out through the instance's mail transport, in the
  * workspace's brand (name, colour, white-label by plan) and in the EM.1
  * layout, in English or Arabic. It is how a plugin sends what a business
- * sends its customers (Front Office's invoices, quotes, receipts and payment
- * reminders; Whity Pay's receipts) without drawing HTML of its own.
+ * sends its customers (Whity Pay's receipts; core's own trading emails, TR.2,
+ * go the same way) without drawing HTML of its own.
  *
  * WHICH WORKSPACE. Pass the workspace the caller is already authorized in:
  * a route handler's `Request::getWorkspaceId()`, an MCP tool's

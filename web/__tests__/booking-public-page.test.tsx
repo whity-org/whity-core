@@ -185,6 +185,16 @@ describe('PublicBookingScreen', () => {
     expect(await screen.findByTestId('book-closed')).toHaveTextContent('This booking page isn’t available');
   });
 
+  // WHIT-1298 (#2203): booking is refused until the bot check is set up; say so up front.
+  it('says the business is still setting up when the bot check is not ready', async () => {
+    fetchMock.mockImplementation(() => respond(200, { data: { ...page, bot_check_ready: false } }));
+    render(<PublicBookingScreen workspace="example-bakery" />);
+    const card = await screen.findByTestId('book-notReady');
+    expect(card).toHaveTextContent('isn’t taking bookings here yet');
+    expect(card).toHaveTextContent('Try again later, or contact them to book.');
+    expect(screen.queryByRole('radio', { name: /Cake tasting/ })).not.toBeInTheDocument();
+  });
+
   it('offers the next week when nothing is free in this one', async () => {
     const asked: string[] = [];
     fetchMock.mockImplementation((url: string) => {

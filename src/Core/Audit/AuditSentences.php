@@ -107,6 +107,10 @@ final class AuditSentences
      *   audit.sentence.plugin_enable_migrate_failed = A plugin could not be turned on
      *   audit.sentence.plugin_secret_deleted = {actor} removed a plugin secret
      *   audit.sentence.plugin_secret_set = {actor} set a plugin secret
+     *   audit.sentence.plugin_store_unsigned_installed = {actor} installed a store plugin that Whity hasn't signed
+     *   audit.sentence.plugin_store_unsigned_refused = A store plugin that Whity hasn't signed was refused
+     *   audit.sentence.plugin_store_unsigned_turned_off = {actor} stopped unsigned store plugins from being installed
+     *   audit.sentence.plugin_store_unsigned_turned_on = {actor} allowed store plugins that Whity hasn't signed
      *   audit.sentence.plugin_upload = {actor} uploaded a plugin
      *   audit.sentence.profile_email_added = {actor} added an email address
      *   audit.sentence.profile_email_primary_set = {actor} changed their main email address
@@ -218,6 +222,10 @@ final class AuditSentences
         'plugin.enable.migrate_failed' => 'A plugin could not be turned on',
         'plugin.secret.deleted' => '{actor} removed a plugin secret',
         'plugin.secret.set' => '{actor} set a plugin secret',
+        'plugin.store_unsigned.installed' => "{actor} installed a store plugin that Whity hasn't signed",
+        'plugin.store_unsigned.refused' => "A store plugin that Whity hasn't signed was refused",
+        'plugin.store_unsigned.turned_off' => '{actor} stopped unsigned store plugins from being installed',
+        'plugin.store_unsigned.turned_on' => "{actor} allowed store plugins that Whity hasn't signed",
         'plugin.upload' => '{actor} uploaded a plugin',
         'profile_email.added' => '{actor} added an email address',
         'profile_email.primary_set' => '{actor} changed their main email address',

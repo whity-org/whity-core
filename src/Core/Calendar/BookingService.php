@@ -148,11 +148,12 @@ final class BookingService
 
     /**
      * Bookable slots for a service in `[from, to)`, by start time, each with
-     * the people free then.
+     * the people free then. `$exceptBookingId` treats that booking's own time
+     * and buffers as free, so a customer moving it sees the times next to it.
      *
      * @return list<array{starts_at: string, ends_at: string, profile_ids: list<int>}>
      */
-    public function availability(int $tenantId, int $serviceId, ?int $profileId, DateTimeImmutable $from, DateTimeImmutable $to, bool $publicOnly = false): array
+    public function availability(int $tenantId, int $serviceId, ?int $profileId, DateTimeImmutable $from, DateTimeImmutable $to, bool $publicOnly = false, ?int $exceptBookingId = null): array
     {
         $service = $this->service($tenantId, $serviceId, $publicOnly);
         $settings = $this->settingsFor($tenantId);
@@ -165,7 +166,7 @@ final class BookingService
 
         $byStart = [];
         foreach ($this->candidates($tenantId, $service, $profileId, $publicOnly) as $candidate) {
-            foreach ($this->slotsFor($tenantId, $candidate, $service, $settings, $earliest, $latest, $now, null) as $slot) {
+            foreach ($this->slotsFor($tenantId, $candidate, $service, $settings, $earliest, $latest, $now, $exceptBookingId) as $slot) {
                 $key = $slot->getTimestamp();
                 $byStart[$key] ??= ['start' => $slot, 'profile_ids' => []];
                 $byStart[$key]['profile_ids'][] = $candidate;

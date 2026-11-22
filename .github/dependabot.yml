@@ -55,7 +55,14 @@ updates:
 
   # GitHub Actions workflow dependencies (would have surfaced #198).
   - package-ecosystem: "github-actions"
-    directory: "/"
+    # "/" covers .github/workflows only. The composite actions under
+    # .github/actions/ pin their own `uses:` (setup-node, cache) and were
+    # never offered a bump; listing them here does (WHIT-1223). Third-party
+    # actions are pinned to a commit SHA with the tag in a comment, which
+    # Dependabot updates as a pair.
+    directories:
+      - "/"
+      - "/.github/actions/*"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10

@@ -56,16 +56,17 @@ describe('fewer sidebar headings (WHIT-1082)', () => {
     { id: 'notifications', label: 'Notification log', href: '/admin/notifications', group: 'platform', order: 9 },
   ];
 
-  it('puts a plugin’s Operations page in Work and folds the Workspace group into Settings', async () => {
+  it('keeps Operations after Work and folds the Workspace group into Settings', async () => {
     mockTenant = 1;
     mockItems = workspaceItems;
     const { result } = renderHook(() => useShellNav());
     await waitFor(() => expect(result.current.groups.length).toBeGreaterThan(0));
     const ids = result.current.groups.map((group) => group.id);
-    expect(ids).not.toContain('operations');
+    // IV.23 (WHIT-1233): Operations holds Contacts and Inventory again.
+    expect(ids.indexOf('operations')).toBe(ids.indexOf('work') + 1);
     expect(ids).not.toContain('platform');
-    const work = result.current.groups.find((group) => group.id === 'work');
-    expect(work?.items.map((item) => item.id)).toEqual(['tasks', 'contacts']);
+    const operations = result.current.groups.find((group) => group.id === 'operations');
+    expect(operations?.items.map((item) => item.id)).toEqual(['contacts']);
   });
 
   it('keeps the Platform group for the system tenant', async () => {

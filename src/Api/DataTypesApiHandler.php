@@ -17,6 +17,7 @@ use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\JsonBody;
+use Whity\Mcp\Auth\McpCallerScope;
 
 /**
  * The generated lifecycle surface for plugin-declared data types (WC-723,
@@ -107,7 +108,8 @@ final class DataTypesApiHandler
 
         $data = [];
         foreach ($this->registry->all() as $definition) {
-            if (!$this->gate->may($definition, LifecycleAction::READ, $profileId, $tenantId)) {
+            if (!$this->gate->may($definition, LifecycleAction::READ, $profileId, $tenantId)
+                || !self::credentialPermits($request, $definition, LifecycleAction::READ)) {
                 continue;
             }
 
@@ -115,6 +117,7 @@ final class DataTypesApiHandler
             $payload['actions'] = array_values(array_filter(
                 $definition->offeredActions(),
                 fn (string $action): bool => $this->gate->may($definition, $action, $profileId, $tenantId)
+                    && self::credentialPermits($request, $definition, $action)
             ));
             $data[] = $payload;
         }
@@ -305,7 +308,7 @@ final class DataTypesApiHandler
         // object — and applied BEFORE the batch is even read, so a caller who may
         // not use this action cannot probe the tenant's configured batch ceiling
         // (or anything else) by submitting a deliberately malformed body.
-        $refusal = $this->gate->authorize($type, $action, $tenantId, $profileId);
+        $refusal = $this->authorize($request, $type, $action, $tenantId, $profileId);
         if ($refusal !== null) {
             return $this->respond($type, $refusal);
         }
@@ -559,7 +562,7 @@ final class DataTypesApiHandler
         [$tenantId, $profileId] = $context;
 
         $type = (string) ($params['type'] ?? '');
-        $refusal = $this->gate->authorize($type, $action, $tenantId, $profileId);
+        $refusal = $this->authorize($request, $type, $action, $tenantId, $profileId);
         if ($refusal !== null) {
             return $this->respond($type, $refusal);
         }
@@ -578,6 +581,38 @@ final class DataTypesApiHandler
         }
 
         return [$definition, $tenantId, $profileId, $id];
+    }
+
+    /**
+     * The gate's three checks for the person, then the same two for the MCP
+     * credential they came in on (#2253): a type the credential may not read is
+     * unknown, an action it may not take is forbidden naming the permission.
+     * These routes carry no route-level permission, so tools/call cannot apply
+     * a token's scope or an agent's grant for them; this is where it happens.
+     */
+    private function authorize(Request $request, string $type, string $action, int $tenantId, int $profileId): ?LifecycleResult
+    {
+        $refusal = $this->gate->authorize($type, $action, $tenantId, $profileId);
+        if ($refusal !== null) {
+            return $refusal;
+        }
+        $definition = $this->registry->get($type);
+        if ($definition === null || !self::credentialPermits($request, $definition, LifecycleAction::READ)) {
+            return LifecycleResult::unknownType();
+        }
+        if ($action !== LifecycleAction::READ && !self::credentialPermits($request, $definition, $action)) {
+            return LifecycleResult::forbidden((string) $definition->permissionFor($action));
+        }
+        return null;
+    }
+
+    /** Whether the request's MCP credential, if any, reaches the type's permission for $action. */
+    private static function credentialPermits(Request $request, DataTypeDefinition $definition, string $action): bool
+    {
+        $permission = $definition->permissionFor($action);
+
+        return $permission !== null
+            && McpCallerScope::permits($request->user, $permission, $action === LifecycleAction::READ);
     }
 
     /**

@@ -46,6 +46,9 @@ final class CustomerSignupSsoJoinRealEngineTest extends TestCase
     private const APP_URL = 'https://app.test';
     private const ISSUER = 'https://id.whity.test';
     private const CLIENT_ID = 'whity-core';
+    /** Bakery's form whose public link asks people to sign in (#2355). */
+    private const FORM_ID = 5;
+    private const FORM_SLUG = 'ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12';
 
     private PDO $pdo;
     private JwtParser $jwtParser;
@@ -132,6 +135,7 @@ final class CustomerSignupSsoJoinRealEngineTest extends TestCase
             null,
             $this->signups,
             $hostRepo,
+            forms: new \Whity\Core\Form\FormRepository($this->pdo),
         );
 
         $this->seed();
@@ -164,6 +168,24 @@ final class CustomerSignupSsoJoinRealEngineTest extends TestCase
         // A slug that disagrees with the host's workspace is refused the same way.
         $_GET = ['join' => 'bakery'];
         self::assertSame('https://app.test/join/bakery?sso=closed', $this->location($this->start('other.whity.test')));
+    }
+
+    /**
+     * #2195 / WHIT-1294: a malformed X-Forwarded-Host (a list, here) named no
+     * workspace, so the check that the host belongs to the workspace in
+     * `?join=` was skipped. It now falls back to Host, which names "other".
+     */
+    public function testAMalformedForwardedHostCannotSkipTheDomainCheck(): void
+    {
+        $this->open('open');
+        $_GET = ['join' => 'bakery'];
+
+        $res = $this->handler->start(new Request('GET', '/api/v1/auth/sso/whity_id/start', [
+            'Host' => 'other.whity.test',
+            'X-Forwarded-Host' => 'localhost, other.whity.test',
+        ], ''), ['provider' => 'whity_id']);
+
+        self::assertSame('https://app.test/join/bakery?sso=closed', $this->location($res));
     }
 
     // ── callback ──────────────────────────────────────────────────────────────
@@ -279,6 +301,91 @@ final class CustomerSignupSsoJoinRealEngineTest extends TestCase
         self::assertSame(0, $this->rows("SELECT COUNT(*) FROM memberships m JOIN profile_emails pe ON pe.profile_id = m.profile_id WHERE pe.email = 'late@customer.test'"));
     }
 
+    // ── a form's public link that asks people to sign in (#2355) ─────────────
+
+    public function testStartFromAFormLinkCarriesTheFormsWorkspaceInTheSignedFlow(): void
+    {
+        $_GET = ['form' => self::FORM_SLUG];
+        $res = $this->start();
+
+        // Off to the operator's provider even though the workspace takes no
+        // sign-ups: a member may still sign in from the form.
+        self::assertStringStartsWith(self::ISSUER . '/authorize?', $this->location($res));
+
+        // A form whose link doesn't ask for sign-in, an unknown slug, and a
+        // host naming another workspace all go back to the form's page.
+        $this->pdo->exec('UPDATE forms SET public_requires_sign_in = FALSE WHERE id = ' . self::FORM_ID);
+        self::assertSame('https://app.test/f/' . self::FORM_SLUG . '?sso=closed', $this->location($this->start()));
+        $this->pdo->exec('UPDATE forms SET public_requires_sign_in = TRUE WHERE id = ' . self::FORM_ID);
+        self::assertSame('https://app.test/f/' . self::FORM_SLUG . '?sso=closed', $this->location($this->start('other.whity.test')));
+        $_GET = ['form' => str_repeat('c', 64)];
+        self::assertSame('https://app.test/f/' . str_repeat('c', 64) . '?sso=closed', $this->location($this->start()));
+    }
+
+    /**
+     * The reported case: a new person creates their Whity ID account from the
+     * form's link. They join the form's workspace under its open sign-up rules
+     * and land on the form, and are never offered a workspace of their own.
+     */
+    public function testANewPersonFromAFormLinkJoinsItsWorkspaceAndLandsOnTheForm(): void
+    {
+        $this->open('open', ['customer.test']);
+        $tenants = $this->rows('SELECT COUNT(*) FROM tenants');
+
+        $res = $this->returnFromProvider('form-sub', 'applicant@customer.test', true, [], 'form');
+
+        self::assertSame('https://app.test/forms/' . self::FORM_ID, $this->location($res));
+        $row = $this->membership('applicant@customer.test', $this->workspaceId);
+        self::assertSame('active', $row['status']);
+        self::assertSame($this->customerRole, (int) $row['role_id']);
+        self::assertSame($tenants, $this->rows('SELECT COUNT(*) FROM tenants'));
+        self::assertCount(1, $this->joinedEvents);
+    }
+
+    public function testAFormLinkAppliesTheWorkspacesDomainList(): void
+    {
+        $this->open('open', ['bakery.test']);
+
+        $res = $this->returnFromProvider('gmail-sub', 'outsider@gmail.test', true, [], 'form');
+
+        self::assertSame('https://app.test/f/' . self::FORM_SLUG . '?sso=domain', $this->location($res));
+        self::assertSame(0, $this->rows("SELECT COUNT(*) FROM memberships m JOIN profile_emails pe ON pe.profile_id = m.profile_id WHERE pe.email = 'outsider@gmail.test'"));
+    }
+
+    public function testAFormLinkWithSignupsOffNeverOffersANewWorkspace(): void
+    {
+        $tenants = $this->rows('SELECT COUNT(*) FROM tenants');
+
+        $res = $this->returnFromProvider('off-sub', 'stranger@customer.test', true, [], 'form');
+
+        self::assertSame('https://app.test/f/' . self::FORM_SLUG . '?sso=closed', $this->location($res));
+        self::assertSame($tenants, $this->rows('SELECT COUNT(*) FROM tenants'));
+    }
+
+    /** A member outside the domain list still signs in: the list is for joining. */
+    public function testAMemberFromAFormLinkIsSignedIntoTheWorkspaceAndLandsOnTheForm(): void
+    {
+        $this->open('open', ['customer.test']);
+
+        $res = $this->returnFromProvider('staff-sub', 'staff@bakery.test', true, [], 'form');
+
+        self::assertSame('https://app.test/forms/' . self::FORM_ID, $this->location($res));
+        self::assertSame('member', $this->col(
+            'SELECT kind FROM memberships WHERE tenant_id = ' . $this->workspaceId . ' AND profile_id = ' . $this->staffProfile
+        ));
+        self::assertSame([], $this->joinedEvents);
+    }
+
+    public function testAFormLinkInApprovalModeSaysTheRequestIsWaiting(): void
+    {
+        $this->open('approval');
+
+        $res = $this->returnFromProvider('appr-sub', 'later@customer.test', true, [], 'form');
+
+        self::assertSame('https://app.test/f/' . self::FORM_SLUG . '?sso=pending', $this->location($res));
+        self::assertSame(0, $this->rows("SELECT COUNT(*) FROM memberships m JOIN profile_emails pe ON pe.profile_id = m.profile_id WHERE pe.email = 'later@customer.test'"));
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private function start(string $host = 'app.test'): \Whity\Sdk\Http\Response
@@ -291,18 +398,21 @@ final class CustomerSignupSsoJoinRealEngineTest extends TestCase
      *
      * @param array<string, string> $extraQuery
      */
-    private function returnFromProvider(string $sub, string $email, bool $verified = true, array $extraQuery = []): \Whity\Sdk\Http\Response
+    private function returnFromProvider(string $sub, string $email, bool $verified = true, array $extraQuery = [], string $from = 'join'): \Whity\Sdk\Http\Response
     {
-        $_COOKIE['sso_flow_token'] = $this->jwtParser->create([
+        $flow = [
             'state' => 'state-1',
             'nonce' => 'nonce-1',
             'code_verifier' => 'verifier-1',
             'provider_id' => $this->providerId,
             'tenant_id' => 0,
             'provider_key' => 'whity_id',
-            'join_tenant_id' => $this->workspaceId,
-            'join_slug' => 'bakery',
-        ], 600, 'oidc_flow');
+        ];
+        // What /start writes: the sign-up page's workspace, or the form's (#2355).
+        $flow += $from === 'form'
+            ? ['form_tenant_id' => $this->workspaceId, 'form_id' => self::FORM_ID, 'form_slug' => self::FORM_SLUG]
+            : ['join_tenant_id' => $this->workspaceId, 'join_slug' => 'bakery'];
+        $_COOKIE['sso_flow_token'] = $this->jwtParser->create($flow, 600, 'oidc_flow');
 
         $now = time();
         $this->http->tokenResponse = ['id_token' => JWT::encode([
@@ -349,6 +459,9 @@ final class CustomerSignupSsoJoinRealEngineTest extends TestCase
             'scopes' => 'openid email profile',
             'enabled' => true,
         ]);
+
+        $this->pdo->exec("INSERT INTO forms (id, tenant_id, form_key, name, status, public_enabled, public_slug, public_requires_sign_in, created_at, updated_at)
+            VALUES (" . self::FORM_ID . ", {$this->workspaceId}, 'application', 'Application', 'published', TRUE, '" . self::FORM_SLUG . "', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
 
         SchemaFromMigrations::syncSequences($this->pdo);
     }

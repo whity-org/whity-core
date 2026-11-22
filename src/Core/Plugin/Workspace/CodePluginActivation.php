@@ -6,6 +6,7 @@ namespace Whity\Core\Plugin\Workspace;
 
 use PDO;
 use Whity\Core\Db\DbBool;
+use Whity\Core\Plugin\Trust\PluginTrust;
 use Whity\Core\Tenant\TenantContext;
 
 /**
@@ -64,6 +65,14 @@ final class CodePluginActivation
     /** @var array<string, ?string> */
     private array $licences = [];
 
+    /**
+     * The code plugins a signed revocation list killed, by name, read once
+     * per request (WHIT-1277).
+     *
+     * @var array<string, bool>|null
+     */
+    private ?array $killed = null;
+
     /** @var (\Closure(): array<string, array{entitlement: string, product: string, trialDays: int}>)|null */
     private ?\Closure $paidAccess = null;
 
@@ -103,6 +112,7 @@ final class CodePluginActivation
         $this->rows = [];
         $this->states = [];
         $this->licences = [];
+        $this->killed = null;
     }
 
     /**
@@ -153,12 +163,19 @@ final class CodePluginActivation
      *
      * `reason` is one of: null (free or plain on), `free_for_all`, `entitled`,
      * `cash`, `trial`, `grace`, `lapsed`, `installation_unlicensed`,
-     * `installation_grace`.
+     * `installation_grace`, `withdrawn`.
+     *
+     * A plugin a signed revocation list killed is off everywhere (WHIT-1277,
+     * #2233), the system workspace and work with no workspace included: the
+     * operator removes it, nobody runs it.
      *
      * @return array{state: string, reason: ?string, graceUntil: ?string, trialEndsAt: ?string}
      */
     public function stateFor(string $pluginName, ?int $tenantId = null): array
     {
+        if ($this->isKilled($pluginName)) {
+            return self::state(self::STATE_OFF, 'withdrawn');
+        }
         $tenantId ??= TenantContext::getTenantId();
         if ($tenantId === null || $tenantId === self::SYSTEM_TENANT_ID) {
             return self::state(self::STATE_ON);
@@ -166,6 +183,40 @@ final class CodePluginActivation
         $key = $tenantId . ':' . $pluginName;
 
         return $this->states[$key] ??= $this->compute($pluginName, $tenantId);
+    }
+
+    /**
+     * Whether a signed revocation list killed the version of this code plugin
+     * that is installed (WHIT-1277, #2233). The version is the one
+     * `plugin_installs` recorded; a plugin with no record (copied in by hand)
+     * is matched only by an entry for every version.
+     */
+    public function isKilled(string $pluginName): bool
+    {
+        if ($this->killed === null) {
+            $this->killed = [];
+            try {
+                $entries = PluginTrust::acceptedEntries($this->db);
+            } catch (\PDOException) {
+                $entries = []; // a database without the trust tables has no list to apply
+            }
+            if ($entries !== []) {
+                $versions = [];
+                $installs = $this->db->prepare('SELECT plugin_name, version FROM plugin_installs');
+                $installs->execute();
+                foreach ($installs->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                    $versions[(string) $row['plugin_name']] = $row['version'] === null ? null : (string) $row['version'];
+                }
+                foreach ($entries as $entry) {
+                    $name = $entry['plugin'] ?? null;
+                    if (is_string($name) && PluginTrust::kills($entries, $name, $versions[$name] ?? null)) {
+                        $this->killed[$name] = true;
+                    }
+                }
+            }
+        }
+
+        return $this->killed[$pluginName] ?? false;
     }
 
     /** @return array{state: string, reason: ?string, graceUntil: ?string, trialEndsAt: ?string} */
@@ -421,6 +472,13 @@ final class CodePluginActivation
         $stmt->bindValue(':enabled', $enabled, PDO::PARAM_BOOL);
         $stmt->bindValue(':profile', $profileId, $profileId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
         $stmt->execute();
+        // #2256: turning a plugin off in a workspace takes back the core
+        // permissions the operator approved for its roles there. Turning it on
+        // again does not bring them back: approving is the operator's.
+        if (!$enabled) {
+            (new \Whity\Core\Plugin\PluginCoreGrants($this->db))->removeAll($pluginName, $tenantId);
+            \Whity\Auth\RoleChecker::clearCache();
+        }
         $this->forget($tenantId);
     }
 

@@ -60,6 +60,11 @@ final class CoreTables
         'away_periods' => '251_add_two_admin_resets_and_away.php',
         'backup_codes' => '007_add_two_factor_support.php',
         'calendar_booking_services' => '302_create_calendar_booking_services.php',
+        // WHIT-1334: the walk-in queue at the front desk (design section 35).
+        'calendar_walkins' => '338_create_calendar_walkins.php',
+        'calendar_commission_rates' => '340_create_calendar_commission_rates.php',
+        'calendar_commission_closes' => '342_create_calendar_commission_closes.php',
+        'calendar_commission_close_lines' => '342_create_calendar_commission_closes.php',
         'calendar_bookings' => '248_create_calendar_bookings.php',
         'calendar_events' => '247_create_calendar.php',
         'calendar_rooms' => '258_add_calendar_rooms_and_requests.php',
@@ -69,8 +74,8 @@ final class CoreTables
         'calendar_view_preferences' => '278_create_calendar_view_preferences.php',
         'calendar_event_people' => '284_extend_calendar_events.php',
         'calendar_working_hours' => '247_create_calendar.php',
-        'contact_import_changes' => '261_create_contacts.php',
-        'contact_imports' => '261_create_contacts.php',
+        'import_job_changes' => '331_create_import_jobs.php',
+        'import_jobs' => '331_create_import_jobs.php',
         'contacts' => '261_create_contacts.php',
         'convening_bodies' => '130_create_convening.php',
         'convening_body_members' => '130_create_convening.php',
@@ -118,10 +123,36 @@ final class CoreTables
         'plugin_version_marks' => '212_create_plugin_version_marks.php',
         'plugin_revocation_state' => '213_create_plugin_revocation_state.php',
         'plugin_role_approvals' => '221_track_plugin_role_grants.php',
+        'plugin_core_grants' => '325_create_plugin_core_grants.php',
+        'plugin_versions_seen' => '339_create_plugin_versions_seen.php',
         'plugin_agent_context_grants' => '227_create_plugin_agent_context_grants.php',
         'agent_proposals' => '176_create_agent_proposals.php',
         // MCP idempotency keys (WHIT-931).
         'mcp_call_keys' => '308_create_mcp_call_keys.php',
+        // Inventory (WHIT-1232, design section 31).
+        'inv_barcodes' => '317_create_inventory_items.php',
+        'inv_categories' => '317_create_inventory_items.php',
+        'inv_item_units' => '317_create_inventory_items.php',
+        'inv_items' => '317_create_inventory_items.php',
+        'inv_levels' => '318_create_inventory_stock_ledger.php',
+        'inv_locations' => '318_create_inventory_stock_ledger.php',
+        'inv_moves' => '318_create_inventory_stock_ledger.php',
+        'inv_operation_lines' => '320_create_inventory_operations.php',
+        'inv_order_lines' => '321_create_inventory_orders.php',
+        'inv_orders' => '321_create_inventory_orders.php',
+        'sales_quotes' => '330_create_sales_quotes.php',
+        'sales_quote_lines' => '330_create_sales_quotes.php',
+        'sales_quote_conversions' => '330_create_sales_quotes.php',
+        // Company stamps (#1729).
+        'company_stamps' => '336_create_company_stamps.php',
+        'company_stamp_holders' => '336_create_company_stamps.php',
+        'inv_operations' => '320_create_inventory_operations.php',
+        'inv_reasons' => '320_create_inventory_operations.php',
+        'inv_reorder_rules' => '320_create_inventory_operations.php',
+        'inv_supplier_items' => '321_create_inventory_orders.php',
+        'inv_lots' => '337_create_inventory_lots.php',
+        'inv_units' => '317_create_inventory_items.php',
+        'inv_variants' => '317_create_inventory_items.php',
         'plugin_secrets' => '187_create_plugin_secrets.php',
         'public_form_keys' => '217_create_public_form_keys.php',
         'workspace_signup_settings' => '222_create_workspace_signup.php',
@@ -224,12 +255,17 @@ final class CoreTables
         // Files, photos and voice sent in Chat (UC.10).
         'chat_attachments' => '279_create_chat_attachments.php',
         'stored_files' => '298_create_stored_files.php',
+        // The usage ledger and stored bytes (section 33 §5, WHIT-1325).
+        'usage_ledger' => '332_create_usage_ledger.php',
+        'tenant_storage_usage' => '333_create_tenant_storage_usage.php',
         // Who owns each workspace (WHIT-1169).
         'workspace_owners' => '300_create_workspace_owners.php',
         // Offers to hand a workspace over or co-own it (WHIT-1170).
         'workspace_ownership_offers' => '301_create_workspace_ownership_offers.php',
         'workspace_template_items' => '305_create_workspace_templates.php',
         'workspace_template_runs' => '305_create_workspace_templates.php',
+        // WHIT-1225: themes a workspace imported or installed from the store.
+        'themes' => '323_create_themes.php',
         // Votes in chat polls (UC.5).
         'chat_poll_votes' => '280_create_chat_poll_votes.php',
         // Bots and blocked senders (UC.4, UC.12).

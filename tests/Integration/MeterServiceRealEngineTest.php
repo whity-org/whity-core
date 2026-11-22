@@ -60,6 +60,10 @@ final class MeterServiceRealEngineTest extends TestCase
             $this->entitlements,
             $settings,
         );
+
+        // Most of these tests are about refusing, which an operator now has to
+        // choose: warn is the default (BM.17). The warn tests set it back.
+        (new GlobalSettingsRepository($this->pdo))->set(SettingsRegistry::METERS_ENFORCEMENT, 'block');
     }
 
     // ── Spending ────────────────────────────────────────────────────────────
@@ -333,9 +337,9 @@ final class MeterServiceRealEngineTest extends TestCase
 
     // ── Warning instead of refusing ─────────────────────────────────────────
 
-    public function testBlockIsTheDefaultAndGlobalOnly(): void
+    public function testWarnIsTheDefaultAndGlobalOnly(): void
     {
-        self::assertSame('block', SettingsRegistry::defaultFor(SettingsRegistry::METERS_ENFORCEMENT));
+        self::assertSame('warn', SettingsRegistry::defaultFor(SettingsRegistry::METERS_ENFORCEMENT));
         self::assertTrue(SettingsRegistry::isGlobalOnly(SettingsRegistry::METERS_ENFORCEMENT));
     }
 

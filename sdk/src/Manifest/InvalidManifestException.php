@@ -13,7 +13,7 @@ use RuntimeException;
  * fixed in one sitting and a person (or an agent) fixing it one complaint at a
  * time is the slow way round.
  */
-final class InvalidManifestException extends RuntimeException
+final class InvalidManifestException extends RuntimeException implements \Whity\Sdk\SdkException
 {
     /**
      * @param list<string> $errors

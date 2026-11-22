@@ -65,7 +65,7 @@ final class DisplayPreferencesApiHandlerRealEngineTest extends TestCase
         $response = $this->authed()->get(new Request('GET', '/api/me/display-preferences'));
 
         self::assertSame(200, $response->getStatusCode());
-        self::assertSame(['textSize' => 'standard', 'showTechnicalDetails' => false, 'animations' => 'full'], $this->data($response));
+        self::assertSame(['textSize' => 'standard', 'showTechnicalDetails' => false, 'animations' => 'full', 'contrast' => 'standard'], $this->data($response));
     }
 
     public function testAChangeIsStoredAndReachesOnlyThatPerson(): void
@@ -73,11 +73,11 @@ final class DisplayPreferencesApiHandlerRealEngineTest extends TestCase
         $response = $this->authed()->update($this->put('{"textSize":"larger","showTechnicalDetails":true}'));
 
         self::assertSame(200, $response->getStatusCode());
-        self::assertSame(['textSize' => 'larger', 'showTechnicalDetails' => true, 'animations' => 'full'], $this->data($response));
+        self::assertSame(['textSize' => 'larger', 'showTechnicalDetails' => true, 'animations' => 'full', 'contrast' => 'standard'], $this->data($response));
 
         $other = $this->handler(['profile_id' => self::OTHER, 'active_tenant_id' => 1])
             ->get(new Request('GET', '/api/me/display-preferences'));
-        self::assertSame(['textSize' => 'standard', 'showTechnicalDetails' => false, 'animations' => 'full'], $this->data($other));
+        self::assertSame(['textSize' => 'standard', 'showTechnicalDetails' => false, 'animations' => 'full', 'contrast' => 'standard'], $this->data($other));
     }
 
     public function testChangingOneLeavesTheOther(): void
@@ -85,7 +85,7 @@ final class DisplayPreferencesApiHandlerRealEngineTest extends TestCase
         $this->authed()->update($this->put('{"textSize":"larger"}'));
         $response = $this->authed()->update($this->put('{"showTechnicalDetails":true}'));
 
-        self::assertSame(['textSize' => 'larger', 'showTechnicalDetails' => true, 'animations' => 'full'], $this->data($response));
+        self::assertSame(['textSize' => 'larger', 'showTechnicalDetails' => true, 'animations' => 'full', 'contrast' => 'standard'], $this->data($response));
     }
 
     public function testAnimationsAreStoredAndLeaveTheRest(): void
@@ -94,10 +94,17 @@ final class DisplayPreferencesApiHandlerRealEngineTest extends TestCase
         $response = $this->authed()->update($this->put('{"animations":"calm"}'));
 
         self::assertSame(200, $response->getStatusCode());
-        self::assertSame(['textSize' => 'larger', 'showTechnicalDetails' => false, 'animations' => 'calm'], $this->data($response));
+        self::assertSame(['textSize' => 'larger', 'showTechnicalDetails' => false, 'animations' => 'calm', 'contrast' => 'standard'], $this->data($response));
 
         $off = $this->authed()->update($this->put('{"animations":"off"}'));
         self::assertSame('off', $this->data($off)['animations']);
+
+        // WHIT-1225: Higher contrast is each person's own, beside the rest.
+        $high = $this->authed()->update($this->put('{"contrast":"high"}'));
+        self::assertSame(200, $high->getStatusCode());
+        self::assertSame('high', $this->data($high)['contrast']);
+        self::assertSame('larger', $this->data($high)['textSize']);
+        self::assertSame(422, $this->authed()->update($this->put('{"contrast":"max"}'))->getStatusCode());
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('invalidBodies')]
@@ -107,7 +114,7 @@ final class DisplayPreferencesApiHandlerRealEngineTest extends TestCase
 
         self::assertSame(422, $response->getStatusCode());
         $current = $this->authed()->get(new Request('GET', '/api/me/display-preferences'));
-        self::assertSame(['textSize' => 'standard', 'showTechnicalDetails' => false, 'animations' => 'full'], $this->data($current));
+        self::assertSame(['textSize' => 'standard', 'showTechnicalDetails' => false, 'animations' => 'full', 'contrast' => 'standard'], $this->data($current));
     }
 
     /** @return array<string, array{string}> */

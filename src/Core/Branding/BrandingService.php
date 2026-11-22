@@ -10,6 +10,9 @@ use Whity\Storage\MimeTypes;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 use Whity\Core\Settings\SettingsValidationException;
+use Whity\Core\Theme\ThemeLibrary;
+use Whity\Core\Theme\ThemeRepository;
+use Whity\Core\Theme\ThemeResolver;
 use Whity\Storage\StorageDriverInterface;
 use Whity\Storage\StorageKey;
 
@@ -28,6 +31,10 @@ final class BrandingService
         private readonly ?BrandingAssetValidator $validator = null,
         // WHIT-932: whether the plan removes "Built on Whity". Null: it shows.
         private readonly ?EntitlementService $entitlements = null,
+        // WHIT-1225: the themes a workspace imported. Null: Whity's own themes only.
+        private readonly ?ThemeRepository $themes = null,
+        // SDK 1.125: the themes plugins ship (PluginLoader::getPluginThemes).
+        private readonly ?\Closure $pluginThemes = null,
     ) {
     }
 
@@ -64,14 +71,11 @@ final class BrandingService
         $square = $this->urlOrNull($values[SettingsRegistry::BRANDING_LOGO_SQUARE] ?? '');
         $favicon = $this->urlOrNull($values[SettingsRegistry::BRANDING_FAVICON] ?? '');
 
-        $mainColor = null;
-        $theme = null;
-        $color = trim($values[SettingsRegistry::BRANDING_MAIN_COLOR] ?? '');
-        if (preg_match('/^#[0-9A-Fa-f]{6}$/', $color) === 1) {
-            $derived = TenantTheme::derive($color);
-            $mainColor = $derived['color'];
-            $theme = ['light' => $derived['light'], 'dark' => $derived['dark']];
-        }
+        // WHIT-1225: the chosen theme, the main colour as its primary seed and
+        // the overrides, compiled with the guard rails (ThemeResolver).
+        $resolved = ThemeResolver::resolve($values, new ThemeLibrary($this->themes, $this->pluginThemes), $tenantId);
+        $mainColor = $resolved['mainColor'];
+        $theme = $resolved['theme'];
 
         return new Branding(
             siteName: $values[SettingsRegistry::SITE_NAME] ?? SettingsRegistry::defaultFor(SettingsRegistry::SITE_NAME),
@@ -80,6 +84,7 @@ final class BrandingService
             faviconUrl: $favicon ?? $square,
             mainColor: $mainColor,
             theme: $theme,
+            themeHigh: $resolved['high'],
             installable: self::installableFrom(
                 $this->settings->storedGlobals()[SettingsRegistry::APP_INSTALLABLE] ?? null,
                 $_ENV['PWA_ENABLED'] ?? getenv('PWA_ENABLED'),
@@ -110,7 +115,7 @@ final class BrandingService
      * shared host should read the bakery's name, not the operator's. Logos and
      * the colour resolve as everywhere else (workspace, then global default).
      *
-     * @return array{name: string, logo_wide_url: ?string, logo_square_url: ?string, main_color: ?string, theme: array{light: array<string, string>, dark: array<string, string>}|null}
+     * @return array{name: string, logo_wide_url: ?string, logo_square_url: ?string, main_color: ?string, theme: array<string, mixed>|null}
      */
     public function forPublicPage(int $tenantId, string $workspaceName): array
     {

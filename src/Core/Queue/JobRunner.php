@@ -6,6 +6,7 @@ namespace Whity\Core\Queue;
 
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Whity\Auth\RoleChecker;
 use Whity\Core\Audit\AuditContext;
 use Whity\Core\Tenant\TenantContext;
 
@@ -20,8 +21,10 @@ use Whity\Core\Tenant\TenantContext;
  *
  * Per-job isolation mirrors the FrankenPHP request loop: TenantContext is set
  * to the job's tenant before the handler and RESET afterwards (along with
- * AuditContext + the DB session state), so no per-job state leaks into the next
- * job in a persistent worker.
+ * AuditContext, the RoleChecker permission caches and the per-request reads
+ * the web kernel resets, #2205), so no per-job state leaks into the next job in
+ * a persistent worker. Without the cache reset a permission revoked on the web
+ * stayed live in `queue:work` until it recycled, up to an hour.
  */
 final class JobRunner
 {
@@ -49,6 +52,25 @@ final class JobRunner
     public function setWorkspaceActivation(\Whity\Core\Plugin\Workspace\CodePluginActivation $activation): void
     {
         $this->activation = $activation;
+    }
+
+    /** What else to reset after every job: the web kernel's per-request reads (#2205). */
+    private ?\Closure $afterJob = null;
+
+    public function setAfterJob(\Closure $afterJob): void
+    {
+        $this->afterJob = $afterJob;
+    }
+
+    /** The per-job reset, after every job however it ended. */
+    private function resetAfterJob(): void
+    {
+        TenantContext::reset();
+        AuditContext::reset();
+        RoleChecker::clearCache();
+        if ($this->afterJob !== null) {
+            ($this->afterJob)();
+        }
     }
 
     /**
@@ -101,7 +123,7 @@ final class JobRunner
         if ($source !== null && $this->activation !== null && !$this->activation->isOn($source, (int) $job['tenant_id'])) {
             $this->logger->info('Job skipped: its plugin is off for this workspace', ['job' => $name, 'id' => $id, 'tenant_id' => (int) $job['tenant_id']]);
             $this->repo->markCompleted($id, ['skipped' => 'plugin_off']);
-            TenantContext::reset();
+            $this->resetAfterJob();
 
             return;
         }
@@ -126,8 +148,7 @@ final class JobRunner
             // transaction rollback / DISCARD ALL) is the worker loop's concern,
             // not the per-job runner's — and rolling back here would undo the
             // outcome write on a connection the caller manages transactionally.
-            TenantContext::reset();
-            AuditContext::reset();
+            $this->resetAfterJob();
         }
     }
 

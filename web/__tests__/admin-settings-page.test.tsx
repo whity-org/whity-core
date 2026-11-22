@@ -90,6 +90,10 @@ jest.mock('@/components/branding-settings', () => ({
     <div data-testid="branding-form" data-scope={scope} data-can-write={String(canWrite)} />
   ),
 }));
+// The Theme picker has its own tests (theme-picker.test.tsx).
+jest.mock('@/components/theme-picker', () => ({
+  ThemePicker: () => <div data-testid="theme-picker" />,
+}));
 import BrandingSettingsPage from '@/app/(protected)/admin/settings/branding/page';
 import SignupSettingsPage from '@/app/(protected)/admin/settings/signup/page';
 import FeatureFlagsSettingsPage from '@/app/(protected)/admin/settings/feature-flags/page';
@@ -961,6 +965,82 @@ describe('AdminSettingsPage - the company details', () => {
     const body = (call as unknown[])[1] as { body: { settings: Record<string, unknown> } };
     expect(body.body.settings['company.phone']).toBe('+962 6 555 0100');
     expect(body.body.settings).not.toHaveProperty('company.name');
+  });
+});
+
+/**
+ * #1730: what the public check of a document's QR code tells a holder, on the
+ * tenant card: the level, each in plain words, and the names switch, which only
+ * means something at the `signed` level and so only appears there.
+ */
+describe('AdminSettingsPage - the document check', () => {
+  const CHECK_REGISTRY = [
+    ...REGISTRY,
+    {
+      key: 'documents.qr_public_detail',
+      type: 'enum',
+      default: 'minimal',
+      options: ['undated', 'minimal', 'stage', 'described', 'signed'],
+    },
+    { key: 'documents.qr_public_signer_names', type: 'bool', default: 'false' },
+  ];
+
+  function routeCheck(level: string) {
+    mockApiGet.mockImplementation((path: string) => {
+      if (path === '/api/v1/settings/tabs') return Promise.resolve(settingsTabsResponse());
+      return Promise.resolve({
+        data: {
+          data: {
+            effective: {
+              ...EFFECTIVE,
+              'documents.qr_public_detail': level,
+              'documents.qr_public_signer_names': 'false',
+            },
+            registry: CHECK_REGISTRY,
+            overridden: ['site_name'],
+            tenant_overridable: true,
+          },
+        },
+        error: undefined,
+      });
+    });
+  }
+
+  it('names the level in plain words and hides the names switch below signed', async () => {
+    grant('settings:read', 'settings:write');
+    setTenant(5);
+    routeCheck('minimal');
+    render(<AdminSettingsPage />);
+
+    const group = await screen.findByTestId('tenant-document-check-settings');
+    expect(within(group).getByLabelText(/^What the check shows/)).toHaveTextContent('Basic');
+    expect(within(group).getByTestId('qr-detail-level-help')).toHaveTextContent(
+      'Says that the document is genuine, who issued it and when.'
+    );
+    expect(within(group).queryByTestId('setting-switch-documents.qr_public_signer_names')).not.toBeInTheDocument();
+  });
+
+  it('describes signed and offers the names switch there, writing only what changed', async () => {
+    grant('settings:read', 'settings:write');
+    setTenant(5);
+    routeCheck('signed');
+    render(<AdminSettingsPage />);
+
+    const group = await screen.findByTestId('tenant-document-check-settings');
+    expect(within(group).getByLabelText(/^What the check shows/)).toHaveTextContent('Signed');
+    expect(within(group).getByTestId('qr-detail-level-help')).toHaveTextContent(
+      'Adds who signed as their roles, with dates, and warns when the signing record was changed.'
+    );
+    expect(within(group).getByText('Show the names of people who signed')).toBeInTheDocument();
+
+    fireEvent.click(within(group).getByTestId('setting-switch-documents.qr_public_signer_names'));
+    fireEvent.click(screen.getByRole('button', { name: /save tenant settings/i }));
+
+    await waitFor(() => expect(mockApiPatch).toHaveBeenCalled());
+    const call = mockApiPatch.mock.calls.find((args: unknown[]) => args[0] === '/api/v1/settings');
+    const body = (call as unknown[])[1] as { body: { settings: Record<string, unknown> } };
+    expect(body.body.settings['documents.qr_public_signer_names']).toBe('true');
+    expect(body.body.settings).not.toHaveProperty('documents.qr_public_detail');
   });
 });
 

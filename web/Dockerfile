@@ -109,6 +109,14 @@ WORKDIR /app
 # `next start` writes its runtime caches under .next/.
 COPY --from=build --chown=node:node /app /app
 
+# `next start` is the only process this image runs, and it needs node alone.
+# The npm, npx and corepack the node image bundles were never used here and
+# carried their own dependency tree into the vulnerability scan (brace-expansion,
+# pacote, sigstore, picomatch, ip-address...; WHIT-1221), so they are removed.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
+    /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
+    /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
+
 # Nothing here needs root, and the node image already ships this user.
 USER node
 

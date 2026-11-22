@@ -22,6 +22,8 @@ use Whity\Core\Request;
 use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\Field;
+use Whity\Http\Validation\FieldValidator;
 use Whity\Sdk\Messaging\InboundMessage;
 use Whity\Core\Security\PublicToken;
 
@@ -64,6 +66,23 @@ final class PublicChatApiHandler
     ) {
     }
 
+    /** A visitor must pass a bot check: a provider is chosen and fully set up. */
+    private function needsBotCheck(): bool
+    {
+        return $this->bot->isRequired() && $this->bot->isReady();
+    }
+
+    /**
+     * The bot check isn't set up, so no new chat starts (#2203). Either a
+     * provider is chosen with its secret or site key missing (WHIT-1286), or
+     * none is chosen and "allow without a bot check" is off (WHIT-1298, owner
+     * 2026-11-19: refuse). Chats already open carry on.
+     */
+    private function botCheckNotSetUp(): bool
+    {
+        return !$this->bot->isReady();
+    }
+
     /** @param array<string, string> $params */
     public function info(Request $request, array $params = []): Response
     {
@@ -76,9 +95,14 @@ final class PublicChatApiHandler
             'workspace_name' => $workspace['name'],
             'greeting' => $workspace['greeting'],
             'max_length' => WebChatChannel::MAX_BODY,
-            'bot_check' => $this->bot->isReady()
+            // WHIT-1220: only when a provider is chosen. "Allow without a bot check"
+            // also makes isReady() true, and a check with no provider could never pass.
+            'bot_check' => $this->needsBotCheck()
                 ? ['provider' => $this->bot->provider(), 'site_key' => $this->bot->siteKey()]
                 : null,
+            // WHIT-1298 (#2203): false when no new chat can start until an admin
+            // sets up the bot check, so the page says so before anyone types.
+            'bot_check_ready' => $this->bot->isReady(),
             'brand' => $this->brandFor($workspace['id'], $workspace['name']),
         ]]);
     }
@@ -124,7 +148,10 @@ final class PublicChatApiHandler
             return Response::json(['data' => ['token' => PublicToken::make(32), 'messages' => []]], 201);
         }
 
-        if ($this->bot->isReady()) {
+        if ($this->botCheckNotSetUp()) {
+            return Response::error('Chat is not available right now. Please try again later.', 503);
+        }
+        if ($this->needsBotCheck()) {
             $verdict = $this->bot->verify((string) ($body['bot_token'] ?? ''), $ip);
             if ($verdict === BotCheck::UNREACHABLE) {
                 return Response::error('The bot check could not be reached. Please try again.', 503);
@@ -142,12 +169,17 @@ final class PublicChatApiHandler
             return RateLimited::response($openRule->window);
         }
 
-        $name = trim((string) ($body['name'] ?? ''));
-        $name = $name !== '' ? mb_substr($name, 0, self::MAX_NAME) : null;
-        $email = trim((string) ($body['email'] ?? ''));
-        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-            return Response::error('The email address is not valid.', 422);
+        // #2174: the shared field validator. The name is cut to length rather
+        // than refused, and the email address is kept as typed.
+        $checked = FieldValidator::check($body, [
+            'name' => Field::text()->truncate(self::MAX_NAME),
+            'email' => Field::email(lowercase: false),
+        ]);
+        if (!$checked->ok()) {
+            return $checked->refusal('The email address is not valid.');
         }
+        $name = $checked->value('name') !== '' ? $checked->value('name') : null;
+        $email = $checked->value('email');
 
         $token = PublicToken::makeUrlSafe();
         $visitorAddress = 'visitor:' . substr(PublicToken::hash($token), 0, 24);
@@ -293,7 +325,7 @@ final class PublicChatApiHandler
             if ($tenantId === null || $tenantId === self::SYSTEM_TENANT_ID) {
                 return null;
             }
-            $host = $request->getHeader('X-Forwarded-Host') ?? $request->getHeader('Host') ?? '';
+            $host = \Whity\Core\Http\RequestHost::fromRequest($request);
             $hostTenant = $this->hosts->resolveTenantIdByHost($host);
             if ($hostTenant !== null && $hostTenant !== $tenantId) {
                 return null;

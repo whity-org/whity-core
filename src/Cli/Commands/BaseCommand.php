@@ -101,7 +101,11 @@ abstract class BaseCommand implements CliCommand, CommandHelp
      */
     protected function setupKernel(): void
     {
-        $db = Database::connect();
+        // WHIT-1247: the web kernel's wiring first, so a plugin reached through
+        // whity-cli resolves every host service its routes do; the CLI kernel
+        // built below adds its own router and replaces what it registers.
+        // One connection for both, as in a request.
+        $db = \Whity\Core\Kernel\HostKernel::boot()['db'];
         // Registered as a service exactly as public/index.php does. Without it,
         // the CLI kernel's simulated API could not serve a plugin route at all:
         // the documented plugin seam is `\Whity\app(Database::class)` (both
@@ -401,6 +405,9 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $documentFieldRegistry->add(new \Whity\Core\Document\Fields\RouteApprovalFieldProvider($db->getPdo()));
         // WHIT-954: contacts and their custom fields, as in public/index.php.
         $documentFieldRegistry->add(new \Whity\Core\Contacts\ContactFieldProvider($db->getPdo()));
+        foreach (\Whity\Core\Inventory\Print\InventoryPrintFields::all($db->getPdo(), $settingsService) as $inventoryFieldProvider) {
+            $documentFieldRegistry->add($inventoryFieldProvider);
+        }
         \Whity\register_service(\Whity\Core\Document\Fields\DocumentFieldRegistry::class, $documentFieldRegistry);
 
         $dataTypeLifecycle = new \Whity\Core\DataType\DataTypeLifecycleService(
@@ -783,6 +790,11 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         $router->register('POST', '/api/plugins/{id}/uninstall', [$pluginsHandler, 'uninstall'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_UNINSTALL);
         // #1907: `plugin role-approve`, mirroring public/index.php.
         $router->register('POST', '/api/plugins/{name}/roles/{role}/approve', [$pluginsHandler, 'approveRole'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_INSTALL);
+        // #2256: `plugin core-grants`, `core-grant-approve`, `core-grant-revoke`, mirroring public/index.php.
+        $pluginCoreGrantsHandler = new \Whity\Api\PluginCoreGrantsApiHandler($db->getPdo(), $pluginLoader, $roleChecker, $auditLogger);
+        $router->register('GET', '/api/plugins/{name}/core-grants', [$pluginCoreGrantsHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_READ);
+        $router->register('POST', '/api/plugins/{name}/core-grants/{role}/approve', [$pluginCoreGrantsHandler, 'approve'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_INSTALL);
+        $router->register('POST', '/api/plugins/{name}/core-grants/{role}/revoke', [$pluginCoreGrantsHandler, 'revoke'], null, null, \Whity\Core\RBAC\CorePermissions::PLUGINS_INSTALL);
 
         $migrationsHandler = new MigrationsApiHandler($db, $baseDir . '/database/migrations');
         // #990: gated on the `migrations:*` slugs (migration 220). The list
@@ -823,17 +835,31 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         // `admin` in the system tenant and which nothing can authenticate as.
         //
         // TENANT 0, not 1. `EnforceTenantIsolation` pins every request to the
-        // token's tenant, so the old `tenant_id: 1` would have refused
+        // token's tenant, so the old tenant claim of 1 would have refused
         // `tenant update 5` even once the 401 was fixed. Tenant 0 is the
         // platform-wide scope these commands have always meant to operate at.
         if (!$this->token) {
-            $this->token = $jwtParser->create([
-                'profile_id'  => self::servicePrincipalId($db),
-                'sub'         => 'cli-service-principal',
-                'tenant_id'   => 0,
-                'token_epoch' => 0,
-            ]);
+            $this->token = $jwtParser->create(self::cliTokenClaims(self::servicePrincipalId($db)));
         }
+    }
+
+    /**
+     * The claims of the CLI's synthetic token, in the post-cutover shape every
+     * sign-in mints (#2200): `profile_id` and `active_tenant_id`. The legacy
+     * `tenant_id` claim is only read as a fallback for old tokens
+     * ({@see \Whity\Core\Tenant\TenantContext}), so a token carrying it alone
+     * left `active_tenant_id` null for any handler that reads it.
+     *
+     * @return array{profile_id: int, sub: string, active_tenant_id: int, token_epoch: int}
+     */
+    public static function cliTokenClaims(int $servicePrincipalId): array
+    {
+        return [
+            'profile_id'       => $servicePrincipalId,
+            'sub'              => 'cli-service-principal',
+            'active_tenant_id' => 0,
+            'token_epoch'      => 0,
+        ];
     }
 
     /**

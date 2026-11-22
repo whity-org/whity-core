@@ -182,13 +182,13 @@ class DeactivationEndsSessionsTest extends TestCase
 
     private function mintRefresh(): string
     {
-        return $this->jwtParser->create([
+        return \Tests\Support\LiveSession::forRefresh($this->pdo, $this->jwtParser, $this->jwtParser->create([
             'profile_id' => self::TEST_USER_ID,
             'active_tenant_id' => self::TEST_TENANT_ID,
             'email' => self::TEST_USER_EMAIL,
             'role' => 'admin',
             'token_epoch' => 0,
-        ], 604800, 'refresh');
+        ], 604800, 'refresh'));
     }
 
     private function setProfileStatus(string $status): void

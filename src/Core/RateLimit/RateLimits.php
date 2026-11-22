@@ -33,6 +33,12 @@ final class RateLimits
         return RateLimitRule::keyed('document_verification.address', 60, self::HOUR);
     }
 
+    /** Redeeming a device activation code, per client address (WHIT-1248). */
+    public static function licensingRedeemPerAddress(): RateLimitRule
+    {
+        return RateLimitRule::keyed('licensing_redeem.address', 30, self::HOUR);
+    }
+
     /** Asking for a verification email, per address asked about. */
     public static function emailVerificationPerEmail(): RateLimitRule
     {
@@ -43,6 +49,16 @@ final class RateLimits
     public static function emailVerificationPerAddress(): RateLimitRule
     {
         return RateLimitRule::keyed('email_verification.address', 20, self::HOUR);
+    }
+
+    /**
+     * Confirming an email address with its link, per client address (#2190).
+     * Each failed try writes an audit row, so the global limit alone let one
+     * address add millions of rows a day.
+     */
+    public static function emailVerificationConfirmPerAddress(): RateLimitRule
+    {
+        return RateLimitRule::keyed('email_verification.confirm_address', 30, self::HOUR);
     }
 
     /** Sending one of my own email addresses its verification link again. */
@@ -73,6 +89,12 @@ final class RateLimits
     public static function twoFactorRecoveryPerAddress(): RateLimitRule
     {
         return RateLimitRule::keyed('two_factor_recovery.address', 20, self::HOUR);
+    }
+
+    /** Confirming a two-step recovery request with its link, per client address (#2190). */
+    public static function twoFactorRecoveryConfirmPerAddress(): RateLimitRule
+    {
+        return RateLimitRule::keyed('two_factor_recovery.confirm_address', 30, self::HOUR);
     }
 
     /** Opening or accepting an invitation link, per address. */
@@ -133,6 +155,18 @@ final class RateLimits
     public static function publicBookingSlotsPerAddress(): RateLimitRule
     {
         return RateLimitRule::keyed('public_booking.slots', 240, self::HOUR);
+    }
+
+    /** Opening a customer's quote link, per address (WHIT-1321). */
+    public static function publicQuoteViewPerAddress(): RateLimitRule
+    {
+        return RateLimitRule::keyed('public_quote.view', 120, self::HOUR);
+    }
+
+    /** Accepting or declining a quote online, per address (WHIT-1321). */
+    public static function publicQuoteAnswerPerAddress(): RateLimitRule
+    {
+        return RateLimitRule::keyed('public_quote.answer', 20, self::HOUR);
     }
 
     /** Making a public booking, per address. */

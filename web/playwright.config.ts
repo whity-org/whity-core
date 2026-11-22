@@ -73,7 +73,9 @@ export default defineConfig({
     },
     {
       name: 'authflow',
-      testMatch: /auth(-bugs|-transitions)?\.spec\.ts/,
+      // register and verify-email are logged-out flows too; both sat unwired
+      // from July to November 2026 (WHIT-638).
+      testMatch: /(auth(-bugs|-transitions)?|register|verify-email)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
@@ -90,7 +92,7 @@ export default defineConfig({
       // silently never executes. `document-library` (#1006) is here for exactly
       // that reason — it was written against an earlier version of this list and
       // would otherwise have been dropped by the rewrite that added the others.
-      testMatch: /(agents-pages|navigation|roles|users|ous-tenants|ous-hub|stats|settings-2fa|profile|website-settings|branding|global-settings|sso|email-settings|mcp-connect|document-create|document-record|document-library|form-document-fit|rtl-direction|user-groups|workspace-create-paid|workspace-create-pay-step|plugin-embed-isolation)\.spec\.ts/,
+      testMatch: /(agents-pages|navigation|roles|users|ous-tenants|ous-hub|stats|settings-2fa|profile|website-settings|branding|global-settings|sso|email-settings|mcp-connect|document-create|document-record|document-library|form-document-fit|rtl-direction|user-groups|workspace-create-paid|workspace-create-pay-step|plugin-embed-isolation|role-record-sections)\.spec\.ts/,
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], storageState: adminStatePath },
     },
@@ -159,7 +161,13 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npm run dev -- -p ${PORT}`,
+    // CI builds the app first and sets E2E_NEXT_START, so the suite runs
+    // against `next start` — the production server, as deployed — instead of
+    // `next dev`, which compiles every route on its first visit and spent a
+    // good part of each shard doing so (WHIT-1222). Locally it stays `next dev`.
+    command: process.env.E2E_NEXT_START
+      ? `npm run start -- -p ${PORT}`
+      : `npm run dev -- -p ${PORT}`,
     url: `${BASE_URL}/login`,
     reuseExistingServer: true,
     timeout: 120_000,

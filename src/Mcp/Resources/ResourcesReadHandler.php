@@ -12,7 +12,11 @@ use Whity\Core\i18n\RequestLanguageResolver;
 use Whity\Core\Router;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\RequestContext;
+use Whity\Mcp\Auth\OAuth\OAuthTokenRefusedException;
+use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpPrincipal;
+use Whity\Mcp\Tools\ToolDeriver;
+use Whity\Mcp\Tools\ToolSurface;
 use Whity\Mcp\JsonRpc\ErrorCode;
 use Whity\Mcp\JsonRpc\McpException;
 use Whity\Mcp\JsonRpc\MethodHandler;
@@ -73,12 +77,7 @@ final class ResourcesReadHandler implements MethodHandler
         }
 
         // 2. Re-validate bearer token to obtain the principal.
-        $principal = $bearerToken !== null
-            ? $this->tokenValidator->validateMcpToken($bearerToken)
-            : null;
-        if ($principal === null) {
-            throw new McpException(ErrorCode::UNAUTHENTICATED, 'Unauthenticated');
-        }
+        $principal = $this->principalOf($bearerToken);
 
         // Route the AI principal into AuditContext so hook-fired audit entries
         // (e.g. a read that triggers a hook) also capture the MCP actor.
@@ -134,10 +133,13 @@ final class ResourcesReadHandler implements MethodHandler
         $requiredPermission = $matched['requiredPermission'] ?? null;
         $requiredRole       = $matched['requiredRole'] ?? null;
 
-        // ADR-0006 §4 (WHIT-695): an ungated route is readable only when it is
-        // on the resource surface. Without this, any GET route the Router
-        // knows — /me/emails, /health — answered here, listed or not.
-        if (!$this->exposed($matched)) {
+        // ADR-0006 §4 (WHIT-695): a route is readable only when it is on the
+        // resource surface. Without this, any GET route the Router knows —
+        // /me/emails, /health — answered here, listed or not. The deriver's
+        // answer wins, so a gated route that opts out (`'mcp' => ['expose' =>
+        // false]`, declared in the static schemas) is not readable (#2202).
+        $access = $this->surfaceAccess($matched);
+        if ($access === null) {
             throw new McpException(ErrorCode::RESOURCE_NOT_FOUND, "Resource not found: {$uri}");
         }
 
@@ -145,6 +147,16 @@ final class ResourcesReadHandler implements MethodHandler
         $gate = is_string($requiredPermission) && $requiredPermission !== '' ? $requiredPermission : null;
         if (!McpScope::of($principal)->allowsPermission($gate)) {
             throw new McpException(ErrorCode::FORBIDDEN, 'Forbidden');
+        }
+        // #2266: a token narrowed to toolsets reaches only resources in them,
+        // as with tools/call; and an agent reads only what its grant and the
+        // route's agentPolicy leave Allowed. There is no approval here, so Ask
+        // first is refused as well as Off.
+        if (!McpScope::of($principal)->allowsToolset($access['toolset'])) {
+            throw new McpException(ErrorCode::FORBIDDEN, 'Forbidden');
+        }
+        if (!AgentScopeGrant::permitsRead($principal, $gate, $access['agentPolicy'])) {
+            throw new McpException(ErrorCode::FORBIDDEN, 'This agent is not granted this operation.');
         }
 
         if (is_string($requiredPermission) && $requiredPermission !== '') {
@@ -186,24 +198,65 @@ final class ResourcesReadHandler implements MethodHandler
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    /** @param array<string, mixed> $matched */
-    private function exposed(array $matched): bool
+    /**
+     * The caller, validated the way the Dispatcher validated it: an MCP token,
+     * a session bearer or an OAuth access token (#2202).
+     *
+     * @throws McpException
+     */
+    private function principalOf(?string $bearerToken): McpPrincipal
     {
-        if (McpExposure::exposes($matched)) {
-            return true;
+        try {
+            $principal = $bearerToken !== null ? $this->tokenValidator->validateBearerForMcp($bearerToken) : null;
+        } catch (OAuthTokenRefusedException) {
+            $principal = null;
         }
+        if ($principal === null) {
+            throw new McpException(ErrorCode::UNAUTHENTICATED, 'Unauthenticated');
+        }
+        return $principal;
+    }
+
+    /**
+     * The route's place on the resource surface, or null when it is not on it.
+     * With a deriver, its answer is the only one: it reads the opt-outs and
+     * opt-ins declared in the static schemas, which the Router's route does not
+     * carry. Without one, only what the matched route itself declares counts.
+     *
+     * @param array<string, mixed> $matched
+     * @return array{agentPolicy: string, toolset: string}|null
+     */
+    private function surfaceAccess(array $matched): ?array
+    {
         $path = $matched['path'] ?? null;
-        return $this->resourceDeriver !== null && is_string($path) && $this->resourceDeriver->exposesRoute($path);
+        if ($this->resourceDeriver !== null) {
+            $access = is_string($path) ? $this->resourceDeriver->accessForRoute($path) : null;
+            return $access === null ? null : ['agentPolicy' => $access['agentPolicy'], 'toolset' => $access['toolset']];
+        }
+        if (!McpExposure::exposes($matched)) {
+            return null;
+        }
+        $schema = is_array($matched['schema'] ?? null) ? $matched['schema'] : [];
+        return [
+            'agentPolicy' => ToolSurface::routeOptions($schema)['agentPolicy'] ?? ToolSurface::AGENT_ALLOW,
+            'toolset'     => ToolDeriver::toolsetForRoute($matched),
+        ];
     }
 
     private function buildRequest(string $path, McpPrincipal $principal): Request
     {
+        // The same claims tools/call stamps (#2202): handlers read the caller
+        // off the canonical {profile_id, active_tenant_id}; the legacy aliases
+        // stay for any consumer still on them.
         $claims = [
-            'user_id'        => $principal->userId,
-            'tenant_id'      => $principal->tenantId,
-            'type'           => 'mcp',
-            'principal_kind' => $principal->principalKind,
-            'scope'          => $principal->scope,
+            'profile_id'         => $principal->userId,
+            'active_tenant_id'   => $principal->tenantId,
+            'user_id'            => $principal->userId,
+            'tenant_id'          => $principal->tenantId,
+            'type'               => 'mcp',
+            'principal_kind'     => $principal->principalKind,
+            'scope'              => $principal->scope,
+            'agent_principal_id' => $principal->isAgent() ? $principal->agentPrincipalId() : null,
         ];
 
         $request = new Request('GET', $path, ['content-type' => 'application/json'], '');
@@ -233,10 +286,7 @@ final class ResourcesReadHandler implements MethodHandler
         if ($resource === null || ($this->pluginGranted !== null && !($this->pluginGranted)($resource['plugin']))) {
             throw new McpException(ErrorCode::RESOURCE_NOT_FOUND, "Resource not found: {$uri}");
         }
-        $principal = $bearerToken !== null ? $this->tokenValidator->validateMcpToken($bearerToken) : null;
-        if ($principal === null) {
-            throw new McpException(ErrorCode::UNAUTHENTICATED, 'Unauthenticated');
-        }
+        $principal = $this->principalOf($bearerToken);
         AuditContext::setActor($principal->actor());
         $tenantId = TenantContext::getTenantId();
         if ($tenantId === null) {
@@ -245,6 +295,10 @@ final class ResourcesReadHandler implements MethodHandler
         if (!McpScope::of($principal)->allowsPermission($resource['requiredPermission'])
             || !$this->roleChecker->hasPermissionForProfile($principal->userId, $resource['requiredPermission'], $tenantId)) {
             throw new McpException(ErrorCode::FORBIDDEN, 'Forbidden');
+        }
+        // #2266: an agent's grant for the resource's permission holds here too.
+        if (!AgentScopeGrant::permitsRead($principal, $resource['requiredPermission'])) {
+            throw new McpException(ErrorCode::FORBIDDEN, 'This agent is not granted this operation.');
         }
 
         $context = new McpToolContext(

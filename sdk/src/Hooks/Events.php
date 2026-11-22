@@ -12,11 +12,18 @@ use Whity\Sdk\PluginNamespace;
  * Plugins subscribe to these via {@see \Whity\Sdk\PluginInterface::getHooks()}.
  * Two flavours exist:
  *
- * - Synchronous FILTER hooks (`*.creating` / `*.updating` / `*.deleting`):
- *   listeners receive the mutable payload plus a context array and MUST return
- *   the (possibly modified) payload.
+ * - Synchronous FILTER hooks: listeners receive the payload plus a context
+ *   array and return the (possibly modified) payload, which the host reads.
+ *   Only a few events are filters: `navigation.register`, `tenant.creating`,
+ *   `ou.creating`, `role.creating`, `document.issuing`,
+ *   `membership.customer_inviting`, `time_window.close_report` and
+ *   `rbac.resource_grant.verify_resource`. `*.updating` and `*.deleting` are
+ *   dispatched synchronously but their return value is not read (a
+ *   `*.deleting` listener can still veto, below).
  * - Notification hooks (`*.created` / `*.updated` / `*.deleted` and the
  *   `*.async` variants): listeners observe; async variants are queued.
+ *
+ * The full catalogue, with each event's kind, is in docs/wiki/HOOK_SYSTEM.md.
  *
  * Any listener can be OBSERVE-ONLY (SDK 1.89): subscribe with
  * `['callback' => $fn, 'observe' => true]`. The host ignores what it returns,
@@ -309,6 +316,13 @@ final class Events
     public const ROUTE_SIGNED_ASYNC = 'route.signed.async';
 
     /**
+     * A holder applied a company stamp on a stamp step (#1729). Payload also has `step_id`
+     * and `stamp_id`.
+     */
+    public const ROUTE_STAMPED = 'route.stamped';
+    public const ROUTE_STAMPED_ASYNC = 'route.stamped.async';
+
+    /**
      * A route's finalise step made its final document. Payload: `id` (the document),
      * `document_id`, `route_id`, `subject_type`, `subject_id`, `artifact_id`, `tenant_id`.
      */
@@ -322,7 +336,12 @@ final class Events
     public const FORM_SUBMITTED = 'form.submitted';
     public const FORM_SUBMITTED_ASYNC = 'form.submitted.async';
 
-    /** The office recorded its answers on a submission. Payload: `id`, `form_id`, `tenant_id`, `actor_profile_id`. */
+    /**
+     * The office recorded its answers on a submission, at a step of its route,
+     * after the act committed. Payload: `id`, `form_id`, `tenant_id`,
+     * `actor_profile_id`, and since 1.124 `route_id`, `step_id` and `decided`
+     * (the step's outcome, or null while it is still open). Never the answers.
+     */
     public const SUBMISSION_REVIEWED = 'submission.reviewed';
     public const SUBMISSION_REVIEWED_ASYNC = 'submission.reviewed.async';
 
@@ -429,6 +448,162 @@ final class Events
     public const WORKER_BOOT = 'worker.boot';
     public const WORKER_REQUEST_START = 'worker.request.start';
     public const WORKER_REQUEST_END = 'worker.request.end';
+
+    // ---- inventory (SDK 1.127, WHIT-1232, design section 31) ----
+    /**
+     * FILTER hook, before stock moves post, inside their transaction. Payload:
+     * `tenant_id`, `batch_key`, `source_type`, `source_id`, `reason_code`,
+     * `acting_profile_id`, `occurred_at`, and `lines` (each `variant_id`,
+     * `from_location_id`, `to_location_id`, `quantity` as base-unit steps).
+     * Return the payload unchanged; refuse the whole post with
+     * {@see HookVetoException} (the caller gets 409 and your reason). Used for
+     * a workspace's rules (stock below zero, a locked period) and a plugin's own.
+     */
+    public const STOCK_MOVING = 'stock.moving';
+    /**
+     * Stock moves posted. Payload: `tenant_id`, `batch_key`, `source_type`,
+     * `source_id`, `acting_profile_id`, `move_ids`, and `moves` (each `id`,
+     * `variant_id`, `from_location_id`, `to_location_id`, `quantity` as a base-unit
+     * decimal). One event per post, listing all its moves.
+     */
+    public const STOCK_MOVED = 'stock.moved';
+    public const STOCK_MOVED_ASYNC = 'stock.moved.async';
+    /** An item was added. Payload: `tenant_id`, `item_id`, `variant_ids`, `acting_profile_id`. */
+    public const INVENTORY_ITEM_CREATED = 'inventory.item.created';
+    public const INVENTORY_ITEM_CREATED_ASYNC = 'inventory.item.created.async';
+    /** An item changed. Payload: `tenant_id`, `item_id`, `changed` (field names), `acting_profile_id`. */
+    public const INVENTORY_ITEM_UPDATED = 'inventory.item.updated';
+    public const INVENTORY_ITEM_UPDATED_ASYNC = 'inventory.item.updated.async';
+    /** An item was archived. Payload: `tenant_id`, `item_id`, `acting_profile_id`. */
+    public const INVENTORY_ITEM_ARCHIVED = 'inventory.item.archived';
+    public const INVENTORY_ITEM_ARCHIVED_ASYNC = 'inventory.item.archived.async';
+
+    // ---- stock operations and reorder levels (SDK 1.128, WHIT-1233) ----
+    /**
+     * An adjustment, count or transfer is done: its stock has moved (for a
+     * transfer, it has arrived). Payload: `tenant_id`, `operation_id`, `kind`
+     * (`adjustment`, `count`, `transfer`), `number`, `batch_key`,
+     * `acting_profile_id`.
+     */
+    public const INVENTORY_OPERATION_DONE = 'inventory.operation.done';
+    public const INVENTORY_OPERATION_DONE_ASYNC = 'inventory.operation.done.async';
+    /**
+     * A count was finished and found differences, before they post (or before
+     * they wait for approval). Payload: `tenant_id`, `operation_id`, `number`,
+     * `location_id`, `waiting_approval` (bool), and `lines` (each `variant_id`,
+     * `expected`, `counted`, `difference` as base-unit decimals, `value_minor`,
+     * `currency`).
+     */
+    public const INVENTORY_COUNT_DIFFERENCES = 'inventory.count.differences';
+    public const INVENTORY_COUNT_DIFFERENCES_ASYNC = 'inventory.count.differences.async';
+    /**
+     * Stock available at a place went under its reorder level. Fires once,
+     * until it comes back. Payload: `tenant_id`, `rule_id`, `variant_id`,
+     * `location_id`, `available`, `min_quantity`, `order_up_to` (base-unit
+     * decimals; `order_up_to` may be null), `suggested_quantity`,
+     * `supplier_contact_id`.
+     */
+    public const STOCK_LEVEL_BELOW_REORDER = 'stock.level.below_reorder';
+    public const STOCK_LEVEL_BELOW_REORDER_ASYNC = 'stock.level.below_reorder.async';
+    /** Stock is back at or above its reorder level. Payload: `tenant_id`, `rule_id`, `variant_id`, `location_id`, `available`, `min_quantity`. */
+    public const STOCK_LEVEL_RESTORED = 'stock.level.restored';
+    public const STOCK_LEVEL_RESTORED_ASYNC = 'stock.level.restored.async';
+
+    // ---- batches and expiry (SDK 1.137, WHIT-1235) ----
+    /**
+     * A batch with stock expires within the workspace's warning window (7 days
+     * unless changed). Fired once per batch by the daily job. Payload:
+     * `tenant_id`, `lot_id`, `variant_id`, `item_id`, `code`, `expires_on`
+     * (`YYYY-MM-DD`), `on_hand` (base-unit decimal, every place together).
+     */
+    public const STOCK_LOT_EXPIRING = 'stock.lot.expiring';
+    public const STOCK_LOT_EXPIRING_ASYNC = 'stock.lot.expiring.async';
+    /** A batch with stock passed its expiry date. Fired once, the day after. Payload as `stock.lot.expiring`. */
+    public const STOCK_LOT_EXPIRED = 'stock.lot.expired';
+    public const STOCK_LOT_EXPIRED_ASYNC = 'stock.lot.expired.async';
+
+    // ---- orders: purchase orders now, sales orders later (SDK 1.129, WHIT-1234) ----
+    /**
+     * FILTER hook, before an order goes to its route or is approved. Payload:
+     * `tenant_id`, `order_id`, `kind` (`purchase`), `number`, `contact_id`,
+     * `location_id`, `currency`, `total_minor`, `acting_profile_id`, and `lines`
+     * (each `variant_id`, `quantity` as a base-unit decimal, `price_minor`,
+     * `line_total_minor`). Return the payload unchanged; refuse with
+     * {@see HookVetoException} (a buyer's budget, a blocked supplier): the
+     * caller gets 409 and your reason.
+     */
+    public const INVENTORY_ORDER_SUBMITTING = 'inventory.order.submitting';
+    /**
+     * An order was drafted. This and every `inventory.order.*` notification
+     * below carry `tenant_id`, `order_id`, `kind`, `number`, `contact_id`,
+     * `status` and `acting_profile_id`.
+     */
+    public const INVENTORY_ORDER_CREATED = 'inventory.order.created';
+    public const INVENTORY_ORDER_CREATED_ASYNC = 'inventory.order.created.async';
+    /** Approved, by its route or on sending when no route is set; for a purchase order, it can now be sent to the supplier. */
+    public const INVENTORY_ORDER_APPROVED = 'inventory.order.approved';
+    public const INVENTORY_ORDER_APPROVED_ASYNC = 'inventory.order.approved.async';
+    /** Turned down on its route; back in draft. */
+    public const INVENTORY_ORDER_REJECTED = 'inventory.order.rejected';
+    public const INVENTORY_ORDER_REJECTED_ASYNC = 'inventory.order.rejected.async';
+    /** Part of it was received (purchase) or delivered (sale). Also carries `operation_id` (the receipt). */
+    public const INVENTORY_ORDER_PARTLY_DONE = 'inventory.order.partly_done';
+    public const INVENTORY_ORDER_PARTLY_DONE_ASYNC = 'inventory.order.partly_done.async';
+    /** Every line received (or closed short). Also carries `operation_id` when a receipt finished it. */
+    public const INVENTORY_ORDER_DONE = 'inventory.order.done';
+    public const INVENTORY_ORDER_DONE_ASYNC = 'inventory.order.done.async';
+    /** Cancelled before anything was received. */
+    public const INVENTORY_ORDER_CANCELLED = 'inventory.order.cancelled';
+    public const INVENTORY_ORDER_CANCELLED_ASYNC = 'inventory.order.cancelled.async';
+
+    // ---- quotes to customers (SDK 1.132, WHIT-1321, design section 34 §3.6) ----
+    /**
+     * FILTER hook, before a quote is sent to the customer (its first send or a
+     * revision). Payload: `tenant_id`, `quote_id`, `number`, `revision`,
+     * `contact_id`, `currency`, `total_minor`, `valid_until`,
+     * `acting_profile_id`, and `lines` (each `variant_id` or null,
+     * `description`, `quantity`, `price_minor`, `line_total_minor`). Return the
+     * payload unchanged; refuse with {@see HookVetoException} (a credit limit, a
+     * blocked customer): the caller gets 409 and your reason.
+     */
+    public const SALES_QUOTE_SENDING = 'sales.quote.sending';
+    /**
+     * A quote was drafted. This and every `sales.quote.*` notification below
+     * carry `tenant_id`, `quote_id`, `number` (null until first sent),
+     * `revision`, `contact_id`, `status`, `total_minor`, `currency` and
+     * `acting_profile_id` (null when the customer decided online).
+     */
+    public const SALES_QUOTE_CREATED = 'sales.quote.created';
+    public const SALES_QUOTE_CREATED_ASYNC = 'sales.quote.created.async';
+    /** Sent to the customer, with its number. */
+    public const SALES_QUOTE_SENT = 'sales.quote.sent';
+    public const SALES_QUOTE_SENT_ASYNC = 'sales.quote.sent.async';
+    /** The customer accepted, online or as a person recorded. Also carries `decided_by_name` and `online`. */
+    public const SALES_QUOTE_ACCEPTED = 'sales.quote.accepted';
+    public const SALES_QUOTE_ACCEPTED_ASYNC = 'sales.quote.accepted.async';
+    /** The customer declined. Also carries `decided_by_name`, `online` and `reason`. */
+    public const SALES_QUOTE_DECLINED = 'sales.quote.declined';
+    public const SALES_QUOTE_DECLINED_ASYNC = 'sales.quote.declined.async';
+    /** Past its valid-until date without a decision. */
+    public const SALES_QUOTE_EXPIRED = 'sales.quote.expired';
+    public const SALES_QUOTE_EXPIRED_ASYNC = 'sales.quote.expired.async';
+    /** Turned into a target. Also carries `target` (`sales_order`, `invoice`, a plugin's key) and `target_id`. */
+    public const SALES_QUOTE_CONVERTED = 'sales.quote.converted';
+    public const SALES_QUOTE_CONVERTED_ASYNC = 'sales.quote.converted.async';
+    /** Cancelled before a decision. */
+    public const SALES_QUOTE_CANCELLED = 'sales.quote.cancelled';
+    public const SALES_QUOTE_CANCELLED_ASYNC = 'sales.quote.cancelled.async';
+
+    // ---- staff commission (SDK 1.141, WHIT-1334, design section 35 §4.3) ----
+    /**
+     * An owner closed a commission period: its totals are frozen. Payload:
+     * `tenant_id`, `close_id`, `from` and `to` (the workspace's dates, both
+     * included), `acting_profile_id`, and `lines` (each `profile_id`,
+     * `currency`, `bookings`, `sales_minor`, `commission_minor`). To book it,
+     * implement {@see \Whity\Sdk\Contribute\WorkspaceCommissionExpenses}.
+     */
+    public const CALENDAR_COMMISSION_CLOSED = 'calendar.commission.closed';
+    public const CALENDAR_COMMISSION_CLOSED_ASYNC = 'calendar.commission.closed.async';
 
     /**
      * The event name to dispatch for one of THIS plugin's own events (SDK 1.29).

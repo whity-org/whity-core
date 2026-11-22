@@ -6,6 +6,8 @@ namespace Whity\Core\Events;
 
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Whity\Auth\RoleChecker;
+use Whity\Core\Audit\AuditContext;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Tenant\TenantContext;
 
@@ -112,6 +114,13 @@ final class EventRelay
             // guard exactly as strict for everybody else.
             TenantContext::reset();
             TenantContext::setTenantId($tenantId);
+            // Every event starts with no one's permissions and no audit actor
+            // in memory (#2205). RoleChecker's cache lives as long as the
+            // process, and `events:relay` runs for up to an hour: without this a
+            // listener would keep honouring a permission revoked since the
+            // relay started, and carry the previous event's actor into its
+            // audit rows.
+            self::resetPerEventState();
             $this->hooks->dispatch($eventName, $payload);
             $this->store->markRelayed($eventId);
 
@@ -146,9 +155,22 @@ final class EventRelay
             if ($previousTenantId !== null) {
                 TenantContext::setTenantId($previousTenantId);
             }
+            // And nothing an event's listeners resolved outlives the event.
+            self::resetPerEventState();
         }
 
         return true;
+    }
+
+    /**
+     * What one event's listeners may have left in process memory: resolved
+     * permissions (the same reset `queue:work` makes after each job and the
+     * web worker after each request) and the audit actor.
+     */
+    private static function resetPerEventState(): void
+    {
+        RoleChecker::clearCache();
+        AuditContext::reset();
     }
 
     /**

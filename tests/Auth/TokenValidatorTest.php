@@ -695,6 +695,8 @@ class TokenValidatorTest extends TestCase
             'principal_kind'   => 'user',
             'scope'            => [],
             'aud'              => 'mcp',
+            // The mock answers every column read with '1', the stored epoch included (#2262).
+            'token_epoch'      => 1,
         ], 3600, 'mcp');
 
         $result = $validator->validateBearerForMcp($token);

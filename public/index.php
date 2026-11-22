@@ -780,13 +780,26 @@ $hookManager->listen('navigation.register', function ($data, $context) {
         'label' => 'Contacts',
         'href' => '/contacts',
         'icon' => 'customer',
-        // Customers and suppliers (WHIT-955, design 3.3 A8). In Work since
-        // WHIT-1082: Operations held nothing else, so it was a heading for one
-        // link. Tasks, Boards and Calendar hold orders 1-3.
-        'group' => 'work',
-        'order' => 4,
+        // Customers and suppliers (WHIT-955, design 3.3 A8). First in
+        // Operations (register, Work and operations): WHIT-1082 had folded it
+        // into Work while it was Operations' only link; Inventory joined it
+        // (IV.23, WHIT-1233).
+        'group' => 'operations',
+        'order' => 1,
         // Mirrors GET /api/contacts.
         'requiredPermission' => \Whity\Core\RBAC\CorePermissions::CONTACTS_READ,
+    ];
+    $items[] = [
+        'id' => 'inventory',
+        'label' => 'Inventory',
+        'href' => '/inventory',
+        'icon' => 'package',
+        // Items, places and stock (WHIT-1232, design section 31): Operations ›
+        // Inventory, after Contacts (IV.23).
+        'group' => 'operations',
+        'order' => 2,
+        // Mirrors GET /api/inventory/items.
+        'requiredPermission' => \Whity\Core\RBAC\CorePermissions::INVENTORY_READ,
     ];
     $items[] = [
         'id' => 'users',
@@ -1414,6 +1427,9 @@ $delegationRepository = new DelegationRepository($db->getPdo());
 $delegationService = new DelegationService($delegationRepository, $baseRoleChecker, $permissionRegistry);
 
 $roleChecker = new RoleChecker($db, $permissionRegistry, null, $delegationService);
+// #2235/#2236/#2241/#2246: every path that grants a role or a permission asks
+// this first, so a caller only grants what they hold.
+$roleGrantGuard = new \Whity\Core\RBAC\RoleGrantGuard($roleChecker);
 
 // 5b. Expose permission RESOLUTION to plugins (WC-712, issue #712).
 //     A route's `requiredPermission` is a flat, one-shot gate: it answers a
@@ -1472,7 +1488,9 @@ $kernel = new HttpKernel($router, $rbacMiddleware);
 // disables the whole layer. Defaults are generous so normal usage (and the e2e
 // suite) is never throttled — operators tighten them per deployment.
 $rateLimitEnabled    = (($_ENV['RATE_LIMIT_ENABLED'] ?? '1') !== '0');
-$rateLimitStore      = new SharedStoreRateLimitStore(new DatabaseSharedStore($db->getPdo()));
+// WHIT-1229: relaxed commits — four counter upserts run on EVERY request, and
+// waiting for each one's WAL flush was the largest single cost of a page load.
+$rateLimitStore      = new SharedStoreRateLimitStore(new DatabaseSharedStore($db->getPdo(), relaxedCounterCommits: true));
 // #1049: /api/build joins the infrastructure probes. A monitor that compares it
 // against /web-build on an interval is the intended consumer, and a throttled
 // 429 there is indistinguishable from the drift it is watching for.
@@ -1518,6 +1536,8 @@ $postAuthRateLimiter = new RateLimitMiddleware(
             (int) ($_ENV['RATE_LIMIT_PRINCIPAL_LIMIT']  ?? 2000),
             (int) ($_ENV['RATE_LIMIT_PRINCIPAL_WINDOW'] ?? 60),
         ),
+        // SDK 1.152 (#1686): a plugin route's own `rateLimit`, per person a minute.
+        \Whity\Core\Plugin\PluginRouteLimits::rule($router),
     ],
     enabled: $rateLimitEnabled,
     exemptPaths: $rateLimitExemptPaths,
@@ -1773,6 +1793,8 @@ $emailVerificationProvider = new TokenEmailVerificationProvider(
     $brandedEmailSender,
     $verifyUrlBase,
 );
+// WHIT-1246: PATCH /api/me sends the confirmation link for a new address.
+$authHandler->setEmailVerificationProvider($emailVerificationProvider);
 // WC-email: customer lifecycle emails. The subscriber listens on lifecycle hooks
 // (welcome on registration today; approval/invitation to follow) and sends via
 // the branded EmailLayout, gated per-event on the mail.events.* toggles. Sends
@@ -1929,6 +1951,8 @@ $gatedApproval = new \Whity\Core\Security\GatedApproval(
         new \Whity\Core\Document\Signing\SigningChallengeRepository($db->getPdo()),
         $totpService,
         new \Whity\Core\Security\IdentityCheckMailer($brandedEmailSender),
+        // #2223: the signing limiter, so both "confirm it's you" checks share one budget.
+        new \Whity\Core\Document\Signing\SigningAttemptLimiter(new DatabaseSharedStore($db->getPdo())),
     )
 );
 
@@ -2043,7 +2067,7 @@ $router->register('POST',   '/api/invitations/{id:\d+}/resend',  [$invitationsHa
 $router->register('DELETE', '/api/invitations/{id:\d+}',         [$invitationsHandler, 'revoke'], null, null, CorePermissions::USERS_WRITE);
 
 // 11. Register API handlers
-$usersHandler = new UsersApiHandler($db->getPdo(), $hookManager);
+$usersHandler = new UsersApiHandler($db->getPdo(), $hookManager, null, $roleGrantGuard);
 $usersBulkHandler = new \Whity\Api\UsersBulkApiHandler($db->getPdo(), $roleChecker, $hookManager, $auditLogger);
 // WC-203: gate users routes on fine-grained permission grants instead of the
 // bare 'admin' role. requiredRole is cleared (null) so the check is driven
@@ -2093,7 +2117,8 @@ $rolesHandler = new RolesApiHandler(
     $hookManager,
     null,
     new \Whity\Core\RBAC\RecordSectionResolver($roleChecker),
-    $tenantPluginRepository
+    $tenantPluginRepository,
+    $roleGrantGuard
 );
 // Roles are gated on PERMISSION SLUGS, not on the `admin` role name (#977).
 //
@@ -2259,10 +2284,21 @@ $frontendFeaturesHandler = new FrontendFeaturesApiHandler(
     // #1044: core's own declarations answer in the caller's language.
     $serverLabels,
     $logger,
-    \Whity\Core\Convening\ConveningFeatures::all($router),
+    array_merge(
+        \Whity\Core\Convening\ConveningFeatures::all($router),
+        // WHIT-1334: the front desk's Walk-ins screen (design section 35).
+        \Whity\Core\Calendar\FrontDeskFeatures::all($router),
+        // WHIT-1334: the Commission screen (design section 35 §4).
+        \Whity\Core\Calendar\CommissionFeatures::all($router),
+    ),
     $tenantManifestHost
 );
 $router->register('GET', '/api/frontend/features', [$frontendFeaturesHandler, 'list'], null);
+
+// #1688: a five-minute token, bound to one plugin's routes, that the web app's
+// embed screen makes the framed page's API calls with (never the cookies).
+$pluginFrameTokenHandler = new \Whity\Api\PluginFrameTokenApiHandler($pluginLoader, $roleChecker, $router, $jwtParser);
+$router->register('POST', '/api/plugin-frames/{feature}/token', [$pluginFrameTokenHandler, 'issue'], null);
 
 // Record routes of workspace plugins (Whity Builder, WHIT-761): one fixed
 // family, registered once. The plugin, its record type and the permission that
@@ -2520,6 +2556,13 @@ $router->register('POST', '/api/plugins/{name}/reinstall', [$pluginsHandler, 're
 // #1907: approve an existing role for a plugin's own grants (migration 221).
 // It widens what the plugin can do, so it takes the install permission.
 $router->register('POST', '/api/plugins/{name}/roles/{role}/approve', [$pluginsHandler, 'approveRole'], null, null, CorePermissions::PLUGINS_INSTALL);
+// #2256: core permissions a plugin asks for its roles, approved by the operator
+// per role and per workspace. Granting is widening, so the install permission.
+$pluginCoreGrantsHandler = new \Whity\Api\PluginCoreGrantsApiHandler($db->getPdo(), $pluginLoader, $roleChecker, $auditLogger);
+$router->register('GET', '/api/plugins/{name}/core-grants', [$pluginCoreGrantsHandler, 'list'], null, null, CorePermissions::PLUGINS_READ);
+$router->register('POST', '/api/plugins/{name}/core-grants/{role}/approve', [$pluginCoreGrantsHandler, 'approve'], null, null, CorePermissions::PLUGINS_INSTALL);
+$router->register('POST', '/api/plugins/{name}/core-grants/{role}/revoke', [$pluginCoreGrantsHandler, 'revoke'], null, null, CorePermissions::PLUGINS_INSTALL);
+\Whity\register_service(\Whity\Sdk\Contribute\CorePermissionGrants::class, new \Whity\Core\Plugin\HostCorePermissionGrants(new \Whity\Core\Plugin\PluginCoreGrants($db->getPdo()), $pluginLoader));
 // WC-install-from-store: fetch a package from a TRUSTED plugin store (host must
 // be on the operator `plugins.store_allowed_hosts` allowlist; empty ⇒ disabled)
 // and stage it through the SAME hardened installer as an upload (lands DISABLED).
@@ -2635,7 +2678,7 @@ $router->register('GET', '/api/admin/stats', [$adminHandler, 'stats'], null, nul
 // them outright; ous:write is the create/update slug the admin UI's capability
 // check already uses. ous:assign gates the two routes that ASSIGN roles to an
 // OU — verbatim what migration 005 seeded it for.
-$ousHandler = new OusApiHandler($db->getPdo(), $hookManager);
+$ousHandler = new OusApiHandler($db->getPdo(), $hookManager, $roleGrantGuard);
 $router->register('GET', '/api/ous', [$ousHandler, 'list'], null, null, CorePermissions::OUS_READ);
 $router->register('POST', '/api/ous', [$ousHandler, 'create'], null, null, CorePermissions::OUS_WRITE);
 $router->register('GET', '/api/ous/{id:\d+}', [$ousHandler, 'get'], null, null, CorePermissions::OUS_READ);
@@ -2761,6 +2804,8 @@ $settingsHandler = new \Whity\Api\SettingsApiHandler(
     $serverLabels,
     // WHIT-1168: turning password sign-in off must leave a way in.
     $db->getPdo(),
+    // WHIT-1308: turning unsigned store packages on or off is audited.
+    $auditLogger,
 );
 $router->register('GET',   '/api/settings',        [$settingsHandler, 'get'],         null, null, CorePermissions::SETTINGS_READ);
 $router->register('PATCH', '/api/settings',        [$settingsHandler, 'patch'],       null, null, CorePermissions::SETTINGS_WRITE);
@@ -2949,6 +2994,11 @@ $workspaceTemplatesHandler = new \Whity\Api\WorkspaceTemplatesApiHandler(
 );
 $workspaceCodePluginsHandler->useTemplateOnboardings(static fn (int $tenantId): array => $workspaceTemplatesHandler->onboardings($tenantId));
 $workspaceTemplatesHandler->useDisplayNames(static fn (): array => $pluginLoader->getDisplayNames());
+// SDK 1.131 (WHIT-1225): a template's theme is offered only when the workspace has it.
+$workspaceTemplatesHandler->useThemes(static fn (int $tenantId, string $id): ?array => (new \Whity\Core\Theme\ThemeLibrary(
+    new \Whity\Core\Theme\ThemeRepository($db->getPdo()),
+    static fn (): array => $pluginLoader->getPluginThemes(),
+))->find($tenantId, $id));
 $workspaceTemplatesHandler->useTrialStarter(static fn (int $tenantId, ?int $profileId, string $plugin, ?int $days): \Whity\Core\Response => $workspaceCodePluginsHandler->startTrialFor($tenantId, $profileId, $plugin, $days));
 $router->register('GET', '/api/workspace/templates', [$workspaceTemplatesHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 $router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', [$workspaceTemplatesHandler, 'apply'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
@@ -3161,7 +3211,8 @@ $licensingHandler = new \Whity\Api\LicensingApiHandler(
     new \Whity\Core\Licensing\ActivationService($db->getPdo(), null, $deviceAllowance),
     $roleChecker,
     null,
-    $deviceAllowance
+    $deviceAllowance,
+    new DatabaseSharedStore($db->getPdo())
 );
 $router->register('GET',  '/api/licensing/devices',                 [$licensingHandler, 'devices'],    null, null, CorePermissions::LICENSING_VIEW);
 $router->register('POST', '/api/licensing/devices',                 [$licensingHandler, 'provision'],  null, null, CorePermissions::LICENSING_MANAGE);
@@ -3314,6 +3365,9 @@ $router->register('GET',  '/api/billing/trial',    [$externalBillingHandler, 'tr
 // its allowance, and the workspace's admins read the result on Billing.
 $customerUsage = new \Whity\Core\Usage\CustomerUsage($db->getPdo(), $entitlementService, $settingsService);
 $customerUsage->subscribe($hookManager);
+// Section 33 §5 (BM.17): the durable usage ledger every meter writes to, per
+// workspace and month, that a bill is made from.
+$usageLedger = new \Whity\Core\Usage\UsageLedger($db->getPdo(), $settingsService);
 $planLimitMeters = new \Whity\Core\Entitlement\MeterService(
     new DatabaseSharedStore($db->getPdo()),
     $entitlementService,
@@ -3344,11 +3398,26 @@ $planLimitsHandler = new \Whity\Api\PlanLimitsApiHandler(
         $entitlementService,
         new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService),
         $customerUsage,
-        $planLimitMeters
+        $planLimitMeters,
+        $usageLedger,
     ),
     $roleChecker
 );
 $router->register('GET',  '/api/billing/limits',   [$planLimitsHandler, 'show'],      null, null, CorePermissions::BILLING_VIEW);
+// Section 33 §5: every usage meter, its base and whether it is near or past it.
+$usageReport = new \Whity\Core\Usage\UsageReport(
+    $usageLedger,
+    new \Whity\Core\Usage\UsageSnapshots(
+        $db->getPdo(),
+        $usageLedger,
+        new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService),
+        $customerUsage,
+    ),
+    $entitlementService,
+);
+$router->register('GET',  '/api/usage',            [new \Whity\Api\UsageApiHandler($usageReport, $roleChecker), 'show'], null, null, CorePermissions::BILLING_VIEW);
+// SDK 1.133: a plugin reads its workspace's meters, read-only.
+\Whity\register_service(\Whity\Sdk\Usage\Usage::class, new \Whity\Core\Usage\HostUsage($usageReport));
 // More seats, or fewer. The only change the billing service supports in place:
 // a PLAN swap would mean cancelling and buying again, which either double-charges
 // or leaves a gap, so it is refused rather than faked.
@@ -3808,6 +3877,10 @@ $documentFieldRegistry->add(new \Whity\Core\Document\Fields\RouteValueFieldProvi
 $documentFieldRegistry->add(new \Whity\Core\Document\Fields\RouteApprovalFieldProvider($db->getPdo(), $documentFieldLabels));
 // WHIT-954: contacts as a record type, with the workspace's own fields (`{{contact.<key>}}`).
 $documentFieldRegistry->add(new \Whity\Core\Contacts\ContactFieldProvider($db->getPdo(), $documentFieldLabels));
+// IV.20: purchase orders, goods received notes and item labels print through the document themes.
+foreach (\Whity\Core\Inventory\Print\InventoryPrintFields::all($db->getPdo(), $settingsService, $documentFieldLabels) as $inventoryFieldProvider) {
+    $documentFieldRegistry->add($inventoryFieldProvider);
+}
 // WHIT-742: each workspace plugin's record types, in the workspaces where
 // the plugin is published and on (`CakeOrders.order`), so a template can be
 // written for them and a slot can be issued from them.
@@ -4177,7 +4250,11 @@ $brandingService = new \Whity\Core\Branding\BrandingService(
     $settingsService,
     $storageDriver,
     new \Whity\Core\Branding\BrandingAssetValidator(new \Whity\Core\Branding\SvgSanitizer()),
-    $entitlementService
+    $entitlementService,
+    // WHIT-1225: themes a workspace imported, beside Whity's own.
+    new \Whity\Core\Theme\ThemeRepository($db->getPdo()),
+    // SDK 1.125: and the themes plugins ship.
+    static fn (): array => $pluginLoader->getPluginThemes(),
 );
 $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     $documentQrService,
@@ -4188,6 +4265,7 @@ $documentVerificationHandler = new \Whity\Api\DocumentVerificationApiHandler(
     $documentSourceRepository,
     $documentArtifactRepository,
     $brandingService,
+    $db->getPdo(),
 );
 
 // `/api/documents/views` is registered BEFORE the `{id:\d+}` routes and cannot
@@ -4250,6 +4328,8 @@ $router->register('DELETE', '/api/documents/{id:\d+}/qr',                       
 // unit's name — see DocumentVerificationApiHandler and VerificationPresenter for
 // what it discloses and why each field earns its place.
 $router->register('GET', '/api/document-verifications/{token}', [$documentVerificationHandler, 'verify'], null);
+// #1730: "Check a file". The browser sends only the SHA-256 of the PDF.
+$router->register('GET', '/api/document-verifications/{token}/files/{sha256:[0-9a-fA-F]{64}}', [$documentVerificationHandler, 'checkFile'], null);
 
 // 13a-nonies-ter. DOCUMENT ROUTING (#947 item 3) — routes, ordered steps, the
 // append-only trail, and recipients as the inbox.
@@ -4410,6 +4490,7 @@ $signingService = new \Whity\Core\Document\Signing\SigningService(
     $signingChallengeRepository,
     $instanceSealKeys,
     new \Whity\Core\Document\Signing\SigningCodeMailer($brandedEmailSender),
+    $companyStampRepository = new \Whity\Core\Document\Signing\CompanyStampRepository($db->getPdo()),
 );
 $documentSigningHandler = new \Whity\Api\DocumentSigningApiHandler(
     $documentRepository,
@@ -4424,10 +4505,22 @@ $documentSigningHandler = new \Whity\Api\DocumentSigningApiHandler(
 $router->register('GET',    '/api/documents/{id:\d+}/routes/{routeId:\d+}/signing',      [$documentSigningHandler, 'context'],         null);
 $router->register('POST',   '/api/documents/{id:\d+}/routes/{routeId:\d+}/signing/code', [$documentSigningHandler, 'sendCode'],        null);
 $router->register('POST',   '/api/documents/{id:\d+}/routes/{routeId:\d+}/sign',         [$documentSigningHandler, 'sign'],            null);
+$router->register('GET',    '/api/documents/{id:\d+}/routes/{routeId:\d+}/stamping',     [$documentSigningHandler, 'stampContext'],    null);
+$router->register('POST',   '/api/documents/{id:\d+}/routes/{routeId:\d+}/stamp',        [$documentSigningHandler, 'stamp'],           null);
 $router->register('GET',    '/api/documents/{id:\d+}/audit',                              [$documentSigningHandler, 'audit'],           null);
 $router->register('GET',    '/api/me/signature',                                          [$documentSigningHandler, 'savedSignature'],  null);
 $router->register('PUT',    '/api/me/signature',                                          [$documentSigningHandler, 'saveSignature'],   null);
 $router->register('DELETE', '/api/me/signature',                                          [$documentSigningHandler, 'deleteSignature'], null);
+// Company stamps (#1729): anyone who reads documents can list them, so a
+// route's author can choose one; documents:stamps changes them.
+$companyStampsHandler = new \Whity\Api\CompanyStampsApiHandler($companyStampRepository);
+$router->register('GET',    '/api/document-stamps',                    [$companyStampsHandler, 'list'],       null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST',   '/api/document-stamps',                    [$companyStampsHandler, 'create'],     null, null, CorePermissions::DOCUMENTS_STAMPS);
+$router->register('GET',    '/api/document-stamps/{id:\d+}',           [$companyStampsHandler, 'show'],       null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('PATCH',  '/api/document-stamps/{id:\d+}',           [$companyStampsHandler, 'update'],     null, null, CorePermissions::DOCUMENTS_STAMPS);
+$router->register('PUT',    '/api/document-stamps/{id:\d+}/holders',   [$companyStampsHandler, 'setHolders'], null, null, CorePermissions::DOCUMENTS_STAMPS);
+$router->register('POST',   '/api/document-stamps/{id:\d+}/archive',   [$companyStampsHandler, 'archive'],    null, null, CorePermissions::DOCUMENTS_STAMPS);
+$router->register('POST',   '/api/document-stamps/{id:\d+}/restore',   [$companyStampsHandler, 'restore'],    null, null, CorePermissions::DOCUMENTS_STAMPS);
 $router->register('GET',    '/api/signing-keys',                                          [$documentSigningHandler, 'publishedKeys'],   null);
 
 // 13a-nonies-quater. NAMED USER GROUPS (#999). A group is a named, reusable RULE
@@ -4740,6 +4833,14 @@ $formPrintoutsHandler = new \Whity\Api\FormPrintoutsApiHandler(
     new \Whity\Core\Form\Print\FormPrintoutService($db->getPdo(), $sourceDocumentPrinter, $entitlementService, $settingsService),
     $flowDocumentRenderer,
     $documentRenderMeters,
+    // #2243: the theme preview prints a real response, so it needs forms:read too.
+    static function (\Whity\Core\Request $request, int $tenantId) use ($roleChecker): bool {
+        $profileId = is_object($request->user) && isset($request->user->profile_id) && is_int($request->user->profile_id)
+            ? $request->user->profile_id
+            : null;
+
+        return $profileId !== null && $roleChecker->hasPermissionForProfile($profileId, CorePermissions::FORMS_READ, $tenantId);
+    },
 );
 $router->register('GET', '/api/form-submissions/{id:\d+}/printout', [$formPrintoutsHandler, 'submission'], null, null, CorePermissions::FORMS_READ);
 $router->register('POST', '/api/document-themes/form-printout-preview', [$formPrintoutsHandler, 'themePreview'], null, null, CorePermissions::DOCUMENTS_THEMES);
@@ -5161,7 +5262,10 @@ $notificationDispatcher = new \Whity\Core\Notification\NotificationDispatcher(
     $brandedEmailSender->gate()
 );
 $notificationDispatcher->subscribe($hookManager);
-\Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger, $logger);
+\Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger, $logger, static fn (): array => $pluginLoader->getPluginThemes());
+// SDK 1.152 (#1686): a plugin's $ctx->errors() reaches the tracker, scrubbed.
+// Entry points without one (the worker, the CLI) write reports to the log.
+\Whity\register_service(\Whity\Core\Observability\ErrorTracker::class, $errorTracker);
 
 // Comments and suggestions on editor documents (editor M5; E.4, E.6, E.10,
 // E.29, E.37). Registered here, after the notification dispatcher, because a
@@ -5367,8 +5471,7 @@ $decisionRecorder = new \Whity\Core\Convening\DecisionRecorder(
         $documentRouter,
         $routeRepository,
         $routeStepRepository,
-        $routeRecipientRepository,
-        $conveningBodyRepository
+        $routeRecipientRepository
     )
 );
 
@@ -5440,8 +5543,11 @@ $router->register('DELETE', '/api/calendar/staff/{profileId:\d+}/feed',     [$ca
 $router->register('GET',    '/api/calendar/staff/{profileId:\d+}/hours',    [$calendarHandler, 'getHours'],        null, null, CorePermissions::CALENDAR_READ);
 $router->register('PUT',    '/api/calendar/staff/{profileId:\d+}/hours',    [$calendarHandler, 'putHours'],        null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('GET',    '/api/calendar/time-off',                       [$calendarHandler, 'listExceptions'],  null, null, CorePermissions::CALENDAR_READ);
-$router->register('POST',   '/api/calendar/time-off',                       [$calendarHandler, 'createException'], null, null, CorePermissions::CALENDAR_WRITE);
-$router->register('DELETE', '/api/calendar/time-off/{id:\d+}',              [$calendarHandler, 'deleteException'], null, null, CorePermissions::CALENDAR_WRITE);
+// #2256: every member of staff keeps their own time off with no grant, so these
+// two check in the handler (CalendarApiHandler::assertMayChangeTimeOff()):
+// anybody else's still needs calendar:write and calendar:manage.
+$router->register('POST',   '/api/calendar/time-off',                       [$calendarHandler, 'createException'], null);
+$router->register('DELETE', '/api/calendar/time-off/{id:\d+}',              [$calendarHandler, 'deleteException'], null);
 $router->register('GET',    '/api/calendar/services',                       [$calendarHandler, 'listServices'],    null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/services',                       [$calendarHandler, 'createService'],   null, null, CorePermissions::CALENDAR_MANAGE);
 $router->register('GET',    '/api/calendar/services/{id:\d+}',              [$calendarHandler, 'showService'],     null, null, CorePermissions::CALENDAR_READ);
@@ -5462,6 +5568,61 @@ $router->register('POST',   '/api/calendar/bookings/{id:\d+}/accept',       [$ca
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/suggest',      [$calendarHandler, 'suggestBooking'],  null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/check-in',     [$calendarHandler, 'checkIn'],         null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('DELETE', '/api/calendar/bookings/{id:\d+}/check-in',     [$calendarHandler, 'checkIn'],         null, null, CorePermissions::CALENDAR_WRITE);
+
+// WHIT-1334 (design section 35 §3, SL.2-SL.4): the walk-in queue at the front
+// desk, moved from the Salons plugin. Every route needs calendar:front_desk;
+// the handler also refuses while the workspace's calendar.walkins_enabled is off.
+$walkinsHandler = new \Whity\Api\WalkinsApiHandler(
+    new \Whity\Core\Calendar\WalkinQueue($db->getPdo(), $calendarBookingService, $calendarRepository, $calendarServiceRepository, $calendarBookingRepository),
+    $calendarBookingService,
+    $languageRegistry,
+);
+$router->register('GET',    '/api/calendar/price-list',                     [$walkinsHandler, 'priceList'],        null, null, CorePermissions::CALENDAR_READ);
+$router->register('GET',    '/api/calendar/walkins',                        [$walkinsHandler, 'list'],             null, null, CorePermissions::CALENDAR_FRONT_DESK);
+$router->register('POST',   '/api/calendar/walkins',                        [$walkinsHandler, 'add'],              null, null, CorePermissions::CALENDAR_FRONT_DESK);
+$router->register('GET',    '/api/calendar/walkins/services',               [$walkinsHandler, 'services'],         null, null, CorePermissions::CALENDAR_FRONT_DESK);
+$router->register('GET',    '/api/calendar/walkins/staff',                  [$walkinsHandler, 'staff'],            null, null, CorePermissions::CALENDAR_FRONT_DESK);
+$router->register('POST',   '/api/calendar/walkins/assign',                 [$walkinsHandler, 'assignChosen'],     null, null, CorePermissions::CALENDAR_FRONT_DESK);
+$router->register('POST',   '/api/calendar/walkins/{id:\d+}/assign',        [$walkinsHandler, 'assignNext'],       null, null, CorePermissions::CALENDAR_FRONT_DESK);
+$router->register('POST',   '/api/calendar/walkins/{id:\d+}/left',          [$walkinsHandler, 'left'],             null, null, CorePermissions::CALENDAR_FRONT_DESK);
+
+// WHIT-1334 (design section 35 §4, SL.5-SL.7): staff commission rates and the
+// report from done bookings, moved from the Salons plugin.
+$calendarCommission = new \Whity\Core\Calendar\Commission($db->getPdo(), $calendarBookingService, $calendarRepository, $calendarServiceRepository);
+$commissionHandler = new \Whity\Api\CommissionApiHandler(
+    $calendarCommission,
+    $languageRegistry,
+    // SL.6: closing a period by hand; the books bind WorkspaceCommissionExpenses.
+    new \Whity\Core\Calendar\CommissionCloses($db->getPdo(), $calendarCommission, $calendarRepository, $hookManager),
+);
+$router->register('GET',    '/api/calendar/commission/rates',               [$commissionHandler, 'rates'],         null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('POST',   '/api/calendar/commission/rates',               [$commissionHandler, 'setRate'],       null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('DELETE', '/api/calendar/commission/rates/{id:\d+}',      [$commissionHandler, 'removeRate'],    null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('GET',    '/api/calendar/commission/periods',             [$commissionHandler, 'periods'],       null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('GET',    '/api/calendar/commission/report',              [$commissionHandler, 'report'],        null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('GET',    '/api/calendar/commission/staff',               [$commissionHandler, 'staff'],         null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('GET',    '/api/calendar/commission/services',            [$commissionHandler, 'services'],      null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('GET',    '/api/calendar/commission/closes',              [$commissionHandler, 'closes'],        null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('GET',    '/api/calendar/commission/closes/periods',      [$commissionHandler, 'closablePeriods'], null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('POST',   '/api/calendar/commission/closes',              [$commissionHandler, 'close'],         null, null, CorePermissions::CALENDAR_COMMISSION);
+$router->register('POST',   '/api/calendar/commission/closes/{id:\d+}/book', [$commissionHandler, 'book'],          null, null, CorePermissions::CALENDAR_COMMISSION);
+$hookManager->listen('navigation.register', function ($data, $context) use ($languageRegistry) {
+    $items = $data['items'] ?? [];
+    $items[] = \Whity\Core\Calendar\CommissionFeatures::navigationItem($languageRegistry->getCurrentLanguageCode());
+
+    return ['items' => $items];
+});
+$hookManager->listen('navigation.register', function ($data, $context) use ($calendarBookingService, $languageRegistry) {
+    $tenantId = \Whity\Core\Tenant\TenantContext::getTenantId();
+    if ($tenantId === null || !$calendarBookingService->settingsFor($tenantId)->walkinsEnabled) {
+        return $data;
+    }
+    $items = $data['items'] ?? [];
+    $items[] = \Whity\Core\Calendar\FrontDeskFeatures::navigationItem($languageRegistry->getCurrentLanguageCode());
+    $items[] = \Whity\Core\Calendar\FrontDeskFeatures::printablesNavigationItem($languageRegistry->getCurrentLanguageCode());
+
+    return ['items' => $items];
+});
 $router->register('GET',    '/api/calendar/today',                          [$calendarHandler, 'today'],           null, null, CorePermissions::CALENDAR_READ);
 $router->register('GET',    '/api/calendar/items',                          [$calendarHandler, 'items'],           null, null, CorePermissions::CALENDAR_READ);
 $router->register('GET',    '/api/calendar/events',                         [$calendarHandler, 'listEvents'],      null, null, CorePermissions::CALENDAR_READ);
@@ -5543,6 +5704,260 @@ $router->register('POST',   '/api/contacts/imports/{id:\d+}/run',          [$con
 $router->register('POST',   '/api/contacts/imports/{id:\d+}/undo',         [$contactsHandler, 'undoImport'],  null, null, CorePermissions::CONTACTS_IMPORT);
 $router->register('GET',    '/api/contacts/imports/{id:\d+}/skipped.csv',  [$contactsHandler, 'skippedCsv'],  null, null, CorePermissions::CONTACTS_IMPORT);
 
+// Inventory in core (WHIT-1232, design section 31, register IV.1-IV.24): items,
+// units, places and the append-only stock ledger, with the same services for
+// plugins (SDK 1.127). Items carry the workspace's own fields (record type
+// `inventory.item`); the plan's `inventory.items.max` counts live variants and
+// only warns, on Billing and the plan banner (IV.24).
+$inventoryDb = new \Whity\Core\Inventory\InventoryDb($db->getPdo());
+$inventoryWorkspace = new \Whity\Core\Inventory\InventoryWorkspace($inventoryDb);
+$inventoryUnits = new \Whity\Core\Inventory\UnitCatalog($inventoryDb, $inventoryWorkspace);
+$inventoryItems = new \Whity\Core\Inventory\ItemService(
+    $inventoryDb,
+    $inventoryWorkspace,
+    $inventoryUnits,
+    static function (int $tenantId) use ($settingsService): string {
+        $currency = $settingsService->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? null;
+        return is_string($currency) && preg_match('/^[A-Z]{3}$/', $currency) === 1 ? $currency : 'USD';
+    },
+    $customFieldService,
+    $hookManager,
+);
+
+// WHIT-1334 (SL.8): an item changed in inventory is copied onto its calendar
+// service, and a service saved in the calendar writes its item.
+$calendarServiceItems = new \Whity\Core\Calendar\ServiceItems($db->getPdo(), $calendarServiceRepository, $inventoryItems);
+$calendarHandler->setServiceItems($calendarServiceItems);
+$walkinsHandler->setPriceList(new \Whity\Core\Calendar\PriceList($calendarServiceRepository, $inventoryItems, $settingsService));
+foreach ([\Whity\Sdk\Hooks\Events::INVENTORY_ITEM_UPDATED, \Whity\Sdk\Hooks\Events::INVENTORY_ITEM_ARCHIVED] as $itemEvent) {
+    $hookManager->listen($itemEvent, function ($data) use ($calendarServiceItems) {
+        if (is_array($data) && is_int($data['tenant_id'] ?? null) && is_int($data['item_id'] ?? null)) {
+            try {
+                $calendarServiceItems->fromItem($data['tenant_id'], $data['item_id']);
+            } catch (\Throwable $e) {
+                error_log('[calendar] item ' . $data['item_id'] . ' not copied to its service: ' . $e->getMessage());
+            }
+        }
+
+        return $data;
+    });
+}
+$customFieldRecordTypes->register(new \Whity\Core\CustomFields\CustomFieldRecordType(
+    \Whity\Core\Inventory\ItemService::RECORD_TYPE,
+    'Items',
+    'الأصناف',
+    CorePermissions::INVENTORY_READ,
+    CorePermissions::INVENTORY_WRITE,
+    static fn (int $tenantId, int $id): bool => $inventoryItems->row($tenantId, $id) !== null,
+    \Whity\Core\Inventory\ItemService::RESERVED_KEYS,
+));
+$inventoryLocations = new \Whity\Core\Inventory\LocationService($inventoryDb, $inventoryWorkspace);
+$inventoryReasons = new \Whity\Core\Inventory\ReasonCatalog($inventoryDb, $inventoryWorkspace);
+// WHIT-1235: lots, serial numbers and expiry; FEFO and the warning window are workspace settings.
+$inventoryLots = new \Whity\Core\Inventory\LotService($inventoryDb, static fn (int $tenantId): array => $settingsService->effective($tenantId));
+$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager, $inventoryReasons, $inventoryLots);
+$inventoryItems->useOpeningLots($inventoryLedger->moveIntoOpeningLots(...));
+// WHIT-1233: adjustments, counts and transfers as records. Above the
+// workspace's value an adjustment or a count's differences travel a route
+// (inventory.adjustment, inventory.count); reorder levels watch every posting.
+$inventorySettings = static fn (int $tenantId): array => $settingsService->effective($tenantId);
+$inventoryOperations = new \Whity\Core\Inventory\StockOperations(
+    $inventoryDb,
+    $inventoryWorkspace,
+    $inventoryItems,
+    $inventoryUnits,
+    $inventoryLedger,
+    $inventoryReasons,
+    $inventorySettings,
+    $hookManager,
+);
+$routeSubjectRegistry->register(new \Whity\Core\Inventory\OperationRouteSubject(\Whity\Core\Inventory\OperationRouteSubject::ADJUSTMENT, $inventoryDb, $inventoryOperations));
+$routeSubjectRegistry->register(new \Whity\Core\Inventory\OperationRouteSubject(\Whity\Core\Inventory\OperationRouteSubject::COUNT, $inventoryDb, $inventoryOperations));
+// WHIT-1301: a change nobody can approve keeps waiting, and the people who
+// can fix that are told.
+$inventoryOperations->useApprovals(new \Whity\Core\Inventory\OperationRoutes($inventoryDb, $documentRouter, $routeTemplateRepository, $roleChecker, $inventorySettings, $notificationDispatcher));
+$inventoryReorder = new \Whity\Core\Inventory\ReorderRules($inventoryDb, $inventoryItems, $inventoryLedger, $hookManager);
+$inventoryReorder->subscribe($hookManager);
+// WHIT-1234: purchase orders, what suppliers sell, and receiving against an
+// order. A purchase order travels the workspace's purchase route when one is
+// chosen (inventory.purchase_order); with none it is approved on sending.
+$inventorySuppliers = new \Whity\Core\Inventory\SupplierItems($inventoryDb, $inventoryItems, $inventoryUnits);
+$inventoryPurchases = new \Whity\Core\Inventory\PurchaseOrders(
+    $inventoryDb,
+    $inventoryWorkspace,
+    $inventoryItems,
+    $inventoryUnits,
+    $inventoryOperations,
+    $inventorySuppliers,
+    new \Whity\Database\SequenceCounters($db->getPdo()),
+    $inventorySettings,
+    $inventoryItems->currencyFor(...),
+    $hookManager,
+);
+$routeSubjectRegistry->register(new \Whity\Core\Inventory\OrderRouteSubject($inventoryDb, $inventoryPurchases));
+$inventoryPurchases->useApprovals(new \Whity\Core\Inventory\OperationRoutes($inventoryDb, $documentRouter, $routeTemplateRepository, $roleChecker, $inventorySettings));
+// WHIT-1321: quotes to customers (design section 34, QT.1-QT.12). A quote
+// travels the workspace's quote route when one is chosen (sales.quote); the
+// customer answers on a public page reached by a 256-bit link. What a quote
+// turns into is a registry the inventory and accounting lanes fill.
+$salesQuoteConversions = new \Whity\Core\Sales\QuoteConversions();
+\Whity\register_service(\Whity\Core\Sales\QuoteConversions::class, $salesQuoteConversions); // @phpstan-ignore-line
+$salesQuotes = new \Whity\Core\Sales\Quotes(
+    $inventoryDb,
+    $inventoryWorkspace,
+    $inventoryItems,
+    $inventoryUnits,
+    new \Whity\Database\SequenceCounters($db->getPdo()),
+    $salesQuoteConversions,
+    $inventorySettings,
+    $inventoryItems->currencyFor(...),
+    $hookManager,
+);
+$routeSubjectRegistry->register(new \Whity\Core\Sales\QuoteRouteSubject($inventoryDb, $salesQuotes));
+$salesQuotes->useApprovals(new \Whity\Core\Sales\QuoteRoutes($documentRouter, $routeTemplateRepository, $inventorySettings));
+$salesQuotesHandler = new \Whity\Api\SalesQuotesApiHandler(
+    $salesQuotes,
+    $settingsService,
+    new DatabaseSharedStore($db->getPdo()),
+    \Whity\Core\Http\FrontendUrls::fromEnv()->base(),
+    $brandingService,
+    static fn (int $tenantId): string => (new \Whity\Core\Branding\TenantHostRepository($db->getPdo()))->findNameById($tenantId) ?? '',
+    // WHIT-1323: sending a quote emails it to the customer (EM.1 "Money").
+    new \Whity\Core\Sales\TradingEmails($brandedEmailSender, $settingsService),
+);
+$router->register('GET',    '/api/sales/quotes',                     [$salesQuotesHandler, 'list'],     null, null, CorePermissions::QUOTES_READ);
+$router->register('POST',   '/api/sales/quotes',                     [$salesQuotesHandler, 'create'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('GET',    '/api/sales/quotes/{id:\d+}',            [$salesQuotesHandler, 'show'],     null, null, CorePermissions::QUOTES_READ);
+$router->register('PATCH',  '/api/sales/quotes/{id:\d+}',            [$salesQuotesHandler, 'update'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/submit',     [$salesQuotesHandler, 'submit'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/send',       [$salesQuotesHandler, 'send'],     null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/link',       [$salesQuotesHandler, 'newLink'],  null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/decision',   [$salesQuotesHandler, 'decide'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/revise',     [$salesQuotesHandler, 'revise'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/cancel',     [$salesQuotesHandler, 'cancel'],   null, null, CorePermissions::QUOTES_WRITE);
+$router->register('GET',    '/api/sales/quotes/{id:\d+}/targets',    [$salesQuotesHandler, 'targets'],  null, null, CorePermissions::QUOTES_READ);
+$router->register('POST',   '/api/sales/quotes/{id:\d+}/convert',    [$salesQuotesHandler, 'convert'],  null, null, CorePermissions::QUOTES_WRITE);
+$router->register('GET',    '/api/sales/settings',                   [$salesQuotesHandler, 'showSettings'],   null, null, CorePermissions::QUOTES_READ);
+$router->register('PATCH',  '/api/sales/settings',                   [$salesQuotesHandler, 'updateSettings'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('GET',    '/api/public/quotes/{token:[a-f0-9]{64}}',         [$salesQuotesHandler, 'publicShow'],    null);
+$router->register('POST',   '/api/public/quotes/{token:[a-f0-9]{64}}/accept',  [$salesQuotesHandler, 'publicAccept'],  null);
+$router->register('POST',   '/api/public/quotes/{token:[a-f0-9]{64}}/decline', [$salesQuotesHandler, 'publicDecline'], null);
+$inventoryGuard = new \Whity\Core\Inventory\Host\HostInventoryGuard(
+    $inventoryDb,
+    static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+);
+\Whity\register_service(\Whity\Sdk\Inventory\Items::class, new \Whity\Core\Inventory\Host\HostItems($inventoryItems, $inventoryGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Inventory\Locations::class, new \Whity\Core\Inventory\Host\HostLocations($inventoryLocations, $inventoryGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Inventory\Stock::class, new \Whity\Core\Inventory\Host\HostStock($inventoryLedger, $inventoryGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Inventory\Units::class, new \Whity\Core\Inventory\Host\HostUnits($inventoryUnits, $inventoryItems, $inventoryGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Inventory\Operations::class, new \Whity\Core\Inventory\Host\HostOperations($inventoryOperations, $inventoryGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Inventory\Orders::class, new \Whity\Core\Inventory\Host\HostOrders($inventoryPurchases, $inventoryGuard)); // @phpstan-ignore-line
+\Whity\register_service(\Whity\Sdk\Inventory\Lots::class, new \Whity\Core\Inventory\Host\HostLots($inventoryLots, $inventoryGuard)); // @phpstan-ignore-line
+$inventoryHandler = new \Whity\Api\InventoryApiHandler(
+    $inventoryUnits,
+    $inventoryItems,
+    $inventoryLocations,
+    $inventoryLedger,
+    $roleChecker,
+    $inventoryOperations,
+    $inventoryReasons,
+    $inventoryReorder,
+    $settingsService,
+    $inventoryPurchases,
+    $inventorySuppliers,
+);
+// WHIT-1322: items and opening stock from a spreadsheet, on the import engine
+// contacts use (import_jobs; design section 34 §6). Opening stock also needs
+// stock:adjust, checked in the handler.
+$inventoryImportHandler = new \Whity\Api\InventoryImportApiHandler(
+    new \Whity\Core\Inventory\Import\InventoryImports($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryLedger, $inventoryItems->currencyFor(...), $inventorySuppliers),
+    $roleChecker,
+);
+$router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}',                         [$inventoryImportHandler, 'list'],       null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}',                         [$inventoryImportHandler, 'upload'],     null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}',                [$inventoryImportHandler, 'show'],       null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/check',          [$inventoryImportHandler, 'check'],      null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/run',            [$inventoryImportHandler, 'runImport'],  null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/undo',           [$inventoryImportHandler, 'undo'],       null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/skipped.csv',    [$inventoryImportHandler, 'skippedCsv'], null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/units',                            [$inventoryHandler, 'listUnits'],      null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/units',                              [$inventoryHandler, 'createUnit'],     null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/categories',                         [$inventoryHandler, 'listCategories'], null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/categories',                         [$inventoryHandler, 'createCategory'], null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/items',                              [$inventoryHandler, 'listItems'],      null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/items',                              [$inventoryHandler, 'createItem'],     null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/items/lookup',                       [$inventoryHandler, 'lookupItem'],     null, null, CorePermissions::INVENTORY_READ);
+$router->register('GET',    '/api/inventory/items/{id:\d+}',                     [$inventoryHandler, 'showItem'],       null, null, CorePermissions::INVENTORY_READ);
+$router->register('PATCH',  '/api/inventory/items/{id:\d+}',                     [$inventoryHandler, 'updateItem'],     null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/items/{id:\d+}/archive',             [$inventoryHandler, 'archiveItem'],    null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('POST',   '/api/inventory/items/{id:\d+}/restore',             [$inventoryHandler, 'restoreItem'],    null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/locations',                          [$inventoryHandler, 'listLocations'],  null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/locations',                          [$inventoryHandler, 'createLocation'], null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/locations/{id:\d+}',                 [$inventoryHandler, 'showLocation'],   null, null, CorePermissions::INVENTORY_READ);
+$router->register('PATCH',  '/api/inventory/locations/{id:\d+}',                 [$inventoryHandler, 'updateLocation'], null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/stock',                              [$inventoryHandler, 'levels'],         null, null, CorePermissions::INVENTORY_READ);
+// WHIT-1235: batches and serial numbers, and what is expiring.
+$inventoryLotHandler = new \Whity\Api\InventoryLotApiHandler($inventoryLots);
+$router->register('GET',    '/api/inventory/lots',                               [$inventoryLotHandler, 'list'],     null, null, CorePermissions::INVENTORY_READ);
+$router->register('GET',    '/api/inventory/lots/expiring',                      [$inventoryLotHandler, 'expiring'], null, null, CorePermissions::INVENTORY_READ);
+$router->register('GET',    '/api/inventory/lots/{id:\d+}',                      [$inventoryLotHandler, 'show'],     null, null, CorePermissions::INVENTORY_READ);
+$router->register('PATCH',  '/api/inventory/lots/{id:\d+}',                      [$inventoryLotHandler, 'update'],   null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/stock/moves',                        [$inventoryHandler, 'moves'],          null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/stock/adjustments',                  [$inventoryHandler, 'adjust'],         null, null, CorePermissions::STOCK_ADJUST);
+$router->register('POST',   '/api/inventory/stock/batches/{key:[a-f0-9]+}/undo', [$inventoryHandler, 'undo'],         null, null, CorePermissions::STOCK_ADJUST);
+$router->register('GET',    '/api/inventory/operations',                         [$inventoryHandler, 'listOperations'],   null, null, CorePermissions::INVENTORY_READ);
+$router->register('GET',    '/api/inventory/operations/{id:\d+}',                [$inventoryHandler, 'showOperation'],    null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/adjustments',                        [$inventoryHandler, 'createAdjustment'], null, null, CorePermissions::STOCK_ADJUST);
+$router->register('POST',   '/api/inventory/adjustments/{id:\d+}/submit',        [$inventoryHandler, 'submitAdjustment'], null, null, CorePermissions::STOCK_ADJUST);
+$router->register('POST',   '/api/inventory/adjustments/{id:\d+}/cancel',        [$inventoryHandler, 'cancelAdjustment'], null, null, CorePermissions::STOCK_ADJUST);
+$router->register('POST',   '/api/inventory/counts',                             [$inventoryHandler, 'startCount'],       null, null, CorePermissions::STOCK_COUNT);
+$router->register('PUT',    '/api/inventory/counts/{id:\d+}/lines',              [$inventoryHandler, 'recordCount'],      null, null, CorePermissions::STOCK_COUNT);
+$router->register('POST',   '/api/inventory/counts/{id:\d+}/finish',             [$inventoryHandler, 'finishCount'],      null, null, CorePermissions::STOCK_COUNT);
+$router->register('POST',   '/api/inventory/counts/{id:\d+}/cancel',             [$inventoryHandler, 'cancelCount'],      null, null, CorePermissions::STOCK_COUNT);
+$router->register('POST',   '/api/inventory/transfers',                          [$inventoryHandler, 'createTransfer'],   null, null, CorePermissions::STOCK_TRANSFER);
+$router->register('POST',   '/api/inventory/transfers/{id:\d+}/send',            [$inventoryHandler, 'sendTransfer'],     null, null, CorePermissions::STOCK_TRANSFER);
+$router->register('POST',   '/api/inventory/transfers/{id:\d+}/receive',         [$inventoryHandler, 'receiveTransfer'],  null, null, CorePermissions::STOCK_TRANSFER);
+$router->register('POST',   '/api/inventory/transfers/{id:\d+}/cancel',          [$inventoryHandler, 'cancelTransfer'],   null, null, CorePermissions::STOCK_TRANSFER);
+$router->register('GET',    '/api/inventory/reasons',                            [$inventoryHandler, 'listReasons'],      null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/reasons',                            [$inventoryHandler, 'createReason'],     null, null, CorePermissions::INVENTORY_SETTINGS);
+$router->register('PATCH',  '/api/inventory/reasons/{id:\d+}',                   [$inventoryHandler, 'updateReason'],     null, null, CorePermissions::INVENTORY_SETTINGS);
+$router->register('GET',    '/api/inventory/reorder-rules',                      [$inventoryHandler, 'listReorderRules'], null, null, CorePermissions::INVENTORY_READ);
+$router->register('PUT',    '/api/inventory/reorder-rules',                      [$inventoryHandler, 'setReorderRule'],   null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('DELETE', '/api/inventory/reorder-rules/{id:\d+}',             [$inventoryHandler, 'deleteReorderRule'], null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('GET',    '/api/inventory/settings',                           [$inventoryHandler, 'showSettings'],     null, null, CorePermissions::INVENTORY_READ);
+$router->register('PATCH',  '/api/inventory/settings',                           [$inventoryHandler, 'updateSettings'],   null, null, CorePermissions::INVENTORY_SETTINGS);
+// IV.20 (WHIT-1234): purchase orders, goods received notes and label sheets print through the document themes.
+$inventoryPrintHandler = new \Whity\Api\InventoryPrintApiHandler(
+    new \Whity\Core\Inventory\Print\InventoryDocuments(
+        $db->getPdo(),
+        $documentSourceRepository,
+        new \Whity\Core\Document\DocumentSourceVersionRepository($db->getPdo()),
+        static fn (): \Whity\Core\Document\Issuing\TemplateIssuing => \Whity\app(\Whity\Core\Document\Issuing\TemplateIssuing::class),
+        static function (int $tenantId, int $documentId) use ($documentArtifactRepository, $documentArtifactStore): ?array {
+            $artifact = $documentArtifactRepository->findLatestForDocument($documentId, $tenantId);
+
+            return $artifact !== null
+                ? ['bytes' => $documentArtifactStore->get((string) $artifact['storage_key']), 'content_type' => (string) $artifact['content_type']]
+                : null;
+        },
+    ),
+    $roleChecker,
+);
+$router->register('GET',    '/api/inventory/print-templates',                    [$inventoryPrintHandler, 'templates'],          null, null, CorePermissions::INVENTORY_READ);
+$router->register('POST',   '/api/inventory/purchase-orders/{id:\d+}/print',     [$inventoryPrintHandler, 'printPurchaseOrder'], null, null, CorePermissions::PURCHASES_READ);
+$router->register('POST',   '/api/inventory/receipts/{id:\d+}/print',            [$inventoryPrintHandler, 'printReceipt'],       null, null, CorePermissions::PURCHASES_READ);
+$router->register('GET',    '/api/inventory/purchase-orders',                    [$inventoryHandler, 'listPurchaseOrders'],     null, null, CorePermissions::PURCHASES_READ);
+$router->register('POST',   '/api/inventory/purchase-orders',                    [$inventoryHandler, 'createPurchaseOrder'],    null, null, CorePermissions::PURCHASES_WRITE);
+$router->register('GET',    '/api/inventory/purchase-orders/{id:\d+}',           [$inventoryHandler, 'showPurchaseOrder'],      null, null, CorePermissions::PURCHASES_READ);
+$router->register('PATCH',  '/api/inventory/purchase-orders/{id:\d+}',           [$inventoryHandler, 'updatePurchaseOrder'],    null, null, CorePermissions::PURCHASES_WRITE);
+$router->register('POST',   '/api/inventory/purchase-orders/{id:\d+}/submit',    [$inventoryHandler, 'submitPurchaseOrder'],    null, null, CorePermissions::PURCHASES_WRITE);
+$router->register('POST',   '/api/inventory/purchase-orders/{id:\d+}/cancel',    [$inventoryHandler, 'cancelPurchaseOrder'],    null, null, CorePermissions::PURCHASES_WRITE);
+$router->register('POST',   '/api/inventory/purchase-orders/{id:\d+}/receive',   [$inventoryHandler, 'receivePurchaseOrder'],   null, null, CorePermissions::PURCHASES_WRITE);
+$router->register('POST',   '/api/inventory/purchase-orders/{id:\d+}/lines/{line:\d+}/close', [$inventoryHandler, 'closePurchaseOrderLine'], null, null, CorePermissions::PURCHASES_WRITE);
+$router->register('GET',    '/api/inventory/supplier-items',                     [$inventoryHandler, 'listSupplierItems'],      null, null, CorePermissions::PURCHASES_READ);
+$router->register('PUT',    '/api/inventory/supplier-items',                     [$inventoryHandler, 'setSupplierItem'],        null, null, CorePermissions::INVENTORY_WRITE);
+$router->register('DELETE', '/api/inventory/supplier-items/{id:\d+}',            [$inventoryHandler, 'deleteSupplierItem'],     null, null, CorePermissions::INVENTORY_WRITE);
+
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,
     $meetingRepository,
@@ -5551,7 +5966,21 @@ $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $meetingInvitationRepository,
     $meetingAttendanceRepository,
     $meetingService,
-    $decisionRecorder
+    $decisionRecorder,
+    // #2247: the document library's visibility rule, for agenda documents and
+    // a document's convening history.
+    static function (\Whity\Core\Request $request, int $tenantId, int $documentId) use ($documentRepository, $documentVisibilityPolicy, $roleChecker): bool {
+        $callerId = is_object($request->user) && isset($request->user->profile_id) && is_int($request->user->profile_id)
+            ? $request->user->profile_id
+            : null;
+        $document = $callerId === null ? null : $documentRepository->findById($documentId, $tenantId);
+
+        return $document !== null && $documentVisibilityPolicy->canView(
+            $document,
+            $callerId,
+            \Whity\Core\RBAC\ScopedPermissionSet::forProfile($roleChecker, $callerId, $tenantId)
+        );
+    }
 );
 $router->register('GET',    '/api/meetings',                                [$meetingsHandler, 'list'],     null, null, CorePermissions::CONVENING_READ);
 $router->register('POST',   '/api/meetings',                                [$meetingsHandler, 'create'],   null, null, CorePermissions::CONVENING_MANAGE);
@@ -5905,6 +6334,7 @@ $messagingService = \Whity\Core\Messaging\CoreMessaging::build(
     $planLimitMeters,
     (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
     $brandedEmailSender,
+    $usageLedger,
 );
 \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messagingService);
 // WHIT-967 (SDK 1.99): a plugin messages a workspace's customer through Messages.
@@ -5947,13 +6377,22 @@ $chatRepository = new \Whity\Core\Chat\ChatRepository($db->getPdo());
 // WHIT-1077: each chat line is pushed to the chat's other people who have a
 // device on and aren't looking at that chat.
 $chatStore = new \Whity\Core\Store\DatabaseSharedStore($db->getPdo());
+// WHIT-1266 (#2231, #2232): a record a chat talks about is shown, found or
+// joined only by people its own screen would show it to.
+$chatRecordAccess = new \Whity\Core\Chat\ChatRecordAccess(
+    $db->getPdo(),
+    $permissionResolver,
+    $documentRepository,
+    $documentVisibilityPolicy,
+    $routeRecipientRepository,
+);
 $chatService = new \Whity\Core\Chat\ChatService($chatRepository, new \Whity\Core\Chat\ChatPushNotifier(
     $notificationDispatcher,
     $chatRepository,
     new \Whity\Core\Notification\Push\PushSubscriptionRepository($db->getPdo()),
     $chatStore,
     $logger,
-), $chatStore, new \Whity\Core\Chat\ChatAttachments($db->getPdo(), $storageDriver), new \Whity\Core\Chat\ChatBlocks($db->getPdo()));
+), $chatStore, new \Whity\Core\Chat\ChatAttachments($db->getPdo(), $storageDriver), new \Whity\Core\Chat\ChatBlocks($db->getPdo(), $chatRecordAccess), $chatRecordAccess);
 // One chat (UC.1, WHIT-1093): team chats and, for people with messages.read,
 // the customer conversations, in one list with each person's pins.
 $chatHandler = new \Whity\Api\ChatApiHandler(
@@ -6126,6 +6565,24 @@ $router->register('GET', '/api/ui/preferences', [$uiPreferencesHandler, 'get'], 
 // erroring, so this route itself is unprotected at the router level.
 $themeHandler = new \Whity\Api\ThemeApiHandler($pluginLoader, $roleChecker);
 $router->register('GET', '/api/theme', [$themeHandler, 'get'], null, null, null);
+// WHIT-1225: the themes a workspace can choose, and importing a theme file.
+// Choosing one is the branding_theme setting (PATCH /api/settings).
+$themesHandler = new \Whity\Api\ThemesApiHandler(
+    new \Whity\Core\Theme\ThemeRepository($db->getPdo()),
+    $settingsService,
+    static fn (): array => $pluginLoader->getPluginThemes(),
+);
+$router->register('GET',    '/api/themes',            [$themesHandler, 'list'],   null, null, CorePermissions::SETTINGS_READ);
+$router->register('GET',    '/api/themes/export',     [$themesHandler, 'export'], null, null, CorePermissions::SETTINGS_READ);
+$router->register('GET',    '/api/themes/export/tokens', [$themesHandler, 'exportTokens'], null, null, CorePermissions::SETTINGS_READ);
+$router->register('POST',   '/api/themes/tokens',     [$themesHandler, 'tokens'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('POST',   '/api/themes',            [$themesHandler, 'import'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('POST',   '/api/themes/convert',    [$themesHandler, 'convert'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('POST',   '/api/themes/preview',    [$themesHandler, 'preview'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('POST',   '/api/themes/compare',    [$themesHandler, 'compare'], null, null, CorePermissions::SETTINGS_READ);
+$router->register('POST',   '/api/themes/package',    [$themesHandler, 'package'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('GET',    '/api/themes/{themeId}',  [$themesHandler, 'show'],   null, null, CorePermissions::SETTINGS_READ);
+$router->register('DELETE', '/api/themes/{themeId}',  [$themesHandler, 'delete'], null, null, CorePermissions::SETTINGS_WRITE);
 
 // 13c-bis. Register the pending-registration review API (WC-235). Gated on
 // registrations:approve (6th positional arg) AND — inside the handler — on the
@@ -6141,7 +6598,8 @@ $router->register('POST', '/api/registrations/{id}/reject',  [$registrationsHand
 // in the handler via TenantContext so a caller can only manage its own domains.
 $emailDomainHandler = new TenantEmailDomainApiHandler(
     $db->getPdo(),
-    new \Whity\Core\Identity\DomainOwnershipVerifier(new \Whity\Core\Identity\SystemDnsTxtResolver())
+    new \Whity\Core\Identity\DomainOwnershipVerifier(new \Whity\Core\Identity\SystemDnsTxtResolver()),
+    $roleGrantGuard
 );
 // #990: gated on `email_domains:manage` (6th positional arg; the role stays
 // null so RbacMiddleware enforces the permission). Migration 156 grants it to
@@ -6219,6 +6677,8 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     $invitationService,
     // WHIT-1181: a verified phone_number fills the person's own phone.
     new \Whity\Core\Identity\PersonalPhone($db->getPdo()),
+    // #2355: signing in from a form's public link joins the form's workspace.
+    $formRepository,
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).
@@ -6551,7 +7011,7 @@ $proposalDiffs->useAuthoredTools($authoredMcpTools, new \Whity\Mcp\Tools\ReadOnl
 ))->registerOn($proposalDiffs);
 // WHIT-812: what an agent did that its person can still undo.
 $agentActions = new \Whity\Core\Agent\AgentActionRepository($db->getPdo());
-$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters, callKeys: new \Whity\Mcp\Tools\McpCallKeys($db->getPdo()));
+$mcpToolsCallHandler = new ToolsCallHandler($toolDeriver, $router, $roleChecker, $tokenValidator, auditLogger: $auditLogger, authoredTools: $authoredMcpTools, proposals: $agentProposals, proposalDiffs: $proposalDiffs, actions: $agentActions, languages: new \Whity\Core\i18n\RequestLanguageResolver($db->getPdo(), $languageRegistry, $settingsService), agentWork: $planLimitMeters, callKeys: new \Whity\Mcp\Tools\McpCallKeys($db->getPdo()), usage: new \Whity\Core\Usage\McpUsage($usageLedger, new DatabaseSharedStore($db->getPdo())));
 $mcpToolsCallHandler->setWorkspaceGate($pluginLoader);
 // The approvals inbox: the person an agent acts for approves, edits or
 // declines what it asked to do. Session-gated and never on the MCP surface:
@@ -6996,6 +7456,25 @@ $pluginLoader->collectJobs($jobsRegistry);
 // Features are read at dispatch time, so runtime disable drops the entry.
 \Whity\Core\PluginNavigationBridge::subscribe($hookManager, $pluginLoader, static fn (): string => $languageRegistry->getCurrentLanguageCode());
 \Whity\Core\Plugin\Tenant\TenantPluginNavigation::subscribe($hookManager, $tenantManifestHost);
+
+// WHIT-1247: queue:work, events:relay and the whity-cli kernel boot this same
+// wiring through \Whity\Core\Kernel\HostKernel::boot(), so every service a
+// plugin's job, async listener or command resolves is the one its routes get.
+// They stop here: nothing below serves a request.
+if (defined('WHITY_HOST_KERNEL_BOOT')) {
+    return [
+        'db' => $db,
+        'hookManager' => $hookManager,
+        'pluginLoader' => $pluginLoader,
+        // #2205: what a worker resets between jobs, as the request loop does
+        // between requests (the job runner resets RoleChecker's caches itself).
+        'resetRequest' => static function () use ($tenantManifestHost, $codePluginActivation, $documentFieldRegistry): void {
+            $tenantManifestHost->resetRequest();
+            $codePluginActivation->resetRequest();
+            $documentFieldRegistry->resetRequest();
+        },
+    ];
+}
 
 // Handle requests (persistent worker mode or fallback single-request mode)
 $isWorker = function_exists('frankenphp_handle_request');

@@ -102,6 +102,27 @@ final class TemplateApplierTest extends TestCase
         self::assertContains('services', array_column($result['skipped'], 'part'));
     }
 
+    public function testTheTemplatesThemeIsSetOnItsOwnAndOnlyOverTheInstallationsTheme(): void
+    {
+        $result = $this->applier()->apply(self::BAKERY, self::AMRO, ExampleBakeryTemplate::manifest(), false, 'templates.market');
+
+        $patches = array_values(array_filter($this->api->calls, static fn (array $call): bool => $call[0] === 'PATCH /api/settings'));
+        self::assertSame(['settings' => ['branding_theme' => 'templates.market']], $patches[1][1], 'Its own PATCH, after the template settings');
+        self::assertNotContains('theme', array_column($result['skipped'], 'part'));
+
+        // A theme the workspace chose (here, by the first run) stays.
+        $this->applier()->apply(self::BAKERY, self::AMRO, ExampleBakeryTemplate::manifest(), false, 'templates.other');
+        $themes = array_filter($this->api->calls, static fn (array $call): bool => isset($call[1]['settings']['branding_theme']));
+        self::assertCount(1, $themes);
+    }
+
+    public function testNoThemeWhenThePersonSaysNo(): void
+    {
+        $this->applier()->apply(self::BAKERY, self::AMRO, ExampleBakeryTemplate::manifest(), false);
+
+        self::assertSame([], array_filter($this->api->calls, static fn (array $call): bool => isset($call[1]['settings']['branding_theme'])));
+    }
+
     public function testNoExamplesWhenThePersonSaysNo(): void
     {
         $this->applier()->apply(self::BAKERY, self::AMRO, ExampleBakeryTemplate::manifest(), false);

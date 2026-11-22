@@ -11,6 +11,7 @@ use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\InputLimits;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\FieldValidator;
 
 /**
  * Tenant-scoped CRUD for the tenant's own ORGANIZATIONAL-UNIT TYPE vocabulary
@@ -151,9 +152,9 @@ final class OuTypesApiHandler
             }
             $body = JsonBody::parsed($request);
 
-            $key = trim((string) ($body['key'] ?? ''));
+            $key = FieldValidator::text($body, 'key');
             if ($key === '') {
-                return Response::error('key is required', 422);
+                return FieldValidator::missing('key is required', 'key');
             }
             if (!OuTypeRegistry::isValidKey($key)) {
                 return Response::error(
@@ -186,7 +187,7 @@ final class OuTypesApiHandler
                 );
             }
 
-            $label = array_key_exists('label', $body) ? trim((string) $body['label']) : '';
+            $label = FieldValidator::text($body, 'label');
             if ($label === '') {
                 $label = $declared?->label() ?? $key;
             }
@@ -249,7 +250,7 @@ final class OuTypesApiHandler
 
             $fields = [];
             if (array_key_exists('label', $body)) {
-                $label = trim((string) $body['label']);
+                $label = FieldValidator::text($body, 'label');
                 if ($label === '') {
                     return Response::error('label must be a non-empty string', 422);
                 }

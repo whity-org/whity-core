@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use Psr\Log\LoggerInterface;
 use Whity\Auth\RoleChecker;
+use Whity\Auth\SessionService;
 use Whity\Auth\TwoFactorRequirementReader;
 use Whity\Core\PasswordPolicy;
 use Whity\Core\Request;
@@ -14,6 +15,7 @@ use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\AuthMethod;
 use Whity\Core\Identity\PersonName;
 use Whity\Core\Identity\ProfileProvisioner;
+use Whity\Core\RBAC\RoleGrantGuard;
 use Whity\Http\InputLimits;
 use Whity\Http\JsonBody;
 use Whity\Http\ListQuery;
@@ -150,12 +152,65 @@ class UsersApiHandler
      * @param PDO                  $db          Database connection.
      * @param HookManager          $hookManager Hook dispatcher for user lifecycle events.
      * @param LoggerInterface|null $logger      Optional PSR-3 logger for structured logs.
+     * @param RoleGrantGuard|null  $grantGuard  #2235: a caller only gives a role they hold. `public/index.php` always wires it.
      */
-    public function __construct(PDO $db, HookManager $hookManager, ?LoggerInterface $logger = null)
-    {
+    public function __construct(
+        PDO $db,
+        HookManager $hookManager,
+        ?LoggerInterface $logger = null,
+        private readonly ?RoleGrantGuard $grantGuard = null
+    ) {
         $this->db = $db;
         $this->hookManager = $hookManager;
         $this->logger = $logger;
+    }
+
+    /**
+     * #2235: the 403 when the caller is giving somebody a role with permissions
+     * the caller does not hold in the tenant they act in, or null to go ahead.
+     * This also stops a caller raising their own role. With a guard wired, a
+     * request with no caller is refused.
+     */
+    private function refuseRoleGrant(Request $request, int $roleId, int $actingTenantId): ?Response
+    {
+        if ($this->grantGuard === null) {
+            return null;
+        }
+        $actor = $request->user;
+        $actorId = is_object($actor) && isset($actor->profile_id) && is_int($actor->profile_id)
+            ? $actor->profile_id
+            : null;
+        if ($actorId === null) {
+            return RoleGrantGuard::refusal([], 'You may not give roles');
+        }
+        $missing = $this->grantGuard->roleNotHeld($actorId, $actingTenantId, $roleId);
+
+        return $missing === [] ? null : RoleGrantGuard::refusal($missing);
+    }
+
+    /**
+     * #2314: the 403 when the person's current role carries permissions the
+     * caller does not hold, so changing it would take away access the caller
+     * could never give back; or null to go ahead. Same rule and order as the
+     * new role's check: with a guard wired, a request with no caller is refused.
+     */
+    private function refuseOutranked(Request $request, int $currentRoleId, int $actingTenantId): ?Response
+    {
+        if ($this->grantGuard === null) {
+            return null;
+        }
+        $actor = $request->user;
+        $actorId = is_object($actor) && isset($actor->profile_id) && is_int($actor->profile_id)
+            ? $actor->profile_id
+            : null;
+        if ($actorId === null) {
+            return RoleGrantGuard::refusal([], 'You may not change roles');
+        }
+        $missing = $this->grantGuard->roleNotHeld($actorId, $actingTenantId, $currentRoleId);
+
+        return $missing === []
+            ? null
+            : RoleGrantGuard::refusal($missing, 'This person has access you do not hold, so you may not change their role');
     }
 
     /**
@@ -619,6 +674,11 @@ class UsersApiHandler
             if ($roleNamed && $roleId === null) {
                 return Response::error('Role not found', 404);
             }
+            // #2235: a role the caller names must be one they hold. The default
+            // role is the workspace's choice, not the caller's, so it is not asked.
+            if ($roleId !== null && ($refused = $this->refuseRoleGrant($request, $roleId, $tenantId)) !== null) {
+                return $refused;
+            }
             if ($roleId === null) {
                 $roleDefaulted = true;
                 $roleId = $this->resolveVisibleRoleId('user', $tenantId, $tenantId);
@@ -680,7 +740,15 @@ class UsersApiHandler
 
             try {
                 // Find-or-create the global profile for this (globally-unique) email.
-                $profileId = $this->findOrCreateProfile($email, $passwordHash);
+                try {
+                    $profileId = $this->findOrCreateProfile($email, $passwordHash);
+                } catch (\Whity\Core\Identity\UnconfirmedEmailClaimException) {
+                    // #2245: another account's unconfirmed sign-in address.
+                    if ($ownTx && $this->db->inTransaction()) {
+                        $this->db->rollBack();
+                    }
+                    return Response::error('This email address is waiting to be confirmed on another account', 409, ['code' => 'email_unconfirmed_elsewhere']);
+                }
 
                 // Reject when an ACTIVE membership already exists for this profile
                 // in the tenant (a profile may be re-added after being removed, but
@@ -988,6 +1056,18 @@ class UsersApiHandler
                     return Response::error('Role not found', 404);
                 }
                 if ($resolved !== (int)$membership['role_id']) {
+                    // #2314: the person's CURRENT role must not outrank the
+                    // caller, or a people manager could move an admin onto a
+                    // lower role. The bulk role change refuses the same thing.
+                    $refused = $this->refuseOutranked($request, (int)$membership['role_id'], $currentTenantId);
+                    if ($refused !== null) {
+                        return $refused;
+                    }
+                    // #2235: after visibility, so a private role still reads 404.
+                    $refused = $this->refuseRoleGrant($request, $resolved, $currentTenantId);
+                    if ($refused !== null) {
+                        return $refused;
+                    }
                     $newRoleId = $resolved;
                     $roleChanged = true;
                 }
@@ -1110,10 +1190,22 @@ class UsersApiHandler
                     )->execute([$newDisplayName, $profileId]);
                 }
                 if ($accountStatusChanged) {
-                    // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
-                    $this->db->prepare(
-                        'UPDATE profiles SET status = ?, updated_at = NOW() WHERE id = ?'
-                    )->execute([$newAccountStatus, $profileId]);
+                    if ($newAccountStatus === 'inactive') {
+                        // Deactivating ends every session now, not at token
+                        // expiry (#2238). The epoch bump kills every access,
+                        // refresh, device and MCP token the person holds; the
+                        // session rows are stamped so the lists agree.
+                        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+                        $this->db->prepare(
+                            'UPDATE profiles SET status = ?, token_epoch = token_epoch + 1, updated_at = NOW() WHERE id = ?'
+                        )->execute([$newAccountStatus, $profileId]);
+                        (new SessionService($this->db))->revokeAllForProfile($profileId);
+                    } else {
+                        // Profiles is a sanctioned GLOBAL identity table (ADR 0005 §1)
+                        $this->db->prepare(
+                            'UPDATE profiles SET status = ?, updated_at = NOW() WHERE id = ?'
+                        )->execute([$newAccountStatus, $profileId]);
+                    }
                 }
 
                 // Membership writes (tenant-owned). The UPDATE carries the tenant
@@ -1589,6 +1681,10 @@ class UsersApiHandler
                 : $this->resolveVisibleRoleId($roleRef, $currentTenantId, $ownerTenantId);
             if ($roleId === null) {
                 return Response::error('Role not found', 404);
+            }
+            // #2235: a second role is a grant like any other.
+            if (($refused = $this->refuseRoleGrant($request, $roleId, $currentTenantId)) !== null) {
+                return $refused;
             }
 
             // Reuses the create/update gate, so a foreign OU is a 403 here too.

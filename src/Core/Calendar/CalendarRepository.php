@@ -248,17 +248,21 @@ final class CalendarRepository
         );
     }
 
-    /** @return array{id: int, profile_id: int}|null */
+    /** @return array{id: int, profile_id: int, kind: 'off'|'open'}|null */
     public function findException(int $tenantId, int $id): ?array
     {
         $stmt = $this->db->prepare(
-            "SELECT id, profile_id FROM calendar_events
+            "SELECT id, profile_id, kind FROM calendar_events
               WHERE tenant_id = :tenant_id AND id = :id AND status = 'confirmed' AND kind IN ('time_off', 'open_hours')"
         );
         $stmt->execute([':tenant_id' => $tenantId, ':id' => $id]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        return is_array($row) ? ['id' => (int) $row['id'], 'profile_id' => (int) $row['profile_id']] : null;
+        return is_array($row) ? [
+            'id' => (int) $row['id'],
+            'profile_id' => (int) $row['profile_id'],
+            'kind' => $row['kind'] === self::KIND_OPEN_HOURS ? 'open' : 'off',
+        ] : null;
     }
 
     /**

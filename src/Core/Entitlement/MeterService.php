@@ -313,7 +313,7 @@ final class MeterService
      */
     private function warnsOnly(int $tenantId): bool
     {
-        return ($this->settings->effective($tenantId)[SettingsRegistry::METERS_ENFORCEMENT] ?? 'block') === 'warn';
+        return ($this->settings->effective($tenantId)[SettingsRegistry::METERS_ENFORCEMENT] ?? 'warn') === 'warn';
     }
 
     /**

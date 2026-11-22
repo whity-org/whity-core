@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.121).
+ * SDK identity (v1.153).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1410,12 +1410,188 @@ namespace Whity\Sdk;
  * `required` means at least one (#1437).
  *
  * Purely additive: without `multiple` a reference select submits one string, as before.)
+ *
+ * 1.122 (OUTBOUND HEADERS AND ADDRESSES: {@see Http\Outbound\HttpResponse::$headers} and `header()`
+ * carry the answer's headers (`Retry-After`, `Location`), and {@see Testing\RecordedHttpClient::on()}
+ * scripts them. {@see Http\Outbound\AddressPolicy::publicOnly()} is an opt-in for
+ * {@see Http\Outbound\StreamHttpClient} when a person supplies the URL: the host is resolved once,
+ * refused when any address is not public, and the connection goes to the checked address (#2151).
+ *
+ * Purely additive: the new constructor arguments are optional and nothing changes without a policy.)
+ *
+ * 1.123 (ONE ERROR TYPE: every exception the SDK defines implements {@see SdkException}, so a plugin
+ * can catch "the host refused this" in one place. Each still extends \RuntimeException as before.
+ * The hook catalogue in docs/wiki/HOOK_SYSTEM.md lists every published event with its kind, and
+ * the reference page docs/wiki/Plugin-SDK-Reference.md names every SDK interface (WHIT-1230).
+ *
+ * Purely additive: no class changes its parent and no signature changes.)
+ *
+ * 1.124 (RELEASE 0.2.31, THE FIRST ONE-MINOR-PER-RELEASE ENTRY (decision D7): {@see PluginContext} is
+ * the one entry point (D3): `\Whity\app(PluginContext::class)->for($this)` gives a
+ * {@see Context\PluginScope} with settings, secrets ({@see Secrets\WorkspaceSecrets}, the workspace from
+ * the context, D2), files, documents, notify, jobs, audit and http; a service the host lacks throws
+ * {@see Context\ServiceUnavailable}. The seven `->for($this)` factories and
+ * {@see PluginHomeCardInterface} (D5) are @deprecated, working through 2.0.x. `submission.reviewed`
+ * fires again, from the route step where the office records its answers, with `route_id`, `step_id`
+ * and `decided` added (WHIT-1243). Other lanes' SDK additions in 0.2.31 join this entry.
+ *
+ * Purely additive: deprecations only; every existing name keeps working.)
+ *
+ * 1.125 (THEMES: a plugin ships theme files with {@see Contribute\PluginThemesInterface}; the host checks
+ * each against the theme format (`schemas/theme/v1.json`) and lists them in the workspace's theme
+ * picker, where a person chooses one; a plugin never applies a theme. {@see Context\PluginScope::themes()}
+ * gives {@see Theme\WorkspaceTheme}, the workspace's compiled theme and the themes it can choose,
+ * read-only, with the workspace from the context (D2). {@see PluginThemeInterface} is @deprecated,
+ * working through 2.0.x (WHIT-1225, decisions TH.1-TH.14).
+ *
+ * Purely additive: one new method on PluginScope, which only the host implements.)
+ *
+ * 1.127 (INVENTORY: host services {@see Inventory\Items}, {@see Inventory\Locations},
+ * {@see Inventory\Stock} and {@see Inventory\Units} read and change core's items, places and stock
+ * without HTTP, and {@see Context\InventoryScope} puts them on the plugin context as `$ctx->inventory()`.
+ * Stock is an append-only ledger of moves from one place to another; a plugin writes it only through
+ * the context, whose `stock()` is bound to the loaded plugin, so its moves are stored under its own name, act as a person holding `stock:adjust`, can be made idempotent, and
+ * are undone by reversing moves. {@see Inventory\Quantity} keeps quantities exact (whole steps of a
+ * unit, never floats). New events `stock.moving` (a filter that can veto), `stock.moved` and
+ * `inventory.item.created|updated|archived` (WHIT-1232, design section 31).
+ *
+ * Purely additive.)
+ *
+ * 1.128 (STOCK OPERATIONS: {@see Inventory\Operations} adjusts stock with a reason from the workspace's
+ * list, counts it (expected taken as each line is counted, blind counts optional) and moves it between
+ * places (sent, on the way, received), each as an {@see Inventory\Operation} with its
+ * {@see Inventory\OperationLine}s. An adjustment or a count's differences worth more than the workspace's
+ * value waits for approval on its route before it posts. A plugin writes through
+ * `$ctx->inventory()->operations()`, bound to the loaded plugin like `stock()`; the container's copy only
+ * reads. New events `inventory.operation.done`, `inventory.count.differences`,
+ * `stock.level.below_reorder` and `stock.level.restored`, each with an `.async` twin (WHIT-1233, design
+ * section 31 §3.6, §3.9).
+ *
+ * Purely additive: one new method on Context\InventoryScope, which only the host implements.)
+ *
+ * 1.129 (PURCHASE ORDERS: {@see Inventory\Orders} drafts a purchase order for a supplier contact, sends it
+ * (to the workspace's purchase route when one is chosen, else approved at once) and receives it in parts,
+ * each receipt an {@see Inventory\Operation} posting `supplier → place` at the order's cost; more than
+ * ordered past the workspace's tolerance is refused unless allowed. {@see Inventory\Order} and
+ * {@see Inventory\OrderLine} carry it. A plugin writes through `$ctx->inventory()->orders()`, bound to the
+ * loaded plugin; the container's copy only reads. New events: the filter `inventory.order.submitting`
+ * (can veto) and `inventory.order.created|approved|rejected|partly_done|done|cancelled`, each with an
+ * `.async` twin (WHIT-1234, design section 31 §3.7).
+ *
+ * Purely additive: one new method on Context\InventoryScope, which only the host implements.)
+ *
+ * 1.130 (CORE PERMISSIONS FOR A PLUGIN'S ROLES, with the operator's approval (#2256):
+ * {@see Contribute\CorePermissionRequestsInterface} lets a plugin say which core permissions its roles
+ * need (`['hr' => ['calendar:write', 'calendar:manage']]`). Nothing is granted until an operator
+ * approves it, per role and per workspace; an approval grants exactly what was asked, is recorded with
+ * the operator, can be revoked, and goes when the plugin is turned off. The host service
+ * {@see Contribute\CorePermissionGrants} answers whether a grant is in place. Also: a member of staff now
+ * puts time off on their own calendar through {@see Calendar\TimeOff} with no `calendar:write`.
+ *
+ * Purely additive: one new optional interface and one new host service.)
+ *
+ * 1.131 (A WORKSPACE TEMPLATE NAMES ITS THEME (WHIT-1225, 30-themes §14.6, TH.23):
+ * {@see Manifest\WorkspaceTemplateValidator} accepts an optional `theme`, a theme id such as
+ * `templates.market`, usually one the same plugin ships through {@see Contribute\PluginThemesInterface}.
+ * Choosing the template offers that theme, on by default; core sets it only while the workspace still
+ * has the installation's theme, and skips it when no theme by that id is installed.
+ *
+ * Purely additive: one new optional manifest key. Older hosts refuse a manifest that carries it, so a
+ * plugin that sets `theme` needs `^1.131`.)
+ *
+ * 1.132 (QUOTES: {@see Contribute\WorkspaceQuoteConversion} turns an accepted quote into something
+ * else, read as a {@see Sales\QuoteSnapshot} with its {@see Sales\QuoteSnapshotLine}s; it answers a
+ * {@see Sales\ConversionCheck} and a {@see Sales\ConversionResult}. Core's inventory (sales orders) and
+ * accounting (invoices) are its first implementations. New events: the filter `sales.quote.sending`
+ * (can veto) and `sales.quote.created|sent|accepted|declined|expired|converted|cancelled`, each with an
+ * `.async` twin (WHIT-1321, design section 34 §3).
+ *
+ * Purely additive.)
+ *
+ * 1.133 (USAGE METERS, READ-ONLY (section 33 §5, BM.17): the host service {@see Usage\Usage} gives a
+ * plugin its workspace's usage meters for a month, as Billing > Usage shows them: seats, customers,
+ * items, invoices, storage, messages by channel, agent runs and tool calls, and API calls, each with
+ * what was used, its base and whether it is near or past it ({@see Usage\UsageMeter}). Past a base is
+ * a warning only; nothing is ever refused.
+ *
+ * Purely additive: one new host service, null on older hosts.)
+ *
+ * 1.137 (LOTS, SERIAL NUMBERS AND EXPIRY: {@see Inventory\Lots} reads an item's batches and serial
+ * numbers ({@see Inventory\Lot}) and what is expiring, through `$ctx->inventory()->lots()` or the container.
+ * An item keeps batches when its `tracking` is `lot` (each batch with its expiry) or `serial`. A
+ * {@see Inventory\MoveLine} gains `lotId`, `lotCode`, `expiresOn` and `madeOn`: stock coming in names its
+ * batch (a new code makes it), stock leaving may name one or takes the batches that expire first.
+ * {@see Inventory\Move} gains `lotId`. New events, fired once per batch by a daily job:
+ * `stock.lot.expiring` and `stock.lot.expired`, each with an `.async` twin (WHIT-1235, design 31 §3.5).
+ *
+ * Purely additive: one new method on Context\InventoryScope, which only the host implements, and new
+ * optional constructor arguments, last, on MoveLine and Move.)
+ *
+ * 1.141 (NOTICES BY EMAIL: a type in {@see Notification\PluginNotificationsInterface::getNotificationTypes()}
+ * may carry `emailDefault` (bool, optional, false when left out). Every notice still lands in the inbox;
+ * with `emailDefault` it also goes by email to a person who never chose for the type. The person's own
+ * choice always wins, and the workspace's email switch applies as for core notices. The email carries
+ * the Notice's subject and body only, never `data` (WHIT-1250, #2209).
+ *
+ * Purely additive: one optional key. Older hosts ignore it and keep notices in-app, so a plugin that
+ * needs the email needs `^1.141`.)
+ *
+ * 1.147 (WALK-INS (WHIT-1334, design section 35 §3): a workspace template may set the calendar's
+ * `walkins_enabled`, which turns on the walk-in queue at the front desk, and give a role
+ * `calendar:front_desk`. Older hosts refuse a template that sets it, so a template plugin that
+ * does needs `^1.147`.
+ *
+ * Purely additive.)
+ *
+ * 1.148 (COMMISSION TO THE BOOKS (WHIT-1334, design section 35 §4.3): when an owner closes a
+ * commission period, core freezes each member of staff's totals and hands the close
+ * ({@see Calendar\CommissionClose}, its {@see Calendar\CommissionCloseLine}s) to the one
+ * {@see Contribute\WorkspaceCommissionExpenses} bound in the container, which answers the
+ * reference it booked it under. New event `calendar.commission.closed`, with an `.async` twin.
+ *
+ * Purely additive.)
+ *
+ * 1.150 (EMBEDDED SCREENS CALL THEIR OWN API (#1688): an `embed` screen's page talks to the app over a
+ * postMessage bridge, protocol {@see Frontend\FrameBridge::PROTOCOL}; {@see Frontend\FrameBridge::script()}
+ * is the page side (`whity.ready()`, `request()`, `resize()`, `navigate()`, `toast()`). The app makes the
+ * page's API calls with a five-minute token bound to the routes of the plugin that registered the screen,
+ * never with the person's cookies, and the route's permission is checked against the person as usual.
+ * A core route or another plugin's route refuses the token (WHIT-1329).
+ *
+ * Purely additive: one new class; an embed page that does not use the bridge works as before.)
+ *
+ * 1.151 (DECLARED SERVICES AND WORKSPACE TABLES (#1693): {@see Contribute\PluginCapabilitiesInterface} lets a
+ * plugin say which {@see Context\PluginScope} services it uses ({@see Context\Service}) and which of its own
+ * tables it reaches; its context then gives only those, and anything else throws
+ * {@see Context\ServiceNotDeclared}. {@see Context\PluginScope::database()} gives
+ * {@see Database\WorkspaceTables}: select, count, insert, update, delete and transactions on the declared
+ * tables, the host adding `tenant_id` to every condition and row, so no call reaches another workspace;
+ * refusals throw {@see Database\TableRefused}. The operator sees each plugin's declaration in
+ * `GET /api/plugins` (WHIT-1330).
+ *
+ * Purely additive: a plugin that declares nothing keeps every service as before; `database()` is new and
+ * needs the declaration. One new method on PluginScope, which only the host implements.)
+ *
+ * 1.152 (LOGS, ERRORS, ROUTE LIMITS AND INSTALL CALLBACKS (#1686, WHIT-1331)):
+ * {@see Context\PluginScope::log()} gives {@see Log\PluginLog} and {@see Context\PluginScope::errors()} gives
+ * {@see Log\ErrorReporter}; both pass everything through core's error scrubber and are tagged by the host with
+ * the plugin and workspace. A plugin route may declare `'rateLimit' => <calls a minute>` (1 to 10000), per person
+ * or, signed out, per address; past it the host answers 429. {@see PluginInstallLifecycleInterface} is told once
+ * per version per deployment that the plugin was installed or upgraded, after its migrations.
+ *
+ * Purely additive: two new methods on PluginScope, which only the host implements; one optional route key; one
+ * optional interface.)
+ * 1.153 (COMPANY STAMPS: {@see Hooks\Events::ROUTE_STAMPED} (`route.stamped`, with its `.async` twin)
+ * fires after a holder applied a company stamp on a route's stamp step, with ids only and the
+ * `stamp_id` (#1729).
+ *
+ * Purely additive.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.121.0';
+    public const VERSION = '1.153.0';
 
     /**
      * Static identity only — never instantiated.

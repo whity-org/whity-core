@@ -3,7 +3,7 @@
 import * as React from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import * as TablerIcons from '@tabler/icons-react';
+import { namedIcon } from '@/lib/named-icon';
 import type { Icon } from '@tabler/icons-react';
 import {
   IconArrowDownRight,
@@ -87,8 +87,7 @@ import type {
 } from '@/lib/plugin-features';
 import { OU_SCOPE_KINDS, isOuScopeValue } from '@/lib/plugin-features';
 import { buildFlowModel } from '@/components/plugin/blocks/flow-model';
-import { DocumentViewer } from '@/components/plugin/blocks/document-viewer';
-import { Chart } from '@whity/ui/chart';
+import { Chart, DocumentViewer, MathText } from '@/components/lazy-heavy';
 import { DataTable as SharedDataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
 import { FieldSelect } from '@/components/field-select';
@@ -98,7 +97,6 @@ import { timeOptions } from '@/lib/calendar/times';
 import { Checkbox } from '@whity/ui/checkbox';
 import { ColorPicker } from '@whity/ui/color-picker';
 import { BilingualInput } from '@whity/ui/bilingual-input';
-import { MathText } from '@whity/ui/math-text';
 import { renderMarkdown } from '@/lib/safe-markdown';
 import { Pagination } from '@/components/ui/pagination';
 import { Textarea } from '@whity/ui/textarea';
@@ -214,18 +212,13 @@ import { localizedText, type LocalizedText } from '@whity/ui/localized-text';
  * is keyed.
  */
 
-const tablerIcons = TablerIcons as unknown as Record<string, Icon | undefined>;
-
-/** Resolve a kebab/snake/Pascal icon name to a Tabler component (fallback dot). */
+/**
+ * Resolve a kebab/snake/Pascal icon name to a Tabler component (fallback dot).
+ * Curated icons at once, any other Tabler icon on demand (WHIT-1245): the
+ * renderer no longer carries the whole icon set to every signed-in page.
+ */
 function resolveIcon(name: string): Icon {
-  const pascal = name
-    .trim()
-    .split(/[-_\s]+/)
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join('');
-  const componentName = pascal.startsWith('Icon') ? pascal : `Icon${pascal}`;
-  return tablerIcons[componentName] ?? IconPointFilled;
+  return namedIcon(name, IconPointFilled);
 }
 
 // ---- defensive prop guards (mirror the SDK BlockContract rules) ----

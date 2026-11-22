@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Noto_Sans, Noto_Sans_Arabic, Geist_Mono, Readex_Pro } from "next/font/google";
+import { Noto_Sans, Noto_Sans_Arabic, Geist_Mono, Readex_Pro, IBM_Plex_Sans, IBM_Plex_Sans_Arabic, Cairo, Noto_Kufi_Arabic, Rubik, Alexandria, Noto_Naskh_Arabic, Noto_Serif } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { AuthProvider } from "@/lib/auth-context";
@@ -49,10 +49,67 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Readex Pro 600 is for document titles and brand headlines (3.1, E.35), and
+// since TH.6 a workspace theme may also choose it for headings and body, so
+// 400 and 500 are loaded too.
 const readexPro = Readex_Pro({
   variable: "--font-readex-pro",
-  weight: "600",
+  weight: ["400", "500", "600"],
   subsets: ["latin", "arabic"],
+});
+
+// The other allowed theme font pairs (TH.6, src/Core/Theme/ThemeFonts.php).
+// Not preloaded: a browser fetches a face only when the workspace's theme
+// names it in --font-sans or --font-heading. 400, 500 and 600 only (3.6).
+const ibmPlexSans = IBM_Plex_Sans({
+  variable: "--font-ibm-plex-sans",
+  weight: ["400", "500", "600"],
+  subsets: ["latin"],
+  preload: false,
+});
+const ibmPlexSansArabic = IBM_Plex_Sans_Arabic({
+  variable: "--font-ibm-plex-sans-arabic",
+  weight: ["400", "500", "600"],
+  subsets: ["arabic"],
+  preload: false,
+});
+const cairo = Cairo({
+  variable: "--font-cairo",
+  weight: ["400", "500", "600"],
+  subsets: ["latin", "arabic"],
+  preload: false,
+});
+const notoKufiArabic = Noto_Kufi_Arabic({
+  variable: "--font-noto-kufi-arabic",
+  weight: ["400", "500", "600"],
+  subsets: ["arabic"],
+  preload: false,
+});
+
+// TH.20 (21 Nov 2026): four more pairs, chosen by their Arabic face.
+const rubik = Rubik({
+  variable: "--font-rubik",
+  weight: ["400", "500", "600"],
+  subsets: ["latin", "arabic"],
+  preload: false,
+});
+const alexandria = Alexandria({
+  variable: "--font-alexandria",
+  weight: ["400", "500", "600"],
+  subsets: ["latin", "arabic"],
+  preload: false,
+});
+const notoNaskhArabic = Noto_Naskh_Arabic({
+  variable: "--font-noto-naskh-arabic",
+  weight: ["400", "500", "600"],
+  subsets: ["arabic"],
+  preload: false,
+});
+const notoSerif = Noto_Serif({
+  variable: "--font-noto-serif",
+  weight: ["400", "500", "600"],
+  subsets: ["latin"],
+  preload: false,
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -140,6 +197,14 @@ export default async function RootLayout({
         notoSansArabic.variable,
         geistMono.variable,
         readexPro.variable,
+        ibmPlexSans.variable,
+        ibmPlexSansArabic.variable,
+        cairo.variable,
+        notoKufiArabic.variable,
+        rubik.variable,
+        alexandria.variable,
+        notoNaskhArabic.variable,
+        notoSerif.variable,
         "font-sans"
       )}
       // The blocking init scripts (see <head> below) set the `dark` class and

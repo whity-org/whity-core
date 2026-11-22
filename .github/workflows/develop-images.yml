@@ -10,9 +10,14 @@
 # Tags, on all three images:
 #   develop-<7-char sha>  immutable; what a deployment pins, so a rollback is exact
 #   develop               floating; moved by the `promote` job only after the
-#                         smoke test passed, and only while the commit is still
-#                         develop's tip, so a deployment polling it never gets an
-#                         image that failed smoke or an older build than it has
+#                         smoke test passed, and only forward: the tag carries
+#                         its commit (org.opencontainers.image.revision on the
+#                         index), and a build moves it only when that commit is an
+#                         ancestor of its own. So a deployment polling it never
+#                         gets an image that failed smoke or an older build than it
+#                         has, and the tag still moves while develop keeps moving
+#                         (WHIT-1307: "only while it is the tip" starved it for
+#                         hours during a run of merges).
 #
 # The build itself is images.yml, the same jobs release.yml uses: identical
 # Dockerfile stages, build identity (/api/build reports the commit), Trivy
@@ -102,8 +107,14 @@ jobs:
       contents: read
       packages: write
     steps:
+      - name: Checkout (history, for the ancestry check)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.commit }}
+          fetch-depth: 0
+
       - name: Login to GHCR
-        uses: docker/login-action@v4.8.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -114,15 +125,21 @@ jobs:
           TAG: ${{ needs.resolve.outputs.tag }}
           COMMIT: ${{ needs.resolve.outputs.commit }}
         run: |
-          # Checked again here: the build took long enough for develop to move.
-          TIP=$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}" refs/heads/develop | cut -f1)
-          if [ "${COMMIT}" != "${TIP}" ]; then
-            echo "::notice::develop moved to ${TIP:0:7} during the build; ${TAG} stays published, the develop tag is left for the newer build."
-            exit 0
-          fi
           BASE="ghcr.io/${GITHUB_REPOSITORY,,}"
+          # Only forward (WHIT-1307). The tag records its commit; move it when
+          # that commit is an ancestor of this build's, or when it records none
+          # (the first run after this change). A newer build that already moved
+          # it wins, whatever order the builds finish in.
+          CURRENT=$(docker buildx imagetools inspect --raw "${BASE}:develop" 2>/dev/null             | jq -r '.annotations["org.opencontainers.image.revision"] // empty' || true)
+          if [ -n "${CURRENT}" ] && [ "${CURRENT}" != "${COMMIT}" ]; then
+            git cat-file -e "${CURRENT}^{commit}" 2>/dev/null || git fetch --quiet origin "${CURRENT}" || true
+            if ! git merge-base --is-ancestor "${CURRENT}" "${COMMIT}"; then
+              echo "::notice::develop already points at ${CURRENT:0:7}, which is not older than ${COMMIT:0:7}; ${TAG} stays published, the develop tag is left alone."
+              exit 0
+            fi
+          fi
           # Copies the manifest in the registry; nothing is rebuilt or pulled.
           for name in "${BASE}" "${BASE}/web" "${BASE}/render"; do
-            docker buildx imagetools create --tag "${name}:develop" "${name}:${TAG}"
+            docker buildx imagetools create               --annotation "index:org.opencontainers.image.revision=${COMMIT}"               --tag "${name}:develop" "${name}:${TAG}"
           done
           echo "develop -> ${TAG} (${COMMIT})" >> "$GITHUB_STEP_SUMMARY"

@@ -36,7 +36,7 @@ Everything Whity Render prints: invoices, letters, payslips, reports. Documents 
 | People | Payslip · Employment letter · Leave approval | QR to verify; the employment letter keeps a signature and stamp row; the leave approval shows its trail from the audit log |
 | General | Report · Letter · Purchase order | Reports run to several pages with key numbers and an ink-only chart |
 
-**The free set and Front Office.** Whity's free set has an **Invoice** (فاتورة) and a **Credit note** (إشعار دائن), with no JoFotara stamp or fiscal QR. The **Tax invoice** (فاتورة ضريبية) and the **fiscal credit note**, issued through JoFotara with their stamp, reference and QR, are what Front Office adds. The `TplDocInvoice` and `TplDocCreditNote` cards show those, and the JoFotara parts of the footer rule above apply to them (owner, 2 Nov 2026).
+**The free set and e-invoicing.** Whity's free set has an **Invoice** (فاتورة) and a **Credit note** (إشعار دائن), with no JoFotara stamp or fiscal QR. The **Tax invoice** (فاتورة ضريبية) and the **fiscal credit note** carry JoFotara's stamp, reference and QR. Since 21 Nov 2026 (BM.15, BM.16) the Tax invoice layout is core and the JoFotara submission, stamp, reference and QR come from the paid JoFotara integration plugin through core's e-invoicing point (AC.22). The `TplDocInvoice` and `TplDocCreditNote` cards show those, and the JoFotara parts of the footer rule above apply to them (owner, 2 Nov 2026).
 
 The examples tell one story for Example Bakery: quote QUO-0318 → invoice INV-1042 ($301.60) → credit note CN-0012 ($98.60) → receipt RCT-0207 ($203.00) → the clinic's October statement.
 

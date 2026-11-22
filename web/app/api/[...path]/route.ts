@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { backendUrl } from '@/lib/backend-url';
-import { CLIENT_IP_HEADER, stripClientIpHeaders, trustedClientIp } from '@/lib/trusted-client-ip';
+import { CLIENT_IP_HEADER, stripClientIpHeaders, trustedClientIp, trustedForwardedHost } from '@/lib/trusted-client-ip';
 
 /**
  * HTTP statuses that, per the Fetch spec, MUST NOT carry a response body.
@@ -61,9 +61,15 @@ async function proxyRequest(request: Request, method: string): Promise<Response>
     // ONLY the internal header, so a browser can neither spoof its IP nor preset
     // the internal header.
     const clientIp = trustedClientIp(request);
+    const forwardedHost = trustedForwardedHost(request);
     stripClientIpHeaders(headers);
     if (clientIp) {
       headers.set(CLIENT_IP_HEADER, clientIp);
+    }
+    // WHIT-1287 (#2195): the host the browser asked for, never one it claimed.
+    // The backend picks the workspace from it (custom domains, branding).
+    if (forwardedHost) {
+      headers.set('X-Forwarded-Host', forwardedHost);
     }
 
     // Force an identity (uncompressed) response on the proxy->backend leg.
@@ -127,6 +133,9 @@ async function proxyRequest(request: Request, method: string): Promise<Response>
     // We requested identity encoding from the backend, so no decompression is
     // needed. Drop content-encoding anyway to avoid any client confusion.
     responseHeaders.delete('content-encoding');
+    // `new Headers(response.headers)` already carries every Set-Cookie; drop
+    // them here and re-append each one exactly once below (#2234).
+    responseHeaders.delete('set-cookie');
     // content-length is forwarded as-is; arrayBuffer() reads the exact bytes
     // the backend sent, so the length remains accurate. If the backend omits it
     // (chunked), it stays absent — which is fine.
@@ -150,7 +159,7 @@ async function proxyRequest(request: Request, method: string): Promise<Response>
       headers: responseHeaders,
     });
 
-    // Forward Set-Cookie headers
+    // Forward Set-Cookie headers, one per cookie (never comma-joined)
     response.headers.getSetCookie().forEach(cookie => {
       result.headers.append('Set-Cookie', cookie);
     });

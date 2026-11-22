@@ -75,10 +75,20 @@ final class RegistrationsApiHandler
             // tenant invitations.
             $p = PaginationParams::fromPath($request->getPath());
 
+            // ?status=rejected lists the registrations an operator turned down,
+            // so one rejected by mistake can be approved after all (#408). Only
+            // rows reject() stamped with rejected_at: a member suspended for
+            // cause has the same status and must never appear here.
+            $query = [];
+            parse_str((string) parse_url($request->getPath(), PHP_URL_QUERY), $query);
+            $statusFilter = ($query['status'] ?? '') === 'rejected'
+                ? "m.status = 'suspended' AND m.rejected_at IS NOT NULL"
+                : "m.status = 'invited'";
+
             // System-tenant platform operation — counts pending registrations across all tenants (WC-235)
             $count = $this->db->query(
                 "SELECT COUNT(*) FROM memberships m
-                 WHERE m.status = 'invited'
+                 WHERE {$statusFilter}
                    AND NOT EXISTS (
                        SELECT 1 FROM memberships am
                        WHERE am.tenant_id = m.tenant_id AND am.status = 'active'
@@ -88,7 +98,7 @@ final class RegistrationsApiHandler
 
             // System-tenant platform operation — lists pending registrations across all tenants (WC-235)
             $stmt = $this->db->prepare(
-                "SELECT m.id AS membership_id, m.tenant_id, m.created_at,
+                "SELECT m.id AS membership_id, m.tenant_id, m.created_at, m.rejected_at,
                         t.name AS tenant_name, t.slug AS tenant_slug,
                         p.id AS profile_id, p.display_name,
                         pe.email AS owner_email
@@ -96,7 +106,7 @@ final class RegistrationsApiHandler
                  JOIN tenants t ON t.id = m.tenant_id
                  JOIN profiles p ON p.id = m.profile_id
                  LEFT JOIN profile_emails pe ON pe.profile_id = p.id AND pe.is_primary = TRUE
-                 WHERE m.status = 'invited'
+                 WHERE {$statusFilter}
                    AND NOT EXISTS (
                        SELECT 1 FROM memberships am
                        WHERE am.tenant_id = m.tenant_id AND am.status = 'active'
@@ -121,6 +131,7 @@ final class RegistrationsApiHandler
                     'display_name'  => (string) ($row['display_name'] ?? ''),
                     'owner_email'   => (string) ($row['owner_email'] ?? ''),
                     'created_at'    => (string) ($row['created_at'] ?? ''),
+                    'rejected_at'   => $row['rejected_at'] !== null ? (string) $row['rejected_at'] : null,
                 ];
             }
 
@@ -139,19 +150,37 @@ final class RegistrationsApiHandler
      */
     public function approve(Request $request, array $params = []): Response
     {
-        return $this->transition($request, $params, MembershipRepository::STATUS_ACTIVE, 'approved');
+        // A pending registration, or one an operator rejected earlier (#408).
+        // rejected_at is what tells a rejected registration apart from a member
+        // suspended for cause, which has the same status and is never matched.
+        return $this->transition(
+            $request,
+            $params,
+            MembershipRepository::STATUS_ACTIVE,
+            'approved',
+            "(status = 'invited' OR (status = 'suspended' AND rejected_at IS NOT NULL))",
+            'rejected_at = NULL'
+        );
     }
 
     /**
      * POST /api/v1/registrations/{id}/reject — reject a pending registration
-     * (invited → suspended). Reversible: a suspended registration can be
-     * re-approved later. {id} is the owner membership id.
+     * (invited → suspended, stamped rejected_at). Reversible: approve() accepts a
+     * rejected registration, and GET ?status=rejected lists them.
+     * {id} is the owner membership id.
      *
      * @param array<string, mixed> $params
      */
     public function reject(Request $request, array $params = []): Response
     {
-        return $this->transition($request, $params, MembershipRepository::STATUS_SUSPENDED, 'rejected');
+        return $this->transition(
+            $request,
+            $params,
+            MembershipRepository::STATUS_SUSPENDED,
+            'rejected',
+            "status = 'invited'",
+            'rejected_at = CURRENT_TIMESTAMP'
+        );
     }
 
     /**
@@ -163,8 +192,14 @@ final class RegistrationsApiHandler
      *
      * @param array<string, mixed> $params
      */
-    private function transition(Request $request, array $params, string $newStatus, string $verb): Response
-    {
+    private function transition(
+        Request $request,
+        array $params,
+        string $newStatus,
+        string $verb,
+        string $fromStatusSql,
+        string $setRejectedSql
+    ): Response {
         $ctx = $this->authorize($request);
         if ($ctx instanceof Response) {
             return $ctx;
@@ -183,9 +218,9 @@ final class RegistrationsApiHandler
             // System-tenant platform operation — approves/rejects a pending registration in another tenant (WC-235)
             $stmt = $this->db->prepare(
                 "UPDATE memberships
-                    SET status = :new_status
+                    SET status = :new_status, {$setRejectedSql}
                   WHERE id = :id
-                    AND status = 'invited'
+                    AND {$fromStatusSql}
                     AND NOT EXISTS (
                         SELECT 1 FROM memberships am
                         WHERE am.tenant_id = memberships.tenant_id AND am.status = 'active'

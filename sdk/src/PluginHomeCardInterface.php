@@ -7,13 +7,20 @@ namespace Whity\Sdk;
 /**
  * Optional (SDK 1.62, WHIT-872): this plugin's one card on the home page. It names
  * the app, shows one number that matters, a few lines and at most one chart, and
- * links into the app. A person can hide it, and can't rearrange it.
+ * links into the app. A person can hide, move and resize it with the dashboard's
+ * widgets ({@see PluginDashboardInterface}, register H.5). A dashboard `stat`
+ * widget now covers the same ground; prefer it for new plugins.
  *
  * `source` is a GET route this plugin registered under this same `permission`, and
  * {@see Manifest\HomeCardValidator} describes what it answers. That route decides
  * the person's scope, because the host shows what it returns. A card grants nothing
  * by itself: it appears only to people holding `permission`, and a bad one is
  * dropped with a logged reason while the plugin keeps loading.
+ *
+ * @deprecated 1.124 Declare a `stat` widget in {@see PluginDashboardInterface}
+ *             instead (decision D5, register H.4, owner 19 Nov 2026). An
+ *             existing card keeps showing with the widgets through SDK 2.0.x
+ *             and the interface goes in 2.1.
  */
 interface PluginHomeCardInterface
 {

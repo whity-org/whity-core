@@ -40,6 +40,14 @@ on:
         default: 'develop'
         type: string
 
+# Serialised, never cancelled (WHIT-277): a half-finished run of this
+# workflow leaves the release in a state someone has to repair by hand.
+# Two dispatches at once would both bump CoreVersion.php and open
+# competing release PRs.
+concurrency:
+  group: release-prepare
+  cancel-in-progress: false
+
 jobs:
   prepare:
     name: Bump version and open the release PR
@@ -144,7 +152,7 @@ jobs:
           echo "[Unreleased] has content; it will be dated as this release's notes."
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_sqlite

@@ -27,13 +27,16 @@ final class RecordedHttpClient implements HttpClient
     /** @var list<array{method: string, prefix: string, response: HttpResponse|HttpFailure}> */
     private array $script = [];
 
-    /** @param array<mixed>|string $body A string is sent as is; an array as JSON. */
-    public function on(string $method, string $urlPrefix, array|string $body, int $status = 200): self
+    /**
+     * @param array<mixed>|string   $body    A string is sent as is; an array as JSON.
+     * @param array<string, string> $headers The answer's headers (SDK 1.122), e.g. `['Retry-After' => '30']`.
+     */
+    public function on(string $method, string $urlPrefix, array|string $body, int $status = 200, array $headers = []): self
     {
         $this->script[] = [
             'method' => strtoupper($method),
             'prefix' => $urlPrefix,
-            'response' => new HttpResponse($status, is_string($body) ? $body : (string) json_encode($body)),
+            'response' => new HttpResponse($status, is_string($body) ? $body : (string) json_encode($body), $headers),
         ];
 
         return $this;

@@ -1,8 +1,8 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.121.0",
-    "core_version": "0.2.30",
-    "updated": "2026-11-18",
+    "sdk_version": "1.153.0",
+    "core_version": "0.2.31",
+    "updated": "2026-11-22",
     "ratings": {
         "full": "A plugin can read, change, react to and extend this area through a published SDK contract.",
         "partial": "Some of it is in the SDK; the rest is missing or reachable only through internal core classes.",
@@ -108,6 +108,82 @@
             "plan": "later"
         },
         {
+            "id": "inventory",
+            "group": "workflow",
+            "name": "Inventory and stock",
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "Inventory\\Items host service: list, get, find by SKU or barcode, create, update and archive items with variants, units and barcodes, writes acting as a person with inventory:write and counted toward inventory.items.max, which only warns",
+                    "since": "1.127"
+                },
+                {
+                    "what": "Inventory\\Locations host service: real places and the virtual ones (supplier, customer, loss, found, production, consumed, opening, transit)",
+                    "since": "1.127"
+                },
+                {
+                    "what": "Inventory\\Stock: levels, available and the append-only ledger; plugins post and undo moves through $ctx->inventory()->stock(), bound to the loaded plugin (idempotent by key); the container copy only reads",
+                    "since": "1.127"
+                },
+                {
+                    "what": "Inventory\\Units and Inventory\\Quantity: exact unit conversions and quantities as whole steps, never floats",
+                    "since": "1.127"
+                },
+                {
+                    "what": "Events stock.moving (filter, can veto), stock.moved, inventory.item.created, updated and archived",
+                    "since": "1.127"
+                },
+                {
+                    "what": "PluginContext: $ctx->inventory() (Context\\InventoryScope) with items(), locations(), stock() and units()",
+                    "since": "1.127"
+                },
+                {
+                    "what": "Inventory\\Operations: adjustments with the workspace's reasons, counts (expected taken per line, blind optional) and transfers (sent, on the way, received), through $ctx->inventory()->operations(), bound to the loaded plugin; the container copy only reads",
+                    "since": "1.128"
+                },
+                {
+                    "what": "Approval above the workspace's value: an adjustment or a count's differences travel their route (inventory.adjustment, inventory.count) before posting",
+                    "since": "1.128"
+                },
+                {
+                    "what": "Events inventory.operation.done, inventory.count.differences, stock.level.below_reorder and stock.level.restored",
+                    "since": "1.128"
+                },
+                {
+                    "what": "Inventory\\Orders: purchase orders for a supplier contact, sent on the workspace's purchase route (or approved at once) and received in parts at the order's cost, through $ctx->inventory()->orders(), bound to the loaded plugin; the container copy only reads",
+                    "since": "1.129"
+                },
+                {
+                    "what": "Events inventory.order.submitting (filter, can veto) and inventory.order.created, approved, rejected, partly_done, done and cancelled",
+                    "since": "1.129"
+                },
+                {
+                    "what": "Inventory\\Lots: batches and serial numbers with their expiry and what each holds where, and what is expiring, through $ctx->inventory()->lots(); MoveLine names a batch (lotId, lotCode, expiresOn, madeOn), and stock leaving without one takes the batches that expire first",
+                    "since": "1.137"
+                },
+                {
+                    "what": "Events stock.lot.expiring and stock.lot.expired, once per batch",
+                    "since": "1.137"
+                },
+                {
+                    "what": "Contribute\\WorkspaceQuoteConversion: what an accepted quote turns into (a sales order, an invoice), read as a Sales\\QuoteSnapshot; core's inventory and accounting implement it",
+                    "since": "1.132"
+                },
+                {
+                    "what": "Events sales.quote.sending (filter, can veto) and sales.quote.created, sent, accepted, declined, expired, converted and cancelled",
+                    "since": "1.132"
+                }
+            ],
+            "missing": [
+                "Reorder levels and reasons as SDK services (they are on the API and MCP)",
+                "Sales orders and reservations (P5); supplier prices as an SDK service (they are on the API and MCP)",
+                "Scanning GS1 barcodes and batch labels (P4b)",
+                "Costing, accounting export, operation kinds, item fields, barcode parsers and price lists as extension points (P7)"
+            ],
+            "security": "Reads are trusted to the plugin. Writes check the acting person's permissions like the routes do, and a plugin's moves are named by the host, never by the plugin.",
+            "plan": "later"
+        },
+        {
             "id": "authentication",
             "group": "people",
             "name": "Sign-in, SSO and two-factor",
@@ -203,6 +279,10 @@
                 {
                     "what": "Customer-grade permissions (PluginCustomerPermissionsInterface): the plugin's own permissions that reach only the caller's records, which customers may hold and sign-up roles may include",
                     "since": "1.104"
+                },
+                {
+                    "what": "Core permissions for the plugin's roles, asked for with Contribute\\CorePermissionRequestsInterface and granted only when an operator approves them per role and workspace; Contribute\\CorePermissionGrants says whether a grant is in place",
+                    "since": "1.130"
                 }
             ],
             "missing": [
@@ -393,6 +473,10 @@
                 {
                     "what": "route.sent_back, route.resubmitted, route.completed, route.signed and document.finalised events",
                     "since": "1.94"
+                },
+                {
+                    "what": "route.stamped event: a holder applied a company stamp on a stamp step",
+                    "since": "1.153"
                 },
                 {
                     "what": "Blocks a plugin adds to the document editor, drawn by Whity's renderer (documents.blocks, PluginDocumentBlocksInterface)",
@@ -787,6 +871,10 @@
                     "since": "1.90"
                 },
                 {
+                    "what": "A declared type can also go by email (emailDefault), following each person's preferences and the workspace's email switch",
+                    "since": "1.141"
+                },
+                {
                     "what": "WorkspaceEmails host service: send an email as the workspace (its brand, language and the EM.1 layout) to anyone, such as a customer's invoice; plain text only, one button, best effort",
                     "since": "1.100"
                 },
@@ -865,14 +953,21 @@
                 {
                     "what": "Theme token override from a plugin route",
                     "since": "1.12"
+                },
+                {
+                    "what": "Ship theme files a workspace can choose (Contribute\\PluginThemesInterface)",
+                    "since": "1.125"
+                },
+                {
+                    "what": "Read the workspace's compiled theme and the themes it can choose (Theme\\WorkspaceTheme, from the context)",
+                    "since": "1.125"
                 }
             ],
             "missing": [
-                "Reading workspace branding",
-                "Choosing which plugin's override applies per workspace",
-                "Fonts, logos and radii"
+                "Reading the workspace logo and name",
+                "Theme events (a workspace changed its theme)"
             ],
-            "security": "The theme route is public and runs on every page. Per-workspace overrides need a design.",
+            "security": "Themes are data checked against a closed schema and the host runs the contrast guard rails on the result; no CSS reaches the page. Logos and names still need a design for a read API.",
             "plan": "later"
         },
         {
@@ -1019,6 +1114,10 @@
                     "since": "1.84"
                 },
                 {
+                    "what": "Usage\\Usage: a workspace's usage meters for a month, read-only, with each base and warning state",
+                    "since": "1.133"
+                },
+                {
                     "what": "Asking the host to re-read a workspace's billing access (AccessRefresh)",
                     "since": "1.86"
                 },
@@ -1065,28 +1164,49 @@
                 {
                     "what": "PluginAccessInterface and PluginWorkspaceLifecycleInterface: paid plugins switched on per workspace, with trials, grace and read-only; WorkspaceAddons for billing plugins",
                     "since": "1.107"
+                },
+                {
+                    "what": "SdkException: every exception the SDK defines shares one marker interface, so a plugin can catch whatever the host refused",
+                    "since": "1.123"
+                },
+                {
+                    "what": "PluginContext: one entry point to a plugin's settings, secrets, files, documents, notices, jobs, audit and outbound HTTP, in the workspace the call runs in; bound at the web, CLI and queue-worker entry points",
+                    "since": "1.124"
+                },
+                {
+                    "what": "PluginInstallLifecycleInterface: onInstalled and onUpgraded, once per version per deployment, after the plugin's migrations",
+                    "since": "1.152"
                 }
             ],
             "missing": [
-                "Enabled, installed and upgraded callbacks",
                 "The running core version"
             ],
-            "security": "Installing and enabling stay operator-only. A lifecycle callback must not let a plugin enable others.",
+            "security": "Installing and enabling stay operator-only. The installed and upgraded callbacks are told it happened, run with no workspace, and are given nothing that installs or enables a plugin.",
             "plan": "0.2.28"
         },
         {
             "id": "observability",
             "group": "runtime",
             "name": "Logging, errors and rate limits",
-            "rating": "none",
-            "has": [],
+            "rating": "partial",
+            "has": [
+                {
+                    "what": "$ctx->log(): a plugin log scrubbed like the error tracker and tagged with the plugin and workspace by the host",
+                    "since": "1.152"
+                },
+                {
+                    "what": "$ctx->errors(): report a caught error to the deployment's error tracker, scrubbed and tagged",
+                    "since": "1.152"
+                },
+                {
+                    "what": "rateLimit on a plugin route: calls a minute per person (or address), answered with 429 before the handler runs",
+                    "since": "1.152"
+                }
+            ],
             "missing": [
-                "A scrubbed logger",
-                "Reporting errors to the error tracker",
-                "Rate limits declared per route",
                 "Metrics"
             ],
-            "security": "Plugin payloads must pass through the same scrubber before they reach logs or the error tracker.",
+            "security": "Plugin log records and error reports pass through core's error scrubber before they are written or sent, and the plugin cannot set the plugin or workspace they are tagged with.",
             "plan": "0.2.28"
         },
         {
@@ -1118,13 +1238,20 @@
                 {
                     "what": "Offline-host conformance kit",
                     "since": "1.27"
+                },
+                {
+                    "what": "$ctx->database(): the plugin's declared tables, every call held to the workspace by the host (WorkspaceTables)",
+                    "since": "1.151"
+                },
+                {
+                    "what": "PluginCapabilitiesInterface: a plugin declares the context services and tables it uses and gets only those",
+                    "since": "1.151"
                 }
             ],
             "missing": [
-                "A runtime connection handle from the SDK",
                 "Read-only views of core tables"
             ],
-            "security": "Workspace isolation is checked by lint and tests, not enforced. A connection bound to the workspace is a design question.",
+            "security": "Since SDK 1.151 a plugin's own tables can be reached through a handle the host binds to the workspace, and a plugin that declares its services gets only those from its context. Plugin SQL written by hand is still checked by lint and tests, and plugin PHP runs in the host's process, so the declaration is least privilege, not a sandbox.",
             "plan": "later"
         },
         {
@@ -1268,13 +1395,17 @@
                 {
                     "what": "referenceSelect multiple: several rows from an API-backed source, shown as chips",
                     "since": "1.121"
+                },
+                {
+                    "what": "Embedded screens call their own plugin's API through a message bridge (FrameBridge), with a five-minute token bound to the plugin's routes",
+                    "since": "1.150"
                 }
             ],
             "missing": [
                 "Native screens for store plugins (custom screens need a change in this repository)",
                 "Blocks outside /admin/x pages"
             ],
-            "security": "Embedded screens run in a sandboxed frame with no origin of their own (0.2.30). A message bridge and a scoped token are still needed before an embedded screen can call the API.",
+            "security": "Embedded screens run in a sandboxed frame with no origin of their own (0.2.30). Since SDK 1.150 they reach the API only through the app's message bridge, with a short-lived token that works on their own plugin's routes alone. Native screens for store plugins still need a design.",
             "plan": "later"
         },
         {
@@ -1441,13 +1572,17 @@
                 {
                     "what": "One outbound HTTP client for calling other servers: https only unless asked, verified TLS, no redirects, timeouts and a size cap, with recorded answers for tests (Http\\Outbound\\HttpClient, StreamHttpClient, Testing\\RecordedHttpClient)",
                     "since": "1.114"
+                },
+                {
+                    "what": "Response headers, and an opt-in policy that keeps a person-supplied URL off the server's own network: resolved once, every address public, connected to the checked address (HttpResponse::$headers, Http\\Outbound\\AddressPolicy)",
+                    "since": "1.122"
                 }
             ],
             "missing": [
                 "Subscribing external URLs to events, with signing, retries and a delivery log",
                 "Admin-registered connectors"
             ],
-            "security": "Outbound calls need a guard against private addresses, signing secrets kept in PluginSecrets, a workspace check per event and id-only payloads.",
+            "security": "Outbound calls to person-supplied URLs use AddressPolicy (1.122); webhooks still need signing secrets kept in PluginSecrets, a workspace check per event and id-only payloads.",
             "issues": [
                 342
             ],
@@ -1482,6 +1617,18 @@
                 {
                     "what": "PluginWorkspaceTemplatesInterface: ready starts for one kind of business, offered after a workspace is created and applied by core as the person choosing them",
                     "since": "1.116"
+                },
+                {
+                    "what": "A workspace template names its theme (`theme`), offered when the template is chosen",
+                    "since": "1.131"
+                },
+                {
+                    "what": "A workspace template turns on the walk-in queue (`calendar.settings.walkins_enabled`) and may give a role `calendar:front_desk`",
+                    "since": "1.147"
+                },
+                {
+                    "what": "WorkspaceCommissionExpenses (Contribute): book a closed commission period (CommissionClose) as an expense; event calendar.commission.closed",
+                    "since": "1.148"
                 },
                 {
                     "what": "PluginDisplayNameInterface: the name people read for a plugin, in English and Arabic",

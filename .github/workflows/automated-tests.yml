@@ -49,6 +49,12 @@ concurrency:
   group: tests-${{ github.event_name == 'schedule' && 'nightly' || github.ref }}
   cancel-in-progress: true
 
+# Least privilege (WHIT-1223). Every job here only reads the repository (the
+# upgrade check pulls a public ghcr.io image and reads the latest release),
+# so the token gets nothing more, whatever the repository default becomes.
+permissions:
+  contents: read
+
 # ---------------------------------------------------------------------------
 # What runs where (WHIT-801)
 #
@@ -149,7 +155,7 @@ jobs:
 
       - name: Filter changed paths
         if: steps.mode.outputs.all != 'true'
-        uses: dorny/paths-filter@v4
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4
         id: filter
         with:
           filters: |
@@ -332,7 +338,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_sqlite
@@ -431,7 +437,7 @@ jobs:
       # instance; installing the extension costs seconds and removes any
       # question of unserialising into an environment the object came from.
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_sqlite
@@ -512,7 +518,7 @@ jobs:
       # Same extension set as the test shards: the OpenAPI generator and the
       # plugin/guard scripts boot the app's CLI, which expects a PDO driver.
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_sqlite
@@ -620,6 +626,16 @@ jobs:
       - name: Grant-by-role-name guard
         run: php scripts/ci-grant-by-role-name-guard.php
 
+      # #2174: request fields are checked by the shared field validator;
+      # hand-written email checks outside it may only go down.
+      - name: Email-validation guard
+        run: php scripts/ci-email-validation-guard.php
+
+      # #2198: a request body field is read as text through the validator, not
+      # cast; (string) of a JSON list stores "Array". The count may not go up.
+      - name: Body string-cast guard
+        run: php scripts/ci-body-string-cast-guard.php
+
       # Emitted-URL version guard (#1046): fail when a URL RETURNED to a client
       # is missing the /v1 the router serves it at.
       #
@@ -668,6 +684,18 @@ jobs:
       # guard that fires on correct code is worse than no guard at all.
       - name: Database-boolean guard
         run: php scripts/ci-db-bool-guard.php
+
+      # Migration safety (WHIT-1240): a migration newer than the schema
+      # baseline must not lock or rewrite a big table (non-concurrent index,
+      # rewriting column add or type change, validated constraint, unbatched
+      # backfill) and must be safe to run twice. Then: the migrations the
+      # baseline stands for must not have changed since it was made, or fresh
+      # installs would get a different schema from upgraded ones. Rules and
+      # their safe forms: docs/ops/migrations.md.
+      - name: Migration safety lint and baseline check
+        run: |
+          php scripts/ci-migration-lint.php
+          php scripts/migration-baseline.php check
 
       # WHIT-616: the README advertises suite sizes, and that bullet has been
       # corrected by hand three times (#685, #690, and #1266 — the last found
@@ -748,7 +776,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring
@@ -806,7 +834,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           coverage: none
@@ -825,7 +853,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring
@@ -869,7 +897,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring
@@ -920,7 +948,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_pgsql, pgsql
@@ -955,6 +983,25 @@ jobs:
           INITIAL_SYSTEM_ADMIN_PASSWORD=systemadmin123
           INITIAL_SUPERUSER_PASSWORD=superuser123
           EOF
+
+      # The full forward / rollback-to-zero / forward cycle, foreign keys and
+      # cascades on the real engine (tests/Database/MigrationCycleTest.php).
+      # It needs pdo_pgsql and DB_* credentials, so in the SQLite shards it
+      # skips; until WHIT-1224 nothing ran it anywhere, and it is the only test
+      # of a rollback to zero. It drops everything before and after itself, so
+      # it goes first, on the still-empty database, and --fail-on-skipped stops
+      # it quietly skipping here as well.
+      - name: Migration cycle (forward, full rollback, forward) on real PostgreSQL
+        env:
+          DB_HOST: localhost
+          DB_PORT: '5432'
+          DB_NAME: whity_core
+          DB_USER: whity
+          DB_PASSWORD: whity_dev
+        # Database::connect() reads $_ENV only, and the runner's CLI PHP leaves
+        # $_ENV empty (variables_order=GPCS), so without EGPCS the connection
+        # fails and the test skips itself as "not reachable".
+        run: php -d variables_order=EGPCS vendor/bin/phpunit --fail-on-skipped --display-skipped tests/Database/MigrationCycleTest.php
 
       - name: Run migrations on real PostgreSQL
         run: php public/index.php migrate run
@@ -1058,7 +1105,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_pgsql, pgsql
@@ -1248,7 +1295,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           extensions: mbstring, pdo, pdo_pgsql, pgsql
@@ -1363,7 +1410,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+        uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
           coverage: none
@@ -1869,8 +1916,26 @@ jobs:
         if: always()
         run: docker rm -f whity_render_ci || true
 
-  web:
-    name: Frontend types, tests & generated-artifact drift
+  # ---------------------------------------------------------------------------
+  # The frontend, as three parallel jobs (CI-0231).
+  #
+  # Until 0.2.31 this was ONE job, "Frontend types, tests & generated-artifact
+  # drift", and at ~6m20s it was the longest job in the workflow: 61 s of
+  # npm ci, then type checks, lint, the production build, Jest and Storybook
+  # one after another. None of those steps reads another's output (Jest does
+  # not need the build, the build does not need tsc), so they now run side by
+  # side, each on its own runner, and node_modules comes from the cache
+  # instead of a fresh npm ci (.github/actions/setup-node-deps).
+  #
+  #   web-checks  audit, generated-artifact drift, package tests, every tsc
+  #   web-tests   Jest
+  #   web-build   lint, production build, Storybook galleries
+  #
+  # Same steps, same commands, same trigger (`frontend`) as before; only the
+  # grouping changed. All three are in the CI gate's `needs`.
+  # ---------------------------------------------------------------------------
+  web-checks:
+    name: Frontend types & generated-artifact drift
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
@@ -1883,20 +1948,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Setup Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: '22'
-          cache: npm
-          # Single lockfile at the workspace root (npm workspaces).
-          cache-dependency-path: package-lock.json
-
-      # npm workspaces install the whole repo from the root lockfile; the web
-      # scripts below still run with working-directory: web (bins resolve from
+      # Node plus the whole npm workspace from the root lockfile, with
+      # node_modules restored from the cache when the lockfile is unchanged.
+      # The scripts below run with working-directory: web (bins resolve from
       # the hoisted root node_modules).
-      - name: Install dependencies
-        working-directory: .
-        run: npm ci
+      - name: Setup Node and install the workspace
+        uses: ./.github/actions/setup-node-deps
 
       # Fail on a high or critical advisory in an installed npm dependency
       # (WC-232ec317). RESTORED to `high` on 2026-10-26 — where this gate
@@ -1955,8 +2012,20 @@ jobs:
       - name: Registry build smoke
         run: npm run registry:build
 
+      # Incremental: tsc keeps per-file hashes in the build-info file and
+      # re-checks only what changed and what depends on it, so restoring the
+      # last run's file is safe on any branch (a stale entry is just
+      # re-checked). The key is per-commit so every run saves its own.
+      - name: Restore the tsc build info
+        uses: actions/cache@v6
+        with:
+          path: web/ci.tsbuildinfo
+          key: tsc-web-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            tsc-web-${{ hashFiles('package-lock.json') }}-
+
       - name: Type check
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit --incremental --tsBuildInfoFile ci.tsbuildinfo
 
       # `packages/ui` ships RAW SOURCES (exports "." -> "./src/index.ts"), so
       # until now its only type checking was whatever each consumer's tsconfig
@@ -1992,6 +2061,62 @@ jobs:
         working-directory: templates/tauri-desktop
         run: npx vite build
 
+  web-tests:
+    name: Frontend unit tests (Jest)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # Node plus the whole npm workspace from the root lockfile, with
+      # node_modules restored from the cache when the lockfile is unchanged.
+      # The scripts below run with working-directory: web (bins resolve from
+      # the hoisted root node_modules).
+      - name: Setup Node and install the workspace
+        uses: ./.github/actions/setup-node-deps
+
+      # Jest's transform cache is keyed on file content and config, so a
+      # restored cache from another commit can only skip work, never change a
+      # result.
+      - name: Restore the Jest cache
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/jest-cache
+          key: jest-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            jest-${{ hashFiles('package-lock.json') }}-
+
+      - name: Run Jest
+        run: npx jest --cacheDirectory "$RUNNER_TEMP/jest-cache"
+
+  web-build:
+    name: Frontend lint, production build & Storybook
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # Node plus the whole npm workspace from the root lockfile, with
+      # node_modules restored from the cache when the lockfile is unchanged.
+      # The scripts below run with working-directory: web (bins resolve from
+      # the hoisted root node_modules).
+      - name: Setup Node and install the workspace
+        uses: ./.github/actions/setup-node-deps
+
       # ESLint gate (WC-122): zero errors required; warnings are tolerated.
       # Runs after the WC-195 debt clearance so the gate starts clean.
       - name: Lint
@@ -2019,9 +2144,6 @@ jobs:
       - name: Build (production)
         run: npm run build
 
-      - name: Run Jest
-        run: npx jest
-
       # Gate both component galleries so a broken story can't land silently
       # (WC-3f9b0364). Both workspaces define build-storybook; run from the repo
       # root so the -w workspace flags resolve.
@@ -2030,6 +2152,26 @@ jobs:
         run: |
           npm run build-storybook -w @whity/ui
           npm run build-storybook -w web
+
+      # Theme shapes (WHIT-1225): render the tricky components from the built
+      # gallery under every shape preset, left-to-right light and right-to-left
+      # dark, desktop and phone, and fail when a rounded corner cuts text or a
+      # painted child pokes past a curve. The presets come from
+      # packages/ui/scripts/shape-presets.json, which ThemeEngineTest keeps
+      # equal to what ThemeCompiler emits.
+      - name: Shape clip check
+        working-directory: .
+        run: |
+          npx playwright install --with-deps chromium
+          node packages/ui/scripts/shape-clip-check.mjs --static packages/ui/storybook-static --out shape-clip-check
+
+      - name: Upload shape clip screenshots
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: shape-clip-check
+          path: shape-clip-check/
+          if-no-files-found: ignore
 
   # ---------------------------------------------------------------------------
   # The single check branch protection requires.
@@ -2065,7 +2207,9 @@ jobs:
       - postgres-timings
       - render-service
       - watchdog
-      - web
+      - web-checks
+      - web-tests
+      - web-build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

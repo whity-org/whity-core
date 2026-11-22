@@ -154,6 +154,12 @@ final class InstallFromStoreApiHandler
             return Response::error('The store rejected the request or the package was not found.', 502);
         }
 
+        // WHIT-1308 (#2189): Whity's signature on these exact bytes, before anything is unpacked.
+        $unsigned = $this->signatureRefusal((string) $origin, $slug, $version, $bytes, 'install');
+        if ($unsigned !== null) {
+            return $unsigned;
+        }
+
         // What the store says it reaches, for the consent record. Display data only.
         $listed = $this->records !== null ? $this->catalogueEntry((string) $origin, $slug) : null;
 
@@ -322,6 +328,80 @@ final class InstallFromStoreApiHandler
         ]], 201);
     }
 
+    /**
+     * WHIT-1308 (#2189), owner decision 2026-11-20: a code plugin from a store
+     * runs on this server, so it needs Whity's signed statement that these exact
+     * bytes passed review before anything is unpacked. A package with no
+     * statement (or none that can be checked, because no key is pinned in core
+     * yet) is refused unless the operator turned on
+     * {@see SettingsRegistry::PLUGINS_STORE_ALLOW_UNSIGNED}, and every package
+     * that lets through is in the audit log. A statement that doesn't hold
+     * (forged, another package, expired, withdrawn) is refused whatever that
+     * setting says. A .zip the operator uploads by hand doesn't come through here.
+     *
+     * @param 'install'|'update' $during
+     */
+    private function signatureRefusal(string $origin, string $slug, string $version, string $bytes, string $during): ?Response
+    {
+        $sha256 = hash('sha256', $bytes);
+        $envelope = $this->fetchAttestation($origin, $slug, $version);
+        if ($envelope === null || $this->trust === null) {
+            $check = ['ok' => false, 'reason' => $this->trust === null ? 'no_keys' : 'missing', 'plugin' => null];
+        } else {
+            $check = $this->trust->checkStorePackage($envelope, $version, $sha256);
+        }
+        if ($check['ok']) {
+            return null;
+        }
+
+        $metadata = [
+            'store' => $origin,
+            'slug' => $slug,
+            'version' => $version,
+            'sha256' => $sha256,
+            'reason' => $check['reason'],
+            'during' => $during,
+        ];
+        if (in_array($check['reason'], ['missing', 'no_keys'], true)) {
+            if ($this->allowUnsigned()) {
+                $this->auditLogger?->record('plugin.store_unsigned.installed', [
+                    'target_type' => 'plugin',
+                    'metadata' => $metadata,
+                ]);
+
+                return null;
+            }
+            $this->auditLogger?->record('plugin.store_unsigned.refused', [
+                'target_type' => 'plugin',
+                'metadata' => $metadata,
+            ]);
+
+            return Response::error(
+                "This package isn't signed by Whity, so it can't be installed.",
+                422,
+                ['reason' => 'unsigned']
+            );
+        }
+
+        $this->auditLogger?->record('plugin.store_unsigned.refused', [
+            'target_type' => 'plugin',
+            'metadata' => $metadata + ['attested_plugin' => $check['plugin']],
+        ]);
+
+        return Response::error(match ($check['reason']) {
+            'list_stale' => "Whity's list of withdrawn plugins is out of date. Import a fresh list, then try again.",
+            'revoked' => "Whity has withdrawn this version, so it can't be installed.",
+            'expired' => "Whity's signature on this package has expired. Try again once the store has a fresh one.",
+            default => "Whity's signature doesn't match this package, so it can't be installed.",
+        }, 422, ['reason' => $check['reason']]);
+    }
+
+    /** The operator's temporary override for unsigned store packages; off unless turned on. */
+    private function allowUnsigned(): bool
+    {
+        return ($this->settings->getGlobal()[SettingsRegistry::PLUGINS_STORE_ALLOW_UNSIGNED] ?? 'false') === 'true';
+    }
+
     /** The store's signed statement about this version, if it has one. Checked by PluginTrust. */
     private function fetchAttestation(string $origin, string $slug, string $version): ?string
     {
@@ -486,6 +566,12 @@ final class InstallFromStoreApiHandler
         }
         if ($bytes === null || $bytes === '') {
             return Response::error('The store rejected the request or the package was not found.', 502);
+        }
+
+        // WHIT-1308 (#2189): an update is new code too, so it needs the same signature.
+        $unsigned = $this->signatureRefusal((string) $origin, $install['store_slug'], $latest, $bytes, 'update');
+        if ($unsigned !== null) {
+            return $unsigned;
         }
 
         $installer = new PluginInstaller($this->pluginDir, $this->pluginLoader, $this->auditLogger);
@@ -706,7 +792,7 @@ final class InstallFromStoreApiHandler
                 // A declarative plugin goes into one workspace, so any workspace may.
                 'can_install_declarative' => (TenantContext::getTenantId() ?? 0) > 0,
                 // WHIT-1003: whether this installation is connected to a store through Whity ID.
-                'connection' => $this->connector?->status() ?? ['connected' => false],
+                'connection' => $this->connectionForCaller(),
             ],
         ]);
     }
@@ -891,6 +977,11 @@ final class InstallFromStoreApiHandler
      */
     public function licenceStatus(Request $request, array $params = []): Response
     {
+        // WHIT-1275 (#2242): an installation's licences are the operator's.
+        $refusal = PluginOperatorGate::refusal();
+        if ($refusal !== null) {
+            return $refusal;
+        }
         if ($this->licence === null) {
             return Response::json(['data' => \Whity\Sdk\Licensing\LicenceState::unlicensed('Licences are unavailable.')->toArray()]);
         }
@@ -908,7 +999,25 @@ final class InstallFromStoreApiHandler
      */
     public function connection(Request $request, array $params = []): Response
     {
-        return Response::json(['data' => $this->connector?->status() ?? ['connected' => false]]);
+        return Response::json(['data' => $this->connectionForCaller()]);
+    }
+
+    /**
+     * The store connection as this caller may see it (WHIT-1275, #2242). It is
+     * the operator's own Whity ID account, so a workspace learns only whether
+     * the installation is connected, to which store, and whether it needs
+     * signing in again: never the account, its issuer or when it connected.
+     *
+     * @return array<string, mixed>
+     */
+    private function connectionForCaller(): array
+    {
+        $status = $this->connector?->status() ?? ['connected' => false];
+        if (PluginOperatorGate::isOperator()) {
+            return $status;
+        }
+
+        return array_intersect_key($status, array_flip(['connected', 'store_host', 'needs_reconnect']));
     }
 
     /**

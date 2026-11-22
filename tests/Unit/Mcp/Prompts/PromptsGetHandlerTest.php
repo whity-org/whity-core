@@ -44,7 +44,7 @@ final class PromptsGetHandlerTest extends TestCase
         $this->tokenValidator = $this->createMock(TokenValidator::class);
 
         $principal = new McpPrincipal(self::USER_ID, self::USER_ID, self::TENANT_ID, 'user', ['prompts:get'], 'jti-get');
-        $this->tokenValidator->method('validateMcpToken')->willReturn($principal);
+        $this->tokenValidator->method('validateBearerForMcp')->willReturn($principal);
 
         $this->handler = new PromptsGetHandler(
             $this->registry,

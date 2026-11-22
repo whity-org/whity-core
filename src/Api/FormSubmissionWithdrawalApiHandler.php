@@ -142,7 +142,8 @@ final class FormSubmissionWithdrawalApiHandler
             return Response::error('Submission not found', 404);
         }
 
-        return $submission['withdrawn_at'] !== null
+        // #2204: also when the document it produced was withdrawn on its own.
+        return $submission['withdrawn_at'] !== null || ($submission['state'] ?? null) === 'withdrawn'
             ? Response::error('This submission has already been withdrawn', 409, ['reason' => 'already_withdrawn'])
             : Response::error('This submission has already been decided', 409, ['reason' => 'already_decided']);
     }

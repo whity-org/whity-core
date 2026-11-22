@@ -187,17 +187,34 @@
   --color-primary-tint: var(--primary-tint);
   --color-primary-tint-foreground: var(--primary-tint-foreground);
   --color-chart-6: var(--chart-6);
-  --radius-sm: 4px;
-  --radius-md: 7px;
-  --radius-lg: 10px;
-  --radius-xl: 12px;
-  --radius-2xl: 16px;
-  --radius-control-sm: 8px;
-  --radius-control: 10px;
-  --radius-control-lg: 11px;
-  --radius-card: 12px;
-  --radius-dialog: 16px;
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-surface-4: var(--surface-4);
+  --color-surface-5: var(--surface-5);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-secondary-container: var(--secondary-container);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-foreground: var(--tertiary-foreground);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-on-tertiary-container: var(--on-tertiary-container);
+  --radius-sm: var(--shape-radius-sm);
+  --radius-md: var(--shape-radius-md);
+  --radius-lg: var(--shape-radius-lg);
+  --radius-xl: var(--shape-radius-xl);
+  --radius-2xl: var(--shape-radius-2xl);
+  --radius-control-sm: var(--shape-radius-control-sm);
+  --radius-control: var(--shape-radius-control);
+  --radius-control-lg: var(--shape-radius-control-lg);
+  --radius-card: var(--shape-radius-card);
+  --radius-dialog: var(--shape-radius-dialog);
   --radius-full: 999px;
+  --spacing-inset-control: var(--shape-inset-control);
+  --radius-control-inner: var(--shape-radius-control-inner);
+  --radius-control-pressed: var(--shape-radius-control-pressed);
+  --radius-control-selected: var(--shape-radius-control-selected);
   --shadow-plane: var(--plane-rest);
   --shadow-plane-hover: var(--plane-hover);
   --shadow-plane-primary: var(--plane-primary-rest);
@@ -207,6 +224,17 @@
 }
 
 @utility plane-lift { transition: box-shadow 120ms cubic-bezier(0.2, 0, 0, 1), translate 120ms cubic-bezier(0.2, 0, 0, 1); &:hover { translate: 1px -1px; } }
+@layer base { [class*="rounded-control"], [class*="rounded-card"], [class*="rounded-dialog"], [class*="rounded-sm"], [class*="rounded-md"], [class*="rounded-lg"], [class*="rounded-xl"], [class*="rounded-2xl"] { corner-shape: var(--shape-corner, round); } }
+@layer base { :root, [data-theme-preview] { --shape-radius-sm: var(--wy-radius-sm, 4px); --shape-radius-md: var(--wy-radius-md, 7px); --shape-radius-lg: var(--wy-radius-lg, 10px); --shape-radius-xl: var(--wy-radius-xl, 12px); --shape-radius-2xl: var(--wy-radius-2xl, 16px); --shape-radius-control-sm: var(--wy-radius-control-sm, 8px); --shape-radius-control: var(--wy-radius-control, 10px); --shape-radius-control-lg: var(--wy-radius-control-lg, 11px); --shape-radius-card: var(--wy-radius-card, 12px); --shape-radius-dialog: var(--wy-radius-dialog, 16px); --shape-inset-control: max(0.25rem, calc(var(--shape-radius-control) * 0.3)); --shape-radius-control-inner: max(0.125rem, calc(var(--shape-radius-control) - var(--shape-inset-control))); --shape-radius-control-pressed: var(--wy-radius-control-pressed, var(--shape-radius-control)); --shape-radius-control-selected: var(--wy-radius-control-selected, var(--shape-radius-control-sm)); --shape-corner: var(--wy-corner-shape, round); } }
+@layer base { [data-slot="button"], [data-slot="icon-button"] { --shape-radius-sm: var(--wy-buttons-radius-sm, var(--wy-radius-sm, 4px)); --shape-radius-md: var(--wy-buttons-radius-md, var(--wy-radius-md, 7px)); --shape-radius-lg: var(--wy-buttons-radius-lg, var(--wy-radius-lg, 10px)); --shape-radius-xl: var(--wy-buttons-radius-xl, var(--wy-radius-xl, 12px)); --shape-radius-2xl: var(--wy-buttons-radius-2xl, var(--wy-radius-2xl, 16px)); --shape-radius-control-sm: var(--wy-buttons-radius-control-sm, var(--wy-radius-control-sm, 8px)); --shape-radius-control: var(--wy-buttons-radius-control, var(--wy-radius-control, 10px)); --shape-radius-control-lg: var(--wy-buttons-radius-control-lg, var(--wy-radius-control-lg, 11px)); --shape-radius-card: var(--wy-buttons-radius-card, var(--wy-radius-card, 12px)); --shape-radius-dialog: var(--wy-buttons-radius-dialog, var(--wy-radius-dialog, 16px)); --shape-inset-control: max(0.25rem, calc(var(--shape-radius-control) * 0.3)); --shape-radius-control-inner: max(0.125rem, calc(var(--shape-radius-control) - var(--shape-inset-control))); --shape-radius-control-pressed: var(--wy-buttons-radius-control-pressed, var(--wy-radius-control-pressed, var(--shape-radius-control))); --shape-radius-control-selected: var(--wy-buttons-radius-control-selected, var(--wy-radius-control-selected, var(--shape-radius-control-sm))); --shape-corner: var(--wy-buttons-corner-shape, var(--wy-corner-shape, round)); } }
+@layer base { [data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"], [data-slot="search-field"], [data-slot="tag-input"], [data-slot="bilingual-input"], [data-slot="phone-input"], [data-slot="otp-input"], [data-slot="date-picker-trigger"], [data-slot="time-picker-trigger"] { --shape-radius-sm: var(--wy-fields-radius-sm, var(--wy-radius-sm, 4px)); --shape-radius-md: var(--wy-fields-radius-md, var(--wy-radius-md, 7px)); --shape-radius-lg: var(--wy-fields-radius-lg, var(--wy-radius-lg, 10px)); --shape-radius-xl: var(--wy-fields-radius-xl, var(--wy-radius-xl, 12px)); --shape-radius-2xl: var(--wy-fields-radius-2xl, var(--wy-radius-2xl, 16px)); --shape-radius-control-sm: var(--wy-fields-radius-control-sm, var(--wy-radius-control-sm, 8px)); --shape-radius-control: var(--wy-fields-radius-control, var(--wy-radius-control, 10px)); --shape-radius-control-lg: var(--wy-fields-radius-control-lg, var(--wy-radius-control-lg, 11px)); --shape-radius-card: var(--wy-fields-radius-card, var(--wy-radius-card, 12px)); --shape-radius-dialog: var(--wy-fields-radius-dialog, var(--wy-radius-dialog, 16px)); --shape-inset-control: max(0.25rem, calc(var(--shape-radius-control) * 0.3)); --shape-radius-control-inner: max(0.125rem, calc(var(--shape-radius-control) - var(--shape-inset-control))); --shape-radius-control-pressed: var(--wy-fields-radius-control-pressed, var(--wy-radius-control-pressed, var(--shape-radius-control))); --shape-radius-control-selected: var(--wy-fields-radius-control-selected, var(--wy-radius-control-selected, var(--shape-radius-control-sm))); --shape-corner: var(--wy-fields-corner-shape, var(--wy-corner-shape, round)); } }
+@layer base { [data-slot="badge"], [data-slot="actor-chip"], [data-slot="data-table-phone-chips"] { --shape-radius-sm: var(--wy-chips-radius-sm, var(--wy-radius-sm, 4px)); --shape-radius-md: var(--wy-chips-radius-md, var(--wy-radius-md, 7px)); --shape-radius-lg: var(--wy-chips-radius-lg, var(--wy-radius-lg, 10px)); --shape-radius-xl: var(--wy-chips-radius-xl, var(--wy-radius-xl, 12px)); --shape-radius-2xl: var(--wy-chips-radius-2xl, var(--wy-radius-2xl, 16px)); --shape-radius-control-sm: var(--wy-chips-radius-control-sm, var(--wy-radius-control-sm, 8px)); --shape-radius-control: var(--wy-chips-radius-control, var(--wy-radius-control, 10px)); --shape-radius-control-lg: var(--wy-chips-radius-control-lg, var(--wy-radius-control-lg, 11px)); --shape-radius-card: var(--wy-chips-radius-card, var(--wy-radius-card, 12px)); --shape-radius-dialog: var(--wy-chips-radius-dialog, var(--wy-radius-dialog, 16px)); --shape-inset-control: max(0.25rem, calc(var(--shape-radius-control) * 0.3)); --shape-radius-control-inner: max(0.125rem, calc(var(--shape-radius-control) - var(--shape-inset-control))); --shape-radius-control-pressed: var(--wy-chips-radius-control-pressed, var(--wy-radius-control-pressed, var(--shape-radius-control))); --shape-radius-control-selected: var(--wy-chips-radius-control-selected, var(--wy-radius-control-selected, var(--shape-radius-control-sm))); --shape-corner: var(--wy-chips-corner-shape, var(--wy-corner-shape, round)); } }
+@layer base { [data-slot="card"] { --shape-radius-sm: var(--wy-cards-radius-sm, var(--wy-radius-sm, 4px)); --shape-radius-md: var(--wy-cards-radius-md, var(--wy-radius-md, 7px)); --shape-radius-lg: var(--wy-cards-radius-lg, var(--wy-radius-lg, 10px)); --shape-radius-xl: var(--wy-cards-radius-xl, var(--wy-radius-xl, 12px)); --shape-radius-2xl: var(--wy-cards-radius-2xl, var(--wy-radius-2xl, 16px)); --shape-radius-control-sm: var(--wy-cards-radius-control-sm, var(--wy-radius-control-sm, 8px)); --shape-radius-control: var(--wy-cards-radius-control, var(--wy-radius-control, 10px)); --shape-radius-control-lg: var(--wy-cards-radius-control-lg, var(--wy-radius-control-lg, 11px)); --shape-radius-card: var(--wy-cards-radius-card, var(--wy-radius-card, 12px)); --shape-radius-dialog: var(--wy-cards-radius-dialog, var(--wy-radius-dialog, 16px)); --shape-inset-control: max(0.25rem, calc(var(--shape-radius-control) * 0.3)); --shape-radius-control-inner: max(0.125rem, calc(var(--shape-radius-control) - var(--shape-inset-control))); --shape-radius-control-pressed: var(--wy-cards-radius-control-pressed, var(--wy-radius-control-pressed, var(--shape-radius-control))); --shape-radius-control-selected: var(--wy-cards-radius-control-selected, var(--wy-radius-control-selected, var(--shape-radius-control-sm))); --shape-corner: var(--wy-cards-corner-shape, var(--wy-corner-shape, round)); } }
+@layer base { [data-slot="dialog-content"], [data-slot="alert-dialog-content"], [data-slot="sheet-content"], [data-slot="popover-content"], [data-slot="select-content"], [data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"], [data-slot="menu-bar-content"], [data-slot="menu-bar-sub-content"], [data-slot="command-palette"] { --shape-radius-sm: var(--wy-dialogs-radius-sm, var(--wy-radius-sm, 4px)); --shape-radius-md: var(--wy-dialogs-radius-md, var(--wy-radius-md, 7px)); --shape-radius-lg: var(--wy-dialogs-radius-lg, var(--wy-radius-lg, 10px)); --shape-radius-xl: var(--wy-dialogs-radius-xl, var(--wy-radius-xl, 12px)); --shape-radius-2xl: var(--wy-dialogs-radius-2xl, var(--wy-radius-2xl, 16px)); --shape-radius-control-sm: var(--wy-dialogs-radius-control-sm, var(--wy-radius-control-sm, 8px)); --shape-radius-control: var(--wy-dialogs-radius-control, var(--wy-radius-control, 10px)); --shape-radius-control-lg: var(--wy-dialogs-radius-control-lg, var(--wy-radius-control-lg, 11px)); --shape-radius-card: var(--wy-dialogs-radius-card, var(--wy-radius-card, 12px)); --shape-radius-dialog: var(--wy-dialogs-radius-dialog, var(--wy-radius-dialog, 16px)); --shape-inset-control: max(0.25rem, calc(var(--shape-radius-control) * 0.3)); --shape-radius-control-inner: max(0.125rem, calc(var(--shape-radius-control) - var(--shape-inset-control))); --shape-radius-control-pressed: var(--wy-dialogs-radius-control-pressed, var(--wy-radius-control-pressed, var(--shape-radius-control))); --shape-radius-control-selected: var(--wy-dialogs-radius-control-selected, var(--wy-radius-control-selected, var(--shape-radius-control-sm))); --shape-corner: var(--wy-dialogs-corner-shape, var(--wy-corner-shape, round)); } }
+@layer base { [data-slot="table-container"], [data-slot="data-table"] { --shape-radius-sm: var(--wy-tables-radius-sm, var(--wy-radius-sm, 4px)); --shape-radius-md: var(--wy-tables-radius-md, var(--wy-radius-md, 7px)); --shape-radius-lg: var(--wy-tables-radius-lg, var(--wy-radius-lg, 10px)); --shape-radius-xl: var(--wy-tables-radius-xl, var(--wy-radius-xl, 12px)); --shape-radius-2xl: var(--wy-tables-radius-2xl, var(--wy-radius-2xl, 16px)); --shape-radius-control-sm: var(--wy-tables-radius-control-sm, var(--wy-radius-control-sm, 8px)); --shape-radius-control: var(--wy-tables-radius-control, var(--wy-radius-control, 10px)); --shape-radius-control-lg: var(--wy-tables-radius-control-lg, var(--wy-radius-control-lg, 11px)); --shape-radius-card: var(--wy-tables-radius-card, var(--wy-radius-card, 12px)); --shape-radius-dialog: var(--wy-tables-radius-dialog, var(--wy-radius-dialog, 16px)); --shape-inset-control: max(0.25rem, calc(var(--shape-radius-control) * 0.3)); --shape-radius-control-inner: max(0.125rem, calc(var(--shape-radius-control) - var(--shape-inset-control))); --shape-radius-control-pressed: var(--wy-tables-radius-control-pressed, var(--wy-radius-control-pressed, var(--shape-radius-control))); --shape-radius-control-selected: var(--wy-tables-radius-control-selected, var(--wy-radius-control-selected, var(--shape-radius-control-sm))); --shape-corner: var(--wy-tables-corner-shape, var(--wy-corner-shape, round)); } }
+@layer base { [data-slot="app-sidebar-nav"], [data-slot="tabs-list"], [data-slot="toggle-group"], [data-slot="view-toggle"], [data-slot="menu-bar"] { --shape-radius-sm: var(--wy-navigation-radius-sm, var(--wy-radius-sm, 4px)); --shape-radius-md: var(--wy-navigation-radius-md, var(--wy-radius-md, 7px)); --shape-radius-lg: var(--wy-navigation-radius-lg, var(--wy-radius-lg, 10px)); --shape-radius-xl: var(--wy-navigation-radius-xl, var(--wy-radius-xl, 12px)); --shape-radius-2xl: var(--wy-navigation-radius-2xl, var(--wy-radius-2xl, 16px)); --shape-radius-control-sm: var(--wy-navigation-radius-control-sm, var(--wy-radius-control-sm, 8px)); --shape-radius-control: var(--wy-navigation-radius-control, var(--wy-radius-control, 10px)); --shape-radius-control-lg: var(--wy-navigation-radius-control-lg, var(--wy-radius-control-lg, 11px)); --shape-radius-card: var(--wy-navigation-radius-card, var(--wy-radius-card, 12px)); --shape-radius-dialog: var(--wy-navigation-radius-dialog, var(--wy-radius-dialog, 16px)); --shape-inset-control: max(0.25rem, calc(var(--shape-radius-control) * 0.3)); --shape-radius-control-inner: max(0.125rem, calc(var(--shape-radius-control) - var(--shape-inset-control))); --shape-radius-control-pressed: var(--wy-navigation-radius-control-pressed, var(--wy-radius-control-pressed, var(--shape-radius-control))); --shape-radius-control-selected: var(--wy-navigation-radius-control-selected, var(--wy-radius-control-selected, var(--shape-radius-control-sm))); --shape-corner: var(--wy-navigation-corner-shape, var(--wy-corner-shape, round)); } }
+:root { --dur-morph: var(--dur-fast); }
+:root[data-motion="calm"], :root[data-motion="off"] { --dur-morph: 0ms; }
 @utility bg-blueprint-grid { background-color: var(--blueprint); background-image: linear-gradient(var(--blueprint-line) 1px, transparent 1px), linear-gradient(90deg, var(--blueprint-line) 1px, transparent 1px), linear-gradient(var(--blueprint-line-strong) 1px, transparent 1px), linear-gradient(90deg, var(--blueprint-line-strong) 1px, transparent 1px); background-size: 16px 16px, 16px 16px, 80px 80px, 80px 80px; }
 
 :root {
@@ -271,6 +299,19 @@
   --primary-tint: oklch(0.9607 0.0148 251.16);
   --primary-tint-foreground: oklch(0.5 0.16 255);
   --chart-6: oklch(0.3485 0 0);
+  --surface-1: oklch(1 0 0);
+  --surface-2: oklch(0.985 0 0);
+  --surface-3: oklch(0.97 0 0);
+  --surface-4: oklch(0.955 0 0);
+  --surface-5: oklch(0.94 0 0);
+  --primary-container: oklch(0.9 0.06 255);
+  --on-primary-container: oklch(0.25 0.1 255);
+  --secondary-container: oklch(0.92 0.05 255);
+  --on-secondary-container: oklch(0.25 0.05 255);
+  --tertiary: oklch(0.5 0.08 315);
+  --tertiary-foreground: oklch(1 0 0);
+  --tertiary-container: oklch(0.92 0.05 315);
+  --on-tertiary-container: oklch(0.25 0.06 315);
   --plane-rest: -3px 3px 0 0 oklch(0.5 0.16 255);
   --plane-hover: -5px 5px 0 0 oklch(0.5 0.16 255);
   --plane-primary-rest: -3px 3px 0 0 oklch(0.3 0.1 255);
@@ -407,6 +448,19 @@
   --primary-tint: oklch(0.2987 0.06 255.91);
   --primary-tint-foreground: oklch(0.6995 0.1498 255.09);
   --chart-6: oklch(0.6167 0 0);
+  --surface-1: oklch(0.19 0 0);
+  --surface-2: oklch(0.215 0 0);
+  --surface-3: oklch(0.24 0 0);
+  --surface-4: oklch(0.265 0 0);
+  --surface-5: oklch(0.29 0 0);
+  --primary-container: oklch(0.32 0.08 255);
+  --on-primary-container: oklch(0.92 0.04 255);
+  --secondary-container: oklch(0.3 0.05 255);
+  --on-secondary-container: oklch(0.92 0.05 255);
+  --tertiary: oklch(0.75 0.08 315);
+  --tertiary-foreground: oklch(0.205 0 0);
+  --tertiary-container: oklch(0.3 0.06 315);
+  --on-tertiary-container: oklch(0.92 0.06 315);
   --plane-rest: -3px 3px 0 0 oklch(0.7 0.15 255);
   --plane-hover: -5px 5px 0 0 oklch(0.7 0.15 255);
   --plane-primary-rest: -3px 3px 0 0 oklch(0.42 0.13 255);
@@ -488,6 +542,19 @@
   --primary-tint: oklch(0.9607 0.0148 251.16);
   --primary-tint-foreground: oklch(0.5 0.16 255);
   --chart-6: oklch(0.3485 0 0);
+  --surface-1: oklch(1 0 0);
+  --surface-2: oklch(0.985 0 0);
+  --surface-3: oklch(0.97 0 0);
+  --surface-4: oklch(0.955 0 0);
+  --surface-5: oklch(0.94 0 0);
+  --primary-container: oklch(0.9 0.06 255);
+  --on-primary-container: oklch(0.25 0.1 255);
+  --secondary-container: oklch(0.92 0.05 255);
+  --on-secondary-container: oklch(0.25 0.05 255);
+  --tertiary: oklch(0.5 0.08 315);
+  --tertiary-foreground: oklch(1 0 0);
+  --tertiary-container: oklch(0.92 0.05 315);
+  --on-tertiary-container: oklch(0.25 0.06 315);
   --plane-rest: -3px 3px 0 0 oklch(0.5 0.16 255);
   --plane-hover: -5px 5px 0 0 oklch(0.5 0.16 255);
   --plane-primary-rest: -3px 3px 0 0 oklch(0.3 0.1 255);

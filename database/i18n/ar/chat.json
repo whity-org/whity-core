@@ -345,6 +345,7 @@
         "sys.agentAddedQuiet": "أضاف {by} {agent}. يعمل هنا لصالح {for}، ويقرأ هذه المحادثة {reads}، ولا يستطيع النشر.",
         "sys.agentRemoved": "أزال {by} {agent}.",
         "sys.created": "بدأ {by} {title}.",
+        "sys.joined": "انضم {by}.",
         "sys.left": "غادر {by}.",
         "sys.linked": "ربط {by} المحادثة بـ{label}.",
         "sys.personAdded": "أضاف {by} {person}.",

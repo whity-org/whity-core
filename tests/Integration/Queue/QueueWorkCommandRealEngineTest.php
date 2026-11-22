@@ -83,6 +83,24 @@ final class QueueWorkCommandRealEngineTest extends TestCase
         self::assertSame(1, $this->countJobs(), 'the third job is left for the next worker');
     }
 
+    /**
+     * #2205: the worker's services hold the raw connection, so the worker
+     * recycles once it has run as long as a connection may live.
+     */
+    public function testRecyclesWhenTheDatabaseConnectionLifetimeIsReached(): void
+    {
+        $handler = $this->countingHandler();
+        $this->registry->register('count', $handler);
+        $this->repo->enqueue(self::TENANT, 'count', []);
+        $this->repo->enqueue(self::TENANT, 'count', []);
+
+        $this->command->recycleAfterConnectionAge(0);
+        $exit = $this->command->execute(['--memory=0']);
+
+        self::assertSame(0, $exit);
+        self::assertSame(1, $handler->runs, 'recycled after the first job: the connection is as old as allowed');
+    }
+
     public function testEmptyQueueOnceReturnsImmediately(): void
     {
         $handler = $this->countingHandler();

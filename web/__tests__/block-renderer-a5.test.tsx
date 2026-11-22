@@ -36,11 +36,12 @@ function renderWrapped(ui: React.ReactElement) {
 }
 
 describe('BlockRenderer — WC-532 A5', () => {
-  it('math block renders KaTeX', () => {
+  it('math block renders KaTeX', async () => {
     const { container } = renderWrapped(
       <BlockRenderer blocks={[{ type: 'math', expression: 'e^{i\\pi}+1=0', block: true } as Block]} />
     );
-    expect(container.querySelector('.katex')).not.toBeNull();
+    // KaTeX is its own chunk (WHIT-1245), so the formula arrives a tick later.
+    await waitFor(() => expect(container.querySelector('.katex')).not.toBeNull());
   });
 
   it('markdown block renders formatted content (no raw HTML injection)', () => {

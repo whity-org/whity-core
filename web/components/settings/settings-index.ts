@@ -48,6 +48,7 @@ export const SETTING_KEYWORDS: Readonly<Record<string, string>> = {
   general: 'general workspace name address company contact currency dollars dinars عام مساحة العمل اسم عنوان شركة عملة العملة',
   branding: 'branding logo colour color brand icon الهوية البصرية الشعار اللون العلامة',
   'document-themes': 'document themes letterhead print printout stamp أنساق المستندات الترويسة طباعة ختم',
+  'document-stamps': 'company stamps stamp seal holders legal name أختام الشركة ختم الشركة حاملو الختم الاسم القانوني',
   billing: 'billing plan subscription invoices payment upgrade الباقة الفوترة الاشتراك فواتير دفع ترقية',
   plugins: 'plugins apps store extensions add-ons الإضافات المتجر تطبيقات',
   owners: 'owners owner co-owner hand over transfer ownership shareholders المالكون المالك شريك نقل الملكية تسليم',

@@ -105,7 +105,10 @@ class RbacMiddleware
         // an absent type can only come from a stubbed parser.
         if (array_key_exists('type', $payload)
             && $payload['type'] !== 'access'
-            && !($stashedClaims && $payload['type'] === 'mcp')) {
+            && !($stashedClaims && $payload['type'] === 'mcp')
+            // An embedded screen's frame token (#1688) is admitted upstream only on
+            // its own plugin's routes; the route's permission is still checked below.
+            && !($stashedClaims && $payload['type'] === \Whity\Core\Plugin\PluginFrameTokens::TYPE)) {
             return Response::error('Invalid or expired token', 401);
         }
 

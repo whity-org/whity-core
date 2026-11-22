@@ -125,6 +125,14 @@ class RoleChecker
      */
     private static array $effectiveUserPermissionCache = [];
 
+    /**
+     * #2224: profile+tenant => {@see self::getPermissionScopesForProfile()}.
+     * Same lifetime as the caches above.
+     *
+     * @var array<string, array<string, list<int|null>>>
+     */
+    private static array $permissionScopeCache = [];
+
     private Database $db;
     private PermissionRegistry $registry;
     private ?LoggerInterface $logger;
@@ -320,6 +328,16 @@ class RoleChecker
             return self::$effectiveUserPermissionCache[$cacheKey];
         }
 
+        // #2254: no ACTIVE membership here means nothing here — not a role, not
+        // a resource grant, and not a delegation either. Roles already stopped
+        // at this gate; delegations did not, so a suspended or removed member
+        // kept every live delegation made to them.
+        if ($this->getActiveMembershipRows($profileId, $tenantId) === []) {
+            self::$effectiveUserPermissionCache[$cacheKey] = [];
+
+            return [];
+        }
+
         $permissions = [];
 
         $effectiveRoleIds = $this->getEffectiveRoleIdsForProfile($profileId, $tenantId, $resourceType, $resourceId);
@@ -396,6 +414,26 @@ class RoleChecker
         }
 
         return $owners === [] || in_array($profileId, $owners, true);
+    }
+
+    /**
+     * Whether the profile is a member of STAFF here: at least one active
+     * membership that is not a customer one (#2256).
+     */
+    public function isActiveStaff(int $profileId, int $tenantId): bool
+    {
+        try {
+            $statement = $this->db->query(
+                "SELECT 1 FROM memberships
+                  WHERE profile_id = :profileId AND tenant_id = :tenantId AND status = 'active' AND kind <> 'customer'
+                  LIMIT 1",
+                [':profileId' => $profileId, ':tenantId' => $tenantId]
+            );
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return $statement->fetchColumn() !== false;
     }
 
     /**
@@ -490,6 +528,89 @@ class RoleChecker
     }
 
     /**
+     * WHERE a profile holds each of its permissions in a tenant (#2224).
+     *
+     * `null` means tenant-wide: the permission comes from a membership's own
+     * role. An OU id means the permission comes from a role assigned to that OU
+     * (which its members, and the members of every OU below it, inherit), so it
+     * is held for that OU's subtree only.
+     *
+     * Only permissions in the profile's effective set appear, so everything
+     * that set drops (no active membership, customer-only, owner-only) is
+     * dropped here too. Resource grants and delegations are never a scope: a
+     * delegation is not something its holder may pass on, and a resource grant
+     * is held at one record, not over people.
+     *
+     * @return array<string, list<int|null>> permission => the scopes it is held at
+     */
+    public function getPermissionScopesForProfile(int $profileId, int $tenantId): array
+    {
+        $cacheKey = $profileId . ':' . $tenantId . ':' . ($this->delegationResolver !== null ? '1' : '0');
+        if (isset(self::$permissionScopeCache[$cacheKey])) {
+            return self::$permissionScopeCache[$cacheKey];
+        }
+
+        $effective = array_fill_keys($this->getEffectivePermissionsForProfile($profileId, $tenantId), true);
+        if ($effective === []) {
+            return self::$permissionScopeCache[$cacheKey] = [];
+        }
+
+        /** @var array<string, array<string, int|null>> $scopes */
+        $scopes = [];
+        $add = function (int $roleId, ?int $ouId) use (&$scopes, $effective, $tenantId): void {
+            foreach ($this->getEffectivePermissionsForRole($roleId, $tenantId) as $permission) {
+                if (isset($effective[$permission])) {
+                    $scopes[$permission][$ouId === null ? '-' : (string) $ouId] = $ouId;
+                }
+            }
+        };
+
+        foreach ($this->getActiveMembershipRows($profileId, $tenantId) as $membership) {
+            if ($membership['role_id'] !== null) {
+                $add($membership['role_id'], null);
+            }
+            if ($membership['ou_id'] !== null) {
+                foreach ($this->buildOuChainIds($membership['ou_id'], $tenantId) as $ouId) {
+                    foreach ($this->getRoleIdsAssignedToOu($ouId, $tenantId) as $roleId) {
+                        $add($roleId, $ouId);
+                    }
+                }
+            }
+        }
+
+        return self::$permissionScopeCache[$cacheKey] = array_map(static fn (array $s): array => array_values($s), $scopes);
+    }
+
+    /**
+     * An OU and every OU above it, tenant scoped: the OUs whose subtree
+     * contains `$ouId` (#2224).
+     *
+     * @return list<int>
+     */
+    public function getOuAndAncestorIds(int $ouId, int $tenantId): array
+    {
+        return array_values($this->buildOuChainIds($ouId, $tenantId));
+    }
+
+    /**
+     * Whether a profile holds `$permission` at a scope that covers `$ouId`
+     * (null: the whole tenant) (#2224). Tenant-wide covers everything; an OU
+     * covers itself and every OU below it.
+     */
+    public function holdsPermissionOver(int $profileId, int $tenantId, string $permission, ?int $ouId): bool
+    {
+        $scopes = $this->getPermissionScopesForProfile($profileId, $tenantId)[$permission] ?? [];
+        if (in_array(null, $scopes, true)) {
+            return true;
+        }
+        if ($ouId === null || $scopes === []) {
+            return false;
+        }
+
+        return array_intersect($scopes, $this->getOuAndAncestorIds($ouId, $tenantId)) !== [];
+    }
+
+    /**
      * Invalidate the worker-level effective-permission caches.
      *
      * Must be called whenever any input to authorization changes — role/permission
@@ -513,6 +634,7 @@ class RoleChecker
     {
         self::$effectivePermissionCache = [];
         self::$effectiveUserPermissionCache = [];
+        self::$permissionScopeCache = [];
     }
 
     // =========================================================================
@@ -622,10 +744,9 @@ class RoleChecker
     /**
      * Every ACTIVE membership a profile holds in a tenant.
      *
-     * `getMembershipRow()` answers "what is this profile HERE?" and must give
-     * exactly one answer — the primary row — because callers render it as the
-     * person's role and OU. This answers a different question: "everything this
-     * profile is here", which is a set.
+     * Not "what is this profile HERE?" (the primary row, which screens render
+     * as the person's role and OU) but "everything this profile is here",
+     * which is a set — and the only question authorization asks.
      *
      * A doctor attending in Emergency and part-timing in Family Medicine holds
      * two rows with two OUs; both contribute roles, and both OU chains are in
@@ -659,63 +780,32 @@ class RoleChecker
     }
 
     /**
-     * The ONE membership row that speaks for this profile in this tenant.
+     * Collect the OU ids in scope for a profile: the OU of every ACTIVE
+     * membership and every ancestor of each (walking
+     * organizational_units.parent_id up to the root), tenant scoped. The same
+     * set of rows {@see self::getEffectiveRoleIdsForProfile()} reads roles from.
      *
-     * Distinct from {@see self::getActiveMembershipRows()}, which answers the
-     * set-valued question. Callers here render a single role and a single OU,
-     * so they need exactly one answer: the primary row.
-     *
-     * @param int $profileId The profile id.
-     * @param int $tenantId  The tenant id.
-     * @return array{role_id: int|null, ou_id: int|null, status: string}|null
-     */
-    private function getMembershipRow(int $profileId, int $tenantId): ?array
-    {
-        $statement = $this->db->query(
-            // ORDER BY, not bare LIMIT 1: once a profile may hold more than
-            // one membership in a tenant (migration 094), an unordered pick
-            // returns whichever row the plan reaches first, so "what is my
-            // role here?" and "which OU am I in?" would answer differently
-            // between runs. The PRIMARY row is the answer; `id` breaks ties
-            // so the result is stable even if the partial unique index were
-            // ever missing.
-            'SELECT role_id, ou_id, status FROM memberships
-             WHERE profile_id = :profileId AND tenant_id = :tenantId
-             ORDER BY is_primary DESC, id ASC
-             LIMIT 1',
-            [':profileId' => $profileId, ':tenantId' => $tenantId]
-        );
-        $result = $statement->fetch();
-
-        if ($result === false) {
-            return null;
-        }
-
-        return [
-            'role_id' => $result['role_id'] !== null ? (int) $result['role_id'] : null,
-            'ou_id'   => $result['ou_id']   !== null ? (int) $result['ou_id']   : null,
-            'status'  => (string) $result['status'],
-        ];
-    }
-
-    /**
-     * Collect the OU ids in scope for a profile's membership: the membership's
-     * own OU and every ancestor OU (walking organizational_units.parent_id up to
-     * the root), tenant scoped. Returns an empty list when the profile's
-     * membership has no OU assignment.
+     * #2254: this used to read only the primary row, whatever its status, so a
+     * suspended primary membership kept its OU's delegations live while an
+     * active second membership's OU was ignored.
      *
      * @param int $profileId The profile id.
      * @param int $tenantId  The tenant id.
-     * @return array<int, int> Distinct OU ids (own OU + ancestors).
+     * @return array<int, int> Distinct OU ids (own OUs + ancestors).
      */
     private function getOuChainIdsForProfile(int $profileId, int $tenantId): array
     {
-        $membership = $this->getMembershipRow($profileId, $tenantId);
-        if ($membership === null || $membership['ou_id'] === null) {
-            return [];
+        $ouIds = [];
+        foreach ($this->getActiveMembershipRows($profileId, $tenantId) as $membership) {
+            if ($membership['ou_id'] === null) {
+                continue;
+            }
+            foreach ($this->buildOuChainIds($membership['ou_id'], $tenantId) as $ouId) {
+                $ouIds[$ouId] = true;
+            }
         }
 
-        return $this->buildOuChainIds((int) $membership['ou_id'], $tenantId);
+        return array_keys($ouIds);
     }
 
     // =========================================================================
@@ -917,7 +1007,7 @@ class RoleChecker
      */
     private function getParentRoleId(int $roleId): ?int
     {
-        // @tenant-guard-ignore: role-hierarchy traversal by globally-unique role id (SERIAL PK); the role hierarchy is tenant-independent
+        // @tenant-guard-ignore: walks parent links by role PK; parent_id is written only by migrations, seeders and PluginRoleSeeder, never by a request
         $statement = $this->db->query(
             'SELECT parent_id FROM roles WHERE id = :roleId',
             [':roleId' => $roleId]

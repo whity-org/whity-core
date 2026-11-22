@@ -42,6 +42,7 @@ Checked by `Whity\Sdk\Manifest\WorkspaceTemplateValidator::errors()`. A template
 | `documents` | no | Up to 5: `key`, `kind` (`note`, `letter`, `template`, `label`), `title`, `blocks` as `{en: [...], ar: [...]}` editor blocks |
 | `examples` | no | Up to 10 `contacts` (`key`, `name`, an `@example.com` `email`, `phone`, `notes`) and 10 `bookings` (`key`, `service`, `contact`, `inDays` 1-14, `time` HH:MM) |
 | `setup` | no | The guided setup: `title`, `description`, and 1 to 8 `steps`, each an `id`, a `kind`, a `title` and a `why` |
+| `theme` | no | The theme that suits this business, by id (`templates.market`), usually one your plugin ships with `PluginThemesInterface` (SDK 1.125). SDK 1.131: older hosts refuse a manifest with it, so require `^1.131`. See below |
 | `offer` | no | `plugin` (the name of the plugin made for this business), `trialDays` (1 to 90, the trial started from the template's setup), and `free` and `paid`: 1 to 6 lines each. Hidden until that plugin is installed and paid, so a template can carry its offer before the plugin exists |
 
 ### Guided setup step kinds
@@ -67,6 +68,10 @@ Core draws each step and works out whether it is done from what the workspace ho
 - Examples are recorded as examples. Example bookings email nobody.
 
 `DELETE /api/workspace/templates/examples` cancels the example bookings and archives the example contacts still there, as the caller. Nothing the workspace made itself is touched.
+
+## The theme
+
+A template that names a `theme` shows "Use its look: <theme name>" when it is chosen, on by default. Core sets it only while the workspace still has the installation's theme, so a theme someone already chose stays, and the person can change it any time in Branding, for free. The card's `theme` is null when no theme by that id is installed in the workspace, and then nothing is offered (30-themes §14.6, TH.23).
 
 ## The offer
 

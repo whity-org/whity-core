@@ -12,7 +12,7 @@ use RuntimeException;
  * The REASON is what the host acts on; the message is for logs only and must
  * not carry keys, card data or a provider's raw response.
  */
-final class BillingPortalException extends RuntimeException
+final class BillingPortalException extends RuntimeException implements \Whity\Sdk\SdkException
 {
     /** The provider could not be reached. Worth retrying. */
     public const REASON_UNREACHABLE = 'unreachable';

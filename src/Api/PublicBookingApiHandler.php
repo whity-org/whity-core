@@ -29,6 +29,8 @@ use Whity\Core\Response;
 use Whity\Core\Store\SharedStoreInterface;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\Field;
+use Whity\Http\Validation\FieldValidator;
 
 /**
  * The public booking page, the customer's manage link and the staff ICS feed
@@ -124,9 +126,13 @@ final class PublicBookingApiHandler
                 'settings' => array_intersect_key($settings->toApi(), array_flip(['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days', 'multi_service_booking'])),
                 'services' => $services,
                 'staff' => array_map(static fn (array $s): array => ['profile_id' => $s['profile_id'], 'display_name' => $s['display_name']], $staff),
-                'bot_check' => $this->bot->isRequired() && $this->bot->provider() !== null
+                // WHIT-1286 (#2203): only a check that is fully set up; never an empty site key.
+                'bot_check' => $this->bot->isRequired() && $this->bot->isReady()
                     ? ['provider' => $this->bot->provider(), 'site_key' => $this->bot->siteKey()]
                     : null,
+                // WHIT-1298 (#2203): false when booking is refused until an admin
+                // sets up the bot check, so the page says so up front.
+                'bot_check_ready' => $this->bot->isReady(),
             ]]);
         });
     }
@@ -208,25 +214,38 @@ final class PublicBookingApiHandler
                 return $limited;
             }
 
-            $name = is_string($body['name'] ?? null) ? trim($body['name']) : '';
-            $email = is_string($body['email'] ?? null) ? strtolower(trim($body['email'])) : '';
-            $phone = is_string($body['phone'] ?? null) ? trim($body['phone']) : '';
-            $note = is_string($body['note'] ?? null) ? mb_substr(trim($body['note']), 0, 1000) : '';
-            if ($name === '' || mb_strlen($name) > 200) {
-                return Response::error('Your name is required', 422, ['field' => 'name']);
+            // #2174: the shared field validator. The booking page reads
+            // `details.field` to mark the field, so that key stays; every
+            // field's problem follows it in English and Arabic.
+            $checked = FieldValidator::check($body, [
+                'name' => Field::text()->required()->max(200),
+                'email' => Field::email()->required()->max(320),
+                'phone' => Field::phone('/^\+?[0-9 ()-]{6,40}$/'),
+                'note' => Field::text()->truncate(1000),
+            ]);
+            $sentence = [
+                'name' => 'Your name is required',
+                'email' => 'Your email address does not look right',
+                'phone' => 'Your phone number does not look right',
+            ];
+            if (($first = $checked->first()) !== null) {
+                return $checked->refusal($sentence[$first] ?? 'Please check the form.', ['field' => $first]);
             }
-            if ($email === '' || mb_strlen($email) > 320 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-                return Response::error('Your email address does not look right', 422, ['field' => 'email']);
-            }
-            if ($phone !== '' && preg_match('/^\+?[0-9 ()-]{6,40}$/', $phone) !== 1) {
-                return Response::error('Your phone number does not look right', 422, ['field' => 'phone']);
-            }
+            $name = $checked->value('name');
+            $email = $checked->value('email');
+            $phone = $checked->value('phone');
+            $note = $checked->value('note');
             // WHIT-1173: `services` books several back to back, when the workspace allows it.
             $many = ServiceChoices::fromBody($body);
             $serviceId = $many[0]['service_id'] ?? (is_int($body['service_id'] ?? null) ? $body['service_id'] : throw new CalendarRejectedException('Choose a service', 422));
             $start = Interval::fromApi($body['starts_at'] ?? null) ?? throw new CalendarRejectedException('Choose a time', 422);
             $profileId = is_int($body['profile_id'] ?? null) ? $body['profile_id'] : null;
 
+            // #2203: a bot check that isn't set up refuses, never skips: a provider
+            // half set up (WHIT-1286), or none with "allow without" off (WHIT-1298).
+            if (!$this->bot->isReady()) {
+                return Response::error('Booking is unavailable right now. Try again later.', 503);
+            }
             if ($this->bot->isRequired()) {
                 $verdict = $this->bot->verify(is_string($body['bot_token'] ?? null) ? $body['bot_token'] : '', ClientIp::fromRequest($request));
                 if ($verdict === BotCheck::UNREACHABLE) {
@@ -303,7 +322,7 @@ final class PublicBookingApiHandler
 
                 return Response::json(['data' => array_map(static fn (array $s): array => ['starts_at' => $s['starts_at'], 'ends_at' => $s['ends_at']], $slots)]);
             }
-            $slots = $this->booking->availability($tenantId, (int) $booking['service_id'], (int) $booking['profile_id'], $from, $to, true);
+            $slots = $this->booking->availability($tenantId, (int) $booking['service_id'], (int) $booking['profile_id'], $from, $to, true, $bookingId);
 
             return Response::json(['data' => array_map(static fn (array $s): array => ['starts_at' => $s['starts_at'], 'ends_at' => $s['ends_at']], $slots)]);
         });
@@ -508,7 +527,7 @@ final class PublicBookingApiHandler
         if ($tenantId === null || $tenantId === self::SYSTEM_TENANT_ID) {
             return null;
         }
-        $host = $request->getHeader('X-Forwarded-Host') ?? $request->getHeader('Host') ?? '';
+        $host = \Whity\Core\Http\RequestHost::fromRequest($request);
         $hostTenant = $this->hosts->resolveTenantIdByHost($host);
         if ($hostTenant !== null && $hostTenant !== $tenantId) {
             return null;

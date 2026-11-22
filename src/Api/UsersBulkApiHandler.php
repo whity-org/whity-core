@@ -139,10 +139,10 @@ final class UsersBulkApiHandler
 
         // After visibility, so somebody else's private role reads as not found and
         // never as "it has permissions you do not hold".
-        foreach ($this->roleChecker->getEffectivePermissionsForRole($roleId, $tenantId) as $permission) {
-            if (!isset($held[$permission])) {
-                return Response::error('This role has permissions you do not hold', 403, ['reason' => 'exceeds_your_access']);
-            }
+        // The shared grant rule (#2235): the same check every other grant path makes.
+        $missing = (new \Whity\Core\RBAC\RoleGrantGuard($this->roleChecker))->roleNotHeld($actor, $tenantId, $roleId);
+        if ($missing !== []) {
+            return \Whity\Core\RBAC\RoleGrantGuard::refusal($missing);
         }
 
         $changed = [];

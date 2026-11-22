@@ -47,6 +47,53 @@ final class DatabaseSharedStoreTest extends TestCase
         self::assertSame(1, $this->store->increment('k1', 60));
     }
 
+    public function testRelaxedCommitsCountExactlyLikeStrictOnes(): void
+    {
+        // WHIT-1229: relaxed only changes when the commit waits for the WAL, never
+        // what is counted — same window semantics, same RETURNING value.
+        $relaxed = new DatabaseSharedStore($this->pdo, relaxedCounterCommits: true);
+
+        self::assertSame(1, $relaxed->increment('r', 60));
+        self::assertSame(2, $relaxed->increment('r', 60));
+        self::assertSame(3, $this->store->increment('r', 60), 'both stores share one row');
+        self::assertSame(4, $relaxed->increment('r', 60));
+
+        $relaxed->increment('expired', -1);
+        self::assertSame(1, $relaxed->increment('expired', 60), 'an elapsed window restarts at one');
+
+        if ($this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
+            // Compared with the session's own value, not 'on': a test server
+            // may run with it off already.
+            $before = $this->synchronousCommit();
+            $this->pdo->exec("SET synchronous_commit = 'on'");
+            $relaxed->increment('r', 60);
+            self::assertSame('on', $this->synchronousCommit(), 'the relaxed commit is statement-local, never the session');
+            $this->pdo->exec("SET synchronous_commit = '" . $before . "'");
+        }
+    }
+
+    private function synchronousCommit(): string
+    {
+        $setting = $this->pdo->query('SHOW synchronous_commit');
+        self::assertNotFalse($setting);
+
+        return (string) $setting->fetchColumn();
+    }
+
+    public function testRelaxedIncrementInsideACallersTransactionStillCounts(): void
+    {
+        // Inside a transaction the store leaves the commit alone (plain upsert)
+        // and the count rides the caller's transaction like any other write.
+        $relaxed = new DatabaseSharedStore($this->pdo, relaxedCounterCommits: true);
+
+        $this->pdo->beginTransaction();
+        self::assertSame(1, $relaxed->increment('t', 60));
+        self::assertSame(2, $relaxed->increment('t', 60));
+        $this->pdo->rollBack();
+
+        self::assertSame(0, $this->store->count('t'), 'rolled back with the caller');
+    }
+
     public function testDifferentKeysAreIndependent(): void
     {
         $this->store->increment('a', 60);

@@ -155,11 +155,46 @@ final class TranslationsApiHandler
                 $formatted[$translation->key] = $translation->translation;
             }
 
-            return Response::json(['translations' => $formatted], 200);
+            return self::revalidatable(Response::json(['translations' => $formatted], 200), $request);
         } catch (\Throwable $e) {
             error_log('[TranslationsApiHandler] getTranslations failed: ' . $e->getMessage());
             return Response::error('Failed to fetch translations', 500);
         }
+    }
+
+    /**
+     * A bundle the browser may keep and must revalidate (WHIT-1229).
+     *
+     * Every page load fetched the `admin` bundle whole — 266 KB of JSON for
+     * English — though it changes only when someone edits a translation. The
+     * ETag is a hash of the exact body, so ANY change (an edit, a tenant
+     * override, a new key) is a new tag and nothing stale is ever served;
+     * `no-cache` makes the browser ask every time, and an unchanged bundle is
+     * answered 304 with no body. `private` and the Vary keep a tenant's
+     * overrides in that reader's own cache.
+     */
+    private static function revalidatable(Response $response, Request $request): Response
+    {
+        $etag = '"' . hash('xxh128', $response->getBody()) . '"';
+        $headers = [
+            'ETag'          => $etag,
+            'Cache-Control' => 'private, no-cache',
+            'Vary'          => 'Cookie, Authorization, Host',
+        ];
+
+        $ifNoneMatch = $request->getHeader('If-None-Match');
+        if (is_string($ifNoneMatch)) {
+            foreach (explode(',', $ifNoneMatch) as $candidate) {
+                // Caddy's `encode` tags a compressed copy `"<tag>-br"` (or -gzip,
+                // -zstd); a browser revalidating that copy sends it back.
+                $candidate = (string) preg_replace('/-(?:br|gzip|zstd)"$/', '"', trim($candidate));
+                if ($candidate === $etag || $candidate === 'W/' . $etag || $candidate === '*') {
+                    return new Response(304, '', $headers);
+                }
+            }
+        }
+
+        return $response->withHeaders($headers);
     }
 
     /**

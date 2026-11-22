@@ -155,7 +155,10 @@ final class SettingsApiRealEngineTest extends TestCase
         // 52 since WHIT-966: calendar.instant_booking.
         // 54 since design 3.4 (P1): company.name_ar and company.address_ar.
         // 55 since WHIT-1173: calendar.multi_service_booking.
-        self::assertCount(55, $data['registry']);
+        // 57 since WHIT-1225: branding_theme and branding_theme_overrides.
+        // 58 since WHIT-1334: calendar.walkins_enabled.
+        // 59 since #1730: documents.qr_public_signer_names.
+        self::assertCount(59, $data['registry']);
         self::assertArrayNotHasKey('auth.self_registration_enabled', $data['effective']);
         self::assertSame([], $data['overridden']);
     }
@@ -465,6 +468,33 @@ final class SettingsApiRealEngineTest extends TestCase
         );
     }
 
+    /**
+     * WHIT-1308 (#2189): letting unsigned store code onto the server is the
+     * operator's temporary call, so each time it goes on or off is kept, and a
+     * write that changes nothing, or another setting, adds nothing.
+     */
+    public function testTurningUnsignedStorePackagesOnAndOffIsAudited(): void
+    {
+        TenantContext::setTenantId(self::SYSTEM_TENANT);
+        $writes = [
+            ['plugins.store_allow_unsigned' => 'true'],
+            ['plugins.store_allow_unsigned' => 'true'],
+            ['timezone' => 'Europe/Berlin'],
+            ['plugins.store_allow_unsigned' => 'false'],
+        ];
+        foreach ($writes as $settings) {
+            $response = $this->handler->patchGlobal(
+                $this->req('PATCH', '/api/settings/global', ['settings' => $settings], self::USER_FULL, self::SYSTEM_TENANT)
+            );
+            self::assertSame(200, $response->getStatusCode(), $response->getBody());
+        }
+
+        $stmt = $this->pdo->prepare("SELECT action FROM audit_log WHERE action LIKE 'plugin.store_unsigned.%' ORDER BY id");
+        $stmt->execute();
+        $actions = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        self::assertSame(['plugin.store_unsigned.turned_on', 'plugin.store_unsigned.turned_off'], $actions);
+    }
+
     public function testPatchGlobalRejectsManageCallerWithBadValue(): void
     {
         TenantContext::setTenantId(self::SYSTEM_TENANT);
@@ -592,7 +622,7 @@ final class SettingsApiRealEngineTest extends TestCase
 
         $roleChecker = new RoleChecker($this->databaseFor($this->pdo), $registry);
 
-        return new SettingsApiHandler($service, $roleChecker, $this->serverLabels());
+        return new SettingsApiHandler($service, $roleChecker, $this->serverLabels(), null, new \Whity\Core\Audit\AuditLogger($this->pdo));
     }
 
     private function databaseFor(PDO $pdo): Database

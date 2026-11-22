@@ -242,9 +242,28 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.121.0',
+            '1.153.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.121 ADDS referenceSelect `multiple`: several rows from an API-backed source, as chips (#1437). '
+            'SDK 1.153 ADDS the route.stamped event: a holder applied a company stamp on a stamp step (#1729). '
+            . 'SDK 1.152 ADDS Log\PluginLog and Log\ErrorReporter (PluginScope::log(), errors()), route rateLimit and PluginInstallLifecycleInterface (#1686). '
+            . 'SDK 1.151 ADDS Contribute\PluginCapabilitiesInterface and Database\WorkspaceTables (PluginScope::database()): plugins get only the services they declare, and their own tables held to the workspace (#1693). '
+            . 'SDK 1.150 ADDS Frontend\FrameBridge: an embedded screen calls its own plugin routes through the app, with a short-lived token bound to them (#1688). '
+            . 'SDK 1.148 ADDS Contribute\\WorkspaceCommissionExpenses, Calendar\\CommissionClose and the calendar.commission.closed event: a closed commission period goes to the books (WHIT-1334). '
+            . 'SDK 1.147 ADDS the workspace template calendar setting `walkins_enabled`: a template turns on the walk-in queue (WHIT-1334). '
+            . 'SDK 1.141 ADDS the optional notification type `emailDefault` key: a plugin notice can also go by email, per each person\'s preferences (WHIT-1250, #2209). '
+            . 'SDK 1.137 ADDS Inventory\\Lots and Inventory\\Lot, lot fields on MoveLine and Move, and the stock.lot.expiring|expired events: batches, serial numbers and expiry (WHIT-1235). '
+            . 'SDK 1.133 ADDS Usage\\Usage: a workspace\'s usage meters for a month, read-only, with each base and warning state (section 33 §5). '
+            . 'SDK 1.132 ADDS Contribute\\WorkspaceQuoteConversion and the sales.quote.* events: what an accepted quote turns into (WHIT-1321). '
+            . 'SDK 1.131 ADDS the optional workspace template `theme` key: a template names the theme that suits it, offered when it is chosen (WHIT-1225). '
+            . 'SDK 1.130 ADDS Contribute\\CorePermissionRequestsInterface and the CorePermissionGrants host service: plugins ask for core permissions for their roles, granted only with an operator\'s approval (#2256). '
+            . 'SDK 1.129 ADDS Inventory\\Orders: purchase orders for plugins, sent on the workspace\'s route and received in parts (WHIT-1234). '
+            . 'SDK 1.128 ADDS Inventory\\Operations: adjustments, counts and transfers for plugins, with approval above the workspace\'s value (WHIT-1233). '
+            . 'SDK 1.127 ADDS Inventory\\Items, Locations, Stock and Units: core items, places and an append-only stock ledger for plugins (WHIT-1232). '
+            . 'SDK 1.125 ADDS Contribute\PluginThemesInterface and Theme\WorkspaceTheme (PluginScope::themes()): plugins ship theme files and read the workspace theme; deprecates PluginThemeInterface (WHIT-1225). '
+            . 'SDK 1.124 (release 0.2.31) ADDS PluginContext, Context\\PluginScope and Secrets\\WorkspaceSecrets, deprecates the seven ->for($this) factories and PluginHomeCardInterface, and fires submission.reviewed again (WHIT-1243). '
+            . 'SDK 1.123 ADDS SdkException: one marker interface on every exception the SDK defines (WHIT-1230). '
+            . 'SDK 1.122 ADDS HttpResponse headers and Http\\Outbound\\AddressPolicy: an opt-in public-address policy for URLs people supply (#2151). '
+            . 'SDK 1.121 ADDS referenceSelect `multiple`: several rows from an API-backed source, as chips (#1437). '
             . 'SDK 1.120 ADDS Calendar\\TimeOff and Delegation\\Away: a plugin puts time off on core\'s calendar and reads who is away and who stands in (WHIT-1210). '
             . 'SDK 1.119 ADDS Contacts\\Contacts and PluginContactFieldsInterface: core contacts and a plugin\'s own contact fields (WHIT-1209). '
             . 'SDK 1.118 ADDS Billing\\TrialCheckout: the card now, the first charge when a workspace\'s trial ends (WHIT-1207). '

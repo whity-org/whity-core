@@ -20,6 +20,9 @@ use Whity\Core\Signup\CustomerSignupService;
 use Whity\Core\Signup\WorkspaceSignupSettings;
 use Whity\Core\Store\SharedStoreInterface;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\Field;
+use Whity\Http\Validation\FieldValidator;
+use Whity\Http\Validation\Messages;
 
 /**
  * Public, unauthenticated side of workspace customer sign-up (WHIT-915).
@@ -160,16 +163,23 @@ final class PublicSignupApiHandler
         }
 
         $body = JsonBody::parsed($request);
-        $email = strtolower(trim((string) ($body['email'] ?? '')));
-        $name = trim((string) ($body['display_name'] ?? ''));
         $botToken = (string) ($body['bot_token'] ?? '');
 
-        if ($email === '' || strlen($email) > 255 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-            return Response::error('Enter a valid email address', 422, ['email' => 'invalid']);
+        // #2174: the shared field validator. The join page reads the FIRST key
+        // of `details` to choose its own words, so the existing key stays first
+        // and the per-field problems follow it.
+        $checked = FieldValidator::check($body, [
+            'email' => Field::email()->required()->maxBytes(255),
+            'display_name' => Field::text()->required()->max(120),
+        ]);
+        if ($checked->has('email')) {
+            return $checked->refusal('Enter a valid email address', ['email' => 'invalid']);
         }
-        if ($name === '' || mb_strlen($name) > 120) {
-            return Response::error('Enter your name (up to 120 characters)', 422, ['display_name' => 'invalid']);
+        if ($checked->has('display_name')) {
+            return $checked->refusal('Enter your name (up to 120 characters)', ['display_name' => 'invalid']);
         }
+        $email = $checked->value('email');
+        $name = $checked->value('display_name');
 
         // Bot check before anything is written or mailed. A bot check that is
         // not set up is a configuration state, not an outage: 409 with a code
@@ -193,7 +203,12 @@ final class PublicSignupApiHandler
         // Says nothing about the address beyond what the workspace publishes:
         // its domain list is public on the info endpoint already.
         if (!WorkspaceSignupSettings::emailAllowed($email, $workspace['settings']['allowed_domains'])) {
-            return Response::error('This workspace only accepts sign-ups from some email domains', 422, ['email' => 'domain']);
+            return FieldValidator::refusal('This workspace only accepts sign-ups from some email domains', [
+                'email' => Messages::problem(Messages::NOT_ALLOWED, [
+                    'This workspace only accepts sign-ups from some email domains.',
+                    'لا تقبل مساحة العمل هذه التسجيل إلا من بعض نطاقات البريد الإلكتروني.',
+                ]),
+            ], ['email' => 'domain']);
         }
 
         // Per address, after validation so it cannot be filled with junk. Over
@@ -263,19 +278,23 @@ final class PublicSignupApiHandler
         }
 
         $body = JsonBody::parsed($request);
-        $token = trim((string) ($body['token'] ?? ''));
-        $password = (string) ($body['password'] ?? '');
-        if ($token === '') {
-            return Response::error('A token is required', 422);
+        // #2174: the shared field validator. A password is optional here (a
+        // person joining with Whity ID has none), and checked when given.
+        $checked = FieldValidator::check($body, [
+            'token' => Field::text()->required(),
+            'password' => Field::password(),
+        ]);
+        if ($checked->has('token')) {
+            return $checked->refusal('A token is required');
         }
+        if ($checked->has('password')) {
+            return $checked->refusal('Password must be at least ' . PasswordPolicy::MIN_LENGTH . ' characters', ['password' => 'too_short']);
+        }
+        $token = $checked->value('token');
+        $password = $checked->value('password');
 
         $passwordHash = null;
         if ($password !== '') {
-            try {
-                PasswordPolicy::validate($password);
-            } catch (\InvalidArgumentException) {
-                return Response::error('Password must be at least ' . PasswordPolicy::MIN_LENGTH . ' characters', 422, ['password' => 'too_short']);
-            }
             $passwordHash = password_hash($password, PASSWORD_BCRYPT);
         }
 
@@ -358,7 +377,7 @@ final class PublicSignupApiHandler
                 return null;
             }
 
-            $host = $request->getHeader('X-Forwarded-Host') ?? $request->getHeader('Host') ?? '';
+            $host = \Whity\Core\Http\RequestHost::fromRequest($request);
             $hostTenant = $this->hosts->resolveTenantIdByHost($host);
             if ($hostTenant !== null && $hostTenant !== $tenantId) {
                 return null;

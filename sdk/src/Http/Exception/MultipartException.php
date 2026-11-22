@@ -13,7 +13,7 @@ namespace Whity\Sdk\Http\Exception;
  * without leaking internal parser detail. Never thrown for non-multipart
  * requests — those simply yield an empty uploaded-files bag.
  */
-final class MultipartException extends \RuntimeException
+final class MultipartException extends \RuntimeException implements \Whity\Sdk\SdkException
 {
     /** The raw body exceeded the configured global request-size cap. */
     public const REASON_REQUEST_TOO_LARGE = 'request_too_large';

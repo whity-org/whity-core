@@ -52,6 +52,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'branding_logo_square',
             'branding_favicon',
             'branding_main_color',
+            'branding_theme',
+            'branding_theme_overrides',
             'mcp.enabled',
             'mcp.always_on_plugin_tools',
             'auth.self_registration_enabled',
@@ -125,6 +127,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             // for them to configure. A deployment that had set them keeps the
             // rows in `app_settings`; nothing reads them, and nothing will.
             'payments.mock_enabled',
+            // #2206: the local billing and dunning runs, off by default.
+            'billing.local_runs_enabled',
             // Whether a refunded payment claws its affiliate commission back.
             // GLOBAL-ONLY: the payer is the platform, not the tenant, so a
             // referred customer's own settings must not decide what their
@@ -139,6 +143,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'plugins.store_allowed_hosts',
             'plugins.store_enabled',
             'plugins.mcp_prompts_require_mark',
+            'plugins.store_allow_unsigned',
             'plugins.billing_email_senders',
             'documents.render_enabled',
             'documents.theme',
@@ -169,6 +174,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'documents.qr_public_detail',
             // WHIT-920: whether an applicant sees who reviewed their form. Off.
             'forms.show_reviewer_names',
+            // #1730: whether the public check names who signed. Off.
+            'documents.qr_public_signer_names',
             // #999 — how many people a USER GROUP preview SHOWS. Not a ceiling
             // on resolution: the count a preview reports is exact and unbounded,
             // this is the size of the sample beside it.
@@ -201,6 +208,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.instant_booking',
             // WHIT-1173: one booking, several services back to back.
             'calendar.multi_service_booking',
+            // WHIT-1334: the walk-in queue at the front desk.
+            'calendar.walkins_enabled',
             // #1733. Whether the web app can be installed (instance-wide).
             'app.installable',
             // WS.5, WS.19: the operator's website (global-only).
@@ -219,6 +228,24 @@ final class SettingsRegistryCorePinTest extends TestCase
             'messaging.webchat_enabled',
             'messaging.webchat_greeting',
             'messaging.inbound_email_address',
+            // WHIT-1233: inventory approvals and transfers.
+            'inventory.approve_adjustments_above',
+            'inventory.approve_counts_above',
+            'inventory.adjustment_route_template_id',
+            'inventory.count_route_template_id',
+            'inventory.transfers_one_step',
+            // WHIT-1234: purchasing.
+            'inventory.purchase_route_template_id',
+            'inventory.over_receipt_percent',
+            // WHIT-1235: batches and expiry.
+            'inventory.fefo',
+            'inventory.expiry_warning_days',
+            'sales.quote_valid_days',
+            'sales.quote_route_template_id',
+            'sales.email_quote',
+            'sales.email_invoice',
+            'sales.email_receipt',
+            'sales.email_reminder',
         ];
     }
 
@@ -274,6 +301,9 @@ final class SettingsRegistryCorePinTest extends TestCase
             'branding_favicon' => '',
             // Empty: Whity Blue until a workspace sets its own main colour (2.8).
             'branding_main_color' => '',
+            // Empty: the installation's theme (WHIT-1225), and no overrides.
+            'branding_theme' => '',
+            'branding_theme_overrides' => '',
             'mcp.enabled' => 'false',
             'mcp.always_on_plugin_tools' => '',
             'auth.self_registration_enabled' => 'false',
@@ -323,7 +353,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'licensing.billing_basis' => 'activated',
             'seats.enforcement' => 'warn',
             'seats.count_invited' => 'true',
-            'meters.enforcement' => 'block',
+            'meters.enforcement' => 'warn',
             // Tax defaults to ZERO, not to any country's rate: charging tax
             // an operator is not registered to collect is a worse failure than
             // not charging it, and a default correct for one jurisdiction and
@@ -344,6 +374,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             // that is on by default can take money before anybody decided it
             // should.
             'payments.mock_enabled' => 'false',
+            'billing.local_runs_enabled' => 'false',
             // Claws back by default. Absorbing a refund means paying commission
             // out of money nobody collected, which is a decision to make
             // deliberately rather than one to inherit.
@@ -357,6 +388,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'plugins.store_allowed_hosts' => 'app.whity.dev',
             'plugins.store_enabled' => 'true',
             'plugins.mcp_prompts_require_mark' => 'false',
+            'plugins.store_allow_unsigned' => 'false',
             'plugins.billing_email_senders' => '',
             // WHIT-1001: on by default; printing also needs a ready render
             // service, so an install without one still prints nothing.
@@ -407,6 +439,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'documents.qr_public_detail' => 'minimal',
             // WHIT-920: OFF. Applicants see stages and outcomes, not reviewers.
             'forms.show_reviewer_names' => 'false',
+            // #1730: OFF. The public check shows capacities, not names.
+            'documents.qr_public_signer_names' => 'false',
             // Ten faces: enough to recognise a group at a glance, small enough
             // that nobody mistakes the sample for the list.
             'groups.preview_sample_size' => '10',
@@ -442,6 +476,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.weekend_days' => 'friday,saturday',
             'calendar.instant_booking' => 'true',
             'calendar.multi_service_booking' => 'false',
+            'calendar.walkins_enabled' => 'false',
             // #1733: on, which is what app.whity.dev wants; an operator turns
             // it off here or with PWA_ENABLED.
             'app.installable' => 'true',
@@ -456,6 +491,21 @@ final class SettingsRegistryCorePinTest extends TestCase
             'messaging.webchat_enabled' => 'false',
             'messaging.webchat_greeting' => '',
             'messaging.inbound_email_address' => '',
+            'inventory.approve_adjustments_above' => '25',
+            'inventory.approve_counts_above' => '25',
+            'inventory.adjustment_route_template_id' => '0',
+            'inventory.count_route_template_id' => '0',
+            'inventory.transfers_one_step' => 'false',
+            'inventory.purchase_route_template_id' => '0',
+            'inventory.over_receipt_percent' => '0',
+            'inventory.fefo' => 'true',
+            'inventory.expiry_warning_days' => '7',
+            'sales.quote_valid_days' => '30',
+            'sales.quote_route_template_id' => '0',
+            'sales.email_quote' => 'true',
+            'sales.email_invoice' => 'true',
+            'sales.email_receipt' => 'true',
+            'sales.email_reminder' => 'true',
         ];
     }
 
@@ -492,6 +542,15 @@ final class SettingsRegistryCorePinTest extends TestCase
             ['branding_main_color', '', true],
             ['branding_main_color', '#B74C05', true],
             ['branding_main_color', 'b74c05', false],
+            ['branding_theme', '', true],
+            ['branding_theme', 'whity.harbour', true],
+            ['branding_theme', 'Harbour', false],
+            ['branding_theme_overrides', '', true],
+            ['branding_theme_overrides', '{"light":{"background":"#f4f1ea"}}', true],
+            ['branding_theme_overrides', '{"light":{"success":"#00ff00"}}', false],
+            ['branding_theme_overrides', 'not json', false],
+            ['branding_theme_overrides', '{"shape":"round","density":"compact","font":"cairo"}', true],
+            ['branding_theme_overrides', '{"shape":"blob"}', false],
             ['mcp.enabled', 'true', true],
             ['mcp.enabled', '1', false],
             ['mcp.always_on_plugin_tools', '', true],
@@ -695,6 +754,8 @@ final class SettingsRegistryCorePinTest extends TestCase
         self::assertTrue(SettingsRegistry::isGlobalOnly('i18n.enabled'));
         // Code plugins are install-wide, so whose prompts are served is too (WHIT-1014).
         self::assertTrue(SettingsRegistry::isGlobalOnly('plugins.mcp_prompts_require_mark'));
+        // WHIT-1308: only the operator installs code plugins, so only the operator lets unsigned ones in.
+        self::assertTrue(SettingsRegistry::isGlobalOnly('plugins.store_allow_unsigned'));
 
         self::assertTrue(SettingsRegistry::isFeatureFlag('mcp.enabled'));
         self::assertFalse(SettingsRegistry::isFeatureFlag('mail.events.welcome_enabled'));

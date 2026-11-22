@@ -1,0 +1,12 @@
+{
+  "$schema": "https://whity.dev/schema/theme/v1.json",
+  "schemaVersion": 1,
+  "id": "whity.ink",
+  "version": "1.0.0",
+  "name": { "en": "Ink", "ar": "حبر" },
+  "description": { "en": "Black and white with crisp corners and flat edges; your colour stays in charts.", "ar": "أسود وأبيض بزوايا حادة وحواف مسطحة؛ ويبقى لونك في الرسوم البيانية." },
+  "author": { "name": "Whity" },
+  "colour": { "scheme": "monochrome" },
+  "shape": { "preset": "crisp" },
+  "elevation": { "style": "flat" }
+}

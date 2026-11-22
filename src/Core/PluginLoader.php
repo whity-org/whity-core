@@ -809,6 +809,80 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     }
 
     /**
+     * Each plugin's checked themes (SDK 1.125, WHIT-1225), by plugin key.
+     *
+     * @var array<string, list<array<string, mixed>>>
+     */
+    private array $themes = [];
+
+    /**
+     * The themes of the plugins on in the current workspace (SDK 1.125,
+     * TH.13), each with the plugin that shipped it. An id offered by two
+     * plugins is kept from the first loaded.
+     *
+     * @return list<array{plugin: string, theme: array<string, mixed>}>
+     */
+    public function getPluginThemes(): array
+    {
+        $out = [];
+        $seen = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $themes = $this->themes[$pluginKey] ?? [];
+            if ($themes === [] || isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive() || $this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+            foreach ($themes as $theme) {
+                $id = (string) $theme['id'];
+                if (isset($seen[$id])) {
+                    continue;
+                }
+                $seen[$id] = true;
+                $out[] = ['plugin' => $info['plugin']->getName(), 'theme' => $theme];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Check a plugin's themes (SDK 1.125) against the theme format, each on
+     * its own, so a bad one is dropped with its reasons and the rest kept.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function collectThemes(PluginInterface $plugin, string $pluginKey): array
+    {
+        if (!$plugin instanceof \Whity\Sdk\Contribute\PluginThemesInterface) {
+            return [];
+        }
+        try {
+            $declared = $plugin->getThemes();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'getThemes');
+
+            return [];
+        }
+        $out = [];
+        foreach ($declared as $i => $theme) {
+            $errors = \Whity\Core\Theme\ThemeValidator::validate($theme);
+            if ($errors === [] && str_starts_with((string) $theme['id'], 'whity.')) {
+                $errors[] = 'ids starting with "whity." are Whity\'s own';
+            }
+            if ($errors !== []) {
+                $this->logWarning("[Plugin:{$pluginKey}] getThemes(): theme {$i} dropped: " . implode('; ', array_slice($errors, 0, 5)));
+                continue;
+            }
+            $out[] = $theme;
+        }
+
+        return $out;
+    }
+
+    /**
      * Each plugin's checked contact fields (SDK 1.119), by plugin key.
      *
      * @var array<string, list<array{key: string, label: array{en: string, ar: string}, kind: string, options: list<string>, required: bool, in_list: bool, edit_permission: ?string}>>
@@ -1701,6 +1775,8 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         foreach ($this->registeredPlugins as $pluginKey => $info) {
             $this->agentPresetRegistry?->unregisterPlugin((string) $pluginKey);
             $this->router->unregisterByNamespace($info['namespacePrefix']);
+            \Whity\Core\Plugin\PluginCapabilities::forget($info['plugin']->getName());
+            \Whity\Core\Plugin\PluginRouteLimits::removeOwner((string) $info['namespacePrefix']);
             // A reload re-declares them from the plugin as it is now.
             $this->templateSlotRegistry?->unregister($info['plugin']->getName());
             $this->documentFieldRegistry?->removeOwner($info['plugin']->getName());
@@ -2364,7 +2440,10 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
      * (WHIT-1030). A declaration that throws or is malformed costs that plugin
      * its entries here and nothing else.
      *
-     * @return list<array{type: string, label: array{en: string, ar: string}, plugin: string}>
+     * `email_default`: whether email starts on for a person who never chose
+     * for the type (#2209).
+     *
+     * @return list<array{type: string, label: array{en: string, ar: string}, plugin: string, email_default: bool}>
      */
     public function declaredNotificationTypes(): array
     {
@@ -2382,8 +2461,8 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             }
             try {
                 $slug = \Whity\Core\Plugin\PluginIdentity::slugOf($plugin);
-                foreach (\Whity\Core\Notification\PluginNotificationTypes::of($plugin, $slug) as $type => $label) {
-                    $declared[] = ['type' => $type, 'label' => $label, 'plugin' => $slug];
+                foreach (\Whity\Core\Notification\PluginNotificationTypes::declared($plugin, $slug) as $type => $declaration) {
+                    $declared[] = ['type' => $type, 'label' => $declaration['label'], 'plugin' => $slug, 'email_default' => $declaration['emailDefault']];
                 }
             } catch (Throwable $e) {
                 $this->logWarning("Plugin {$pluginKey} declares invalid notification types: " . $e->getMessage());
@@ -3070,6 +3149,8 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // plugin leaves nothing reachable without tenant resolution.
         \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
         \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
+        \Whity\Core\Plugin\PluginCapabilities::forget($info['plugin']->getName());
+        \Whity\Core\Plugin\PluginRouteLimits::removeOwner((string) $info['namespacePrefix']);
         // A disabled or uninstalled plugin vouches for nothing (#1872): its
         // customer-grade permissions are privileged for customers again.
         \Whity\Core\Identity\CustomerGradePermissions::remove($pluginKey);
@@ -3958,6 +4039,10 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
 
         $registered = $this->registerCapabilities($plugin, $namespacePrefix, $pluginKey);
 
+        // What it declared it uses (SDK 1.151, #1693): in discovery order, so the
+        // first plugin to declare a table owns it in every process.
+        \Whity\Core\Plugin\PluginCapabilities::register($plugin, $this->logger);
+
         // Seed plugin-declared roles and permission grants into the database.
         // The seeder is optional (not wired in tests that lack a DB); errors
         // are swallowed internally so a seeding failure never prevents the
@@ -4364,6 +4449,26 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                         . 'route and was NOT registered (first registration wins).'
                     );
                     continue;
+                }
+
+                // A per-route limit (SDK 1.152, #1686), kept for the route the
+                // router really resolves to this plugin's handler.
+                if (array_key_exists('rateLimit', $route)) {
+                    $limitRefusal = \Whity\Core\Plugin\PluginRouteLimits::refusal($route['rateLimit']);
+                    $served = $this->router->versionedPath((string) $path);
+                    $probe = (string) preg_replace('/\{[^}]+\}/', '1', $served);
+                    $resolved = $limitRefusal === null
+                        ? $this->router->match(new \Whity\Core\Request(strtoupper((string) $method), $probe, [], ''))
+                        : null;
+                    if ($limitRefusal === null && $resolved !== null && ($resolved['namespacePrefix'] ?? null) === $namespacePrefix) {
+                        \Whity\Core\Plugin\PluginRouteLimits::add((string) $namespacePrefix, (string) $method, (string) $resolved['path'], (int) $route['rateLimit']);
+                    } else {
+                        $this->logWarning(
+                            "Plugin {$pluginKey} route {$method} {$path}: "
+                            . ($limitRefusal ?? 'its rateLimit could not be tied to the route')
+                            . '; it is registered without a limit of its own.'
+                        );
+                    }
                 }
 
                 if ($serviceScope !== null) {
@@ -4896,6 +5001,9 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // 4d. Workspace templates (SDK 1.116, WHIT-1194): data only, each
         //     checked alone.
         $this->workspaceTemplates[$pluginKey] = $this->collectWorkspaceTemplates($plugin, $pluginKey);
+
+        // 4d'. Themes (SDK 1.125, WHIT-1225): data only, each checked alone.
+        $this->themes[$pluginKey] = $this->collectThemes($plugin, $pluginKey);
 
         // 4e. Fields on contacts (SDK 1.119, WHIT-1209): data only, each
         //     checked alone and named under the plugin.

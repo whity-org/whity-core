@@ -84,6 +84,8 @@ export function stripClientIpHeaders(headers: Headers): void {
   headers.delete('x-forwarded-for');
   headers.delete('x-real-ip');
   headers.delete('forwarded');
+  // WHIT-1287 (#2195): the proxy sets this itself, from trustedForwardedHost().
+  headers.delete('x-forwarded-host');
 }
 
 export function trustedClientIp(request: Request, hops: number = trustedProxyHops()): string | null {
@@ -108,4 +110,52 @@ export function trustedClientIp(request: Request, hops: number = trustedProxyHop
 
   const ip = parts[index];
   return ip ? ip.slice(0, MAX_IP_LENGTH) : null;
+}
+
+/**
+ * The host the browser asked for, for the backend's `X-Forwarded-Host`
+ * (WHIT-1287, #2195).
+ *
+ * The backend picks a workspace by host (custom domains, branding, SSO,
+ * public booking and chat) and reads `X-Forwarded-Host` first. This proxy
+ * replaces `Host` with the backend's own, so it must say which host the
+ * browser used, and it must not pass on one the browser made up.
+ *
+ * With no trusted proxy in front (`hops` 0), that is the `Host` this app
+ * received. With trusted proxies in front, it is the last `X-Forwarded-Host`
+ * value, the one the nearest of them wrote, as for `X-Forwarded-For`; `Host`
+ * when they sent none. Anything that isn't a plain host name or address with
+ * an optional port gives null, and no `X-Forwarded-Host` is sent.
+ */
+export function trustedForwardedHost(request: Request, hops: number = trustedProxyHops()): string | null {
+  return trustedForwardedHostFrom(request.headers, hops);
+}
+
+/**
+ * {@link trustedForwardedHost} for a header set alone, such as the one
+ * `headers()` from `next/headers` gives a server component. The server-side
+ * fetches for branding, theme, UI preferences and share cards use it, so a
+ * browser can't pick another workspace's answer for the page it is shown by
+ * sending its own `X-Forwarded-Host` (WHIT-1295, #2195).
+ */
+export function trustedForwardedHostFrom(
+  headers: { get(name: string): string | null },
+  hops: number = trustedProxyHops(),
+): string | null {
+  let host = headers.get('host');
+  if (hops > 0) {
+    const forwarded = (headers.get('x-forwarded-host') ?? '')
+      .split(',')
+      .map(part => part.trim())
+      .filter(part => part.length > 0);
+    if (forwarded.length > 0) {
+      host = forwarded[forwarded.length - 1] ?? null;
+    }
+  }
+  if (!host) {
+    return null;
+  }
+  host = host.trim().toLowerCase();
+
+  return host.length <= 260 && /^(\[[0-9a-f:.]+\]|[a-z0-9.-]+)(:\d{1,5})?$/.test(host) ? host : null;
 }

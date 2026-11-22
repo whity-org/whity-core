@@ -363,6 +363,31 @@ There is deliberately no automatic backfill: deciding which existing roles a
 plugin may grant to is the security decision migration 221 made, so each role
 is approved by a person.
 
+### Core permissions a plugin asks for its roles (#2256)
+
+A plugin never grants a core permission itself. When its roles need one (an HR
+role that writes approved leave to the calendar needs `calendar:write` and
+`calendar:manage`), it asks through `CorePermissionRequestsInterface`, and
+nothing is granted until you approve it, per role and per workspace:
+
+```bash
+whity-cli plugin core-grants <plugin> [--tenant <id>]             # what it asks for, and what is approved
+whity-cli plugin core-grant-approve <plugin> <role> --tenant <id> # a workspace's role
+whity-cli plugin core-grant-revoke <plugin> <role> --tenant <id>  # take it back
+```
+
+The same list, with Approve and Take back, is in Plugins, in the plugin's
+details. An approval grants exactly what the plugin asked for that role and
+only what you hold yourself. It is recorded in `plugin_core_grants` with who
+approved it and written to the audit log as `plugin.core_grant_approve` (and
+`plugin.core_grant_revoke`). Turning the plugin off in a workspace, or
+uninstalling it, removes the approvals and the grants there; turning it on
+again does not bring them back.
+
+Separately, every member of staff can now put time off on their own calendar
+without any calendar permission; someone else's still needs `calendar:write`
+and `calendar:manage`.
+
 ## Rolling back
 
 Check out the previous tag and restart (steps 5–6). Migrations are

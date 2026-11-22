@@ -110,16 +110,15 @@ final class PermissionOccupancy
      */
     public function hasRoleNamedAdmin(): bool
     {
-        // The twenty-seven by-name migrations run
-        // `SELECT id FROM roles WHERE name = 'admin'` with NO tenant predicate
-        // either, so a per-tenant answer here would report "no admin role" for
-        // tenants whose grants those migrations DID land on — and would miss the
-        // deployment-wide fact the operator needs. Mirroring the unqualified
-        // lookup is what makes the diagnosis true about what actually happened.
+        // The question is about the whole deployment, not one workspace: the
+        // seed migrations still find the administrator role by name with no
+        // tenant predicate (036, 107), so whether ANY role is named `admin` is
+        // the fact the operator needs. Only `permissions:unheld` (an operator
+        // CLI) asks it, and it returns a yes or no, never a row.
         //
         // (The tag goes LAST: the scanner reads at most three lines above the
         // statement, so an annotation opening a longer block never reaches it.)
-        // @tenant-guard-ignore: mirrors the unqualified lookup the by-name grant migrations themselves perform
+        // @tenant-guard-ignore: deployment-wide yes/no for the operator CLI; reads no row data from any workspace
         $stmt = $this->db->prepare("SELECT 1 FROM roles WHERE name = 'admin' LIMIT 1");
         $stmt->execute();
 

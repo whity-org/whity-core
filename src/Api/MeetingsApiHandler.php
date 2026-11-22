@@ -24,6 +24,7 @@ use Whity\Core\Response;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Http\InputLimits;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\FieldValidator;
 
 /**
  * Sittings: their agenda, their invitations, and the decisions taken at them.
@@ -76,7 +77,20 @@ final class MeetingsApiHandler
         private readonly AttendanceRepository $attendance,
         private readonly MeetingService $service,
         private readonly DecisionRecorder $recorder,
+        /**
+         * #2247: whether the caller may see this document (the document
+         * library's own visibility rule). Null refuses every document, so an
+         * unwired check never reads as "visible".
+         *
+         * @var (\Closure(Request, int, int): bool)|null
+         */
+        private readonly ?\Closure $canViewDocument = null,
     ) {
+    }
+
+    private function mayViewDocument(Request $request, int $tenantId, int $documentId): bool
+    {
+        return $this->canViewDocument !== null && ($this->canViewDocument)($request, $tenantId, $documentId);
     }
 
     /**
@@ -204,9 +218,9 @@ final class MeetingsApiHandler
             }
 
             $body = JsonBody::parsed($request);
-            $scheduledAt = trim((string) ($body['scheduled_at'] ?? ''));
+            $scheduledAt = FieldValidator::text($body, 'scheduled_at');
             if ($scheduledAt === '') {
-                return Response::error('scheduled_at is required', 422);
+                return FieldValidator::missing('scheduled_at is required', 'scheduled_at');
             }
 
             $location = isset($body['location']) && is_string($body['location'])
@@ -617,6 +631,11 @@ final class MeetingsApiHandler
             );
 
             $documentId = self::intField($body, 'document_id');
+            // #2247: putting a document in front of a body exposes it to the
+            // body, so the caller must be able to see it themselves.
+            if ($documentId !== null && !$this->mayViewDocument($request, $tenantId, $documentId)) {
+                return Response::error('Document not found', 404);
+            }
             $notes = isset($body['notes']) && is_string($body['notes']) ? trim($body['notes']) : null;
             if ($notes !== null && ($tooLong = InputLimits::firstViolation([
                 'notes' => [$notes, InputLimits::TEXT_MAX],
@@ -849,6 +868,10 @@ final class MeetingsApiHandler
             }
 
             $documentId = (int) ($params['id'] ?? 0);
+            // #2247: a document's history is as private as the document.
+            if (!$this->mayViewDocument($request, $tenantId, $documentId)) {
+                return Response::error('Document not found', 404);
+            }
             $out = [];
 
             foreach ($this->agenda->listForDocument($tenantId, $documentId) as $item) {

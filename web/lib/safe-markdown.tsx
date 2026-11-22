@@ -16,7 +16,8 @@
  */
 
 import * as React from 'react';
-import { MathText } from '@whity/ui/math-text';
+// Lazy (WHIT-1245): katex is ~75 KB gzipped and most markdown has no maths.
+import { MathText } from '@/components/lazy-heavy';
 
 /** Allow only non-javascript, non-data hrefs. Everything else is dropped to text. */
 function safeHref(url: string): string | null {

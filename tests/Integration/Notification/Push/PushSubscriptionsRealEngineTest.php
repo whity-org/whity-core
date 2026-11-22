@@ -46,6 +46,18 @@ final class PushSubscriptionsRealEngineTest extends TestCase
         return new VapidKeys(new GlobalSettingsRepository($this->pdo), $this->secrets);
     }
 
+    public function testThePublicKeyIsReadWithoutDecryptingThePrivateHalf(): void
+    {
+        // WHIT-1229: decrypting runs the key ring's password derivation (~40 ms)
+        // and the device list asks for the public key on every dashboard load.
+        // A store that cannot decrypt proves the public key never needs it.
+        $public = $this->keys()->pair()['public'];
+        $cannotDecrypt = new EncryptedSecretStore(['v1' => str_repeat('x', 64)], 'v1');
+        $keys = new VapidKeys(new GlobalSettingsRepository($this->pdo), $cannotDecrypt);
+
+        self::assertSame($public, $keys->publicKey());
+    }
+
     private function handler(int $profileId, int $tenantId = 1): PushSubscriptionsApiHandler
     {
         $tv = $this->createStub(TokenValidator::class);

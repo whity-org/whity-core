@@ -4,6 +4,7 @@ namespace Whity\Auth;
 
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
+use Whity\Api\MeEmailsApiHandler;
 use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Identity\AuthMethod;
 use Whity\Core\PasswordPolicy;
@@ -14,6 +15,9 @@ use Whity\Core\Response;
 use Whity\Core\Settings\SettingsRegistry;
 use Whity\Core\Settings\SettingsService;
 use Whity\Http\JsonBody;
+use Whity\Http\Validation\Field;
+use Whity\Http\Validation\FieldValidator;
+use Whity\Http\Validation\Messages;
 use PDO;
 use Whity\Core\i18n\LocalizedText;
 use Whity\Core\i18n\LocalizedTexts;
@@ -171,6 +175,14 @@ class AuthHandler
         $this->securityMailer = $mailer;
     }
 
+    /** Sends the confirmation link for a new address (WHIT-1246): set at boot once mail is wired. */
+    private ?\Whity\Core\Identity\EmailVerificationProvider $emailVerificationProvider = null;
+
+    public function setEmailVerificationProvider(\Whity\Core\Identity\EmailVerificationProvider $provider): void
+    {
+        $this->emailVerificationProvider = $provider;
+    }
+
     /**
      * Record a security audit entry when an audit logger is configured.
      *
@@ -212,6 +224,13 @@ class AuthHandler
      * @param Request $request The incoming request.
      * @return string|null The client IP, or null.
      */
+    /** A failed sign-in counts against the profile, the address typed and the client (#2190). */
+    private function recordLoginFailure(?int $profileId, ?string $ip, string $email): void
+    {
+        $this->loginThrottle?->recordFailure($profileId, $ip);
+        $this->loginThrottle?->recordEmailFailure($email);
+    }
+
     private function clientIp(Request $request): ?string
     {
         return ClientIp::fromRequest($request);
@@ -247,9 +266,24 @@ class AuthHandler
         // Parse request body (envelope validated upstream, WC-189).
         $body = JsonBody::parsed($request);
 
-        // Validate request has email and password
-        if (!isset($body['email']) || !isset($body['password'])) {
-            return Response::error('Email and password are required', 401);
+        // #2174: the fields are read through the shared validator. Sign-in only
+        // refuses a field that was not sent, exactly as before: a badly shaped
+        // address or a short password is not refused here, it fails the
+        // credential check below like any wrong pair, so the audit trail and
+        // the throttles still count it. The password is never trimmed and its
+        // length is never checked at sign-in.
+        $checked = FieldValidator::check($body, [
+            'email' => Field::email()->required(),
+            'password' => Field::password()->required(),
+        ]);
+        $missing = array_filter(['email', 'password'], static fn (string $key): bool => !isset($body[$key]));
+        if ($missing !== []) {
+            return FieldValidator::refusal(
+                'Email and password are required',
+                array_intersect_key($checked->problems(), array_flip($missing)),
+                [],
+                401
+            );
         }
 
         // Normalize the submitted email BEFORE the lookup. Migration 035 and the
@@ -260,12 +294,21 @@ class AuthHandler
         // contract is preserved. The original is retained only for audit display.
         $rawEmail = $body['email'];
         $email    = is_string($rawEmail) ? self::normalizeEmail($rawEmail) : '';
-        $password = $body['password'];
+        // A string as sent; a number as its digits; anything else is ''.
+        $password = $checked->value('password');
         $ip       = $this->clientIp($request);
 
         // WC-0abcc29f: check IP throttle before touching the DB — a heavily
         // throttled IP must not learn whether an email is registered.
         if ($this->loginThrottle !== null && $this->loginThrottle->isThrottled(null, $ip)) {
+            return RateLimited::response(60);
+        }
+
+        // #2190: the per-address limit is checked before the database is read
+        // and counts every failure, so it answers a registered address and an
+        // unknown one alike. The per-profile check below still guards an account
+        // reached through several addresses.
+        if ($this->loginThrottle !== null && $this->loginThrottle->isEmailThrottled($email)) {
             return RateLimited::response(60);
         }
 
@@ -289,13 +332,13 @@ class AuthHandler
             // bcrypt time (~tens of ms), letting an attacker enumerate registered
             // emails by response latency despite the identical 401 body. Burn one
             // bcrypt verify against a fixed dummy hash so both paths cost the same.
-            password_verify(is_string($password) ? $password : '', self::DUMMY_PASSWORD_HASH);
+            password_verify($password, self::DUMMY_PASSWORD_HASH);
 
             $this->audit('auth.login.failure', $request, null, null, [
                 'email'  => $email,
                 'reason' => 'profile_not_found',
             ]);
-            $this->loginThrottle?->recordFailure(null, $ip);
+            $this->recordLoginFailure(null, $ip, $email);
             return Response::error('Invalid credentials', 401);
         }
 
@@ -319,13 +362,13 @@ class AuthHandler
             // Same timing guard as the unknown-email path: this also returns
             // before the real password_verify(), so burn one dummy bcrypt to keep
             // the unverified-email response indistinguishable by latency.
-            password_verify(is_string($password) ? $password : '', self::DUMMY_PASSWORD_HASH);
+            password_verify($password, self::DUMMY_PASSWORD_HASH);
 
             $this->audit('auth.login.failure', $request, null, $profileId, [
                 'email'  => $email,
                 'reason' => 'email_not_verified',
             ]);
-            $this->loginThrottle?->recordFailure($profileId, $ip);
+            $this->recordLoginFailure($profileId, $ip, $email);
             return Response::error('Invalid credentials', 401);
         }
 
@@ -352,7 +395,7 @@ class AuthHandler
                 'email'  => $email,
                 'reason' => 'profile_row_missing',
             ]);
-            $this->loginThrottle?->recordFailure($profileId, $ip);
+            $this->recordLoginFailure($profileId, $ip, $email);
             return Response::error('Invalid credentials', 401);
         }
 
@@ -364,24 +407,27 @@ class AuthHandler
         // above. Same timing compensation: burn the dummy bcrypt verify BEFORE
         // the real one so this path costs the same as every other failure.
         if ((string) ($profile['status'] ?? 'active') === 'inactive') {
-            password_verify(is_string($password) ? $password : '', self::DUMMY_PASSWORD_HASH);
+            password_verify($password, self::DUMMY_PASSWORD_HASH);
 
             $this->audit('auth.login.failure', $request, null, $profileId, [
                 'email'  => $email,
                 'reason' => 'profile_inactive',
             ]);
-            $this->loginThrottle?->recordFailure($profileId, $ip);
+            $this->recordLoginFailure($profileId, $ip, $email);
             return Response::error('Invalid credentials', 401);
         }
 
-        if (!password_verify((string) $password, (string) $profile['password_hash'])) {
+        if (!password_verify($password, (string) $profile['password_hash'])) {
             $this->audit('auth.login.failure', $request, null, $profileId, [
                 'email'  => $email,
                 'reason' => 'invalid_password',
             ]);
-            $this->loginThrottle?->recordFailure($profileId, $ip);
+            $this->recordLoginFailure($profileId, $ip, $email);
             return Response::error('Invalid credentials', 401);
         }
+        // The password is right: earlier wrong tries at this address stop counting.
+        $this->loginThrottle?->clearEmail($email);
+
 
         // ── Step 4: resolve active memberships (ADR 0005 §6) ─────────────────
         // Zero → refuse; exactly one → log in directly (INCLUDING a single
@@ -394,7 +440,7 @@ class AuthHandler
             // Zero active memberships (none, or all suspended/invited). Return a
             // GENERIC 401 rather than a distinct status: a membership-specific
             // error is a user-enumeration oracle.
-            $this->loginThrottle?->recordFailure($profileId, $ip);
+            $this->recordLoginFailure($profileId, $ip, $email);
             return Response::error('Invalid credentials', 401);
         }
 
@@ -408,8 +454,11 @@ class AuthHandler
         // returns the selection prompt.
         if (self::dbTruthy($profile['two_factor_enabled'] ?? false)) {
             $tempClaims = [
-                'profile_id' => $profileId,
-                'email'      => $email,
+                'profile_id'  => $profileId,
+                'email'       => $email,
+                // A password change during the 5-minute window voids the
+                // pending second step (#2267).
+                'token_epoch' => $this->currentProfileTokenEpoch($profileId),
             ];
             if (count($memberships) === 1) {
                 $only = $memberships[0]['tenant_id'];
@@ -556,6 +605,11 @@ class AuthHandler
         $profileId = $claims['profile_id'];
         $email     = isset($claims['email']) && is_string($claims['email']) ? $claims['email'] : '';
 
+        // One selection per token (#2267): a used or epoch-stale token is refused.
+        if (!$this->signInStepTokenIsLive($claims)) {
+            return Response::error('Invalid or expired selection token', 401);
+        }
+
         // A profile deactivated during the 5-minute selection window must not
         // get the session it was about to choose (WHIT-672 review).
         if ($this->sessionRefusalReason($profileId) !== null) {
@@ -581,6 +635,12 @@ class AuthHandler
         // Re-read the profile epoch (the selection token is short-lived but the
         // session must carry the current epoch).
         $tokenEpoch = $this->currentProfileTokenEpoch($profileId);
+
+        // Spend the token before minting. Losing the race means another request
+        // already used it (#2267).
+        if (!$this->spendSignInStepToken($claims)) {
+            return Response::error('Invalid or expired selection token', 401);
+        }
 
         // Cookie mode only: clear the selection cookie after use.
         if (!$tokenMode) {
@@ -613,7 +673,7 @@ class AuthHandler
     private function requireTenantSelection(int $profileId, string $email, array $memberships, bool $tokenMode = false): Response
     {
         $selectionToken = $this->jwtParser->create(
-            ['profile_id' => $profileId, 'email' => $email],
+            ['profile_id' => $profileId, 'email' => $email, 'token_epoch' => $this->currentProfileTokenEpoch($profileId)],
             300,
             'tenant_select'
         );
@@ -668,7 +728,8 @@ class AuthHandler
         int $profileId,
         string $email,
         Request $request,
-        ?int $restrictToTenantId = null,
+        ?int $restrictToTenantId,
+        bool $tenantTrust,
     ): Response {
         // A deactivated account (profiles.status = 'inactive') must never get a
         // session, whichever door it uses. Password login and refresh already
@@ -685,8 +746,17 @@ class AuthHandler
             return Response::error('No active membership', 403);
         }
 
+        if ($tenantTrust && $restrictToTenantId === null) {
+            // A workspace's own provider always names its workspace; without one
+            // there is nothing to confine the session to, so there is no session.
+            return Response::error('No active membership', 403);
+        }
+
         if ($restrictToTenantId !== null) {
-            // Tenant-trust: the session may ONLY target the configuring tenant.
+            // The session may ONLY target this tenant. For tenant-trust it is
+            // also CONFINED there for its whole life (#2249): the confinement
+            // rides the signed tokens, so a refresh keeps it, switch-tenant
+            // refuses it, and the person's global account stays out of reach.
             if (!$this->hasActiveMembershipInTenant($profileId, $restrictToTenantId)) {
                 return Response::error('No active membership', 403);
             }
@@ -699,6 +769,7 @@ class AuthHandler
                 self::isTokenMode($request),
                 auditAction: 'auth.login.sso',
                 recordNewSession: true,
+                confinedTenantId: $tenantTrust ? $restrictToTenantId : null,
             );
         }
 
@@ -788,9 +859,7 @@ class AuthHandler
             return $m[1];
         }
 
-        $body = JsonBody::parsed($request);
-        $bodyToken = $body['temp_token'] ?? null;
-        return is_string($bodyToken) && $bodyToken !== '' ? $bodyToken : null;
+        return self::bodyToken($request, 'temp_token');
     }
 
     /**
@@ -853,9 +922,32 @@ class AuthHandler
         array $auditMetadata = [],
         bool $recordNewSession = false,
         ?string $rotateSessionFromJti = null,
-        array $extraTokenBody = []
+        array $extraTokenBody = [],
+        ?int $confinedTenantId = null,
+        bool $withRefreshToken = true
     ): Response
     {
+        // A deactivated profile gets no session, whichever path got here (#2227).
+        // Login, refresh and tenant selection checked this themselves; the
+        // device-credential exchange and the 2FA step did not, so a desktop app
+        // holding a device credential kept minting sessions after "Deactivate".
+        // Generic wording: a deactivation-specific error is an enumeration oracle.
+        $refusalReason = $this->sessionRefusalReason($profileId);
+        if ($refusalReason !== null) {
+            $this->audit('auth.login.failure', $request, $activeTenantId, $profileId, [
+                'reason' => $refusalReason,
+            ]);
+
+            return Response::error('Invalid credentials', 401);
+        }
+
+        // #2249: a session confined to one workspace is only ever minted INTO
+        // that workspace. Every caller already passes the confined tenant as the
+        // active one; this is the chokepoint that keeps it so.
+        if ($confinedTenantId !== null && $confinedTenantId !== $activeTenantId) {
+            return Response::error(TenantConfinement::REFUSAL, 403);
+        }
+
         // Resolve role from the active membership (post-cutover: no legacy users row).
         // Memberships is the canonical role store (ADR 0005 §6)
         $roleName = '';
@@ -872,12 +964,12 @@ class AuthHandler
         if ($membershipRow === false) {
             // Fail closed: no ACTIVE membership in the target tenant means it was
             // revoked/suspended (possibly during the 2FA challenge window) or never
-            // existed. Never mint a session on a stale claim — critically, for the
-            // system tenant (0) the ActiveTenantMembershipGuard bypasses the
-            // per-request membership check, so a stale active_tenant_id=0 claim here
-            // would otherwise grant lingering system authority. Every other caller
-            // pre-verifies membership; this is the chokepoint that also covers the
-            // single-membership 2FA branch, which trusts the temp-token claim.
+            // existed. Never mint a session on a stale claim — the system tenant
+            // (0) included, whose cross-tenant authority is the costliest to leave
+            // lingering (the per-request guard checks it too since #2229). Every
+            // other caller pre-verifies membership; this is the chokepoint that
+            // also covers the single-membership 2FA branch, which trusts the
+            // temp-token claim.
             return Response::json(['error' => 'No active membership for the requested tenant'], 401);
         }
         $roleName = (string) ($membershipRow['role'] ?? '');
@@ -890,7 +982,7 @@ class AuthHandler
         // $enrollmentDeadline is non-null but the session still mints (with a
         // nag flag in the response); at/after it, a refusal Response is
         // returned instead of ever reaching the claim-issuing code below.
-        $refusal = $this->twoFactorPolicyRefusal($profileId, $activeTenantId, $ouId, $email, $profileEpoch, $request);
+        $refusal = $this->twoFactorPolicyRefusal($profileId, $activeTenantId, $ouId, $email, $profileEpoch, $request, $confinedTenantId);
         if ($refusal !== null) {
             return $refusal;
         }
@@ -903,8 +995,40 @@ class AuthHandler
             'role'             => $roleName,
             'token_epoch'      => $profileEpoch,
         ];
+        if ($confinedTenantId !== null) {
+            $claims[TenantConfinement::CLAIM] = $confinedTenantId;
+        }
 
         $accessTokenStr  = $this->jwtParser->create($claims, 900, 'access');
+
+        // The device-credential exchange gets an access token only (#2265). The
+        // device credential IS that client's refresh credential: a 7-day refresh
+        // token beside it rotated forever through /auth/refresh, out of reach of
+        // device revocation and of auth.desktop_login_max_hours, and listed
+        // nowhere. Token mode only; it never sets cookies.
+        if (!$withRefreshToken) {
+            $this->audit($auditAction, $request, $activeTenantId, $profileId, $auditMetadata);
+
+            return Response::json([
+                'access_token' => $accessTokenStr,
+                'token_type'   => 'Bearer',
+                'expires_in'   => 900,
+                'user'         => [
+                    'id'        => $profileId,
+                    'email'     => $email,
+                    'role'      => $roleName,
+                    'tenant_id' => $activeTenantId,
+                ],
+            ] + $extraTokenBody, 200);
+        }
+
+        // The refresh token names its session family (#2264): a new family on a
+        // new sign-in, the caller's own on a re-mint.
+        if ($recordNewSession) {
+            $claims['fam'] = $this->sessionFamilyFor(null);
+        } elseif ($rotateSessionFromJti !== null) {
+            $claims['fam'] = $this->sessionFamilyFor($rotateSessionFromJti);
+        }
         $refreshTokenStr = $this->jwtParser->create($claims, 604800, 'refresh');
 
         // Session registry (WC-f): record a new interactive session on login /
@@ -1024,7 +1148,8 @@ class AuthHandler
         ?int $ouId,
         string $email,
         int $profileEpoch,
-        Request $request
+        Request $request,
+        ?int $confinedTenantId = null
     ): ?Response {
         if ($this->twoFactorPolicyResolver === null) {
             return null;
@@ -1049,6 +1174,10 @@ class AuthHandler
             'email'            => $email,
             'token_epoch'      => $profileEpoch,
         ];
+        if ($confinedTenantId !== null) {
+            // #2249: the enrollment step of a confined sign-in stays confined.
+            $enrollmentClaims[TenantConfinement::CLAIM] = $confinedTenantId;
+        }
         $enrollmentJwt = $this->jwtParser->create($enrollmentClaims, 600, 'two_factor_enrollment');
 
         return Response::json([
@@ -1307,6 +1436,14 @@ class AuthHandler
         $role   = isset($claims['role']) ? (string) $claims['role'] : null;
 
         $memberships = $this->listActiveMemberships($profileId);
+        $confinedTenantId = TenantConfinement::of($claims);
+        if ($confinedTenantId !== null) {
+            // #2249: a confined session sees only its own workspace.
+            $memberships = array_values(array_filter(
+                $memberships,
+                static fn (array $m): bool => $m['tenant_id'] === $confinedTenantId,
+            ));
+        }
 
         return Response::json([
             'user' => [
@@ -1383,6 +1520,12 @@ class AuthHandler
             return Response::error('tenant_id is required', 400);
         }
         $targetTenantId = (int) $body['tenant_id'];
+
+        // #2249: a session from a workspace's own sign-in provider never leaves
+        // that workspace.
+        if (TenantConfinement::of($claims) !== null) {
+            return Response::error(TenantConfinement::REFUSAL, 403);
+        }
 
         // Authorization gate: the profile MUST hold an ACTIVE membership in the
         // target tenant. Never trust the request body alone — this is the
@@ -1483,6 +1626,12 @@ class AuthHandler
             return Response::error('Unauthorized', 401);
         }
 
+        // #2249: the sign-in email and password belong to the person's global
+        // account, which a workspace's own sign-in provider may not change.
+        if (TenantConfinement::of($claims) !== null) {
+            return Response::error(TenantConfinement::REFUSAL, 403);
+        }
+
         $body = JsonBody::parsed($request);
 
         $emailProvided    = array_key_exists('email', $body) && is_string($body['email']);
@@ -1548,6 +1697,7 @@ class AuthHandler
         }
 
         $newEmail          = (string) $profileEmail['email'];
+        $pendingEmail      = null;
         $passwordChanged   = false;
 
         if ($emailProvided) {
@@ -1567,12 +1717,50 @@ class AuthHandler
                     return Response::error('Email already exists', 409);
                 }
 
-                // Update the primary profile_email row.
+                // WHIT-1246: the new address is ADDED, unconfirmed, beside the
+                // current one, and a confirmation link goes to it. Rewriting the
+                // primary row in place kept it verified, so anyone could claim an
+                // address they do not own as a confirmed one, and a later sign-in
+                // through an identity provider that vouches for that address
+                // would be linked to their profile. The current password proves
+                // who is asking, not who owns the new mailbox. It becomes the
+                // sign-in address once confirmed and made primary under Email
+                // addresses (MeEmailsApiHandler), as any added address does.
                 // Profile_emails is a sanctioned GLOBAL identity table (ADR 0005 §2)
-                $this->db->prepare(
-                    'UPDATE profile_emails SET email = ? WHERE id = ?'
-                )->execute([$email, $profileEmail['id']]);
-                $newEmail = $email;
+                $ownStmt = $this->db->prepare(
+                    'SELECT verified FROM profile_emails WHERE profile_id = ? AND email = ? LIMIT 1'
+                );
+                $ownStmt->execute([$profileId, $email]);
+                $own = $ownStmt->fetch(PDO::FETCH_ASSOC);
+                if (is_array($own) && self::dbTruthy($own['verified'])) {
+                    return Response::error(
+                        'That address is already confirmed. Make it your main address under Email addresses.',
+                        409
+                    );
+                }
+                if ($own === false) {
+                    $countStmt = $this->db->prepare('SELECT COUNT(*) FROM profile_emails WHERE profile_id = ?');
+                    $countStmt->execute([$profileId]);
+                    if ((int) $countStmt->fetchColumn() >= MeEmailsApiHandler::MAX_EMAILS_PER_PROFILE) {
+                        return Response::error('You have reached the maximum number of email addresses', 422);
+                    }
+                    $this->db->prepare(
+                        'INSERT INTO profile_emails (profile_id, email, verified, is_primary, created_at)
+                         VALUES (?, ?, FALSE, FALSE, CURRENT_TIMESTAMP)'
+                    )->execute([$profileId, $email]);
+                }
+                // A new address, or one added earlier and not yet confirmed: the
+                // link goes (again) either way.
+                if ($this->emailVerificationProvider !== null) {
+                    try {
+                        $this->emailVerificationProvider->sendVerification($profileId, $email);
+                    } catch (\Throwable $e) {
+                        // The address is recorded; the link can be sent again from
+                        // Email addresses (resend-verification).
+                        error_log('[update-me] confirmation link not sent: ' . $e->getMessage());
+                    }
+                }
+                $pendingEmail = $email;
             }
         }
 
@@ -1625,13 +1813,17 @@ class AuthHandler
             'token_epoch'      => $currentEpoch,
         ];
 
+        $currentJti = isset($claims['jti']) && is_string($claims['jti']) ? $claims['jti'] : null;
         $accessToken  = $this->jwtParser->create($newClaims, 900, 'access');
-        $refreshToken = $this->jwtParser->create($newClaims, 604800, 'refresh');
+        $refreshToken = $this->jwtParser->create(
+            $newClaims + ['fam' => $this->sessionFamilyFor($currentJti)],
+            604800,
+            'refresh'
+        );
 
         // Rotate the caller's session row to the re-minted jtis (matched by the
         // access jti this request carried) so it stays live/listable after an
         // email or password change. Best-effort.
-        $currentJti = isset($claims['jti']) && is_string($claims['jti']) ? $claims['jti'] : null;
         if ($currentJti !== null) {
             $this->recordSession($accessToken, $refreshToken, $profileId, $activeTenantId, $request, false, $currentJti);
         }
@@ -1647,6 +1839,7 @@ class AuthHandler
                     'email' => $newEmail,
                     'role'  => $role,
                 ],
+                'pending_email' => $pendingEmail,
                 'access_token'  => $accessToken,
                 'refresh_token' => $refreshToken,
                 'token_type'    => 'Bearer',
@@ -1662,7 +1855,7 @@ class AuthHandler
             'id'    => $profileId,
             'email' => $newEmail,
             'role'  => $role,
-        ]], 200);
+        ], 'pending_email' => $pendingEmail], 200);
     }
 
     /**
@@ -1696,6 +1889,10 @@ class AuthHandler
         $activeTenantId = isset($claims['active_tenant_id']) && is_int($claims['active_tenant_id']) ? $claims['active_tenant_id'] : null;
         if ($profileId === null || $profileId <= 0 || $activeTenantId === null || $activeTenantId < 0) {
             return Response::error('Unauthorized', 401);
+        }
+        // #2249: signing the person out everywhere reaches every workspace.
+        if (TenantConfinement::of($claims) !== null) {
+            return Response::error(TenantConfinement::REFUSAL, 403);
         }
         $email = isset($claims['email']) && is_string($claims['email']) ? $claims['email'] : '';
         $currentJti = isset($claims['jti']) && is_string($claims['jti']) ? $claims['jti'] : '';
@@ -1771,15 +1968,16 @@ class AuthHandler
         Request $request,
         bool $recordNew,
         ?string $rotateFromJti
-    ): void {
+    ): bool {
         try {
             $ac = $this->jwtParser->parse($accessToken);
             $rf = $this->jwtParser->parse($refreshToken);
             $accessJti  = is_array($ac) && isset($ac['jti']) ? (string) $ac['jti'] : '';
             $refreshJti = is_array($rf) && isset($rf['jti']) ? (string) $rf['jti'] : '';
             if ($accessJti === '' || $refreshJti === '') {
-                return;
+                return false;
             }
+            $family = isset($rf['fam']) && is_string($rf['fam']) ? $rf['fam'] : null;
             $expiresAt = isset($rf['exp'])
                 ? date('Y-m-d H:i:s', (int) $rf['exp'])
                 : date('Y-m-d H:i:s', time() + 604800);
@@ -1793,7 +1991,8 @@ class AuthHandler
                     $refreshJti,
                     $expiresAt,
                     $request->getHeader('User-Agent'),
-                    $this->clientIp($request)
+                    $this->clientIp($request),
+                    $family
                 );
                 // A browser this account hasn't used before gets the new
                 // sign-in email. Never lets a mail problem touch the sign-in.
@@ -1806,11 +2005,53 @@ class AuthHandler
                     );
                 } catch (\Throwable) {
                 }
-            } elseif ($rotateFromJti !== null) {
-                $sessions->rotate($rotateFromJti, $accessJti, $refreshJti, $expiresAt);
+
+                return true;
             }
+            if ($rotateFromJti !== null) {
+                return $sessions->rotate($rotateFromJti, $accessJti, $refreshJti, $expiresAt, $activeTenantId, $family);
+            }
+
+            return false;
         } catch (\Throwable $e) {
             error_log('[sessions] record/rotate failed: ' . $e->getMessage());
+
+            return false;
+        }
+    }
+
+    /**
+     * The session family a refresh token names (#2264): the live session's own
+     * when $currentJti matches one that has a family, otherwise a new one.
+     */
+    private function sessionFamilyFor(?string $currentJti): string
+    {
+        if ($currentJti !== null && $currentJti !== '') {
+            try {
+                $family = $this->sessions()->familyOf($currentJti);
+                if ($family !== null) {
+                    return $family;
+                }
+            } catch (\Throwable $e) {
+                error_log('[sessions] family lookup failed: ' . $e->getMessage());
+            }
+        }
+
+        return bin2hex(random_bytes(16));
+    }
+
+    /**
+     * Whether a refresh jti is the current one of a live session row. Fails
+     * closed: an unreadable sessions table refuses the refresh (#2265).
+     */
+    private function refreshHasLiveSession(string $refreshJti): bool
+    {
+        try {
+            return $this->sessions()->isLiveRefresh($refreshJti);
+        } catch (\Throwable $e) {
+            error_log('[sessions] live-session check failed: ' . $e->getMessage());
+
+            return false;
         }
     }
 
@@ -2046,9 +2287,7 @@ class AuthHandler
                     $rawToken = $m[1];
                 }
                 if ($rawToken === null) {
-                    $body = JsonBody::parsed($request);
-                    $bodyToken = $body['refresh_token'] ?? null;
-                    $rawToken = is_string($bodyToken) ? $bodyToken : null;
+                    $rawToken = self::bodyToken($request, 'refresh_token');
                 }
                 $claims = $rawToken !== null
                     ? $this->tokenValidator->validateRefreshTokenFromString($rawToken)
@@ -2071,8 +2310,31 @@ class AuthHandler
                     $activeTenantId = $parsedToken['active_tenant_id'];
                     if (is_string($jti) && is_int($profileId) && is_int($activeTenantId)) {
                         if ($this->isJtiRevoked($jti)) {
-                            // This token has been reused → log security event
-                            $this->audit('auth.refresh_token_reuse_detected', $request, $activeTenantId, $profileId);
+                            // A refresh token that was already used came back
+                            // (#2264). Within 30 s of its rotation it is two tabs
+                            // racing; any other reuse ends the whole session, the
+                            // thief's copy and the person's alike.
+                            $family = isset($parsedToken['fam']) && is_string($parsedToken['fam']) ? $parsedToken['fam'] : null;
+                            try {
+                                $outcome = ($parsedToken['type'] ?? null) === 'refresh'
+                                    ? $this->sessions()->onRefreshReuse($jti, $family)
+                                    : 'unknown';
+                            } catch (\Throwable $e) {
+                                error_log('[sessions] reuse handling failed: ' . $e->getMessage());
+                                $outcome = 'unknown';
+                            }
+                            $this->audit('auth.refresh_token_reuse_detected', $request, $activeTenantId, $profileId, [
+                                'outcome' => $outcome,
+                            ]);
+                        } elseif (($parsedToken['type'] ?? null) === 'refresh'
+                            && $this->sessionRefusalReason($profileId) === 'profile_inactive'
+                        ) {
+                            // The membership guard now refuses a deactivated
+                            // profile before we get here (#2227); keep the
+                            // record that a deactivated person tried to stay in.
+                            $this->audit('auth.refresh.failure', $request, $activeTenantId, $profileId, [
+                                'reason' => 'profile_inactive',
+                            ]);
                         }
                     }
                 }
@@ -2103,6 +2365,13 @@ class AuthHandler
             return Response::error('Unauthorized', 401);
         }
 
+        // #2249: a confined session stays confined across every refresh, and
+        // only ever in its own workspace.
+        $confinedTenantId = TenantConfinement::of($claims);
+        if ($confinedTenantId !== null && $confinedTenantId !== $activeTenantId) {
+            return Response::error('Unauthorized', 401);
+        }
+
         $tokenEpoch = $this->currentProfileTokenEpoch($profileId);
         $email = isset($claims['email']) && is_string($claims['email']) ? $claims['email'] : '';
 
@@ -2127,6 +2396,20 @@ class AuthHandler
             return Response::error('Unauthorized', 401);
         }
 
+        // A refresh token rotates only inside a live session row (#2265). Every
+        // interactive sign-in records one; the device-credential exchange used
+        // to mint refresh tokens with none, which then rotated forever, past
+        // device revocation and desktop_login_max_hours, listed nowhere. A
+        // revoked or missing row ends the chain here.
+        $presentedJti = isset($claims['jti']) && is_string($claims['jti']) ? $claims['jti'] : '';
+        if ($presentedJti === '' || !$this->refreshHasLiveSession($presentedJti)) {
+            $this->audit('auth.refresh.failure', $request, $activeTenantId, $profileId, [
+                'reason' => 'no_live_session',
+            ]);
+
+            return Response::error('Unauthorized', 401);
+        }
+
         // WC-525: a refresh is how a session PERSISTS across the deadline of an
         // admin-enforced 2FA policy that took effect (or whose grace period
         // elapsed) after this session was minted — without this check here,
@@ -2134,7 +2417,7 @@ class AuthHandler
         // again for the lifetime of the refresh token (up to 7 days, rotating
         // indefinitely). Refuse exactly like a fresh login would.
         $ouId = $this->activeMembershipOuId($profileId, $activeTenantId);
-        $refusal = $this->twoFactorPolicyRefusal($profileId, $activeTenantId, $ouId, $email, $tokenEpoch, $request);
+        $refusal = $this->twoFactorPolicyRefusal($profileId, $activeTenantId, $ouId, $email, $tokenEpoch, $request, $confinedTenantId);
         if ($refusal !== null) {
             return $refusal;
         }
@@ -2147,21 +2430,34 @@ class AuthHandler
             'role'        => $claims['role'] ?? '',
             'token_epoch' => $tokenEpoch,
         ];
+        if ($confinedTenantId !== null) {
+            $newClaims[TenantConfinement::CLAIM] = $confinedTenantId;
+        }
+        $family = isset($claims['fam']) && is_string($claims['fam']) && $claims['fam'] !== ''
+            ? $claims['fam']
+            : $this->sessionFamilyFor($presentedJti);
 
         $accessToken     = $this->jwtParser->create($newClaims, 900, 'access');
-        $newRefreshToken = $this->jwtParser->create($newClaims, 604800, 'refresh');
+        $newRefreshToken = $this->jwtParser->create($newClaims + ['fam' => $family], 604800, 'refresh');
 
         // Rotate the interactive session row in place, matched by the OLD refresh
         // jti this call presented, so the family stays one row across rotations.
-        $oldRefreshJti = isset($claims['jti']) && is_string($claims['jti']) ? $claims['jti'] : null;
-        if ($oldRefreshJti !== null) {
-            $this->recordSession($accessToken, $newRefreshToken, $profileId, $activeTenantId, $request, false, $oldRefreshJti);
+        // The live-session check above proved the presented jti non-empty.
+        // The rotation is the claim (#2264): of two requests racing on one
+        // refresh token only the first rotates; the other gets a plain 401 and
+        // the session carries on with the first one's tokens.
+        if (!$this->recordSession($accessToken, $newRefreshToken, $profileId, $activeTenantId, $request, false, $presentedJti)) {
+            $this->audit('auth.refresh.failure', $request, $activeTenantId, $profileId, [
+                'reason' => 'refresh_raced',
+            ]);
 
-            // WC-refresh-reuse: revoke the old refresh token to prevent reuse.
-            // On next use of this token, it will be detected as revoked and logged
-            // as a security incident (auth.refresh_token_reuse_detected).
-            $this->revokeRefreshToken($oldRefreshJti);
+            return Response::error('Unauthorized', 401);
         }
+
+        // WC-refresh-reuse: revoke the old refresh token to prevent reuse.
+        // On next use of this token, it will be detected as revoked and logged
+        // as a security incident (auth.refresh_token_reuse_detected).
+        $this->revokeRefreshToken($presentedJti);
 
         // WC-525: same grace-period nag as issueSessionForProfile() — the
         // refusal check above already means we only reach here when not
@@ -2198,8 +2494,9 @@ class AuthHandler
      *
      * The native client presents its long-lived device credential (type='device',
      * issued at enrollment) as `Authorization: Bearer` or in the body field
-     * `credential`, and receives a fresh access+refresh session (token-body mode —
-     * device clients never use cookies). This is the "per-device refresh
+     * `credential`, and receives a fresh 15-minute access token (token-body mode —
+     * device clients never use cookies). No refresh token (#2265): the client
+     * exchanges the credential again when the access token expires. This is the "per-device refresh
      * credential" step: the durable, individually-revocable enrollment mints
      * ephemeral sessions on demand.
      *
@@ -2302,7 +2599,8 @@ class AuthHandler
             [
                 'desktop_login_max_seconds' => $maxSeconds,
                 'desktop_login_expires_at'  => date('c', $issuedAt + $maxSeconds),
-            ]
+            ],
+            withRefreshToken: false
         );
     }
 
@@ -2359,6 +2657,7 @@ class AuthHandler
             $exp = $claims['exp'] ?? null;
             if ($jti !== null && $exp !== null) {
                 $this->revokeJti((string) $jti, (int) $exp);
+                $this->endSessionOf((string) $jti);
             }
         }
 
@@ -2370,6 +2669,20 @@ class AuthHandler
         return Response::json([
             'status' => 'logged out'
         ], 200);
+    }
+
+    /**
+     * End the session a signed-out token belongs to (#2264): its paired access
+     * or refresh jti is revoked too, and the row leaves the sessions list.
+     * Best-effort, like the rest of sign-out.
+     */
+    private function endSessionOf(string $jti): void
+    {
+        try {
+            $this->sessions()->revokeByJti($jti);
+        } catch (\Throwable $e) {
+            error_log('[sessions] sign-out revoke failed: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -2395,9 +2708,20 @@ class AuthHandler
      */
     private function bodyRefreshToken(Request $request): ?string
     {
-        $body      = JsonBody::parsed($request);
-        $bodyToken = $body['refresh_token'] ?? null;
-        return is_string($bodyToken) ? $bodyToken : null;
+        return self::bodyToken($request, 'refresh_token');
+    }
+
+    /**
+     * A token from the request body, read exactly as sent through the shared
+     * field validator (#2174), or null when it is absent, not a string, or only
+     * spaces. No token is ever trimmed or changed: an unusable value is null,
+     * which every caller already treats as "no token".
+     */
+    private static function bodyToken(Request $request, string $key): ?string
+    {
+        $checked = FieldValidator::check(JsonBody::parsed($request), [$key => Field::secret()->required()]);
+
+        return $checked->ok() ? $checked->value($key) : null;
     }
 
     /**
@@ -2430,7 +2754,19 @@ class AuthHandler
         // Parse temp token
         $claims = $this->jwtParser->parse($tempToken);
 
-        if ($claims === null) {
+        // Only the 5-minute token the password step minted (type 'temp') may
+        // finish a sign-in here. Every token type shares the signing key, so
+        // without this an access, tenant-select or sign-in-flow token carrying a
+        // profile_id was accepted as well (WHIT-1248). The TOTP code was still
+        // required, but the step should not trust tokens minted for other jobs.
+        if ($claims === null || ($claims['type'] ?? null) !== 'temp') {
+            return Response::error('Invalid or expired temporary token', 401);
+        }
+
+        // One sign-in per temp token (#2267): a used one, or one minted before a
+        // password change, is refused. A wrong code does not spend it, so a typo
+        // does not send the person back to the password step.
+        if (!$this->signInStepTokenIsLive($claims)) {
             return Response::error('Invalid or expired temporary token', 401);
         }
 
@@ -2450,13 +2786,21 @@ class AuthHandler
         }
 
         // Parse request body to get 2FA code (envelope validated upstream, WC-189).
-        $body = JsonBody::parsed($request);
-
-        if (!isset($body['code']) || empty($body['code'])) {
-            return Response::error('2FA code is required', 401);
+        // #2174: the code is read exactly as sent and only a string counts, so a
+        // number or a list is "no code" (it reached the TOTP check as a non-string
+        // and failed with a 500 before). "0" stays "no code", as empty() had it.
+        $body    = JsonBody::parsed($request);
+        $checked = FieldValidator::check($body, ['code' => Field::secret()->required()]);
+        if (!$checked->ok() || empty($body['code'])) {
+            return FieldValidator::refusal(
+                '2FA code is required',
+                $checked->problems() !== [] ? $checked->problems() : ['code' => Messages::problem(Messages::REQUIRED)],
+                [],
+                401
+            );
         }
 
-        $code = $body['code'];
+        $code = $checked->value('code');
 
         // ── Resolve 2FA credentials from the profile ──────────────────────────
         // Post-cutover: profile_id is required in the temp token (ADR 0005 §1)
@@ -2539,6 +2883,12 @@ class AuthHandler
             );
             $this->loginThrottle?->recordFailure($throttleId, $ip ?? null);
             return Response::error('Invalid 2FA code', 401);
+        }
+
+        // Spend the temp token now the code is good; losing the race means a
+        // parallel request already finished this sign-in with it (#2267).
+        if (!$this->spendSignInStepToken($claims)) {
+            return Response::error('Invalid or expired temporary token', 401);
         }
 
         // Second factor verified — full login completes.
@@ -2674,6 +3024,54 @@ class AuthHandler
     private function consumeTotpStep(int $profileId, int $step): bool
     {
         return TotpStepFloor::advance($this->db, $profileId, $step);
+    }
+
+    /**
+     * Whether a sign-in step token (type temp or tenant_select) may still be
+     * used: its jti is not spent, and it was minted at the profile's current
+     * epoch (#2267). A token without an epoch claim counts as epoch 0, so one
+     * minted before this check shipped still works for a profile whose epoch
+     * never moved.
+     *
+     * @param array<string, mixed> $claims
+     */
+    private function signInStepTokenIsLive(array $claims): bool
+    {
+        $jti = $claims['jti'] ?? null;
+        if (!is_string($jti) || $jti === '' || $this->isJtiRevoked($jti)) {
+            return false;
+        }
+        $profileId = is_int($claims['profile_id'] ?? null) ? $claims['profile_id'] : 0;
+        $tokenEpoch = is_int($claims['token_epoch'] ?? null) ? $claims['token_epoch'] : 0;
+
+        return $tokenEpoch >= $this->currentProfileTokenEpoch($profileId);
+    }
+
+    /**
+     * Spend a sign-in step token by recording its jti in revoked_tokens, so it
+     * mints at most one session even in token mode, where no cookie is cleared
+     * (#2267). Atomic: of two parallel requests only the one whose insert lands
+     * gets true. Fails closed: an unwritable table refuses the step.
+     *
+     * @param array<string, mixed> $claims
+     */
+    private function spendSignInStepToken(array $claims): bool
+    {
+        $jti = $claims['jti'] ?? null;
+        $exp = $claims['exp'] ?? null;
+        if (!is_string($jti) || $jti === '' || !is_int($exp)) {
+            return false;
+        }
+        try {
+            $stmt = $this->db->prepare(
+                'INSERT INTO revoked_tokens (jti, expires_at) VALUES (?, ?) ON CONFLICT (jti) DO NOTHING'
+            );
+            $stmt->execute([$jti, date('Y-m-d H:i:s', $exp)]);
+
+            return $stmt->rowCount() === 1;
+        } catch (\Exception) {
+            return false;
+        }
     }
 
     /**

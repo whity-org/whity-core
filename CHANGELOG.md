@@ -6,6 +6,557 @@ uses tag-based releases (see the `v*` tags in the repository).
 
 ## [Unreleased]
 
+## [0.2.31] - 2026-11-22
+
+### Added
+
+- `@whity/tokens` carries the websites' token CSS (`site.css`) and the brand logos, and a `whity-tokens copy <folder>` command puts them in a static site at build. The token drift check also fails when the package's copies differ from the brand handoff.
+- **Themes for every workspace, free.** Settings › Branding has a Theme picker with
+  Whity's own themes (Whity, Harbour, Ink, Bloom, Desert) and any theme file the
+  workspace adds. A theme sets colours from a seed (the main colour still leads),
+  fonts in Latin and Arabic, corners, density, depth and motion, and the app checks
+  every colour pair for contrast and fixes what fails, saying so in words. Everyone
+  can also turn on **Higher contrast** in Display preferences (WHIT-1225).
+- **Plugins can ship themes (SDK 1.125).** A plugin offers theme files through
+  `PluginThemesInterface`; they appear in the workspace's theme picker marked with
+  the plugin's name, and a person chooses one. Plugins read the workspace's theme
+  through their context with `$ctx->themes()`. The old colour-override route,
+  `PluginThemeInterface`, is deprecated and keeps working through SDK 2.0.x (WHIT-1225).
+- **Themes spec: an expansion proposal for the owner.** Section 14 of the themes spec proposes more shape presets, per-component shapes, per-person density, four more Arabic-first font pairs, outline elevation, a theme per workspace template, free export, and where free ends and Whity Studio begins, with ten questions. Nothing is built yet.
+- **Adjust a theme and export it, free.** Settings › Branding › Theme now lets a workspace pick the corners, spacing and fonts on top of any theme, like the main colour, and export the theme in use as a theme file that gives the same look when imported elsewhere. Adding a newer version of an imported theme first says, in words, what it changes.
+- **Two more theme shapes, shape morph, outline and brisk.** Themes can now use **Pebble** (pill buttons with Soft's cards) and **Cut** (bevelled corners for formal brands). With Round and Pebble the main button squares off while pressed and a selected chip goes from pill to rounded; people on Calm or Off animations see the end state without movement. Themes can also choose **outline** elevation (borders instead of shadows) and **brisk** motion (the standard springs, a little faster).
+- **Four more Arabic-first font pairs for themes.** A theme, or a workspace adjusting one, can now choose Rubik, Alexandria, Noto Naskh Arabic with Noto Serif, or IBM Plex Sans Arabic with Noto Kufi Arabic headings. Each loads only when a workspace uses it.
+- **A workspace template can bring its own look.** A template may name the theme that suits it (SDK 1.131, the manifest's optional `theme` key). Choosing the template shows "Use its look" with the theme's name, on by default; Whity sets it only while the workspace still has the installation's theme, and it can be changed any time in Branding.
+- **A theme can give buttons, fields, chips, cards, dialogs, tables and navigation their own corners.** A theme file's `shape.components` names a shape preset for any of seven families, for example round buttons with crisp cards. Values are preset names only, never pixels, so the corner rules and the browser check cover every mix. A newer version of an imported theme says in words when a family's corners change.
+- **Bring a theme from shadcn, Tailwind or Material Theme Builder.** In Branding › Theme, "Import from another tool" takes shadcn's CSS variables, a Tailwind `@theme` block or a Material Theme Builder JSON file. It shows the theme it makes, with a preview and what was kept in plain words, before you add it. Colours, the corner radius and a matching font come across; colours for errors, warnings and success stay Whity's. Free for every workspace.
+- **Make your own theme, free.** Branding › Theme now has a theme editor: start from any theme, change its colours, fonts, corners, spacing, shadows and animations, and see light and dark side by side as you go. It lists anything that needs fixing before you can save. Saving keeps the theme in your workspace as a new version, or as a copy if you started from someone else's, and "Save and use" puts it in use straight away.
+- **Take your theme to other tools.** Branding › Theme › Export theme now also gives the theme in use as CSS variables, design tokens (JSON), a Tailwind CSS file or a Flutter file. Each has every colour for light and dark, the corners, sizes, fonts and animation timings, exactly as your workspace shows them. Free for every workspace.
+- **See two versions of a theme side by side.** When you add a newer version of a theme you imported, Branding shows it next to the one you have now, light or dark, with what changes in plain words, before you choose to update. In the theme editor, Compare shows your changes next to where you started.
+- **Publish your theme to the store.** In the theme editor, Publish saves your theme and makes its store package, with a checksum to download and submit to the Whity store as its publisher. Publishing straight from Whity comes when the store accepts uploads from publishers.
+- **The Whity UI theme standard is decided.** `docs/design/30-themes.md` and register rows TH.1-TH.14 (version 3.6) define themes as tokens only: colour from seed colours, a Latin and Arabic font pair from an allowed list, shape, density, elevation and motion, with guard rails that always hold. Applying a theme is free; the editor is part of Whity Studio (WHIT-1225).
+- SDK 1.122: `HttpResponse` carries the answer's headers (`header('Retry-After')`, `Location` on a redirect), `RecordedHttpClient::on()` scripts them, and `AddressPolicy::publicOnly()` keeps a URL a person supplied off the server's own network: the host is resolved once, refused when any address is not public, and the request goes to the address that was checked (#2151).
+- **Inventory in core: the plan the owner approved.** Section 31 of the design docs sets out items with variants and units, places, an append-only stock ledger, levels, reorder levels, batches and expiry, counts, transfers, waste, and simple purchase and sales orders, all in the plugin SDK from the first phase. Register rows IV.1–IV.24 record the decisions, including Free workspaces getting up to 100 items (WHIT-1228).
+- SDK 1.123: every exception the SDK defines implements `Whity\Sdk\SdkException`, so a plugin catches whatever the host refused in one place. The hook guide now lists all 121 published events with what a listener can do (observe, filter, veto, queued), a new wiki page `Plugin-SDK-Reference` maps every host service and contribution point, and contract tests keep the three in step with the SDK (WHIT-1230).
+- **Inventory screens.** Inventory joins the sidebar under Work. Its Stock tab shows each item in every place, with a figure below zero in red. Items can be searched by name in either language, SKU or barcode. Places lists your warehouses, shops and vans. An item's page shows stock by place, its codes and units, and the full history of every change, with Undo. New item takes a name in Arabic and English, sizes or colours, prices and the stock you have now, in one step. Change stock asks for a reason (WHIT-1232).
+- **Inventory in core, first part: items, places and stock.** Items with variants, units (exact conversions such as a 25 kg bag), SKUs and barcodes; warehouses and shops; and stock as an append-only ledger of moves, where an undo is a move the other way and nothing is ever edited. Opening stock and adjustments with a reason, stock per place, and the history of every change are on the API and as MCP tools for agents (as proposals). Plugins get the same through SDK 1.127 (`Inventory\Items`, `Locations`, `Stock`, `Units`) and the `stock.moving` and `stock.moved` events. Free includes 100 items, each variant counted; past that, Billing and the plan banner warn the people who can change the plan, and items are still added (WHIT-1232).
+- **Inventory screens for counts, transfers, waste and reorder levels.** Inventory now sits under Operations in the sidebar, with Contacts. The page follows its design: the tabs are under the header, and the numbers below them (items, and what is below its reorder level, named in red). **Count stock** and **Transfer** sit beside New item. Counts and Transfers have their own tabs; a count opens a page where you enter what is on the shelves and finish it, and a transfer on the way opens to be received. **Waste and adjustments** has its own page: waste this week at cost, what waits for approval, the most wasted item, what counts found, every line with its reason and value, and the approval rule. Record waste offers the workspace's own reasons. An item's page sets its reorder level for each place, and the Stock tab says "Low at Sweifieh" when one place is under it (WHIT-1233).
+- **Inventory: adjustments, counts, transfers and reorder levels.** Each adjustment, count and transfer is now a record with a number (ADJ-0001, CNT-0001, TRF-0001). Adjustments take a reason from the workspace's own list. A line worth more than 25 at its buying price waits for approval before stock changes; the approval goes to a route chosen in the inventory settings, or by default to the people who run inventory. Counts take the expected amount as each line is counted, so sales during a long count aren't differences, and they can be blind. Differences above the same value also wait for approval. Transfers wait "on the way" until received, and anything that didn't arrive is written off; a setting makes them arrive at once. A reorder level per item and place tells the Stock assistant once when stock goes under it. All of this is on the API and as MCP tools for agents (as proposals). Plugins get it through SDK 1.128 (`Inventory\Operations`) and four new events. Two new permissions: count stock and transfer stock (WHIT-1233).
+- **Purchasing screens.** Inventory has a Purchases tab listing purchase orders, with New purchase order as its main button. A new order takes the supplier, the place it's received into, when it's expected, and lines in the unit you buy in; leave a price empty to use the supplier's. An order's page shows ordered and received side by side, line by line, and marks a line short with how much hasn't arrived. It has Send for approval while a draft, and Receive once approved; receiving starts each line at what is still to come and asks before taking more than ordered. A line that won't come can be closed. An item's page lists who supplies it and at what price, and a supplier's contact page shows what they supply and their purchase orders (WHIT-1234).
+- **Inventory: printed purchase orders, goods received notes and item labels.** A purchase order prints from its page, and each receipt from the Receiving tab, in English or in Arabic, in the workspace's document theme. Each is kept as a document with its own number, and printing again gives the same document until the order or its template changes. An item's page prints a sheet of labels for its variants, with the name, price and a barcode (the SKU when it has none). The templates appear in Documents the first time they're needed, already published, and can be changed there like any other; they read the order, the receipt or the item, so every figure comes from the record (WHIT-1234).
+- **Import items with their variants, and supplier prices.** An items spreadsheet can now have a row per variant: up to three option columns, each named by its own heading (Size, Colour), and the rows of one item share an item group column or its name. A new item is made with all its variants, and an item that already exists gains the new SKUs as variants. A new kind, supplier prices, sets what each supplier sells and at what price, matched by supplier and SKU; a blank cell keeps what is there. Both check before anything changes and can be undone for 24 hours (WHIT-1234).
+- **Inventory: purchase orders and receiving.** Draft a purchase order for a supplier (a contact marked as one), with lines in the unit you buy in, such as a 25 kg bag. A line without a price takes what that supplier sells it for; supplier prices are kept per item. Sending an order takes it along the workspace's purchase route when one is chosen in the inventory settings; with none, it is approved at once. Goods are received in parts: each receipt (GRN-0001) adds the stock to the order's place at the order's cost. Receiving more than ordered asks first, beyond a tolerance you can set (0% by default). A line that won't come can be closed, and the order is done when every line is received or closed. All of this is on the API and as MCP tools for agents (as proposals). Plugins get it through SDK 1.129 (`Inventory\Orders`) and the `inventory.order.*` events, including `inventory.order.submitting`, which can refuse an order. Two new permissions: see purchase orders, and draft, send and receive them (WHIT-1234).
+- **Batches, serial numbers and expiry dates in inventory.** An item can keep batches (each with its expiry date) or a serial number per piece. Stock coming in names its batch, and a new code makes it, with its expiry from the date typed or the item's shelf life. Stock leaving takes the batch that expires first, unless a batch is named; a workspace can choose oldest first instead. A transfer keeps its batches on the way, and a count names the batch any extra stock belongs to. Turning batches on for an item that already has stock puts that stock into a batch called OPENING. Each day, batches expiring within the warning window (7 days unless changed) and batches that have expired are reported once each, to plugins and the Stock assistant. New API routes list an item's batches and what is expiring, and plugins read them through the SDK (1.137) (WHIT-1235).
+- **A new install creates its database faster.** An empty database now loads a saved schema baseline (migrations 001 to 308) in one step instead of replaying every migration, then loads the labels from this release's catalogue: 18 s instead of 23 s with the database on the same Docker network, 55 s instead of 2 min 13 s over a slow link. Existing installs keep running the numbered migrations; a test proves both ways build the same database on PostgreSQL and SQLite (WHIT-1240).
+- **Migrations are safer on big databases.** `migrate run` shows how long each migration took, gives up on a lock after 5 s and retries instead of stalling the app, and on failure says which migration, why, and what to do next. `migrate plan` shows what would run without changing anything. CI flags migrations that would lock or rewrite a big table, and `Backfill::inBatches` and `SafeIndex::create` give the safe way to write them. See `docs/ops/migrations.md` (WHIT-1240).
+- SDK 1.124 (release 0.2.31): plugins reach everything that acts as them through one entry point, `PluginContext::for($this)`: settings, secrets, files, documents, notices, jobs, audit and outbound HTTP, always in the workspace the call runs in. The seven older `->for($this)` factories and the home card are deprecated and keep working until SDK 2.1 (WHIT-1243).
+- **Plugin notices by email.** A plugin's notice can now reach people by email as well as in the inbox, following each person's notification preferences and the workspace's email switch like core's own notices. A plugin opts in per type with `emailDefault` (SDK 1.141); people turn each type on or off by email in Preferences › Notifications, and their choice always wins. The email is in the person's language with the workspace's brand and carries only the notice's subject and body. Plugins that don't opt in behave exactly as before (WHIT-1250, #2209).
+- **A plugin can ask for Whity's own permissions for its roles, and you
+  decide.** A plugin says which core permissions its roles need (an HR role
+  that writes approved leave to the calendar, say). Nothing is granted until
+  the platform operator approves it, per role and per workspace, in the
+  plugin's details or with `whity-cli plugin core-grant-approve`. An approval
+  gives exactly what was asked, can be taken back, and goes when the plugin is
+  turned off in that workspace. Plugin SDK 1.130 (WHIT-1252).
+- **Everyone on the staff can add their own time off.** Putting time off on
+  your own calendar no longer needs a calendar permission; changing someone
+  else's still does (WHIT-1252).
+- **Accounting in core: the spec and the owner's decisions.** Section 32 of the design guide describes the double-entry ledger, the chart of accounts with a Jordan default, invoices, bills, payments, cheques, Whity Pay and stock posting, the tax engine and the Jordan sales tax return, reports, permissions and the plugin SDK surface, built in phases A1 to A6. Register rows AC.1 to AC.30 record the owner's answers ("Core basics, paid plugin", "Jordan first", JoFotara in the paid plugin), and MO.1, R.2, IV.1, IV.12, IV.23 and 6.8 are updated to match. Nothing is built yet (WHIT-1318).
+- **Quotes, receipts, trading emails and import specified and decided.** Section 34 of the design guideline and register rows QT.1–QT.12, TR.1–TR.4 and IM.1–IM.9 describe the parts of Front Office that move into core: quotes with online acceptance that turn into sales orders or invoices through a hook, the 80 mm receipt, the quote, invoice, receipt and reminder emails, and one import engine for contacts, items, opening stock and supplier prices. Docs only.
+- **Quotes to customers.** Draft a quote with items or free lines, send it for approval when the workspace has a quote route, send it with its own number (QUO-0001) and a link the customer opens without an account to accept (typing their name) or decline, revise it under the same number, and let it expire after its valid-until date (30 days by default). An accepted quote turns into a sales order or an invoice once those arrive; plugins and core lanes plug in through the new SDK 1.132 `WorkspaceQuoteConversion` and the `sales.quote.*` events (WHIT-1321).
+- **Import items and opening stock from a spreadsheet.** Inventory now imports items (matched by SKU: new ones made, existing ones updated without emptying anything) and opening stock (into the place each row names, at its unit cost) with the same steps as contacts: match columns from English or Arabic headings, check what will happen, import, and undo for 24 hours. Every kind of import now shares one set of tables; the contacts' imports moved into it (WHIT-1322).
+- **Quote, invoice, receipt and reminder emails, and the 80 mm receipt.** Sending a quote now emails it to the customer with a Review and accept button, in the workspace's brand, in English or Arabic. The invoice, receipt and payment reminder emails are ready for invoices to use. Each of the four can be turned off in the sales settings. A new 80 mm till receipt starter, in English and Arabic, prints on the receipt roll (WHIT-1323).
+- **Usage, counted and kept per workspace and month.** A new usage ledger keeps
+  every meter the business model sells (section 33 §5): staff, customers,
+  items, invoices, storage, messages by channel, agent runs and tool calls, and
+  API and MCP calls. Owners see each meter, what their plan includes and
+  whether it is near or past it on **Billing > Usage**. Past a limit is only a
+  warning: nothing is refused or removed. Plugins can read the meters through
+  the SDK's `Usage` service (SDK 1.133). Stored bytes are now counted, and
+  `whity-cli usage:storage-rebuild` recounts them (WHIT-1325).
+- **Embedded plugin screens can call their own plugin's API.** A plugin page
+  shown in the app's sandboxed frame now talks to the app over a message
+  bridge (SDK 1.150, `Whity\Sdk\Frontend\FrameBridge`): it can load and save
+  its own data, fit the frame to its content, open an app page and show a
+  message. The app makes each call for it with a five-minute token that works
+  only on that plugin's routes and only as the person, never with their
+  cookies, so a plugin page still cannot reach core or another plugin
+  (WHIT-1329, #1688).
+- **Plugins can say what they use, and get only that.** A plugin that declares
+  its services and tables (SDK 1.151, `PluginCapabilitiesInterface`) is given
+  only those by its context, and the plugin list shows the operator what each
+  plugin declared. Its own tables are reached through `$ctx->database()`, which
+  keeps every read and write inside the workspace it runs in, so a forgotten
+  workspace check in a plugin can no longer show or change another
+  workspace's rows (WHIT-1330, #1693).
+- **Plugins get a safe log, error reporting, route limits and install
+  callbacks.** A plugin's log records and the errors it reports pass through
+  the same scrubber as Whity's own error tracker and are tagged with the plugin
+  and workspace by Whity. A plugin can cap a route at a number of calls a minute
+  per person. And a plugin is told once when it is installed and once per
+  upgrade, after its migrations, so it can set itself up or move its data
+  (SDK 1.152, WHIT-1331, #1686).
+- **Company stamps held by named people.** A workspace can keep company stamps:
+  a name, the legal name the stamp stands for, its image, and who holds it
+  (named people or roles). A route can now have a stamp step: only a holder of
+  that stamp can answer it, by applying the stamp with the same consent line
+  and second check as a signature, or by declining with a reason. The applied
+  stamp is sealed in the audit with the stamp's names and image as they were,
+  and the trail says who applied it. It is an authorised person applying the
+  stamp's image, not a certified electronic seal. Managing stamps needs the new
+  permission `documents:stamps`, given on upgrade to every role that can change
+  workspace settings. Plugins can listen for the new `route.stamped` event (SDK 1.153)
+  (#1729, WHIT-1332).
+- **Signatures on the final PDF and on the public document check.** A route's
+  final PDF now carries a signature block (each signer's drawn signature, name,
+  capacity, date and a short hash of the sealed record), the image of each
+  company stamp applied, and an evidence page that sums up the trail and says
+  whether its chain is intact. The public check has a new detail level,
+  `signed`, off by default: it adds the signatures and stamps as capacities
+  with dates, and says when the trail's chain is broken. Names appear only if
+  the workspace turns on `documents.qr_public_signer_names`. "Check a file" lets
+  a visitor drop the PDF on the check page: the browser hashes it and only the
+  hash is compared with the stored one, so the file never leaves their device
+  (#1730, WHIT-1333).
+- **Walk-in queue in core.** A workspace that takes bookings can turn on Walk-ins in Calendar settings: the front desk adds people who come in without a booking, sees who is next, and hands each to the next free person or one it chooses, which books the service now, checked in, and finds or adds the customer in Contacts. It replaces the Salons plugin's queue; new permission `calendar:front_desk` (WHIT-1334).
+- **Staff commission in core.** Set each member of staff's share of a booking's price, for every service or one, and see what each earned this month, last month, this week or the last 7 or 30 days, from done bookings in the workspace's time zone, each service of a booking of several counted for whoever gave it. It replaces the Salons plugin's commission; new permission `calendar:commission` (WHIT-1334).
+- **Salons' walk-ins and commission rates copied into core.** A migration, and `whity-cli calendar:copy-salons` to run it again before the plugin is removed, copy the Salons plugin's queue and rates, give its front-desk and commission roles the core permissions, and turn walk-ins on where Salons was used. Safe to run more than once; does nothing where Salons never ran (WHIT-1334).
+- **Close a commission period by hand.** On the Commission screen an owner closes a period that has ended: each person's totals are frozen, so later price or rate changes never move a paid month, and the close goes to the books once accounting books commission (SDK `Contribute\WorkspaceCommissionExpenses`, event `calendar.commission.closed`). Until then it shows as ready for the books and can be sent again (WHIT-1334).
+- **Every calendar service is an inventory service item, and the price list prints from it.** A service's name and price live on its item (kind service), kept in step both ways with the calendar; a migration links every existing service. Service items don't count on the items meter. Calendar › Print for the front desk opens the price list in English and Arabic, ready for A4 (WHIT-1334).
+- **Walk-ins, commission and the price list move into core (decided).** Section 35 and register rows SL.1–SL.12 plan the Salons plugin's walk-in queue, commission rates and price list as free core features for any business that takes bookings, with the chair price folded into the staff-seat meter and Salons retired afterwards (WHIT-1334).
+
+### Changed
+
+- **A refused cross-site request now says what is missing.** The 403 names the
+  `X-Requested-With: XMLHttpRequest` header, so an API client can fix its
+  request without guessing (WHIT-703).
+- **Browser tests run against the app as it ships.** The E2E suite now runs
+  against a production build of the web app instead of the development server,
+  which roughly halves the time each test shard spends in the suite and caught
+  two tests that only passed because the development server was slow
+  (WHIT-1222).
+- **Pull request checks finish sooner.** The frontend checks run as three
+  parallel jobs instead of one six-minute job, and every frontend and E2E job
+  restores its npm packages from a cache instead of reinstalling them
+  (WHIT-1222).
+- **CI workflows are tighter.** Third-party GitHub Actions are pinned to a
+  commit instead of a movable tag, Dependabot now also updates the shared
+  composite actions, and the watchdog's fallback scheduler says plainly when
+  its failure is a secret that does not match rather than an outage
+  (WHIT-1223).
+- **Every part of the theme system is free.** The theme editor, importers and the other theme tools planned for paid Whity Studio are now free core features (decision TH.25). The theme picker no longer points people to Whity Studio.
+- Pages load faster and the server handles more people at once. The request rate limiter no longer waits for the database to flush its counters to disk on every request, a workspace's rate budget is remembered for 30 seconds instead of read on every request, and two pieces of per-request work were made cheaper. On a test stack, the eight calls behind every page load went from 165 ms to 118 ms, and throughput under load rose from about 255 to 400-440 requests a second.
+- The interface's translations are now cached by the browser and only re-downloaded when one of them changes, instead of about 266 KB of English on every page load.
+- The list of a person's notification devices, read on every dashboard load, no longer decrypts the server's private push key just to return the public one (55 ms to 20 ms on a test stack).
+- Expired rate and once-only counters are now removed by the scheduler every minute. They were never removed before, so the table kept growing with every elapsed minute, hour and day.
+- Signed-in pages download about half as much code. Icons named by the server or a plugin no longer bring the whole icon set (6,288 icons) with them: the design system's icons are built in and any other icon loads on its own when shown. Charts, maths and the document viewer load when a page shows one. The sidebar and the phone tab bar now share one read of the waiting counts instead of each making their own on every page change. On a test stack the dashboard's code went from about 1.16 MB to 0.57 MB compressed.
+- **Public forms say what is wrong with every field, in English and Arabic.**
+  Registering, joining a workspace, booking, starting a chat and the website
+  contact form now check their fields in one shared place. A refused form
+  lists every field that needs fixing, each with plain English and Arabic
+  words and a short code, alongside the message these pages already show,
+  so nothing changes for anyone sending valid details (#2174, WHIT-1302).
+- **Password reset, email verification, two-step recovery and sign-in check their fields through the shared validator (WHIT-1309, #2174 part 2).** The error sentences and status codes are unchanged; a refusal now also lists each field's problem in English and Arabic, with a code. A sign-in code or token that is not text counts as missing instead of failing the request with a server error.
+- **All of accounting is core, and only outside integrations are paid.** Following the owner's new approach, section 32 and register rows AC.1, AC.6, AC.16, AC.22 and AC.29 now put multi-currency, fixed assets, budgets and consolidation in core as later phases (A7 to A9), with no paid accounting plugin. JoFotara and live bank feeds are paid integration plugins, and accounting's paid part is its volume meter, invoices issued a month (WHIT-1318).
+- **The business model: everything in core, pay for seats, volume and outside services.** The owner's decision of 21 November 2026 is recorded as register rows BM.13 to BM.20: Whity Studio, Front Office and the accounting extras become free core features; paid is seats and volume (staff, storage, records, messages, API and agent usage, warn-only until plans charge), plugins that connect outside services (Whity Pay, JoFotara, bank feeds, WhatsApp, SMS, calendar sync) and hosted services. BM.14 is the test for placing a new feature. Section 33 of the design guide plans the moves, lists the paid integration plugins and the usage meters core must count, and asks the owner 14 questions. Rows BM.3 to BM.5, BM.11, M.16, S.2, 6.8, MO.1, R.2, IV.1, TH.14, FP.2 and FP.4 are updated, along with sections 9, 11, 16, 28 and 31. Nothing is built yet (WHIT-1319).
+- **"Front Office" is retired as a name.** Its parts are core features with plain names (stock, purchasing, quotes, invoices, receipts, import); the guidelines and code comments no longer present it as a product (WHIT-1324, BM.19).
+- **Limits warn by default, and nobody is locked out.** `meters.enforcement`
+  now defaults to `warn`, so a workspace past its document allowance keeps
+  making documents and is told. An operator can still choose `block`. The free
+  plan gets two new allowances, 100 invoices and 10,000 API and MCP calls a
+  month, and both only warn. A self-hosted install still has no limits
+  (WHIT-1325).
+
+### Removed
+
+- **Dead and duplicate backend tests removed.** 17 tests that never ran in CI,
+  asserted only their own fixtures, or repeated another test line for line are
+  gone; the one that covered a full migration rollback now runs on PostgreSQL
+  instead of being skipped everywhere (WHIT-1224).
+
+### Fixed
+
+- **Three browser test files that never ran now run.** The registration,
+  email-verification and role-record specs were not claimed by any Playwright
+  project, so their 11 tests had never executed in CI (WHIT-638).
+- **npm publishing uses trusted publishing (OIDC) instead of the placeholder token setup-node writes.** The registry refused every `@whity` publish with a 404 because npm sent that placeholder rather than exchanging the job's OIDC token.
+- **Final documents made by the queue worker carry their verification QR again (WHIT-1219).** A route's final document is made in the queue worker, which had no `APP_URL` in the shipped compose files, so the QR was left off without a word even with QR codes turned on. The worker, events relay and scheduler now get `APP_URL` (and `FRONTEND_URL`) in `docker-compose.yml` and `docker-compose.staging.yml`, and core logs a warning when QR codes are on but the process has no public origin to link them to. Deployments with their own compose files should pass `APP_URL` to their worker services too.
+- **Web chat works again when no bot check is set up.** With "allow without a bot check" on and no provider chosen, the chat page waited for a check that could never appear, so Send stayed off and a first message was refused. The chat now asks for a bot check only when a provider is chosen and set up. (WHIT-1220)
+- **The Round theme shape no longer cuts text in boxes that grow.** Long text fields and comment cards turned into stadium shapes that clipped their text. A corner is now at most half the height of a one-line control, padding grows with the corner, and a CI check renders tricky components under every shape so it can't come back.
+- When a theme file, a theme from another tool or a theme from the editor can't be used, Branding now says why in plain words instead of a general message.
+- **Inventory in Arabic.** Digits in item, place and reason names are kept Western, as everywhere else ("كيس 25 كغ"). The waste page's approval rule shows the value as money in the workspace's currency ($25.00), and amounts stay left to right inside Arabic sentences (WHIT-1233).
+- A plugin's background jobs can read its own secrets and settings again: the queue worker never had them, so a job that needed a provider key, such as Whity Pay's daily renewals, found no store. A test now pins which plugin services every entry point provides (WHIT-1243).
+- `submission.reviewed` fires again when the office records its answers at a step of a form's route; it had stopped when form reviews became route steps (WHIT-1243).
+- **A rejected sign-up can be approved after all.** The sign-up approvals
+  page now lists the sign-ups you rejected, each with Approve. A rejection is
+  recorded as its own thing, so approving one can never reactivate a member
+  who was suspended for another reason (WHIT-1244, #408).
+- **Plugins' background work reaches the same services as their screens.** The queue worker, the event relay and whity-cli now start from the web app's own wiring, so a plugin's job can use contacts, time off, workspace setup, billing emails and every other SDK service, as its routes do (WHIT-1247).
+- **A plugin's listener on a `*.async` event now runs.** The event relay delivered every event into an empty hook manager with no plugins loaded, so these listeners were never called (WHIT-1247).
+- **Migration numbers 309-311 and 313-316 are recorded as never used (WHIT-1249).** They were reserved for 0.2.31 work that needed no migration, so the schema test no longer reports them as missing.
+- **Signing in again to sign a document or confirm an approval works.** People
+  who sign in with an identity provider were always told re-authentication was
+  unavailable; it now starts, for workspace ownership changes too, and in the
+  platform workspace (WHIT-1256, #2194).
+- **The "two-step sign-in was turned off" email comes from your workspace**, in
+  its language and with its brand, instead of the instance's default
+  (WHIT-1264, #2197).
+- **Your session follows you when you switch workspace.** After switching, the
+  current sign-in shows under Sessions in the new workspace and can be signed
+  out there; it used to stay listed under the workspace you signed in to
+  (WHIT-1265, #2218).
+- **Signing out other devices from an app keeps that app signed in.** The
+  typed API client now keeps the new sign-in the server hands back
+  (WHIT-1265, #2219).
+- **`@whity/features` works in apps that use `verbatimModuleSyntax`.** The
+  i18n provider imported `ReactNode` as a value, so an app whose TypeScript
+  settings require type-only imports (Vite's React template does) couldn't
+  use `@whity/features/i18n` or `/datetime`. The package now checks itself
+  with that setting (WHIT-1292, #2259).
+- **app.whity.dev keeps up with develop during a run of merges (WHIT-1307).** The floating `develop` image tag moved only when its build was still develop's newest commit, so while pull requests merged back to back it stayed on an hours-old image. It now records its commit and moves forward whenever a build is newer than what it points at, and never backwards.
+- **Sign-in and other cookie-setting responses through the web proxy no longer send every Set-Cookie header twice.** Each upstream cookie now reaches the browser exactly once.
+- **Moving a single-service booking shows the times next to it again.** The
+  customer's link no longer treats their own appointment and its buffers as
+  busy, so they can shift it by 15 or 30 minutes (#2207, WHIT-1311).
+- **Core's own subscription billing and dunning can now run on a schedule.**
+  `schedule:run` starts the billing run hourly and the dunning sweep daily
+  when an operator sets `billing.local_runs_enabled` to `true`; it is off by
+  default, so deployments billed through Whity Pay change nothing (#2206,
+  WHIT-1312).
+- **A form response whose document was withdrawn now shows as withdrawn.** Withdrawing the document a form produced left its response marked completed, counted it with the completed ones in the responses summary and printed it as Approved; it now reads and prints as Withdrawn, and its author is told it was already withdrawn (#2204).
+- **A refused activation no longer uses up the code.** Redeeming a code with a
+  mistyped serial, no device, or a retired unit used to spend one of its
+  redemptions, so a single-use code was dead after one typo. The redemption is
+  now given back whenever activation does not go through (#2225, WHIT-1314).
+- **Held messages are always sent.** An agent's held reply picked up by the
+  queue before its hold ended was queued again under the same key as the job
+  already running, so the queue dropped it and the message stayed queued for
+  ever. The deferral now has its own key (#2220, WHIT-1315).
+- **The command line's internal token names its workspace like every
+  sign-in does.** It carried the old `tenant_id` claim, so anything reading
+  `active_tenant_id` saw none (#2200, WHIT-1316).
+- **A field sent as a list is refused instead of saved as "Array".** Creating
+  a form, a unit type, a period type or a period, scheduling a meeting, or
+  reopening a period with a key, label, date or reason sent as a list or
+  object now answers 422 naming the field (the shared field error), rather
+  than storing the text "Array". A new CI check keeps casts of request fields
+  from coming back (#2198, WHIT-1317).
+- **Signing in from a form's public link joins the form's workspace and returns to the form.** A new person who created their Whity ID account from a form that asks people to sign in was offered "Create your workspace" and never reached the form. Sign-in now carries the form's workspace, applies that workspace's open sign-up rules (allowed domains, role), and lands on the form; a member is signed straight into it. When the workspace can't take them, the form's page says why, and a workspace of their own is never offered from there. A started sign-in now lasts 30 minutes, long enough to create an account and type the emailed code (#2355).
+
+### Security
+
+- **The desktop app template reads plugin packages with a patched zip library.**
+  zip 4.6 had a critical and a high advisory; the template now uses zip 9.7,
+  together with tauri-plugin-updater 2.14.1 (which needed the same bump) and the
+  Tauri 2.12 it brings. A package entry whose name is not valid UTF-8 is now
+  refused with a plain message (WHIT-724).
+- **The render image no longer ships npm.** Like the web image, it removes
+  npm, npx and corepack once its build steps are done; only `node` runs
+  there (WHIT-1221).
+- **The published images no longer carry build tools.** The app image drops
+  the C compiler, the kernel headers (linux-libc-dev, the source of 64 kernel
+  CVE reports), git, unzip and composer, and the desktop app template. The web
+  image drops npm, npx and corepack, which `next start` never used and which
+  brought their own vulnerable packages. Nothing changes for a running
+  deployment; dev and staging builds are unchanged (WHIT-1221).
+- **minimatch moves to 11.0.9 everywhere it was 9 or 10.** Older versions let a
+  crafted glob pattern take quadratic time (GHSA-g3hv-75wg-m249). It reached
+  the web image through the shadcn tooling and the render service through jest
+  (WHIT-1231).
+- **The early theme script escapes what it embeds.** The script that sets dark
+  mode before the first paint now escapes `<`, `>`, `/` and the two Unicode
+  line separators in the values it writes, so nothing it embeds can close the
+  script element (WHIT-1236).
+- **Tenant-isolation exceptions stay honest.** Two reviewed exceptions to the
+  tenant rule gave reasons that were no longer true, and now give the real
+  ones. A new check fails the build when an exception no longer guards
+  anything, so one left behind after a query changes cannot pass as reviewed
+  (WHIT-1241, #2135).
+- **A new email address must be confirmed before it counts.** Changing your
+  email on the profile form used to replace your address and keep it marked as
+  confirmed, so an account could claim a mailbox it did not own. The new
+  address is now added beside your current one and sent a confirmation link;
+  once you confirm it, make it your main address under Email addresses.
+  Installs with password sign-in off were not affected (WHIT-1246).
+- **Outbound requests refuse more internal addresses.** The check that keeps
+  server-side fetches (sign-in discovery, plugin store, MCP verifiers) off
+  internal hosts now also refuses carrier-grade NAT space (where some clouds
+  put their metadata service), benchmarking and protocol ranges, IPv4-mapped
+  IPv6 and NAT64 addresses (WHIT-1248).
+- **The two-step sign-in step accepts only its own token.** It used to accept
+  any validly signed token that named a person; it now accepts only the
+  short-lived token the password step issues. The code was always needed too
+  (WHIT-1248).
+- **Redeeming a device activation code is rate limited.** The public redeem
+  endpoint now allows 30 attempts an hour per address, like the other public
+  endpoints that check a secret (WHIT-1248).
+- **The test payment rail refuses webhooks when it has no secret.** With the
+  test rail switched on and no webhook secret stored, a callback signed with
+  an empty key used to be accepted, so anyone could mark an invoice paid. It
+  is now refused (WHIT-1248).
+- **A workspace's own sign-in provider can only sign people into that
+  workspace.** The session it gives now stays there through every refresh: it
+  can't switch to another of the person's workspaces (the system workspace
+  included), lists only that workspace, and can't change the person's sign-in
+  email, password, email addresses, linked sign-ins, phone, two-step setup,
+  devices, MCP tokens, sessions or ownership offers. Signing in with Whity ID is
+  unchanged (WHIT-1253, #2249).
+- **An email address only links accounts once it is confirmed.** Adding an
+  address to your account without confirming it no longer gets you the
+  memberships, invitations or workspace sign-ups sent to that address: they go
+  to the person who actually holds it, and an unconfirmed claim no longer stops
+  them signing in or being added. Password-reset and two-step-recovery emails
+  go only to confirmed addresses (WHIT-1254, #2245).
+- **Workspace admins can only reset the sign-in of people that workspace alone
+  answers for.** Approving a password reset or clearing two-step sign-in now
+  needs the person to be staff in that workspace and in no other: a customer,
+  or someone who also belongs to another workspace, is helped from the platform
+  workspace, which can now also clear two-step sign-in. Nobody can approve their
+  own password reset (WHIT-1255, #2226).
+- **The two-step sign-in and workspace choice tokens work once.** The 5-minute
+  token that carries a sign-in from the password step to the authenticator
+  code, and the one that carries it to the workspace choice, now finish one
+  sign-in each, and a password change during those 5 minutes voids them. Apps
+  that sign in without cookies could replay them before (WHIT-1257, #2267).
+- **Deactivating a person signs them out everywhere, at once.** Every sign-in,
+  app, device, MCP token and agent key they hold stops working on its next
+  request, their sessions are ended, and the desktop app, two-step sign-in and
+  Whity ID connections can no longer start a new one. Before, deactivation only
+  stopped new password sign-ins (WHIT-1258, #2227, #2238, #2261).
+- **Removing a desktop device now signs it out.** Exchanging a device
+  credential returns a 15-minute access token only, and a refresh token keeps
+  working only while its sign-in is listed under Sessions. Before, the exchange
+  also returned a 7-day refresh token that renewed itself forever, past
+  removing the device and past the workspace's desktop sign-in limit
+  (WHIT-1259, #2265).
+- **MCP tokens and agent keys end when you change your password.** A 90-day
+  MCP token or agent key now stops working after a password change, a password
+  reset or "Sign out everywhere", like every other sign-in. Before, anyone who
+  briefly held a session could make one that outlived all three. Make a new
+  token where you still need one (WHIT-1260, #2262).
+- **Removing someone from the system workspace ends their operator access.**
+  A sign-in in the system workspace now needs an active membership there on
+  every request, like any other workspace. Before, a suspended or removed
+  operator kept cross-workspace authority for as long as their sign-in kept
+  renewing (WHIT-1261, #2229).
+- **"Confirm it's you" limits wrong codes.** Approving a password reset, a
+  two-step reset, a change of workspace owner or an agent's "Needs verifying"
+  request now allows a few wrong codes per person in 15 minutes, shared with
+  document signing, then answers "Too many tries" until the window passes.
+  Before, someone holding a stolen session could keep guessing authenticator
+  codes (WHIT-1262, #2223).
+- **A stolen renewal token ends the sign-in.** When a 7-day renewal token that
+  was already used comes back, the whole sign-in ends on every device holding
+  it. Within 30 seconds of its replacement it is taken as two tabs renewing at
+  once and only refused (WHIT-1263, #2264).
+- **Signing out ends the whole sign-in.** Signing out now also ends the
+  7-day renewal token that belongs to the same sign-in, even when an app sends
+  only its short-lived token, and the sign-in leaves your Sessions list
+  (WHIT-1263, #2264).
+- **Turning on two-step sign-in checks what it is given.** The confirm step
+  accepts only the kind of secret setup hands out (at least 128 bits), counts
+  wrong codes and pauses after too many, and records them in the audit log.
+  A malformed request now gets a plain error instead of a server error
+  (WHIT-1264, #2196).
+- **"Discuss in chat" only lets in people who may see the record.** It
+  decides the way the record's own screen does: a booking needs
+  `calendar:read`, a document `documents:read` and its visibility, a form
+  submission `forms:read`, its sender or a route to you, a meeting
+  `convening:read`, a board `tasks:read`. Anyone else gets a 404. Someone the
+  chat's starter removed can't rejoin through it, and the chat now says who
+  joined. A plugin's record, which core can't check yet, gets a chat that only
+  its members are in. A chat can't be linked to a record you can't see
+  (WHIT-1266, #2231).
+- **Chat record search and record blocks follow the same rules.** Finding a
+  record to share, sharing it and reading it in a message now show a booking
+  or a document only to someone who may see it (WHIT-1266, #2232).
+- **An agent's grant now holds on MCP resources and prompts too.** An agent
+  whose person set a permission to Off or Ask first can no longer read it
+  through `resources/read`, `resources/list`, `prompts/list` or `prompts/get`,
+  and a route that refuses agents is refused there as well. Routes kept off MCP
+  stay unreadable as resources, and OAuth and session sign-ins now work for
+  resources and prompts as they do for tools (#2266, #2202, WHIT-1267).
+- **An agent's grant now holds on search and on plugin data types.** Over MCP,
+  `/api/search` skips any record type whose permission the agent's person set
+  to Off or Ask first, or that a narrowed token leaves out, and
+  `/api/data-types` hides those types and refuses an action set to Off, even
+  when the person holds the permission (#2253, WHIT-1268).
+- **A retried MCP call is authorised again before its stored result is
+  returned.** A retry with the same idempotency key now passes every check the
+  first call did (the token's toolsets and permissions, an agent's grant, the
+  person's role) and is written to the audit log, so a revoked permission, a
+  grant turned Off or a narrower token no longer gets the earlier answer
+  (#2263, WHIT-1269).
+- **MCP batches are capped and every call in one counts against the rate
+  limit.** A JSON-RPC batch (2025-03-26 clients only) may hold at most 20
+  requests, and each one is charged to the per-person and per-workspace limits
+  before any of it runs, so batching can no longer multiply the limit or tie up
+  the server (#2260, WHIT-1270).
+- **Only the person an agent works for can add it to a chat.** Another chat
+  member can no longer bring someone's agent into a chat, choose what it reads
+  or switch off the approval its lines wait for (#2252, WHIT-1271).
+- **You can only give out what you hold.** Giving someone a role, attaching a
+  role to an organizational unit or to one record, choosing the role new
+  sign-ups on a company email domain get, and adding permissions to a role now
+  all need the person doing it to hold every permission involved. Before, a
+  person allowed to manage users, roles, OUs or email domains could make
+  themselves or someone else an admin (WHIT-1272).
+- **Turning a plugin file on or off stays inside the plugin folder.** The
+  plugin name in `POST /api/plugins/{name}/enable` and `/disable` is decoded
+  from the address, so `..%2F` could reach and rename `.php` files elsewhere
+  on the server. Those names are now refused with 400 (WHIT-1273, #2251).
+- **A workspace's own plugin can no longer use Whity's own permission names.**
+  A plugin named after a core area, such as `users` or `roles`, or declaring a
+  core permission, is refused when published. Before, it could hide those
+  permissions from every other workspace's roles screen and strip them from
+  roles edited there (WHIT-1274).
+- **A workspace no longer sees the operator's Whity ID account through the
+  plugin store.** `GET /api/plugins/store/connection` and the `connection` in
+  `GET /api/plugins/store/allowed` tell a workspace only whether the
+  installation is connected, to which store, and whether it needs signing in
+  again. The account, its issuer and when it connected are for the operator.
+  `GET /api/plugins/store/licences/{slug}` is operator-only (WHIT-1275, #2242).
+- **Background jobs see a removed permission straight away.** The job worker
+  and the scheduler now forget cached permissions after every job and every
+  tick, as the web app does after every request. Before, a permission taken
+  away on the web could keep working in background jobs for up to an hour.
+  Both also restart themselves once their database connection is as old as
+  the web app allows one to be (WHIT-1276).
+- **A kill in a signed revocation list now reaches every kind of plugin.** A
+  killed code plugin is off in every workspace, the system workspace
+  included, until the operator removes it. A revocation that names the
+  installed version also takes away its Verified mark at once, even when a
+  store mark was cached before it (WHIT-1277, #2233).
+- **A workspace can't bring back a killed version of its own plugin.**
+  Publishing that version, or rolling back to it, is refused with 409, and a
+  killed version never runs, however a workspace came to point at it
+  (WHIT-1277, #2244).
+- **The form printout preview needs permission to read form responses.** The
+  preview on a document theme's Form printouts tab prints a real response, so
+  styling documents alone no longer lets someone read responses, office-only
+  steps and decisions included (WHIT-1278).
+- **A suspended or removed member keeps nothing delegated to them.** A person
+  with no active membership in a workspace now holds no permissions there at
+  all, delegations included, and a suspended membership's organizational unit
+  no longer counts towards which delegations apply (WHIT-1279).
+- **Committees only reach people and documents of their own workspace.** A
+  convening body can seat only active members of the workspace, attendance
+  can name only its members (guests still go in by name), and an agenda item
+  can carry only one of the workspace's documents that the person adding it
+  can see. A document's committee history follows the document's visibility
+  too (WHIT-1280).
+- **Only active staff cover for someone who is away.** A customer can no
+  longer be named to decide someone's approvals while they are away, and an
+  away period stops covering as soon as either person is suspended or leaves,
+  without anyone ending it (WHIT-1281).
+- **A delegation reaches only as far as the person giving it.** Someone who
+  holds a permission through a role on one organizational unit can now
+  delegate it only within that unit, not across the whole workspace or into
+  another unit, and older delegations wider than that stop counting
+  (WHIT-1282).
+- **Every page a handler serves with its own Content-Security-Policy runs
+  sandboxed.** The opaque-origin sandbox (`sandbox allow-scripts allow-forms`)
+  used to be added only to pages that allow framing, so a plugin page or a
+  checkout page that refused framing, or said nothing about it, ran its
+  scripts as the app when opened in a tab. It is now added to all of them. A
+  page's own `sandbox` can be stricter, never looser (WHIT-1283, #2228).
+- **A workspace's own object store must be on the public internet.** The S3
+  endpoint a workspace sets in storage settings is now refused (422) when it
+  names a private, loopback, link-local or other internal address, and every
+  request to it is checked again and sent to the address that was checked,
+  so a later DNS answer can't point it inside. The operator's own storage
+  can still be a private MinIO (WHIT-1284, #2240).
+- **Outbound fetches share one rule for "public".** `HttpFetcher` now uses
+  the SDK's `AddressPolicy`, which also refuses multicast, and refuses URLs
+  with a user name or password in them (WHIT-1284, #2214).
+- **Calendar lists keep colleagues' private events private.**
+  `GET /api/calendar/events` now shows another person's synced event as Busy,
+  with no notes, place or link to where it came from, as the calendar grid
+  does. `GET /api/calendar/exceptions` shows why someone is away only to them
+  and to people who manage the calendar (WHIT-1285, #2237).
+- **A calendar feed stops when its person leaves.** Someone removed or
+  suspended can no longer read their ICS feed. Its address is forgotten, so
+  coming back means turning on a new one. Someone who manages the calendar
+  can turn off the feed of a person who has already left (WHIT-1285, #2215).
+- **Public chat and booking refuse while the chosen bot check is half set
+  up.** With a bot-check provider chosen but its secret or site key missing,
+  the public chat skipped the check, and the booking page sent an empty site
+  key. Starting a chat and booking now answer 503 until the check is fully set
+  up, and the pages offer a check only when it can work. With no provider and
+  "allow without a bot check" on, nothing changes (WHIT-1286, #2203).
+- **The backend learns the host the browser really used.** The web app's API
+  and MCP proxies used to pass on any `X-Forwarded-Host` a browser sent (so it
+  could claim another host past the custom-domain checks of public booking,
+  chat and sign-up), and never sent the real one (so a workspace's own domain
+  could fall back to the default workspace). They now drop the browser's and
+  set it themselves: from `Host`, or with trusted proxies in front
+  (`TRUSTED_PROXY_HOPS`), from the value the nearest one wrote (WHIT-1287,
+  #2195).
+- **A figure in a printed document must be a picture.** The render service
+  checked only that a figure's source started with `data:`, unlike the logos
+  in headers and footers. It now accepts PNG, JPEG, GIF, WebP and SVG images
+  up to 8 MB (`RENDER_FLOW_MAX_FIGURE_BYTES`) and refuses anything else
+  (WHIT-1289, #2201).
+- **`whity install` checks what it puts into SQL and `.env`.** When it
+  carries on after a failed attempt, the owner email from `.env` is checked
+  again before it reaches `psql`, and quotes in it are escaped. A site address
+  or owner email containing `#` is refused, because docker compose would read
+  the rest of the unquoted `.env` value as a comment (WHIT-1290, #2208).
+- **Every lookup of a workspace by host uses one rule.** Custom domains,
+  branding, SSO, public booking, chat and sign-up read `X-Forwarded-Host` only
+  when it is a single plain host, otherwise `Host`, so a malformed value can no
+  longer skip the check that a domain belongs to the workspace named
+  (WHIT-1294, #2195).
+- The server-rendered branding, theme, UI preferences and share cards now tell the backend the host the browser asked for, never an `X-Forwarded-Host` the browser made up (WHIT-1295, #2195).
+- **A meeting's decision answers an approval only as the person who records
+  it.** Recording a convening body's decision used to answer a document's
+  approval in the name of whichever member held it, chair first. The
+  secretary can no longer apply a decision under the chair's name: if the
+  chair holds the approval, the chair records or signs it themselves, or the
+  person covering for them while they are away decides it, and the trail
+  says whom they acted for (#2247, WHIT-1296).
+- **Event listeners no longer keep permissions that were taken away.** The
+  `events:relay` worker, which runs for up to an hour, now forgets resolved
+  permissions and the audit actor before and after each event, as
+  `queue:work` does after each job. A permission revoked while it ran stays
+  revoked for the listeners that run next (#2205, WHIT-1297).
+- **Behaviour change for self-hosted installs:** with no bot-check provider chosen and "allow without a bot check" off, public chat no longer starts new chats and online booking no longer takes bookings. Both answer 503 until an admin picks a provider or turns that switch on in Settings → Public forms. Before, they skipped the check. The public pages now say the business is still setting up and what to do next, and the settings screen says that chat and booking are closed as well as public forms. Chats a visitor already has carry on. Installs with the switch on (as on app.whity.dev) are unchanged (WHIT-1298, #2203).
+- **Removing a role grant at a record needs the same access as giving it.**
+  Revoking one grant, or every grant at a record, is refused (403
+  `exceeds_your_access`) when the grant's role carries permissions you do not
+  hold there, so `roles:manage` no longer lets someone strip the access of a
+  person who outranks them (#2313, WHIT-1299).
+- **Changing one person's role checks their current role too.** Editing a
+  person now refuses (403 `exceeds_your_access`) to change the role of
+  someone whose current role has permissions you do not hold, as the bulk
+  role change already did, so a people manager can no longer move an admin
+  onto a lower role (#2314, WHIT-1300).
+- **A stock change above the approval value no longer posts when nobody can approve it.** Before, if nobody but the person who made the change could approve it, waste, an adjustment or a count's differences above the workspace's approval value went straight into stock. Now it stays waiting for approval, and the operation says `nobody_can_approve`. The people with the inventory settings permission and the workspace owners get a notice saying how to unblock it, and the person who made the change sees the same in plain words. Once someone can approve, Send again routes it. Changes below the value still post at once.
+- Outbound requests (sign-in providers' discovery, tokens and keys, store downloads, mail OAuth tokens) now resolve the host once and connect to the address that was checked, with the certificate still checked against the host. A host can no longer pass the check with a public address and then answer the request with an internal one (WHIT-1303, #2188).
+- Connecting Taskaat or the Whity store: a callback with the wrong state, or from someone other than the person who started, no longer cancels the sign-in in progress, and a caller with no person behind it can't finish a sign-in a person started. The right callback still finishes it, once (WHIT-1304, #2222).
+- **Failed confirmations and sign-ins are limited per address.** Confirming an
+  email address or a two-step recovery request now allows 30 tries an hour from
+  one client address, so failed tries can't flood the audit log. The sign-in
+  limit counts the address typed, registered or not, so a registered address
+  and an unknown one get the same answer after the same number of tries
+  (WHIT-1305, #2190).
+- **A payment in another currency no longer pays an invoice.** Only money in
+  the invoice's own currency counts toward settling it, toward its balance and
+  toward dunning. A payment in another currency is still recorded and marked
+  so a person can sort it out (WHIT-1306, #2217).
+- **Store plugins with server code must be signed by Whity.** Installing or
+  updating a code plugin from a store now checks Whity's signed statement for
+  that exact package before anything in it is unpacked; a package without one
+  is refused with "This package isn't signed by Whity". A signature that
+  doesn't match the package, has expired or was withdrawn is always refused
+  (#2189, WHIT-1308).
+- **Behaviour change for self-hosted installs:** Whity doesn't sign store
+  packages yet, so store installs of code plugins stop until it does. An
+  operator who needs them meanwhile can turn on the temporary setting **Allow
+  unsigned store packages** (Settings, Plugin store; off by default). Turning
+  it on or off, and every unsigned package it lets in, is in the audit log.
+  Workspace (declarative) plugins and a .zip the operator uploads by hand are
+  unchanged.
+
 ## [0.2.30] - 2026-11-18
 
 ### Added

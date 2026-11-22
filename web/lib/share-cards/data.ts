@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { backendUrl } from '@/lib/backend-url';
+import { trustedForwardedHostFrom } from '@/lib/trusted-client-ip';
 import type { PaperCard, WorkspaceCard } from './card';
 import { isArabic, logoData } from './card';
 
@@ -17,15 +18,19 @@ interface PublicBrand {
   main_color?: string | null;
 }
 
-async function host(): Promise<string> {
-  const h = await headers();
-  return h.get('x-forwarded-host') ?? h.get('host') ?? '';
+// Never the browser's own X-Forwarded-Host (WHIT-1295, #2195).
+async function host(): Promise<string | null> {
+  return trustedForwardedHostFrom(await headers());
+}
+
+function hostHeader(h: string | null): Record<string, string> {
+  return h !== null ? { 'X-Forwarded-Host': h } : {};
 }
 
 async function get<T>(path: string): Promise<T | null> {
   try {
     const res = await fetch(`${backendUrl()}${path}`, {
-      headers: { Accept: 'application/json', 'X-Forwarded-Host': await host() },
+      headers: { Accept: 'application/json', ...hostHeader(await host()) },
       cache: 'no-store',
       signal: AbortSignal.timeout(4000),
     });
@@ -38,7 +43,7 @@ async function get<T>(path: string): Promise<T | null> {
 
 /** The address as people see it: the host and path, without the scheme. */
 async function address(path: string): Promise<string> {
-  return `${await host()}${path}`;
+  return `${(await host()) ?? ''}${path}`;
 }
 
 /** The brand this host shows when the page itself names none. */

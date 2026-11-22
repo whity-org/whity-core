@@ -653,6 +653,7 @@ final class DocumentIssuing
      * @param array<string, mixed>   $version  The template version to print.
      * @param array<string, ?string> $values   Field path => value.
      * @param array<string, mixed>   $document The `documents` row.
+     * @param list<array<string, mixed>> $evidence #1730: the signature block and evidence page, printed before the QR.
      * @return array{0: array{attempted: bool, stored: bool, reason: string|null}, 1: array<string, mixed>|null}
      */
     public function renderFinal(
@@ -662,8 +663,9 @@ final class DocumentIssuing
         array $values,
         array $document,
         string $footnote,
+        array $evidence = [],
     ): array {
-        return $this->renderAndStore($actor, $source, $version, $values, null, $document, $footnote);
+        return $this->renderAndStore($actor, $source, $version, $values, null, $document, $footnote, $evidence);
     }
 
     /**
@@ -671,6 +673,7 @@ final class DocumentIssuing
      * @param array<string, mixed>   $version
      * @param array<string, ?string> $values
      * @param array<string, mixed>   $document
+     * @param list<array<string, mixed>> $evidence
      * @return array{0: array{attempted: bool, stored: bool, reason: string|null}, 1: array<string, mixed>|null} What happened, and the stored artifact.
      */
     private function renderAndStore(
@@ -681,6 +684,7 @@ final class DocumentIssuing
         ?string $recordLabel,
         array $document,
         ?string $footnote = null,
+        array $evidence = [],
     ): array {
         [$tenantId, $callerId] = [$actor->tenantId, $actor->issuerId()];
         $effective = $this->settings->effective($tenantId);
@@ -709,6 +713,10 @@ final class DocumentIssuing
         if ($footnote !== null && $footnote !== '') {
             // WHIT-921: which version a final document was made from.
             $payload['content'][] = ['type' => 'paragraph', 'text' => $footnote];
+        }
+        // #1730: the signatures and the evidence page, then the QR that checks them.
+        foreach ($evidence as $block) {
+            $payload['content'][] = $block;
         }
         $stamp = $this->stamp($tenantId, $callerId, (int) $document['id'], $effective);
         if ($stamp !== null) {

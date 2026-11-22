@@ -80,6 +80,9 @@ final class ToolsCallHandler implements MethodHandler
         // WHIT-931: idempotency keys, so a retried call runs once. Null: keys
         // are ignored and every call runs, as before.
         private readonly ?McpCallKeys $callKeys = null,
+        // The usage ledger (business model, BM.17): an agent's call is agent
+        // work, a person's call is an API call. Null: nothing is recorded.
+        private readonly ?\Whity\Core\Usage\McpUsage $usage = null,
     ) {}
 
     /**
@@ -424,6 +427,24 @@ final class ToolsCallHandler implements MethodHandler
             throw new McpException(ErrorCode::CALL_IN_PROGRESS, 'A call with this idempotency key is still running. Try again shortly with the same key to get its result.');
         }
         if ($claim['state'] === 'done') {
+            // #2263: a stored result is handed back only to a caller who may
+            // make this call NOW. Every gate run() applies is applied again
+            // first: the tool still exists for them, their token's toolsets and
+            // permission narrowing, an agent's grant, and the person's RBAC. A
+            // revoked permission, a grant turned Off, a disabled plugin or a
+            // narrower token of the same person gets the refusal, not the result.
+            AuditContext::setActor($principal->actor());
+            try {
+                $this->assertMayReplay($principal, $toolName, $arguments, $claim['result']);
+            } finally {
+                $this->auditLogger?->record('mcp.tools.call', [
+                    'tenant_id'     => $principal->tenantId,
+                    'actor_user_id' => $principal->userId,
+                    'target_type'   => 'tool',
+                    'metadata'      => ['tool' => $toolName, 'principal_kind' => $principal->principalKind, 'replayed' => true, 'args' => $this->redactArgs($arguments)]
+                        + ($split !== null ? ['split' => $split] : []),
+                ]);
+            }
             $result = $claim['result'];
             if (is_array($result)) {
                 $result['_meta'] = (is_array($result['_meta'] ?? null) ? $result['_meta'] : []) + [self::META_REPLAYED => true];
@@ -450,6 +471,95 @@ final class ToolsCallHandler implements MethodHandler
             $this->warn("[mcp] storing the result of {$toolName} for its idempotency key failed (tenant {$principal->tenantId}): " . $e->getMessage());
         }
         return $result;
+    }
+
+    /**
+     * The gates of {@see self::run()}, without running anything, for a caller
+     * about to be handed a stored result (#2263). An agent whose grant is now
+     * Ask first may have back the proposal it was given before, never the
+     * result of a call that ran: that would be the call without the approval.
+     *
+     * @param array<string, mixed> $arguments
+     * @throws McpException
+     */
+    private function assertMayReplay(McpPrincipal $principal, string $toolName, array $arguments, mixed $stored): void
+    {
+        $declaration = $this->toolDeriver->findDeclarationByName($toolName);
+        if ($declaration !== null) {
+            if (!$this->toolDeriver->isExposed($toolName)) {
+                throw new McpException(ErrorCode::METHOD_NOT_FOUND, "Unknown tool: {$toolName}");
+            }
+            $toolset = $this->toolDeriver->toolsetOf($toolName);
+            $tool    = $this->toolDeriver->toolFor($toolName) ?? [];
+            // The gate tools/call enforces is the live Router route's.
+            $access  = $this->routeGate($declaration, $arguments) ?? ($this->toolDeriver->buildAccessMap()[$toolName] ?? []);
+        } else {
+            $registry = $this->authoredTools;
+            $authored = $registry === null ? null : $registry->get($toolName);
+            if ($registry === null || $authored === null) {
+                throw new McpException(ErrorCode::METHOD_NOT_FOUND, "Unknown tool: {$toolName}");
+            }
+            $toolset = $registry->toolsetOf($toolName);
+            if ($this->workspaceGate?->isToolsetOffForWorkspace($toolset, $principal->tenantId) === true) {
+                throw new McpException(ErrorCode::METHOD_NOT_FOUND, "Unknown tool: {$toolName}");
+            }
+            $tool   = $this->authoredTool($toolName);
+            $access = $authored;
+        }
+
+        $this->assertInTokenToolsets($principal, $toolset);
+        if (AgentScopeGrant::appliesTo($principal)) {
+            $mode = ToolsListHandler::agentModeFor($tool, $access, $principal);
+            if ($mode === AgentScopeGrant::OFF) {
+                throw new McpException(ErrorCode::FORBIDDEN, 'This agent is not granted this operation.');
+            }
+            if ($mode === AgentScopeGrant::ASK && !self::isProposalResult($stored)) {
+                throw new McpException(ErrorCode::FORBIDDEN, 'This operation now needs a person to approve it. Call it again with a new idempotency key.');
+            }
+        }
+        $this->assertPersonMay($principal, $access);
+        // An authored tool checks its role as well as its permission.
+        $role = is_string($access['requiredRole'] ?? null) && $access['requiredRole'] !== '' ? $access['requiredRole'] : null;
+        $tenantId = TenantContext::getTenantId();
+        if ($role !== null && $tenantId !== null && !$this->roleChecker->hasRoleForProfile($principal->userId, $role, $tenantId)) {
+            throw new McpException(ErrorCode::FORBIDDEN, 'Forbidden');
+        }
+    }
+
+    /**
+     * The access gate of the Router route a derived tool's call resolves to,
+     * or null when it resolves to none.
+     *
+     * @param array<string, mixed> $declaration
+     * @param array<string, mixed> $arguments
+     * @return array{requiredPermission: ?string, requiredRole: ?string}|null
+     */
+    private function routeGate(array $declaration, array $arguments): ?array
+    {
+        $method = strtoupper((string) ($declaration['method'] ?? 'GET'));
+        [$concretePath] = $this->substitutePath((string) ($declaration['path'] ?? ''), $arguments);
+        $versionedPath = $this->router->versionedPath($concretePath);
+        $matched = $this->router->match(new Request($method, $versionedPath));
+        if ($matched === null && $versionedPath !== $concretePath) {
+            $matched = $this->router->match(new Request($method, $concretePath));
+        }
+        if ($matched === null) {
+            return null;
+        }
+        return [
+            'requiredPermission' => is_string($matched['requiredPermission'] ?? null) ? $matched['requiredPermission'] : null,
+            'requiredRole'       => is_string($matched['requiredRole'] ?? null) ? $matched['requiredRole'] : null,
+        ];
+    }
+
+    /** Whether a stored result is the "waiting for approval" answer {@see self::proposalResult()} builds. */
+    private static function isProposalResult(mixed $result): bool
+    {
+        $text = is_array($result) ? ($result['content'][0]['text'] ?? null) : null;
+        $decoded = is_string($text) ? json_decode($text, true) : null;
+
+        return is_array($decoded) && is_array($decoded['proposal'] ?? null)
+            && ($decoded['proposal']['status'] ?? null) === AgentProposalRepository::WAITING;
     }
 
     private function releaseKey(McpCallKeys $keys, int $id, int $tenantId): void
@@ -482,7 +592,14 @@ final class ToolsCallHandler implements MethodHandler
      */
     private function countAgentWork(McpPrincipal $principal): void
     {
+        $startedRun = $this->recordUsage($principal);
+
         if ($this->agentWork === null || !$principal->isAgent()) {
+            return;
+        }
+        // With the usage ledger, the allowance is on runs (BM.3: 300 agent
+        // runs a month), so the meter that warns is spent once per run.
+        if ($this->usage !== null && !$startedRun) {
             return;
         }
 
@@ -491,6 +608,27 @@ final class ToolsCallHandler implements MethodHandler
         } catch (\Throwable $e) {
             $this->warn('Could not count agent work: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Into the usage ledger; a failure there never stops the call. Returns
+     * whether an agent's call started a run.
+     */
+    private function recordUsage(McpPrincipal $principal): bool
+    {
+        if ($this->usage === null) {
+            return false;
+        }
+        try {
+            if ($principal->isAgent()) {
+                return $this->usage->agentCalled($principal->tenantId, $principal->agentPrincipalId());
+            }
+            $this->usage->personCalled($principal->tenantId);
+        } catch (Throwable $e) {
+            $this->warn('Could not record usage: ' . $e->getMessage());
+        }
+
+        return false;
     }
 
     /**

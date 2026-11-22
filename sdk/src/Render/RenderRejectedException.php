@@ -26,7 +26,7 @@ namespace Whity\Sdk\Render;
  * {@see because()}, and a host mapping this to an HTTP response reads THAT.
  * The host's own rejection type is built the same way for the same reason.
  */
-final class RenderRejectedException extends \RuntimeException
+final class RenderRejectedException extends \RuntimeException implements \Whity\Sdk\SdkException
 {
     /** Text written to be shown to the caller, never a wrapped internal error. */
     public readonly string $clientMessage;

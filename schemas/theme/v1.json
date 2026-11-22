@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://whity.dev/schema/theme/v1.json",
+  "title": "Whity theme",
+  "description": "A Whity UI theme (docs/design/30-themes.md, TH.1-TH.14): choices, never CSS. Core compiles it into design tokens and runs the guard rails on the result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "version", "name"],
+  "$defs": {
+    "hex": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+    "text": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": "^[^<>{}]*$" },
+    "bilingual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["en"],
+      "properties": { "en": { "$ref": "#/$defs/text" }, "ar": { "$ref": "#/$defs/text" } }
+    },
+    "roleOverrides": {
+      "type": "object",
+      "maxProperties": 64,
+      "propertyNames": { "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
+      "additionalProperties": { "$ref": "#/$defs/hex" }
+    },
+    "shapePreset": { "enum": ["square", "crisp", "whity", "soft", "round", "pebble", "cut"] },
+    "fontId": { "enum": ["noto", "plex", "readex", "cairo", "kufi", "rubik", "alexandria", "naskh", "ibm-kufi"] }
+  },
+  "properties": {
+    "$schema": { "type": "string", "maxLength": 200 },
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*[.][a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 100 },
+    "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)[.](0|[1-9][0-9]*)[.](0|[1-9][0-9]*)$" },
+    "name": { "$ref": "#/$defs/bilingual" },
+    "description": { "$ref": "#/$defs/bilingual" },
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": { "name": { "$ref": "#/$defs/text" } }
+    },
+    "colour": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "seeds": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "primary": { "$ref": "#/$defs/hex" },
+            "secondary": { "$ref": "#/$defs/hex" },
+            "tertiary": { "$ref": "#/$defs/hex" }
+          }
+        },
+        "scheme": { "enum": ["calm", "tonal", "vibrant", "expressive", "monochrome"] },
+        "neutral": { "enum": ["pure", "warm", "cool", "tinted"] },
+        "contrast": { "enum": ["standard", "high"] },
+        "overrides": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "light": { "$ref": "#/$defs/roleOverrides" }, "dark": { "$ref": "#/$defs/roleOverrides" } }
+        }
+      }
+    },
+    "type": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "family": { "$ref": "#/$defs/fontId" },
+        "headingFamily": { "anyOf": [{ "$ref": "#/$defs/fontId" }, { "const": "same" }] },
+        "scale": { "enum": ["standard", "roomy", "large"] },
+        "titleWeight": { "enum": [500, 600] },
+        "emphasis": { "enum": ["quiet", "expressive"] }
+      }
+    },
+    "shape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "preset": { "$ref": "#/$defs/shapePreset" },
+        "morph": { "enum": ["off", "on"] },
+        "components": {
+          "type": "object",
+          "description": "A shape preset for one component family, never pixels (TH.21).",
+          "additionalProperties": false,
+          "properties": {
+            "buttons": { "$ref": "#/$defs/shapePreset" },
+            "fields": { "$ref": "#/$defs/shapePreset" },
+            "chips": { "$ref": "#/$defs/shapePreset" },
+            "cards": { "$ref": "#/$defs/shapePreset" },
+            "dialogs": { "$ref": "#/$defs/shapePreset" },
+            "tables": { "$ref": "#/$defs/shapePreset" },
+            "navigation": { "$ref": "#/$defs/shapePreset" }
+          }
+        }
+      }
+    },
+    "density": { "enum": ["compact", "standard", "comfortable"] },
+    "elevation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "style": { "enum": ["plane", "soft", "flat", "outline"] },
+        "float": { "enum": ["light", "standard", "strong"] }
+      }
+    },
+    "motion": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "preset": { "enum": ["calm", "standard", "expressive", "brisk"] } }
+    },
+    "documents": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "accentUse": { "enum": ["title", "title-and-headings"] },
+        "titleFace": { "enum": ["readex", "noto"] },
+        "largePrint": { "type": "boolean" }
+      }
+    }
+  }
+}

@@ -51,6 +51,13 @@ on:
 permissions:
   contents: read
 
+# Serialised, never cancelled (WHIT-277): a half-finished run of this
+# workflow leaves the release in a state someone has to repair by hand.
+# Two deploys over SSH at once would interleave on the same host.
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
 jobs:
   # Gate: only proceed when a staging host is actually configured. secrets can't
   # be used in a job-level `if:`, so we surface "is it configured?" as an output.
@@ -123,7 +130,7 @@ jobs:
           echo "Deploying images: ${name}:${tag} + ${name}/web:${tag}"
 
       - name: Copy compose file to the host
-        uses: appleboy/scp-action@v1.0.0
+        uses: appleboy/scp-action@ff85246acaad7bdce478db94a363cd2bf7c90345 # v1.0.0
         with:
           host: ${{ secrets.STAGING_SSH_HOST }}
           username: ${{ secrets.STAGING_SSH_USER }}
@@ -133,7 +140,7 @@ jobs:
           target: ${{ secrets.STAGING_DEPLOY_DIR || '/opt/whity-staging' }}
 
       - name: Deploy over SSH (pull -> up -> migrate -> health)
-        uses: appleboy/ssh-action@v1.2.5
+        uses: appleboy/ssh-action@0ff4204d59e8e51228ff73bce53f80d53301dee2 # v1.2.5
         env:
           IMAGE_REF: ${{ steps.image.outputs.ref }}
           WEB_IMAGE_REF: ${{ steps.image.outputs.web_ref }}

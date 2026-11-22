@@ -168,6 +168,33 @@ class ResourceRoleAssignmentRepository
     }
 
     /**
+     * One grant by id, tenant scoped, or null: what a revoke must know before it
+     * removes the row (#2313: the caller must hold the role's permissions there).
+     *
+     * @return array{id: int, resource_type: string, resource_id: int, role_id: int, profile_id: int|null}|null
+     */
+    public function findById(int $tenantId, int $id): ?array
+    {
+        $statement = $this->db->prepare(
+            'SELECT id, resource_type, resource_id, role_id, profile_id FROM resource_role_assignments
+             WHERE id = ? AND tenant_id = ?'
+        );
+        $statement->execute([$id, $tenantId]);
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $row['id'],
+            'resource_type' => (string) $row['resource_type'],
+            'resource_id' => (int) $row['resource_id'],
+            'role_id' => (int) $row['role_id'],
+            'profile_id' => $row['profile_id'] === null ? null : (int) $row['profile_id'],
+        ];
+    }
+
+    /**
      * The id of an existing grant, or null.
      *
      * Exists so an idempotent caller can answer "which row already says this?"

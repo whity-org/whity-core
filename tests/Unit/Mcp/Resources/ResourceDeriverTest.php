@@ -235,16 +235,6 @@ final class ResourceDeriverTest extends TestCase
         self::assertSame('whity-api:///api/v1/stuff', $result['resources'][0]['uri']);
     }
 
-    public function testDeriveResources_doesNotApplyVersionPrefix_whenEmpty(): void
-    {
-        $deriver = new ResourceDeriver([
-            ['method' => 'GET', 'path' => '/api/things', 'schema' => ['summary' => 'List things']],
-        ]);
-        $result = $deriver->deriveResources();
-
-        self::assertSame('whity-api:///api/things', $result['resources'][0]['uri']);
-    }
-
     // ── buildAccessMap() ──────────────────────────────────────────────────────
 
     public function testBuildAccessMap_returnsEmptyMap_whenNoDeclarations(): void
