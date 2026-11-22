@@ -124,4 +124,13 @@ RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack 
 
 EXPOSE 8130
 
+# READINESS CO-25: Chromium no longer runs as root. The image's own `node`
+# user owns nothing it can change here (the app is root-owned and read-only to
+# it), and the service writes nothing to disk. Chromium still runs with
+# --no-sandbox: its namespace sandbox needs privileges a default container
+# doesn't grant. What stands in for it is this user, every page locked to
+# `data:` and `about:` (lockDownPage in src/renderer.js), and no capabilities
+# or privilege gain in the compose files.
+USER node
+
 CMD ["node", "src/server.js"]
