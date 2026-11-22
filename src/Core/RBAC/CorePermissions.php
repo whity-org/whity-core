@@ -564,6 +564,32 @@ final class CorePermissions
     public const FIELDS_MANAGE = 'fields:manage';
 
     /**
+     * Whether a plugin may own this permission: a `resource:action` slug that
+     * is not a core permission and not under a core resource
+     * (GHSA-r4hx-wj99-jw8m). The plugin role seeder, the catalogue step and the
+     * System operator's grant rule all ask this one question.
+     *
+     * @param string $permission The slug.
+     * @return bool
+     */
+    public static function isPluginOwnable(string $permission): bool
+    {
+        if (preg_match('/^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/', $permission) !== 1) {
+            return false;
+        }
+
+        static $coreResources = null;
+        if ($coreResources === null) {
+            $coreResources = [];
+            foreach (self::all() as $core) {
+                $coreResources[explode(':', $core, 2)[0]] = true;
+            }
+        }
+
+        return !isset($coreResources[explode(':', $permission, 2)[0]]);
+    }
+
+    /**
      * Return the full list of core permission strings.
      *
      * @return array<int, string> Ordered list of `resource:action` permissions.
