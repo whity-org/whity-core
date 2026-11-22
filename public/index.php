@@ -1911,7 +1911,7 @@ $router->register('POST',   '/api/devices/token', [$authHandler, 'handleDeviceTo
 // 10a-ter. Interactive session management (WC-f-sessions-table). Session-gated
 // in-handler (cookie OR Bearer access token), scoped to the caller's own
 // profile. Interactive logins only — native devices are managed via /api/devices.
-$sessionsHandler = new \Whity\Api\SessionsApiHandler($tokenValidator, new \Whity\Auth\SessionService($db->getPdo()));
+$sessionsHandler = new \Whity\Api\SessionsApiHandler($tokenValidator, new \Whity\Auth\SessionService($db->getPdo()), $auditLogger);
 $router->register('GET',    '/api/me/sessions',      [$sessionsHandler, 'list'], null);
 $router->register('DELETE', '/api/me/sessions/{id}', [$sessionsHandler, 'revoke'], null);
 $router->register('DELETE', '/api/me/sessions',      [$sessionsHandler, 'revokeOthers'], null);
@@ -6809,7 +6809,8 @@ $router->register('DELETE', '/api/email-domains/{id:\d+}',     [$emailDomainHand
 // never returned in a response.
 $identityProvidersHandler = new IdentityProvidersApiHandler(
     $db->getPdo(),
-    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV)
+    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+    $auditLogger,
 );
 $router->register('GET',    '/api/identity-providers',          [$identityProvidersHandler, 'list'],   null, null, CorePermissions::AUTH_PROVIDERS_MANAGE);
 $router->register('POST',   '/api/identity-providers',          [$identityProvidersHandler, 'create'], null, null, CorePermissions::AUTH_PROVIDERS_MANAGE);

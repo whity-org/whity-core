@@ -636,6 +636,11 @@ jobs:
       - name: Body string-cast guard
         run: php scripts/ci-body-string-cast-guard.php
 
+      # READINESS CO-1: a line on stderr is shipped to log aggregation, so it
+      # goes through the scrubber. Bare error_log() calls in src/ may only go down.
+      - name: error_log guard
+        run: php scripts/ci-error-log-guard.php
+
       # Emitted-URL version guard (#1046): fail when a URL RETURNED to a client
       # is missing the /v1 the router serves it at.
       #

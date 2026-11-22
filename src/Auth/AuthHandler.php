@@ -1851,6 +1851,18 @@ class AuthHandler
         }
 
         $this->logProfileUpdate($activeTenantId, $profileId, $emailProvided, $passwordChanged);
+        // READINESS CO-9: a person's own sign-in details changing is on the
+        // trail, not only in the process log. Never the password; the new
+        // address waits unconfirmed, so it is named by its domain only.
+        if ($passwordChanged) {
+            $this->audit('auth.password.changed', $request, $activeTenantId, $profileId);
+        }
+        if ($pendingEmail !== null) {
+            $at = strrpos($pendingEmail, '@');
+            $this->audit('auth.email.change_requested', $request, $activeTenantId, $profileId, [
+                'email_domain' => $at === false ? null : substr($pendingEmail, $at + 1),
+            ]);
+        }
 
         if ($tokenMode) {
             // Token-body mode (WC-ddcd16ad): return the fresh tokens in the body,
@@ -2665,6 +2677,7 @@ class AuthHandler
             $this->bodyRefreshToken($request),
         ];
 
+        $signedOut = null;
         foreach ($tokens as $token) {
             if ($token === null) {
                 continue;
@@ -2674,6 +2687,7 @@ class AuthHandler
             if ($claims === null) {
                 continue;
             }
+            $signedOut ??= $claims;
 
             $jti = $claims['jti'] ?? null;
             $exp = $claims['exp'] ?? null;
@@ -2681,6 +2695,16 @@ class AuthHandler
                 $this->revokeJti((string) $jti, (int) $exp);
                 $this->endSessionOf((string) $jti);
             }
+        }
+
+        // READINESS CO-9: who signed out, when there was someone to sign out.
+        if ($signedOut !== null && is_int($signedOut['profile_id'] ?? null)) {
+            $this->audit(
+                'auth.logout',
+                $request,
+                is_int($signedOut['active_tenant_id'] ?? null) ? $signedOut['active_tenant_id'] : null,
+                $signedOut['profile_id'],
+            );
         }
 
         // Clear both cookies (a no-op for token-mode clients that never set them).

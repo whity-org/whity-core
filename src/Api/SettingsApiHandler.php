@@ -361,7 +361,8 @@ final class SettingsApiHandler
             }
         }
 
-        return $this->applyWrites(
+        $before = $this->settings->effective($tenantId);
+        $response = $this->applyWrites(
             $request,
             fn (string $key, ?string $value): null => $this->writeTenant($tenantId, $key, $value),
             fn (int $tenantIdInner): array => array_intersect_key(
@@ -372,6 +373,59 @@ final class SettingsApiHandler
             // Per-tenant path: reject global-only governance keys (managed globally).
             allowGlobalOnly: false
         );
+        if ($response->getStatusCode() === 200) {
+            $this->auditChanges($tenantId, $before, $this->settings->effective($tenantId));
+        }
+
+        return $response;
+    }
+
+    /**
+     * One row for each saved change of settings, with each key's old and new
+     * value (READINESS CO-7): sign-in policy, mail, plugins and every other
+     * switch. Secrets are never settings (SMTP and provider secrets are kept
+     * apart), and a value is cut short so a long text can't swell the trail.
+     * The switches with their own action are left to it.
+     *
+     * @param array<string, mixed> $before
+     * @param array<string, mixed> $after
+     */
+    private function auditChanges(int $tenantId, array $before, array $after): void
+    {
+        $changes = [];
+        foreach (array_unique(array_merge(array_keys($before), array_keys($after))) as $key) {
+            $key = (string) $key;
+            if (isset(self::AUDITED_SWITCHES[$key])) {
+                continue;
+            }
+            $from = $before[$key] ?? null;
+            $to = $after[$key] ?? null;
+            if ($from === $to) {
+                continue;
+            }
+            // A key that names a secret is recorded as changed, never with values.
+            $changes[] = preg_match('/secret|password|token|encrypted|credential/i', $key) === 1
+                ? ['key' => $key, 'changed' => true]
+                : ['key' => $key, 'from' => self::auditValue($from), 'to' => self::auditValue($to)];
+        }
+        if ($changes === []) {
+            return;
+        }
+        $this->audit?->record('settings.changed', [
+            'tenant_id'   => $tenantId,
+            'target_type' => 'setting',
+            'metadata'    => ['changes' => $changes],
+        ]);
+    }
+
+    private static function auditValue(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $text = is_scalar($value) ? (string) $value : (string) json_encode($value);
+
+        return mb_strlen($text) > 200 ? mb_substr($text, 0, 200) . '…' : $text;
     }
 
     /** A 422 naming the route for a key this PATCH doesn't write, or null. */
@@ -443,6 +497,7 @@ final class SettingsApiHandler
         }
 
         $before = $this->switchStates();
+        $globalsBefore = $this->settings->getGlobal();
         $response = $this->applyWrites(
             $request,
             fn (string $key, ?string $value): null => $this->writeGlobal($key, $value),
@@ -452,6 +507,7 @@ final class SettingsApiHandler
             )
         );
         if ($response->getStatusCode() === 200) {
+            $this->auditChanges(0, $globalsBefore, $this->settings->getGlobal());
             foreach ($this->switchStates() as $key => $on) {
                 if ($on !== $before[$key]) {
                     $this->audit?->record(self::AUDITED_SWITCHES[$key][$on ? 0 : 1], [

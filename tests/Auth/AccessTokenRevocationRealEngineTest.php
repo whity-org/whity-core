@@ -98,6 +98,20 @@ final class AccessTokenRevocationRealEngineTest extends TestCase
         );
     }
 
+    public function testSigningOutIsAuditedAndNothingIsWhenNobodyWasSignedIn(): void
+    {
+        // READINESS CO-9.
+        $profileId = $this->seedProfile('signout@example.com', 'secret-123', epoch: 0);
+        $handler = new AuthHandler($this->pdo, $this->jwtParser, $this->validator(), null, null, null, new \Whity\Core\Audit\AuditLogger($this->pdo));
+
+        $handler->handleLogout(new Request('POST', '/api/auth/logout', []));
+        self::assertSame(0, (int) $this->pdo->query("SELECT COUNT(*) FROM audit_log WHERE action = 'auth.logout'")->fetchColumn());
+
+        $_COOKIE['access_token'] = $this->mintAccess($profileId, 1, epoch: 0);
+        $handler->handleLogout(new Request('POST', '/api/auth/logout', []));
+        self::assertSame($profileId, (int) $this->pdo->query("SELECT actor_user_id FROM audit_log WHERE action = 'auth.logout'")->fetchColumn());
+    }
+
     public function testLogoutIsIdempotentWithoutTokens(): void
     {
         // No cookies set: logout must still succeed and not error.
@@ -185,7 +199,9 @@ final class AccessTokenRevocationRealEngineTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
 
         // The stored profile epoch must have been bumped to 1.
-        $epoch = (int) $this->pdo->query("SELECT token_epoch FROM profiles WHERE id = {$profileId}")->fetchColumn();
+        $stmt = $this->pdo->query("SELECT token_epoch FROM profiles WHERE id = {$profileId}");
+        self::assertNotFalse($stmt);
+        $epoch = (int) $stmt->fetchColumn();
         self::assertSame(1, $epoch, 'A password change must bump profiles.token_epoch.');
 
         // The OLD access token (epoch 0 < stored 1) is now rejected.
@@ -223,7 +239,9 @@ final class AccessTokenRevocationRealEngineTest extends TestCase
         ])));
         self::assertSame(200, $response->getStatusCode());
 
-        $epoch = (int) $this->pdo->query("SELECT token_epoch FROM profiles WHERE id = {$profileId}")->fetchColumn();
+        $stmt = $this->pdo->query("SELECT token_epoch FROM profiles WHERE id = {$profileId}");
+        self::assertNotFalse($stmt);
+        $epoch = (int) $stmt->fetchColumn();
         self::assertSame(0, $epoch, 'An email-only change must NOT bump the token_epoch.');
     }
 
