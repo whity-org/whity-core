@@ -7,6 +7,7 @@ namespace Whity\Core\Tenant;
 use PDO;
 use Whity\Core\Audit\AuditLogger;
 use Whity\Core\Hooks\HookManager;
+use Whity\Core\Log\ScrubbedErrorLog;
 use Whity\Sdk\Hooks\Events;
 
 /**
@@ -221,7 +222,7 @@ final class Handles
                     'by_profile_id' => $byProfileId,
                 ]);
             } catch (\Throwable $e) {
-                error_log('[handles] tenant.handle_changed listeners failed: ' . $e->getMessage());
+                ScrubbedErrorLog::failure('[handles] tenant.handle_changed listeners failed', $e);
             }
         }
 
