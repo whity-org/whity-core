@@ -20,7 +20,7 @@ Related: [PERMISSION_SYSTEM](PERMISSION_SYSTEM.md) · [TENANT_ISOLATION](TENANT_
 ```sql
 CREATE TABLE audit_log (
     id            SERIAL PRIMARY KEY,
-    tenant_id     INTEGER NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    tenant_id     INTEGER NOT NULL,        -- no foreign key since migration 347: the trail outlives its workspace
     actor_user_id INTEGER NULL,            -- nullable: failed logins / system actions
     action        VARCHAR(100) NOT NULL,   -- stable key, e.g. auth.login.success
     target_type   VARCHAR(100) NULL,       -- affected entity type (role/user/tenant/ou)
@@ -36,7 +36,8 @@ CREATE INDEX idx_audit_log_tenant_action  ON audit_log (tenant_id, action);
 
 Notes:
 
-- `tenant_id` cascades with the tenant, mirroring the other scoped tables. The **system tenant (id 0)** owns cross-tenant/system records (e.g. a failed login with no resolved tenant).
+- `tenant_id` is a plain column. Until migration 347 (WHIT-1339) it cascaded with the tenant, so deleting a workspace deleted its history, including who deleted it. Workspace ids are never reused, so a deleted workspace's rows stay its own. The **system tenant (id 0)** owns cross-tenant/system records (e.g. a failed login with no resolved tenant).
+- **The database refuses UPDATE and DELETE** on `audit_log` (and TRUNCATE on PostgreSQL), on both engines (migration 348). There is no retention purge; one would have to be a migration that replaces the triggers with a sanctioned archive path, once a retention period is decided.
 - `actor_user_id` is **nullable and intentionally not a foreign key** — a failed login has no authenticated user, and an audit record must survive deletion of the user it refers to (deleting the evidence with the subject would defeat the trail).
 - `metadata` carries action-specific context and **never** stores secrets or PII: the writer drops any key whose name suggests a password/hash/secret/token/code before persisting.
 - The composite `(tenant_id, created_at DESC, id DESC)` index backs the primary access pattern — a tenant's newest-first listing.
@@ -122,13 +123,23 @@ Web rows are unchanged — the absence of `_origin` is what "this came from an H
 
 See the OpenAPI spec (`public/openapi.json`) for the full request/response contract.
 
+## Hash chain (tamper evidence)
+
+Migration 348 adds `audit_log_seals` (one seal per row: the previous seal's hash and this row's hash, version 1 covering a fixed column list) and `audit_log_chain` (where sealing got to). Both refuse UPDATE and DELETE except the one-row head.
+
+- `core.audit.seal` (queued every five minutes by `schedule:run`) seals rows older than five minutes, in id order, a few batches per run, and logs the head: `[audit] chain head audit_id=… seals=… hash=…`. Keep those lines off the host: they are what shows a rewrite by someone who could also rewrite the database.
+- `whity-cli audit:seal [--settle=<seconds>]` does the same now.
+- `whity-cli audit:verify` recomputes the chain from the first seal. Exit 1 names the first row that was changed or removed. Rows below the head with no seal (a transaction that committed after sealing passed its id) are reported, not hidden.
+
+Sealing is after the fact, not at insert, so audit writes never wait on one install-wide lock. On an existing install the first runs seal the backlog a batch at a time; the migration itself reads no audit row.
+
 ## Admin UI
 
 `web/app/(protected)/admin/audit-logs` lists entries with the filters and pagination, matching the other admin pages' loading/empty/error states and design tokens. A sidebar entry (`Audit Logs`, registered via the `navigation.register` hook in `public/index.php`) links to it.
 
 ## Summary
 
-- `audit_log` is an append-only, tenant-scoped trail; `tenant_id` cascades, `actor_user_id` is nullable, `metadata` is secret/PII-free.
+- `audit_log` is an append-only, tenant-scoped trail: the database refuses UPDATE and DELETE, rows outlive their workspace, a hash chain shows tampering (`whity-cli audit:verify`), `actor_user_id` is nullable, `metadata` is secret/PII-free.
 - `AuditLogger` is the single writer: it subscribes to the core CRUD hooks, is called explicitly by the auth/2FA endpoints, and subscribes to the events plugins declare; it is fail-soft and worker-safe.
 - Plugin-declared events are namespaced under the declaring plugin (action `acme:task.completed`, target type `acme:task`) from the name the loader supplies, so no plugin can forge a core action or another plugin's.
 - `AuditContext` carries the per-request actor/IP and is reset between requests.

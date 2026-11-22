@@ -262,6 +262,8 @@ export function useSettingsGroups({ enabled = true }: { enabled?: boolean } = {}
   const canSeeDevices = has(LICENSING_VIEW);
   // WHIT-955: the workspace's own fields on its records (A9).
   const canManageFields = has('fields:manage');
+  // WHIT-1326: Settings › Import, for anyone who may import some kind.
+  const canImport = has('contacts:import') || has('inventory:write');
   const canEditThemes = has(DOCUMENT_THEMES_PERMISSION);
   const canManageStamps = has(DOCUMENTS_STAMPS);
   const canManageBookings = has(CALENDAR_MANAGE);
@@ -329,6 +331,9 @@ export function useSettingsGroups({ enabled = true }: { enabled?: boolean } = {}
     if (canManageFields) {
       links.push({ id: 'fields', href: '/admin/settings/fields', label: t('settingsArea.fields', 'Fields'), group: 'data' });
     }
+    if (canImport && !isSystemTenant) {
+      links.push({ id: 'import', href: '/admin/settings/import', label: t('settingsArea.import', 'Import'), group: 'data' });
+    }
     if (canSeeDevices) {
       links.push({ id: 'devices', href: DEVICES_HREF, label: t('settingsArea.devices', 'Licensed devices'), group: 'security' });
     }
@@ -360,7 +365,7 @@ export function useSettingsGroups({ enabled = true }: { enabled?: boolean } = {}
       label: groupLabels[group],
       links: links.filter((link) => link.group === group).sort((a, b) => rank(a.id) - rank(b.id)),
     })).filter((group) => group.links.length > 0);
-  }, [tabs, navItems, navLabels, canSeeDevices, canManageFields, canEditThemes, canManageStamps, canManageBookings, isSystemTenant, t, tc, ta, workspaceName]);
+  }, [tabs, navItems, navLabels, canSeeDevices, canManageFields, canImport, canEditThemes, canManageStamps, canManageBookings, isSystemTenant, t, tc, ta, workspaceName]);
 
   return groups;
 }

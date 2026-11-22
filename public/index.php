@@ -2111,6 +2111,8 @@ $tenantManifestHost = new \Whity\Core\Plugin\Tenant\TenantManifestHost($tenantPl
 // WHIT-1122: installed code plugins, switched on per workspace.
 $codePluginActivation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($db->getPdo());
 $pluginLoader->setWorkspaceActivation($codePluginActivation);
+// WHIT-1338: a plugin a signed revocation list killed is never loaded into a worker.
+$pluginLoader->setKillSwitch(static fn (string $name): bool => $codePluginActivation->isKilled($name));
 
 $rolesHandler = new RolesApiHandler(
     $db->getPdo(),
@@ -5880,6 +5882,10 @@ $router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|su
 $router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/run',            [$inventoryImportHandler, 'runImport'],  null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/undo',           [$inventoryImportHandler, 'undo'],       null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/skipped.csv',    [$inventoryImportHandler, 'skippedCsv'], null, null, CorePermissions::INVENTORY_WRITE);
+// WHIT-1326: every kind the shared import screen offers (design section 34 §6.5).
+$importKinds = new \Whity\Core\Import\ImportKinds();
+\Whity\Core\Import\CoreImportKinds::register($importKinds, $inventoryLocations, $contactRepository);
+$router->register('GET',    '/api/imports/kinds',                                [new \Whity\Api\ImportKindsApiHandler($importKinds, $roleChecker), 'list']);
 $router->register('GET',    '/api/inventory/units',                            [$inventoryHandler, 'listUnits'],      null, null, CorePermissions::INVENTORY_READ);
 $router->register('POST',   '/api/inventory/units',                              [$inventoryHandler, 'createUnit'],     null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/categories',                         [$inventoryHandler, 'listCategories'], null, null, CorePermissions::INVENTORY_READ);
@@ -7743,6 +7749,15 @@ if ($isWorker) {
             && $pluginLoader->consumePendingWorkerRecycle()
         ) {
             error_log("[FrankenPHP Worker] Recycling worker to load modified plugin code.");
+            $db->disconnect();
+            break;
+        }
+
+        // WHIT-1338: a kill imported while this worker runs cannot unload code
+        // already in it. Recycle, so the fresh worker's discovery leaves the
+        // killed plugin out. Checked at most every 30 seconds per worker.
+        if ($pluginLoader->holdsKilledPlugin()) {
+            error_log("[FrankenPHP Worker] A loaded plugin was killed by the revocation list. Recycling worker.");
             $db->disconnect();
             break;
         }
