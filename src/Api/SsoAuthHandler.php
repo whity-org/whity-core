@@ -1192,7 +1192,8 @@ final class SsoAuthHandler
     private function logReauth(string $outcome, ?array $flow, ?string $detail = null, ?string $mode = null): void
     {
         $purpose = is_string($flow['reauth_purpose'] ?? null) ? $flow['reauth_purpose'] : null;
-        error_log('[sso.reauth] ' . json_encode([
+        // Scrubbed like every log line here; it carries no secret to begin with.
+        \Whity\Core\Log\ScrubbedErrorLog::write('[sso.reauth] ' . json_encode([
             'outcome'    => $outcome,
             'mode'       => $mode ?? ($purpose !== null ? 'gate' : 'sign'),
             'kind'       => $purpose !== null ? strstr($purpose, ':', true) : null,
