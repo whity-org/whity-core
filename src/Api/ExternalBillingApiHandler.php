@@ -74,6 +74,7 @@ final class ExternalBillingApiHandler
     }
 
     private ?\Whity\Core\Billing\WorkspaceTrial $workspaceTrial = null;
+    private ?\Whity\Core\Billing\WorkspacePause $workspacePause = null;
 
     // ── the tenant-facing surface ───────────────────────────────────────────
 
@@ -885,6 +886,31 @@ final class ExternalBillingApiHandler
             && $trial->trialDaysForCheckout($tenantId, $state['plan_key']) !== null;
 
         return Response::json(['data' => $state]);
+    }
+
+    /** 2026-11-22: whether the workspace is paused because its plan lapsed, and who can pay. */
+    public function useWorkspacePause(\Whity\Core\Billing\WorkspacePause $pause): void
+    {
+        $this->workspacePause = $pause;
+    }
+
+    /**
+     * GET /api/v1/billing/pause — whether this workspace is paused because its
+     * subscription expired or was canceled, and the names of its owners.
+     *
+     * For EVERY member: people who can't pay are shown a plain page that says
+     * the workspace is paused until an owner pays and names the owners. Exempt
+     * from the payment wall with the rest of /billing, so a paused workspace
+     * can always find out why. `data` is null when it is not paused.
+     */
+    public function pause(Request $request): Response
+    {
+        $tenantId = TenantContext::getTenantId();
+        if ($tenantId === null) {
+            return Response::error('Tenant context is required', 403);
+        }
+
+        return Response::json(['data' => $this->workspacePause?->stateFor($tenantId)]);
     }
 
     private function pluginBridge(): ?SdkBillingPortalBridge

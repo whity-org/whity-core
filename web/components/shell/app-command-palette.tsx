@@ -31,6 +31,7 @@ import { namedIcon } from '@/lib/named-icon';
 import type { Icon as TablerIcon } from '@tabler/icons-react';
 import { CommandPalette, type CommandPaletteItem } from '@whity/ui/command-palette';
 import { Icon } from '@whity/ui/icon';
+import { useSwitchRefusalMessage } from '@/lib/workspace-switch';
 import { useCurrentLanguage, useTranslation } from '@whity/features/i18n';
 import { useNavigation } from '@/lib/navigation-context';
 import { useNavItemLabels } from '@/lib/nav-item-labels';
@@ -77,6 +78,7 @@ const DEBOUNCE_MS = 200;
 
 export function AppCommandPalette() {
   const t = useTranslation('common');
+  const refusalMessage = useSwitchRefusalMessage();
   const commandT = useCommandTranslation();
   const router = useRouter();
   const { currentLanguage, availableLanguages, setLanguage } = useCurrentLanguage();
@@ -224,13 +226,13 @@ export function AppCommandPalette() {
         void (async () => {
           try {
             await switchTenant(id);
-            await refreshNav();
           } catch (err) {
-            addToast(
-              err instanceof Error ? err.message : t('sidebar.tenantSwitcher.error', 'Couldn’t switch workspace'),
-              'error',
-            );
+            // Never silent (2026-11-22): the reason, in plain words.
+            addToast(refusalMessage(err), 'error');
+            return;
           }
+          // The switch happened; a menu that fails to reload is not a refusal.
+          await refreshNav().catch(() => undefined);
         })();
       },
       theme: themePreference,
@@ -258,7 +260,6 @@ export function AppCommandPalette() {
     isHidden,
     settingsHidden,
     canCreateWorkspace,
-    t,
     commandT,
     has,
     navItems,
@@ -272,6 +273,7 @@ export function AppCommandPalette() {
     switchTenant,
     refreshNav,
     addToast,
+    refusalMessage,
     themePreference,
     setThemePreference,
     availableLanguages,

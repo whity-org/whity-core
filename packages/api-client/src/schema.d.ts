@@ -2080,6 +2080,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether this workspace is paused because its plan lapsed, and who its owners are
+         * @description For every member: when the subscription of this workspace expired or was canceled and changes are refused, its status, whether reads are refused too, and the names of its owners, so people who cannot pay are told who can. `data` is null when the workspace is not paused. Not behind the payment wall.
+         */
+        get: operations["get_api_v1_billing_pause"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/plans": {
         parameters: {
             query?: never;
@@ -27010,6 +27030,19 @@ export interface components {
                 is_owner: boolean;
             };
         };
+        WorkspacePauseResponse: {
+            data: components["schemas"]["WorkspacePauseState"] | null;
+        };
+        WorkspacePauseState: {
+            /** @description expired or canceled */
+            status: string;
+            /** @description The wall refuses reads too, not only changes */
+            reads_refused: boolean;
+            /** @description The owners who can pay, by name */
+            owners: {
+                name: string;
+            }[];
+        };
         WorkspacePlugin: {
             /** @description The name in lower case, used in routes */
             slug: string;
@@ -37671,6 +37704,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaymentMethodListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_billing_pause: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether this workspace is paused */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspacePauseResponse"];
                 };
             };
             /** @description Missing or invalid authentication */

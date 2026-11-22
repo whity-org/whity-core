@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { WorkspaceSwitchRefused } from '@/lib/workspace-switch';
 import { api, SESSION_EXPIRED_EVENT } from './api/client';
 import { forgetPushOnSignOut } from '@/lib/pwa/push';
 import { oneEntryPerWorkspace } from '@/lib/workspace-memberships';
@@ -252,14 +253,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
    * memberships) reflects the new session without a page reload.
    */
   const switchTenant = async (tenantId: number): Promise<void> => {
-    const { error: switchError, response: switchResponse } = await api.POST(
-      '/api/v1/auth/switch-tenant',
-      { body: { tenant_id: tenantId } }
-    );
+    let outcome;
+    try {
+      outcome = await api.POST('/api/v1/auth/switch-tenant', { body: { tenant_id: tenantId } });
+    } catch {
+      // Never reached the server: still a refusal the switcher must explain.
+      throw new WorkspaceSwitchRefused(0, null);
+    }
+    const { error: switchError, response: switchResponse } = outcome;
 
     if (!switchResponse.ok) {
+      // Typed, so the switcher can say why in plain words (2026-11-22).
       const errData = (switchError ?? {}) as Record<string, unknown>;
-      throw new Error((errData['error'] as string | undefined) ?? 'Tenant switch failed');
+      const message = typeof errData['error'] === 'string' ? errData['error'] : null;
+      throw new WorkspaceSwitchRefused(switchResponse.status, message);
     }
 
     // Re-fetch /api/v1/me so the in-memory user/memberships reflect the new

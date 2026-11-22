@@ -379,6 +379,17 @@ describe('typed api client — the payment wall', () => {
     delete (globalThis as unknown as { window?: unknown }).window;
   });
 
+  // Runs first: the redirect happens once per page load.
+  it('a refused workspace switch stays on the page, for the switcher to explain (2026-11-22)', async () => {
+    const { fn } = scriptedFetch(jsonResponse(402, { error: 'Payment Required' }));
+    const api = client(fn);
+
+    const result = await api.POST('/api/v1/auth/switch-tenant', { body: { tenant_id: 2 } });
+
+    expect(result.response.status).toBe(402);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
   it('sends a walled workspace to Billing once, however many calls come back 402', async () => {
     const { fn } = scriptedFetch(jsonResponse(402, {}), jsonResponse(402, {}));
     const api = client(fn);
