@@ -36,7 +36,7 @@
 # `COPY --from=manifests` that follows on the CONTENT of what this stage
 # leaves, so a commit that changes packages/ui/src, and not a manifest, reuses
 # the cached install from the registry cache (images.yml).
-FROM node:22.23.5-bookworm-slim AS manifests
+FROM node:26.13.1-bookworm-slim AS manifests
 WORKDIR /src
 COPY package.json package-lock.json ./
 COPY packages packages
@@ -45,7 +45,7 @@ COPY web/package.json web/package.json
 RUN find packages templates -type f ! -regex '^[^/]*/[^/]*/\(package\.json\|bin/.*\)$' -delete \
     && find packages templates -mindepth 1 -type d -empty -delete
 
-FROM node:22.23.5-bookworm-slim AS build
+FROM node:26.13.1-bookworm-slim AS build
 
 # Deliberately NOT NODE_ENV=production in this stage: that would make `npm ci`
 # skip the devDependencies that ARE the build toolchain.
@@ -114,7 +114,7 @@ RUN grep -Eq '^[0-9a-f]{7,40}$' web/.next/BUILD_ID \
 # Strip the toolchain from the tree the runtime stage inherits.
 RUN npm prune --omit=dev
 
-FROM node:22.23.5-bookworm-slim AS runtime
+FROM node:26.13.1-bookworm-slim AS runtime
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
