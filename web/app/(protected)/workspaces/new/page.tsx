@@ -152,7 +152,7 @@ export default function NewWorkspacePage() {
 
       if (response.status === 201 && typeof body.data?.tenant_id === 'number') {
         // Into the new workspace, as its owner; the switch re-reads /me.
-        await switchTenant(body.data.tenant_id);
+        await switchTenant(body.data.tenant_id, { land: false });
         await refreshNav();
         // Read before the cache is dropped: whether this one starts a paid trial.
         const paid = (state?.next_plan ?? null) !== null;

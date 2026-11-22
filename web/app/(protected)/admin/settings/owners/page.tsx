@@ -84,7 +84,7 @@ export default function OwnersSettingsPage() {
   const t = useTranslation('admin');
   const refusalText = useRefusalText();
   const { addToast } = useToast();
-  const { user, refreshAuth } = useAuth();
+  const { user, sessionChanged } = useAuth();
   const dates = useDateDisplay();
   const formatDate = (value: string): string => dates.date(value) ?? '';
   const [version, setVersion] = useState(0);
@@ -185,7 +185,7 @@ export default function OwnersSettingsPage() {
           'success',
         );
         // My own owner flag changed: the switcher and owner-only actions follow.
-        if (done.profileId === user?.id) await refreshAuth();
+        if (done.profileId === user?.id) await sessionChanged();
       }
       reload();
     } catch {

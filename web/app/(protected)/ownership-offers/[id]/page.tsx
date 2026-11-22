@@ -54,7 +54,7 @@ export default function OwnershipOfferPage() {
   const router = useRouter();
   const homePath = useHomePath();
   const { addToast } = useToast();
-  const { user, switchTenant } = useAuth();
+  const { user, switchTenant, sessionChanged } = useAuth();
   const dates = useDateDisplay();
   const formatDate = (value: string): string => dates.date(value) ?? '';
   const [version, setVersion] = useState(0);
@@ -120,8 +120,12 @@ export default function OwnershipOfferPage() {
         'success',
       );
       invalidateWorkspaceCreateState();
+      // Into the workspace now owned; the owners page is next, not a landing page.
       if (user?.tenant_id !== offer.tenant_id) {
-        await switchTenant(offer.tenant_id);
+        await switchTenant(offer.tenant_id, { land: false });
+      } else {
+        // Same workspace, new owner flag: the screen and the other tabs follow.
+        await sessionChanged();
       }
       router.push('/admin/settings/owners');
     } catch {

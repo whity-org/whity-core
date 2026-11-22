@@ -21,6 +21,7 @@ import { PublicShell } from '@/components/auth/public-shell';
 import { PublicOutcome } from '@/components/auth/public-outcome';
 import type { WorkspaceBrand } from '@/lib/branding-context';
 import { api } from '@/lib/api/client';
+import { useOptionalAuth } from '@/lib/auth-context';
 import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy';
 
 type Phase = 'loading' | 'form' | 'joined' | 'pending' | 'already' | 'refused' | 'closed' | 'invalid';
@@ -36,6 +37,7 @@ interface Preview {
 function ConfirmInner() {
   const token = useSearchParams().get('token');
   const t = useTranslation('auth');
+  const auth = useOptionalAuth();
 
   const [phase, setPhase] = useState<Phase>(token ? 'loading' : 'invalid');
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -98,6 +100,8 @@ function ConfirmInner() {
 
       if (res.status === 200) {
         const body = (joinBody as unknown) as { data: { status: string } };
+        // Signed in already: the new workspace joins the switcher in every tab.
+        if (body.data.status === 'joined' && auth?.user) void auth.sessionChanged({ here: false });
         setPhase(
           body.data.status === 'joined' ? 'joined' : body.data.status === 'pending_approval' ? 'pending' : 'already'
         );

@@ -1,10 +1,17 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { WorkspaceSwitchRefused } from '@/lib/workspace-switch';
 import { api, SESSION_EXPIRED_EVENT } from './api/client';
 import { forgetPushOnSignOut } from '@/lib/pwa/push';
 import { oneEntryPerWorkspace } from '@/lib/workspace-memberships';
+import {
+  announceSessionChange,
+  identityOf,
+  subscribeSessionChanges,
+  tenantOf,
+  type SessionChangeKind,
+} from '@/lib/session-sync';
 
 interface User {
   id: number;
@@ -39,6 +46,22 @@ export interface Membership {
   is_owner?: boolean;
 }
 
+export interface SwitchOptions {
+  /**
+   * False when the caller goes somewhere itself right after the switch (a new
+   * workspace's next step, the owners page). Default true: stay on the page
+   * when it exists in the new workspace, else its list or the dashboard.
+   */
+  land?: boolean;
+}
+
+/** See {@link AuthContextType.session}. */
+export interface SessionEpoch {
+  epoch: number;
+  /** Move off a page the new workspace may not have (`landingPath`). */
+  land: boolean;
+}
+
 interface AuthContextType {
   user: User | null;
   /** The authenticated profile's active memberships (WC-f8164c87). Empty array
@@ -53,9 +76,27 @@ interface AuthContextType {
   /**
    * Switch the active tenant for the current session (WC-f8164c87).
    * POSTs to /api/v1/auth/switch-tenant and re-fetches /api/v1/me on success,
-   * so user and memberships are updated without a full page reload.
+   * so user and memberships are updated without a full page reload, and
+   * everything else on screen refreshes through {@link session}.
    */
-  switchTenant: (tenantId: number) => Promise<void>;
+  switchTenant: (tenantId: number, options?: SwitchOptions) => Promise<void>;
+  /**
+   * Same person, same workspace, but what they may see changed: a plan change,
+   * a finished checkout, an accepted invitation. Re-reads `/api/v1/me`,
+   * refreshes everything on screen and tells the other tabs.
+   *
+   * `{ here: false }` for a one-time page whose answer would be lost by a
+   * remount (accepting an invitation, the payment return): this tab only
+   * re-reads `/me`, and the other tabs refresh.
+   */
+  sessionChanged: (options?: { here?: boolean }) => Promise<void>;
+  /**
+   * Bumped whenever the session on screen became a different one (another
+   * workspace, another account, another role) or {@link sessionChanged} ran,
+   * here or in another tab. `SessionScope` keys the workspace-dependent tree
+   * on it, so every fetch runs again for the new session (lib/session-sync.ts).
+   */
+  session: SessionEpoch;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -94,6 +135,21 @@ function decodeJWT(token: string): JWTPayload | null {
   }
 }
 
+function membershipsOf(data: MeBody): Membership[] {
+  return Array.isArray(data.memberships) ? oneEntryPerWorkspace(data.memberships as Membership[]) : [];
+}
+
+interface CommitOptions {
+  /** Tell the other tabs, as this kind of change, when something changed. */
+  announce?: SessionChangeKind | null;
+  /** Announce even when nothing changed (a page load saying who it is). */
+  announceAlways?: boolean;
+  /** Refresh everything even when the identity is the same. */
+  force?: boolean;
+  /** False: stay on the page whatever the workspace (see {@link SwitchOptions}). */
+  land?: boolean;
+}
+
 interface AuthProviderProps {
   children: ReactNode;
 }
@@ -103,6 +159,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [session, setSession] = useState<SessionEpoch>({ epoch: 0, land: false });
+  /** The identity on screen (`identityOf`); undefined until the first `/me` answered. */
+  const identityRef = useRef<string | null | undefined>(undefined);
+
+  /**
+   * Put a session on screen. A different signed-in session from the one already
+   * there (or `force`) bumps the epoch, so everything on screen fetches again.
+   * From signed out to signed in there is nothing stale to clear, and on the way
+   * to signed out `AuthGate` takes the tab to sign-in, so neither bumps it.
+   */
+  const commit = useCallback(
+    (nextUser: User | null, nextMemberships: Membership[] | null, opts: CommitOptions = {}): void => {
+      setUser(nextUser);
+      if (nextMemberships !== null) setMemberships(nextMemberships);
+      const next = identityOf(nextUser);
+      const prev = identityRef.current;
+      identityRef.current = next;
+      const changed = prev !== undefined && next !== prev;
+      if (prev !== undefined && prev !== null && next !== null && (changed || opts.force === true)) {
+        const land = opts.land !== false && tenantOf(prev) !== tenantOf(next);
+        setSession((s) => ({ epoch: s.epoch + 1, land }));
+      }
+      if (opts.announce && (changed || opts.force === true || opts.announceAlways === true)) {
+        announceSessionChange(opts.announce, next);
+      }
+    },
+    [],
+  );
 
   // Initialize user from /api/v1/me on mount (uses httpOnly cookies)
   useEffect(() => {
@@ -115,22 +199,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         if (response.ok) {
           const data = (body ?? {}) as MeBody;
-          if (data.user) {
-            setUser(data.user);
-          }
-          if (Array.isArray(data.memberships)) {
-            setMemberships(oneEntryPerWorkspace(data.memberships as Membership[]));
-          }
+          // Announced on every load: a tab still showing another account or
+          // workspace follows this one. That is what catches a sign-in that was
+          // a full-page redirect (Whity ID, choosing another account).
+          commit(data.user ?? null, membershipsOf(data), { announce: 'signed-in', announceAlways: true });
+        } else {
+          identityRef.current = null;
+          // Only a refused session, never an outage, signs the other tabs out.
+          if (response.status === 401) announceSessionChange('signed-out', null);
         }
       } catch (error) {
         console.error('Failed to initialize auth:', error);
       } finally {
+        if (identityRef.current === undefined) identityRef.current = null;
         setIsLoading(false);
       }
     };
 
     initializeAuth();
-  }, []);
+  }, [commit]);
 
   /**
    * A session that ends MID-VISIT, rather than one that was already over at
@@ -150,14 +237,65 @@ export function AuthProvider({ children }: AuthProviderProps) {
    */
   useEffect(() => {
     const onSessionExpired = (): void => {
-      setUser(null);
-      setMemberships([]);
+      commit(null, [], { announce: 'signed-out' });
     };
 
     window.addEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
 
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onSessionExpired);
-  }, []);
+  }, [commit]);
+
+  /**
+   * Re-read `/api/v1/me` and put the answer on screen. `announce: false` is for
+   * a tab following another tab's message, so two tabs never echo each other.
+   */
+  const readSession = useCallback(
+    async (opts: { announce: boolean; force?: boolean; land?: boolean; kind?: SessionChangeKind }): Promise<void> => {
+      const prev = identityRef.current ?? null;
+      try {
+        const { data: body, response } = await api.GET('/api/v1/me');
+
+        if (response.ok) {
+          const data = (body ?? {}) as MeBody;
+          const nextUser = data.user ?? null;
+          const kind: SessionChangeKind =
+            opts.kind ??
+            (prev === null
+              ? 'signed-in'
+              : nextUser !== null && String(nextUser.tenant_id) !== tenantOf(prev)
+                ? 'switched'
+                : 'changed');
+          commit(nextUser, membershipsOf(data), {
+            announce: opts.announce ? kind : null,
+            force: opts.force,
+            land: opts.land,
+          });
+        } else {
+          commit(null, [], { announce: opts.announce ? 'signed-out' : null });
+        }
+      } catch (error) {
+        console.error('Failed to refresh auth:', error);
+        commit(null, [], {});
+      }
+    },
+    [commit],
+  );
+
+  /**
+   * Another tab changed the session. Follow it when it differs from ours, or
+   * when only what we may see changed, without announcing back.
+   */
+  useEffect(() => {
+    return subscribeSessionChanges((change) => {
+      if (identityRef.current === undefined) return; // Our own first read is still out.
+      if (change.kind !== 'changed' && change.identity === identityRef.current) return;
+      if (change.identity === null) {
+        commit(null, [], {});
+        return;
+      }
+      void readSession({ announce: false, force: change.kind === 'changed' });
+    });
+  }, [commit, readSession]);
 
   const login = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
@@ -181,7 +319,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // object; fall back to decoding the response token purely to populate that
       // profile (it is not stored).
       if (data.user) {
-        setUser(data.user);
+        commit(data.user, null, { announce: 'signed-in' });
       } else if (typeof data.token === 'string') {
         const payload = decodeJWT(data.token);
         // Canonical claims only (ADR 0005 §5): profile_id is the identity,
@@ -191,12 +329,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const tenantId =
           typeof payload?.active_tenant_id === 'number' ? payload.active_tenant_id : 0;
         if (payload && profileId && payload.email) {
-          setUser({
-            id: profileId,
-            email: payload.email,
-            role: payload.role || '',
-            tenant_id: tenantId,
-          });
+          commit(
+            {
+              id: profileId,
+              email: payload.email,
+              role: payload.role || '',
+              tenant_id: tenantId,
+            },
+            null,
+            { announce: 'signed-in' },
+          );
         }
       }
     } catch (err) {
@@ -216,33 +358,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch (error) {
       console.error('Logout request failed:', error);
     } finally {
-      setUser(null);
-      setMemberships([]);
+      // Every tab of the app signs out with this one.
+      commit(null, [], { announce: 'signed-out', announceAlways: true });
       setError(null);
     }
   };
 
   const refreshAuth = async (): Promise<void> => {
-    try {
-      const { data: body, response } = await api.GET('/api/v1/me');
+    await readSession({ announce: true });
+  };
 
-      if (response.ok) {
-        const data = (body ?? {}) as MeBody;
-        if (data.user) {
-          setUser(data.user);
-        }
-        if (Array.isArray(data.memberships)) {
-          setMemberships(oneEntryPerWorkspace(data.memberships as Membership[]));
-        }
-      } else {
-        setUser(null);
-        setMemberships([]);
-      }
-    } catch (error) {
-      console.error('Failed to refresh auth:', error);
-      setUser(null);
-      setMemberships([]);
+  const sessionChanged = async (options: { here?: boolean } = {}): Promise<void> => {
+    if (options.here === false) {
+      await readSession({ announce: false });
+      if (identityRef.current) announceSessionChange('changed', identityRef.current);
+      return;
     }
+    await readSession({ announce: true, force: true, land: false, kind: 'changed' });
   };
 
   /**
@@ -250,9 +382,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
    *
    * POSTs to /api/v1/auth/switch-tenant with the chosen tenant_id, then
    * refetches /api/v1/me so user state (including the new tenant_id and
-   * memberships) reflects the new session without a page reload.
+   * memberships) reflects the new session without a page reload. The session
+   * epoch bump refreshes every page, banner and menu for the new workspace, and
+   * the other tabs follow (lib/session-sync.ts).
    */
-  const switchTenant = async (tenantId: number): Promise<void> => {
+  const switchTenant = async (tenantId: number, options: SwitchOptions = {}): Promise<void> => {
     let outcome;
     try {
       outcome = await api.POST('/api/v1/auth/switch-tenant', { body: { tenant_id: tenantId } });
@@ -269,9 +403,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       throw new WorkspaceSwitchRefused(switchResponse.status, message);
     }
 
-    // Re-fetch /api/v1/me so the in-memory user/memberships reflect the new
-    // active_tenant_id without a full page reload.
-    await refreshAuth();
+    await readSession({ announce: true, force: true, land: options.land !== false, kind: 'switched' });
   };
 
   const isAuthenticated = useCallback((): boolean => {
@@ -288,6 +420,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAuthenticated,
     refreshAuth,
     switchTenant,
+    sessionChanged,
+    session,
   };
 
   return (
@@ -303,4 +437,13 @@ export function useAuth(): AuthContextType {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
+}
+
+/**
+ * The same context, or undefined outside an `AuthProvider`: for public pages
+ * (an invitation, a payment return) that tell a signed-in reader's other tabs
+ * about a change but render perfectly well without a session.
+ */
+export function useOptionalAuth(): AuthContextType | undefined {
+  return useContext(AuthContext);
 }
