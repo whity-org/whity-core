@@ -139,10 +139,17 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         $_COOKIE = [];
     }
 
+    /** Puts error_log back after a test that captured it. */
+    private ?\Closure $restoreErrorLog = null;
+
     protected function tearDown(): void
     {
         $_GET = [];
         $_COOKIE = [];
+        if ($this->restoreErrorLog !== null) {
+            ($this->restoreErrorLog)();
+            $this->restoreErrorLog = null;
+        }
     }
 
     private function seed(): void
@@ -474,6 +481,79 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
 
         self::assertStringEndsWith('?identity_check=sign_in_not_fresh', $result['location']);
         self::assertNull($result['verify']($purpose));
+    }
+
+    /**
+     * When the provider refuses or the callback fails, a person signing in AGAIN goes back to the
+     * page they came from, told it didn't work, never to the login page, where "Continue with
+     * Whity ID" signed them in afresh and recorded nothing (WHIT-1371). The log says why.
+     */
+    public function testAFailedReauthCallbackGoesBackToThePageAndIsLogged(): void
+    {
+        $log = $this->captureErrorLog();
+        $_COOKIE = ['sso_flow_token' => $this->jwtParser->create([
+            'state' => 's', 'nonce' => 'n', 'code_verifier' => 'v',
+            'provider_id' => $this->providerId, 'tenant_id' => 0, 'provider_key' => 'google',
+            'reauth_profile_id' => $this->profileId, 'reauth_tenant_id' => $this->tenantId,
+            'reauth_return_to' => '/admin/settings/owners', 'reauth_route_id' => null,
+            'reauth_purpose' => 'workspace-ownership:offer-1-9-co_owner',
+        ], 600, 'oidc_flow')];
+        $_GET = ['error' => 'login_required', 'state' => 's'];
+        $handler = new SsoAuthHandler(...$this->handlerArgsWithReauth());
+
+        $res = $handler->callback(new Request('GET', '/api/v1/auth/sso/google/callback', [], ''), ['provider' => 'google']);
+
+        self::assertSame(self::APP_URL . '/admin/settings/owners?identity_check=sign_in_failed', $this->location($res));
+        $line = $this->lastReauthLog($log);
+        self::assertSame('sign_in_failed', $line['outcome']);
+        self::assertSame('denied:login_required', $line['detail']);
+        self::assertSame('workspace-ownership', $line['kind'], 'the kind, never the subject');
+        self::assertSame($this->profileId, $line['profile_id']);
+
+        // The next, ordinary sign-in on the same worker still lands on the login page.
+        $_COOKIE = [];
+        $_GET = ['code' => 'c', 'state' => 's'];
+        self::assertStringContainsString('sso_error=expired', $this->location($handler->callback(new Request('GET', '/api/v1/auth/sso/google/callback', [], ''), ['provider' => 'google'])));
+    }
+
+    public function testEveryReauthOutcomeIsLoggedWithoutSecrets(): void
+    {
+        $log = $this->captureErrorLog();
+        $this->gateRoundTrip('workspace-ownership:offer-' . $this->tenantId . '-9-co_owner', ['auth_time' => time() - 900]);
+
+        $text = (string) file_get_contents($log);
+        self::assertStringContainsString('"outcome":"started"', $text);
+        $line = $this->lastReauthLog($log);
+        self::assertSame('sign_in_not_fresh', $line['outcome']);
+        self::assertMatchesRegularExpression('/^auth_time_age=9\d\d$/', (string) $line['detail']);
+        self::assertStringNotContainsString(self::SUBJECT, $text);
+        self::assertStringNotContainsString('alice@acme.test', $text);
+        self::assertStringNotContainsString('offer-', $text);
+    }
+
+    private function captureErrorLog(): string
+    {
+        $file = (string) tempnam(sys_get_temp_dir(), 'reauth-log');
+        $previous = ini_set('error_log', $file);
+        $this->restoreErrorLog = static function () use ($previous, $file): void {
+            ini_set('error_log', $previous === false ? '' : $previous);
+            @unlink($file);
+        };
+
+        return $file;
+    }
+
+    /** @return array<string, mixed> */
+    private function lastReauthLog(string $file): array
+    {
+        $lines = array_values(array_filter(
+            explode("\n", (string) file_get_contents($file)),
+            static fn (string $l): bool => str_contains($l, '[sso.reauth] '),
+        ));
+        self::assertNotSame([], $lines, 'a reauth outcome is logged');
+        $json = substr((string) end($lines), (int) strpos((string) end($lines), '[sso.reauth] ') + 13);
+
+        return (array) json_decode(trim($json), true);
     }
 
     /** Someone else signing in at the provider never confirms this approver. */
