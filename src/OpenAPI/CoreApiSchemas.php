@@ -3592,6 +3592,23 @@ final class CoreApiSchemas
                     ],
                 ],
             ],
+            // #2386: public, so the web server's route guard can ask before sign-in.
+            [
+                'method' => 'GET',
+                'path' => '/api/navigation/hidden',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The menu items and Settings pages hidden on this instance (public)',
+                    'description' => 'The union of the navigation.hidden_ids setting and the WHITY_HIDDEN_NAV_IDS '
+                        . 'environment variable. Hidden items leave GET /api/navigation and GET /api/settings/tabs, '
+                        . 'and the web app answers their pages with 404. See docs/wiki/Hiding-Pages.md.',
+                    'tags' => ['platform-ops'],
+                    'responses' => [
+                        200 => self::jsonResponse('The hidden ids', 'HiddenNavIdsResponse'),
+                    ],
+                ],
+            ],
             self::permissionRoute('GET', '/api/migrations', 'migrations:read', [
                 'summary' => 'List database migrations and their execution state',
                 'tags' => ['platform-ops'],
@@ -12067,6 +12084,11 @@ final class CoreApiSchemas
                 'requiredPermission' => self::str(true),
             ], ['id', 'label', 'href', 'icon', 'group', 'order']),
             'NavigationListResponse' => self::listEnvelope('NavigationItem'),
+            // GET /api/navigation/hidden (#2386)
+            'HiddenNavIdsResponse' => self::dataEnvelope(self::object([
+                'nav' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Menu item ids, as on GET /api/navigation.'],
+                'settings' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Settings page ids, without the settings. prefix.'],
+            ], ['nav', 'settings'])),
 
             // GET /api/settings/tabs (WC-tabs-nav-be)
             'SettingsTab' => self::object([

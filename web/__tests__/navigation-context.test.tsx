@@ -27,9 +27,15 @@ const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 // The typed client, over a fetch-shaped fake: the tests queue `{ ok, json }`
 // answers on `mockFetch`, and this maps each to `{ data, error, response }`.
 const mockFetch = jest.fn<Promise<Response>, [string, RequestInit?]>();
+let mockHidden: unknown = { data: { nav: [], settings: [] } };
 jest.mock('@/lib/api/client', () => ({
   api: {
     GET: async (path: string, init?: RequestInit) => {
+      // #2386: the hidden ids are asked once per page load, apart from the
+      // per-user navigation these tests count.
+      if (path === '/api/v1/navigation/hidden') {
+        return { data: mockHidden, error: undefined, response: { ok: true, status: 200 } };
+      }
       const res = await mockFetch(path, init);
       const body: unknown = await res.json();
       return {
@@ -302,5 +308,35 @@ describe('NavigationProvider refresh + optimistic removal (WC-221)', () => {
 
     expect(screen.getByTestId('ids').textContent).toBe('dashboard');
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('NavigationProvider hidden pages (#2386)', () => {
+  function HiddenProbe() {
+    const { hidden, isHidden } = useNavigation();
+    return (
+      <div>
+        <span data-testid="hidden-nav">{hidden.nav.join(',')}</span>
+        <span data-testid="calendar-hidden">{String(isHidden('/calendar/rooms'))}</span>
+      </div>
+    );
+  }
+
+  afterEach(() => {
+    mockHidden = { data: { nav: [], settings: [] } };
+  });
+
+  it('exposes the operator’s hidden ids and answers for a path', async () => {
+    mockUseAuth.mockReturnValue(authState(null));
+    mockHidden = { data: { nav: ['calendar'], settings: ['sso'] } };
+
+    render(
+      <NavigationProvider>
+        <HiddenProbe />
+      </NavigationProvider>
+    );
+
+    await waitFor(() => expect(screen.getByTestId('hidden-nav').textContent).toBe('calendar'));
+    expect(screen.getByTestId('calendar-hidden').textContent).toBe('true');
   });
 });

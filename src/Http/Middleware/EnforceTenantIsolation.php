@@ -195,6 +195,9 @@ class EnforceTenantIsolation
         // the reader asking whether the service is down. Exposes component states
         // and uptime only, never deployment internals.
         '/api/v1/status',
+        // #2386: the menu items and Settings pages the operator hid. Asked by
+        // the web server's route guard before anyone signs in; instance-wide.
+        '/api/v1/navigation/hidden',
         // WHIT-922: the instance's public signing keys, so anyone holding a
         // signature record can check its seal. Public keys only.
         '/api/v1/signing-keys',

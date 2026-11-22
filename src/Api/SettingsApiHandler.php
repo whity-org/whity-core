@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Auth\RoleChecker;
+use Whity\Core\Navigation\HiddenNavIds;
 use Whity\Core\RBAC\CorePermissions;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -229,9 +230,11 @@ final class SettingsApiHandler
             return Response::error('Authentication required', 403);
         }
 
+        // #2386: a Settings page the operator hid (`settings.<id>`) is not a tab.
+        $hidden = HiddenNavIds::split(HiddenNavIds::all($this->settings))['settings'];
         $visible = array_values(array_filter(
             self::TABS,
-            fn (array $tab): bool => $this->tabVisibleTo($tab, $userId, $tenantId)
+            fn (array $tab): bool => !in_array($tab['id'], $hidden, true) && $this->tabVisibleTo($tab, $userId, $tenantId)
         ));
 
         $data = array_map(

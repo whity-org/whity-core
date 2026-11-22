@@ -212,6 +212,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.walkins_enabled',
             // #1733. Whether the web app can be installed (instance-wide).
             'app.installable',
+            // #2386: menu items and Settings pages hidden on this instance.
+            'navigation.hidden_ids',
             // WS.5, WS.19: the operator's website (global-only).
             'website.plans',
             'website.contact_workspace',
@@ -484,6 +486,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             // #1733: on, which is what app.whity.dev wants; an operator turns
             // it off here or with PWA_ENABLED.
             'app.installable' => 'true',
+            'navigation.hidden_ids' => '',
             'website.plans' => '',
             'website.contact_workspace' => '',
             'signup.mode' => 'off',
@@ -691,6 +694,11 @@ final class SettingsRegistryCorePinTest extends TestCase
             ['calendar.weekend_days', 'fri', false],
             ['app.installable', 'false', true],
             ['app.installable', '1', false],
+            ['navigation.hidden_ids', '', true],
+            ['navigation.hidden_ids', 'calendar, plugin-reports,settings.sso', true],
+            ['navigation.hidden_ids', 'calendar,../admin', false],
+            ['navigation.hidden_ids', 'website-settings', false],
+            ['navigation.hidden_ids', 'settings.general', false],
             ['website.plans', '', true],
             ['website.plans', '{"plans":{"team":{"highlight":true}}}', true],
             ['website.plans', 'not json', false],

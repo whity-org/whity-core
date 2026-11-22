@@ -68014,6 +68014,58 @@
                 }
             }
         },
+        "/api/v1/navigation/hidden": {
+            "get": {
+                "operationId": "get_api_v1_navigation_hidden",
+                "summary": "The menu items and Settings pages hidden on this instance (public)",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "The union of the navigation.hidden_ids setting and the WHITY_HIDDEN_NAV_IDS environment variable. Hidden items leave GET /api/navigation and GET /api/settings/tabs, and the web app answers their pages with 404. See docs/wiki/Hiding-Pages.md.",
+                "responses": {
+                    "200": {
+                        "description": "The hidden ids",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HiddenNavIdsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/notification-metrics": {
             "get": {
                 "operationId": "get_api_v1_notification_metrics",
@@ -121444,6 +121496,37 @@
                         "$ref": "#/components/schemas/HelloGreeting"
                     }
                 }
+            },
+            "HiddenNavIdsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "nav": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Menu item ids, as on GET /api/navigation."
+                            },
+                            "settings": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Settings page ids, without the settings. prefix."
+                            }
+                        },
+                        "required": [
+                            "nav",
+                            "settings"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
             },
             "HomeCard": {
                 "type": "object",

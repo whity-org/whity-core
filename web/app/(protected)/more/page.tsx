@@ -37,6 +37,8 @@ import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
 import { localizedText } from '@whity/ui/localized-text';
 
 /** Nav items the tab bar already holds, and the Settings entry, which More splits in two. */
+const NEVER_HIDDEN = (): boolean => false;
+
 const HIDDEN_ITEM_IDS = ['dashboard', 'inbox', 'chat', 'settings-area'];
 
 const ROW =
@@ -58,6 +60,9 @@ function RowLink({
   hint?: string;
   testId: string;
 }) {
+  // #2386: a page the operator hid has no row.
+  const { isHidden = NEVER_HIDDEN } = useNavigation();
+  if (isHidden(href)) return null;
   return (
     <li>
       <Link href={href} className={ROW} data-testid={testId}>
@@ -77,7 +82,7 @@ export default function MorePage() {
   const ta = useTranslation('auth');
   const router = useRouter();
   const { user, memberships, logout } = useAuth();
-  const { items: navItems } = useNavigation();
+  const { items: navItems, isHidden = NEVER_HIDDEN } = useNavigation();
   const { groups: allGroups } = useShellNav();
   // Home, Inbox and Chat are tabs already; More lists everything else.
   const groups = allGroups
@@ -117,6 +122,7 @@ export default function MorePage() {
           {ta('settings.title', 'My settings')}
         </h2>
         <ul className={LIST}>
+          {!isHidden(MY_SETTINGS_HREF.profile) && (
           <li>
             <Link href={MY_SETTINGS_HREF.profile} className={`${ROW} min-h-16`} data-testid="more-account">
               <Avatar name={displayName} size={40} />
@@ -134,6 +140,7 @@ export default function MorePage() {
               <Icon name="chevron-right" size={18} className="text-muted-foreground" />
             </Link>
           </li>
+          )}
           {/* WHIT-1078: push on this phone and which kinds, one tap away. */}
           <RowLink
             href={NOTIFICATIONS_HREF}
@@ -222,7 +229,7 @@ export default function MorePage() {
       ))}
 
       <ul className={LIST}>
-        {canChangeWorkspace && (
+        {canChangeWorkspace && !isHidden(WORKSPACE_SETTINGS_MENU_HREF) && (
           <li>
             <Link href={WORKSPACE_SETTINGS_MENU_HREF} className={ROW} data-testid="more-workspace-settings">
               <Icon name="settings" size={20} className="text-muted-foreground" />
