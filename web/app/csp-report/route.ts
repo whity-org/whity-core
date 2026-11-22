@@ -76,7 +76,10 @@ export async function POST(request: Request): Promise<Response> {
   for (const report of reportsIn(body)) {
     if (linesThisWindow >= MAX_LINES_PER_MINUTE) break;
     linesThisWindow += 1;
-    console.warn(describeReport(report));
+    // describeReport() already strips every control character; the explicit
+    // CR/LF removal here is the form static analysis recognises as the
+    // log-injection sanitizer (CodeQL js/log-injection).
+    console.warn(describeReport(report).replace(/\n|\r/g, ''));
   }
 
   return new Response(null, { status: 204 });
