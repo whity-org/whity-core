@@ -20,7 +20,7 @@ use Tests\Support\SchemaFromMigrations;
  * Theme versions (TH.25, 30-themes 11): every save keeps its version, the
  * history lists them newest first with who and how, any version can be read
  * for the side-by-side diff, and restore brings one back as the next version.
- * Every migration's schema (SchemaFromMigrations); 347's up() runs again,
+ * Every migration's schema (SchemaFromMigrations); 349's up() runs again,
  * twice, over a theme saved before it, as an upgrade does.
  */
 final class ThemeVersionsApiTest extends TestCase

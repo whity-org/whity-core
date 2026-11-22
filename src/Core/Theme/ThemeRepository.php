@@ -10,7 +10,7 @@ use Whity\Core\Db\DbBool;
 /**
  * The `themes` table (migration 323): theme files a workspace imported,
  * made in the editor or installed from the store, one row each with the
- * version in use. And `theme_versions` (347): every version of each, for the
+ * version in use. And `theme_versions` (349): every version of each, for the
  * editor's history, compare and restore (TH.25). Every query binds the tenant.
  */
 final class ThemeRepository

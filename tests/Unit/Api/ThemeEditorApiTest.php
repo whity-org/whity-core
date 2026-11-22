@@ -27,7 +27,7 @@ final class ThemeEditorApiTest extends TestCase
 
     protected function setUp(): void
     {
-        // The migrations' own schema (themes 323, theme_versions 347), so this can't drift from them.
+        // The migrations' own schema (themes 323, theme_versions 349), so this can't drift from them.
         $this->db = \Tests\Support\SchemaFromMigrations::make();
         $this->db->exec('DELETE FROM theme_versions');
         $this->db->exec('DELETE FROM themes');

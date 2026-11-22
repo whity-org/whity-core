@@ -267,7 +267,7 @@ final class CoreTables
         // WHIT-1225: themes a workspace imported or installed from the store.
         'themes' => '323_create_themes.php',
         // WHIT-1225 (TH.25): every version of a workspace's own theme.
-        'theme_versions' => '347_create_theme_versions.php',
+        'theme_versions' => '349_create_theme_versions.php',
         // Votes in chat polls (UC.5).
         'chat_poll_votes' => '280_create_chat_poll_votes.php',
         // Bots and blocked senders (UC.4, UC.12).

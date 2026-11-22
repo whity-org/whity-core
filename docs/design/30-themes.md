@@ -342,7 +342,7 @@ This section first described Whity Studio, a paid tool for making themes. On 21 
 - **Whity's own themes** can't be packaged: make a copy to publish your own.
 - **Direct upload** comes once the Whity ID store module has a publisher API. The store is moving into Whity ID, so the old store plugin gets no upload.
 
-**Versions (built, WHIT-1225).** Every save of a workspace's own theme keeps its version in `theme_versions` (migration 347). That covers imports, the editor and restores. Today's version of each theme became its first.
+**Versions (built, WHIT-1225).** Every save of a workspace's own theme keeps its version in `theme_versions` (migration 349). That covers imports, the editor and restores. Today's version of each theme became its first.
 - **History:** Branding › Theme › a theme's Versions lists them newest first: the number, how it came in (added from a file, saved in the editor, restored), who saved it by name, and when.
 - **Compare:** any older version opens beside the one in use in the side-by-side diff.
 - **Restore:** brings an older version back as the next version, numbered past the newest, so the history only grows and nothing is lost. Saving the same number again replaces that version.
