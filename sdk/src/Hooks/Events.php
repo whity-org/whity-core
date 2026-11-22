@@ -692,6 +692,13 @@ final class Events
     /** Payments settled all of a bill. Payload as `accounting.invoice.issued`. */
     public const ACCOUNTING_BILL_PAID = 'accounting.bill.paid';
     public const ACCOUNTING_BILL_PAID_ASYNC = 'accounting.bill.paid.async';
+    /**
+     * A person filed an expense claim (SDK 1.158, WHIT-1318 A3b). Payload as
+     * `accounting.invoice.issued` (the claim is a bill of kind `purchase`), plus
+     * `claimant_profile_id`. It posts later when the bill route approves it.
+     */
+    public const ACCOUNTING_EXPENSE_CLAIMED = 'accounting.expense.claimed';
+    public const ACCOUNTING_EXPENSE_CLAIMED_ASYNC = 'accounting.expense.claimed.async';
 
     /**
      * The event name to dispatch for one of THIS plugin's own events (SDK 1.29).
