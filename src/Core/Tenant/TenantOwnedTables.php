@@ -696,6 +696,7 @@ final class TenantOwnedTables
         'acc_invoices' => '350_create_accounting_invoices.php',
         'acc_invoice_lines' => '350_create_accounting_invoices.php',
         'acc_allocations' => '350_create_accounting_invoices.php',
+        'acc_payments' => '351_create_accounting_payments.php',
     ];
 
     /**

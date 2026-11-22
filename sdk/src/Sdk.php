@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.155).
+ * SDK identity (v1.156).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1613,12 +1613,24 @@ namespace Whity\Sdk;
  * (WHIT-1318 A2a, design section 32 §5.2, §7).
  *
  * Purely additive: two new methods on Context\AccountingScope, which only the host implements.)
+ *
+ * 1.156 (PAYMENTS: host service {@see Accounting\Payments} records money a customer paid
+ * (`recordReceived()` with a {@see Accounting\PaymentRequest}: posted at once, settling an invoice when
+ * named, a provider's fee to Bank and payment fees), settles invoices with what a payment has left
+ * (`allocate()`), moves money between the workspace's own accounts (`recordTransfer()`, a payment
+ * provider's payout to the bank), and reads payments ({@see Accounting\Payment}). On the plugin context as
+ * `$ctx->accounting()->payments()`; its payments belong to the plugin and its external references are kept
+ * under its name, so Whity Pay's payment id records once. New events `accounting.payment.recorded`,
+ * `accounting.payment.allocated`, `accounting.invoice.paid`, `accounting.invoice.partly_paid` and
+ * `accounting.cheque.bounced`, each with an `.async` twin (WHIT-1318 A2b, design section 32 §5.4, §5.5).
+ *
+ * Purely additive: one new method on Context\AccountingScope, which only the host implements.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.155.0';
+    public const VERSION = '1.156.0';
 
     /**
      * Static identity only — never instantiated.

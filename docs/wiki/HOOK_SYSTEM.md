@@ -419,6 +419,16 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `accounting.invoice.issued.async` | `ACCOUNTING_INVOICE_ISSUED_ASYNC` | queued |  |
 | `accounting.invoice.credited` | `ACCOUNTING_INVOICE_CREDITED` | observe | A credit note settled an invoice. Payload as issued (the invoice), plus `credit_note_id` and `amount_minor`. |
 | `accounting.invoice.credited.async` | `ACCOUNTING_INVOICE_CREDITED_ASYNC` | queued |  |
+| `accounting.invoice.paid` | `ACCOUNTING_INVOICE_PAID` | observe | Payments settled all of an invoice (SDK 1.156). Payload as `accounting.invoice.issued`. |
+| `accounting.invoice.paid.async` | `ACCOUNTING_INVOICE_PAID_ASYNC` | queued |  |
+| `accounting.invoice.partly_paid` | `ACCOUNTING_INVOICE_PARTLY_PAID` | observe | A payment settled part of an invoice. Payload as `accounting.invoice.issued`. |
+| `accounting.invoice.partly_paid.async` | `ACCOUNTING_INVOICE_PARTLY_PAID_ASYNC` | queued |  |
+| `accounting.payment.recorded` | `ACCOUNTING_PAYMENT_RECORDED` | observe | A payment was recorded and posted (money received or a transfer). Payload: `tenant_id`, `payment_id`, `direction`, `number`, `contact_id`, `paid_on`, `amount_minor`, `currency`, `method`, `status`, `cheque_status`, `unallocated_minor`, `acting_profile_id`. |
+| `accounting.payment.recorded.async` | `ACCOUNTING_PAYMENT_RECORDED_ASYNC` | queued |  |
+| `accounting.payment.allocated` | `ACCOUNTING_PAYMENT_ALLOCATED` | observe | A payment settled an invoice. Payload as recorded, plus `invoice_id` and `amount_minor` (the share). |
+| `accounting.payment.allocated.async` | `ACCOUNTING_PAYMENT_ALLOCATED_ASYNC` | queued |  |
+| `accounting.cheque.bounced` | `ACCOUNTING_CHEQUE_BOUNCED` | observe | A cheque bounced: its entries were reversed and the invoices it paid reopened. Payload as recorded, plus `fee_minor` and `reopened_invoice_ids`. |
+| `accounting.cheque.bounced.async` | `ACCOUNTING_CHEQUE_BOUNCED_ASYNC` | queued |  |
 
 ### Deletion is transactional (WC-713)
 

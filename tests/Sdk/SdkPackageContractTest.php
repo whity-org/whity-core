@@ -242,9 +242,10 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.155.0',
+            '1.156.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.155 ADDS Accounting\\Invoices and Taxes, and the WorkspaceEInvoicing point: sales invoices, credit notes and tax codes for plugins (WHIT-1318). '
+            'SDK 1.156 ADDS Accounting\\Payments: payments received, allocations and transfers for plugins; Whity Pay records its payments here (WHIT-1318). '
+            . 'SDK 1.155 ADDS Accounting\\Invoices and Taxes, and the WorkspaceEInvoicing point: sales invoices, credit notes and tax codes for plugins (WHIT-1318). '
             . 'SDK 1.154 ADDS Accounting\\Accounts, Ledger, Periods and Reports: the chart of accounts, an append-only double-entry ledger and the trial balance for plugins (WHIT-1318). '
             . 'SDK 1.153 ADDS the route.stamped event: a holder applied a company stamp on a stamp step (#1729). '
             . 'SDK 1.152 ADDS Log\PluginLog and Log\ErrorReporter (PluginScope::log(), errors()), route rateLimit and PluginInstallLifecycleInterface (#1686). '

@@ -540,6 +540,10 @@ final class CorePermissions
     // holding settings:write or accounting:post (the Accountant role).
     public const INVOICES_READ = 'invoices:read';
     public const INVOICES_WRITE = 'invoices:write';
+    // Payments received, allocations and cheques (migration 351, WHIT-1318 A2b),
+    // granted like the invoice slugs.
+    public const PAYMENTS_READ = 'payments:read';
+    public const PAYMENTS_WRITE = 'payments:write';
     // TASKS on Taskaat (A10, T.3). Tasks and boards live in the workspace's
     // Taskaat; these gate Whity's way into them. Read and write go to every
     // staff role (anchor documents:read); manage (connecting the workspace to
@@ -678,6 +682,8 @@ final class CorePermissions
             self::ACCOUNTING_SETTINGS,
             self::INVOICES_READ,
             self::INVOICES_WRITE,
+            self::PAYMENTS_READ,
+            self::PAYMENTS_WRITE,
             self::FIELDS_MANAGE,
             self::TASKS_READ,
             self::TASKS_WRITE,
