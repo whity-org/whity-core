@@ -7,6 +7,16 @@
 /* The shared feature screens (the document editor screen, its issuing bar, record pages) render here too. */
 @source "../../packages/features/src";
 
+/*
+ * WHIT-1379: `rtl:` and `ltr:` follow the NEAREST `dir`, not the outermost one.
+ * Tailwind's own variant also matches `[dir="rtl"] *`, so an English form inside
+ * the Arabic interface (a `dir="ltr"` block in a right-to-left page) still
+ * flipped its arrows, switches and slide-ins. `:dir()` reads the element's own
+ * resolved direction, so nested blocks get theirs.
+ */
+@custom-variant rtl (&:where(:dir(rtl)));
+@custom-variant ltr (&:where(:dir(ltr)));
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
