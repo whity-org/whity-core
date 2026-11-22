@@ -530,7 +530,7 @@ final class AccountingApiSchemas
             'unit_price_minor' => self::int() + ['description' => 'The price of one, in minor units.'],
             'discount_bp' => self::int() + ['description' => 'Discount in basis points, 0 to 10000 (1000 = 10%).'],
             'tax_code' => ['oneOf' => [self::int(), self::str()], 'description' => 'A tax code by id or code (JO-GST-16). Default: from the tax category.'],
-            'tax_category' => self::str() + ['description' => '`standard`, `reduced_10`, `reduced_4`, `zero` or `exempt`. Default: the item\'s, else standard.'],
+            'tax_category' => self::str() + ['description' => '`standard`, `zero`, `exempt`, or a category a code the workspace added serves. Default: the item\'s, else standard.'],
             'account_id' => self::int(true) + ['description' => 'An income account. Default: Sales, or Services for a service item.'],
             'account_code' => self::str() + ['description' => 'The income account by its code, instead of account_id.'],
             'ou_id' => self::int(true) + ['description' => 'The branch (organisational unit) the sale belongs to.'],

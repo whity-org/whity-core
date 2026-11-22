@@ -10,7 +10,7 @@ namespace Whity\Sdk\Accounting;
  * `direction` is `output` (on sales) or `input` (on purchases). `rateBp` is
  * the rate in basis points (1600 = 16%). `treatment` is `standard`,
  * `reduced`, `zero`, `exempt`, `out_of_scope` or `reverse_charge`. An item's
- * tax category (`standard`, `reduced_10`, `zero`, `exempt`...) picks the code
+ * tax category (`standard`, `reduced_8`, `zero`, `exempt`...) picks the code
  * through `category`. Rates change by date: a new code with `validFrom`.
  */
 final class TaxCode

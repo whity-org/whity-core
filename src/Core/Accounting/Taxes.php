@@ -14,7 +14,7 @@ use Whity\Core\i18n\LocalizedText;
  * A code carries a rate in basis points (1600 = 16%), a direction (`output`
  * on sales, `input` on purchases), a treatment (`standard`, `reduced`,
  * `zero`, `exempt`, ...) and the account its tax posts to. Items say their
- * `tax_category` (empty or `standard`, `reduced_10`, `zero`, `exempt`...);
+ * `tax_category` (empty or `standard`, `reduced_8`, `zero`, `exempt`...);
  * {@see self::codeFor()} turns that into the code valid on the date.
  *
  * ROUNDING happens once per line, half away from zero, to whole minor units

@@ -111,7 +111,8 @@ final class InvoicesRealEngineTest extends TestCase
     public function testTheJordanTaxCodesArriveWithTheBooks(): void
     {
         $codes = $this->taxes->list(1);
-        self::assertCount(10, $codes);
+        self::assertCount(6, $codes, '16%, zero-rated and exempt, for sales and purchases');
+        self::assertNotContains('JO-GST-10', array_column($codes, 'code'), 'reduced rates wait for the accountant');
         $standard = $this->taxes->codeFor(1, '', 'output', $this->today);
         self::assertNotNull($standard);
         self::assertSame('JO-GST-16', $standard['code']);
@@ -162,7 +163,7 @@ final class InvoicesRealEngineTest extends TestCase
         self::assertNull($this->taxes->codeFor(1, 'exempt', 'output', $this->today), 'an archived code is not offered');
         $this->taxes->archive(1, $exempt['id'], false);
         self::assertNotNull($this->taxes->codeFor(1, 'exempt', 'output', $this->today));
-        self::assertCount(10, $this->taxes->list(2), 'another workspace keeps its own codes');
+        self::assertCount(6, $this->taxes->list(2), 'another workspace keeps its own codes');
     }
 
     public function testLineArithmeticRoundsOncePerLine(): void

@@ -188,7 +188,7 @@ final class PluginAccountingRealEngineTest extends TestCase
         self::assertNotNull($standard);
         self::assertSame(1600, $standard->rateBp);
         self::assertSame(['net' => 10000, 'tax' => 1600, 'total' => 11600], $this->taxes->compute(10000, 1600));
-        self::assertCount(5, $this->taxes->codes('output'));
+        self::assertCount(3, $this->taxes->codes('output'));
 
         $draft = $invoices->createDraft([
             'contactId' => 41,

@@ -14432,7 +14432,7 @@ export interface components {
                 discount_bp?: number;
                 /** @description A tax code by id or code (JO-GST-16). Default: from the tax category. */
                 tax_code?: number | string;
-                /** @description `standard`, `reduced_10`, `reduced_4`, `zero` or `exempt`. Default: the item's, else standard. */
+                /** @description `standard`, `zero`, `exempt`, or a category a code the workspace added serves. Default: the item's, else standard. */
                 tax_category?: string;
                 /** @description An income account. Default: Sales, or Services for a service item. */
                 account_id?: number | null;
@@ -14496,7 +14496,7 @@ export interface components {
                 discount_bp?: number;
                 /** @description A tax code by id or code (JO-GST-16). Default: from the tax category. */
                 tax_code?: number | string;
-                /** @description `standard`, `reduced_10`, `reduced_4`, `zero` or `exempt`. Default: the item's, else standard. */
+                /** @description `standard`, `zero`, `exempt`, or a category a code the workspace added serves. Default: the item's, else standard. */
                 tax_category?: string;
                 /** @description An income account. Default: Sales, or Services for a service item. */
                 account_id?: number | null;

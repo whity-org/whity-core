@@ -21,7 +21,7 @@ interface Taxes
     public function codes(?string $direction = null): array;
 
     /**
-     * The code for an item's tax category (`standard`, `reduced_10`, `zero`,
+     * The code for an item's tax category (`standard`, `reduced_8`, `zero`,
      * `exempt`; empty is standard) in a direction, valid on a date
      * (`YYYY-MM-DD`). Null when the workspace's pack has none.
      *

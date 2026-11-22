@@ -102,7 +102,8 @@ final class JordanChart
      * The Jordan pack's tax codes (design section 32 §7.2, AC.20), made with
      * the chart. Output codes go on sales, input codes on purchases. An item's
      * `tax_category` picks the code: empty or `standard` is the general 16%.
-     * Reduced rates follow Odoo's Jordan list (10% and 4%) until the review.
+     * Jordan's reduced rates are added once the accountant confirms them
+     * (owner, 22 Nov 2026); until then a workspace adds a dated code itself.
      *
      * code => [direction, rate in basis points, treatment, category, account role, return box, e-invoice category, en, ar]
      *
@@ -110,13 +111,9 @@ final class JordanChart
      */
     public const TAX_CODES = [
         'JO-GST-16' => ['output', 1600, 'standard', 'standard', 'sales_tax_output', 'sales_16', 'S', 'Sales tax 16%', 'ضريبة المبيعات 16%'],
-        'JO-GST-10' => ['output', 1000, 'reduced', 'reduced_10', 'sales_tax_output', 'sales_10', 'S', 'Sales tax 10%', 'ضريبة المبيعات 10%'],
-        'JO-GST-4' => ['output', 400, 'reduced', 'reduced_4', 'sales_tax_output', 'sales_4', 'S', 'Sales tax 4%', 'ضريبة المبيعات 4%'],
         'JO-GST-0' => ['output', 0, 'zero', 'zero', 'sales_tax_output', 'sales_zero', 'Z', 'Zero-rated', 'خاضع بنسبة صفر'],
         'JO-EXEMPT' => ['output', 0, 'exempt', 'exempt', 'sales_tax_output', 'sales_exempt', 'E', 'Exempt', 'معفى'],
         'JO-GST-IN-16' => ['input', 1600, 'standard', 'standard', 'sales_tax_input', 'purchases_16', 'S', 'Sales tax on purchases 16%', 'ضريبة المشتريات 16%'],
-        'JO-GST-IN-10' => ['input', 1000, 'reduced', 'reduced_10', 'sales_tax_input', 'purchases_10', 'S', 'Sales tax on purchases 10%', 'ضريبة المشتريات 10%'],
-        'JO-GST-IN-4' => ['input', 400, 'reduced', 'reduced_4', 'sales_tax_input', 'purchases_4', 'S', 'Sales tax on purchases 4%', 'ضريبة المشتريات 4%'],
         'JO-GST-IN-0' => ['input', 0, 'zero', 'zero', 'sales_tax_input', 'purchases_zero', 'Z', 'Zero-rated purchases', 'مشتريات خاضعة بنسبة صفر'],
         'JO-EXEMPT-IN' => ['input', 0, 'exempt', 'exempt', 'sales_tax_input', 'purchases_exempt', 'E', 'Exempt purchases', 'مشتريات معفاة'],
     ];
