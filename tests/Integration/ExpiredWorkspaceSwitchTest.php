@@ -125,6 +125,28 @@ final class ExpiredWorkspaceSwitchTest extends TestCase
         self::assertSame(200, $res->getStatusCode());
     }
 
+    /**
+     * THE TRAP AS FOUND ON LIVE (2026-11-22): the wall walls by the CURRENT
+     * workspace, so someone sitting in an expired one (Coffee, tenant 10) got
+     * 402 switching to ANY workspace, paid or Free, and could never leave.
+     * Through the wall as the application wires it, then the handler.
+     */
+    public function testSomeoneInAnExpiredWorkspaceCanAlwaysLeaveIt(): void
+    {
+        $this->expire(self::HOME, SubscriptionService::MODE_BLOCK_ALL);
+        // A paid workspace, and one with no plan row at all (Free / unbilled).
+        $this->subscriptions->setSubscription(self::TRIAL_ENDED, ['status' => SubscriptionService::STATUS_ACTIVE]);
+
+        foreach ([self::TRIAL_ENDED, self::EXPIRED] as $target) {
+            $res = $this->switchThroughWall($this->owner, from: self::HOME, to: $target);
+
+            self::assertSame(200, $res->getStatusCode(), "leaving an expired workspace for {$target} must work");
+            self::assertSame($target, $this->jwt->lastAccess['active_tenant_id'] ?? null);
+        }
+        // Still walled for everything else while there.
+        self::assertSame(402, $this->throughWall('GET', '/api/v1/contacts', self::HOME)->getStatusCode());
+    }
+
     /** As strict as before for everything but paying: pages and changes are 402. */
     public function testInsideAnExpiredWorkspaceOnlyBillingIsOpen(): void
     {
@@ -239,6 +261,19 @@ final class ExpiredWorkspaceSwitchTest extends TestCase
             ['Content-Type' => 'application/json'],
             (string) json_encode(['tenant_id' => $to])
         ));
+    }
+
+    /** The switch call made from $from, through the wall and then the handler. */
+    private function switchThroughWall(int $profileId, int $from, int $to): Response
+    {
+        TenantContext::reset();
+        TenantContext::setTenantId($from);
+        $wall = new PaymentWall($this->subscriptions, enabled: true, exemptPrefixes: PaymentWall::DEADLOCK_EXEMPT_PREFIXES);
+
+        return $wall->handle(
+            new SdkRequest('POST', '/api/v1/auth/switch-tenant'),
+            fn (SdkRequest $r): Response => $this->switchAs($profileId, $from, $to),
+        );
     }
 
     /** The wall as the application wires it, for a request made in $tenantId. */
