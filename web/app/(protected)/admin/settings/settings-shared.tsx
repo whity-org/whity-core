@@ -569,6 +569,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'Let people add this site to their phone or computer as an app that opens in its own window and shows a page of its own when there is no connection. Off removes the option and uninstalls the app’s offline support from browsers the next time they open a page. Until this is saved here, the PWA_ENABLED setting of the server decides.'
       ),
     },
+    'navigation.hidden_ids': {
+      label: t('settings.meta.navigation.hidden_ids.label', 'Hidden pages'),
+      help: t(
+        'settings.meta.navigation.hidden_ids.help',
+        'Menu items and settings pages to remove from this installation, separated by commas: a menu item by its id, such as calendar or plugin-reports, and a settings page as settings.<id>, such as settings.sso. They leave every menu, and their pages open as not found. Permissions do not change. The WHITY_HIDDEN_NAV_IDS setting of the server hides more; it cannot be undone here.'
+      ),
+    },
     'website.plans': {
       label: t('settings.meta.website.plans.label', 'Plans on the website'),
       help: t(
@@ -698,6 +705,17 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         'Machine-facing endpoints and connected tooling.'
       ),
       keys: ['mcp.enabled'],
+    },
+    {
+      // #2386: a product that runs Whity beside its own app removes the pages
+      // it does not want. The ids are listed in docs/wiki/Hiding-Pages.md.
+      id: 'pages',
+      title: t('settings.section.pages.title', 'Pages'),
+      description: t(
+        'settings.section.pages.description',
+        'Remove pages from this installation, for example when Whity runs beside another app that does the same job.'
+      ),
+      keys: ['navigation.hidden_ids'],
     },
     {
       id: 'plugin-store',

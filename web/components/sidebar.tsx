@@ -47,6 +47,8 @@ import { useShellNav } from '@/components/shell/use-shell-nav';
 import { localizedText } from '@whity/ui/localized-text';
 import { useCalendarSidebarOpen } from '@/lib/calendar/choices';
 
+const NEVER_HIDDEN = (): boolean => false;
+
 /** Settings stays at the foot with the account row on short windows (PW.10). */
 const PINNED_GROUP_IDS = ['settings'];
 
@@ -156,6 +158,8 @@ export function Sidebar() {
   // Whether this instance offers a language choice at all (`i18n.enabled`).
   const isI18nEnabled = useI18nEnabled();
   const { groups } = useShellNav();
+  // #2386: links the operator hid leave the account menu too.
+  const { isHidden = NEVER_HIDDEN } = useNavigation();
   const { currentLanguage, availableLanguages, setLanguage } = useCurrentLanguage();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -278,19 +282,24 @@ export function Sidebar() {
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/settings" onClick={() => setIsMobileOpen(false)}>
-            <IconUserCog />
-            {t('sidebar.accountSettings', 'My settings')}
-          </Link>
-        </DropdownMenuItem>
+        {/* #2386: the operator may hide your own settings pages. */}
+        {!isHidden('/settings') && (
+          <DropdownMenuItem asChild>
+            <Link href="/settings" onClick={() => setIsMobileOpen(false)}>
+              <IconUserCog />
+              {t('sidebar.accountSettings', 'My settings')}
+            </Link>
+          </DropdownMenuItem>
+        )}
         {/* WHIT-1078: notifications on this device, straight to the card. */}
-        <DropdownMenuItem asChild>
-          <Link href={NOTIFICATIONS_HREF} onClick={() => setIsMobileOpen(false)} data-testid="account-menu-notifications">
-            <IconBell />
-            {t('sidebar.notifications', 'Notifications')}
-          </Link>
-        </DropdownMenuItem>
+        {!isHidden(NOTIFICATIONS_HREF) && (
+          <DropdownMenuItem asChild>
+            <Link href={NOTIFICATIONS_HREF} onClick={() => setIsMobileOpen(false)} data-testid="account-menu-notifications">
+              <IconBell />
+              {t('sidebar.notifications', 'Notifications')}
+            </Link>
+          </DropdownMenuItem>
+        )}
         {isI18nEnabled && availableLanguages.length > 1 && (
           // The language is also the direction (lib/direction-context.tsx):
           // choosing Arabic mirrors the interface. Stored on the profile, so it

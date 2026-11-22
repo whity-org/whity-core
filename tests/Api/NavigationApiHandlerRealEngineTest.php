@@ -98,6 +98,38 @@ final class NavigationApiHandlerRealEngineTest extends TestCase
         $this->assertContains('settings', $this->ids($response));
     }
 
+    // ==================== #2386: ids the operator hid ====================
+
+    public function testAnIdHiddenByTheOperatorLeavesTheMenuEvenForWhoMaySeeIt(): void
+    {
+        TenantContext::setTenantId(1);
+        $_ENV[\Whity\Core\Navigation\HiddenNavIds::ENV] = 'reports, settings.sso';
+
+        try {
+            $response = $this->handler(['admin'], ['audit:read'])->list($this->authedRequest(42));
+        } finally {
+            unset($_ENV[\Whity\Core\Navigation\HiddenNavIds::ENV]);
+        }
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(['audit-logs', 'settings'], $this->ids($response));
+    }
+
+    public function testTheHiddenListIsSplitIntoMenuAndSettingsIds(): void
+    {
+        $_ENV[\Whity\Core\Navigation\HiddenNavIds::ENV] = 'reports,settings.sso';
+
+        try {
+            // Public: no tenant, no user.
+            $response = $this->handler([], [])->hidden(new Request('GET', '/api/navigation/hidden', [], ''));
+        } finally {
+            unset($_ENV[\Whity\Core\Navigation\HiddenNavIds::ENV]);
+        }
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame(['data' => ['nav' => ['reports'], 'settings' => ['sso']]], json_decode($response->getBody(), true));
+    }
+
     public function testGatesAreCheckedAgainstTheResolvedTenant(): void
     {
         TenantContext::setTenantId(7);

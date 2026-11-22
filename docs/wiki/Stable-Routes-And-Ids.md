@@ -74,5 +74,7 @@ There are three kinds.
   can be in both (`notifications` is your own notification settings in one and
   the notification log's menu item in the other).
 
+To remove pages by these ids, see [Hiding pages](Hiding-Pages.md).
+
 The label, icon, group and order of an item are not part of the promise. They
 follow the design and can change in any release.

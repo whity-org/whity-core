@@ -29,6 +29,8 @@ import {
 } from '@/components/settings/settings-area';
 import { SETTINGS_HOME_HREF } from '@/lib/settings/my-settings';
 
+const NEVER_HIDDEN = (): boolean => false;
+
 /**
  * Resolve a navigation `icon` name to a Tabler icon component.
  *
@@ -205,7 +207,9 @@ export interface ShellNav {
 export function useShellNav(): ShellNav {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { items: navItems } = useNavigation();
+  const { items: navItems, isHidden = NEVER_HIDDEN } = useNavigation();
+  // #2386: the operator may hide the Settings area itself (the `settings` id).
+  const settingsHidden = isHidden(SETTINGS_HOME_HREF);
   const t = useTranslation('common');
 
   // Literal `t()` calls, not a computed key — `i18n:extract` rebuilds the
@@ -290,6 +294,7 @@ export function useShellNav(): ShellNav {
         counts[item.id] ? { ...item, count: counts[item.id], countLabel: countLabel(counts[item.id]) } : item,
       ),
     }));
+    if (settingsHidden) return withCounts;
     return [
       ...withCounts,
       {
@@ -309,7 +314,7 @@ export function useShellNav(): ShellNav {
         ],
       },
     ];
-  }, [navItems, pathname, groupLabels, itemLabels, counts, t, isSystemTenant]);
+  }, [navItems, pathname, groupLabels, itemLabels, counts, t, isSystemTenant, settingsHidden]);
 
   const hrefOf = useMemo(() => {
     const byId = new Map(navItems.map((item) => [item.id, item.href]));

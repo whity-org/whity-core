@@ -907,6 +907,15 @@ final class SettingsRegistry
      */
     public const APP_INSTALLABLE = 'app.installable';
 
+    /**
+     * Menu items and Settings pages hidden on this instance (#2386): a
+     * comma-separated list of stable ids, `settings.<id>` for a Settings page.
+     * GLOBAL-ONLY: a product running Whity beside its own app decides this for
+     * the whole installation. Joined with the WHITY_HIDDEN_NAV_IDS environment
+     * variable; see {@see \Whity\Core\Navigation\HiddenNavIds}.
+     */
+    public const NAVIGATION_HIDDEN_IDS = 'navigation.hidden_ids';
+
     // Customer sign-up for one workspace (WHIT-915, #1872), kept in the
     // workspace_signup_settings table until WHIT-1035 folded it in here. Set on
     // the workspace's own Customer sign-up screen (signup:manage), which checks
@@ -1134,6 +1143,8 @@ final class SettingsRegistry
         // Installing the web app is a property of the installation, and the
         // service worker it controls is per origin, not per workspace.
         self::APP_INSTALLABLE,
+        // Hidden pages are the installation's shape, not one workspace's (#2386).
+        self::NAVIGATION_HIDDEN_IDS,
         // The operator's own website; no workspace has one of these.
         self::WEBSITE_PLANS,
         self::WEBSITE_CONTACT_WORKSPACE,
@@ -1540,6 +1551,8 @@ final class SettingsRegistry
         self::CALENDAR_WALKINS_ENABLED => 'false',
         // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
         self::APP_INSTALLABLE => 'true',
+        // Empty: every page is in the menus. See NAVIGATION_HIDDEN_IDS.
+        self::NAVIGATION_HIDDEN_IDS => '',
         // Empty: the plans page shows the active plans as they are, and the
         // contact form is off until a workspace is named.
         self::WEBSITE_PLANS => '',
@@ -2042,6 +2055,7 @@ final class SettingsRegistry
             self::CALENDAR_MULTI_SERVICE_BOOKING => self::validateBoolean($value, self::CALENDAR_MULTI_SERVICE_BOOKING),
             self::CALENDAR_WALKINS_ENABLED => self::validateBoolean($value, self::CALENDAR_WALKINS_ENABLED),
             self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
+            self::NAVIGATION_HIDDEN_IDS => \Whity\Core\Navigation\HiddenNavIds::validate($value),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the
             // registry plainly knows were refused as "Unknown setting key" and

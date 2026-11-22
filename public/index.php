@@ -2211,8 +2211,12 @@ $navigationHandler = new NavigationApiHandler($hookManager, $roleChecker, [
     'messages-for-customer' => [new \Whity\Core\Messaging\MessagesNavConditions($db->getPdo()), 'isCustomerWithMessages'],
     // Team chat (CH.1): the people who work here.
     'chat-for-staff' => [new \Whity\Core\Chat\ChatNavConditions(new \Whity\Core\Chat\ChatRepository($db->getPdo())), 'isStaff'],
-]);
+], $settingsService);
 $router->register('GET', '/api/navigation', [$navigationHandler, 'list']);
+// #2386: which menu items and Settings pages the operator hid. Public (see
+// EnforceTenantIsolation): the web server's route guard asks before anyone
+// signs in.
+$router->register('GET', '/api/navigation/hidden', [$navigationHandler, 'hidden'], null);
 
 // Caller capabilities (WC-176, #205). Registered with NO required
 // role/permission — any authenticated caller may ask which permissions they
