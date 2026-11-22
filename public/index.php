@@ -1536,6 +1536,8 @@ $postAuthRateLimiter = new RateLimitMiddleware(
             (int) ($_ENV['RATE_LIMIT_PRINCIPAL_LIMIT']  ?? 2000),
             (int) ($_ENV['RATE_LIMIT_PRINCIPAL_WINDOW'] ?? 60),
         ),
+        // SDK 1.152 (#1686): a plugin route's own `rateLimit`, per person a minute.
+        \Whity\Core\Plugin\PluginRouteLimits::rule($router),
     ],
     enabled: $rateLimitEnabled,
     exemptPaths: $rateLimitExemptPaths,
@@ -5261,6 +5263,9 @@ $notificationDispatcher = new \Whity\Core\Notification\NotificationDispatcher(
 );
 $notificationDispatcher->subscribe($hookManager);
 \Whity\Core\Plugin\HostPluginServices::register($db->getPdo(), $auditLogger, $logger, static fn (): array => $pluginLoader->getPluginThemes());
+// SDK 1.152 (#1686): a plugin's $ctx->errors() reaches the tracker, scrubbed.
+// Entry points without one (the worker, the CLI) write reports to the log.
+\Whity\register_service(\Whity\Core\Observability\ErrorTracker::class, $errorTracker);
 
 // Comments and suggestions on editor documents (editor M5; E.4, E.6, E.10,
 // E.29, E.37). Registered here, after the notification dispatcher, because a
