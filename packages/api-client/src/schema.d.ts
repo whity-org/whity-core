@@ -11889,9 +11889,29 @@ export interface paths {
         put?: never;
         /**
          * Make a new link to a quote
-         * @description The link before it stops working.
+         * @description The link before it stops working. A new printed copy carries the QR of the new link (`document_id`).
          */
         post: operations["post_api_v1_sales_quotes_id_link"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sales/quotes/{id}/print": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Print a quote
+         * @description Its PDF, `{lang: "en" | "ar"}`. A quote that went out prints the copy it went out as, with its QR; a draft prints a working copy without one. The id of the document is in `X-Document-Id`. When this instance cannot make PDFs, the answer is JSON naming the document, with 202.
+         */
+        post: operations["post_api_v1_sales_quotes_id_print"];
         delete?: never;
         options?: never;
         head?: never;
@@ -11929,7 +11949,7 @@ export interface paths {
         put?: never;
         /**
          * Send a quote to the customer
-         * @description A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`). It is emailed to the customer unless `email` is false or the workspace turned the quote email off; `emailed` says whether it was.
+         * @description A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`). It is emailed to the customer unless `email` is false or the workspace turned the quote email off; `emailed` says whether it was. Its printed copy, with the QR of the link, is issued in the language of the workspace and named in `document_id` (null when it could not be made; the quote has gone out all the same).
          */
         post: operations["post_api_v1_sales_quotes_id_send"];
         delete?: never;
@@ -24343,6 +24363,13 @@ export interface components {
             tax_bp?: number;
             /** @description The item's tax category, kept for the tax engine. */
             tax_category?: string;
+        };
+        SalesQuotePrintRequest: {
+            /**
+             * @description The language of the template: `en` (the default) or `ar`.
+             * @enum {string}
+             */
+            lang?: "en" | "ar";
         };
         SalesQuoteRequest: {
             /** @description The customer: a contact marked as a customer. */
@@ -89144,7 +89171,122 @@ export interface operations {
                 content: {
                     "application/json": {
                         link: string;
+                        document_id: number | null;
                     };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not possible in the quote's state, or a rule refused it */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_sales_quotes_id_print: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SalesQuotePrintRequest"];
+            };
+        };
+        responses: {
+            /** @description The PDF */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+            /** @description Issued, with no PDF here */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            document_id: number;
+                            number: string | null;
+                            title: string;
+                            pdf: boolean;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Missing or invalid authentication */
@@ -89323,6 +89465,7 @@ export interface operations {
                     "application/json": {
                         data: components["schemas"]["SalesQuote"];
                         link: string;
+                        document_id: number | null;
                         emailed: boolean;
                     };
                 };

@@ -2564,6 +2564,10 @@
     "en": "Send a quote to the customer",
     "ar": "إرسال عرض سعر إلى العميل"
   },
+  "post_api_sales_quotes_id_print": {
+    "en": "Print a quote",
+    "ar": "طباعة عرض سعر"
+  },
   "post_api_sales_quotes_id_link": {
     "en": "Make a new link to a quote",
     "ar": "إنشاء رابط جديد لعرض سعر"
