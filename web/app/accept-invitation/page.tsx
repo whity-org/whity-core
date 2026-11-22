@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useTranslation } from '@whity/features/i18n';
 import { api } from '@/lib/api/client';
 import { SsoLoginButtons } from '@/components/sso-login-buttons';
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy';
 
 /**
  * Invitation landing page (WHIT-417). This is where the link a tenant
@@ -113,8 +114,8 @@ function AcceptInvitationInner() {
     }
 
     if (invitation.requiresPassword) {
-      if (password.length < 8) {
-        setError(t('acceptInvitation.error.tooShort', 'Password must be at least 8 characters'));
+      if (password.length < PASSWORD_MIN_LENGTH) {
+        setError(t('acceptInvitation.error.tooShort', 'Password must be at least 12 characters'));
         return;
       }
       if (password !== confirmPassword) {

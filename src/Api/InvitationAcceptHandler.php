@@ -124,11 +124,12 @@ final class InvitationAcceptHandler
         if ($password !== '' && $passwordAllowed) {
             try {
                 PasswordPolicy::validate($password);
-            } catch (\InvalidArgumentException) {
-                return Response::error(
-                    'Password must be at least ' . PasswordPolicy::MIN_LENGTH . ' characters',
-                    422
-                );
+            } catch (\InvalidArgumentException $e) {
+                // The policy's own sentence: too short, too long, or breached
+                // (CE-7). Bound to a local first, as UsersApiHandler does: it is
+                // written by the policy for the person typing, not driver text.
+                $validationError = $e->getMessage();
+                return Response::error($validationError, 422);
             }
             $passwordHash = password_hash($password, PASSWORD_BCRYPT);
         }

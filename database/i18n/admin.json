@@ -4905,7 +4905,7 @@
         "users.create.success": "User created successfully",
         "users.create.title": "Create New User",
         "users.create.validation.email": "Invalid email address",
-        "users.create.validation.password": "Password must be at least 8 characters",
+        "users.create.validation.password": "Password must be at least 12 characters",
         "users.create.validation.role": "Role is required",
         "users.delete.approverWarning": "This is one of the few accounts here that can approve a password reset. Removing it can leave this tenant unable to approve any reset — including its remaining administrator’s own, which nobody could then recover from inside the product.",
         "users.delete.cancel": "Cancel",

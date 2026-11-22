@@ -327,7 +327,7 @@ test.describe('Create User validation + dialog (admin)', () => {
     // Submit fully empty: email/password/role errors appear.
     await dialog.getByRole('button', { name: 'Create User' }).click();
     await expect(dialog.getByText('Invalid email address')).toBeVisible();
-    await expect(dialog.getByText('Password must be at least 8 characters')).toBeVisible();
+    await expect(dialog.getByText('Password must be at least 12 characters')).toBeVisible();
     await expect(dialog.getByText('Role is required')).toBeVisible();
 
     // Invalid email + too-short password keep their field errors after another
@@ -336,7 +336,7 @@ test.describe('Create User validation + dialog (admin)', () => {
     await dialog.getByLabel('Password', { exact: true }).fill('short');
     await dialog.getByRole('button', { name: 'Create User' }).click();
     await expect(dialog.getByText('Invalid email address')).toBeVisible();
-    await expect(dialog.getByText('Password must be at least 8 characters')).toBeVisible();
+    await expect(dialog.getByText('Password must be at least 12 characters')).toBeVisible();
 
     // Nothing was created.
     await expect(page.getByText('User created successfully')).toHaveCount(0);

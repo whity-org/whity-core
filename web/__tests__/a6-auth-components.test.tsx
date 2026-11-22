@@ -53,15 +53,15 @@ describe('OtpInput', () => {
 describe('PasswordChecklist', () => {
   it('ticks the rules the server enforces and the match rule', () => {
     const { rerender } = render(<PasswordChecklist password="short" confirm="" />);
-    expect(screen.getByText('At least 8 characters').parentElement).toHaveClass('text-muted-foreground');
-    rerender(<PasswordChecklist password="longenough" confirm="longenough" />);
-    expect(screen.getByText('At least 8 characters').parentElement).toHaveClass('text-success');
+    expect(screen.getByText('At least 12 characters').parentElement).toHaveClass('text-muted-foreground');
+    rerender(<PasswordChecklist password="long-enough-now" confirm="long-enough-now" />);
+    expect(screen.getByText('At least 12 characters').parentElement).toHaveClass('text-success');
     expect(screen.getByText('Both entries are the same').parentElement).toHaveClass('text-success');
   });
 
-  it('policy matches PasswordPolicy: 8 to 72 characters', () => {
-    expect(passwordMeetsPolicy('1234567')).toBe(false);
-    expect(passwordMeetsPolicy('12345678')).toBe(true);
+  it('policy matches PasswordPolicy: 12 to 72 characters', () => {
+    expect(passwordMeetsPolicy('x'.repeat(11))).toBe(false);
+    expect(passwordMeetsPolicy('x'.repeat(12))).toBe(true);
     expect(passwordMeetsPolicy('x'.repeat(72))).toBe(true);
     expect(passwordMeetsPolicy('x'.repeat(73))).toBe(false);
   });

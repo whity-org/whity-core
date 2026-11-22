@@ -4906,7 +4906,7 @@
         "users.create.success": "أُنشئ المستخدم بنجاح",
         "users.create.title": "إنشاء مستخدم جديد",
         "users.create.validation.email": "عنوان بريد إلكتروني غير صالح",
-        "users.create.validation.password": "يجب ألا تقل كلمة المرور عن 8 أحرف",
+        "users.create.validation.password": "يجب ألا تقل كلمة المرور عن 12 حرفًا",
         "users.create.validation.role": "الدور مطلوب",
         "users.delete.approverWarning": "هذا أحد الحسابات القليلة هنا التي تستطيع اعتماد إعادة تعيين كلمة المرور. وإزالته قد تترك مساحة العمل هذه عاجزةً عن اعتماد أي إعادة تعيين — بما في ذلك إعادة تعيين مسؤولها المتبقّي نفسه، وهو ما لا يمكن لأحد استرداده من داخل المنتج.",
         "users.delete.cancel": "إلغاء",
