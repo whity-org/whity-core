@@ -29,6 +29,15 @@ interface Payments
     public function recordReceived(PaymentRequest $request): Payment;
 
     /**
+     * Records and posts money paid to a supplier (SDK 1.157): `contactId` is
+     * the supplier and `invoiceId` the bill it settles. A cheque dated later
+     * waits on Cheques we wrote until it clears.
+     *
+     * @throws AccountingRejected
+     */
+    public function recordMade(PaymentRequest $request): Payment;
+
+    /**
      * Settles an invoice with what a payment has left: all of it, or
      * `amountMinor`.
      *

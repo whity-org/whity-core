@@ -17,23 +17,26 @@ use Whity\Core\Document\Routing\RoutingRejectedException;
 final class InvoiceRouteSubject implements RouteSubjectProviderInterface, RouteSubjectApprovedInterface, RouteSubjectRejectedInterface
 {
     public const TYPE = 'accounting.invoice';
+    /** A supplier bill travelling the bill route (WHIT-1318 A3a). */
+    public const BILL = 'accounting.bill';
 
     public function __construct(
         private readonly AccountingDb $db,
         private readonly Invoices $invoices,
+        private readonly string $type = self::TYPE,
     ) {
     }
 
     public function type(): string
     {
-        return self::TYPE;
+        return $this->type;
     }
 
     public function title(int $tenantId, int $subjectId): ?string
     {
         $row = $this->invoices->row($tenantId, $subjectId);
 
-        return $row === null ? null : 'Invoice' . (is_string($row['number']) ? ' ' . $row['number'] : '');
+        return $row === null ? null : ($this->type === self::BILL ? 'Bill' : 'Invoice') . (is_string($row['number']) ? ' ' . $row['number'] : '');
     }
 
     public function documentId(int $tenantId, int $subjectId): ?int

@@ -678,6 +678,21 @@ final class Events
     public const ACCOUNTING_CHEQUE_BOUNCED = 'accounting.cheque.bounced';
     public const ACCOUNTING_CHEQUE_BOUNCED_ASYNC = 'accounting.cheque.bounced.async';
 
+    // ---- accounting: supplier bills (SDK 1.157, WHIT-1318, design section 32 §5.3) ----
+    /**
+     * FILTER hook, before a supplier bill or supplier credit is posted.
+     * Payload as `accounting.invoice.issuing` (the same document shape, with
+     * `kind` `purchase` or `purchase_credit`). Throw {@see HookVetoException}
+     * to refuse it: the caller gets 409.
+     */
+    public const ACCOUNTING_BILL_POSTING = 'accounting.bill.posting';
+    /** A supplier bill or supplier credit was posted. Payload as `accounting.invoice.issued`. */
+    public const ACCOUNTING_BILL_POSTED = 'accounting.bill.posted';
+    public const ACCOUNTING_BILL_POSTED_ASYNC = 'accounting.bill.posted.async';
+    /** Payments settled all of a bill. Payload as `accounting.invoice.issued`. */
+    public const ACCOUNTING_BILL_PAID = 'accounting.bill.paid';
+    public const ACCOUNTING_BILL_PAID_ASYNC = 'accounting.bill.paid.async';
+
     /**
      * The event name to dispatch for one of THIS plugin's own events (SDK 1.29).
      *

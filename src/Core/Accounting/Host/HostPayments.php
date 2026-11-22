@@ -38,6 +38,16 @@ final class HostPayments implements Payments
 
     public function recordReceived(PaymentRequest $request): Payment
     {
+        return $this->record($request, false);
+    }
+
+    public function recordMade(PaymentRequest $request): Payment
+    {
+        return $this->record($request, true);
+    }
+
+    private function record(PaymentRequest $request, bool $out): Payment
+    {
         $owner = $this->owner();
         $tenantId = $this->guard->workspace();
         $this->guard->writer($tenantId, $request->actingProfileId, CorePermissions::PAYMENTS_WRITE);
@@ -53,10 +63,13 @@ final class HostPayments implements Payments
             'cheque_bank' => $request->chequeBank,
             'cheque_due_on' => $request->chequeDueOn,
         ], static fn (mixed $v): bool => $v !== null);
-        $result = HostAccountingGuard::run(fn (): array => $this->payments->receive($tenantId, $request->actingProfileId, $data, [
+        $meta = [
             'owner_plugin' => $owner,
             'external_ref' => $request->externalRef === null ? null : $owner . ':' . $request->externalRef,
-        ]));
+        ];
+        $result = HostAccountingGuard::run(fn (): array => $out
+            ? $this->payments->pay($tenantId, $request->actingProfileId, $data, $meta)
+            : $this->payments->receive($tenantId, $request->actingProfileId, $data, $meta));
 
         return Payment::fromArray($result['payment']);
     }

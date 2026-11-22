@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.156).
+ * SDK identity (v1.157).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1625,12 +1625,24 @@ namespace Whity\Sdk;
  * `accounting.cheque.bounced`, each with an `.async` twin (WHIT-1318 A2b, design section 32 §5.4, §5.5).
  *
  * Purely additive: one new method on Context\AccountingScope, which only the host implements.)
+ *
+ * 1.157 (SUPPLIER BILLS AND PAYMENTS MADE: {@see Accounting\Invoices} drafts a supplier bill with `kind`
+ * `purchase` (a supplier, their own `supplierNumber`, input tax codes, cost or asset accounts) and `issue()`
+ * posts it (Dr costs and the tax to reclaim, Cr We owe suppliers); `credit()` makes a supplier credit.
+ * {@see Accounting\Payments::recordMade()} records money paid to a supplier, settling the bill named; a cheque
+ * dated later waits on Cheques we wrote. Writes on bills act as a person holding `bills:write`. New events
+ * `accounting.bill.posting` (a filter that can veto), `accounting.bill.posted` and `accounting.bill.paid`,
+ * each notification with an `.async` twin. Core accounting now implements
+ * {@see Contribute\WorkspaceCommissionExpenses}: a closed commission period posts Staff commission against
+ * Commission to pay (WHIT-1318 A3a, design section 32 §5.3, §5.4).
+ *
+ * Purely additive: one new method on Accounting\Payments, which only the host implements.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.156.0';
+    public const VERSION = '1.157.0';
 
     /**
      * Static identity only — never instantiated.

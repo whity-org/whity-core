@@ -76,13 +76,38 @@ final class Payments
      */
     public function receive(int $tenantId, ?int $actor, array $data, array $meta = []): array
     {
+        return $this->record($tenantId, $actor, $data, $meta, 'in');
+    }
+
+    /**
+     * Records money paid to a supplier, posts it, and settles the bills named:
+     * Dr We owe suppliers, Cr the bank, cash, or Cheques we wrote for a
+     * cheque dated later (until it clears).
+     *
+     * @param array<string, mixed> $data as {@see self::receive()}, with bills to settle
+     * @param array{agent_id?: ?int, on_behalf_of?: ?int, external_ref?: ?string, owner_plugin?: ?string} $meta
+     * @return array{payment: array<string, mixed>, repeated: bool}
+     */
+    public function pay(int $tenantId, ?int $actor, array $data, array $meta = []): array
+    {
+        return $this->record($tenantId, $actor, $data, $meta, 'out');
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array{agent_id?: ?int, on_behalf_of?: ?int, external_ref?: ?string, owner_plugin?: ?string} $meta
+     * @return array{payment: array<string, mixed>, repeated: bool}
+     */
+    private function record(int $tenantId, ?int $actor, array $data, array $meta, string $direction): array
+    {
         $this->workspace->ensure($tenantId);
+        $out = $direction === 'out';
         $external = self::externalRef($meta['external_ref'] ?? null);
         if ($external !== null && ($done = $this->idByExternal($tenantId, $external)) !== null) {
             return ['payment' => $this->get($tenantId, $done), 'repeated' => true];
         }
         $currency = $this->workspace->books($tenantId)['base_currency'];
-        $contactId = $this->customer($tenantId, $data['contact_id'] ?? null);
+        $contactId = $this->counterpart($tenantId, $data['contact_id'] ?? null, $out ? 'is_supplier' : 'is_customer', $out ? 'supplier' : 'customer');
         $date = isset($data['paid_on']) && $data['paid_on'] !== '' ? Periods::date($data['paid_on'], 'paid_on') : $this->today();
         $amount = $this->amount($data, $currency, 'amount');
         $method = $data['method'] ?? 'bank_transfer';
@@ -93,7 +118,7 @@ final class Payments
         if (!is_int($fee) || $fee < 0 || $fee >= $amount) {
             throw AccountingRejectedException::field('fee_minor', 'fee_minor is what the provider kept, in minor units, from 0 to less than the amount');
         }
-        if ($fee > 0 && !in_array($method, ['card', 'whity_pay'], true)) {
+        if ($fee > 0 && ($out || !in_array($method, ['card', 'whity_pay'], true))) {
             throw AccountingRejectedException::field('fee_minor', 'Only a card or Whity Pay payment has a provider\'s fee; record a bank\'s fee as its own entry');
         }
         $cheque = null;
@@ -110,10 +135,13 @@ final class Payments
             ? $this->moneyAccount($tenantId, $data['account_id'], 'account_id')
             : $this->workspace->roleAccountId($tenantId, match (true) {
                 $method === 'cash' => 'cash',
-                $cheque !== null && $cheque['waits'] => 'cheques_to_collect',
-                in_array($method, ['card', 'whity_pay'], true) => 'provider_clearing',
+                $cheque !== null && $cheque['waits'] => $out ? 'cheques_written' : 'cheques_to_collect',
+                !$out && in_array($method, ['card', 'whity_pay'], true) => 'provider_clearing',
                 default => 'bank',
             });
+        if ($out && $method === 'whity_pay') {
+            throw AccountingRejectedException::field('method', 'Whity Pay takes money in; pay a supplier by cash, transfer, CliQ, card or cheque');
+        }
         $allocations = $this->wantedAllocations($data);
         $byInvoiceId = isset($data['invoice_id']);
         $reference = self::text($data['reference'] ?? null, 200, 'reference', false) ?? '';
@@ -121,18 +149,18 @@ final class Payments
 
         try {
             $id = $this->db->transaction(function () use ($tenantId, $actor, $contactId, $date, $amount, $currency, $method, $accountId, $reference,
-                $cheque, $fee, $notes, $external, $meta, $allocations, $byInvoiceId): int {
+                $cheque, $fee, $notes, $external, $meta, $allocations, $byInvoiceId, $direction, $out): int {
                 $year = substr($date, 0, 4);
-                $number = sprintf('RCT-%s-%04d', $year, $this->sequences->next($tenantId, 'acc_payments:in:' . $year));
+                $number = sprintf(($out ? 'PAY' : 'RCT') . '-%s-%04d', $year, $this->sequences->next($tenantId, 'acc_payments:' . $direction . ':' . $year));
                 $id = $this->db->insert(
                     'INSERT INTO acc_payments (tenant_id, direction, number, contact_id, paid_on, amount_minor, currency, method, account_id,
                             reference, cheque_number, cheque_bank, cheque_due_on, cheque_status, fee_minor, status, notes, external_ref,
                             created_by_profile_id, agent_id, on_behalf_of_profile_id, owner_plugin)
-                     VALUES (:tenant_id, \'in\', :number, :contact_id, :paid_on, :amount, :currency, :method, :account_id,
+                     VALUES (:tenant_id, :direction, :number, :contact_id, :paid_on, :amount, :currency, :method, :account_id,
                             :reference, :cheque_number, :cheque_bank, :cheque_due_on, :cheque_status, :fee, \'posted\', :notes, :external,
                             :actor, :agent, :on_behalf, :owner)',
                     [
-                        ':tenant_id' => $tenantId, ':number' => $number, ':contact_id' => $contactId, ':paid_on' => $date, ':amount' => $amount,
+                        ':tenant_id' => $tenantId, ':direction' => $direction, ':number' => $number, ':contact_id' => $contactId, ':paid_on' => $date, ':amount' => $amount,
                         ':currency' => $currency, ':method' => $method, ':account_id' => $accountId, ':reference' => $reference,
                         ':cheque_number' => $cheque['number'] ?? null, ':cheque_bank' => $cheque['bank'] ?? null,
                         ':cheque_due_on' => $cheque['due_on'] ?? null,
@@ -142,12 +170,13 @@ final class Payments
                         ':owner' => is_string($meta['owner_plugin'] ?? null) ? $meta['owner_plugin'] : null,
                     ]
                 );
-                $receivable = $this->workspace->roleAccountId($tenantId, 'receivable');
+                $counter = $this->workspace->roleAccountId($tenantId, $out ? 'payable' : 'receivable');
                 $name = $this->contactName($tenantId, $contactId);
-                $lines = [
-                    ['account_id' => $accountId, 'debit_minor' => $amount, 'contact_id' => $contactId, 'description' => $reference !== '' ? $reference : $name],
-                    ['account_id' => $receivable, 'credit_minor' => $amount, 'contact_id' => $contactId, 'description' => $name],
-                ];
+                $money = ['account_id' => $accountId, 'contact_id' => $contactId, 'description' => $reference !== '' ? $reference : $name];
+                $owed = ['account_id' => $counter, 'contact_id' => $contactId, 'description' => $name];
+                $lines = $out
+                    ? [$owed + ['debit_minor' => $amount], $money + ['credit_minor' => $amount]]
+                    : [$money + ['debit_minor' => $amount], $owed + ['credit_minor' => $amount]];
                 if ($fee > 0) {
                     $lines[] = ['account_id' => $this->workspace->roleAccountId($tenantId, 'payment_fees'), 'debit_minor' => $fee, 'description' => 'Provider fee'];
                     $lines[] = ['account_id' => $accountId, 'credit_minor' => $fee, 'description' => 'Provider fee'];
@@ -155,7 +184,7 @@ final class Payments
                 $posted = $this->ledger->post($tenantId, $actor, [
                     'journal' => $method === 'cash' ? 'CSH' : 'BNK1',
                     'date' => $date,
-                    'memo' => 'Payment ' . $number . ' from ' . $name,
+                    'memo' => 'Payment ' . $number . ($out ? ' to ' : ' from ') . $name,
                     'source_type' => 'payment',
                     'source_id' => $id,
                     'idempotency_key' => 'payment:' . $id,
@@ -200,15 +229,16 @@ final class Payments
     private function settle(int $tenantId, int $paymentId, int $invoiceId, ?int $amount, ?int $actor, string $field): void
     {
         $payment = $this->row($tenantId, $paymentId) ?? throw AccountingRejectedException::notFound('Payment');
-        if ($payment['direction'] !== 'in' || $payment['status'] !== 'posted') {
-            throw new AccountingRejectedException('Only a payment received that stands can settle an invoice', 409);
+        if (!in_array($payment['direction'], ['in', 'out'], true) || $payment['status'] !== 'posted') {
+            throw new AccountingRejectedException('Only a payment that stands can settle an invoice or a bill', 409);
         }
+        $out = $payment['direction'] === 'out';
         $invoice = $this->invoices->row($tenantId, $invoiceId);
-        if ($invoice === null || $invoice['kind'] !== 'sale') {
-            throw AccountingRejectedException::field($field, $field . ' is not a sales invoice here', 404);
+        if ($invoice === null || $invoice['kind'] !== ($out ? 'purchase' : 'sale')) {
+            throw AccountingRejectedException::field($field, $field . ($out ? ' is not a supplier bill here' : ' is not a sales invoice here'), 404);
         }
         if ((int) $invoice['contact_id'] !== (int) $payment['contact_id']) {
-            throw AccountingRejectedException::field($field, 'This invoice is another customer\'s');
+            throw AccountingRejectedException::field($field, $out ? 'This bill is another supplier\'s' : 'This invoice is another customer\'s');
         }
         if (!in_array($invoice['status'], Invoices::OPEN, true)) {
             throw AccountingRejectedException::coded('conflict', 'Invoice ' . ($invoice['number'] ?? '') . ' has nothing left to pay', 409, $field);
@@ -231,7 +261,9 @@ final class Payments
         $this->invoices->refresh($tenantId, $invoiceId);
         $this->notify(Events::ACCOUNTING_PAYMENT_ALLOCATED, $tenantId, $paymentId, $actor, ['invoice_id' => $invoiceId, 'amount_minor' => $share]);
         $status = (string) ($this->invoices->row($tenantId, $invoiceId)['status'] ?? '');
-        if ($status === 'paid' || $status === 'partly_paid') {
+        if ($out && $status === 'paid') {
+            $this->invoices->announce(Events::ACCOUNTING_BILL_PAID, $tenantId, $invoiceId, $actor);
+        } elseif (!$out && ($status === 'paid' || $status === 'partly_paid')) {
             $this->invoices->announce($status === 'paid' ? Events::ACCOUNTING_INVOICE_PAID : Events::ACCOUNTING_INVOICE_PARTLY_PAID, $tenantId, $invoiceId, $actor);
         }
     }
@@ -247,23 +279,26 @@ final class Payments
     {
         $payment = $this->row($tenantId, $paymentId) ?? throw AccountingRejectedException::notFound('Payment');
         if ($payment['method'] !== 'cheque' || $payment['cheque_status'] !== 'waiting' || $payment['status'] !== 'posted') {
-            throw new AccountingRejectedException('Only a cheque waiting to be collected can be deposited', 409);
+            throw new AccountingRejectedException('Only a cheque that is waiting can be deposited or cleared', 409);
         }
         $date = $date === null ? $this->today() : Periods::date($date, 'deposited_on');
         $bank = $bankAccountId === null ? $this->workspace->roleAccountId($tenantId, 'bank') : $this->moneyAccount($tenantId, $bankAccountId, 'account_id');
         $contactId = AccountingDb::int($payment['contact_id']);
-        $this->db->transaction(function () use ($tenantId, $paymentId, $actor, $date, $bank, $payment, $contactId): void {
+        $out = $payment['direction'] === 'out';
+        $this->db->transaction(function () use ($tenantId, $paymentId, $actor, $date, $bank, $payment, $contactId, $out): void {
+            $amount = (int) $payment['amount_minor'];
+            $bankLine = ['account_id' => $bank, 'contact_id' => $contactId];
+            $chequeLine = ['account_id' => (int) $payment['account_id'], 'contact_id' => $contactId];
             $posted = $this->ledger->post($tenantId, $actor, [
                 'journal' => 'BNK1',
                 'date' => $date,
-                'memo' => 'Cheque ' . ($payment['cheque_number'] ?? '') . ' deposited (' . $payment['number'] . ')',
+                'memo' => 'Cheque ' . ($payment['cheque_number'] ?? '') . ($out ? ' cleared (' : ' deposited (') . $payment['number'] . ')',
                 'source_type' => 'cheque_deposit',
                 'source_id' => $paymentId,
                 'idempotency_key' => 'cheque_deposit:' . $paymentId,
-                'lines' => [
-                    ['account_id' => $bank, 'debit_minor' => (int) $payment['amount_minor'], 'contact_id' => $contactId],
-                    ['account_id' => (int) $payment['account_id'], 'credit_minor' => (int) $payment['amount_minor'], 'contact_id' => $contactId],
-                ],
+                'lines' => $out
+                    ? [$chequeLine + ['debit_minor' => $amount], $bankLine + ['credit_minor' => $amount]]
+                    : [$bankLine + ['debit_minor' => $amount], $chequeLine + ['credit_minor' => $amount]],
             ]);
             $this->db->run(
                 'UPDATE acc_payments SET cheque_status = \'cleared\', deposit_entry_id = :entry_id, updated_at = CURRENT_TIMESTAMP
@@ -574,17 +609,17 @@ final class Payments
         return $minor;
     }
 
-    private function customer(int $tenantId, mixed $contactId): int
+    private function counterpart(int $tenantId, mixed $contactId, string $flag, string $who): int
     {
         $contact = is_int($contactId) ? $this->db->one(
-            'SELECT id, name, is_customer, archived_at FROM contacts WHERE tenant_id = :tenant_id AND id = :id',
+            'SELECT id, name, is_customer, is_supplier, archived_at FROM contacts WHERE tenant_id = :tenant_id AND id = :id',
             [':tenant_id' => $tenantId, ':id' => $contactId]
         ) : null;
         if ($contact === null || $contact['archived_at'] !== null) {
-            throw AccountingRejectedException::field('contact_id', 'contact_id is a customer here');
+            throw AccountingRejectedException::field('contact_id', 'contact_id is a ' . $who . ' here');
         }
-        if (!DbBool::of($contact['is_customer'])) {
-            throw AccountingRejectedException::field('contact_id', $contact['name'] . ' is not marked as a customer; mark them as one on their contact page first');
+        if (!DbBool::of($contact[$flag])) {
+            throw AccountingRejectedException::field('contact_id', $contact['name'] . ' is not marked as a ' . $who . '; mark them as one on their contact page first');
         }
 
         return (int) $contact['id'];
@@ -700,7 +735,7 @@ final class Payments
             'fee_minor' => (int) $r['fee_minor'],
             'status' => (string) $r['status'],
             'allocated_minor' => $allocated,
-            'unallocated_minor' => $r['direction'] === 'in' && $r['status'] === 'posted' ? max(0, $amount - $allocated) : 0,
+            'unallocated_minor' => $r['direction'] !== 'transfer' && $r['status'] === 'posted' ? max(0, $amount - $allocated) : 0,
             'notes' => (string) $r['notes'],
             'entry_id' => AccountingDb::int($r['entry_id']),
             'deposit_entry_id' => AccountingDb::int($r['deposit_entry_id']),

@@ -41,6 +41,8 @@ final class AccountingWorkspace
         CorePermissions::INVOICES_WRITE,
         CorePermissions::PAYMENTS_READ,
         CorePermissions::PAYMENTS_WRITE,
+        CorePermissions::BILLS_READ,
+        CorePermissions::BILLS_WRITE,
         CorePermissions::CONTACTS_READ,
     ];
 

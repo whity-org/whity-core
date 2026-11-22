@@ -262,6 +262,18 @@
     "en": "Show an account's statement",
     "ar": "عرض كشف حساب"
   },
+  "get_api_accounting_bill_settings": {
+    "en": "Show the bill settings",
+    "ar": "عرض إعدادات فواتير الموردين"
+  },
+  "get_api_accounting_bills": {
+    "en": "List supplier bills",
+    "ar": "عرض فواتير الموردين"
+  },
+  "get_api_accounting_bills_id": {
+    "en": "Show a supplier bill",
+    "ar": "عرض فاتورة مورد"
+  },
   "get_api_accounting_books": {
     "en": "Show the workspace's books",
     "ar": "عرض دفاتر مساحة العمل"
@@ -314,6 +326,10 @@
     "en": "List the months of the books",
     "ar": "عرض الفترات المحاسبية"
   },
+  "get_api_accounting_reports_aged_payables": {
+    "en": "Aged payables",
+    "ar": "أعمار الذمم الدائنة"
+  },
   "get_api_accounting_reports_aged_receivables": {
     "en": "Aged receivables",
     "ar": "أعمار الذمم المدينة"
@@ -321,6 +337,10 @@
   "get_api_accounting_reports_trial_balance": {
     "en": "Show the trial balance",
     "ar": "عرض ميزان المراجعة"
+  },
+  "get_api_accounting_suppliers_id_statement": {
+    "en": "A supplier's statement",
+    "ar": "كشف حساب مورد"
   },
   "get_api_accounting_tax_codes": {
     "en": "List the tax codes",
@@ -1271,6 +1291,14 @@
     "en": "Change an account",
     "ar": "تعديل حساب"
   },
+  "patch_api_accounting_bill_settings": {
+    "en": "Change the bill settings",
+    "ar": "تعديل إعدادات فواتير الموردين"
+  },
+  "patch_api_accounting_bills_id": {
+    "en": "Change a draft bill",
+    "ar": "تعديل مسودة فاتورة مورد"
+  },
   "patch_api_accounting_invoice_settings": {
     "en": "Change the invoice settings",
     "ar": "تعديل إعدادات الفواتير"
@@ -1487,6 +1515,22 @@
     "en": "Bring an account back",
     "ar": "استعادة حساب"
   },
+  "post_api_accounting_bills": {
+    "en": "Enter a supplier bill",
+    "ar": "إدخال فاتورة مورد"
+  },
+  "post_api_accounting_bills_id_cancel": {
+    "en": "Cancel a draft bill",
+    "ar": "إلغاء مسودة فاتورة مورد"
+  },
+  "post_api_accounting_bills_id_credits": {
+    "en": "Record a supplier credit",
+    "ar": "تسجيل إشعار دائن من مورد"
+  },
+  "post_api_accounting_bills_id_post": {
+    "en": "Post a supplier bill",
+    "ar": "ترحيل فاتورة مورد"
+  },
   "post_api_accounting_entries_id_reverse": {
     "en": "Reverse a journal entry",
     "ar": "عكس قيد"
@@ -1534,6 +1578,10 @@
   "post_api_accounting_payments_id_deposit": {
     "en": "Deposit a cheque",
     "ar": "إيداع شيك"
+  },
+  "post_api_accounting_payments_made": {
+    "en": "Record a payment to a supplier",
+    "ar": "تسجيل دفعة لمورد"
   },
   "post_api_accounting_periods_id_close": {
     "en": "Close a month",
