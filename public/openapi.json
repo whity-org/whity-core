@@ -142634,7 +142634,7 @@
                     "password": {
                         "type": "string",
                         "format": "password",
-                        "minLength": 8,
+                        "minLength": 12,
                         "maxLength": 72,
                         "description": "Initial password; must satisfy the site password policy."
                     },
@@ -143032,7 +143032,7 @@
                     "password": {
                         "type": "string",
                         "format": "password",
-                        "minLength": 8,
+                        "minLength": 12,
                         "maxLength": 72,
                         "description": "New password; must satisfy the site password policy. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant."
                     },
