@@ -160,19 +160,26 @@ jobs:
           # the cache can only reuse work that does not depend on the commit.
           cache-from: type=registry,ref=${{ steps.image.outputs.name }}:buildcache
           cache-to: type=registry,ref=${{ steps.image.outputs.name }}:buildcache,mode=max,ignore-error=true
+          # READINESS CO-22: every pushed image carries an SBOM (what is in it)
+          # and SLSA provenance (which commit and workflow built it) as BuildKit
+          # attestations beside it in GHCR. `docker buildx imagetools inspect
+          # <image> --format '{{ json .SBOM }}'` reads the SBOM back.
+          sbom: true
+          provenance: mode=max
 
-  # WC-d: scan the just-pushed images for OS/library CVEs. REPORT-ONLY for now
-  # (exit-code 0): a base-image HIGH/CRITICAL must not block a release.
-  # ignore-unfixed drops CVEs with no available fix (pure noise for a gate).
-  # Findings land in the Security tab via the SARIF upload below; flip
-  # exit-code to '1' to make it a hard gate once the images are triaged.
+  # WC-d: scan the just-pushed images for OS/library CVEs. A GATE since
+  # READINESS CO-21 (it was report-only): a HIGH or CRITICAL with a fix
+  # available fails the build, so an image that apt/npm could patch is never
+  # released. ignore-unfixed drops CVEs with no fix (nothing to act on), and
+  # `.trivyignore` holds any accepted one, each with its reason and an expiry.
+  # The SARIF is uploaded either way, so the Security tab shows the findings.
   #
   # Its own job, beside `smoke` rather than inside `image` (WHIT-1340): it took
   # a minute and a half of the web leg's seven, on the release's critical path,
   # for a result that gates nothing. It still finishes before the caller's next
   # job starts, because that job waits for this whole workflow.
   scan:
-    name: Scan ${{ matrix.image }} image (Trivy, report-only)
+    name: Scan ${{ matrix.image }} image (Trivy)
     runs-on: ubuntu-latest
     needs: [image]
 
@@ -208,7 +215,14 @@ jobs:
 
       # The image is in GHCR, not in this runner's engine, so Trivy pulls it.
       # These credentials cover a private package; a public one needs none.
-      - name: Trivy image vulnerability scan (report)
+      - name: Checkout (.trivyignore)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.commit }}
+          sparse-checkout: .trivyignore
+          sparse-checkout-cone-mode: false
+
+      - name: Trivy image vulnerability scan (gate)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           TRIVY_USERNAME: ${{ github.actor }}
@@ -219,7 +233,8 @@ jobs:
           output: trivy-results.sarif
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: '0'
+          trivyignores: .trivyignore
+          exit-code: '1'
 
       # One category per image: code scanning REPLACES the previous results for a
       # category, so a shared one would leave whichever leg finished last as the
