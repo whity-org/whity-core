@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace Whity\Api;
 
+use Whity\Auth\RoleChecker;
 use Whity\Core\Branding\BrandingService;
+use Whity\Core\Document\Issuing\ActingAs;
+use Whity\Core\Document\Issuing\DocumentIssueRefused;
 use Whity\Core\RateLimit\ClientIp;
 use Whity\Core\RateLimit\RateLimitRule;
 use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Request;
 use Whity\Core\Response;
+use Whity\Core\Sales\Print\QuoteDocuments;
 use Whity\Core\Sales\Quotes;
 use Whity\Core\Sales\SalesRejectedException;
 use Whity\Core\Sales\TradingEmails;
@@ -26,9 +30,14 @@ use Whity\Http\Validation\FieldValidator;
  *
  * Signed in, under `/api/sales/quotes`: list, draft, change a draft, send for
  * approval, send, a new link, record the customer's answer, revise, cancel,
- * and turn into a target. Every route is gated by `quotes:read` or
+ * and turn into a target, and print (WHIT-1341). Every route is gated by `quotes:read` or
  * `quotes:write` in the router; turning into a target asks the target itself
  * whether this person may.
+ *
+ * Sending a quote, or giving it a new link, issues its printed copy with the
+ * link's QR ({@see QuoteDocuments}); the answer names it as `document_id`.
+ * Printing never stops a quote going out: a copy that could not be made is
+ * logged and the answer's `document_id` is null.
  *
  * Public, under `/api/public/quotes/{token}`: the customer's page. No
  * account; the 256-bit token names one quote, rate-limited per address, and
@@ -57,6 +66,8 @@ final class SalesQuotesApiHandler
         private readonly ?BrandingService $branding = null,
         private readonly ?\Closure $workspaceName = null,
         private readonly ?TradingEmails $emails = null,
+        private readonly ?QuoteDocuments $documents = null,
+        private readonly ?RoleChecker $roleChecker = null,
     ) {
     }
 
@@ -119,17 +130,68 @@ final class SalesQuotesApiHandler
             }
             $sent = $this->quotes->send($tenantId, (int) $params['id'], $actor);
             $link = $this->link($sent['token']);
+            $documentId = $this->printSent($tenantId, $actor, (int) $params['id'], $link);
 
-            return Response::json(['data' => $sent['quote'], 'link' => $link, 'emailed' => $email && $this->emailQuote($tenantId, $sent['quote'], $link)]);
+            return Response::json([
+                'data' => $sent['quote'],
+                'link' => $link,
+                'document_id' => $documentId,
+                'emailed' => $email && $this->emailQuote($tenantId, $sent['quote'], $link),
+            ]);
         });
     }
 
     /** @param array<string, string> $params */
     public function newLink(Request $request, array $params): Response
     {
-        return $this->run($request, 'quote', fn (int $tenantId): Response => Response::json([
-            'link' => $this->link($this->quotes->newLink($tenantId, (int) $params['id'])),
-        ]));
+        return $this->run($request, 'quote', function (int $tenantId, ?int $actor) use ($params): Response {
+            $link = $this->link($this->quotes->newLink($tenantId, (int) $params['id']));
+
+            return Response::json(['link' => $link, 'document_id' => $this->printSent($tenantId, $actor, (int) $params['id'], $link)]);
+        });
+    }
+
+    /**
+     * `POST /api/sales/quotes/{id}/print`, `{lang: "en" | "ar"}`: the quote's
+     * PDF. A quote that went out prints the copy it went out as; a draft
+     * prints a working copy. The document's id is in `X-Document-Id`; when
+     * this instance can't make PDFs the answer is JSON naming it, with 202.
+     *
+     * @param array<string, string> $params
+     */
+    public function print(Request $request, array $params): Response
+    {
+        return $this->run($request, 'print', function (int $tenantId, ?int $actor) use ($request, $params): Response {
+            if ($this->documents === null || $actor === null) {
+                return Response::error('Printing needs a person signed in', 403);
+            }
+            $lang = JsonBody::parsed($request)['lang'] ?? 'en';
+            if (!in_array($lang, ['en', 'ar'], true)) {
+                throw SalesRejectedException::field('lang', 'lang is "en" or "ar"');
+            }
+            try {
+                $printed = $this->documents->print($this->actingAs($tenantId, $actor), (int) $params['id'], $lang);
+            } catch (DocumentIssueRefused $e) {
+                return Response::error($e->clientMessage, $e->status, ['code' => $e->reason] + $e->details);
+            }
+            if ($printed['pdf'] === null) {
+                return Response::json(['data' => [
+                    'document_id' => $printed['document_id'],
+                    'number' => $printed['number'],
+                    'title' => $printed['title'],
+                    'pdf' => false,
+                ]], 202);
+            }
+            $name = trim((string) preg_replace('/[^A-Za-z0-9._-]+/', '-', $printed['number'] ?? $printed['title']), '-');
+
+            return new Response(200, $printed['pdf']['bytes'], [
+                'Content-Type' => $printed['pdf']['content_type'],
+                'Content-Disposition' => 'inline; filename="' . ($name !== '' ? $name : 'quote') . '.pdf"',
+                'X-Document-Id' => (string) $printed['document_id'],
+                'Cache-Control' => 'private, no-store',
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        });
     }
 
     /** @param array<string, string> $params */
@@ -314,6 +376,39 @@ final class SalesQuotesApiHandler
             'currency' => (string) $quote['currency'],
             'valid_until' => (string) $quote['valid_until'],
         ], $link);
+    }
+
+    /**
+     * The printed copy that goes out with the quote, in the workspace's
+     * language, carrying the link's QR. Null when it could not be made: the
+     * quote has gone out all the same.
+     */
+    private function printSent(int $tenantId, ?int $actor, int $quoteId, string $link): ?int
+    {
+        if ($this->documents === null || $actor === null) {
+            return null;
+        }
+        try {
+            $locale = (string) ($this->settings->effective($tenantId)[SettingsRegistry::LOCALE] ?? 'en');
+            $lang = str_starts_with(strtolower(trim($locale)), 'ar') ? 'ar' : 'en';
+
+            return $this->documents->issueSent($this->actingAs($tenantId, $actor), $quoteId, $lang, $link)['document_id'];
+        } catch (\Throwable $e) {
+            error_log('[SalesQuotesApiHandler] the printed copy of quote ' . $quoteId . ' could not be made: ' . $e->getMessage());
+
+            return null;
+        }
+    }
+
+    private function actingAs(int $tenantId, int $profileId): ActingAs
+    {
+        $checker = $this->roleChecker;
+
+        return new ActingAs(
+            $tenantId,
+            $profileId,
+            static fn (string $permission): bool => $checker !== null && $checker->hasPermissionForProfile($profileId, $permission, $tenantId),
+        );
     }
 
     private function link(string $token): string

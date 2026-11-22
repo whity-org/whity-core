@@ -408,6 +408,7 @@ abstract class BaseCommand implements CliCommand, CommandHelp
         foreach (\Whity\Core\Inventory\Print\InventoryPrintFields::all($db->getPdo(), $settingsService) as $inventoryFieldProvider) {
             $documentFieldRegistry->add($inventoryFieldProvider);
         }
+        $documentFieldRegistry->add(new \Whity\Core\Sales\Print\QuoteFieldProvider($db->getPdo(), $settingsService));
         \Whity\register_service(\Whity\Core\Document\Fields\DocumentFieldRegistry::class, $documentFieldRegistry);
 
         $dataTypeLifecycle = new \Whity\Core\DataType\DataTypeLifecycleService(

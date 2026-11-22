@@ -72,17 +72,31 @@ final class SalesApiSchemas
                 'summary' => 'Send a quote to the customer',
                 'description' => 'A ready quote, or a draft when the workspace has no quote route. It takes its number (`QUO-0318`) on first send and a link for the customer, '
                     . 'answered once in `link`; only its hash is kept. The revision before becomes `replaced`. `sales.quote.sending` may refuse it (409, `vetoed`). '
-                    . 'It is emailed to the customer unless `email` is false or the workspace turned the quote email off; `emailed` says whether it was.',
+                    . 'It is emailed to the customer unless `email` is false or the workspace turned the quote email off; `emailed` says whether it was. '
+                    . 'Its printed copy, with the QR of the link, is issued in the language of the workspace and named in `document_id` (null when it could not be made; the quote has gone out all the same).',
                 'tags' => $tags,
                 'request' => 'SalesQuoteSendRequest',
-                'responses' => [200 => self::json('The quote and the customer\'s link', self::object(['data' => SchemaBuilder::ref('SalesQuote'), 'link' => self::str(), 'emailed' => self::bool()], ['data', 'link', 'emailed']))]
+                'responses' => [200 => self::json('The quote and the customer\'s link', self::object(['data' => SchemaBuilder::ref('SalesQuote'), 'link' => self::str(), 'document_id' => self::int(true), 'emailed' => self::bool()], ['data', 'link', 'document_id', 'emailed']))]
                     + $refused + $notFound + self::auth(),
             ]),
             self::route('POST', '/api/sales/quotes/{id:\d+}/link', 'quotes:write', [
                 'summary' => 'Make a new link to a quote',
-                'description' => 'The link before it stops working.',
+                'description' => 'The link before it stops working. A new printed copy carries the QR of the new link (`document_id`).',
                 'tags' => $tags,
-                'responses' => [200 => self::json('The new link', self::object(['link' => self::str()], ['link']))] + $refused + $notFound + self::auth(),
+                'responses' => [200 => self::json('The new link', self::object(['link' => self::str(), 'document_id' => self::int(true)], ['link', 'document_id']))] + $refused + $notFound + self::auth(),
+            ]),
+            self::route('POST', '/api/sales/quotes/{id:\d+}/print', 'quotes:read', [
+                'summary' => 'Print a quote',
+                'description' => 'Its PDF, `{lang: "en" | "ar"}`. A quote that went out prints the copy it went out as, with its QR; a draft prints a working copy without one. '
+                    . 'The id of the document is in `X-Document-Id`. When this instance cannot make PDFs, the answer is JSON naming the document, with 202.',
+                'tags' => $tags,
+                'request' => 'SalesQuotePrintRequest',
+                'responses' => [
+                    200 => ['description' => 'The PDF', 'content' => ['application/pdf' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                    202 => self::json('Issued, with no PDF here', self::object(['data' => self::object([
+                        'document_id' => self::int(), 'number' => self::str(true), 'title' => self::str(), 'pdf' => self::bool(),
+                    ], ['document_id', 'number', 'title', 'pdf'])], ['data'])),
+                ] + $refused + $notFound + self::auth(),
             ]),
             self::route('POST', '/api/sales/quotes/{id:\d+}/decision', 'quotes:write', [
                 'summary' => 'Record the customer\'s answer',
@@ -202,6 +216,7 @@ final class SalesApiSchemas
                 'reason' => self::str() + ['description' => 'Why they declined, if they said.'],
             ], ['accepted']),
             'SalesQuoteSendRequest' => self::object(['email' => self::bool() + ['description' => 'False to only make the link, without emailing the customer. True by default.']], []),
+            'SalesQuotePrintRequest' => self::object(['lang' => self::str() + ['enum' => ['en', 'ar'], 'description' => 'The language of the template: `en` (the default) or `ar`.']], []),
             'SalesQuoteConvertRequest' => self::object(['target' => self::str() + ['description' => 'A target key from GET …/targets, such as `sales_order` or `invoice`.']], ['target']),
             'SalesQuoteTarget' => self::object([
                 'key' => self::str(),
