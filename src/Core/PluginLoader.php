@@ -1775,6 +1775,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         foreach ($this->registeredPlugins as $pluginKey => $info) {
             $this->agentPresetRegistry?->unregisterPlugin((string) $pluginKey);
             $this->router->unregisterByNamespace($info['namespacePrefix']);
+            \Whity\Core\Plugin\PluginCapabilities::forget($info['plugin']->getName());
             // A reload re-declares them from the plugin as it is now.
             $this->templateSlotRegistry?->unregister($info['plugin']->getName());
             $this->documentFieldRegistry?->removeOwner($info['plugin']->getName());
@@ -3147,6 +3148,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // plugin leaves nothing reachable without tenant resolution.
         \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
         \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
+        \Whity\Core\Plugin\PluginCapabilities::forget($info['plugin']->getName());
         // A disabled or uninstalled plugin vouches for nothing (#1872): its
         // customer-grade permissions are privileged for customers again.
         \Whity\Core\Identity\CustomerGradePermissions::remove($pluginKey);
@@ -4034,6 +4036,10 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         $this->lifecycles[$pluginKey] = $lifecycle;
 
         $registered = $this->registerCapabilities($plugin, $namespacePrefix, $pluginKey);
+
+        // What it declared it uses (SDK 1.151, #1693): in discovery order, so the
+        // first plugin to declare a table owns it in every process.
+        \Whity\Core\Plugin\PluginCapabilities::register($plugin, $this->logger);
 
         // Seed plugin-declared roles and permission grants into the database.
         // The seeder is optional (not wired in tests that lack a DB); errors

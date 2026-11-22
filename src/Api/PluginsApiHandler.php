@@ -300,6 +300,23 @@ class PluginsApiHandler
             }
             $plugins = $this->withRecords($plugins);
 
+            // What each plugin declared it uses (SDK 1.151, #1693); null when it
+            // declares nothing and so keeps every service until 2.0.
+            $plugins = array_map(
+                static function (array $plugin): array {
+                    $declared = null;
+                    foreach ([$plugin['name'] ?? null, $plugin['id'] ?? null] as $key) {
+                        if (is_string($key) && $declared === null) {
+                            $declared = \Whity\Core\Plugin\PluginCapabilities::of($key);
+                        }
+                    }
+                    $plugin['capabilities'] = $declared;
+
+                    return $plugin;
+                },
+                $plugins
+            );
+
             // Errors and file names describe the deployment, not the workspace
             // asking: a stack trace can carry paths and other workspaces' data.
             $operator = PluginOperatorGate::isOperator();

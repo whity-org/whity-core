@@ -1559,6 +1559,18 @@ namespace Whity\Sdk;
  * A core route or another plugin's route refuses the token (WHIT-1329).
  *
  * Purely additive: one new class; an embed page that does not use the bridge works as before.)
+ *
+ * 1.151 (DECLARED SERVICES AND WORKSPACE TABLES (#1693): {@see Contribute\PluginCapabilitiesInterface} lets a
+ * plugin say which {@see Context\PluginScope} services it uses ({@see Context\Service}) and which of its own
+ * tables it reaches; its context then gives only those, and anything else throws
+ * {@see Context\ServiceNotDeclared}. {@see Context\PluginScope::database()} gives
+ * {@see Database\WorkspaceTables}: select, count, insert, update, delete and transactions on the declared
+ * tables, the host adding `tenant_id` to every condition and row, so no call reaches another workspace;
+ * refusals throw {@see Database\TableRefused}. The operator sees each plugin's declaration in
+ * `GET /api/plugins` (WHIT-1330).
+ *
+ * Purely additive: a plugin that declares nothing keeps every service as before; `database()` is new and
+ * needs the declaration. One new method on PluginScope, which only the host implements.)
  * 1.153 (COMPANY STAMPS: {@see Hooks\Events::ROUTE_STAMPED} (`route.stamped`, with its `.async` twin)
  * fires after a holder applied a company stamp on a route's stamp step, with ids only and the
  * `stamp_id` (#1729).

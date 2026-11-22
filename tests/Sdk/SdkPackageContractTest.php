@@ -245,6 +245,7 @@ final class SdkPackageContractTest extends TestCase
             '1.153.0',
             \Whity\Sdk\Sdk::VERSION,
             'SDK 1.153 ADDS the route.stamped event: a holder applied a company stamp on a stamp step (#1729). '
+            . 'SDK 1.151 ADDS Contribute\PluginCapabilitiesInterface and Database\WorkspaceTables (PluginScope::database()): plugins get only the services they declare, and their own tables held to the workspace (#1693). '
             . 'SDK 1.150 ADDS Frontend\FrameBridge: an embedded screen calls its own plugin routes through the app, with a short-lived token bound to them (#1688). '
             . 'SDK 1.148 ADDS Contribute\\WorkspaceCommissionExpenses, Calendar\\CommissionClose and the calendar.commission.closed event: a closed commission period goes to the books (WHIT-1334). '
             . 'SDK 1.147 ADDS the workspace template calendar setting `walkins_enabled`: a template turns on the walk-in queue (WHIT-1334). '
