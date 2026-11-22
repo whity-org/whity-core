@@ -21,7 +21,7 @@
 # and copies in that one file + the server source, so neither the PHP file nor
 # the build script ships in the image.
 
-FROM node:22.23.5-bookworm-slim AS build
+FROM node:26.13.1-bookworm-slim AS build
 WORKDIR /workspace/render-service
 
 COPY render-service/package.json ./
@@ -43,7 +43,7 @@ ENV WHITY_BUILD_COMMIT=$WHITY_BUILD_COMMIT
 COPY src/Core/CoreVersion.php /workspace/src/Core/CoreVersion.php
 RUN npm run build:info
 
-FROM node:22.23.5-bookworm-slim AS runtime
+FROM node:26.13.1-bookworm-slim AS runtime
 
 # System Chromium + fonts baked into the image, including Arabic (Noto Naskh /
 # Noto Sans Arabic — hard cross-cutting RTL requirement across this app;
