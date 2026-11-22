@@ -8361,6 +8361,148 @@
                 ]
             }
         },
+        "/api/v1/accounting/stock/costs": {
+            "post": {
+                "operationId": "post_api_v1_accounting_stock_costs",
+                "summary": "Give stock with no cost its cost",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "For an item on hand whose cost is unknown (no purchase price and no priced receipt): sets the cost of one base unit, in the workspace's currency, and posts the stock's value against Opening balances so the Stock account takes it in.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingStockCost"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The cost given",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "variant_id": {
+                                                    "type": "integer"
+                                                },
+                                                "value_minor": {
+                                                    "type": "integer",
+                                                    "description": "What the stock on hand is now worth."
+                                                },
+                                                "entry_id": {
+                                                    "type": "integer",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "required": [
+                                                "variant_id",
+                                                "value_minor"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/accounting/stock/opening": {
             "post": {
                 "operationId": "post_api_v1_accounting_stock_opening",
@@ -8514,11 +8656,11 @@
         "/api/v1/accounting/stock/waiting": {
             "get": {
                 "operationId": "get_api_v1_accounting_stock_waiting",
-                "summary": "Stock changes waiting for a cost",
+                "summary": "Stock waiting for a cost",
                 "tags": [
                     "accounting"
                 ],
-                "description": "Moves since stock went into the books whose cost is unknown, so they posted nothing.",
+                "description": "Items on hand whose cost is unknown, so they are not in the Stock account, and moves since stock went into the books that posted nothing for want of a cost.",
                 "responses": {
                     "200": {
                         "description": "Waiting",
@@ -8528,40 +8670,76 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "move_id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "variant_id": {
-                                                        "type": "integer"
-                                                    },
-                                                    "item_name": {
-                                                        "type": "string"
-                                                    },
-                                                    "quantity": {
-                                                        "type": "integer"
-                                                    },
-                                                    "source_type": {
-                                                        "type": "string"
-                                                    },
-                                                    "source_id": {
-                                                        "type": "integer",
-                                                        "nullable": true
-                                                    },
-                                                    "occurred_at": {
-                                                        "type": "string"
+                                            "type": "object",
+                                            "properties": {
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "variant_id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "item_id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "item_name": {
+                                                                "type": "string"
+                                                            },
+                                                            "quantity": {
+                                                                "type": "integer",
+                                                                "description": "In the unit's smallest steps."
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "variant_id",
+                                                            "item_id",
+                                                            "item_name",
+                                                            "quantity"
+                                                        ]
                                                     }
                                                 },
-                                                "required": [
-                                                    "move_id",
-                                                    "variant_id",
-                                                    "item_name",
-                                                    "quantity"
-                                                ]
-                                            }
+                                                "moves": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "move_id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "variant_id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "item_name": {
+                                                                "type": "string"
+                                                            },
+                                                            "quantity": {
+                                                                "type": "integer"
+                                                            },
+                                                            "source_type": {
+                                                                "type": "string"
+                                                            },
+                                                            "source_id": {
+                                                                "type": "integer",
+                                                                "nullable": true
+                                                            },
+                                                            "occurred_at": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "move_id",
+                                                            "variant_id",
+                                                            "item_name",
+                                                            "quantity"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "items",
+                                                "moves"
+                                            ]
                                         }
                                     },
                                     "required": [
@@ -104131,6 +104309,26 @@
                     "closing_minor",
                     "lines",
                     "next"
+                ]
+            },
+            "AccountingStockCost": {
+                "type": "object",
+                "properties": {
+                    "variant_id": {
+                        "type": "integer"
+                    },
+                    "unit_cost_minor": {
+                        "type": "integer",
+                        "description": "The cost of one base unit (a kilogram, a piece), in minor units of the workspace's currency."
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD, in an open month. Default: today."
+                    }
+                },
+                "required": [
+                    "variant_id",
+                    "unit_cost_minor"
                 ]
             },
             "AccountingStockOpening": {

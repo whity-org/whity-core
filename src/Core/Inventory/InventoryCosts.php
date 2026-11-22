@@ -30,6 +30,9 @@ namespace Whity\Core\Inventory;
  */
 final class InventoryCosts
 {
+    /** @var array<string, int> steps per base unit, for one call (a long-lived worker must not keep them) */
+    private array $scales = [];
+
     /** @param \Closure(int): string $currency the workspace's currency */
     public function __construct(
         private readonly InventoryDb $db,
@@ -48,6 +51,7 @@ final class InventoryCosts
      */
     public function value(int $tenantId, array $lines, array $virtual): array
     {
+        $this->scales = [];
         $base = $this->base($tenantId);
         $variants = array_values(array_unique(array_map(static fn (array $l): int => (int) $l['variant_id'], $lines)));
         sort($variants);
@@ -64,7 +68,7 @@ final class InventoryCosts
             $row = &$rows[$variantId];
             $given = array_key_exists('value_minor', $line) ? $line['value_minor'] : false;
             if (!$fromReal && $toReal) {
-                $value = $given !== false ? (is_int($given) ? $given : null) : $this->incoming($line, $steps, $row, $base);
+                $value = $given !== false ? (is_int($given) ? $given : null) : $this->incoming($tenantId, $line, $steps, $row, $base);
                 // Empty (or short) stock takes the new value as it is; known
                 // stock adds it; an unknown part makes the whole unknown.
                 $row['value'] = match (true) {
@@ -196,15 +200,37 @@ final class InventoryCosts
      * @param array<string, mixed> $line
      * @param array{quantity: int, value: ?int} $row
      */
-    private function incoming(array $line, int $steps, array $row, string $base): ?int
+    private function incoming(int $tenantId, array $line, int $steps, array $row, string $base): ?int
     {
         $unit = $line['unit_cost_minor'] ?? null;
         $currency = is_string($line['currency'] ?? null) && $line['currency'] !== '' ? strtoupper($line['currency']) : $base;
         if (is_int($unit) && $currency === $base) {
-            return $unit * $steps;
+            // The cost is of one base unit (a kilogram); the quantity is in its steps (grams).
+            return self::divRound($unit * $steps, $this->scale($tenantId, (int) $line['variant_id']));
         }
+        // No price on the line: the average, or, into empty stock, the item's purchase price.
+        $average = self::average($row, $steps);
+        if ($average !== null || $row['quantity'] > 0) {
+            return $average;
+        }
+        $price = $this->purchasePrice($tenantId, (int) $line['variant_id'], $base);
 
-        return self::average($row, $steps);
+        return $price === null ? null : self::divRound($price * $steps, $this->scale($tenantId, (int) $line['variant_id']));
+    }
+
+    /** The variant's (or its item's) purchase price for one base unit, when it is in the workspace's currency. */
+    private function purchasePrice(int $tenantId, int $variantId, string $base): ?int
+    {
+        $price = $this->db->one(
+            'SELECT v.purchase_price_minor AS variant_price, i.purchase_price_minor AS item_price, i.currency
+               FROM inv_variants v JOIN inv_items i ON i.id = v.item_id AND i.tenant_id = v.tenant_id
+              WHERE v.tenant_id = :tenant_id AND v.id = :variant_id',
+            [':tenant_id' => $tenantId, ':variant_id' => $variantId]
+        );
+        $unit = InventoryDb::int($price['variant_price'] ?? null) ?? InventoryDb::int($price['item_price'] ?? null);
+        $currency = is_string($price['currency'] ?? null) && $price['currency'] !== '' ? strtoupper($price['currency']) : $base;
+
+        return $unit !== null && $currency === $base ? $unit : null;
     }
 
     /** @param array{quantity: int, value: ?int} $row */
@@ -218,6 +244,44 @@ final class InventoryCosts
         }
 
         return self::divRound($row['value'] * $steps, $row['quantity']);
+    }
+
+    /**
+     * Gives stock whose cost is unknown a cost: `unitCostMinor` for one base
+     * unit, in the workspace's currency. Answers the stock's value now, or
+     * null when its cost was already known (or there is none on hand).
+     */
+    public function setUnknown(int $tenantId, int $variantId, int $unitCostMinor): ?int
+    {
+        $this->scales = [];
+        $row = $this->row($tenantId, $variantId, $this->base($tenantId), true);
+        if ($row['value'] !== null || $row['quantity'] <= 0) {
+            return null;
+        }
+        $value = self::divRound($unitCostMinor * $row['quantity'], $this->scale($tenantId, $variantId));
+        $this->db->run(
+            'UPDATE inv_costs SET value_minor = :value, updated_at = CURRENT_TIMESTAMP
+              WHERE tenant_id = :tenant_id AND variant_id = :variant_id AND value_minor IS NULL',
+            [':value' => $value, ':tenant_id' => $tenantId, ':variant_id' => $variantId]
+        );
+
+        return $value;
+    }
+
+    /** Steps in one base unit: 1000 for a kilogram kept in grams. */
+    private function scale(int $tenantId, int $variantId): int
+    {
+        if (isset($this->scales[$tenantId . ':' . $variantId])) {
+            return $this->scales[$tenantId . ':' . $variantId];
+        }
+        $decimals = $this->db->one(
+            'SELECT u.decimals FROM inv_variants v JOIN inv_items i ON i.id = v.item_id AND i.tenant_id = v.tenant_id
+               LEFT JOIN inv_units u ON u.id = i.base_unit_id AND u.tenant_id = i.tenant_id
+              WHERE v.tenant_id = :tenant_id AND v.id = :variant_id',
+            [':tenant_id' => $tenantId, ':variant_id' => $variantId]
+        )['decimals'] ?? 0;
+
+        return $this->scales[$tenantId . ':' . $variantId] = 10 ** max(0, (int) $decimals);
     }
 
     private static function divRound(int $n, int $d): int

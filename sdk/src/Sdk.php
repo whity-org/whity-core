@@ -1648,7 +1648,7 @@ namespace Whity\Sdk;
  * 1.159 (STOCK IN THE BOOKS: extension point {@see Contribute\WorkspaceAccountingExport} (IV.22): core hands
  * each posted stock batch, as an {@see Inventory\StockPosting} of {@see Inventory\StockPostingMove}s with their
  * places, virtual roles, branches and values, to the one export bound in the container, inside the stock
- * transaction; throwing refuses the batch. Values come from core's moving average cost (IV.18). Core
+ * transaction, for each workspace whose `keepsStock()` answers true; throwing refuses the batch. Values come from core's moving average cost (IV.18). Core
  * accounting is the default export and posts each batch to the stock journal (WHIT-1318 A4a, design section 31
  * §6.3, section 32 §6).
  *

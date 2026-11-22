@@ -22,8 +22,15 @@ use Whity\Sdk\Inventory\StockPosting;
  * it (a closed month in the books is a closed month for stock). Answer a
  * reference people can read (the journal entry's number), or null when
  * nothing needed posting. The workspace comes from the posting.
+ *
+ * {@see keepsStock()} is asked first: when it answers false for a workspace,
+ * core makes no {@see record()} call for it, so its stock moves exactly as
+ * without books and no closed month can refuse them.
  */
 interface WorkspaceAccountingExport
 {
+    /** Whether this workspace's stock goes to these books at all. */
+    public function keepsStock(int $workspaceId): bool;
+
     public function record(StockPosting $posting): ?string;
 }

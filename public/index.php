@@ -6149,6 +6149,15 @@ $router->register('GET',    '/api/accounting/stock',                            
 $router->register('PATCH',  '/api/accounting/stock',                              [$accountingStockHandler, 'update'],  null, null, CorePermissions::ACCOUNTING_SETTINGS);
 $router->register('POST',   '/api/accounting/stock/opening',                      [$accountingStockHandler, 'open'],    null, null, CorePermissions::ACCOUNTING_SETTINGS);
 $router->register('GET',    '/api/accounting/stock/waiting',                      [$accountingStockHandler, 'waiting'], null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('POST',   '/api/accounting/stock/costs',                        [$accountingStockHandler, 'cost'],    null, null, CorePermissions::ACCOUNTING_SETTINGS);
+// Stock with no cost waits in the Inbox for the people who set accounting up.
+$inboxSourceRegistry->registerCoreSource(
+    \Whity\Core\Accounting\StockCostInboxSource::KEY,
+    new \Whity\Core\Accounting\StockCostInboxSource(
+        $accountingDb,
+        static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+    )
+);
 
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,

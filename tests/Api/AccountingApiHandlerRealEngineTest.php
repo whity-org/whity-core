@@ -219,7 +219,7 @@ final class AccountingApiHandlerRealEngineTest extends TestCase
                 $byRoute[$route['method'] . ' ' . $route['path']] = $route['requiredPermission'];
             }
         }
-        self::assertCount(4, $byRoute);
+        self::assertCount(5, $byRoute);
         $index = (string) file_get_contents(dirname(__DIR__, 2) . '/public/index.php');
         foreach ($byRoute as $route => $permission) {
             $expected = str_starts_with($route, 'GET ') ? 'accounting:read' : 'accounting:settings';

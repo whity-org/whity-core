@@ -12,6 +12,7 @@ use Whity\Core\Accounting\AccountingWorkspace;
 use Whity\Core\Accounting\Ledger;
 use Whity\Core\Accounting\Periods;
 use Whity\Core\Accounting\StockBooks;
+use Whity\Core\Accounting\StockCostInboxSource;
 use Whity\Core\Inventory\InventoryCosts;
 use Whity\Core\Inventory\InventoryDb;
 use Whity\Core\Inventory\InventoryRejectedException;
@@ -22,6 +23,7 @@ use Whity\Core\Inventory\StockLedger;
 use Whity\Core\Inventory\UnitCatalog;
 use Whity\Database\SequenceCounters;
 use Whity\Sdk\Contribute\WorkspaceAccountingExport;
+use Whity\Sdk\Inventory\StockPosting;
 
 /**
  * Stock in the books against the real schema (WHIT-1318 A4a, design section
@@ -74,7 +76,7 @@ final class StockBooksRealEngineTest extends TestCase
         $this->stock = new StockBooks($db, $this->books, $this->ledger, $this->costs);
         // Before A4: stock with no cost and no books. After: costs and the export.
         $this->plain = new StockLedger($invDb, $this->places, $this->items, $this->units, null, null, null, null, static fn (): ?WorkspaceAccountingExport => null);
-        $this->booked = new StockLedger($invDb, $this->places, $this->items, $this->units, null, null, null, $this->costs, fn (): ?WorkspaceAccountingExport => $this->stock);
+        $this->booked = new StockLedger($invDb, $this->places, $this->items, $this->units, null, null, null, $this->costs, fn (): WorkspaceAccountingExport => $this->stock);
         $this->flour = (int) $this->items->create(1, ['name' => 'Flour, 1 kg bag', 'unit' => 'pc', 'purchase_price_minor' => 1000], self::AMRO)['variants'][0]['id'];
         $this->kitchen = (int) $this->locations->create(1, ['name' => 'Central kitchen'])['id'];
     }
@@ -165,12 +167,119 @@ final class StockBooksRealEngineTest extends TestCase
             self::fail('a closed month in the books is closed for stock');
         } catch (InventoryRejectedException $e) {
             self::assertSame(409, $e->status);
-            self::assertSame('books', $e->extra['code'] ?? null);
+            self::assertSame('period_closed', $e->extra['code'] ?? null);
+            self::assertSame('accounting:close', $e->extra['reopened_with'] ?? null);
+            // Plain words: the month is closed in the books, and who can reopen it.
+            self::assertStringContainsString('that month is closed in the books', $e->getMessage());
+            self::assertStringContainsString('close and reopen months in Accounting (an admin or the accountant) can reopen it', $e->getMessage());
         }
         self::assertSame(5, $this->costs->of(1, $this->flour)['quantity'], 'the stock did not move');
         $level = $this->pdo->query('SELECT SUM(on_hand) FROM inv_levels WHERE tenant_id = 1');
         self::assertNotFalse($level);
         self::assertSame(5, (int) $level->fetchColumn());
+    }
+
+    /**
+     * Live (AAU IRB shape): stock already on hand, most of it with no purchase
+     * price, and nobody runs the CLI. The first stock change brings in only
+     * what has a cost, posts nothing for the rest, and lists it as waiting;
+     * giving it a cost then posts it.
+     */
+    public function testTheFirstChangeOnALiveWorkspaceWithUncostedStockPostsNothingWrong(): void
+    {
+        $gloves = (int) $this->items->create(1, ['name' => 'Nitrile gloves, box', 'unit' => 'pc'], self::AMRO)['variants'][0]['id'];
+        $swabs = (int) $this->items->create(1, ['name' => 'Sterile swabs', 'unit' => 'pc'], self::AMRO)['variants'][0]['id'];
+        $this->plain->adjust(1, self::AMRO, 'opening', [
+            ['variant_id' => $gloves, 'location_id' => $this->kitchen, 'change' => '40'],
+            ['variant_id' => $swabs, 'location_id' => $this->kitchen, 'change' => '200'],
+            ['variant_id' => $this->flour, 'location_id' => $this->kitchen, 'change' => '3'],
+        ], '', '', null, null);
+        self::assertSame(0, $this->entries(), 'nothing in the books before the first change');
+        // The deploy comes later (SQLite keeps seconds only; PostgreSQL's cutover is the first batch's own instant).
+        sleep(1);
+
+        // The first change after the deploy: two boxes of gloves used.
+        $this->booked->post(1, self::AMRO, [[
+            'variant_id' => $gloves, 'quantity' => '2', 'from_location_id' => $this->kitchen, 'to_location_id' => $this->places->virtualId(1, 'consumed'),
+        ]], ['source_type' => 'adjustment']);
+
+        self::assertSame(3000, $this->balance('1300'), 'only the flour, which has a price, is brought in');
+        self::assertSame(-3000, $this->balance('3900'));
+        self::assertSame(0, $this->balance('5100'), 'gloves with no cost post no cost of sales');
+        $status = $this->stock->status(1);
+        self::assertSame($status['stock_value_minor'], $status['stock_account_minor']);
+        self::assertSame(2, $status['items_without_cost']);
+
+        $waiting = $this->stock->waitingAll(1);
+        self::assertSame(['Nitrile gloves, box', 'Sterile swabs'], array_column($waiting['items'], 'item_name'));
+        self::assertSame([38, 200], array_column($waiting['items'], 'quantity'));
+        self::assertCount(1, $waiting['moves'], 'the gloves used');
+
+        // Waiting for me in the Inbox, for whoever can set accounting up, and nobody else.
+        $inbox = new StockCostInboxSource(new AccountingDb($this->pdo), static fn (int $p, string $perm, int $t): bool => $p === self::AMRO && $perm === 'accounting:settings');
+        self::assertSame(2, $inbox->count(1, self::AMRO, true));
+        self::assertSame(0, $inbox->count(1, 12, true));
+        self::assertSame('Nitrile gloves, box', $inbox->list(1, self::AMRO, true, 10, 0)[1]->title);
+
+        // A person gives the gloves a cost: their stock goes into the books.
+        $given = $this->stock->setCost(1, $gloves, 2500, self::AMRO);
+        self::assertSame(95000, $given['value_minor'], '38 boxes at 2.500');
+        self::assertSame(98000, $this->balance('1300'));
+        self::assertSame(1, $inbox->count(1, self::AMRO, true));
+        $status = $this->stock->status(1);
+        self::assertSame($status['stock_value_minor'], $status['stock_account_minor']);
+        self::assertTrue($this->ledger->verifyChain(1)['intact']);
+    }
+
+    /**
+     * Off means inventory as before A4: the export is never called, so a
+     * closed month in the books cannot refuse a stock change.
+     */
+    public function testOffNeverCallsTheExportAndAClosedMonthDoesNotStopStock(): void
+    {
+        $calls = 0;
+        $spy = new class ($this->stock, $calls) implements WorkspaceAccountingExport {
+            public function __construct(private readonly StockBooks $inner, private int &$calls)
+            {
+            }
+
+            public function keepsStock(int $workspaceId): bool
+            {
+                return $this->inner->keepsStock($workspaceId);
+            }
+
+            public function record(StockPosting $posting): ?string
+            {
+                $this->calls++;
+
+                return $this->inner->record($posting);
+            }
+        };
+        $ledger = new StockLedger(new InventoryDb($this->pdo), $this->places, $this->items, $this->units, null, null, null, $this->costs, static fn (): WorkspaceAccountingExport => $spy);
+
+        $ledger->adjust(1, self::AMRO, 'adjustment', [['variant_id' => $this->flour, 'location_id' => $this->kitchen, 'change' => '4']], 'found', '', null, null);
+        self::assertSame(1, $calls, 'on: each stock change goes to the books');
+
+        $this->stock->setOn(1, false);
+        $month = $this->periods->periodFor(1, $this->today);
+        $this->periods->close(1, $month['id'], self::AMRO);
+        $entries = $this->entries();
+        $ledger->adjust(1, self::AMRO, 'adjustment', [['variant_id' => $this->flour, 'location_id' => $this->kitchen, 'change' => '-1']], 'damaged', '', null, null);
+        self::assertSame(1, $calls, 'off: no call at all');
+        self::assertSame($entries, $this->entries());
+        self::assertSame(3, $this->costs->of(1, $this->flour)['quantity'], 'the stock moved, closed month or not');
+    }
+
+    public function testAPricedReceiptOfAWeighedItemIsValuedPerKilogram(): void
+    {
+        $sugar = (int) $this->items->create(1, ['name' => 'Sugar', 'unit' => 'kg'], self::AMRO)['variants'][0]['id'];
+        $this->booked->post(1, self::AMRO, [[
+            'variant_id' => $sugar, 'quantity' => '2.5',
+            'from_location_id' => $this->places->virtualId(1, 'supplier'), 'to_location_id' => $this->kitchen,
+            'unit_cost_minor' => 800, 'currency' => 'JOD',
+        ]], ['source_type' => 'receipt']);
+        self::assertSame(2000, $this->costs->of(1, $sugar)['value_minor'], '2.5 kg at 0.800 a kilogram, not 2,500 grams at 0.800');
+        self::assertSame(2000, $this->balance('1300'));
     }
 
     private function receive(int $kg, int $unitCost): void

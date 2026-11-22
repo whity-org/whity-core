@@ -16,8 +16,8 @@ use Whity\Http\JsonBody;
  * §6, Q3).
  *
  * PERMISSIONS
- * Reading on `accounting:read`; the switch and bringing stock in on
- * `accounting:settings`.
+ * Reading on `accounting:read`; the switch, bringing stock in and giving
+ * stock with no cost its cost on `accounting:settings`.
  *
  * AGENTS
  * The routes are MCP tools in `core.accounting`. No write declares an undo,
@@ -59,9 +59,30 @@ final class AccountingStockApiHandler
         });
     }
 
+    public function cost(Request $request): Response
+    {
+        return $this->run($request, 'stock cost', function (int $tenantId, ?int $actor) use ($request): Response {
+            $body = JsonBody::parsed($request);
+            $variant = $body['variant_id'] ?? null;
+            $cost = $body['unit_cost_minor'] ?? null;
+            $date = $body['date'] ?? null;
+            if (!is_int($variant) || $variant <= 0) {
+                throw AccountingRejectedException::field('variant_id', 'variant_id is the item variant to give a cost');
+            }
+            if (!is_int($cost) || $cost < 0) {
+                throw AccountingRejectedException::field('unit_cost_minor', 'unit_cost_minor is the cost of one base unit, in minor units, zero or more');
+            }
+            if ($date !== null && !is_string($date)) {
+                throw AccountingRejectedException::field('date', 'date is YYYY-MM-DD');
+            }
+
+            return Response::json(['data' => $this->stock->setCost($tenantId, $variant, $cost, $actor, $date)], 201);
+        });
+    }
+
     public function waiting(Request $request): Response
     {
-        return $this->run($request, 'stock waiting', fn (int $tenantId): Response => Response::json(['data' => $this->stock->waiting($tenantId)]));
+        return $this->run($request, 'stock waiting', fn (int $tenantId): Response => Response::json(['data' => $this->stock->waitingAll($tenantId)]));
     }
 
     /** @param callable(int, ?int): Response $work */

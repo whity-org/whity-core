@@ -59,10 +59,33 @@ final class StockBooks implements WorkspaceAccountingExport
     ) {
     }
 
+    public function keepsStock(int $workspaceId): bool
+    {
+        return $this->isOn($workspaceId);
+    }
+
     public function record(StockPosting $posting): ?string
     {
         // The books' refusals reach inventory as the SDK's AccountingRejected.
-        return HostAccountingGuard::run(fn (): ?string => $this->post($posting));
+        return HostAccountingGuard::run(function () use ($posting): ?string {
+            try {
+                return $this->post($posting);
+            } catch (AccountingRejectedException $e) {
+                if (($e->extra['code'] ?? null) !== 'period_closed') {
+                    throw $e;
+                }
+                $lock = $this->workspace->books($posting->workspaceId)['lock_date'];
+                throw AccountingRejectedException::coded(
+                    'period_closed',
+                    $lock !== null && $posting->occurredOn <= $lock
+                        ? 'Stock can\'t change on ' . $posting->occurredOn . ': the books are locked up to ' . $lock
+                            . '. Someone allowed to close and reopen months in Accounting (an admin or the accountant) can move the lock date. Or date this change after it.'
+                        : 'Stock can\'t change on ' . $posting->occurredOn . ': that month is closed in the books.'
+                            . ' Someone allowed to close and reopen months in Accounting (an admin or the accountant) can reopen it. Or date this change in an open month.',
+                    409
+                );
+            }
+        });
     }
 
     private function post(StockPosting $posting): ?string
@@ -110,6 +133,43 @@ final class StockBooks implements WorkspaceAccountingExport
     }
 
     /**
+     * Gives stock with no cost its cost (one base unit, in the workspace's
+     * currency) and, when stock is in the books, posts its value against
+     * Opening balances, so the Stock account takes it in. Clears it from
+     * "Waiting for you".
+     *
+     * @return array{variant_id: int, value_minor: int, entry_id: ?int}
+     */
+    public function setCost(int $tenantId, int $variantId, int $unitCostMinor, ?int $actor, ?string $date = null): array
+    {
+        if ($unitCostMinor < 0) {
+            throw AccountingRejectedException::coded('invalid', 'The cost can\'t be below zero', 422, 'unit_cost_minor');
+        }
+
+        return $this->db->transaction(function () use ($tenantId, $variantId, $unitCostMinor, $actor, $date): array {
+            $value = $this->costs->setUnknown($tenantId, $variantId, $unitCostMinor);
+            if ($value === null) {
+                throw new AccountingRejectedException('This item\'s cost is already known, or none is on hand', 409, ['code' => 'already']);
+            }
+            $entry = null;
+            if ($value > 0 && $this->isOn($tenantId) && $this->cutover($tenantId) !== null) {
+                $stock = $this->workspace->roleAccountId($tenantId, 'inventory');
+                $opening = $this->workspace->roleAccountId($tenantId, 'opening_balance');
+                $entry = (int) $this->ledger->post($tenantId, $actor, [
+                    'journal' => 'OPN',
+                    'date' => $date ?? gmdate('Y-m-d'),
+                    'memo' => 'Stock with no cost given its cost',
+                    'source_type' => 'stock',
+                    'idempotency_key' => 'stock_cost:' . $variantId . ':' . bin2hex(random_bytes(6)),
+                    'lines' => [['account_id' => $stock, 'debit_minor' => $value], ['account_id' => $opening, 'credit_minor' => $value]],
+                ])['entry']['id'];
+            }
+
+            return ['variant_id' => $variantId, 'value_minor' => $value, 'entry_id' => $entry];
+        });
+    }
+
+    /**
      * Turns stock in the books on or off. Off stops posting; on again values
      * the stock with the next batch (or now, with `openNow`).
      *
@@ -152,8 +212,46 @@ final class StockBooks implements WorkspaceAccountingExport
     }
 
     /**
+     * "Waiting for you": the items on hand whose cost is unknown (no purchase
+     * price and no priced receipt, so they are not in the Stock account), and
+     * the stock moves since stock went into the books that posted nothing for
+     * want of a cost.
+     *
+     * @return array{items: list<array<string, mixed>>, moves: list<array<string, mixed>>}
+     */
+    public function waitingAll(int $tenantId, int $limit = 100): array
+    {
+        return ['items' => $this->withoutCost($tenantId, $limit), 'moves' => $this->waiting($tenantId, $limit)];
+    }
+
+    /**
+     * Items on hand with no known cost.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function withoutCost(int $tenantId, int $limit = 100): array
+    {
+        $this->costs->stockValue($tenantId);
+
+        return array_map(static fn (array $r): array => [
+            'variant_id' => (int) $r['variant_id'],
+            'item_id' => (int) $r['item_id'],
+            'item_name' => (string) $r['item_name'],
+            'quantity' => (int) $r['quantity'],
+        ], $this->db->all(
+            'SELECT c.variant_id, v.item_id, i.name AS item_name, c.quantity
+               FROM inv_costs c
+               JOIN inv_variants v ON v.id = c.variant_id AND v.tenant_id = c.tenant_id
+               JOIN inv_items i ON i.id = v.item_id AND i.tenant_id = v.tenant_id
+              WHERE c.tenant_id = :tenant_id AND c.quantity <> 0 AND c.value_minor IS NULL
+              ORDER BY i.name, c.variant_id LIMIT ' . max(1, min(1000, $limit)),
+            [':tenant_id' => $tenantId]
+        ));
+    }
+
+    /**
      * Stock moves since stock went into the books whose cost is unknown, so
-     * they posted nothing: "Waiting for you".
+     * they posted nothing.
      *
      * @return list<array<string, mixed>>
      */
@@ -271,9 +369,14 @@ final class StockBooks implements WorkspaceAccountingExport
 
     private function isOn(int $tenantId): bool
     {
+        // Read first: a workspace that turned it off never has its books touched.
+        $row = $this->db->one('SELECT stock_in_books FROM acc_books WHERE tenant_id = :tenant_id', [':tenant_id' => $tenantId]);
+        if ($row !== null) {
+            return DbBool::of($row['stock_in_books'] ?? true);
+        }
         $this->workspace->ensure($tenantId);
 
-        return DbBool::of($this->db->one('SELECT stock_in_books FROM acc_books WHERE tenant_id = :tenant_id', [':tenant_id' => $tenantId])['stock_in_books'] ?? true);
+        return true;
     }
 
     private function cutover(int $tenantId): ?string

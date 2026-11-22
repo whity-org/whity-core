@@ -234,11 +234,29 @@ final class AccountingApiSchemas
                     'unknown' => ['type' => 'array', 'items' => self::int(), 'description' => 'Variants with no cost yet, not valued.'],
                 ], ['posted', 'amount_minor', 'unknown'])))] + $refused + self::auth(),
             ]),
-            self::route('GET', '/api/accounting/stock/waiting', 'accounting:read', [
-                'summary' => 'Stock changes waiting for a cost',
-                'description' => 'Moves since stock went into the books whose cost is unknown, so they posted nothing.',
+            self::route('POST', '/api/accounting/stock/costs', 'accounting:settings', [
+                'summary' => 'Give stock with no cost its cost',
+                'description' => 'For an item on hand whose cost is unknown (no purchase price and no priced receipt): sets the cost of one base unit, in the workspace\'s currency, and posts the stock\'s value against Opening balances so the Stock account takes it in.',
                 'tags' => $tags,
-                'responses' => [200 => self::json('Waiting', ['type' => 'object', 'properties' => ['data' => ['type' => 'array', 'items' => self::object([
+                'request' => 'AccountingStockCost',
+                'responses' => [201 => self::json('The cost given', self::data(self::object([
+                    'variant_id' => self::int(),
+                    'value_minor' => self::int() + ['description' => 'What the stock on hand is now worth.'],
+                    'entry_id' => self::int(true),
+                ], ['variant_id', 'value_minor'])))] + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/stock/waiting', 'accounting:read', [
+                'summary' => 'Stock waiting for a cost',
+                'description' => 'Items on hand whose cost is unknown, so they are not in the Stock account, and moves since stock went into the books that posted nothing for want of a cost.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('Waiting', ['type' => 'object', 'properties' => ['data' => self::object([
+                    'items' => ['type' => 'array', 'items' => self::object([
+                        'variant_id' => self::int(),
+                        'item_id' => self::int(),
+                        'item_name' => self::str(),
+                        'quantity' => self::int() + ['description' => 'In the unit\'s smallest steps.'],
+                    ], ['variant_id', 'item_id', 'item_name', 'quantity'])],
+                    'moves' => ['type' => 'array', 'items' => self::object([
                     'move_id' => self::int(),
                     'variant_id' => self::int(),
                     'item_name' => self::str(),
@@ -246,7 +264,8 @@ final class AccountingApiSchemas
                     'source_type' => self::str(),
                     'source_id' => self::int(true),
                     'occurred_at' => self::str(),
-                ], ['move_id', 'variant_id', 'item_name', 'quantity'])]], 'required' => ['data']])] + self::auth(),
+                    ], ['move_id', 'variant_id', 'item_name', 'quantity'])],
+                ], ['items', 'moves'])], 'required' => ['data']])] + self::auth(),
             ]),
         ];
     }
@@ -1223,6 +1242,11 @@ final class AccountingApiSchemas
             'AccountingStockSwitch' => self::object([
                 'stock_in_books' => self::bool() + ['description' => 'Whether stock posts to the books.'],
             ], ['stock_in_books']),
+            'AccountingStockCost' => self::object([
+                'variant_id' => self::int(),
+                'unit_cost_minor' => self::int() + ['description' => 'The cost of one base unit (a kilogram, a piece), in minor units of the workspace\'s currency.'],
+                'date' => self::str() + ['description' => 'YYYY-MM-DD, in an open month. Default: today.'],
+            ], ['variant_id', 'unit_cost_minor']),
             'AccountingStockOpening' => self::object([
                 'date' => self::str() + ['description' => 'YYYY-MM-DD, in an open month. Default: today.'],
             ], []),

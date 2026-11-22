@@ -1627,6 +1627,10 @@
     "en": "Record a petty cash spend",
     "ar": "تسجيل مصروف من النثرية"
   },
+  "post_api_accounting_stock_costs": {
+    "en": "Give stock a cost",
+    "ar": "تحديد تكلفة المخزون"
+  },
   "post_api_accounting_stock_opening": {
     "en": "Bring stock into the books",
     "ar": "إدخال المخزون إلى الدفاتر"

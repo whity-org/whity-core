@@ -12,6 +12,7 @@ use Whity\Sdk\Hooks\HookVetoException;
 use Whity\Sdk\Inventory\Quantity;
 use Whity\Sdk\Inventory\StockPosting;
 use Whity\Sdk\Inventory\StockPostingMove;
+use Whity\Sdk\Accounting\AccountingRejected;
 use Whity\Sdk\SdkException;
 
 /**
@@ -402,8 +403,16 @@ final class StockLedger
             });
         } catch (HookVetoException $e) {
             throw new InventoryRejectedException($e->reason(), 409, ['code' => 'vetoed']);
-        } catch (SdkException $e) {
+        } catch (AccountingRejected $e) {
             // The books refused the batch (a closed month): the stock move is refused with it.
+            throw new InventoryRejectedException(
+                $e->getMessage(),
+                409,
+                $e->reason === AccountingRejected::PERIOD_CLOSED
+                    ? ['code' => 'period_closed', 'reopened_with' => 'accounting:close']
+                    : ['code' => 'books']
+            );
+        } catch (SdkException $e) {
             throw new InventoryRejectedException($e->getMessage(), 409, ['code' => 'books']);
         } catch (\PDOException $e) {
             $key = $meta['idempotency_key'] ?? null;
@@ -728,7 +737,8 @@ final class StockLedger
     private function toBooks(int $tenantId, ?int $actor, string $batchKey, string $sourceType, ?int $sourceId, string $occurredAt): void
     {
         $export = ($this->export)();
-        if ($export === null) {
+        // Stock not in the books: no call at all, so no closed month can refuse the move.
+        if ($export === null || !$export->keepsStock($tenantId)) {
             return;
         }
         $moves = $this->db->all(
