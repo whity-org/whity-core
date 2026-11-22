@@ -8,7 +8,7 @@
 #   php-version: '8.4'
 #   test job       -> extensions: mbstring, pdo, pdo_sqlite   coverage: pcov
 #   postgres job   -> extensions: mbstring, pdo, pdo_pgsql, pgsql
-FROM php:8.4.28-cli
+FROM php:8.6.0RC7-cli
 
 # git + unzip: composer needs them for --prefer-dist and for the OpenAPI drift
 # check, which shells out to `git diff --exit-code`.
