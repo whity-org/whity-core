@@ -3,9 +3,13 @@
 # end to end; adapt the images, the other app and the secrets to yours.
 #
 #   cp .env.example .env    # then fill in the secrets
+#   docker compose up -d postgres
+#   docker compose run --rm --no-deps app php public/index.php migrate run
 #   docker compose up -d
-#   docker compose exec app php public/index.php migrate
 #   ./smoke.sh http://localhost:8080
+#
+# Migrate BEFORE starting the app: on an empty database its workers fail to
+# boot and restart, which would also kill a migration run inside them.
 #
 # Only Caddy publishes a port. The backend and the web app are reachable only
 # on the compose network, and the backend believes the client-IP header only
@@ -108,7 +112,7 @@ services:
   # Stand-in for your app: it answers every path Whity does not own.
   other:
     image: caddy:2
-    command: caddy respond --listen :80 --body "Example Bakery app: this path belongs to the other app."
+    command: ["caddy", "respond", "--listen", ":80", "--body", "Example Bakery app: this path belongs to the other app."]
     networks: [edge]
 
 networks:
@@ -116,7 +120,10 @@ networks:
     ipam:
       config:
         - subnet: ${EDGE_SUBNET:-172.30.0.0/24}
-  internal: {}
+  internal:
+    ipam:
+      config:
+        - subnet: ${INTERNAL_SUBNET:-172.31.0.0/24}
 
 volumes:
   storage: {}

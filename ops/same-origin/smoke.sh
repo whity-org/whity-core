@@ -20,7 +20,13 @@ check "backend answers /api"        "/api/health"             '"status"'
 check "web answers its pages"       "/login"                  "_next/static"
 check "web serves its manifest"     "/web-build/routes.json"  '"routes"'
 check "web serves its worker"       "/sw.js"                  "Whity app worker"
-check "MCP discovery is the backend" "/.well-known/oauth-protected-resource" "resource"
+# MCP answers 404 while it is switched off (mcp.enabled), so check who answered:
+# the backend's API responses carry its strict CSP; the web app's pages do not.
+headers=$(curl -sS -o /dev/null -D - --max-time 15 "$ORIGIN/.well-known/oauth-protected-resource" 2>/dev/null || true)
+case "$headers" in
+  *"default-src 'none'"*) echo "ok   MCP discovery reaches the backend: /.well-known/oauth-protected-resource" ;;
+  *) echo "FAIL MCP discovery: /.well-known/oauth-protected-resource did not reach the backend"; fail=1 ;;
+esac
 
 asset=$(curl -fsS --max-time 15 "$ORIGIN/login" | grep -o '/_next/static/[^"]*\.js' | head -1 || true)
 if [ -n "$asset" ] && curl -fsS -o /dev/null --max-time 15 "$ORIGIN$asset"; then

@@ -164,10 +164,16 @@ through.
 ```bash
 cd ops/same-origin
 cp .env.example .env   # fill in the secrets
+docker compose up -d postgres
+docker compose run --rm --no-deps app php public/index.php migrate run
 docker compose up -d
-docker compose exec app php public/index.php migrate
 ./smoke.sh http://localhost:8080
 ```
+
+Migrate before the app starts: on an empty database its workers fail to boot
+and restart, and a migration run inside them would be killed with them. The
+first operator sign-in then opens the instance set-up wizard, as on any new
+install.
 
 `smoke.sh` checks that `/` and `/courses/intro` reach your app, `/api/health`
 and MCP discovery the backend, and `/login`, its `/_next` assets,
