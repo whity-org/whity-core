@@ -102,7 +102,7 @@ final class AccountingApiHandlerRealEngineTest extends TestCase
                 $byRoute[$route['method'] . ' ' . $route['path']] = $route['requiredPermission'];
             }
         }
-        self::assertCount(10, $byRoute);
+        self::assertCount(14, $byRoute);
         $constants = ['invoices:read' => 'INVOICES_READ', 'invoices:write' => 'INVOICES_WRITE', 'accounting:settings' => 'ACCOUNTING_SETTINGS'];
         $index = (string) file_get_contents(dirname(__DIR__, 2) . '/public/index.php');
         foreach ($byRoute as $route => $permission) {
@@ -110,7 +110,7 @@ final class AccountingApiHandlerRealEngineTest extends TestCase
             // invoices:write, and the invoice settings accounting:settings.
             $expected = match (true) {
                 str_starts_with($route, 'GET ') => 'invoices:read',
-                str_contains($route, '/invoice-settings') => 'accounting:settings',
+                str_contains($route, '/invoice-settings'), str_contains($route, '/tax-codes') => 'accounting:settings',
                 default => 'invoices:write',
             };
             self::assertSame($expected, $permission, $route);

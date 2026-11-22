@@ -1259,6 +1259,10 @@
     "en": "Change a draft journal entry",
     "ar": "تعديل مسودة قيد"
   },
+  "patch_api_accounting_tax_codes_id": {
+    "en": "Change a tax code",
+    "ar": "تعديل رمز ضريبة"
+  },
   "patch_api_affiliate_payouts_id": {
     "en": "Record that a payout was transferred",
     "ar": "تسجيل تحويل دفعة مسوّق"
@@ -1498,6 +1502,18 @@
   "post_api_accounting_periods_id_reopen": {
     "en": "Reopen a month",
     "ar": "إعادة فتح شهر"
+  },
+  "post_api_accounting_tax_codes": {
+    "en": "Add a tax code",
+    "ar": "إضافة رمز ضريبة"
+  },
+  "post_api_accounting_tax_codes_id_archive": {
+    "en": "Archive a tax code",
+    "ar": "أرشفة رمز ضريبة"
+  },
+  "post_api_accounting_tax_codes_id_restore": {
+    "en": "Restore a tax code",
+    "ar": "استعادة رمز ضريبة"
   },
   "post_api_affiliates": {
     "en": "Create an affiliate",

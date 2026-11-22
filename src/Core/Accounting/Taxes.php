@@ -129,6 +129,173 @@ final class Taxes
         return self::present($row);
     }
 
+    // ── changing the codes (accounting:settings) ─────────────────────────
+
+    public const TREATMENTS = ['standard', 'reduced', 'zero', 'exempt', 'out_of_scope', 'reverse_charge'];
+
+    /**
+     * Adds a code. A rate that changes is a new code from its `valid_from`
+     * date, never an edited rate (AC.19), so documents already issued keep
+     * the rate they were taxed at.
+     *
+     * @param array<string, mixed> $body `code`, `name` (text or `{en, ar}`), `direction`, `rate_bp`, `treatment`, `category`, `account_id`, `valid_from`, `valid_to`
+     * @return array<string, mixed>
+     */
+    public function create(int $tenantId, array $body): array
+    {
+        $this->workspace->ensure($tenantId);
+        $code = is_string($body['code'] ?? null) ? strtoupper(trim($body['code'])) : '';
+        if (preg_match('/^[A-Z0-9][A-Z0-9_.-]{0,29}$/', $code) !== 1) {
+            throw AccountingRejectedException::field('code', 'code is up to 30 letters, digits, dots, dashes or underscores, such as JO-GST-8');
+        }
+        [$name, $names] = self::name($body['name'] ?? null);
+        $direction = $body['direction'] ?? null;
+        if (!in_array($direction, self::DIRECTIONS, true)) {
+            throw AccountingRejectedException::field('direction', 'direction is output (sales) or input (purchases)');
+        }
+        $rate = $body['rate_bp'] ?? null;
+        if (!is_int($rate) || $rate < 0 || $rate > 10000) {
+            throw AccountingRejectedException::field('rate_bp', 'rate_bp is basis points, 0 to 10000 (1600 is 16%)');
+        }
+        $treatment = $body['treatment'] ?? ($rate > 0 ? 'standard' : 'zero');
+        if (!in_array($treatment, self::TREATMENTS, true)) {
+            throw AccountingRejectedException::field('treatment', 'treatment is one of ' . implode(', ', self::TREATMENTS));
+        }
+        $category = is_string($body['category'] ?? null) ? strtolower(trim($body['category'])) : '';
+        if ($category !== '' && preg_match('/^[a-z0-9_]{1,40}$/', $category) !== 1) {
+            throw AccountingRejectedException::field('category', 'category is a tax category such as standard, reduced_8, zero or exempt');
+        }
+        $from = isset($body['valid_from']) ? Periods::date($body['valid_from'], 'valid_from') : null;
+        $to = isset($body['valid_to']) ? Periods::date($body['valid_to'], 'valid_to') : null;
+        if ($from !== null && $to !== null && $to < $from) {
+            throw AccountingRejectedException::field('valid_to', 'valid_to cannot be before valid_from');
+        }
+        $accountId = $this->taxAccount($tenantId, $body['account_id'] ?? null, (string) $direction);
+        try {
+            $id = $this->db->insert(
+                'INSERT INTO acc_tax_codes (tenant_id, code, name, names, pack, direction, rate_bp, treatment, category, account_id,
+                        valid_from, valid_to)
+                 VALUES (:tenant_id, :code, :name, :names, :pack, :direction, :rate, :treatment, :category, :account_id, :from, :to)',
+                [
+                    ':tenant_id' => $tenantId, ':code' => $code, ':name' => $name, ':names' => $names,
+                    ':pack' => $this->workspace->books($tenantId)['tax_pack'], ':direction' => $direction, ':rate' => $rate,
+                    ':treatment' => $treatment, ':category' => $category, ':account_id' => $accountId, ':from' => $from, ':to' => $to,
+                ]
+            );
+        } catch (\PDOException $e) {
+            if (AccountingDb::isUniqueViolation($e)) {
+                throw AccountingRejectedException::coded('conflict', 'There is already a tax code ' . $code, 409, 'code');
+            }
+            throw $e;
+        }
+
+        return $this->get($tenantId, $id);
+    }
+
+    /**
+     * Changes what a code is called, where its tax goes, its category and
+     * when it stops: never its rate, direction or treatment, which issued
+     * documents were taxed at.
+     *
+     * @param array<string, mixed> $body `name`, `account_id`, `category`, `valid_to`
+     * @return array<string, mixed>
+     */
+    public function update(int $tenantId, int $id, array $body): array
+    {
+        $current = $this->get($tenantId, $id);
+        foreach (['rate_bp', 'direction', 'treatment', 'code'] as $frozen) {
+            if (array_key_exists($frozen, $body) && $body[$frozen] !== $current[$frozen]) {
+                throw AccountingRejectedException::field(
+                    $frozen,
+                    $frozen === 'rate_bp'
+                        ? 'A rate never changes: add a new code from the date the new rate starts, and end this one with valid_to'
+                        : $frozen . ' cannot change; add a new code instead'
+                );
+            }
+        }
+        $sets = [];
+        $params = [':tenant_id' => $tenantId, ':id' => $id];
+        if (array_key_exists('name', $body)) {
+            [$params[':name'], $params[':names']] = self::name($body['name']);
+            $sets[] = 'name = :name, names = :names';
+        }
+        if (array_key_exists('account_id', $body)) {
+            $params[':account_id'] = $this->taxAccount($tenantId, $body['account_id'], (string) $current['direction']);
+            $sets[] = 'account_id = :account_id';
+        }
+        if (array_key_exists('category', $body)) {
+            $category = is_string($body['category']) ? strtolower(trim($body['category'])) : null;
+            if ($category === null || ($category !== '' && preg_match('/^[a-z0-9_]{1,40}$/', $category) !== 1)) {
+                throw AccountingRejectedException::field('category', 'category is a tax category such as standard, reduced_8, zero or exempt');
+            }
+            $params[':category'] = $category;
+            $sets[] = 'category = :category';
+        }
+        if (array_key_exists('valid_to', $body)) {
+            $to = $body['valid_to'] === null ? null : Periods::date($body['valid_to'], 'valid_to');
+            if ($to !== null && $current['valid_from'] !== null && $to < $current['valid_from']) {
+                throw AccountingRejectedException::field('valid_to', 'valid_to cannot be before valid_from');
+            }
+            $params[':valid_to'] = $to;
+            $sets[] = 'valid_to = :valid_to';
+        }
+        if ($sets !== []) {
+            $this->db->run('UPDATE acc_tax_codes SET ' . implode(', ', $sets) . ' WHERE tenant_id = :tenant_id AND id = :id', $params);
+        }
+
+        return $this->get($tenantId, $id);
+    }
+
+    /**
+     * Archives a code: new lines can't use it; documents that did keep it.
+     *
+     * @return array<string, mixed>
+     */
+    public function archive(int $tenantId, int $id, bool $archived = true): array
+    {
+        $this->get($tenantId, $id);
+        $this->db->run(
+            'UPDATE acc_tax_codes SET archived_at = ' . ($archived ? 'CURRENT_TIMESTAMP' : 'NULL') . ' WHERE tenant_id = :tenant_id AND id = :id',
+            [':tenant_id' => $tenantId, ':id' => $id]
+        );
+
+        return $this->get($tenantId, $id);
+    }
+
+    /** A tax account: given, or the role account for the direction. */
+    private function taxAccount(int $tenantId, mixed $id, string $direction): int
+    {
+        if ($id === null) {
+            return $this->workspace->roleAccountId($tenantId, $direction === 'output' ? 'sales_tax_output' : 'sales_tax_input');
+        }
+        $row = is_int($id) ? $this->db->one(
+            'SELECT id, is_group, archived_at, type FROM acc_accounts WHERE tenant_id = :tenant_id AND id = :id',
+            [':tenant_id' => $tenantId, ':id' => $id]
+        ) : null;
+        if ($row === null || $row['archived_at'] !== null || DbBool::of($row['is_group']) || !in_array($row['type'], ['asset', 'liability'], true)) {
+            throw AccountingRejectedException::field('account_id', 'account_id is an asset or liability account here that takes lines');
+        }
+
+        return (int) $row['id'];
+    }
+
+    /** @return array{0: string, 1: string} the original text and the LocalizedText JSON */
+    private static function name(mixed $raw): array
+    {
+        $texts = is_string($raw) ? ['en' => $raw] : (is_array($raw) ? $raw : []);
+        $clean = [];
+        foreach ($texts as $lang => $text) {
+            if (is_string($lang) && is_string($text) && trim($text) !== '' && preg_match('/^[a-z]{2}$/', $lang) === 1) {
+                $clean[$lang] = mb_substr(trim($text), 0, 120);
+            }
+        }
+        if ($clean === []) {
+            throw AccountingRejectedException::field('name', 'name is text, or {"en": ..., "ar": ...}');
+        }
+
+        return [$clean['en'] ?? (string) reset($clean), LocalizedText::encode($clean)];
+    }
+
     // ── arithmetic ───────────────────────────────────────────────────────
 
     /**

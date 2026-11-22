@@ -195,7 +195,9 @@ final class ContactsRealEngineTest extends TestCase
         $import = $this->imports->upload(1, 11, 'one.csv', "Name\nExample Bakery\n");
         $this->imports->check(1, $import['id'], ['mapping' => ['0' => 'name']]);
         $this->imports->run(1, $import['id'], 11);
-        $contactId = (int) $this->pdo->query("SELECT id FROM contacts WHERE tenant_id = 1 AND name = 'Example Bakery'")->fetchColumn();
+        $found = $this->pdo->query("SELECT id FROM contacts WHERE tenant_id = 1 AND name = 'Example Bakery'");
+        self::assertNotFalse($found);
+        $contactId = (int) $found->fetchColumn();
         // A line in the books names the contact (WHIT-1318): the books keep what was posted.
         $this->pdo->exec(
             "INSERT INTO acc_invoices (tenant_id, kind, contact_id, issue_date, status, currency) VALUES (1, 'sale', {$contactId}, '2026-11-22', 'draft', 'JOD')"

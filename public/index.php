@@ -6032,6 +6032,10 @@ $salesQuoteConversions->register(new \Whity\Core\Accounting\InvoiceQuoteConversi
 \Whity\register_service(\Whity\Sdk\Accounting\Taxes::class, new \Whity\Core\Accounting\Host\HostTaxes($accountingTaxes, $accountingGuard)); // @phpstan-ignore-line
 $accountingInvoicesHandler = new \Whity\Api\AccountingInvoicesApiHandler($accountingInvoices, $accountingTaxes, $settingsService);
 $router->register('GET',    '/api/accounting/tax-codes',                          [$accountingInvoicesHandler, 'listTaxCodes'],   null, null, CorePermissions::INVOICES_READ);
+$router->register('POST',   '/api/accounting/tax-codes',                          [$accountingInvoicesHandler, 'createTaxCode'],  null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('PATCH',  '/api/accounting/tax-codes/{id:\d+}',                 [$accountingInvoicesHandler, 'updateTaxCode'],  null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('POST',   '/api/accounting/tax-codes/{id:\d+}/archive',         [$accountingInvoicesHandler, 'archiveTaxCode'], null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('POST',   '/api/accounting/tax-codes/{id:\d+}/restore',         [$accountingInvoicesHandler, 'restoreTaxCode'], null, null, CorePermissions::ACCOUNTING_SETTINGS);
 $router->register('GET',    '/api/accounting/invoices',                           [$accountingInvoicesHandler, 'list'],           null, null, CorePermissions::INVOICES_READ);
 $router->register('POST',   '/api/accounting/invoices',                           [$accountingInvoicesHandler, 'create'],         null, null, CorePermissions::INVOICES_WRITE);
 $router->register('GET',    '/api/accounting/invoices/{id:\d+}',                  [$accountingInvoicesHandler, 'show'],           null, null, CorePermissions::INVOICES_READ);

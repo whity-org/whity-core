@@ -20,7 +20,8 @@ use Whity\Http\JsonBody;
  *
  * PERMISSIONS
  * Reading on `invoices:read`; drafting, issuing, cancelling drafts and credit
- * notes on `invoices:write`; the invoice settings on `accounting:settings`.
+ * notes on `invoices:write`; the invoice settings and changing tax codes on
+ * `accounting:settings`.
  * Approving is never a permission: a workspace with an invoice route sends an
  * invoice for approval when it is issued (route subject `accounting.invoice`).
  *
@@ -59,6 +60,29 @@ final class AccountingInvoicesApiHandler
                 'include_archived' => ($q['archived'] ?? '') === 'true' ? true : null,
             ], static fn (mixed $v): bool => $v !== null))]);
         });
+    }
+
+    public function createTaxCode(Request $request): Response
+    {
+        return $this->run($request, 'create tax code', fn (int $tenantId): Response => Response::json(['data' => $this->taxes->create($tenantId, JsonBody::parsed($request))], 201));
+    }
+
+    /** @param array<string, string> $params */
+    public function updateTaxCode(Request $request, array $params): Response
+    {
+        return $this->run($request, 'update tax code', fn (int $tenantId): Response => Response::json(['data' => $this->taxes->update($tenantId, (int) $params['id'], JsonBody::parsed($request))]));
+    }
+
+    /** @param array<string, string> $params */
+    public function archiveTaxCode(Request $request, array $params): Response
+    {
+        return $this->run($request, 'archive tax code', fn (int $tenantId): Response => Response::json(['data' => $this->taxes->archive($tenantId, (int) $params['id'])]));
+    }
+
+    /** @param array<string, string> $params */
+    public function restoreTaxCode(Request $request, array $params): Response
+    {
+        return $this->run($request, 'restore tax code', fn (int $tenantId): Response => Response::json(['data' => $this->taxes->archive($tenantId, (int) $params['id'], false)]));
     }
 
     public function list(Request $request): Response

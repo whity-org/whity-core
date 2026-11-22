@@ -2976,7 +2976,13 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
             static fn (): ?\Whity\Sdk\Contribute\WorkspaceEInvoicing => null,
         );
         $this->pdo->exec("INSERT INTO contacts (tenant_id, name, is_customer, is_supplier) VALUES (1, 'Example Cafe', true, false), (2, 'Other Cafe', true, false)");
-        $customerA = (int) $this->pdo->query("SELECT id FROM contacts WHERE tenant_id = 1 AND name = 'Example Cafe'")->fetchColumn();
+        $contactIds = [];
+        foreach ([1 => 'Example Cafe', 2 => 'Other Cafe'] as $tenant => $name) {
+            $found = $this->pdo->prepare('SELECT id FROM contacts WHERE tenant_id = :tenant AND name = :name');
+            $found->execute([':tenant' => $tenant, ':name' => $name]);
+            $contactIds[$tenant] = (int) $found->fetchColumn();
+        }
+        $customerA = $contactIds[1];
         $issued = $invoices->issue(self::TENANT_A, $invoices->create(self::TENANT_A, null, [
             'contact_id' => $customerA, 'lines' => [['description' => 'Catering', 'unit_price_minor' => 1000]],
         ])['invoice']['id'], null);
@@ -3008,7 +3014,7 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         }
         try {
             $invoices->create(self::TENANT_B, null, [
-                'contact_id' => (int) $this->pdo->query("SELECT id FROM contacts WHERE tenant_id = 2 AND name = 'Other Cafe'")->fetchColumn(),
+                'contact_id' => $contactIds[2],
                 'lines' => [['description' => 'X', 'unit_price_minor' => 1, 'tax_code' => $issued['lines'][0]['tax_code_id']]],
             ]);
             self::fail('Tenant B used Tenant A\'s tax code');

@@ -124,6 +124,47 @@ final class InvoicesRealEngineTest extends TestCase
         self::assertNull($this->taxes->codeFor(1, 'luxury', 'output', $this->today), 'an unknown category has no code');
     }
 
+    public function testTheSeededCodesAreEditableButARateNeverChanges(): void
+    {
+        $standard = $this->taxes->codeFor(1, '', 'output', $this->today);
+        self::assertNotNull($standard);
+        $renamed = $this->taxes->update(1, $standard['id'], ['name' => ['en' => 'General sales tax 16%', 'ar' => 'الضريبة العامة على المبيعات 16%']]);
+        self::assertSame('General sales tax 16%', $renamed['name']);
+        self::assertSame(1600, $renamed['rate_bp']);
+
+        try {
+            $this->taxes->update(1, $standard['id'], ['rate_bp' => 1500]);
+            self::fail('a rate never changes');
+        } catch (AccountingRejectedException $e) {
+            self::assertSame('rate_bp', $e->extra['field'] ?? null);
+        }
+
+        // A new rate is a new code from its date; the old one ends the day before.
+        $this->taxes->update(1, $standard['id'], ['valid_to' => '2026-12-31']);
+        $next = $this->taxes->create(1, [
+            'code' => 'JO-GST-15', 'name' => 'Sales tax 15%', 'direction' => 'output', 'rate_bp' => 1500,
+            'category' => 'standard', 'valid_from' => '2027-01-01',
+        ]);
+        self::assertSame($this->accountId(1, '2200'), $next['account_id'], 'output tax goes to its default account');
+        self::assertSame('JO-GST-16', $this->taxes->codeFor(1, '', 'output', '2026-12-31')['code'] ?? null);
+        self::assertSame('JO-GST-15', $this->taxes->codeFor(1, '', 'output', '2027-01-01')['code'] ?? null);
+
+        try {
+            $this->taxes->create(1, ['code' => 'jo-gst-15', 'name' => 'Again', 'direction' => 'output', 'rate_bp' => 1500]);
+            self::fail('codes are unique');
+        } catch (AccountingRejectedException $e) {
+            self::assertSame(409, $e->status);
+        }
+
+        $exempt = $this->taxes->codeFor(1, 'exempt', 'output', $this->today);
+        self::assertNotNull($exempt);
+        $this->taxes->archive(1, $exempt['id']);
+        self::assertNull($this->taxes->codeFor(1, 'exempt', 'output', $this->today), 'an archived code is not offered');
+        $this->taxes->archive(1, $exempt['id'], false);
+        self::assertNotNull($this->taxes->codeFor(1, 'exempt', 'output', $this->today));
+        self::assertCount(10, $this->taxes->list(2), 'another workspace keeps its own codes');
+    }
+
     public function testLineArithmeticRoundsOncePerLine(): void
     {
         self::assertSame(['net' => 10000, 'tax' => 1600, 'total' => 11600], Taxes::split(10000, 1600, false));
@@ -275,26 +316,25 @@ final class InvoicesRealEngineTest extends TestCase
 
     public function testTheInvoiceRouteApprovesBeforeIssuing(): void
     {
-        $sent = [];
-        $this->invoices->useApprovals(new class ($sent) implements InvoiceApprovals {
-            /** @param list<int> $sent */
-            public function __construct(private array &$sent)
-            {
-            }
+        $route = new class implements InvoiceApprovals {
+            /** @var list<int> */
+            public array $sent = [];
+            public ?int $routeId = 77;
 
             public function issue(int $tenantId, ?int $actor, array $invoice): ?int
             {
                 $this->sent[] = (int) $invoice['id'];
 
-                return 77;
+                return $this->routeId;
             }
-        });
+        };
+        $this->invoices->useApprovals($route);
         $draft = $this->draft();
         $waiting = $this->invoices->issue(1, $draft['id'], self::AMRO);
         self::assertSame('waiting_approval', $waiting['status']);
         self::assertSame(77, $waiting['route_id']);
         self::assertNull($waiting['number']);
-        self::assertSame([$draft['id']], $sent);
+        self::assertSame([$draft['id']], $route->sent);
 
         $this->invoices->rejected(1, $draft['id']);
         self::assertSame('draft', $this->invoices->get(1, $draft['id'])['status'], 'sent back: a draft again');
@@ -347,7 +387,7 @@ final class InvoicesRealEngineTest extends TestCase
 
     public function testAQuoteTurnsIntoADraftInvoice(): void
     {
-        $conversion = new InvoiceQuoteConversion($this->invoices, $this->units, static fn (): ?int => 1);
+        $conversion = new InvoiceQuoteConversion($this->invoices, $this->units, fn (): ?int => $this->workspaceFor('quote'));
         $quote = new QuoteSnapshot(5, 'QUO-0005', 1, 41, 'Example Cafe', 'JOD', false, 9000, 1440, 10440, '2026-12-01', 'Thanks', '', [
             new QuoteSnapshotLine(1, null, null, 'Catering', '2', null, 4500, 0, 'standard', 1600, 9000),
         ]);
@@ -421,6 +461,12 @@ final class InvoicesRealEngineTest extends TestCase
                 ['description' => 'Decorating', 'quantity' => '2.5', 'unit_price_minor' => 4000, 'tax_category' => 'exempt', 'account_code' => '4200'],
             ],
         ])['invoice'];
+    }
+
+    /** The workspace a call runs in: Example Bakery, unless none. */
+    private function workspaceFor(string $what): ?int
+    {
+        return $what === '' ? null : 1;
     }
 
     private function accountId(int $tenantId, string $code): int
