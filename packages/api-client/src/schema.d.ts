@@ -21279,6 +21279,10 @@ export interface components {
                     new_domains: string[];
                 } | null;
             };
+            capabilities?: {
+                services: string[];
+                tables: string[];
+            } | null;
         };
         PluginFrameTokenResponse: {
             data: {

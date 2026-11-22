@@ -11996,6 +11996,12 @@ final class CoreApiSchemas
                         'new_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
                     ], ['version', 'new_permissions', 'new_domains']), ['nullable' => true]),
                 ], ['source', 'installed_at', 'permissions', 'outside_domains']),
+                // SDK 1.151 (#1693): the services and tables the plugin declared it
+                // uses; null when it declares nothing.
+                'capabilities' => array_merge(self::object([
+                    'services' => ['type' => 'array', 'items' => ['type' => 'string']],
+                    'tables' => ['type' => 'array', 'items' => ['type' => 'string']],
+                ], ['services', 'tables']), ['nullable' => true]),
             ], ['id', 'name', 'enabled', 'file']),
             'WorkspacePluginInstallResponse' => self::object([
                 'data' => self::object([

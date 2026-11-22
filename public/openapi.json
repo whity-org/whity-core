@@ -118869,6 +118869,28 @@
                             "permissions",
                             "outside_domains"
                         ]
+                    },
+                    "capabilities": {
+                        "type": "object",
+                        "properties": {
+                            "services": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "tables": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "required": [
+                            "services",
+                            "tables"
+                        ],
+                        "nullable": true
                     }
                 },
                 "required": [

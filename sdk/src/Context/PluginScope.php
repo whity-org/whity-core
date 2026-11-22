@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Context;
 
 use Whity\Sdk\Audit\AuditTrail;
+use Whity\Sdk\Database\WorkspaceTables;
 use Whity\Sdk\Documents\PluginDocumentStore;
 use Whity\Sdk\Http\Outbound\AddressPolicy;
 use Whity\Sdk\Http\Outbound\HttpClient;
@@ -27,6 +28,10 @@ use Whity\Sdk\Theme\WorkspaceTheme;
  * A service this host doesn't provide throws {@see ServiceUnavailable} when
  * asked for, never earlier, so a plugin that uses only settings loads on a host
  * without, say, documents.
+ *
+ * A plugin that declares its services
+ * ({@see \Whity\Sdk\Contribute\PluginCapabilitiesInterface}, SDK 1.151) gets
+ * only those: any other throws {@see ServiceNotDeclared}.
  */
 interface PluginScope
 {
@@ -75,4 +80,12 @@ interface PluginScope
      * Its `stock()` is bound to this plugin, the only way a plugin writes stock.
      */
     public function inventory(): InventoryScope;
+
+    /**
+     * This plugin's own tables in this workspace (SDK 1.151, #1693): every call
+     * is held to the workspace by the host. Needs the plugin to declare
+     * {@see Service::DATABASE} and its tables with
+     * {@see \Whity\Sdk\Contribute\PluginCapabilitiesInterface}.
+     */
+    public function database(): WorkspaceTables;
 }
