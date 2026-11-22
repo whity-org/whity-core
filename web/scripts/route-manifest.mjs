@@ -27,7 +27,7 @@
  * the server or the settings area declares is missing there, or when one listed
  * there is no longer declared anywhere and was not moved to `removed`.
  */
-import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -205,8 +205,12 @@ const ID_SOURCES = {
 export function idProblems(ids, repo = REPO) {
   const problems = [];
   const read = (rel) => {
-    const file = path.join(repo, rel);
-    return existsSync(file) ? readFileSync(file, 'utf8') : null;
+    try {
+      return readFileSync(path.join(repo, rel), 'utf8');
+    } catch (error) {
+      if (error && error.code === 'ENOENT') return null;
+      throw error;
+    }
   };
   const index = read('public/index.php');
   const settingsApi = read('src/Api/SettingsApiHandler.php');
@@ -243,14 +247,26 @@ export function serialize(manifest) {
   return JSON.stringify(manifest, null, 2) + '\n';
 }
 
+/** A JSON file's contents, or null when it is missing or empty. Read once, no exists-then-read. */
+function readJsonOrNull(file) {
+  let text;
+  try {
+    text = readFileSync(file, 'utf8');
+  } catch (error) {
+    if (error && error.code === 'ENOENT') return null;
+    throw error;
+  }
+  return text.trim() === '' ? null : JSON.parse(text);
+}
+
 function main(argv) {
   const ids = JSON.parse(readFileSync(IDS, 'utf8'));
-  const previous = existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, 'utf8')) : null;
+  const previous = readJsonOrNull(MANIFEST);
 
   const diffAt = argv.indexOf('--diff');
   if (diffAt !== -1) {
     const oldFile = argv[diffAt + 1];
-    const old = oldFile && existsSync(oldFile) && statSync(oldFile).size > 0 ? JSON.parse(readFileSync(oldFile, 'utf8')) : null;
+    const old = oldFile ? readJsonOrNull(oldFile) : null;
     process.stdout.write(diffManifests(old, previous ?? { routes: [] }));
     return 0;
   }
