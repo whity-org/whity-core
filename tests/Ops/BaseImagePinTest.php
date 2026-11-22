@@ -96,6 +96,18 @@ final class BaseImagePinTest extends TestCase
     }
 
     /**
+     * The image doesn't copy php.ini-production, so without these PHP's
+     * built-in display_errors=1 prints warnings, with file paths, into
+     * response bodies (READINESS CE-20).
+     */
+    public function test_errors_are_logged_not_shown(): void
+    {
+        foreach (["echo 'display_errors = Off';", "echo 'display_startup_errors = Off';", "echo 'log_errors = On';"] as $line) {
+            self::assertStringContainsString($line, $this->dockerfile, 'missing from the security ini: ' . $line);
+        }
+    }
+
+    /**
      * The mitigation PHP published for CVE-2026-115560, which is still
      * unpatched and affects 8.5.12 as well — so it is not something a later
      * base-image bump quietly resolves.

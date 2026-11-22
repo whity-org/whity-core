@@ -37,7 +37,8 @@ use Whity\Sdk\Http\Request;
  * ignored and the client IP is the peer address (`REMOTE_ADDR`): the caller is
  * then counted as itself and can rotate nothing. When NEITHER is configured,
  * the header is believed from any caller, as before, so an existing deployment
- * behind the bundled proxy keeps its real client IPs. The shared-origin guide
+ * behind the bundled proxy keeps its real client IPs; a request without the
+ * header is counted as its peer address (TM-19). The shared-origin guide
  * (docs/wiki/Same-Origin-Setup.md) requires one of them.
  *
  * The decision is made ONCE per request, in {@see self::authenticate()} at the
@@ -109,8 +110,11 @@ final class ClientIp
         $remote = self::clean(is_string($server['REMOTE_ADDR'] ?? null) ? $server['REMOTE_ADDR'] : null);
 
         if ($secret === '' && $proxies === []) {
-            // Not configured: the behaviour before #2386.
-            return $claimed;
+            // Not configured: the header is believed as before #2386. Without
+            // one the caller reached this port directly, so it is counted as
+            // its peer address rather than as nobody: a request with no IP
+            // skipped several per-IP limits (READINESS TM-19).
+            return $claimed ?? $remote;
         }
         if ($claimed === null) {
             return $remote;

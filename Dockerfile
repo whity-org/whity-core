@@ -92,9 +92,17 @@ RUN { \
 # a session by itself to do so, so an unauthenticated POST reaches it on a
 # platform that — like this one — never calls session_start() anywhere.
 # Nothing here reads upload progress, so turning it off costs us nothing.
+#
+# display_errors — the image never copies php.ini-production, so PHP's built-in
+# default (display_errors=1) applied: a warning or deprecation inside a request
+# was printed into the response body with file paths (READINESS CE-20). Errors
+# go to the log instead, which is where the worker's error_log already writes.
 RUN { \
       echo 'expose_php = Off'; \
       echo 'session.upload_progress.enabled = 0'; \
+      echo 'display_errors = Off'; \
+      echo 'display_startup_errors = Off'; \
+      echo 'log_errors = On'; \
     } > "$PHP_INI_DIR/conf.d/zz-whity-security.ini"
 
 # Set working directory

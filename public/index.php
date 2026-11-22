@@ -1837,7 +1837,7 @@ $accountSecurityMailer = new \Whity\Core\Mail\AccountSecurityMailer(
 );
 $authHandler->setSecurityMailer($accountSecurityMailer);
 
-$registerHandler = new RegisterApiHandler($db->getPdo(), $settingsService, $emailVerificationProvider, $hookManager);
+$registerHandler = new RegisterApiHandler($db->getPdo(), $settingsService, $emailVerificationProvider, $hookManager, store: new DatabaseSharedStore($db->getPdo()));
 $router->register('POST', '/api/register', $passwordRoute([$registerHandler, 'register']), null);
 
 // WC-235: public email verification — (re)send a link + confirm a token. Both are
@@ -1926,6 +1926,8 @@ $twoFactorProofThrottle = new LoginThrottleService(
     'two_factor_proof',
 );
 $twoFactorHandler = new TwoFactorHandler($db->getPdo(), $totpService, $backupCodesService, $tokenValidator, $auditLogger, $twoFactorProofThrottle);
+// READINESS CE-6: the current password on PATCH /me counts against the same budget.
+$authHandler->setProofThrottle($twoFactorProofThrottle);
 $twoFactorHandler->setSecurityMailer($accountSecurityMailer);
 $router->register('POST', '/api/auth/2fa/setup', $passwordRoute([$twoFactorHandler, 'setup']), null);
 $router->register('POST', '/api/auth/2fa/confirm', $passwordRoute([$twoFactorHandler, 'confirm']), null);
@@ -4995,7 +4997,9 @@ $publicFormsHandler = new \Whity\Api\PublicFormsApiHandler(
     // a reason for a second storage path.
     $formUploadStore,
     // WHIT-1040: whether the workspace's plan removes "Built on Whity".
-    new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService)
+    new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService),
+    // READINESS TM-20: the same bot check booking and chat use.
+    $publicFormBotCheck,
 );
 $publicFormKeysHandler = new \Whity\Api\PublicFormKeysApiHandler(
     $publicFormKeyRepository,

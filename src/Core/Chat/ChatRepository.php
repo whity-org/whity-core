@@ -130,7 +130,7 @@ final class ChatRepository
      */
     public function chatsForPerson(int $tenantId, int $profileId, int $limit = 200): array
     {
-        $stmt = $this->db->prepare('SELECT ' . self::CHAT_COLUMNS . ', m.id AS member_id, m.last_read_message_id, 0 AS reads_after_message_id
+        $stmt = $this->db->prepare('SELECT ' . self::CHAT_COLUMNS . ', m.id AS member_id, m.last_read_message_id, m.reads_after_message_id
               FROM chat_members m
               JOIN conversations c ON c.id = m.conversation_id AND c.tenant_id = m.tenant_id
               JOIN chats h ON h.conversation_id = c.id AND h.tenant_id = c.tenant_id
@@ -223,12 +223,18 @@ final class ChatRepository
         return null;
     }
 
-    public function addPerson(int $tenantId, int $chatId, int $profileId, ?int $addedBy): int
+    /**
+     * @param int $readsAfter 0 to read the whole history; otherwise only the
+     *                        messages after this id ("from now on")
+     */
+    public function addPerson(int $tenantId, int $chatId, int $profileId, ?int $addedBy, int $readsAfter = 0): int
     {
         $stmt = $this->db->prepare(
-            "INSERT INTO chat_members (tenant_id, conversation_id, profile_id, reads, added_by_profile_id, joined_at)
-             VALUES (:tid, :cid, :pid, 'all', :by, NOW()) RETURNING id"
+            'INSERT INTO chat_members (tenant_id, conversation_id, profile_id, reads, reads_after_message_id, added_by_profile_id, joined_at)
+             VALUES (:tid, :cid, :pid, :reads, :after, :by, NOW()) RETURNING id'
         );
+        $stmt->bindValue(':reads', $readsAfter > 0 ? 'now' : 'all');
+        $stmt->bindValue(':after', max(0, $readsAfter), PDO::PARAM_INT);
         $stmt->bindValue(':tid', $tenantId, PDO::PARAM_INT);
         $stmt->bindValue(':cid', $chatId, PDO::PARAM_INT);
         $stmt->bindValue(':pid', $profileId, PDO::PARAM_INT);
