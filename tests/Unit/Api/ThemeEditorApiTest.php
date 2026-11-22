@@ -121,4 +121,27 @@ final class ThemeEditorApiTest extends TestCase
         self::assertSame(404, $this->handler->show(new Request('GET', '/api/themes/acme.none', []), ['themeId' => 'acme.none'])->getStatusCode());
         self::assertSame(404, $this->handler->show(new Request('GET', '/api/themes/x', []), ['themeId' => '../x'])->getStatusCode());
     }
+
+    /** The side-by-side diff: what the newer theme changes and both compiled. */
+    public function testTwoThemesCompareSideBySide(): void
+    {
+        $before = self::theme(['shape' => ['preset' => 'soft']]);
+        $after = self::theme(['version' => '1.1.0', 'shape' => ['preset' => 'round', 'components' => ['cards' => 'crisp']]]);
+        [$status, $body] = self::answer($this->handler->compare(new Request('POST', '/api/themes/compare', [], (string) json_encode(['before' => $before, 'after' => $after]))));
+
+        self::assertSame(200, $status);
+        self::assertSame([
+            ['field' => 'shape.preset', 'from' => 'soft', 'to' => 'round'],
+            ['field' => 'shape.components.cards', 'from' => null, 'to' => 'crisp'],
+        ], $body['data']['changes']);
+        self::assertSame('13px', $body['data']['before']['vars']['wy-radius-control']);
+        self::assertSame('20px', $body['data']['after']['vars']['wy-radius-control']);
+        self::assertSame('6px', $body['data']['after']['vars']['wy-cards-radius-card']);
+        self::assertArrayHasKey('background', $body['data']['after']['dark']);
+
+        // A broken side says which.
+        $response = $this->handler->compare(new Request('POST', '/api/themes/compare', [], (string) json_encode(['before' => $before, 'after' => ['id' => 'x']])));
+        self::assertSame(422, $response->getStatusCode());
+        self::assertArrayHasKey('after', json_decode($response->getBody(), true)['details'] ?? []);
+    }
 }

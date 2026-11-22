@@ -24,10 +24,64 @@ final class FrontDeskFeatures
 {
     public const WALKINS = 'calendar-walkins';
 
+    /** WHIT-1334 (SL.8): the price list and the booking QR poster, to print. */
+    public const PRINTABLES = 'calendar-printables';
+
     /** @return list<array<string, mixed>> */
     public static function all(Router $router): array
     {
-        return [self::walkins($router->versionedPath('/api/calendar/walkins'))];
+        return [
+            self::walkins($router->versionedPath('/api/calendar/walkins')),
+            self::printables($router->versionedPath('/api/calendar/price-list')),
+        ];
+    }
+
+    /**
+     * The printables' menu entry, shown beside Walk-ins (a front desk's
+     * workspace).
+     *
+     * @return array<string, mixed>
+     */
+    public static function printablesNavigationItem(string $language): array
+    {
+        return [
+            'id' => self::PRINTABLES,
+            'label' => LocalizedText::resolve(self::printablesLabel(), $language),
+            'href' => '/admin/x/' . self::PRINTABLES,
+            'icon' => 'printer',
+            'group' => 'work',
+            'order' => 44,
+            'requiredPermission' => CorePermissions::CALENDAR_READ,
+        ];
+    }
+
+    /** @return array{en: string, ar: string} */
+    private static function printablesLabel(): array
+    {
+        return ['en' => 'Print for the front desk', 'ar' => 'مطبوعات الاستقبال'];
+    }
+
+    /** @return array<string, mixed> */
+    private static function printables(string $priceList): array
+    {
+        return [
+            'id' => self::PRINTABLES,
+            'plugin' => 'core',
+            'label' => self::printablesLabel(),
+            'screen' => 'blocks',
+            'requiredPermission' => CorePermissions::CALENDAR_READ,
+            'icon' => 'printer',
+            'group' => 'work',
+            'order' => 44,
+            'blocks' => [
+                ['type' => 'alert', 'variant' => 'info', 'body' => [
+                    'en' => 'Print your price list for the counter or the window, and a QR code customers scan to book. Both always show what is in Whity now: change a service or a price, then print again.',
+                    'ar' => 'اطبع قائمة الأسعار للكاونتر أو الواجهة، ورمز QR يمسحه الزبائن للحجز. كلاهما يعرض ما في Whity الآن: غيّر خدمة أو سعراً ثم اطبع مجدداً.',
+                ]],
+                ['type' => 'button', 'label' => ['en' => 'Open the price list to print', 'ar' => 'فتح قائمة الأسعار للطباعة'], 'href' => $priceList, 'variant' => 'primary'],
+                ['type' => 'button', 'label' => ['en' => 'Print the booking QR poster', 'ar' => 'طباعة ملصق QR للحجز'], 'href' => '/calendar/settings', 'variant' => 'outline'],
+            ],
+        ];
     }
 
     /**

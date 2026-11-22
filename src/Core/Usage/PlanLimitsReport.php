@@ -180,9 +180,11 @@ final class PlanLimitsReport
         $stmt = $db->prepare(
             'SELECT COUNT(*) FROM inv_variants v
                JOIN inv_items i ON i.tenant_id = v.tenant_id AND i.id = v.item_id
-              WHERE v.tenant_id = :tenant_id AND v.archived_at IS NULL AND i.archived_at IS NULL'
+              WHERE v.tenant_id = :tenant_id AND v.archived_at IS NULL AND i.archived_at IS NULL AND i.kind <> :service'
         );
-        $stmt->execute([':tenant_id' => $tenantId]);
+        // Services are not stock: the owner kept them off the items meter
+        // (WHIT-1334, SL.8, Q2), and every calendar service is one.
+        $stmt->execute([':tenant_id' => $tenantId, ':service' => 'service']);
 
         return (int) $stmt->fetchColumn();
     }

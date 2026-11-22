@@ -2060,9 +2060,17 @@
     "en": "Import a theme into this workspace",
     "ar": "استيراد سمة إلى مساحة العمل"
   },
+  "post_api_themes_compare": {
+    "en": "Compare two themes side by side",
+    "ar": "مقارنة مظهرين جنباً إلى جنب"
+  },
   "post_api_themes_convert": {
     "en": "Turn a theme from another tool into a theme file",
     "ar": "تحويل مظهر من أداة أخرى إلى ملف مظهر"
+  },
+  "post_api_themes_package": {
+    "en": "Package a theme for the store",
+    "ar": "تجهيز مظهر للمتجر"
   },
   "post_api_themes_preview": {
     "en": "Preview a draft theme",
@@ -2495,5 +2503,9 @@
   "post_api_calendar_commission_closes_id_book": {
     "en": "Send a closed commission period to the books",
     "ar": "إرسال فترة عمولة مقفلة إلى الدفاتر"
+  },
+  "get_api_calendar_price_list": {
+    "en": "Open the price list to print",
+    "ar": "فتح قائمة الأسعار للطباعة"
   }
 }

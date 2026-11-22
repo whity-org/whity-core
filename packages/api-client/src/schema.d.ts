@@ -1759,6 +1759,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/price-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The price list as a page to print
+         * @description A whole HTML page: every active service in English and Arabic, how long it takes and its price, from its inventory service item (WHIT-1334).
+         */
+        get: operations["get_api_v1_calendar_price_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/rooms": {
         parameters: {
             query?: never;
@@ -12018,6 +12038,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/themes/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compare two themes side by side
+         * @description The side-by-side diff (TH.25): what the newer theme changes, field by field as a re-import says it (TH.16), and both themes compiled for a preview, every colour in both modes. Nothing is saved.
+         */
+        post: operations["post_api_v1_themes_compare"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/themes/convert": {
         parameters: {
             query?: never;
@@ -12072,6 +12112,26 @@ export interface paths {
         get: operations["get_api_v1_themes_export_tokens"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/themes/package": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Package a theme for the store
+         * @description Publishing (TH.25): the theme as a store-ready package, a theme-only plugin zip that ships it through the plugin theme interface (SDK 1.125), with manifest.json listing every file's sha256. The publisher downloads it and submits it to the store; a direct upload comes with the Whity ID store's publisher API. Whity's own themes cannot be packaged. Nothing is saved.
+         */
+        post: operations["post_api_v1_themes_package"];
         delete?: never;
         options?: never;
         head?: never;
@@ -14656,6 +14716,8 @@ export interface components {
             room_id?: number | null;
             /** @description A customer's booking is a request staff accept first. */
             needs_approval?: boolean;
+            /** @description The inventory service item that holds its name and price (WHIT-1334). */
+            item_id?: number | null;
         };
         CalendarServiceRequest: {
             /** @description Text, or a `{ar, en}` map. */
@@ -15512,6 +15574,34 @@ export interface components {
             legal_name?: string;
             /** @description A new image: a PNG or JPEG data URL, at most 512 KB. Stamps already applied keep their own copy. */
             image?: string;
+        };
+        CompareThemesRequest: {
+            /** @description The older theme file, such as the installed version. */
+            before: {
+                [key: string]: unknown;
+            };
+            /** @description The newer theme file, such as a file to import or the editor's draft. */
+            after: {
+                [key: string]: unknown;
+            };
+        };
+        CompareThemesResponse: {
+            data: {
+                /** @description What the newer theme changes, field by field. */
+                changes: {
+                    field: string;
+                    from: string | null;
+                    to: string | null;
+                }[];
+                /** @description The older theme compiled: light, dark, vars, fonts, adjustments. */
+                before: {
+                    [key: string]: unknown;
+                };
+                /** @description The newer theme compiled, the same way. */
+                after: {
+                    [key: string]: unknown;
+                };
+            };
         };
         Contact: {
             id: number;
@@ -20961,6 +21051,12 @@ export interface components {
         OwnershipOfferResponse: {
             data: components["schemas"]["OwnershipOffer"];
         };
+        PackageThemeRequest: {
+            /** @description The theme file to package, as saved (schemas/theme/v1.json). */
+            theme: {
+                [key: string]: unknown;
+            };
+        };
         Pagination: {
             page: number;
             perPage: number;
@@ -23947,6 +24043,19 @@ export interface components {
         ThemeOverridesResponse: {
             data: {
                 [key: string]: string;
+            };
+        };
+        ThemePackageResponse: {
+            data: {
+                /** @description The plugin's name in the package, like AcmeHarbourTheme. */
+                plugin: string;
+                filename: string;
+                media_type: string;
+                /** @description The zip's sha256, which the store checks. */
+                sha256: string;
+                size_bytes: number;
+                /** @description The zip, base64-encoded. */
+                content_base64: string;
             };
         };
         ThemePreviewResponse: {
@@ -33667,6 +33776,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_price_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
                 };
             };
             /** @description Missing or invalid authentication */
@@ -89424,6 +89598,102 @@ export interface operations {
             };
         };
     };
+    post_api_v1_themes_compare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompareThemesRequest"];
+            };
+        };
+        responses: {
+            /** @description What changes and both previews */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompareThemesResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The themes are larger than 64 KB together */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description One of the themes has problems; the error says which */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_themes_convert: {
         parameters: {
             query?: never;
@@ -89643,6 +89913,102 @@ export interface operations {
                 };
             };
             /** @description Unknown format */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_themes_package: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PackageThemeRequest"];
+            };
+        };
+        responses: {
+            /** @description The package, its name and its sha256 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemePackageResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The theme is larger than 32 KB */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The theme has problems, or is one of Whity's own */
             422: {
                 headers: {
                     [name: string]: unknown;
