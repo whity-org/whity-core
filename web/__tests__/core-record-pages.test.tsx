@@ -220,10 +220,10 @@ describe('/admin/tenants/[id] — the workspace record', () => {
         expect.objectContaining({ params: { path: { id: 7 } } })
       )
     );
+    // The handle didn't change, so it isn't sent (only an owner may change it).
     expect(apiPatch.mock.calls[0][1].body).toEqual({
       names: { en: 'Acme Widgets' },
       nameLanguage: 'en',
-      slug: 'acme',
     });
   });
 
@@ -259,10 +259,10 @@ describe('/admin/tenants/[id] — the workspace record', () => {
     await user.click(screen.getByTestId('tenant-record-save'));
 
     await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+    // The handle didn't change, so it isn't sent (only an owner may change it).
     expect(apiPatch.mock.calls[0][1].body).toEqual({
       names: { en: 'Acme', ar: 'أكمي' },
       nameLanguage: 'ar',
-      slug: 'acme',
     });
   });
 
@@ -282,7 +282,7 @@ describe('/admin/tenants/[id] — the workspace record', () => {
     expect(apiPatch).not.toHaveBeenCalled();
   });
 
-  it('refuses a slug the backend would accept but no URL should carry', async () => {
+  it('refuses a handle with the wrong shape before asking the server (section 36)', async () => {
     params = { id: '7' };
     grant(TENANTS_WRITE);
     mockTenantBackend();
@@ -297,6 +297,23 @@ describe('/admin/tenants/[id] — the workspace record', () => {
 
     expect(await screen.findByTestId('tenant-record-slug-error')).toBeInTheDocument();
     expect(apiPatch).not.toHaveBeenCalled();
+  });
+
+  it('sends a typed @handle in lower case without the @ (section 36)', async () => {
+    params = { id: '7' };
+    grant(TENANTS_WRITE);
+    mockTenantBackend();
+    const user = userEvent.setup();
+
+    render(<TenantRecordPage />);
+    await screen.findByTestId('tenant-record');
+
+    await user.clear(screen.getByTestId('tenant-record-slug'));
+    await user.type(screen.getByTestId('tenant-record-slug'), '@Acme-Widgets');
+    await user.click(screen.getByTestId('tenant-record-save'));
+
+    await waitFor(() => expect(apiPatch).toHaveBeenCalled());
+    expect(apiPatch.mock.calls[0][1].body.slug).toBe('acme-widgets');
   });
 
   it('names the CAPABILITY gate first when the caller fails both', async () => {

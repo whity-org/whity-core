@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.159).
+ * SDK identity (v1.160).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1653,12 +1653,19 @@ namespace Whity\Sdk;
  * §6.3, section 32 §6).
  *
  * Purely additive: one new extension point and two value objects.)
+ *
+ * 1.160 (WORKSPACE HANDLES: a workspace's `slug` is now its public @handle, unique on the installation, and an
+ * owner may change it; the old one still leads to the workspace for 90 days. New event `tenant.handle_changed`
+ * (`id`, `old_handle`, `new_handle`, `by_profile_id`) so a plugin that stored a handle can update it (WHIT-1363,
+ * design section 36 §3, HD.4).
+ *
+ * Purely additive: one new event.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.159.0';
+    public const VERSION = '1.160.0';
 
     /**
      * Static identity only — never instantiated.

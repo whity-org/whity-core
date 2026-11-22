@@ -282,6 +282,8 @@ final class CoreTables
         'workspace_owners' => '300_create_workspace_owners.php',
         // Offers to hand a workspace over or co-own it (WHIT-1170).
         'workspace_ownership_offers' => '301_create_workspace_ownership_offers.php',
+        // A workspace's earlier @handles (WHIT-1363, design section 36).
+        'tenant_handle_history' => '356_create_tenant_handle_history.php',
         'workspace_template_items' => '305_create_workspace_templates.php',
         'workspace_template_runs' => '305_create_workspace_templates.php',
         // WHIT-1225: themes a workspace imported or installed from the store.

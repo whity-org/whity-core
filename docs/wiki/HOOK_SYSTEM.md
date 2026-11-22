@@ -192,6 +192,7 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `tenant.deleting` | `TENANT_DELETING` | veto |  |
 | `tenant.deleted` | `TENANT_DELETED` | veto |  |
 | `tenant.deleted.async` | `TENANT_DELETED_ASYNC` | queued |  |
+| `tenant.handle_changed` | `TENANT_HANDLE_CHANGED` | observe | A workspace's @handle changed (design section 36, HD.4); the old one still leads to the workspace for 90 days. Payload: `id`, `old_handle` (null when it had none), `new_handle`, `by_profile_id`. |
 
 ### Roles
 

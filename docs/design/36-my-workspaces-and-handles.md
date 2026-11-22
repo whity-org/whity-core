@@ -82,7 +82,7 @@ A refused handle says why in plain words: "That handle is kept for Whity's own p
 
 ### 3.4 Arabic names (HD.3)
 
-Handles stay Latin. When the name has no Latin letters, the handle field **suggests** one from a simple Arabic-to-Latin letter map (`مخبز المثال` → `makhbaz-almithal`). The person always sees and edits the suggestion before it's used. Without a usable suggestion, the field stays empty with the hint "Use Latin letters, for example the name in English." Sign-up stops refusing all-Arabic names: the workspace gets a `ws-` handle, and its owner is asked to choose one later (3.7). No machine translation.
+Handles stay Latin. When the name has no Latin letters, the handle field **suggests** one from a simple Arabic-to-Latin letter map (`مخبز المثال` → `mkhbz-almthal`; short vowels aren't written in Arabic, so the person usually tidies it). The person always sees and edits the suggestion before it's used. Without a usable suggestion, the field stays empty with the hint "Use Latin letters, for example the name in English." Sign-up stops refusing all-Arabic names: the workspace gets a `ws-` handle, and its owner is asked to choose one later (3.7). No machine translation.
 
 ### 3.5 Changing a handle and the redirect period (HD.4)
 

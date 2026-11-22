@@ -88,12 +88,51 @@ interface EntitlementOverride {
 const SYSTEM_TENANT_ID = 0;
 
 /**
- * The slug rule, copied from the create/edit forms it replaces rather than
- * loosened: the backend accepts any string here, so the client is the only place
- * that keeps a slug URL-safe, and a page that dropped the check would let one
- * through that the old dialog refused.
+ * The @handle's shape (design section 36, HD.1): a–z, 0–9 and single dashes,
+ * 3 to 30 characters, starting with a letter. The server checks it again, with
+ * the reserved words, availability and the 30-day rule.
  */
-const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const HANDLE_PATTERN = /^[a-z](?:[a-z0-9]|-(?=[a-z0-9])){2,29}$/;
+
+/** What a person typed, as a handle: trimmed, lower case, without a leading @. */
+function normalizeHandle(typed: string): string {
+  return typed.trim().toLowerCase().replace(/^@+/, '');
+}
+
+/** The server's `handle_*` refusal codes in plain words (section 36, HD.2). */
+function handleProblem(code: string, t: (key: string, fallback: string) => string): string | null {
+  switch (code) {
+    case 'handle_too_short':
+      return t('tenants.record.handle.tooShort', 'A handle needs at least 3 characters.');
+    case 'handle_too_long':
+      return t('tenants.record.handle.tooLong', 'A handle can have at most 30 characters.');
+    case 'handle_characters':
+      return t('tenants.record.handle.characters', 'Use only Latin letters (a to z), numbers and dashes.');
+    case 'handle_start':
+      return t('tenants.record.handle.start', 'Start the handle with a letter.');
+    case 'handle_end':
+      return t('tenants.record.handle.end', 'End the handle with a letter or a number.');
+    case 'handle_double_dash':
+      return t('tenants.record.handle.doubleDash', 'Use one dash at a time.');
+    case 'handle_generated':
+      return t('tenants.record.handle.generated', 'Handles that start with "ws-" are made by Whity. Try another.');
+    case 'handle_reserved':
+      return t('tenants.record.handle.reserved', "That handle is kept for Whity's own pages. Try another.");
+    case 'handle_taken':
+      return t('tenants.record.handle.taken', 'Another workspace already uses that handle.');
+    case 'handle_held':
+      return t(
+        'tenants.record.handle.held',
+        'Another workspace used that handle until recently. It becomes free after 90 days.'
+      );
+    case 'handle_too_soon':
+      return t('tenants.record.handle.tooSoon', 'You can change the handle once every 30 days.');
+    case 'handle_owner_only':
+      return t('tenants.record.handle.ownerOnly', "Only an owner can change the workspace's handle.");
+    default:
+      return null;
+  }
+}
 
 /** The em dash a stated value shows when the record carries none. */
 const EMPTY_VALUE = '—';
@@ -129,7 +168,7 @@ const tenantFacts: RecordFactsFn<TenantRecordFields> = (tenant, t, dates) => ({
     },
     {
       key: 'slug',
-      label: t('tenants.record.stat.slug', 'Slug'),
+      label: t('tenants.record.handle.label', 'Handle'),
       value: tenant.slug,
     },
     // #1068: the stat GOES when this tenant hides dates, rather than
@@ -325,7 +364,7 @@ export function TenantRecordScreen({
     const names = cleanLocalizedText(form.names);
     const nameLanguage = form.nameLanguage;
     const name = names[nameLanguage] ?? '';
-    const slug = form.slug.trim();
+    const slug = normalizeHandle(form.slug);
     if (name === '') {
       // The original is what every other language falls back to.
       setNameError(
@@ -337,11 +376,12 @@ export function TenantRecordScreen({
     // A workspace created without a slug can still be renamed: an empty slug that
     // was already empty is left alone rather than rejected.
     const leaveSlug = slug === '' && (pristine?.slug ?? '') === '';
-    if (!leaveSlug && !SLUG_PATTERN.test(slug)) {
+    const handleChanged = slug !== (pristine?.slug ?? '');
+    if (!leaveSlug && handleChanged && !HANDLE_PATTERN.test(slug)) {
       setSlugError(
         t(
-          'tenants.record.slug.invalid',
-          'The slug must contain only lowercase letters, numbers, and hyphens.'
+          'tenants.record.handle.invalid',
+          'Use 3 to 30 Latin letters (a to z), numbers and single dashes, starting with a letter.'
         )
       );
       return;
@@ -352,8 +392,17 @@ export function TenantRecordScreen({
       setIsSaving(true);
       const { response, error: errorBody } = await api.PATCH('/api/v1/tenants/{id}', {
         params: { path: { id: current.id } },
-        body: leaveSlug ? { names, nameLanguage } : { names, nameLanguage, slug },
+        body: leaveSlug || !handleChanged ? { names, nameLanguage } : { names, nameLanguage, slug },
       });
+      const code =
+        errorBody !== null && typeof errorBody === 'object' && 'details' in errorBody
+          ? String(((errorBody as { details?: { code?: unknown } }).details?.code ?? ''))
+          : '';
+      const problem = handleProblem(code, t);
+      if (problem !== null) {
+        setSlugError(problem);
+        return;
+      }
       if (response.status === 409) {
         onNotify(
           t('tenants.record.error.conflict', 'Another workspace already uses that name or slug.'),
@@ -471,7 +520,7 @@ export function TenantRecordScreen({
               htmlFor="tenant-record-slug"
               className="block text-sm font-medium text-foreground"
             >
-              {t('tenants.record.slug.label', 'Slug')}
+              {t('tenants.record.handle.label', 'Handle')}
             </label>
             <Input
               id="tenant-record-slug"
@@ -480,10 +529,10 @@ export function TenantRecordScreen({
               autoComplete="off"
               onChange={(event) => setDraft({ ...form, slug: event.target.value })}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {t(
-                'tenants.record.slug.hint',
-                'The URL-friendly identifier for this workspace. Changing it changes every address that names it.'
+                'tenants.record.handle.hint',
+                'How customers find this workspace, like @example-bakery, in its booking, sign-up and chat links. Only an owner can change it, once every 30 days; the old handle keeps working for 90 days.'
               )}
             </p>
             {slugError !== null && (
@@ -527,9 +576,9 @@ export function TenantRecordScreen({
       </div>
       <div className="space-y-1.5">
         <dt className="text-sm font-medium text-foreground">
-          {t('tenants.record.slug.label', 'Slug')}
+          {t('tenants.record.handle.label', 'Handle')}
         </dt>
-        <dd className="text-sm text-foreground">{current.slug ?? EMPTY_VALUE}</dd>
+        <dd className="text-sm text-foreground" dir="ltr">{current.slug ? `@${current.slug}` : EMPTY_VALUE}</dd>
       </div>
     </dl>
   );
