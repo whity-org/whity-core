@@ -28,6 +28,7 @@ final class MakeExpiredWorkspacesReadOnly
 {
     public static function up(Database $db): void
     {
+        // migration-lint: allow unbatched-backfill (tenant_plan holds one row per workspace, and only expired ones on block_all match)
         $db->query(
             "UPDATE tenant_plan
                 SET enforcement_mode = 'block_writes'
