@@ -57,6 +57,9 @@ final class CoreTables
         'affiliates' => '154_create_affiliates.php',
         'app_settings' => '024_create_app_settings.php',
         'audit_log' => '016_create_audit_log.php',
+        // WHIT-1339: the audit trail's hash chain. Install-wide, like the chain it seals.
+        'audit_log_chain' => '348_make_audit_log_append_only.php',
+        'audit_log_seals' => '348_make_audit_log_append_only.php',
         'away_periods' => '251_add_two_admin_resets_and_away.php',
         'backup_codes' => '007_add_two_factor_support.php',
         'calendar_booking_services' => '302_create_calendar_booking_services.php',

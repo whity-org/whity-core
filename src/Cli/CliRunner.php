@@ -27,6 +27,9 @@ class CliRunner
         // Section 33 §5: the usage ledger's stored bytes and snapshots.
         'usage:storage-rebuild' => 'Whity\Cli\Commands\UsageCommand',
         'usage:snapshot' => 'Whity\Cli\Commands\UsageCommand',
+        // WHIT-1339: the audit trail's hash chain.
+        'audit:seal' => 'Whity\Cli\Commands\AuditCommand',
+        'audit:verify' => 'Whity\Cli\Commands\AuditCommand',
         'calendar:copy-salons' => 'Whity\Cli\Commands\CalendarCopySalonsCommand',
         // WHIT-1318: account balances recomputed from the ledger, and its hash chain checked.
         'accounting:rebuild-balances' => 'Whity\Cli\Commands\AccountingRebuildBalancesCommand',

@@ -2508,6 +2508,10 @@
     "en": "Change the sales settings",
     "ar": "تعديل إعدادات المبيعات"
   },
+  "get_api_imports_kinds": {
+    "en": "List what you may import",
+    "ar": "عرض ما يمكنك استيراده"
+  },
   "get_api_inventory_imports_kind": {
     "en": "List imports of items or opening stock",
     "ar": "عرض عمليات استيراد الأصناف أو الرصيد الافتتاحي"

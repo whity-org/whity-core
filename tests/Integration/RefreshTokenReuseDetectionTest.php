@@ -27,6 +27,9 @@ class RefreshTokenReuseDetectionTest extends TestCase
     private PDO $pdo;
     private AuditLogger $auditLogger;
 
+    /** Audit rows at or below this id predate the step under test (audit_log refuses DELETE, WHIT-1339). */
+    private int $auditFloor = 0;
+
     private const TEST_SECRET_KEY = 'test-secret-key-for-integration-tests-padded-min-32-byte-key';
     private const TEST_USER_PASSWORD = 'testpassword123';
     private const TEST_USER_EMAIL = 'testuser@example.com';
@@ -313,16 +316,18 @@ class RefreshTokenReuseDetectionTest extends TestCase
     private function getAuditLogEntries(string $action): array
     {
         $stmt = $this->pdo->prepare(
-            'SELECT * FROM audit_log WHERE action = ? ORDER BY created_at DESC'
+            'SELECT * FROM audit_log WHERE action = ? AND id > ? ORDER BY created_at DESC'
         );
-        $stmt->execute([$action]);
+        $stmt->execute([$action, $this->auditFloor]);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
     private function clearAuditLog(): void
     {
-        $this->pdo->exec('DELETE FROM audit_log');
+        $floor = $this->pdo->query('SELECT COALESCE(MAX(id), 0) FROM audit_log');
+        self::assertNotFalse($floor);
+        $this->auditFloor = (int) $floor->fetchColumn();
     }
 
     private function makeSchema(): PDO

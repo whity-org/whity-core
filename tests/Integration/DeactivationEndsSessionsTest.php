@@ -43,6 +43,9 @@ class DeactivationEndsSessionsTest extends TestCase
     private PDO $pdo;
     private AuditLogger $auditLogger;
 
+    /** Audit rows at or below this id predate the step under test (audit_log refuses DELETE, WHIT-1339). */
+    private int $auditFloor = 0;
+
     private const TEST_SECRET_KEY = 'test-secret-key-for-integration-tests-padded-min-32-byte-key';
     private const TEST_USER_EMAIL = 'leaver@example.com';
     /** A sentinel id no seeder will reach; see RefreshTokenReuseDetectionTest. */
@@ -85,7 +88,9 @@ class DeactivationEndsSessionsTest extends TestCase
     public function testTheRefusalIsAuditedWithItsReason(): void
     {
         $this->setProfileStatus('inactive');
-        $this->pdo->exec('DELETE FROM audit_log');
+        $floor = $this->pdo->query('SELECT COALESCE(MAX(id), 0) FROM audit_log');
+        self::assertNotFalse($floor);
+        $this->auditFloor = (int) $floor->fetchColumn();
 
         $this->refresh();
 
@@ -200,8 +205,8 @@ class DeactivationEndsSessionsTest extends TestCase
     /** @return array<int, array<string, mixed>> */
     private function auditRows(string $action): array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM audit_log WHERE action = ?');
-        $stmt->execute([$action]);
+        $stmt = $this->pdo->prepare('SELECT * FROM audit_log WHERE action = ? AND id > ?');
+        $stmt->execute([$action, $this->auditFloor]);
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

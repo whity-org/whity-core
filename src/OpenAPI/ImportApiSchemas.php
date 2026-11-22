@@ -9,7 +9,10 @@ namespace Whity\OpenAPI;
  * (WHIT-1322, design section 34 §6). Kept apart from {@see CoreApiSchemas},
  * which merges these in.
  *
- * MCP: every route is a tool in the `core.inventory` toolset. Running an
+ * `GET /api/imports/kinds` (WHIT-1326) lists every kind the shared import
+ * screen offers, contacts included, in the `core.settings` toolset.
+ *
+ * MCP: every other route is a tool in the `core.inventory` toolset. Running an
  * import declares no undo of its own (its Undo is a person's, for 24 hours),
  * so an agent's run is a proposal its person approves.
  */
@@ -26,6 +29,21 @@ final class ImportApiSchemas
         $refused = [409 => self::error('Not possible in the import\'s state'), 422 => self::error('A value that doesn\'t look right')];
 
         return [
+            [
+                'method' => 'GET',
+                'path' => '/api/imports/kinds',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'What you may import here',
+                    'description' => 'Every kind of import the signed-in person may use in this workspace (contacts, items, opening stock, supplier prices, and kinds added later), '
+                        . 'each with the base of its endpoints `path`, the names of its columns in English and Arabic, the columns that must be matched and the choices it asks. '
+                        . 'The endpoints of every kind have the same shape: upload, check, run, undo and skipped.csv under `path`. A kind needing a permission you lack is left out.',
+                    'tags' => ['settings'],
+                    'parameters' => [['name' => 'area', 'in' => 'query', 'required' => false, 'schema' => ['type' => 'string'], 'description' => 'Only the kinds of one list page: `contacts` or `inventory`.']],
+                    'responses' => [200 => self::json('The kinds', self::object(['data' => ['type' => 'array', 'items' => SchemaBuilder::ref('ImportKind')]], ['data']))] + self::auth(),
+                ],
+            ],
             self::route('GET', $base, [
                 'summary' => 'Recent imports of items, opening stock or supplier prices',
                 'tags' => $tags,
@@ -85,7 +103,39 @@ final class ImportApiSchemas
     {
         $counts = self::object(['create' => self::int(), 'update' => self::int(), 'skip' => self::int()], ['create', 'update', 'skip']);
 
+        $text = self::object(['en' => self::str(), 'ar' => self::str()], ['en', 'ar']);
+        $choice = self::object([
+            'value' => ['nullable' => true, 'oneOf' => [self::str(), self::int()]],
+            'label' => $text,
+        ], ['value', 'label']);
+
         return [
+            'ImportKind' => self::object([
+                'key' => self::str() + ['description' => '`contacts`, `inventory.items`, `inventory.opening_stock`, `inventory.supplier_prices`, …'],
+                'label' => $text,
+                'description' => $text,
+                'path' => self::str() + ['description' => 'The base of the endpoints of the kind, such as `/api/v1/inventory/imports/items`.'],
+                'area' => self::str() + ['description' => 'The list page it is opened from: `contacts` or `inventory`.'],
+                'back' => self::object(['href' => self::str(), 'label' => $text], ['href', 'label']),
+                'targets' => ['type' => 'array', 'items' => self::object([
+                    'key' => self::str(),
+                    'label' => $text,
+                    'hint' => $text + ['nullable' => true],
+                ], ['key', 'label', 'hint'])],
+                'required' => ['type' => 'array', 'items' => self::str(), 'description' => 'Targets the matching must include.'],
+                'options' => ['type' => 'array', 'items' => self::object([
+                    'key' => self::str() + ['description' => 'The field it fills in the check request.'],
+                    'type' => self::str() + ['enum' => ['select', 'text']],
+                    'label' => $text,
+                    'hint' => $text + ['nullable' => true],
+                    'choices' => ['type' => 'array', 'nullable' => true, 'items' => $choice],
+                    'default' => ['nullable' => true, 'oneOf' => [self::str(), self::int()]],
+                    'required_unless' => self::str(true) + ['description' => 'Required unless this target is matched; null when optional.'],
+                    'value_type' => self::str() + ['enum' => ['string', 'int']],
+                    'placeholder' => self::str(true),
+                ], ['key', 'type', 'label', 'hint', 'choices', 'default', 'required_unless', 'value_type', 'placeholder'])],
+                'words' => self::object(['title' => $text, 'create' => $text, 'update' => $text, 'run' => $text], ['title', 'create', 'update', 'run']),
+            ], ['key', 'label', 'description', 'path', 'area', 'back', 'targets', 'required', 'options', 'words']),
             'InventoryImportUploadRequest' => self::object([
                 'file_name' => self::str() + ['description' => 'The file\'s name, such as items.csv; .xlsx is read as Excel.'],
                 'text' => self::str() + ['description' => 'The CSV itself.'],

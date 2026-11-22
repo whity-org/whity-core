@@ -233,7 +233,8 @@ final class QueueWorkCommand implements CliCommand
                 new \Whity\Core\Messaging\Jobs\DeliverMessageJob(static fn (): \Whity\Core\Messaging\MessagingService => $messaging),
                 false
             );
-            $loaded->loader = PluginJobs::register($registry, null, $this->logger, $hookManager, $auditLogger, $documentRegistries, $messageChannels);
+            $killList = new \Whity\Core\Plugin\Workspace\CodePluginActivation($pdo);
+            $loaded->loader = PluginJobs::register($registry, null, $this->logger, $hookManager, $auditLogger, $documentRegistries, $messageChannels, static fn (string $name): bool => $killList->isKilled($name));
             // WHIT-997 (SDK 1.83): runs the bulk issues Documents::issueMany() queued. Internal.
             $registry->register(
                 \Whity\Core\Document\Issuing\IssueBatchJob::NAME,
