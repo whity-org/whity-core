@@ -24,7 +24,7 @@
  * a more specific reason and undoing that.
  */
 
-import { use, useEffect, useState } from 'react';
+import { use, useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Button } from '@whity/ui/button';
 import { FormHeader, type FormBannerValue } from '@whity/features/forms';
@@ -33,7 +33,9 @@ import { TenantLogo } from '@whity/ui/tenant-logo';
 import { useBranding } from '@/lib/branding-context';
 import { useDirection } from '@/lib/direction-context';
 import { useDateDisplay } from '@whity/features/datetime';
-import { LanguageSwitcher, useTranslation } from '@whity/features/i18n';
+import { LanguageSwitcher, useCurrentLanguage, useTranslation } from '@whity/features/i18n';
+import { TurnstileWidget } from '@/components/auth/turnstile-widget';
+import { useThemeMode } from '@/lib/theme-mode-context';
 import {
   type Answer, type LocalizedText, type UploadedFileRef
 } from '@/components/forms/form-fields';
@@ -61,6 +63,8 @@ interface PublicForm {
   form_id?: number | null;
   /** WHIT-932: false when the workspace's plan removes "Built on Whity". */
   built_on_whity?: boolean;
+  /** READINESS TM-20: set when the submit asks for a bot-check token. */
+  bot_check?: { provider: string; site_key: string } | null;
 }
 
 /**
@@ -103,6 +107,19 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   const [submitted, setSubmitted] = useState(false);
   const [reference, setReference] = useState<string | null>(null);
   const [ssoOutcome, setSsoOutcome] = useState<SsoOutcome | null>(null);
+  // The bot check (TM-20): a token is single use, so a fresh one is asked
+  // for after every send. `website` is the trap only a bot fills in.
+  const { currentLanguage } = useCurrentLanguage();
+  const { resolved: theme } = useThemeMode();
+  const [botToken, setBotToken] = useState<string | null>(null);
+  const [botFailed, setBotFailed] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
+  const [website, setWebsite] = useState('');
+  const onToken = useCallback((token: string | null) => {
+    setBotToken(token);
+    if (token !== null) setBotFailed(false);
+  }, []);
+  const onBotError = useCallback(() => setBotFailed(true), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -180,13 +197,23 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
 
   /** Resolves with a refusal, or null once the server has the answers. */
   async function submitAnswers(toSend: Record<string, Answer>): Promise<RefusalBody | null> {
+    if (form?.bot_check && botToken === null) {
+      return { error: t('fill.botPending', 'Wait for the check beside the button to finish, then try again.') };
+    }
     // The client sends the CSRF header (`X-Requested-With`) a cookie-authenticated write needs.
     const { data: sentBody, error: sentError, response } = await api.POST('/api/v1/public/forms/{slug}/submissions', {
       params: { path: { slug } },
-      body: { data: toSend } as never,
+      body: { data: toSend, website, ...(botToken !== null ? { bot_token: botToken } : {}) } as never,
     });
     const body = ((sentBody ?? sentError ?? {}) as unknown) as RefusalBody & { data?: { reference?: string | null } };
-    if (!response.ok) return body;
+    if (!response.ok) {
+      if (form?.bot_check) {
+        setBotToken(null);
+        setResetKey((k) => k + 1);
+      }
+
+      return body;
+    }
 
     setReference(body.data?.reference ?? null);
     setSubmitted(true);
@@ -313,6 +340,40 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
             upload={uploadAttachment}
             submitLabel={submitLabel}
             submit={submitAnswers}
+            footer={
+              <>
+                {/* Hidden from people and from screen readers; only a bot fills it. */}
+                <div aria-hidden="true" className="pointer-events-none absolute -start-[9999px] top-0 h-px w-px overflow-hidden opacity-0">
+                  <label htmlFor="form-website">Website</label>
+                  <input
+                    id="form-website"
+                    name="website"
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                  />
+                </div>
+                {form.bot_check?.site_key && (
+                  <span className="block space-y-1.5" data-testid="form-bot-check">
+                    <TurnstileWidget
+                      siteKey={form.bot_check.site_key}
+                      language={currentLanguage ?? 'en'}
+                      theme={theme === 'dark' ? 'dark' : 'light'}
+                      resetKey={resetKey}
+                      onToken={onToken}
+                      onError={onBotError}
+                    />
+                    {botFailed && (
+                      <span className="block text-sm text-destructive">
+                        {t('fill.botFailed', 'The check didn’t load. Refresh the page and try again.')}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </>
+            }
           />
         )}
       </CardContent>

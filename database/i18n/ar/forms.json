@@ -325,6 +325,8 @@
         "field.uploadFailed": "تعذّر رفع هذا الملف. يرجى المحاولة مرة أخرى.",
         "field.uploading": "جارٍ الرفع…",
         "field.yes": "نعم",
+        "fill.botFailed": "لم يتم تحميل التحقق. حدّث الصفحة وحاول مرة أخرى.",
+        "fill.botPending": "انتظر حتى ينتهي التحقق بجانب الزر، ثم حاول مرة أخرى.",
         "fill.builtOn": "Built on Whity",
         "fill.changesAsked": "التعديلات المطلوبة: {note}",
         "fill.closed": "هذا النموذج لا يستقبل ردودًا.",

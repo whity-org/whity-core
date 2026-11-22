@@ -45,6 +45,9 @@ final class TenantConfinement
         '#^/api(?:/v1)?/me/logout-others$#',
         '#^/api(?:/v1)?/devices(?:/|$)#',
         '#^/api(?:/v1)?/mcp/(?:tokens|connect)(?:/|$)#',
+        // An agent credential is a 90-day token that would outlive the
+        // confined session, like an MCP token (READINESS TM-9).
+        '#^/api(?:/v1)?/me/agents/\d+/credentials$#',
     ];
 
     /**
@@ -56,6 +59,9 @@ final class TenantConfinement
         '#^/api(?:/v1)?/me$#',
         '#^/api(?:/v1)?/me/phone$#',
         '#^/api(?:/v1)?/me/signature$#',
+        // Creating a workspace spends the person's own owner quota and trial,
+        // which a workspace's sign-in provider does not speak for (TM-9).
+        '#^/api(?:/v1)?/workspaces$#',
     ];
 
     /**

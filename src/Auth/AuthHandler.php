@@ -175,6 +175,19 @@ class AuthHandler
         $this->securityMailer = $mailer;
     }
 
+    /**
+     * Counts wrong current passwords on `PATCH /me` (READINESS CE-6). The same
+     * budget as the two-step disable and regenerate proofs, and apart from the
+     * login throttle: a stolen session guessing here must not lock the owner
+     * out of signing in. Null (tests, the CLI): not counted.
+     */
+    private ?LoginThrottleService $proofThrottle = null;
+
+    public function setProofThrottle(LoginThrottleService $throttle): void
+    {
+        $this->proofThrottle = $throttle;
+    }
+
     /** Sends the confirmation link for a new address (WHIT-1246): set at boot once mail is wired. */
     private ?\Whity\Core\Identity\EmailVerificationProvider $emailVerificationProvider = null;
 
@@ -1692,9 +1705,18 @@ class AuthHandler
         $currentPassword = isset($body['current_password']) && is_string($body['current_password'])
             ? $body['current_password']
             : '';
+        $ip = ClientIp::fromRequest($request);
+        if ($this->proofThrottle?->isThrottled($profileId, $ip) === true) {
+            return Response::error('Too many attempts', 429, ['reason' => 'throttled']);
+        }
         if ($currentPassword === '' || !password_verify($currentPassword, (string) $profile['password_hash'])) {
+            if ($currentPassword !== '') {
+                $this->proofThrottle?->recordFailure($profileId, $ip);
+            }
+
             return Response::error('Current password is incorrect', 401);
         }
+        $this->proofThrottle?->clearUser($profileId);
 
         $newEmail          = (string) $profileEmail['email'];
         $pendingEmail      = null;

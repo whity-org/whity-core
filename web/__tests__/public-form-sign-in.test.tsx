@@ -14,6 +14,10 @@ jest.mock('@whity/features/i18n', () => ({
   useCurrentLanguage: () => ({ currentLanguage: 'en' }),
   LanguageSwitcher: () => null,
 }));
+jest.mock('@/lib/theme-mode-context', () => ({ useThemeMode: () => ({ resolved: 'light' }) }));
+jest.mock('@/components/auth/turnstile-widget', () => ({
+  TurnstileWidget: ({ siteKey }: { siteKey: string }) => <div data-testid="turnstile" data-site-key={siteKey} />,
+}));
 jest.mock('@/lib/branding-context', () => ({
   useBranding: () => ({ siteName: 'Example Bakery', logoWideUrl: null, logoSquareUrl: null }),
 }));
@@ -85,4 +89,25 @@ test('an unknown outcome in the address says nothing', async () => {
 
   await screen.findByRole('link', { name: 'Sign in to fill it in' });
   expect(screen.queryByTestId('form-sso-outcome')).toBeNull();
+});
+
+const OPEN_FORM = {
+  data: { ...SIGN_IN_FORM.data, sign_in_required: false, form_id: null, fields: [{ field_key: 'name', field_type: 'text', label: 'Name', help_text: null, is_required: false, options: [], multi_valued: false, position: 1 }] },
+};
+
+test('the bot check shows beside the send button when the server asks for it (TM-20)', async () => {
+  global.fetch = jest.fn().mockResolvedValue(json(200, { data: { ...OPEN_FORM.data, bot_check: { provider: 'turnstile', site_key: 'site-key-1' } } }));
+
+  await renderForm();
+
+  expect(await screen.findByTestId('turnstile')).toHaveAttribute('data-site-key', 'site-key-1');
+});
+
+test('no bot check is shown when the server sets none', async () => {
+  global.fetch = jest.fn().mockResolvedValue(json(200, { data: { ...OPEN_FORM.data, bot_check: null } }));
+
+  await renderForm();
+
+  await screen.findByRole('button', { name: /send/i });
+  expect(screen.queryByTestId('turnstile')).toBeNull();
 });

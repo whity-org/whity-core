@@ -282,6 +282,24 @@ final class UpdateMeRealEngineTest extends TestCase
         );
     }
 
+    public function testGuessingTheCurrentPasswordIsThrottled(): void
+    {
+        // READINESS CE-6: someone holding a stolen session can't try the
+        // current password at the request rate, and the right one is refused
+        // too once the limit is reached.
+        $profileId = $this->seedProfile('guess@example.com', 'correct-pass');
+        $this->authenticateAs($profileId, self::TENANT, 'guess@example.com');
+        $handler = $this->handler();
+        $handler->setProofThrottle(new \Whity\Auth\LoginThrottleService(new \Whity\Core\Store\ArraySharedStore(), 3, 100, 900, 'two_factor_proof'));
+
+        for ($i = 0; $i < 3; $i++) {
+            $this->assertSame(401, $handler->handleUpdateMe($this->jsonRequest(['email' => 'x@example.com', 'current_password' => 'guess-' . $i]))->getStatusCode());
+        }
+
+        $response = $handler->handleUpdateMe($this->jsonRequest(['email' => 'x@example.com', 'current_password' => 'correct-pass']));
+        $this->assertSame(429, $response->getStatusCode(), $response->getBody());
+    }
+
     public function testMissingCurrentPasswordIsRejected(): void
     {
         $profileId = $this->seedProfile('nocur@example.com', 'correct-pass');
