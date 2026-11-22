@@ -15558,6 +15558,7 @@ export interface components {
             } | null;
         };
         AccountingStockCost: {
+            /** @description The item variant whose stock has no cost yet (from Stock waiting for a cost). */
             variant_id: number;
             /** @description The cost of one base unit (a kilogram, a piece), in minor units of the workspace's currency. */
             unit_cost_minor: number;

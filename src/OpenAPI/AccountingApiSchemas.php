@@ -1243,7 +1243,7 @@ final class AccountingApiSchemas
                 'stock_in_books' => self::bool() + ['description' => 'Whether stock posts to the books.'],
             ], ['stock_in_books']),
             'AccountingStockCost' => self::object([
-                'variant_id' => self::int(),
+                'variant_id' => self::int() + ['description' => 'The item variant whose stock has no cost yet (from Stock waiting for a cost).'],
                 'unit_cost_minor' => self::int() + ['description' => 'The cost of one base unit (a kilogram, a piece), in minor units of the workspace\'s currency.'],
                 'date' => self::str() + ['description' => 'YYYY-MM-DD, in an open month. Default: today.'],
             ], ['variant_id', 'unit_cost_minor']),

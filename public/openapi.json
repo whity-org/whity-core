@@ -104439,7 +104439,8 @@
                 "type": "object",
                 "properties": {
                     "variant_id": {
-                        "type": "integer"
+                        "type": "integer",
+                        "description": "The item variant whose stock has no cost yet (from Stock waiting for a cost)."
                     },
                     "unit_cost_minor": {
                         "type": "integer",
