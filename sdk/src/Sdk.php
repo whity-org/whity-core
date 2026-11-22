@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.158).
+ * SDK identity (v1.159).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1644,12 +1644,21 @@ namespace Whity\Sdk;
  * 32 §5.3, Q5).
  *
  * Purely additive: one new optional constructor argument on Accounting\Invoice.)
+ *
+ * 1.159 (STOCK IN THE BOOKS: extension point {@see Contribute\WorkspaceAccountingExport} (IV.22): core hands
+ * each posted stock batch, as an {@see Inventory\StockPosting} of {@see Inventory\StockPostingMove}s with their
+ * places, virtual roles, branches and values, to the one export bound in the container, inside the stock
+ * transaction, for each workspace whose `keepsStock()` answers true; throwing refuses the batch. Values come from core's moving average cost (IV.18). Core
+ * accounting is the default export and posts each batch to the stock journal (WHIT-1318 A4a, design section 31
+ * §6.3, section 32 §6).
+ *
+ * Purely additive: one new extension point and two value objects.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.158.0';
+    public const VERSION = '1.159.0';
 
     /**
      * Static identity only — never instantiated.

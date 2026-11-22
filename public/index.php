@@ -5805,7 +5805,10 @@ $inventoryLocations = new \Whity\Core\Inventory\LocationService($inventoryDb, $i
 $inventoryReasons = new \Whity\Core\Inventory\ReasonCatalog($inventoryDb, $inventoryWorkspace);
 // WHIT-1235: lots, serial numbers and expiry; FEFO and the warning window are workspace settings.
 $inventoryLots = new \Whity\Core\Inventory\LotService($inventoryDb, static fn (int $tenantId): array => $settingsService->effective($tenantId));
-$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager, $inventoryReasons, $inventoryLots);
+// WHIT-1318 A4a: the moving average cost (IV.18), kept with each stock batch;
+// the batch then goes to the bound accounting export (IV.22), core's books by default.
+$inventoryCosts = new \Whity\Core\Inventory\InventoryCosts($inventoryDb, $inventoryItems->currencyFor(...));
+$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager, $inventoryReasons, $inventoryLots, $inventoryCosts);
 $inventoryItems->useOpeningLots($inventoryLedger->moveIntoOpeningLots(...));
 // WHIT-1233: adjustments, counts and transfers as records. Above the
 // workspace's value an adjustment or a count's differences travel a route
@@ -6171,6 +6174,24 @@ $router->register('GET',    '/api/accounting/expense-claims/{id:\d+}',          
 $router->register('POST',   '/api/accounting/expense-claims/{id:\d+}/reimburse',  [$accountingExpensesHandler, 'reimburse'],  null, null, CorePermissions::PAYMENTS_WRITE);
 $router->register('GET',    '/api/accounting/petty-cash',                         [$accountingExpensesHandler, 'pettyCash'],  null, null, CorePermissions::PAYMENTS_READ);
 $router->register('POST',   '/api/accounting/petty-cash/spends',                  [$accountingExpensesHandler, 'spend'],      null, null, CorePermissions::PAYMENTS_WRITE);
+// WHIT-1318 A4a: stock in the books (Q3, on by default). Core accounting is
+// the default WorkspaceAccountingExport; an outside export binds over it.
+$accountingStock = new \Whity\Core\Accounting\StockBooks($accountingDb, $accountingWorkspace, $accountingLedger, $inventoryCosts);
+\Whity\register_service(\Whity\Sdk\Contribute\WorkspaceAccountingExport::class, $accountingStock); // @phpstan-ignore-line
+$accountingStockHandler = new \Whity\Api\AccountingStockApiHandler($accountingStock);
+$router->register('GET',    '/api/accounting/stock',                              [$accountingStockHandler, 'show'],    null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('PATCH',  '/api/accounting/stock',                              [$accountingStockHandler, 'update'],  null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('POST',   '/api/accounting/stock/opening',                      [$accountingStockHandler, 'open'],    null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('GET',    '/api/accounting/stock/waiting',                      [$accountingStockHandler, 'waiting'], null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('POST',   '/api/accounting/stock/costs',                        [$accountingStockHandler, 'cost'],    null, null, CorePermissions::ACCOUNTING_SETTINGS);
+// Stock with no cost waits in the Inbox for the people who set accounting up.
+$inboxSourceRegistry->registerCoreSource(
+    \Whity\Core\Accounting\StockCostInboxSource::KEY,
+    new \Whity\Core\Accounting\StockCostInboxSource(
+        $accountingDb,
+        static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+    )
+);
 
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,
