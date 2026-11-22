@@ -305,7 +305,7 @@ The existing operator permissions carry on, and the role table above assigns the
 
 ### 8.3 Plugin permissions in the catalogue (WHIT-1352)
 
-The fix for Whity Pay comes first, because the owner's Polar setup is waiting on it:
+The fix for Whity Pay comes first, because the owner's Polar setup is waiting on it. It is being built in another lane as #2412: plugin permissions are catalogued when the plugin loads and backfilled on every boot. What it has to do:
 
 1. Core upserts every code plugin's `getPermissions()` into `permissions` when the plugin is installed, enabled or upgraded, and on boot as an idempotent repair (`ON CONFLICT DO NOTHING`).
 2. A grant to a name that isn't in `permissions` is refused with 422 and logged, instead of being silently skipped (`RolesApiHandler.php:2154`, `PluginRoleSeeder.php:566-585`).
@@ -362,7 +362,7 @@ A new register section "The operator console", added once the owner answers.
 
 ## 12. Questions for the owner
 
-1. **The Whity Pay permission fix now.** May WHIT-1352 (section 8.3) be built and merged now, ahead of the rest, so the Polar setup can be entered? Recommended: **yes, now**.
+1. **The Whity Pay permission fix.** Already in hand: WHIT-1352 is fixed by #2412, which catalogues plugin permissions when a plugin loads and backfills them on boot. Once it deploys, may the orchestrator grant `whity_pay:manage` to the owner's tenant-0 admin membership on app.whity.dev, until the operator roles of M2 exist? Recommended: **yes**.
 2. **Who are the operators.** The tenant-0 people who hold the global `admin` today move to the new **Operator** role, and the global `admin` stops carrying operator permissions. Recommended: **yes**.
 3. **Tenant 0's existing data.** On app.whity.dev, anything tenant 0 already holds (bookings, contacts, documents made while testing) is kept hidden, not deleted or moved. Recommended: **keep hidden**. If the owner wants any of it in a real workspace, say which.
 4. **Five roles or one.** Operator, Support, Billing, Marketing and Auditor (section 8.1), or just Operator for now with the others later. Recommended: **all five**. They cost little and keep pricing and campaigns apart.
@@ -381,7 +381,7 @@ One WHIT-ticketed PR each. The orchestrator gives migration numbers and SDK mino
 
 | # | Milestone | Needs |
 | --- | --- | --- |
-| M0 | WHIT-1352: plugin permissions into the catalogue, refuse unknown grants | Question 1 |
+| M0 | WHIT-1352: plugin permissions into the catalogue. Done in another lane (#2412). Refusing unknown grants with 422 (section 8.3, point 2) goes into M2 if #2412 leaves it out | Question 1 (the live grant only) |
 | M1 | Lean sidebar and routes: nav `scope`, the 404 middleware, plugin feature `scope`/`placement` (SDK), console groups, Home from cards | Question 5 |
 | M2 | Operator roles and the operator-only guard, the migration that moves grants, Whity Pay updated | Questions 2 and 4 |
 | M3 | Contact support and the operator inbox | Questions 6 and 11 |
