@@ -6097,6 +6097,33 @@ $router->register('POST',   '/api/accounting/payments/{id:\d+}/bounce',         
 $router->register('POST',   '/api/accounting/transfers',                          [$accountingPaymentsHandler, 'transfer'],  null, null, CorePermissions::PAYMENTS_WRITE);
 $router->register('GET',    '/api/accounting/reports/aged-receivables',           [$accountingPaymentsHandler, 'aged'],      null, null, CorePermissions::INVOICES_READ);
 $router->register('GET',    '/api/accounting/customers/{id:\d+}/statement',       [$accountingPaymentsHandler, 'statement'], null, null, CorePermissions::INVOICES_READ);
+// WHIT-1318 A3a: supplier bills and credits (the invoice engine's purchase
+// side), payments made, aged payables and the supplier statement. A bill
+// travels the workspace's bill route (accounting.bill) when one is chosen.
+$routeSubjectRegistry->register(new \Whity\Core\Accounting\InvoiceRouteSubject($accountingDb, $accountingInvoices, \Whity\Core\Accounting\InvoiceRouteSubject::BILL));
+$accountingInvoices->useApprovals(new \Whity\Core\Accounting\InvoiceRoutes(
+    $documentRouter,
+    $routeTemplateRepository,
+    static fn (int $tenantId): array => $settingsService->effective($tenantId),
+    \Whity\Core\Settings\SettingsRegistry::ACCOUNTING_BILL_ROUTE_TEMPLATE_ID,
+    \Whity\Core\Accounting\InvoiceRouteSubject::BILL,
+), 'purchase');
+// Salon commission (SL.6): closing a period by hand books Staff commission
+// against Commission to pay.
+\Whity\register_service(\Whity\Sdk\Contribute\WorkspaceCommissionExpenses::class, new \Whity\Core\Accounting\CommissionBooks($accountingDb, $accountingWorkspace, $accountingLedger)); // @phpstan-ignore-line
+$accountingBillsHandler = new \Whity\Api\AccountingBillsApiHandler($accountingInvoices, $accountingPayments, $accountingReceivables, $settingsService);
+$router->register('GET',    '/api/accounting/bills',                              [$accountingBillsHandler, 'list'],           null, null, CorePermissions::BILLS_READ);
+$router->register('POST',   '/api/accounting/bills',                              [$accountingBillsHandler, 'create'],         null, null, CorePermissions::BILLS_WRITE);
+$router->register('GET',    '/api/accounting/bills/{id:\d+}',                     [$accountingBillsHandler, 'show'],           null, null, CorePermissions::BILLS_READ);
+$router->register('PATCH',  '/api/accounting/bills/{id:\d+}',                     [$accountingBillsHandler, 'update'],         null, null, CorePermissions::BILLS_WRITE);
+$router->register('POST',   '/api/accounting/bills/{id:\d+}/post',                [$accountingBillsHandler, 'post'],           null, null, CorePermissions::BILLS_WRITE);
+$router->register('POST',   '/api/accounting/bills/{id:\d+}/cancel',              [$accountingBillsHandler, 'cancel'],         null, null, CorePermissions::BILLS_WRITE);
+$router->register('POST',   '/api/accounting/bills/{id:\d+}/credits',             [$accountingBillsHandler, 'credit'],         null, null, CorePermissions::BILLS_WRITE);
+$router->register('POST',   '/api/accounting/payments-made',                      [$accountingBillsHandler, 'pay'],            null, null, CorePermissions::PAYMENTS_WRITE);
+$router->register('GET',    '/api/accounting/reports/aged-payables',              [$accountingBillsHandler, 'aged'],           null, null, CorePermissions::BILLS_READ);
+$router->register('GET',    '/api/accounting/suppliers/{id:\d+}/statement',       [$accountingBillsHandler, 'statement'],      null, null, CorePermissions::BILLS_READ);
+$router->register('GET',    '/api/accounting/bill-settings',                      [$accountingBillsHandler, 'showSettings'],   null, null, CorePermissions::BILLS_READ);
+$router->register('PATCH',  '/api/accounting/bill-settings',                      [$accountingBillsHandler, 'updateSettings'], null, null, CorePermissions::ACCOUNTING_SETTINGS);
 
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,

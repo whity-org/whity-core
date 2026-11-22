@@ -429,6 +429,11 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `accounting.payment.allocated.async` | `ACCOUNTING_PAYMENT_ALLOCATED_ASYNC` | queued |  |
 | `accounting.cheque.bounced` | `ACCOUNTING_CHEQUE_BOUNCED` | observe | A cheque bounced: its entries were reversed and the invoices it paid reopened. Payload as recorded, plus `fee_minor` and `reopened_invoice_ids`. |
 | `accounting.cheque.bounced.async` | `ACCOUNTING_CHEQUE_BOUNCED_ASYNC` | queued |  |
+| `accounting.bill.posting` | `ACCOUNTING_BILL_POSTING` | veto | Before a supplier bill or credit is posted (SDK 1.157). Payload as `accounting.invoice.issuing`, with `kind` `purchase` or `purchase_credit`. Throw `HookVetoException` to refuse it. |
+| `accounting.bill.posted` | `ACCOUNTING_BILL_POSTED` | observe | A supplier bill or credit was posted. Payload as `accounting.invoice.issued`. |
+| `accounting.bill.posted.async` | `ACCOUNTING_BILL_POSTED_ASYNC` | queued |  |
+| `accounting.bill.paid` | `ACCOUNTING_BILL_PAID` | observe | Payments settled all of a bill. Payload as `accounting.invoice.issued`. |
+| `accounting.bill.paid.async` | `ACCOUNTING_BILL_PAID_ASYNC` | queued |  |
 
 ### Deletion is transactional (WC-713)
 

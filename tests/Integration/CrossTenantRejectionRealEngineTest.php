@@ -3055,6 +3055,35 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
             self::assertSame('invoice_id', $e->extra['field'] ?? null);
         }
         self::assertSame('waiting', $payments->get(self::TENANT_A, $cheque['id'])['cheque_status']);
+
+        // ---- supplier bills (WHIT-1318 A3a, migration 352) ----
+        $this->pdo->exec("INSERT INTO contacts (tenant_id, name, is_customer, is_supplier) VALUES (1, 'Jordan Flour Mills', false, true)");
+        $found = $this->pdo->prepare("SELECT id FROM contacts WHERE tenant_id = 1 AND name = 'Jordan Flour Mills'");
+        $found->execute();
+        $supplierA = (int) $found->fetchColumn();
+        $bill = $invoices->issue(self::TENANT_A, $invoices->create(self::TENANT_A, null, [
+            'kind' => 'purchase', 'contact_id' => $supplierA, 'lines' => [['description' => 'Flour', 'unit_price_minor' => 1000]],
+        ])['invoice']['id'], null);
+        self::assertSame([], $invoices->list(self::TENANT_B, ['side' => 'purchase']));
+        self::assertSame([], $receivables->aged(self::TENANT_B, gmdate('Y-m-d'), null, 'purchase')['rows']);
+        foreach ([
+            'read a bill' => fn () => $invoices->get(self::TENANT_B, $bill['id']),
+            'credit a bill' => fn () => $invoices->credit(self::TENANT_B, $bill['id'], null, []),
+            'read a supplier statement' => fn () => $receivables->statement(self::TENANT_B, $supplierA, '2026-01-01', gmdate('Y-m-d'), 'purchase'),
+        ] as $what => $attempt) {
+            try {
+                $attempt();
+                self::fail("Tenant B could {$what} of Tenant A");
+            } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+                self::assertSame(404, $e->status, "a foreign record answers 404 to {$what}");
+            }
+        }
+        try {
+            $payments->pay(self::TENANT_B, null, ['contact_id' => $supplierA, 'amount_minor' => 100]);
+            self::fail('Tenant B paid Tenant A\'s supplier');
+        } catch (\Whity\Core\Accounting\AccountingRejectedException $e) {
+            self::assertSame('contact_id', $e->extra['field'] ?? null);
+        }
     }
 
     private function contactService(): \Whity\Core\Contacts\ContactService
