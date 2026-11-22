@@ -196,6 +196,91 @@ final class WorkspaceOwnersApiRealEngineTest extends TestCase
         self::assertSame(200, $users->delete($request, ['id' => (string) $this->awss])->getStatusCode());
     }
 
+    /**
+     * Found on app.whity.dev on 2026-11-22: an owner who signs in only through Whity ID (no
+     * password, no authenticator) confirms by signing in there again. The approval sends no code;
+     * the fresh sign-in recorded on return for exactly this offer is what lets it through, once,
+     * within five minutes. The callback that records it is covered in SsoAuthHandlerRealEngineTest.
+     */
+    public function testAnOwnerWhoSignsInOnlyThroughWhityIdOffersAfterSigningInAgain(): void
+    {
+        $api = $this->withRealCheck($this->amro);
+        $body = ['to_profile_id' => $this->awss, 'kind' => 'co_owner'];
+
+        $started = $this->json($api->offerIdentityCheck($this->as($this->amro, $body)))['data'] ?? [];
+        self::assertSame('fresh_sign_in', $started['method'] ?? null);
+        self::assertSame('whity_id', $started['provider_key'] ?? null);
+
+        $before = $api->offer($this->as($this->amro, $body + ['code' => '']));
+        self::assertSame(403, $before->getStatusCode(), 'not before signing in again');
+        self::assertSame('identity_check_failed', $this->json($before)['details']['reason'] ?? null);
+
+        $this->signedInAgain($this->amro, (string) $started['purpose']);
+        $made = $api->offer($this->as($this->amro, $body + ['code' => '']));
+        self::assertSame(201, $made->getStatusCode(), (string) $made->getBody());
+        self::assertSame('co_owner', $this->json($made)['data']['kind'] ?? null);
+    }
+
+    public function testAFreshSignInForOneOwnerActionDoesNotApproveAnother(): void
+    {
+        $api = $this->withRealCheck($this->amro);
+        $toAwss = ['to_profile_id' => $this->awss, 'kind' => 'co_owner'];
+        $started = $this->json($api->offerIdentityCheck($this->as($this->amro, $toAwss)))['data'] ?? [];
+        $this->signedInAgain($this->amro, (string) $started['purpose']);
+
+        $other = $api->offer($this->as($this->amro, ['to_profile_id' => $this->ahmad, 'kind' => 'co_owner', 'code' => '']));
+        self::assertSame(403, $other->getStatusCode(), 'another person');
+        $handover = $api->offer($this->as($this->amro, ['to_profile_id' => $this->awss, 'kind' => 'transfer', 'code' => '']));
+        self::assertSame(403, $handover->getStatusCode(), 'another kind');
+
+        $this->pdo->exec("UPDATE signing_challenges SET expires_at = '2000-01-01 00:00:00'");
+        self::assertSame(403, $api->offer($this->as($this->amro, $toAwss + ['code' => '']))->getStatusCode(), 'after five minutes');
+    }
+
+    public function testRemovingAnOwnerAndAcceptingWorkTheSameWayAfterSigningInAgain(): void
+    {
+        $api = $this->withRealCheck($this->amro, $this->awss);
+        $toAwss = ['to_profile_id' => $this->awss, 'kind' => 'co_owner'];
+        $this->signedInAgain($this->amro, (string) ($this->json($api->offerIdentityCheck($this->as($this->amro, $toAwss)))['data']['purpose'] ?? ''));
+        $offerId = (int) $this->json($api->offer($this->as($this->amro, $toAwss + ['code' => ''])))['data']['id'];
+
+        // Accepting: Awss signs in again too.
+        $accept = $this->json($api->acceptIdentityCheck($this->as($this->awss), ['id' => (string) $offerId]))['data'] ?? [];
+        self::assertSame('fresh_sign_in', $accept['method'] ?? null);
+        self::assertSame(403, $api->accept($this->as($this->awss, ['code' => '']), ['id' => (string) $offerId])->getStatusCode());
+        $this->signedInAgain($this->awss, (string) $accept['purpose']);
+        self::assertSame(200, $api->accept($this->as($this->awss, ['code' => '']), ['id' => (string) $offerId])->getStatusCode());
+
+        // Removing: Amro's sign-in for the offer does not count; a new one for this does.
+        $remove = $this->json($api->removeIdentityCheck($this->as($this->amro), ['profileId' => (string) $this->awss]))['data'] ?? [];
+        self::assertSame(403, $api->removeOwner($this->as($this->amro, ['code' => '']), ['profileId' => (string) $this->awss])->getStatusCode());
+        $this->signedInAgain($this->amro, (string) $remove['purpose']);
+        self::assertSame(204, $api->removeOwner($this->as($this->amro, ['code' => '']), ['profileId' => (string) $this->awss])->getStatusCode());
+    }
+
+    /** The owners API with the real check, for people who sign in only through Whity ID. */
+    private function withRealCheck(int ...$idpOnly): WorkspaceOwnersApiHandler
+    {
+        foreach ($idpOnly as $profileId) {
+            $this->pdo->exec("UPDATE profiles SET auth_method = 'idp' WHERE id = " . $profileId);
+            $this->pdo->exec("INSERT INTO external_identities (profile_id, provider_id, provider_key, issuer, subject, last_login_at)
+                VALUES ({$profileId}, NULL, 'whity_id', 'https://id.whity.test', 'sub-{$profileId}', NOW())");
+        }
+
+        return new WorkspaceOwnersApiHandler(
+            new WorkspaceOwnership($this->pdo),
+            new TokenValidator(new JwtParser('test_jwt_secret_min_32_chars_for_hs256_zz'), $this->pdo),
+            new GatedApproval(new IdentityCheck($this->pdo, new SigningChallengeRepository($this->pdo))),
+        );
+    }
+
+    /** What the SSO callback records when this person comes back from signing in again for `$purpose`. */
+    private function signedInAgain(int $profileId, string $purpose): void
+    {
+        self::assertNotSame('', $purpose);
+        (new SigningChallengeRepository($this->pdo))->recordGateFreshSignIn(IdentityCheck::FRESH_SIGN_IN_TENANT, $profileId, IdentityCheck::key($purpose));
+    }
+
     public function testTheSystemWorkspaceHasNoOwners(): void
     {
         TenantContext::reset();
