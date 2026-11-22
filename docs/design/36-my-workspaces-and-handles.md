@@ -1,6 +1,6 @@
 # 36 · My workspaces and @handles
 
-**Status: proposed, waiting for the owner's answers (section 9). Nothing is built.** WHIT-1354.
+**Status: decided by the owner on 22 November 2026 (WHIT-1354): "Accept all", every question in section 9 as recommended.** The register rows are HD.1–HD.9 and MW.1–MW.7 (section "My workspaces and @handles").
 
 The owner, 22 November 2026: "as a normal user they need a manage workspaces/organizations space so that he can hand them over to someone, delete them, etc... Organisation slugs should become like the @handles in social media per whity instance... and we might later enable cross tenant communication".
 
@@ -10,7 +10,7 @@ This section has three parts:
 - **@handles.** Each workspace's `slug` becomes its public @handle, unique on the installation.
 - **Later: messages between workspaces.** Designed for now, not built.
 
-The proposed register rows are in section 8 (MW.\*, HD.\*). They go into `00-decision-register.md` only after the owner answers.
+The register rows are in section 8 (MW.\*, HD.\*) and in `00-decision-register.md`.
 
 It builds on the ownership work of 17 November 2026: WHIT-1169, WHIT-1170 and WHIT-1171, migrations 300 and 301. The owner's rules from that day stay: co-owners are equal, an offer must be accepted within 7 days, and a person owns at most 3 workspaces on app.whity.dev. One rule changes: deleting a workspace was operator-only, and the owner now asks for owners to delete. Question 1 confirms that change.
 
@@ -342,11 +342,11 @@ Order: H1 → H2 and M1 side by side → M2 → M3 → M4 → M5.
 
 Brand-team asks go to `brand-asks/` for the cards with no design: the My workspaces list and record page, the deletion page and the Closing state, the workspace page `/@handle`, and the handle field. Until they arrive, screens follow section 21.
 
-## 8. Proposed register rows
+## 8. Register rows
 
-To add as a new section "My workspaces and @handles (decided … 2026)" once answered.
+In the register as "My workspaces and @handles (decided 22 November 2026)".
 
-| # | Decision | Proposed |
+| # | Decision | Choice |
 | --- | --- | --- |
 | HD.1 | Handle rules | A workspace's `slug` is its public @handle: `a–z`, `0–9`, `-`, 3–30, starts with a letter, no `--`, stored in lower case, unique on the installation on `LOWER(slug)`; `ws-` is kept for handles Whity makes |
 | HD.2 | Reserved | Every first path segment of the web app (generated from `routes.json`, checked in CI), infrastructure and role words, chat words, anything containing `whity`, and the operator's `handles.reserved` list |
@@ -367,7 +367,7 @@ To add as a new section "My workspaces and @handles (decided … 2026)" once ans
 
 ## 9. Questions for the owner
 
-Each has a recommendation. "Accept all" takes every recommendation.
+**Answered 22 November 2026: "Accept all".** Every recommendation below is the decision.
 
 1. **Owners delete workspaces.** On 17 November deleting stayed operator-only. Now any owner can start a deletion, the other owners are told, and any owner can cancel it. *Recommended: yes, any owner; self-hosted operators can switch it off.*
 2. **The waiting period.** *Recommended: 14 days, closed to everyone but the owners, who can cancel or export.* (Alternatives: 7 or 30.)
