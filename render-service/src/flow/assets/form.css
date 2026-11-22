@@ -115,8 +115,11 @@ html {
 .ff-ch { display: flex; flex-wrap: wrap; gap: 1mm 6mm; margin-top: 1mm; margin-inline-start: 9mm; }
 .ff-ch > span { display: inline-flex; gap: 1.5mm; align-items: center; }
 .ff-ch > span.ff-off { color: var(--ff-grey2); }
-.ff-ynr { display: grid; grid-template-columns: 1fr 22mm; gap: 2mm; border-bottom: .4pt solid var(--ff-hair); padding: .75mm 0; margin-inline-start: 9mm; font-size: 9pt; }
-.ff-ynr > b { font-weight: 500; text-align: end; }
+/* The answer column is 22 mm for Yes / No / N/A and grows (to 60 mm) for a
+ * longer word such as "Yes · Attachment 12", which wrapped onto three lines and
+ * made a 20-row checklist taller than a page (WHIT-1370). */
+.ff-ynr { display: grid; grid-template-columns: 1fr fit-content(60mm); gap: 2mm; border-bottom: .4pt solid var(--ff-hair); padding: .75mm 0; margin-inline-start: 9mm; font-size: 9pt; }
+.ff-ynr > b { font-weight: 500; text-align: end; min-width: 22mm; }
 .ff-ynr > b .ff-word { justify-content: flex-end; }
 .ff-yn3 { display: grid; grid-template-columns: 1fr 12mm 12mm 12mm; font-size: 9pt; margin-inline-start: 9mm; margin-top: 1mm; }
 .ff-yn3 > * { padding: .8mm 0; border-bottom: .4pt solid var(--ff-hair); text-align: center; }
