@@ -17,7 +17,7 @@ use Whity\Sdk\Hooks\Events;
 /**
  * Workspace @handles on the real schema (WHIT-1363, design section 36):
  * changing, holding and resolving old handles, the 30-day rule, operators,
- * and how migration 354 moves existing slugs.
+ * and how migration 356 moves existing slugs.
  */
 final class WorkspaceHandlesRealEngineTest extends TestCase
 {
@@ -132,9 +132,9 @@ final class WorkspaceHandlesRealEngineTest extends TestCase
         $this->handles->change(0, 'system-team', null, true);
     }
 
-    public function testMigration354Plan(): void
+    public function testMigration356Plan(): void
     {
-        require_once dirname(__DIR__, 2) . '/database/migrations/354_create_tenant_handle_history.php';
+        require_once dirname(__DIR__, 2) . '/database/migrations/356_create_tenant_handle_history.php';
         $made = 'ws-0123456789ab';
 
         $plan = \Database\Migrations\CreateTenantHandleHistory::plan([

@@ -702,7 +702,7 @@ final class TenantOwnedTables
         // handle to the workspace still holding it, the same shape as the
         // tenants registry lookup by slug it extends, and returns an id only;
         // it carries an explicit `@tenant-guard-ignore` annotation.
-        'tenant_handle_history' => '354_create_tenant_handle_history.php',
+        'tenant_handle_history' => '356_create_tenant_handle_history.php',
     ];
 
     /**

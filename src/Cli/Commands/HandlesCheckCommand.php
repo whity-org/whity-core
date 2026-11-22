@@ -11,7 +11,7 @@ use Whity\Database\Database;
 /**
  * `whity-cli handles:check` (WHIT-1363, design section 36, HD.7).
  *
- * Lists every workspace's handle and what migration 354 does, or did, to it,
+ * Lists every workspace's handle and what migration 356 does, or did, to it,
  * without writing anything. Run it on a restored copy of a live database
  * before deploying, never on the live server. After the migration it says
  * which workspaces still have a handle Whity made (`ws-…`), whose owners will
@@ -43,7 +43,7 @@ class HandlesCheckCommand extends BaseCommand implements CliCommand
             }
         }
 
-        require_once dirname(__DIR__, 3) . '/database/migrations/354_create_tenant_handle_history.php';
+        require_once dirname(__DIR__, 3) . '/database/migrations/356_create_tenant_handle_history.php';
 
         $pdo = Database::connect()->getPdo();
         $stmt = $pdo->prepare('SELECT id, slug, name FROM tenants ORDER BY id');
@@ -114,7 +114,7 @@ class HandlesCheckCommand extends BaseCommand implements CliCommand
     private function showHelp(): void
     {
         echo "Usage: whity-cli handles:check\n\n";
-        echo "Lists what migration 354 does to each workspace's handle (@handle), without writing anything.\n";
+        echo "Lists what migration 356 does to each workspace's handle (@handle), without writing anything.\n";
         echo "Run it on a restored copy before deploying.\n";
     }
 }

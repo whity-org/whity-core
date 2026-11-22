@@ -34,7 +34,7 @@ class CliRunner
         // WHIT-1318: account balances recomputed from the ledger, and its hash chain checked.
         'accounting:rebuild-balances' => 'Whity\Cli\Commands\AccountingRebuildBalancesCommand',
         'accounting:verify-chain' => 'Whity\Cli\Commands\AccountingVerifyChainCommand',
-        // WHIT-1363: what migration 354 does to each workspace's @handle, without writing.
+        // WHIT-1363: what migration 356 does to each workspace's @handle, without writing.
         'handles:check' => 'Whity\Cli\Commands\HandlesCheckCommand',
         // WHIT-1168: the break-glass for a server that signs in only with its identity provider.
         'auth'       => 'Whity\Cli\Commands\AuthCommand',
@@ -260,7 +260,7 @@ class CliRunner
         echo "  seed       Seed default tenant/roles/accounts (--with-fixtures for the demo logins)\n";
         echo "  plugin     Manage plugins (list, enable, disable, reload)\n";
         echo "  tenant     Manage tenants (list, create, update, delete)\n";
-        echo "  handles:check List what migration 354 does to each workspace's @handle, without writing\n";
+        echo "  handles:check List what migration 356 does to each workspace's @handle, without writing\n";
         echo "  totp       TOTP secret maintenance (reencrypt legacy secrets)\n";
         echo "  auth       Sign-in switches (password-sign-in status|on|off, the break-glass)\n";
         echo "  secrets    Stored secret maintenance (reencrypt after a key rotation)\n";
