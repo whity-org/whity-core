@@ -281,6 +281,14 @@ final class ScheduleRunCommand implements CliCommand
             ]);
         }
 
+        // WHIT-1339: settled audit rows into the hash chain, every five minutes.
+        if ((int) $now->format('i') % 5 === 0) {
+            $this->queue->dispatch(\Whity\Core\Audit\AuditSealJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'audit-seal-' . $bucket,
+            ]);
+        }
+
         // WHIT-931: MCP idempotency keys older than a day, once an hour.
         if ((int) $now->format('i') === 0) {
             $this->queue->dispatch(\Whity\Mcp\Tools\McpCallKeysPruneJob::NAME, [], [
