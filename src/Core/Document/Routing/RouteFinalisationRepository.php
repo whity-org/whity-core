@@ -110,6 +110,26 @@ final class RouteFinalisationRepository
     }
 
     /**
+     * The finalisation that made (or is making) this document, or null: the
+     * document page says why a route's final document has no PDF and offers
+     * another try (WHIT-1370).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findForDocument(int $tenantId, int $documentId): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT ' . self::COLUMNS . ' FROM route_finalisations
+              WHERE tenant_id = :tenant_id AND document_id = :document_id
+              ORDER BY id DESC LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':document_id' => $documentId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? self::normalize($row) : null;
+    }
+
+    /**
      * The newest finalisation on a subject, or null.
      *
      * @return array<string, mixed>|null
