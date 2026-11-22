@@ -40599,6 +40599,100 @@
                 ]
             }
         },
+        "/api/v1/imports/kinds": {
+            "get": {
+                "operationId": "get_api_v1_imports_kinds",
+                "summary": "What you may import here",
+                "tags": [
+                    "settings"
+                ],
+                "description": "Every kind of import the signed-in person may use in this workspace (contacts, items, opening stock, supplier prices, and kinds added later), each with the base of its endpoints `path`, the names of its columns in English and Arabic, the columns that must be matched and the choices it asks. The endpoints of every kind have the same shape: upload, check, run, undo and skipped.csv under `path`. A kind needing a permission you lack is left out.",
+                "parameters": [
+                    {
+                        "name": "area",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Only the kinds of one list page: `contacts` or `inventory`."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The kinds",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ImportKind"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/instance/complete-setup": {
             "post": {
                 "operationId": "post_api_v1_instance_complete_setup",
@@ -110994,6 +111088,344 @@
                         "type": "boolean"
                     }
                 }
+            },
+            "ImportKind": {
+                "type": "object",
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "`contacts`, `inventory.items`, `inventory.opening_stock`, `inventory.supplier_prices`, \u2026"
+                    },
+                    "label": {
+                        "type": "object",
+                        "properties": {
+                            "en": {
+                                "type": "string"
+                            },
+                            "ar": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "en",
+                            "ar"
+                        ]
+                    },
+                    "description": {
+                        "type": "object",
+                        "properties": {
+                            "en": {
+                                "type": "string"
+                            },
+                            "ar": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "en",
+                            "ar"
+                        ]
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "The base of the endpoints of the kind, such as `/api/v1/inventory/imports/items`."
+                    },
+                    "area": {
+                        "type": "string",
+                        "description": "The list page it is opened from: `contacts` or `inventory`."
+                    },
+                    "back": {
+                        "type": "object",
+                        "properties": {
+                            "href": {
+                                "type": "string"
+                            },
+                            "label": {
+                                "type": "object",
+                                "properties": {
+                                    "en": {
+                                        "type": "string"
+                                    },
+                                    "ar": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "en",
+                                    "ar"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "href",
+                            "label"
+                        ]
+                    },
+                    "targets": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "key": {
+                                    "type": "string"
+                                },
+                                "label": {
+                                    "type": "object",
+                                    "properties": {
+                                        "en": {
+                                            "type": "string"
+                                        },
+                                        "ar": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "en",
+                                        "ar"
+                                    ]
+                                },
+                                "hint": {
+                                    "type": "object",
+                                    "properties": {
+                                        "en": {
+                                            "type": "string"
+                                        },
+                                        "ar": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "en",
+                                        "ar"
+                                    ],
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "key",
+                                "label",
+                                "hint"
+                            ]
+                        }
+                    },
+                    "required": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Targets the matching must include."
+                    },
+                    "options": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "key": {
+                                    "type": "string",
+                                    "description": "The field it fills in the check request."
+                                },
+                                "type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "select",
+                                        "text"
+                                    ]
+                                },
+                                "label": {
+                                    "type": "object",
+                                    "properties": {
+                                        "en": {
+                                            "type": "string"
+                                        },
+                                        "ar": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "en",
+                                        "ar"
+                                    ]
+                                },
+                                "hint": {
+                                    "type": "object",
+                                    "properties": {
+                                        "en": {
+                                            "type": "string"
+                                        },
+                                        "ar": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "en",
+                                        "ar"
+                                    ],
+                                    "nullable": true
+                                },
+                                "choices": {
+                                    "type": "array",
+                                    "nullable": true,
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "value": {
+                                                "nullable": true,
+                                                "oneOf": [
+                                                    {
+                                                        "type": "string"
+                                                    },
+                                                    {
+                                                        "type": "integer"
+                                                    }
+                                                ]
+                                            },
+                                            "label": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "en": {
+                                                        "type": "string"
+                                                    },
+                                                    "ar": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "required": [
+                                                    "en",
+                                                    "ar"
+                                                ]
+                                            }
+                                        },
+                                        "required": [
+                                            "value",
+                                            "label"
+                                        ]
+                                    }
+                                },
+                                "default": {
+                                    "nullable": true,
+                                    "oneOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "integer"
+                                        }
+                                    ]
+                                },
+                                "required_unless": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "Required unless this target is matched; null when optional."
+                                },
+                                "value_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "string",
+                                        "int"
+                                    ]
+                                },
+                                "placeholder": {
+                                    "type": "string",
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "key",
+                                "type",
+                                "label",
+                                "hint",
+                                "choices",
+                                "default",
+                                "required_unless",
+                                "value_type",
+                                "placeholder"
+                            ]
+                        }
+                    },
+                    "words": {
+                        "type": "object",
+                        "properties": {
+                            "title": {
+                                "type": "object",
+                                "properties": {
+                                    "en": {
+                                        "type": "string"
+                                    },
+                                    "ar": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "en",
+                                    "ar"
+                                ]
+                            },
+                            "create": {
+                                "type": "object",
+                                "properties": {
+                                    "en": {
+                                        "type": "string"
+                                    },
+                                    "ar": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "en",
+                                    "ar"
+                                ]
+                            },
+                            "update": {
+                                "type": "object",
+                                "properties": {
+                                    "en": {
+                                        "type": "string"
+                                    },
+                                    "ar": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "en",
+                                    "ar"
+                                ]
+                            },
+                            "run": {
+                                "type": "object",
+                                "properties": {
+                                    "en": {
+                                        "type": "string"
+                                    },
+                                    "ar": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "en",
+                                    "ar"
+                                ]
+                            }
+                        },
+                        "required": [
+                            "title",
+                            "create",
+                            "update",
+                            "run"
+                        ]
+                    }
+                },
+                "required": [
+                    "key",
+                    "label",
+                    "description",
+                    "path",
+                    "area",
+                    "back",
+                    "targets",
+                    "required",
+                    "options",
+                    "words"
+                ]
             },
             "ImportThemeRequest": {
                 "type": "object",

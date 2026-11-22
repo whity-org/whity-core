@@ -351,6 +351,14 @@ export default function InventoryPage() {
           {t('inventory.count.title', 'Count stock')}
         </Button>
       )}
+      {canWrite && (
+        <Button variant="outline" asChild data-testid="inventory-import">
+          <Link href={tab === 'stock' ? '/inventory/import?kind=inventory.opening_stock' : '/inventory/import?kind=inventory.items'}>
+            <Icon name="upload" />
+            {t('inventory.import', 'Import')}
+          </Link>
+        </Button>
+      )}
       {canTransfer && places.length > 1 && (
         <Button variant="outline" onClick={() => setTransferring(true)} data-testid="inventory-transfer">
           <Icon name="transfer" />
