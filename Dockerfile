@@ -25,12 +25,21 @@
 #                     release workflow builds this stage and pushes it to GHCR;
 #                     container-based deployments run it as-is (see
 #                     docs/wiki/Core-Update.md).
-FROM dunglas/frankenphp:1-php8.4.27 AS base
+FROM dunglas/frankenphp:1-php8.4.28 AS base
 
 # Install required packages for the PostgreSQL and zip extensions. libzip-dev
 # backs ext-zip, which the staged plugin-upload installer (WC-220) needs to
 # safely inspect/extract uploaded .zip packages via ZipArchive.
-RUN apt-get update && apt-get install -y \
+#
+# `apt-get upgrade` takes Debian's security point releases at build time
+# (WHIT-1336). The upstream image is rebuilt for PHP releases, not Debian ones:
+# on 2026-11-22 the newest dunglas/frankenphp:1-php8.4 still shipped glibc
+# 2.41-12+deb13u4 with deb13u5 already in trixie, and Trivy reported every
+# glibc CVE fixed between them against this image. With the upgrade here, a
+# rebuild clears them without waiting for upstream.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y \
     libpq-dev \
     libzip-dev \
     && rm -rf /var/lib/apt/lists/*
