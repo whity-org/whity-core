@@ -80,7 +80,7 @@ final class Invoices
         i.paid_minor, i.credited_minor, i.credits_invoice_id, i.entry_id, i.document_id, i.route_id, i.payment_link_ref,
         i.einvoice_status, i.einvoice_uuid, i.einvoice_ref, i.einvoice_qr, i.einvoice_counter, i.einvoice_message, i.notes,
         i.external_ref, i.quote_id, i.issued_at, i.issued_by_profile_id, i.created_by_profile_id, i.agent_id,
-        i.on_behalf_of_profile_id, i.owner_plugin, i.created_at, i.updated_at';
+        i.on_behalf_of_profile_id, i.owner_plugin, i.claimant_profile_id, i.receipt_stored_file_id, i.created_at, i.updated_at';
 
     private ?InvoiceApprovals $approvals = null;
 
@@ -271,7 +271,7 @@ final class Invoices
      *
      * @return array<string, mixed>
      */
-    public function issue(int $tenantId, int $id, ?int $actor): array
+    public function issue(int $tenantId, int $id, ?int $actor, bool $route = true): array
     {
         $invoice = $this->row($tenantId, $id) ?? throw AccountingRejectedException::notFound('Invoice');
         if ($invoice['status'] !== 'draft') {
@@ -282,7 +282,7 @@ final class Invoices
             }, 409);
         }
         $this->ready($tenantId, $id);
-        $approvals = self::sideOf((string) $invoice['kind']) === 'purchase' ? $this->billApprovals : $this->approvals;
+        $approvals = !$route ? null : (self::sideOf((string) $invoice['kind']) === 'purchase' ? $this->billApprovals : $this->approvals);
         if ($approvals !== null) {
             $view = $this->get($tenantId, $id);
             $routeId = $approvals->issue($tenantId, $actor, $view);
@@ -1326,6 +1326,8 @@ final class Invoices
             'agent_id' => AccountingDb::int($r['agent_id']),
             'on_behalf_of_profile_id' => AccountingDb::int($r['on_behalf_of_profile_id']),
             'owner_plugin' => is_string($r['owner_plugin']) ? $r['owner_plugin'] : null,
+            'claimant_profile_id' => AccountingDb::int($r['claimant_profile_id'] ?? null),
+            'receipt_stored_file_id' => AccountingDb::int($r['receipt_stored_file_id'] ?? null),
             'created_at' => (string) $r['created_at'],
         ];
     }

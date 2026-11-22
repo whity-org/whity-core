@@ -191,6 +191,71 @@ final class AccountingApiSchemas
             ...self::invoiceRoutes($notFound, $refused),
             ...self::paymentRoutes($notFound, $refused),
             ...self::billRoutes($notFound, $refused),
+            ...self::expenseRoutes($notFound, $refused),
+        ];
+    }
+
+    /**
+     * Phase A3b: expense claims and petty cash.
+     *
+     * @param array<int, array<string, mixed>> $notFound
+     * @param array<int, array<string, mixed>> $refused
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function expenseRoutes(array $notFound, array $refused): array
+    {
+        $tags = ['accounting'];
+        $claim = self::data(SchemaBuilder::ref('AccountingInvoice'));
+
+        return [
+            self::route('GET', '/api/accounting/expense-claims', 'expenses:submit', [
+                'summary' => 'List expense claims',
+                'description' => 'Your own claims, newest first. With `all=true`, people who can read bills see everyone\'s.',
+                'tags' => $tags,
+                'parameters' => [
+                    self::param('all', 'string', '`true` for everyone\'s claims (needs bills:read).'),
+                    self::param('limit', 'integer', 'At most 200. Default 50.'),
+                    self::param('offset', 'integer', 'Skip this many.'),
+                ],
+                'responses' => [200 => self::json('Claims', self::list('AccountingInvoice'))] + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/expense-claims', 'expenses:submit', [
+                'summary' => 'Claim back money you spent',
+                'description' => 'Each line is what you paid, tax included. The claim is a bill from you: it posts the costs and the tax to reclaim against what the workspace owes you, after the bill route when the workspace has one, and is paid back as a payment made.',
+                'tags' => $tags,
+                'request' => 'AccountingExpenseClaimRequest',
+                'responses' => [201 => self::json('The claim', $claim)] + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/expense-claims/{id:\d+}', 'expenses:submit', [
+                'summary' => 'Show an expense claim',
+                'description' => 'Your own, or anyone\'s when you can read bills.',
+                'tags' => $tags,
+                'responses' => [200 => self::json('The claim', $claim)] + $notFound + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/expense-claims/{id:\d+}/reimburse', 'payments:write', [
+                'summary' => 'Pay back an expense claim',
+                'description' => 'Pays the person what the claim is still owed, from the bank by default.',
+                'tags' => $tags,
+                'request' => 'AccountingReimburseRequest',
+                'responses' => [201 => self::json('The payment', self::data(SchemaBuilder::ref('AccountingPayment')))] + $notFound + $refused + self::auth(),
+            ]),
+            self::route('GET', '/api/accounting/petty-cash', 'payments:read', [
+                'summary' => 'Show petty cash',
+                'description' => 'The Petty cash account and what is in it. Its history is the account\'s statement; top it up with a transfer from the bank.',
+                'tags' => $tags,
+                'parameters' => [self::param('as_of', 'string', 'YYYY-MM-DD. Default: today.')],
+                'responses' => [200 => self::json('Petty cash', self::data(SchemaBuilder::ref('AccountingPettyCash')))] + self::auth(),
+            ]),
+            self::route('POST', '/api/accounting/petty-cash/spends', 'payments:write', [
+                'summary' => 'Record money spent from petty cash',
+                'description' => 'A bill from Cash purchases, posted and paid at once from Petty cash, so its costs and reclaimable tax reach the books. Amounts are what was paid, tax included.',
+                'tags' => $tags,
+                'request' => 'AccountingExpenseClaimRequest',
+                'responses' => [201 => self::json('The bill and its payment', self::data(self::object([
+                    'bill' => SchemaBuilder::ref('AccountingInvoice'),
+                    'payment' => SchemaBuilder::ref('AccountingPayment'),
+                ], ['bill', 'payment'])))] + $refused + self::auth(),
+            ]),
         ];
     }
 
@@ -718,7 +783,7 @@ final class AccountingApiSchemas
                 ], ['line_id', 'entry_id', 'number', 'date', 'debit_minor', 'credit_minor', 'balance_minor'])],
                 'next' => ['type' => 'object', 'nullable' => true, 'properties' => ['after_date' => self::str(), 'after_line' => self::int()]],
             ], ['account', 'from', 'to', 'currency', 'opening_minor', 'closing_minor', 'lines', 'next']),
-        ] + self::invoiceComponents($names) + self::paymentComponents() + self::billComponents();
+        ] + self::invoiceComponents($names) + self::paymentComponents() + self::billComponents() + self::expenseComponents();
     }
 
     /**
@@ -850,6 +915,8 @@ final class AccountingApiSchemas
                 'agent_id' => self::int(true),
                 'on_behalf_of_profile_id' => self::int(true),
                 'owner_plugin' => self::str(true),
+                'claimant_profile_id' => self::int(true) + ['description' => 'On an expense claim: the person who paid and is owed it.'],
+                'receipt_stored_file_id' => self::int(true) + ['description' => 'The photo of the receipt.'],
                 'created_at' => self::str(),
                 'lines' => ['type' => 'array', 'items' => SchemaBuilder::ref('AccountingInvoiceLine')],
                 'allocations' => ['type' => 'array', 'items' => self::object([
@@ -1047,6 +1114,40 @@ final class AccountingApiSchemas
             'AccountingBillSettings' => self::object([
                 'bill_route_template_id' => self::int(true) + ['description' => 'The route bills travel before they are posted; null for none.'],
             ], []),
+        ];
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private static function expenseComponents(): array
+    {
+        return [
+            'AccountingExpenseClaimRequest' => self::object([
+                'date' => self::str() + ['description' => 'When it was paid, YYYY-MM-DD. Default: today.'],
+                'lines' => ['type' => 'array', 'description' => '1 to 50 lines.', 'items' => self::object([
+                    'description' => self::str() + ['description' => 'What it was: "Taxi to the bank".'],
+                    'amount' => self::str() + ['description' => 'What was paid, tax included, such as "12.500".'],
+                    'amount_minor' => self::int() + ['description' => 'Or the amount in minor units.'],
+                    'tax_category' => self::str() + ['description' => '`standard` (default), `zero` or `exempt`.'],
+                    'tax_code' => ['oneOf' => [self::int(), self::str()], 'description' => 'An input tax code instead of the category.'],
+                    'account_id' => self::int() + ['description' => 'The cost it was. Default: Other costs.'],
+                    'account_code' => self::str() + ['description' => 'The cost by its code, instead of account_id.'],
+                ], ['description'])],
+                'notes' => self::str() + ['description' => 'Where and why. Up to 2000 characters.'],
+                'receipt_stored_file_id' => self::int() + ['description' => 'The photo of the receipt, a file uploaded to the workspace.'],
+                'idempotency_key' => self::str() + ['description' => 'Retrying with the same key returns the same record.'],
+            ], ['lines']),
+            'AccountingReimburseRequest' => self::object([
+                'method' => self::str() + ['description' => '`bank_transfer` (default), `cliq`, `cash` or `cheque`.'],
+                'account_id' => self::int() + ['description' => 'The bank or cash account it is paid from.'],
+                'paid_on' => self::str() + ['description' => 'YYYY-MM-DD. Default: today.'],
+                'reference' => self::str() + ['description' => 'The bank\'s reference.'],
+            ], []),
+            'AccountingPettyCash' => self::object([
+                'account_id' => self::int(),
+                'code' => self::str(),
+                'balance_minor' => self::int() + ['description' => 'What is in petty cash, in minor units.'],
+                'currency' => self::str(),
+            ], ['account_id', 'code', 'balance_minor', 'currency']),
         ];
     }
 
